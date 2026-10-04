@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Positionen &amp; Pools · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: positionen_editor.html
+  ZWECK: Für jede Position im SchichtPlaner: wer ist Stammkraft, wer
+         springt als nächstes ein (Rangliste). Ablöst die frühere
+         Version, die als eigenständiges Claude-Artefakt (window.storage,
+         echte Namen im Quellcode) lief — jetzt echter BOS-Satellit,
+         Firestore statt Artefakt-Speicher, Opaque-IDs statt Namen.
+  DATENFLUSS: bos_access_guard.js (admin-only) → Firestore Collection
+         'positionen' (Dokument-ID = Positions-Slug wie "teigmacher_n",
+         last-write-wins) + Firestore Collection 'personen' (lesend, für
+         die Auswahl-Listen) → bos_namen.js für die
+         Namensauflösung (dieselbe lokale Datei wie im Personen-Editor,
+         siehe LOKALE_DATEN_DATENSCHUTZ_DOKU.md). Jede Positions-Änderung
+         schreibt direkt (debounced) das jeweilige Firestore-Dokument.
+  SCHNITTSTELLEN: bos_firebase_config.js, bos_namen.js, Firestore
+         ('positionen', 'personen'). Export/Import bleiben als manuelle
+         Sicherung/Wiederherstellung erhalten, sind aber nicht mehr der
+         primäre Speicherweg (das ist jetzt Firestore, automatisch).
+  BEKANNTE OFFENE PUNKTE:
+    - Auswahl-Liste zeigt bewusst ALLE aktiven Personen für JEDE Position,
+      unabhängig von deren Stammschicht — genau wie im Vorgänger-Tool
+      ("welche Zuordnung sinnvoll ist, entscheidet beim Eintragen, nicht
+      eine vorab gefilterte Liste").
+    - Keine PIN-Zusatzsperre, nur roles:['admin'] — gleiche Begründung wie
+      beim Personen-Editor (§0, kein unbestätigtes Muster nachgebaut).
+
+  CHANGELOG
+    2026-09-10 · v0.1 · Feature
+      Erste BOS-Satelliten-Version. Firestore statt window.storage,
+      Opaque-IDs statt Namen, Namensauflösung über bos_lokal_daten.js.
+      UI/Interaktion vom Vorgänger-Artefakt übernommen (Positions-Karten,
+      Rang-Zeilen, Prioritäts-/Tage-Chips, Add/Remove).
+    2026-09-10 · v0.2 · Fix
+      Bug gefunden (Ulf, "dort lädt nichts"): "Wiederherstellen" erwartete
+      das Sichern-Exportformat ({positionen:[...]}), positionen_migration.json
+      hat aber ein anderes, flaches ID-Objekt-Format -- daher immer 0
+      Positionen importiert, keine Fehlermeldung. Eigener Knopf "Migrations-
+      datei importieren" für dieses Format ergänzt (Muster wie im Personen-
+      Editor), plus Formprüfung VOR jedem Firestore-Schreiben bei beiden
+      Import-Wegen, damit eine versehentlich falsche Datei (z. B. die lokale
+      Namensdatei) klar abgelehnt wird statt unklar zu scheitern oder
+      unbeabsichtigt Daten zu schreiben.
+    2026-09-12 · v0.3 · Fix
+      Konsistenz-Fix: ladeLokaleNamenAusCache() jetzt auch hier in
+      try/catch, nachdem derselbe ungeschützte Aufruf in personen_editor.html
+      Ulfs Formular komplett lahmgelegt hatte. Hier strukturell weniger
+      riskant (Aufruf erst nach der Button-Verdrahtung), aber derselbe
+      Fehlerklasse ausgeschlossen.
+    2026-09-12 · 09:50 · v0.4 · Fix
+      Ulf: solche Fehlermeldungen künftig überall zeigen, nicht nur die
+      echte Meldung statt "fehlgeschlagen" konsole-only -- auf Tablet/
+      Handy ist Remote-Debugging umständlich. Alle Fehlermeldungen dieser
+      Datei zeigen jetzt err.message direkt in der UI.
+    2026-09-12 · 10:12 · v0.5 · Feature
+      Neues Feld farbe (Ulf: Positionsfarben für die Dienstplan-Tabelle in
+      entwuerfe.html) — einfacher Farbwähler im Positions-Kopf, Default
+      unfarbig. Wird von entwuerfe.html als Zellhintergrund genutzt.
+    2026-09-12 · 13:00 · v0.6 · Fix
+      Ulf: Farben "eher Richtung Pastell", nicht voll deckend. Freies
+      Colorpicker-Rad ersetzt durch feste 12er-Palette gedeckter Töne
+      (FARB_PALETTE) plus "keine Farbe"-Option — garantiert eine ruhige,
+      konsistente Optik statt beliebiger Neonfarben. Die eigentliche
+      Deckkraft-Abstufung (Bildschirm zart, Druck kräftig) passiert erst
+      in entwuerfe.html (siehe dortiger Changelog), diese Datei liefert
+      nur noch die gedeckte Basisfarbe.
+    2026-09-17 · 04:50 · v0.7 · Fix
+      Erster echter Code-Abgleich dieser Datei gegen ihre Doku (T-53,
+      Kompendium §5.3). Der v0.4-Eintrag oben stimmte nicht: "alle
+      Fehlermeldungen" waren es nicht.
+      (B-3) Beide JSON.parse-catch verwarfen den Fehler ("Datei konnte
+        nicht gelesen werden.") -- ohne jeden Grund, genau das, was Ulfs
+        Regel ausschliesst.
+      (B-5) Das äussere .get() im Migrations-Import hatte gar kein .catch:
+        schlug das Lesen des vorhandenen Bestandes fehl, brach der Import
+        wortlos ab, ohne jede Anzeige.
+      (B-8) Kein reader.onerror an beiden Datei-Eingängen -- ein
+        Lesefehler der Datei selbst blieb völlig stumm.
+      (C-1) posCardHtml() ist gegen fehlende Felder abgesichert
+        (pos.pool && …, (pos.tage || [])), die Klick-Handler waren es
+        nicht: toggle-tag, add-rank und set-rank griffen ungeprüft auf
+        pos.tage bzw. pos.pool zu. Bei einem Positions-Dokument ohne diese
+        Felder -- möglich über Migrations-Import oder ein
+        wiederhergestelltes Backup -- warf der Handler eine TypeError,
+        stumm, und es wurde nichts gespeichert: man setzt die Stammkraft,
+        und nichts passiert. Fehlende Felder werden jetzt beim Zugriff
+        angelegt statt vorausgesetzt.
+      (C-6) URL.revokeObjectURL() stand unmittelbar hinter a.click(); in
+        manchen Android-WebViews bricht das den Download ab. Jetzt
+        verzögert.
+      (C-9) "Position löschen" fragte nur "wirklich löschen?", ohne zu
+        erwähnen, dass die Positions-ID in Plänen und Entwürfen
+        referenziert ist. Die Rückfrage sagt das jetzt.
+      Nicht geändert: der volle Neuaufbau aller drei Listen bei jedem
+      Chip-Klick (die Ansicht springt dabei auf dem Tablet) -- das ist ein
+      Umbau, kein Fix. Ebenso das ID-Schema: neue Positionen bekommen
+      'pos_' + Date.now(), während die migrierten sprechende Slugs tragen
+      ("teigmacher_n"); §5.3 nennt nur die Slug-Form. Beide Formen
+      funktionieren, aber die Regel gehört entschieden, nicht nebenbei
+      geändert. Das feste data-theme="dark" bleibt: die Theme-Anbindung
+      war hier von Anfang an vorhanden (anders als bei T-77).
+    2026-09-17 · 05:01 · v0.8 · Korrektur (Gegen-Check)
+      Der Vorgabewert in posMitFeldern() war falsch herum. Bei einem
+      Dokument ohne `tage` legte C-1 alle sieben Tage an. Die Karte
+      rendert aber (pos.tage || []) und zeigte deshalb KEINEN aktiven
+      Tag -- der erste Tipp auf "Mo" entfernte den Montag aus den sieben,
+      und die Anzeige sprang von null auf sechs aktive Tage: das genaue
+      Gegenteil des Angetippten. Dazu kam, dass entwuerfe.html dasselbe
+      fehlende Feld auf [] normalisiert (Position nie aktiv) -- Editor und
+      Rechenkern hätten gegensätzlich über denselben Wert entschieden, und
+      das Speichern hätte die Editor-Annahme dauerhaft festgeschrieben.
+      Fehlende Tage werden jetzt als leer angelegt. `pool` bleibt bei
+      [''], weil dort eine leere Zeile die Auswahl überhaupt erst
+      ermöglicht und nichts über den Inhalt behauptet.
+    2026-09-17 · 05:13 · v0.9 · Fix (Gegen-Check an der echten Migrationsdatei)
+      siehtAusWieFlachesIdObjekt() liess personen_migration.json durch.
+      Die Pruefung fing bisher nur personen_lokal.json ab (hat einen
+      'personen'-Schluessel) und Sicherungsdateien ('positionen'). Die
+      Personen-Migrationsdatei ist aber ebenfalls ein flaches ID-Objekt --
+      {P01:{…}, P02:{…}} -- und haette hier 36 Personen-Dokumente in die
+      Collection 'positionen' geschrieben, mit der Erfolgsmeldung
+      "36 Position(en) importiert": der Migrationsweg ueberspringt nur
+      VORHANDENE IDs, und P01…P36 sind dort allesamt neu. Der Rechenkern
+      haette sie zwar weggefiltert (er prueft 'schicht', Personen tragen
+      'stammschicht'), aufzuraeumen waere es von Hand gewesen. Beide
+      Dateien liegen im selben Ordner, und T-46 steht noch aus. Jetzt
+      muss jeder Eintrag ein 'schicht'-Feld haben und darf kein
+      'stammschicht'/'arbeitstage' tragen.
+    2026-09-26 · Schritt 5 (Namens-Fundament, K-7) · Umbau
+      Namen kommen aus bos_namen.js (Namensliste in Firestore, NE-6):
+      Rufname > Beschreibung > lokale Datei als Kürzel („M. · lokal“, nur
+      bis Schritt 8) > „P07 · kein Name hinterlegt“ — nie leer, nie
+      undefined. anzeigeName() ist nur noch ein Einzeiler auf
+      BOS_NAMEN.anzeige(); Auswahllisten zeigen „Rufname (Beschreibung)“
+      (NE-7, BOS_NAMEN.auswahl). Die Namensliste lädt einmal zusammen mit
+      den Personen (personenUndNamen()); ist sie nicht lesbar, steht der
+      Grund sichtbar oben. Die lokale Datei bleibt bis Schritt 8 Rückfall.
+      K-9: die Auswahlliste bleibt nach Anzeige sortiert (sie ist eine
+      Auswahl, keine Reihenfolge).
+    2026-09-26 · Schritt 8 (Namens-Fundament) · Rückbau
+      Die lokale Namensdatei ist in Rente: keine Einbindung von
+      bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei und keinen Knopf „Namen laden“.
+      Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
+      Beschreibung > „P07 · kein Name hinterlegt“).
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:40px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.7rem); margin: var(--bos-space-3xs,4px) 0 var(--bos-space-sm,10px); letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .toolbar{ display:flex; gap: var(--bos-space-xs,8px); flex-wrap:wrap; align-items:center; }
+  .btn-klein{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.76rem); background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong); border-radius:8px; padding: 8px 12px; cursor:pointer; }
+  .btn-klein.amber{background:var(--amber); color:#1a1208; border-color:var(--amber);}
+  #status{ font-size: var(--bos-font-xs,.76rem); color:var(--dim); margin-left:auto; }
+  #status b { color: var(--good); }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:720px; margin:0 auto;}
+  .progress{ font-size: var(--bos-font-sm,.85rem); color:var(--dim); margin: 0 0 var(--bos-space-md,18px); }
+  .progress b { color: var(--good); }
+  .schicht-section{ margin-bottom: var(--bos-space-xl,32px); }
+  .schicht-section h2{ font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-md,1rem); color:var(--amber); border-bottom:1px solid var(--border); padding-bottom: var(--bos-space-xs,8px); margin: 0 0 var(--bos-space-md,16px); text-transform:none; }
+  .schicht-hinweis{ color:var(--dim); font-size: var(--bos-font-sm,.82rem); margin: -8px 0 var(--bos-space-sm,14px); }
+
+  .pos-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-md,16px); margin-bottom: var(--bos-space-sm,14px); }
+  .pos-head{ display:flex; align-items:center; gap: var(--bos-space-xs,8px); margin-bottom: var(--bos-space-sm,12px); }
+  .pos-name{ flex:1; background:transparent; border:none; border-bottom:1px solid transparent; color:var(--text); font-family:var(--font-body); font-size: var(--bos-font-lg,1.05rem); font-weight:700; padding: 2px 0; }
+  .pos-farbe-anzeige{ width:24px; height:24px; flex-shrink:0; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface-2); }
+  .farb-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .farb-swatch{ width:28px; height:28px; border-radius:7px; border:2px solid transparent; cursor:pointer; padding:0; }
+  .farb-swatch.aktiv{border-color:var(--text); box-shadow:0 0 0 1px var(--bg);}
+  .farb-swatch.farb-keine{ background:var(--surface-2); border:1px dashed var(--border-strong); color:var(--dim); font-size:.85rem; line-height:1; }
+  .pos-name:focus{ outline:none; border-bottom-color:var(--amber); }
+  .icon-btn{ background:transparent; border:none; color:var(--dim); font-size:1.1rem; padding: 2px 8px; line-height:1; cursor:pointer; }
+  .icon-btn:hover{ color:var(--danger); }
+  .pos-meta{ display:flex; flex-wrap:wrap; gap: var(--bos-space-lg,18px); margin-bottom: var(--bos-space-sm,14px); padding-bottom: var(--bos-space-sm,14px); border-bottom:1px dashed var(--border); }
+  .meta-group .label{ display:block; font-family:var(--font-label); font-size: var(--bos-font-xs,.72rem); color:var(--dim); margin-bottom: var(--bos-space-2xs,6px); text-transform:uppercase; letter-spacing:.04em; }
+  .chip-row{ display:flex; gap: var(--bos-space-2xs,6px); flex-wrap:wrap; }
+  .chip{ border:1px solid var(--border-strong); background:var(--surface-2); color:var(--dim); border-radius:8px; padding: 5px 10px; font-family:var(--font-label); font-size: var(--bos-font-sm,.8rem); cursor:pointer; }
+  .chip.active{ background:var(--amber); border-color:var(--amber); color:#1a1208; font-weight:700; }
+  .pool-row{ display:flex; align-items:center; gap: var(--bos-space-xs,8px); margin-bottom: var(--bos-space-2xs,8px); }
+  .rank-label{ width:88px; flex-shrink:0; font-family:var(--font-label); font-size: var(--bos-font-sm,.8rem); color:var(--dim); }
+  .rank-label.first{ color:var(--text); font-weight:700; }
+  .btn-add-rank{ margin-top: var(--bos-space-2xs,4px); font-family:var(--font-label); font-size: var(--bos-font-sm,.8rem); padding: 6px 12px; color:var(--amber-bright); background:transparent; border:1px dashed var(--border-strong); border-radius:8px; cursor:pointer; }
+  .schichtneutral-row{ margin-bottom: var(--bos-space-md,14px); }
+  .schichtneutral-row label{ display:flex; align-items:flex-start; gap: var(--bos-space-xs,8px); cursor:pointer; }
+  .schichtneutral-row input{ margin-top:3px; width:18px; height:18px; accent-color:var(--amber); flex-shrink:0; }
+  .schichtneutral-row span{ font-size: var(--bos-font-sm,.82rem); color:var(--dim); }
+
+  .add-pos-form{ display:flex; gap: var(--bos-space-xs,8px); flex-wrap:wrap; margin-top: var(--bos-space-2xs,6px); }
+  .add-pos-form input{ flex:1; min-width:140px; }
+
+  .lade-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:720px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet h3{font-family:var(--font-label); font-size: var(--bos-font-sm,.85rem); text-transform:uppercase; letter-spacing:.04em; color:var(--amber-bright); margin: var(--bos-space-md,16px) 0 var(--bos-space-2xs,4px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  #import-input, #migration-input{display:none;}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_positionen';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Positionen &amp; Pools</h1>
+  <div class="toolbar">
+    <button type="button" class="btn-klein amber" id="exportBtn">Sichern (Download)</button>
+    <button type="button" class="btn-klein" id="migrationBtn">Migrationsdatei importieren (einmalig)</button>
+    <button type="button" class="btn-klein" id="importBtn">Wiederherstellen (Backup)</button>
+    <input type="file" id="import-input" accept="application/json">
+    <input type="file" id="migration-input" accept="application/json">
+    <span id="status">—</span>
+  </div>
+</header>
+
+<main>
+  <div class="progress" id="progress"></div>
+
+  <div class="schicht-section">
+    <h2>Nachtschicht — Bäckerei</h2>
+    <div id="nacht-list"><div class="lade-hinweis">Lade …</div></div>
+    <div class="pos-card">
+      <div class="meta-group label" style="margin-bottom:8px;">Neue Nachtschicht-Position</div>
+      <div class="add-pos-form">
+        <input type="text" class="bos-input" id="new-nacht-name" placeholder="Name der Position">
+        <button type="button" class="btn-klein" data-action="add-pos" data-schicht="nacht">Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="schicht-section">
+    <h2>Frühschicht — Bäckerei</h2>
+    <div id="frueh-list"></div>
+    <div class="pos-card">
+      <div class="meta-group label" style="margin-bottom:8px;">Neue Frühschicht-Position</div>
+      <div class="add-pos-form">
+        <input type="text" class="bos-input" id="new-frueh-name" placeholder="Name der Position">
+        <button type="button" class="btn-klein" data-action="add-pos" data-schicht="frueh">Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="schicht-section">
+    <h2>Sonntag — Bäckerei</h2>
+    <p class="schicht-hinweis">Ofenposten und Brötchenstraße laufen sonntags mit — die stehen oben bei Nacht- bzw. Frühschicht und sind dort schon auf „So" aktiv gestellt. Hier nur, was sonntags eigens dazukommt.</p>
+    <div id="sonntag-list"></div>
+    <div class="pos-card">
+      <div class="meta-group label" style="margin-bottom:8px;">Neue Sonntags-Position</div>
+      <div class="add-pos-form">
+        <input type="text" class="bos-input" id="new-sonntag-name" placeholder="Name der Position">
+        <button type="button" class="btn-klein" data-action="add-pos" data-schicht="sonntag">Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert dieser Editor?</h2>
+    <p>Für jede Position eine Rangliste: wer ist Stammkraft (1.), wer springt als nächstes ein. Änderungen speichern automatisch in Firestore — kein Download nötig für den Alltag.</p>
+    <h3>Woher kommen die Namen?</h3>
+    <p>Aus derselben lokalen Datei wie im Personen-Editor (Namen laden). Ohne sie zeigen die Listen nur IDs — die Zuordnung funktioniert trotzdem, nur ohne lesbare Namen.</p>
+    <h3>Warum sehe ich alle Personen bei jeder Position?</h3>
+    <p>Bewusst ungefiltert nach Stammschicht — Nachtschicht-Positionen können auch mit Frühschicht-Leuten besetzt werden (und umgekehrt). Was sinnvoll ist, entscheidest du beim Eintragen.</p>
+    <h3>Sichern / Wiederherstellen / Migrationsdatei</h3>
+    <p>„Sichern" lädt eine Momentaufnahme herunter — sinnvoll als Backup. „Wiederherstellen" liest genau dieses Sicherungsformat wieder ein. Die ursprüngliche <code>positionen_migration.json</code> hat ein anderes Format — dafür gibt es den eigenen Knopf „Migrationsdatei importieren", überspringt bereits vorhandene IDs statt sie zu überschreiben.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  const TAGE = [['mo','Mo'],['di','Di'],['mi','Mi'],['do','Do'],['fr','Fr'],['sa','Sa'],['so','So']];
+  // Feste, gedeckte Palette statt freiem Colorpicker (Ulf, 12.09.2026:
+  // "eher Richtung Pastell") -- garantiert eine ruhige, konsistente
+  // Optik über alle Positionen hinweg, statt beliebiger Neonfarben.
+  const FARB_PALETTE = ['#c9827a','#d1a06a','#c7b26a','#93ab78','#6fab9a','#7a9cc2','#8b8ecb','#a982bd','#c383a8','#8a9199','#a08a6b','#7a9e5f'];
+  const ALLE_TAGE = TAGE.map(t => t[0]);
+  const SCHICHTEN = ['nacht', 'frueh', 'sonntag'];
+
+  let positionen = [];       // [{id, name, schicht, prioritaet, tage, pool, schichtneutral, farbe}]
+  let personenListe = [];    // [{id, aktiv, ...}] aus Firestore 'personen'
+  const saveTimers = {};     // pro Positions-ID ein eigener Debounce-Timer
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // Zeigt die echte Fehlermeldung an, nicht nur "fehlgeschlagen" -- auf
+  // Tablet/Handy ist Remote-Debugging umständlich, das hier hilft sofort
+  // weiter (Ulf, 12.09.2026, siehe SCHICHTPLANER_V2_BAUSTELLEN.md).
+  // Liefert KLARTEXT. Vorher lief hier escHtml() mit drin, wodurch in den
+  // alert()-Meldungen "&quot;" und "&amp;" statt der echten Zeichen standen
+  // -- eine Fehlermeldung, die man erst entziffern muss, hilft am Gerät
+  // nicht. Escaping passiert jetzt dort, wo der Text in innerHTML landet.
+  function fehlertext(err) { return (err && err.message) || String(err); }
+
+  // Schritt 5 (Namens-Fundament, 26.09.2026): EINE Namensfunktion für alle
+  // Planungsseiten — bos_namen.js (Rufname > Beschreibung > lokal als
+  // Kürzel > "P07 · kein Name hinterlegt"). Die frühere eigene Kopie, die
+  // Vor- und Nachname aus der lokalen Datei zusammensetzte, ist entfernt.
+  function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
+  // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
+  function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
+  // Personen UND Namensliste zusammen laden; liefert wie vorher den
+  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  function personenUndNamen() {
+    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
+      .then(function (r) { return r[0]; });
+  }
+
+  function aktualisiereStatusZeile(text) {
+    document.getElementById('status').textContent = text || 'Namen aus der Namensliste';
+  }
+
+  /* ==== Firestore laden ==== */
+  function ladeAlles() {
+    Promise.all([
+      window.db.collection('positionen').get(),
+      personenUndNamen()
+    ]).then(function (ergebnisse) {
+      positionen = [];
+      ergebnisse[0].forEach(function (doc) { positionen.push(Object.assign({ id: doc.id }, doc.data())); });
+      personenListe = [];
+      ergebnisse[1].forEach(function (doc) { personenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+      render();
+    }).catch(function (err) {
+      console.error('[Positionen] Lesefehler:', err);
+      document.getElementById('nacht-list').innerHTML = '<div class="lade-hinweis">Laden fehlgeschlagen: ' + escHtml(fehlertext(err)) + '</div>';
+    });
+  }
+
+  /* ==== Render ==== */
+  function render() {
+    renderList('nacht', document.getElementById('nacht-list'));
+    renderList('frueh', document.getElementById('frueh-list'));
+    renderList('sonntag', document.getElementById('sonntag-list'));
+    renderProgress();
+  }
+
+  function renderProgress() {
+    const total = positionen.length;
+    const besetzt = positionen.filter(function (p) { return p.pool && p.pool[0]; }).length;
+    document.getElementById('progress').innerHTML = '<b>' + besetzt + ' von ' + total + '</b> Positionen haben eine Stammkraft';
+  }
+
+  function renderList(schicht, container) {
+    const gefiltert = positionen.filter(function (p) { return p.schicht === schicht; });
+    container.innerHTML = gefiltert.map(posCardHtml).join('') || '<div class="lade-hinweis">Noch keine Positionen.</div>';
+  }
+
+  function optionenHtml(ausgewaehlt) {
+    const aktivePersonen = personenListe.filter(function (p) { return p.aktiv !== false; })
+      .sort(function (a, b) { return anzeigeName(a.id).localeCompare(anzeigeName(b.id), 'de'); });
+    let html = '<option value="">— unbesetzt —</option>';
+    aktivePersonen.forEach(function (p) {
+      html += '<option value="' + p.id + '"' + (p.id === ausgewaehlt ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
+    });
+    // Falls die ausgewählte ID aus irgendeinem Grund nicht (mehr) in der aktiven Liste steht
+    // (z. B. inzwischen inaktiv gesetzt) -- trotzdem anzeigen, nicht stillschweigend leeren.
+    if (ausgewaehlt && !aktivePersonen.find(function (p) { return p.id === ausgewaehlt; })) {
+      html += '<option value="' + ausgewaehlt + '" selected>' + escHtml(auswahlName(ausgewaehlt)) + ' (inaktiv)</option>';
+    }
+    return html;
+  }
+
+  function posCardHtml(pos) {
+    const pool = pos.pool && pos.pool.length ? pos.pool : [''];
+    const poolRows = pool.map(function (val, i) {
+      const label = i === 0 ? '1. Stammkraft' : (i + 1) + '.';
+      const removeBtn = pool.length > 1
+        ? '<button type="button" class="icon-btn" data-action="remove-rank" data-pos="' + pos.id + '" data-rank="' + i + '" title="Rang entfernen">×</button>'
+        : '<span style="width:28px"></span>';
+      return '<div class="pool-row">' +
+        '<span class="rank-label ' + (i === 0 ? 'first' : '') + '">' + label + '</span>' +
+        '<select class="bos-input" data-action="set-rank" data-pos="' + pos.id + '" data-rank="' + i + '">' + optionenHtml(val) + '</select>' +
+        removeBtn +
+        '</div>';
+    }).join('');
+
+    const prioBtns = [1, 2, 3].map(function (p) {
+      return '<button type="button" class="chip ' + (pos.prioritaet === p ? 'active' : '') + '" data-action="set-prio" data-pos="' + pos.id + '" data-val="' + p + '">' + p + '</button>';
+    }).join('');
+
+    const tagBtns = TAGE.map(function (t) {
+      return '<button type="button" class="chip ' + ((pos.tage || []).includes(t[0]) ? 'active' : '') + '" data-action="toggle-tag" data-pos="' + pos.id + '" data-val="' + t[0] + '">' + t[1] + '</button>';
+    }).join('');
+
+    const farbSwatches = FARB_PALETTE.map(function (f) {
+      return '<button type="button" class="farb-swatch' + (pos.farbe === f ? ' aktiv' : '') + '" style="background-color:' + f + ';" data-action="set-farbe" data-pos="' + pos.id + '" data-farbe="' + f + '" title="' + f + '"></button>';
+    }).join('') + '<button type="button" class="farb-swatch farb-keine' + (!pos.farbe ? ' aktiv' : '') + '" data-action="set-farbe" data-pos="' + pos.id + '" data-farbe="" title="Keine Farbe">×</button>';
+
+    return '<div class="pos-card">' +
+      '<div class="pos-head">' +
+      '<span class="pos-farbe-anzeige"' + (pos.farbe ? ' style="background-color:' + pos.farbe + ';"' : '') + '></span>' +
+      '<input class="pos-name" value="' + escHtml(pos.name) + '" data-action="rename" data-pos="' + pos.id + '">' +
+      '<button type="button" class="icon-btn" data-action="delete-pos" data-pos="' + pos.id + '" title="Position löschen">×</button>' +
+      '</div>' +
+      '<div class="meta-group"><span class="label">Farbe für den Dienstplan</span><div class="farb-row">' + farbSwatches + '</div></div>' +
+      '<div class="pos-meta">' +
+      '<div class="meta-group"><span class="label">Priorität</span><div class="chip-row">' + prioBtns + '</div></div>' +
+      '<div class="meta-group"><span class="label">Aktive Tage</span><div class="chip-row">' + tagBtns + '</div></div>' +
+      '</div>' +
+      '<div class="schichtneutral-row"><label>' +
+      '<input type="checkbox" data-action="toggle-schichtneutral" data-pos="' + pos.id + '" ' + (pos.schichtneutral ? 'checked' : '') + '>' +
+      '<span>Keine Ruhezeit-Prüfung nötig (schichtneutral) — für Positionen am Schichtübergang ohne echtes 11-Stunden-Problem, z. B. Brötchenstraße.</span>' +
+      '</label></div>' +
+      '<div class="pool-list">' + poolRows +
+      '<button type="button" class="btn-add-rank" data-action="add-rank" data-pos="' + pos.id + '">+ Rang hinzufügen</button>' +
+      '</div></div>';
+  }
+
+  function findPos(id) { return positionen.find(function (p) { return p.id === id; }); }
+
+  // posCardHtml() verträgt fehlende Felder (pos.pool && …, (pos.tage || [])),
+  // die Klick-Handler taten es nicht: bei einem Dokument ohne pool bzw. tage
+  // warf der Zugriff eine TypeError, stumm, und nichts wurde gespeichert
+  // (C-1, 17.09.2026). Solche Dokumente können über den Migrations-Import
+  // oder ein wiederhergestelltes Backup entstehen. Statt an jeder Stelle zu
+  // prüfen: einmal beim Zugriff nachziehen.
+  function posMitFeldern(id) {
+    var pos = findPos(id);
+    if (!pos) return null;
+    if (!Array.isArray(pos.pool)) pos.pool = [''];
+    // Fehlende Tage werden als LEER angelegt, nicht als alle sieben
+    // (korrigiert 17.09.2026 im Gegen-Check). Zwei Gründe:
+    // 1. posCardHtml() rendert (pos.tage || []) -- die Karte zeigt bei
+    //    fehlendem Feld also KEINEN aktiven Tag. Mit ALLE_TAGE im Speicher
+    //    entfernte der erste Tipp auf "Mo" den Montag aus den sieben, und
+    //    die Karte sprang von null auf sechs aktive Tage: das genaue
+    //    Gegenteil des Angetippten.
+    // 2. entwuerfe.html normalisiert dasselbe fehlende Feld auf []
+    //    (Position nie aktiv). Mit ALLE_TAGE hätten Editor und Rechenkern
+    //    gegensätzlich über denselben fehlenden Wert entschieden, und das
+    //    Speichern hätte die Editor-Annahme dauerhaft festgeschrieben.
+    // Grundsatz wie beim Stammschicht-Feld: eine Lücke wird zur Angabe,
+    // wenn jemand sie füllt, nie durch einen Vorgabewert.
+    if (!Array.isArray(pos.tage)) pos.tage = [];
+    return pos;
+  }
+
+  /* ==== Firestore schreiben (debounced, pro Position) ==== */
+  function speicherePosition(id, sofort) {
+    const status = document.getElementById('status');
+    status.textContent = 'speichere …';
+    clearTimeout(saveTimers[id]);
+    const schreiben = function () {
+      const pos = findPos(id);
+      if (!pos) return;
+      const daten = { name: pos.name, schicht: pos.schicht, prioritaet: pos.prioritaet, tage: pos.tage, pool: pos.pool, schichtneutral: !!pos.schichtneutral, farbe: pos.farbe || null };
+      window.db.collection('positionen').doc(id).set(daten).then(function () {
+        aktualisiereStatusZeile('gespeichert · ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+      }).catch(function (err) {
+        console.error('[Positionen] Schreibfehler:', err);
+        status.textContent = 'Speichern fehlgeschlagen: ' + ((err && err.message) || String(err));
+      });
+    };
+    if (sofort) schreiben(); else saveTimers[id] = setTimeout(schreiben, 400);
+  }
+
+  /* ==== Interaktion ==== */
+  document.addEventListener('click', function (e) {
+    const t = e.target;
+    const action = t.dataset && t.dataset.action;
+    if (!action) return;
+
+    if (action === 'delete-pos') {
+      const zuLoeschen = findPos(t.dataset.pos);
+      // Nennt die Folge, statt nur zu fragen (C-9): die Positions-ID wird in
+      // Plänen und Entwürfen referenziert, das Löschen wirkt dort weiter.
+      if (confirm('Position „' + ((zuLoeschen && zuLoeschen.name) || t.dataset.pos) + '" wirklich löschen?\n\n' +
+                  'Die Positions-ID (' + t.dataset.pos + ') wird in Entwürfen und bereits erstellten Plänen referenziert. ' +
+                  'Dort bleibt sie stehen, lässt sich danach aber nicht mehr auflösen — Farbe und Bezeichnung fehlen dann.')) {
+        const id = t.dataset.pos;
+        window.db.collection('positionen').doc(id).delete().then(function () {
+          positionen = positionen.filter(function (p) { return p.id !== id; });
+          render();
+        }).catch(function (err) { console.error('[Positionen] Löschfehler:', err); alert('Löschen fehlgeschlagen: ' + fehlertext(err)); });
+      }
+    } else if (action === 'set-farbe') {
+      findPos(t.dataset.pos).farbe = t.dataset.farbe || null;
+      render(); speicherePosition(t.dataset.pos);
+    } else if (action === 'add-rank') {
+      posMitFeldern(t.dataset.pos).pool.push('');
+      render(); speicherePosition(t.dataset.pos);
+    } else if (action === 'remove-rank') {
+      const pos = posMitFeldern(t.dataset.pos);
+      pos.pool.splice(Number(t.dataset.rank), 1);
+      render(); speicherePosition(t.dataset.pos);
+    } else if (action === 'set-prio') {
+      findPos(t.dataset.pos).prioritaet = Number(t.dataset.val);
+      render(); speicherePosition(t.dataset.pos);
+    } else if (action === 'toggle-tag') {
+      const pos = posMitFeldern(t.dataset.pos);
+      const val = t.dataset.val;
+      pos.tage = pos.tage.includes(val) ? pos.tage.filter(function (x) { return x !== val; }) : pos.tage.concat([val]);
+      render(); speicherePosition(t.dataset.pos);
+    } else if (action === 'add-pos') {
+      const schicht = t.dataset.schicht;
+      const input = document.getElementById('new-' + schicht + '-name');
+      const name = input.value.trim();
+      if (!name) return;
+      const id = 'pos_' + Date.now();
+      positionen.push({ id: id, name: name, schicht: schicht, prioritaet: 2, tage: ALLE_TAGE.slice(), pool: [''] });
+      input.value = '';
+      render(); speicherePosition(id, true);
+    }
+  });
+
+  document.addEventListener('change', function (e) {
+    const t = e.target;
+    if (t.dataset && t.dataset.action === 'set-rank') {
+      posMitFeldern(t.dataset.pos).pool[Number(t.dataset.rank)] = t.value;
+      renderProgress(); speicherePosition(t.dataset.pos);
+    } else if (t.dataset && t.dataset.action === 'toggle-schichtneutral') {
+      findPos(t.dataset.pos).schichtneutral = t.checked;
+      speicherePosition(t.dataset.pos);
+    }
+  });
+
+  document.addEventListener('input', function (e) {
+    const t = e.target;
+    if (t.dataset && t.dataset.action === 'rename') {
+      findPos(t.dataset.pos).name = t.value;
+      speicherePosition(t.dataset.pos);
+    }
+  });
+
+  /* ==== Sichern / Wiederherstellen / Migrations-Import ====
+     Drei bewusst getrennte Wege, nie verwechselbar machen:
+     - Sichern: Firestore -> Datei (Backup)
+     - Wiederherstellen: Datei -> Firestore, erwartet EXAKT das Sichern-
+       Format ({ positionen: [...] }, ein Array)
+     - Migrationsdatei importieren: Datei -> Firestore, erwartet das
+       FLACHE ID-Objekt-Format aus positionen_migration.json
+       ({ "<id>": {name, schicht, ...} }) -- anderes Format, eigener Knopf,
+       damit man die beiden Dateiformen nicht mehr verwechseln kann. */
+
+  // Grobe Formprüfung, BEVOR irgendetwas nach Firestore geschrieben wird --
+  // verhindert, dass eine versehentlich falsche Datei (z. B. die lokale
+  // Namensdatei) unbemerkt oder mit einer kryptischen Fehlermeldung
+  // durchrutscht.
+  function siehtAusWieFlachesIdObjekt(daten) {
+    if (!daten || typeof daten !== 'object' || Array.isArray(daten)) return false;
+    if ('personen' in daten || 'hinweis' in daten || 'positionen' in daten) return false;
+    const keys = Object.keys(daten);
+    if (!keys.length) return false;
+    if (!keys.every(function (k) { const v = daten[k]; return v && typeof v === 'object' && !Array.isArray(v); })) return false;
+    // Ergänzt 17.09.2026 (Gegen-Check, nachdem positionen_migration.json
+    // wieder aufgetaucht war): die Prüfung oben fing nur personen_lokal.json
+    // ab (hat einen 'personen'-Schlüssel) und Sicherungsdateien (haben
+    // 'positionen'). personen_migration.json ist aber ebenfalls ein flaches
+    // ID-Objekt -- {P01:{…}, P02:{…}} -- und rutschte hier glatt durch.
+    // Folge wären 36 Personen-Dokumente in der Collection 'positionen'
+    // gewesen, angelegt mit der Erfolgsmeldung "36 Position(en) importiert",
+    // weil der Migrationsweg nur vorhandene IDs überspringt und P01…P36 dort
+    // allesamt neu sind. Der Rechenkern hätte sie zwar wegfiltert (er prüft
+    // auf 'schicht', Personen tragen 'stammschicht'), aufzuräumen wäre es
+    // trotzdem von Hand gewesen. Beide Dateien liegen im selben Ordner.
+    return keys.every(function (k) {
+      const v = daten[k];
+      if ('stammschicht' in v || 'arbeitstage' in v) return false; // das ist eine Person
+      return typeof v.schicht === 'string';
+    });
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', function () {
+    const blob = new Blob([JSON.stringify({ positionen: positionen }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'positionen_backup.json'; a.click();
+    // Verzögert: ein sofortiges revoke direkt hinter click() bricht den
+    // Download in manchen Android-WebViews ab, bevor er begonnen hat (C-6).
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function () {
+    document.getElementById('import-input').click();
+  });
+  document.getElementById('import-input').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = function () {
+      console.error('[Positionen] Datei-Lesefehler:', reader.error);
+      alert('Die Datei konnte nicht gelesen werden: ' + fehlertext(reader.error));
+    };
+    reader.onload = function () {
+      let daten;
+      try { daten = JSON.parse(reader.result); } catch (err) {
+        console.error('[Positionen] JSON-Fehler (Wiederherstellen):', err);
+        alert('Die Datei ist kein gültiges JSON — abgebrochen, nichts geschrieben.\n\n' + fehlertext(err));
+        e.target.value = ''; return;
+      }
+      const liste = daten.positionen;
+      if (!Array.isArray(liste)) {
+        alert('Diese Datei sieht nicht wie eine Sicherungsdatei aus (erwartet ein "positionen"-Array) — abgebrochen, nichts geschrieben. Für die ursprüngliche Migrationsdatei "Migrationsdatei importieren" nutzen.');
+        e.target.value = ''; return;
+      }
+      if (!confirm(liste.length + ' Positionen gefunden. Aktuellen Firestore-Stand damit überschreiben?')) { e.target.value = ''; return; }
+      const batch = window.db.batch();
+      liste.forEach(function (pos) {
+        const id = pos.id;
+        const rest = Object.assign({}, pos); delete rest.id;
+        batch.set(window.db.collection('positionen').doc(id), rest);
+      });
+      batch.commit().then(function () { alert(liste.length + ' Positionen wiederhergestellt.'); ladeAlles(); })
+        .catch(function (err) { console.error('[Positionen] Wiederherstell-Fehler:', err); alert('Wiederherstellen fehlgeschlagen: ' + fehlertext(err)); });
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('migrationBtn').addEventListener('click', function () {
+    document.getElementById('migration-input').click();
+  });
+  document.getElementById('migration-input').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = function () {
+      console.error('[Positionen] Datei-Lesefehler:', reader.error);
+      alert('Die Datei konnte nicht gelesen werden: ' + fehlertext(reader.error));
+    };
+    reader.onload = function () {
+      let daten;
+      try { daten = JSON.parse(reader.result); } catch (err) {
+        console.error('[Positionen] JSON-Fehler (Migration):', err);
+        alert('Die Datei ist kein gültiges JSON — abgebrochen, nichts geschrieben.\n\n' + fehlertext(err));
+        e.target.value = ''; return;
+      }
+      if (!siehtAusWieFlachesIdObjekt(daten)) {
+        alert('Diese Datei sieht nicht wie positionen_migration.json aus — abgebrochen, nichts geschrieben. Für eine Sicherungsdatei "Wiederherstellen" nutzen.');
+        e.target.value = ''; return;
+      }
+      if (!confirm('Migrationsdatei importieren? Bereits vorhandene IDs werden übersprungen, nicht überschrieben.')) { e.target.value = ''; return; }
+      window.db.collection('positionen').get().then(function (snap) {
+        const vorhanden = {}; snap.forEach(function (d) { vorhanden[d.id] = true; });
+        const ids = Object.keys(daten);
+        const neu = ids.filter(function (id) { return !vorhanden[id]; });
+        if (!neu.length) { alert('Nichts zu importieren — alle IDs existieren bereits.'); return; }
+        const batch = window.db.batch();
+        neu.forEach(function (id) { batch.set(window.db.collection('positionen').doc(id), daten[id]); });
+        batch.commit().then(function () { alert(neu.length + ' Position(en) importiert, ' + (ids.length - neu.length) + ' bereits vorhanden übersprungen.'); ladeAlles(); })
+          .catch(function (err) { console.error('[Positionen] Import-Fehler:', err); alert('Import fehlgeschlagen: ' + fehlertext(err)); });
+      }).catch(function (err) {
+        // Dieses .catch fehlte: schlug schon das Lesen des vorhandenen
+        // Bestandes fehl, brach der Import wortlos ab (B-5).
+        console.error('[Positionen] Import, Lesen des Bestandes fehlgeschlagen:', err);
+        alert('Import abgebrochen — der aktuelle Positions-Bestand konnte nicht gelesen werden, ' +
+              'deshalb ist nicht feststellbar, welche IDs schon existieren. Es wurde nichts geschrieben.\n\n' + fehlertext(err));
+      });
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen'); });
+
+  /* ==== Start ==== */
+  aktualisiereStatusZeile();
+  (window.BOS_AUTH_READY || Promise.resolve()).then(function () { ladeAlles(); }).catch(function () { ladeAlles(); });
+
+})();
+</script>
+</body>
+</html>

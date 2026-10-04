@@ -1,0 +1,564 @@
+<!--
+  2026-09-02 · v0.4 · Feature
+    Ulf, Screenshot aus dem echten Launcher-Fenster (maximiert): Inhalt
+    bleibt auf der bisherigen 680px-Breite stehen, Rest bleibt leer.
+    Konzept: BOS_NEUER_SATELLIT_CHECKLISTE.md §3a (Kategorie "elastisch")
+    / SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md. Umsetzung: gestufte
+    max-width für .sd-header/.tab-bar/.content (680px → 920px ab 820px
+    Fensterbreite → 1100px ab 1180px), reine CSS-Media-Query, keine
+    HTML-/JS-Änderung nötig. Kein deckel-loses Wachstum, damit die
+    Zeilenlänge im Notiz-Textfeld nicht ausufert. Notiz/Checkliste bleiben
+    weiterhin über Tabs getrennt (kein Nebeneinander) — das war nur eine
+    lose Zusatzidee, keine getroffene Entscheidung, hier nicht mit
+    umgesetzt.
+
+  2026-09-01 · v0.3 · Feature
+    Systemweite Dichte-Einstellung (Standard/Kompakt), siehe
+    BOS_DICHTE_DOKU.md. bos_density_sync.js eingebunden, Abstände/
+    Schriftgrößen im Style-Block auf var(--bos-space-*)/var(--bos-
+    font-*) umgestellt (automatisiert, Ausreißer manuell geprüft — hier
+    keine gefunden). body padding-bottom:3rem unverändert gelassen
+    (einzelner rem-Wert, kein Fixed-Element-Konflikt gefunden, aber auch
+    kein zwingender Grund zum Anfassen). --radius-sm/--radius-md waren
+    schon vorher an --bos-radius-* aliasiert und reagieren automatisch.
+
+  2026-09-01 · v0.2 · Fix
+    Design komplett überarbeitet — v0.1 war gegen bos_design_tokens.css
+    und produkt_config_editor.html geraten (lagen nicht vor), Ergebnis
+    war zu flach/kontrastarm (Ulf-Feedback per Screenshot). Jetzt gegen
+    die echten Dateien gebaut: lokale Token-Aliase mit echten Fallback-
+    Werten, Border-Gewicht auf --bos-border-strong umgestellt (die
+    schwache --bos-border war praktisch unsichtbar), Pills/Buttons mit
+    gefülltem Amber-Aktivzustand statt nur Outline, Feld-Labels amber
+    statt grau (Vorbild: .detail-feld label in produkt_config_editor.html),
+    Header/Tab-Leiste bekommen jetzt echten Surface-Hintergrund statt
+    transparent. "← Zurück"-Link entfernt — die Referenzdatei hat keinen,
+    der Launcher stellt die Fenstersteuerung bereits selbst (siehe
+    Screenshot: eigene Fenster-Titelleiste mit Minimieren/Schließen).
+    Logik unverändert gegenüber v0.1.
+
+  2026-09-01 · v0.1 · Feature
+    Erstversion Schnelldruck V2. Notiz- und Checklisten-Tab aus
+    schnelldruck.html (V1) übernommen, Druck läuft komplett über
+    BOS_DRUCK.drucken() (bos_druck.js). Zwei Druckoptionen (Kopf/Fuß,
+    Farbe) als Schalter direkt im UI vor jedem Druck ergänzt.
+    Bewusst ohne Firestore/Persistenz — Inhalte sind rein session-lokal.
+-->
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Schnelldruck · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Muss vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  /* Lokale Aliase — Werte 1:1 aus der echten bos_design_tokens.css
+     übernommen (als Fallback, falls die Datei mal nicht lädt), gleiches
+     Muster wie produkt_config_editor.html */
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-raised: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --border-soft: var(--bos-border, rgba(255,255,255,0.08));
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --faint: var(--bos-text-faint, #736656);
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --amber-glow-soft: var(--bos-amber-glow-soft, rgba(192,122,16,0.16));
+    --red: var(--bos-red, #d6584a);
+    --radius-sm: var(--bos-radius-sm, 6px);
+    --radius-md: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', Georgia, serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', 'Arial Narrow', sans-serif);
+  }
+
+  * { box-sizing: border-box; }
+  body { padding-bottom: 3rem; }
+
+  /* ── Header + Tabs: echter Surface-Hintergrund, volle Breite ── */
+  .sd-chrome { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .sd-header {
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 680px; margin: 0 auto; padding: var(--bos-space-sm, 14px) var(--bos-space-sm, 16px);
+  }
+  .sd-title-block { display: flex; flex-direction: column; gap: var(--bos-space-3xs, 2px); }
+  .sd-title { font-family: var(--font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); color: var(--text); }
+  .sd-meta { font-family: var(--font-label); font-size: var(--bos-font-xs, 0.68rem); letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+  .sd-help-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--amber);
+    border-radius: var(--radius-sm); width: 34px; height: 34px; font-size: var(--bos-font-md, 1rem); cursor: pointer;
+    transition: border-color 140ms;
+  }
+  .sd-help-btn:hover { border-color: var(--amber); }
+
+  .tab-bar { max-width: 680px; margin: 0 auto; display: flex; padding: 0 var(--bos-space-sm, 16px); }
+  .tab-btn {
+    padding: var(--bos-space-xs, 10px) var(--bos-space-md, 18px) var(--bos-space-xs, 9px); font-family: var(--font-label); font-size: var(--bos-font-sm, 0.85rem); font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em; color: var(--dim);
+    background: none; border: none; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; cursor: pointer;
+  }
+  .tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .content { max-width: 680px; margin: 0 auto; padding: var(--bos-space-md, 18px) var(--bos-space-sm, 16px) 0; }
+
+  /* ── Elastische Breite bei größerem Fenster ─────────────────────
+     Ulf, 02.09.2026 (Screenshot, maximiertes Launcher-Fenster): Inhalt
+     bleibt auf 680px stehen, Rest bleibt leer. Schnelldruck ist reiner
+     Fließtext-/Karten-Inhalt (Notiz-Textfeld, Checklisten-Formular) ohne
+     Tastenfeld-Ergonomie-Frage — fällt laut BOS_NEUER_SATELLIT_
+     CHECKLISTE.md §3a in die Kategorie "elastisch": darf mit Deckel
+     mitwachsen, statt fest zu bleiben wie z. B. beim Schnellrechner.
+     Gestuft statt grenzenlos, damit die Zeilenlänge im Notiz-Textfeld
+     nicht ausufert (siehe SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md). */
+  @media (min-width: 820px) {
+    .sd-header, .tab-bar, .content { max-width: 920px; }
+  }
+  @media (min-width: 1180px) {
+    .sd-header, .tab-bar, .content { max-width: 1100px; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: var(--bos-space-md, 18px);
+  }
+
+  .field-label {
+    display: block;
+    font-family: var(--font-label); font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--amber); font-size: var(--bos-font-xs, 0.72rem); margin-bottom: var(--bos-space-2xs, 7px);
+  }
+
+  .toolbar { display: flex; align-items: center; gap: var(--bos-space-xs, 8px); margin: var(--bos-space-lg, 22px) 0 var(--bos-space-sm, 12px); flex-wrap: wrap; }
+  .toolbar .field-label { margin: 0 var(--bos-space-2xs, 6px) 0 0; }
+  .list-type-row { display: flex; align-items: center; gap: var(--bos-space-xs, 8px); margin: var(--bos-space-sm, 16px) 0; flex-wrap: wrap; }
+  .list-type-row .field-label { margin: 0 var(--bos-space-2xs, 6px) 0 0; }
+
+  .pill {
+    font-family: var(--font-label); font-size: var(--bos-font-sm, 0.78rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    padding: 0 var(--bos-space-sm, 13px); height: 36px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--surface-raised); color: var(--dim);
+    cursor: pointer; transition: background 140ms, border-color 140ms, color 140ms;
+  }
+  .pill.active { background: var(--amber); border-color: var(--amber); color: #1a1208; }
+
+  .bos-input { margin-top: 0; }
+
+  .sd-textarea {
+    width: 100%; min-height: 300px;
+    font-family: var(--bos-font-body, 'Barlow', sans-serif);
+    font-size: var(--bos-font-md, 0.95rem); line-height: 1.7;
+    padding: var(--bos-space-sm, 14px); resize: vertical; margin-top: var(--bos-space-xs, 8px);
+  }
+
+  .char-row { text-align: right; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-3xs, 4px); min-height: 1.2em; }
+
+  .druck-optionen { display: flex; gap: var(--bos-space-xs, 8px); margin-bottom: var(--bos-space-3xs, 4px); }
+
+  .btn {
+    font-family: var(--font-label); font-size: var(--bos-font-sm, 0.82rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    border-radius: var(--radius-sm); padding: 0.75em 1.2em; cursor: pointer; border: 1px solid transparent;
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--bos-space-xs, 8px);
+    transition: background 140ms, border-color 140ms, opacity 140ms;
+  }
+  .btn-amber { background: var(--amber); color: #1a1208; }
+  .btn-amber:hover { background: var(--amber-bright); }
+  .btn-outline { background: transparent; border-color: var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--amber); color: var(--amber); }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .btn-main { width: 100%; margin-top: var(--bos-space-md, 18px); }
+
+  .datum-hint { text-align: center; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-xs, 10px); letter-spacing: .04em; }
+
+  .add-row { display: flex; gap: var(--bos-space-xs, 8px); margin-bottom: var(--bos-space-sm, 12px); }
+  .add-row .bos-input { flex: 1; }
+  .add-row .btn-add {
+    flex-shrink: 0; height: 40px; padding: 0 var(--bos-space-sm, 16px);
+    background: var(--amber); color: #1a1208; border: none; border-radius: var(--radius-sm);
+    font-weight: 700; cursor: pointer;
+  }
+  .add-row .btn-add:hover { background: var(--amber-bright); }
+
+  #item-list { list-style: none; padding: 0; margin: 0 0 var(--bos-space-sm, 14px); }
+  #item-list li { display: flex; align-items: center; gap: var(--bos-space-xs, 10px); padding: var(--bos-space-xs, 9px) var(--bos-space-3xs, 4px); border-bottom: 1px solid var(--border-soft); font-size: var(--bos-font-md, 0.92rem); color: var(--text); }
+  #item-list li:last-child { border-bottom: none; }
+  .item-prefix { color: var(--amber); font-size: var(--bos-font-sm, 0.8rem); flex-shrink: 0; min-width: 20px; }
+  .item-text { flex: 1; }
+  .item-del { background: none; border: none; color: var(--dim); cursor: pointer; font-size: var(--bos-font-lg, 1.1rem); padding: var(--bos-space-3xs, 2px) var(--bos-space-3xs, 4px); }
+  .item-del:hover { color: var(--red); }
+
+  .empty-hint { text-align: center; color: var(--faint); font-size: var(--bos-font-sm, 0.82rem); padding: var(--bos-space-lg, 26px) 0 var(--bos-space-xs, 10px); }
+
+  .actions-row { display: flex; gap: var(--bos-space-xs, 10px); margin-top: var(--bos-space-md, 18px); }
+  .actions-row .btn:first-child { flex: 1; }
+  .actions-row .btn:last-child { flex: 2; }
+
+  /* ── Hilfe Bottom Sheet — Muster aus produkt_config_editor.html ── */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 9999; display: flex; align-items: flex-end; }
+  .sheet-overlay.hidden { display: none !important; }
+  .sheet { background: var(--surface); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: var(--bos-space-sm, 14px) var(--bos-space-md, 20px) var(--bos-space-lg, 24px); border-top: 1px solid var(--border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto var(--bos-space-sm, 16px); }
+  .sheet h2 { font-family: var(--font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); margin: 0 0 var(--bos-space-sm, 14px); color: var(--text); }
+  .sheet .sec { margin-bottom: var(--bos-space-sm, 16px); }
+  .sheet .sec h3 { font-family: var(--font-label); text-transform: uppercase; letter-spacing: .04em; font-size: var(--bos-font-sm, 0.78rem); color: var(--amber); margin: 0 0 var(--bos-space-2xs, 5px); }
+  .sheet .sec p { font-size: var(--bos-font-md, 0.9rem); color: var(--text); line-height: 1.6; margin: 0; }
+  .sheet button.secondary { width: 100%; background: transparent; border: 1px solid var(--amber); color: var(--amber); margin-top: var(--bos-space-xs, 8px); padding: var(--bos-space-xs, 11px) var(--bos-space-sm, 16px); border-radius: var(--radius-sm); font-family: var(--font-label); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schnelldruck';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<script src="../bos_druck.js"></script>
+
+<div class="sd-chrome">
+  <div class="sd-header">
+    <div class="sd-title-block">
+      <div class="sd-title">Schnelldruck</div>
+      <div class="sd-meta">Session-lokal · kein Speichern</div>
+    </div>
+    <button class="sd-help-btn" onclick="oeffneHilfe()" aria-label="Hilfe">❓</button>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="notiz" onclick="switchTab('notiz')">📝 Notiz</button>
+    <button class="tab-btn" data-tab="checkliste" onclick="switchTab('checkliste')">☑ Checkliste</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ── TAB: NOTIZ ── -->
+  <div class="tab-pane active" id="tab-notiz">
+  <div class="card">
+
+    <span class="field-label">Überschrift</span>
+    <input type="text" id="titel" class="bos-input" placeholder="Titel (optional) …" maxlength="120" autocomplete="off">
+
+    <div class="toolbar">
+      <span class="field-label">Schriftgröße</span>
+      <button class="pill" data-pt="9" data-screen="12">Klein</button>
+      <button class="pill active" data-pt="11" data-screen="15">Normal</button>
+      <button class="pill" data-pt="13" data-screen="17">Groß</button>
+      <button class="pill" data-pt="16" data-screen="20">XL</button>
+    </div>
+
+    <textarea id="notiz" class="bos-input sd-textarea" placeholder="Notiz hier eingeben …" spellcheck="true"></textarea>
+    <div class="char-row" id="charcount"></div>
+
+    <div class="toolbar" style="margin-bottom:4px;">
+      <span class="field-label">Druckoptionen</span>
+    </div>
+    <div class="druck-optionen">
+      <button class="pill active" data-toggle="kopf" onclick="toggleOption('kopf')">Kopf/Fuß</button>
+      <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
+    </div>
+
+    <button class="btn btn-amber btn-main" onclick="druckenNotiz()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Drucken
+    </button>
+
+    <div class="datum-hint" id="datum-hint"></div>
+
+  </div>
+  </div><!-- /tab-notiz -->
+
+  <!-- ── TAB: CHECKLISTE ── -->
+  <div class="tab-pane" id="tab-checkliste">
+  <div class="card">
+
+    <span class="field-label">Überschrift</span>
+    <input type="text" id="cl-titel" class="bos-input" placeholder="Titel (optional) …" maxlength="120" autocomplete="off">
+
+    <div style="margin-top:16px;">
+      <span class="field-label">Erklärung <span style="text-transform:none;letter-spacing:0;color:var(--faint);font-weight:400;">(optional)</span></span>
+      <textarea id="cl-beschreibung" class="bos-input" placeholder="Hinweise, Kontext, Erklärung …" rows="3" style="width:100%;resize:vertical;"></textarea>
+    </div>
+
+    <div class="list-type-row">
+      <span class="field-label">Format</span>
+      <button class="pill active" data-type="checkbox">☑ Ankreuzen</button>
+      <button class="pill" data-type="numbered">1. Nummeriert</button>
+      <button class="pill" data-type="bullet">• Aufzählung</button>
+    </div>
+
+    <div class="add-row">
+      <input type="text" id="cl-input" class="bos-input" placeholder="Eintrag hinzufügen …" maxlength="200" autocomplete="off" onkeydown="if(event.key==='Enter') addItem()">
+      <button class="btn-add" onclick="addItem()">＋</button>
+    </div>
+
+    <ul id="item-list"></ul>
+    <div class="empty-hint" id="cl-empty">Noch keine Einträge.</div>
+
+    <div class="toolbar" style="margin-bottom:4px;">
+      <span class="field-label">Druckoptionen</span>
+    </div>
+    <div class="druck-optionen">
+      <button class="pill active" data-toggle="kopf" onclick="toggleOption('kopf')">Kopf/Fuß</button>
+      <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn btn-outline" onclick="clearList()">Liste leeren</button>
+      <button class="btn btn-amber" onclick="druckenCheckliste()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9"/>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Drucken
+      </button>
+    </div>
+
+  </div>
+  </div><!-- /tab-checkliste -->
+
+</div><!-- /content -->
+
+<!-- Hilfe Bottom Sheet -->
+<div id="hilfe-sheet" class="sheet-overlay hidden" onclick="if(event.target===this) schliesseHilfe()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Hilfe · Schnelldruck</h2>
+
+    <div class="sec">
+      <h3>Überblick</h3>
+      <p>Schnelldruck ist dein Werkzeug für spontane Notizen und Checklisten, die du sofort ausdrucken willst — zum Beispiel eine kurze Mitteilung für die nächste Schicht oder eine Aufgabenliste zum Abhaken. Oben schaltest du zwischen den zwei Bereichen Notiz und Checkliste um.</p>
+    </div>
+    <div class="sec">
+      <h3>Notiz</h3>
+      <p>Optional eine Überschrift eingeben, darunter die Schriftgröße für den Ausdruck wählen (Klein, Normal, Groß, XL) und deinen Text ins große Feld schreiben. Ein Tipp auf „Drucken" öffnet den Druckdialog deines Geräts.</p>
+    </div>
+    <div class="sec">
+      <h3>Checkliste</h3>
+      <p>Optional eine Überschrift und eine kurze Erklärung eingeben, das Format wählen (☑ Ankreuzen, 1. Nummeriert oder • Aufzählung) und Einträge über das Eingabefeld hinzufügen — mit der Eingabetaste oder dem ＋-Button. Über das × neben einem Eintrag entfernst du ihn wieder, über „Liste leeren" die ganze Liste auf einmal.</p>
+    </div>
+    <div class="sec">
+      <h3>Die zwei Schalter vor dem Drucken</h3>
+      <p><strong>Kopf/Fuß:</strong> Wenn aktiv, erscheint auf dem Ausdruck oben das BäckereiOS-Logo mit Datum/Uhrzeit und unten eine schmale Fußzeile. Ausgeschaltet druckt nur noch dein reiner Inhalt — praktisch z. B. auf schon bedrucktem Papier oder um Platz zu sparen.</p>
+      <p><strong>Farbe:</strong> Wenn aktiv, erscheint der Logo-Akzent in der bräunlichen BäckereiOS-Farbe. Ausgeschaltet wird der komplette Ausdruck in Graustufen gedruckt — spart Farbtinte, wo der Drucker das unterstützt. Beide Schalter gelten für beide Tabs gemeinsam und merken sich ihren Zustand nur für die aktuelle Sitzung.</p>
+    </div>
+    <div class="sec">
+      <h3>Wichtiger Hinweis</h3>
+      <p>Schnelldruck speichert nichts. Verlässt du die Seite, lädst neu oder wechselst das Gerät, ist der eingegebene Text bzw. die Liste weg. Drucke direkt, wenn du fertig bist — für dauerhaft aufzubewahrende Dinge ist Schnelldruck nicht das richtige Werkzeug.</p>
+    </div>
+
+    <button class="secondary" onclick="schliesseHilfe()">Schließen</button>
+  </div>
+</div>
+
+<script>
+  /* ── i18n ───────────────────────────────────────────────────── */
+  var I18N_DE = { 'tab.notiz': 'Notiz', 'tab.checkliste': 'Checkliste' };
+  function t(key) { return I18N_DE[key] || key; }
+
+  /* ── Datum (Bildschirm-Hinweis) ────────────────────────────── */
+  function formatDatum(d) {
+    var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    var monate = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    return tage[d.getDay()] + ', ' + d.getDate() + '. ' + monate[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  document.getElementById('datum-hint').textContent = 'Ausdruck-Datum: ' + formatDatum(new Date());
+
+  /* ── Tabs ───────────────────────────────────────────────────── */
+  function switchTab(name) {
+    document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    document.querySelector('.tab-btn[data-tab="' + name + '"]').classList.add('active');
+  }
+
+  /* ── Druckoptionen — geteilter Zustand über beide Tabs ────────
+     Entscheidung Ulf, 01.09.2026: beide Schalter leben direkt im
+     UI vor jedem Druck, kein globaler Schalter, keine Satelliten-
+     Festlegung. bos_druck.js selbst kennt diese Schalter nicht —
+     hier werden sie nur als Parameter durchgereicht.            */
+  var druckOptionen = { kopf: true, farbe: true };
+  function toggleOption(art) {
+    druckOptionen[art] = !druckOptionen[art];
+    document.querySelectorAll('[data-toggle="' + art + '"]').forEach(function(btn) {
+      btn.classList.toggle('active', druckOptionen[art]);
+    });
+  }
+
+  /* ── Escape-Helfer (Inhalte gehen als HTML-String an bos_druck.js) */
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /* ── Tab 1: Notiz ───────────────────────────────────────────── */
+  var notiz = document.getElementById('notiz');
+  var charcount = document.getElementById('charcount');
+  notiz.addEventListener('input', function() {
+    var n = notiz.value.length;
+    charcount.textContent = n > 0 ? n + ' Zeichen' : '';
+  });
+
+  var currentPt = 11;
+  document.querySelectorAll('.pill[data-pt]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.pill[data-pt]').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentPt = parseInt(btn.dataset.pt, 10);
+      notiz.style.fontSize = btn.dataset.screen + 'px';
+    });
+  });
+
+  function druckenNotiz() {
+    var text = notiz.value.trim();
+    if (!text) {
+      notiz.focus();
+      notiz.style.borderColor = 'var(--red)';
+      setTimeout(function(){ notiz.style.borderColor = ''; }, 1200);
+      return;
+    }
+    var titel = document.getElementById('titel').value.trim();
+    BOS_DRUCK.drucken({
+      inhaltHTML: escapeHtml(text),
+      titel: titel ? escapeHtml(titel) : '',
+      appName: 'Schnelldruck',
+      mitKopf: druckOptionen.kopf,
+      farbig: druckOptionen.farbe,
+      extraCSS: '.bos-pa-body{white-space:pre-wrap;font-size:' + currentPt + 'pt;}'
+    });
+  }
+
+  /* ── Tab 2: Checkliste ──────────────────────────────────────── */
+  var items = [];
+  var listType = 'checkbox';
+
+  document.querySelectorAll('.pill[data-type]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.pill[data-type]').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      listType = btn.dataset.type;
+      renderList();
+    });
+  });
+
+  function addItem() {
+    var inp = document.getElementById('cl-input');
+    var v = inp.value.trim();
+    if (!v) { inp.focus(); return; }
+    items.push(v);
+    inp.value = '';
+    inp.focus();
+    renderList();
+  }
+  function removeItem(idx) { items.splice(idx, 1); renderList(); }
+  function clearList() {
+    if (items.length === 0) return;
+    items = [];
+    renderList();
+  }
+  function renderList() {
+    var ul = document.getElementById('item-list');
+    var empty = document.getElementById('cl-empty');
+    ul.innerHTML = '';
+    empty.style.display = items.length === 0 ? 'block' : 'none';
+    items.forEach(function(text, idx) {
+      var li = document.createElement('li');
+      var prefix = document.createElement('span');
+      prefix.className = 'item-prefix';
+      if (listType === 'checkbox') prefix.textContent = '☐';
+      else if (listType === 'numbered') prefix.textContent = (idx + 1) + '.';
+      else prefix.textContent = '•';
+      var span = document.createElement('span');
+      span.className = 'item-text';
+      span.textContent = text;
+      var del = document.createElement('button');
+      del.className = 'item-del';
+      del.textContent = '×';
+      del.title = 'Entfernen';
+      del.onclick = (function(i){ return function(){ removeItem(i); }; })(idx);
+      li.appendChild(prefix);
+      li.appendChild(span);
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+
+  function druckenCheckliste() {
+    if (items.length === 0) {
+      var inp = document.getElementById('cl-input');
+      inp.focus();
+      inp.style.borderColor = 'var(--red)';
+      setTimeout(function(){ inp.style.borderColor = ''; }, 1200);
+      return;
+    }
+    var titel = document.getElementById('cl-titel').value.trim();
+    var beschr = document.getElementById('cl-beschreibung').value.trim();
+
+    var itemsHTML = items.map(function(text, idx) {
+      var marker;
+      if (listType === 'checkbox') marker = '<span class="sd-cl-box"></span>';
+      else if (listType === 'numbered') marker = '<span class="sd-cl-num">' + (idx + 1) + '.</span>';
+      else marker = '<span class="sd-cl-bullet">•</span>';
+      return '<div class="sd-cl-item">' + marker + '<span class="sd-cl-text">' + escapeHtml(text) + '</span></div>';
+    }).join('');
+
+    var inhalt = '';
+    if (beschr) inhalt += '<div class="sd-cl-beschr">' + escapeHtml(beschr) + '</div>';
+    inhalt += '<div class="sd-cl-liste">' + itemsHTML + '</div>';
+
+    var clCSS = [
+      '.sd-cl-beschr{font-family:"Barlow",sans-serif;font-size:9.5pt;color:#555;line-height:1.6;margin-bottom:5mm;white-space:pre-wrap;}',
+      '.sd-cl-item{display:flex;align-items:flex-start;gap:3.5mm;padding:2mm 0;border-bottom:0.5px solid #ebebeb;font-family:"Barlow",sans-serif;line-height:1.35;break-inside:avoid;}',
+      '.sd-cl-item:last-child{border-bottom:none;}',
+      '.sd-cl-box{width:5mm;height:5mm;border:1.5px solid #333;flex-shrink:0;margin-top:0.8mm;display:inline-block;}',
+      '.sd-cl-num{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:9pt;color:#888;flex-shrink:0;min-width:6mm;text-align:right;margin-top:0.6mm;}',
+      '.sd-cl-bullet{font-size:10pt;color:#555;flex-shrink:0;margin-top:0.2mm;}',
+      '.sd-cl-text{flex:1;}'
+    ].join('\n');
+
+    BOS_DRUCK.drucken({
+      inhaltHTML: inhalt,
+      titel: titel ? escapeHtml(titel) : '',
+      appName: 'Schnelldruck · Checkliste',
+      mitKopf: druckOptionen.kopf,
+      farbig: druckOptionen.farbe,
+      extraCSS: clCSS
+    });
+  }
+
+  /* ── Hilfe ──────────────────────────────────────────────────── */
+  function oeffneHilfe() { document.getElementById('hilfe-sheet').classList.remove('hidden'); }
+  function schliesseHilfe() { document.getElementById('hilfe-sheet').classList.add('hidden'); }
+
+  /* Initial render */
+  renderList();
+</script>
+</body>
+</html>

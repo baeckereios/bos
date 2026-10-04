@@ -1,0 +1,1180 @@
+<!--
+  schnellrechner.html — BäckereiOS V2
+  ------------------------------------------------------------
+  2026-09-06 · v0.19 · Fix
+    Ulf, live an den Produktionsplaner-Stationsseiten entdeckt und hier
+    gegengeprüft: die am 01.09.2026 (v0.? Kommentar bei srEinheitFaktor())
+    bewusst offen als Annahme markierte Vermutung "Frosterbestand ist
+    intern in Stück, wie Verbrauch auch" war falsch. Der tatsächliche
+    Grund für den "_stueck"-Suffix im legacyKey: ein reiner Namensrest aus
+    der alten produkt_config.json, in der es früher sowohl einen Blech-
+    als auch einen Stück-Wert pro Produkt gab — beim Aufräumen wurde einer
+    der beiden entfernt, der Feldname blieb aber stehen. Die Froster-
+    Zählung selbst (froster_inventur.html) erfasst durchgehend in Bleche
+    (bzw. der jeweiligen Einheit aus produkt_config.json), nie in Stück.
+    srSyncBestand() teilte den Rohwert aus BOS_FROSTER.holeBestand() bisher
+    fälschlich durch srEinheitFaktor() — Fix: Rohwert direkt übernehmen,
+    keine Umrechnung mehr an dieser einen Stelle. Alle anderen Stellen
+    (Verbrauch/Kette rechnen weiterhin in Stück, siehe Kommentar bei
+    srEinheitFaktor()) bleiben unverändert — nur dieser eine Umrechnungs-
+    schritt war betroffen. Siehe auch: derselbe Fix in den vier
+    Produktionsplaner-Stationsseiten (station_*.html), gleicher Bug,
+    gleiche Ursache.
+
+  2026-09-02 · v0.18 · Feature
+    Ulf, Screenshot Hochformat auf echtem Handy: Sondertage nimmt vor dem
+    Ergebnis zu viel Platz weg, explizit als Belastung empfunden ("hasse
+    diese Sonderregeln inzwischen"). Frage, ob Einklappen den Code
+    "sprengt" — Einschätzung dazu direkt im Chat beantwortet: nein, ein
+    Klapp-Zustand ist eines der einfachsten UI-Muster überhaupt, deutlich
+    simpler als das bereits bestehende Breiten-Panel-Reparenting.
+    Umgesetzt: #sr-sondertage-section jetzt mit klickbarer Kopfzeile
+    (srSondertageUmschalten()), Standardzustand eingeklappt (srSondertageOffen
+    = false) — Begründung: der häufige Fall ist "diese Woche nichts
+    Besonderes". Badge neben dem Label zeigt die Anzahl aktiver
+    Markierungen an, auch im eingeklappten Zustand, damit nichts still
+    verschwindet (srAktualisiereSondertageBadge()). Frühere v0.14-
+    Entscheidung (max-height+Scroll statt Klappen, "ohne zusätzlichen
+    Klick bedienbar") damit revidiert — neuer Kontext (wiederholte reale
+    Frustration im mobilen Hochformat) wiegt inzwischen schwerer als der
+    ursprüngliche Wunsch nach null Zusatzklicks, zumal Sondertage ein
+    seltener genutztes Feld ist, kein Kern-Eingabefeld.
+    Im breiten Seiten-Panel (#sr-sondertage-slot) bewusst NICHT eingeklappt
+    — dort blockiert die Sektion nichts, Kopfzeile wird per CSS ausgeblendet,
+    Body immer sichtbar. Hilfe-Text ergänzt.
+    NACHTRAG (Ulf, gleicher Tag): im Alt-System war Sondertage ebenfalls
+    eingeklappt — genau aus demselben Grund (nur zu Feiertagen gebraucht,
+    also selten). Kein neu erfundenes Verhalten, sondern Rückkehr zu
+    einem bereits bewährten V1-Muster, das beim V2-Bau schlicht nicht
+    übernommen wurde.
+
+  2026-09-02 · v0.17 · Fix
+    Ulf, Screenshot mit sichtbarem Sondertage-Panel (v0.16 aus derselben
+    Session): zwei Rückmeldungen. (1) Alles sollte wie kleine eigenständige
+    Fenster aussehen, wie das Sondertage-Panel — einheitlicher als die
+    alte Buchseiten-Optik (Eingabe/Ergebnis als verbundene Seiten mit
+    Buchrücken-Linie), die ohnehin für zwei Panels gedacht war, jetzt sind
+    es strukturell drei. Umgesetzt: .sr-page-left/-right teilen sich jetzt
+    dieselbe .sr-page-Regel (voller Rand, voller Radius), Buchrücken-
+    Linie (::before) entfernt, echter gap zwischen den Karten statt 0.
+    (2) Sondertage soll links vom Buch stehen, nicht rechts — inhaltlich
+    ist Sondertage ohnehin eine Eingabe (beeinflusst die Rechnung wie
+    Zeitraum/Fehlmenge), links der Eingabe zu stehen passt zur Eingabe-
+    vor-Ergebnis-Lesereihenfolge. #sr-sondertage-slot dafür im Markup vor
+    .sr-book verschoben, srLayoutAnpassen() selbst unverändert.
+    ANMERKUNG (nicht stillschweigend übergangen, siehe Antwort im Chat):
+    Ulfs Begründung "damit die Einstellungen zentriert bleiben" stimmt nur
+    näherungsweise — bei reiner Reihenfolge-Vertauschung in derselben
+    zentrierten Flex-Zeile bleibt das Buch weiterhin um denselben Betrag
+    aus der echten Fenstermitte verschoben, nur zur anderen Seite hin
+    (Gruppen-Zentrierung, nicht Buch-Zentrierung). Für eine wirklich
+    fixe Buch-Mitte unabhängig vom Sondertage-Panel bräuchte es eine vom
+    Fluss losgelöste Positionierung (z. B. position:absolute, am Fenster-
+    rand verankert) — das wiederum verlangt einen deutlich höheren
+    Breakpoint, bevor das Panel überhaupt kollisionsfrei erscheinen kann.
+    Bewusst NICHT gebaut (Ulf einverstanden mit der einfacheren Variante,
+    siehe Chat) — bei Bedarf spätere eigene Baustelle.
+
+  2026-09-02 · v0.16 · Feature
+    Ulf, Screenshot aus dem echten Launcher-Fenster (maximiert): Breite
+    oberhalb der 900px-Buchseiten bleibt ungenutzt. Konzept dazu bereits
+    festgehalten in BOS_NEUER_SATELLIT_CHECKLISTE.md §3a und
+    SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md — hier die Umsetzung für
+    diesen Satelliten: Sondertage-Liste (#sr-sondertage-section) wird ab
+    1300px Fensterbreite per JS (srLayoutAnpassen(), matchMedia) als
+    eigene dritte Spalte neben das Buch verschoben (echter DOM-Knoten,
+    kein Klon — keine zweite #sr-tage-liste). Unterhalb dieser Breite:
+    keine Änderung, Sondertage sitzt exakt wie vorher in #sr-links-inhalt.
+    Froster-Sperre (.sr-locked) zieht jetzt in srPruefeFrosterGate() auf
+    beide möglichen Aufenthaltsorte der Sondertage-Sektion mit, damit sich
+    das Sperr-Verhalten durch die Verschiebung nicht ändert. Zusätzlich,
+    da im eigenen Panel vertikal mehr Platz ist: Höhen-Deckel von
+    #sr-tage-liste (220px, siehe v0.14) gilt dort nicht, stattdessen 480px.
+    Hilfe-Text ergänzt.
+
+  2026-09-01 · v0.15 · Feature/Fix
+    Ulf: "geht es nicht etwas filigraner, systemweit, einstellbar?" —
+    komplett auf die neue Dichte-Skala umgestellt (var(--bos-space-*)/
+    var(--bos-font-*) statt fester px/rem-Werte), bos_density_sync.js
+    eingebunden. Hero-Ergebniswert (.sr-res-val) bekam eine eigene
+    5xl-Stufe in bos_design_tokens.css statt auf die 4xl-Stufe anderer
+    Satelliten zu snappen — bleibt bewusst die größte Zahl im System,
+    das ist die wichtigste Zeile der Seite. Details: BOS_DICHTE_DOKU.md.
+
+    Gleichzeitig FIX: "← Zurück"-Link entfernt. Ulf, echtes Launcher-
+    Fenster (Screenshot, taschenrechner.html-Session desselben Tages):
+    der Link navigierte den eigenen Satelliten-IFRAME zu launcher.html,
+    was eine komplette zweite Launcher-Instanz (eigener Boot, eigene
+    Taskbar) innerhalb des kleinen Fensters hochfährt. launcher.html lag
+    diese Session erstmals vor — geprüft: es gibt KEIN Wiederherstellen
+    offener Fenster beim Laden (openWindows ist reiner Laufzeit-Zustand,
+    nicht in bos_launcher_state_v2 persistiert). Das im Screenshot
+    verschachtelte zweite Taschenrechner-Fenster kam also vermutlich
+    durch einen erneuten Tap auf die Kachel im irrtümlich für den
+    "echten" Desktop gehaltenen verschachtelten Launcher zustande, nicht
+    durch eine Restore-Logik. Fenster-Chrome hat ohnehin ein eigenes
+    Schließen-Kreuz — Link war innerhalb des Fenster-Managers nie nötig.
+    Stichprobe über alle anderen Satelliten: DIESES Muster war auf
+    schnellrechner.html beschränkt, kein systemweit kopierter Fehler.
+
+  2026-08-31 · v0.1 · Feature
+    Erstversion. Erster echter Aufrufer von bos_produktionskette.js.
+    Konzept: SESSION_2026-08-31_SCHNELLRECHNER_KONZEPT.md
+
+  2026-08-31 · v0.5 · Fix
+    Ulf, 31.08.: Fehlmenge floss zwar korrekt in die Rechnung ein, aber
+    unsichtbar über einen bereits reduzierten Anfangsbestand — keine
+    eigene Zeile in der Aufschlüsselung. Jetzt explizite "+ Fehlmenge
+    morgen"-Zeile, Anfangsbestand zeigt den roh eingegebenen Wert.
+    Rechnerisch identisches Ergebnis, nur nachvollziehbar.
+
+  2026-08-31 · v0.4 · Breaking
+    Ulf, 31.08.: Produktionstag-Auswahl komplett entfernt — wurde im
+    Alt-System nie angenommen, gehört konzeptionell zu separaten
+    "leichten Planern" (vgl. station_broetchenstrasse.html), nicht in
+    den Schnellrechner ("keine Zwitter mehr"). BOS_KETTE.berechne()
+    läuft jetzt mit leerem prodTage (reine Verbrauchssimulation ohne
+    Produktion); Hauptkennzahl kommt aus gesamtVerbrauch minus
+    Anfangsbestand statt aus gesamtProduktion (war ohne prodTage
+    ohnehin immer 0). gesperrtWerte/manuelleWerte/batchSize/
+    gleichmaessig aus dem Aufruf entfernt — wirkten nur innerhalb der
+    jetzt nicht mehr genutzten Produktionsverteilung. "zu"/🐹 (Sondertage)
+    bleiben, betreffen die Verbrauchsrechnung selbst, keine Planung.
+
+  2026-08-31 · v0.3 · Fix
+    Feedback aus erstem Live-Test (Tablet, Screenshot): Zeitraum direkt
+    unter Produkt verschoben (vorher unter Fehlmenge); Fehlmenge jetzt
+    einklappbar per Checkbox statt immer offen; Zieldatum-Auswahl und
+    Produktionstage-Liste laufen jetzt über ein festes, kalender-
+    verankertes 2-Wochen-Fenster (endet am Sonntag der Folgewoche),
+    unabhängig vom aktuell gewählten Zieldatum — vorher war die Liste
+    fälschlich an zielOffset gekoppelt und zeigte nur so viele Tage wie
+    der Default-Zielwert (3). Legende über der Produktionstage-Liste
+    ergänzt, Zieltag optisch markiert (🎯 + amberner Rand).
+
+  2026-08-31 · v0.2 · Fix
+    Gegen die echte bos_produktionskette.js gegengeprüft. Zwei echte
+    Bugs behoben: prodTage war ein Array statt {offset:true}-Objekt;
+    frosterFertig fehlte komplett im berechne()-Aufruf (wirkte sich
+    ohne Fehlermeldung einfach nicht auf die Rechnung aus). batchSize
+    ergänzt, Ergebnis-Tabelle nutzt jetzt echte kette[]-Felder
+    (tagKurz/produktion/gedecktDurchFroster) statt eigener Rekonstruktion.
+
+  2026-08-31 · v0.11 · Feature
+    Ulf, 31.08.: verbrauch_einstellungen_editor.html zeigte für "Offiziell"
+    echte 36 Tage/116 Produkte an — meine v0.10-Annahme "offiziell hat
+    keine Daten" war falsch. Echte Ursache: die Daten existieren (migrierte
+    backmengen_db.json), aber bos_verbrauch_durchschnitt.js konnte sie nicht
+    lesen (anderes Dokumentschema + hartcodierter Typ). Gegen die echte
+    verbrauch_einstellungen_editor.html-Abfrage (ladeDatenbestand()) verifiziert
+    und in bos_verbrauch_durchschnitt.js nachgebaut (holeOffizielleWerte(),
+    siehe dortiges Änderungsprotokoll). Schnellrechner ruft jetzt für beide
+    Datentöpfe echte Daten ab. Warnung ist jetzt datenbasiert
+    (verlaesslich[]) statt pauschal am Datentopf festgemacht.
+
+  2026-08-31 · v0.10 · Feature
+    Ulf, 31.08.: "Offiziell"-Button doch entsperren. Bewusst NICHT über
+    BOS_VERBRAUCH.holeWochenbedarf() gelöst — die würde intern trotzdem
+    type=='verbrauch_manuell' abfragen (holeManuelleWerte() ist darauf
+    hartcodiert, unabhängig vom Datentopf) und damit Manuell-Daten unter
+    dem Label "Offiziell" zeigen. Genau das stille Vermischen zweier
+    Datentöpfe ist im Projekt explizit verboten. Stattdessen: 'offiziell'
+    liefert lokal einen echten Nullstand, plus gut sichtbare rote Warnung
+    im Ergebnis ("nicht verlässlich"), damit 0 nie als "kein Bedarf"
+    missverstanden wird.
+
+  2026-08-31 · v0.9 · Feature
+    Datentopf-Umschalter (manuell/offiziell) ergänzt, wie im Fundament-
+    Dokument als künftiges Schnellrechner-Feature vorgesehen. "Offiziell"
+    bewusst disabled ("bald") — bos_verbrauch_durchschnitt.js hat dafür
+    nur den Einstellungs-Block, keine echte Leseslogik (keine Erfassung
+    schreibt bisher verbrauch_offiziell-Events). holeWochenbedarf() wird
+    jetzt mit explizit aufgelösten Einstellungen aufgerufen statt über
+    den stillen 'manuell'-Default.
+
+  2026-08-31 · v0.8 · Fix
+    Ulf, 31.08.: rechte Tabelle zeigte pro Tag tag.bestand (laufenden
+    Bestand) statt tag.verbrauch (tatsächlichen Tagesbedarf) — bei
+    Kaltstart-Produkten ohne verbrauch_manuell-Historie blieb der
+    Bestand mangels Verbrauch flach bei der eingegebenen Zahl stehen
+    und sah aus wie eine bloße Weiterreichung der linken Eingabe.
+    Korrigiert auf tag.verbrauch.
+
+  2026-08-31 · v0.7 · Fix
+    Ulf, 31.08. (Screenshot aus dem echten Launcher-Fenster): Seite viel
+    zu groß, riesige leere dunkle Fläche unter dem Inhalt. Ursache:
+    min-height:70vh auf .sr-book zog beide Buchseiten auf 70% der
+    Fensterhöhe, egal wie wenig Inhalt vorhanden war. Entfernt,
+    align-items:start ergänzt (Grid streckt Kinder nicht mehr auf volle
+    Zeilenhöhe), max-width 1200px→900px (kleines Tool, kein Vollbild).
+    Nebenbei behoben: .sr-book hatte kein position:relative, die
+    Buchrücken-Linie (::before, absolut positioniert) positionierte
+    dadurch womöglich relativ zum falschen Vorfahren.
+
+  2026-08-31 · v0.6 · Feature
+    Im System registriert. Gegen echte bos_app_registry.js,
+    bos_launcher_roles.js, bos_permissions.js, produkt_config_felder.json
+    geprüft: Rollen heißen backstube/konditorei (nicht baecker/konditor,
+    wie zuvor angenommen), Feld heißt schnellrechnerRelevant (wieder-
+    belebtes V1-Feld, nicht schnellrechnerFreigabe). Einbindung um
+    bos_permissions.js + bos_access.js ergänzt, laut deren eigenem
+    Kopf-Kommentar die jetzt vorgeschriebene Reihenfolge vor dem Guard.
+
+  2026-09-01 · v0.14 · Feature/Fix
+    Ulf: echte Zahlen liefen jetzt, aber in Stück ("846", "1784" — für
+    Bleche völlig unbrauchbar). Durchgängige Umrechnung über
+    stueckProBlech ergänzt (srEinheitFaktor()) — Bestand/Fehlmenge werden
+    jetzt als Eingabe in der Produkt-Einheit interpretiert und vor dem
+    Kette-Aufruf hoch in Stück gerechnet, alle Kette-Rückgabewerte beim
+    Rendern wieder runter. Kein Umschalter (Ulf bot beides an, einfachere
+    Variante gewählt: immer Produkt-Einheit). Produktion-nötig aufgerundet
+    (kein halbes Blech). ANNAHME weiterhin offen: Frosterbestand wird wie
+    der Verbrauch in Stück gezählt (aus legacyKey-Konvention geschlossen,
+    nicht direkt an froster_inventur.html verifiziert).
+
+    Zweite Ulf-Rückmeldung, gleiche Nachricht: Sondertage-Liste (13-14
+    Zeilen) macht die Seite wieder groß. #sr-tage-liste jetzt max-height
+    220px + eigener Scroll statt Ausklappen — zeigt ca. 4 Zeilen, Rest
+    scrollbar, ohne zusätzlichen Klick bedienbar.
+
+  2026-09-01 · v0.13 · Fix
+    Ulf: Berechnung wirft jetzt einen echten Fehler (Fortschritt — vorher
+    stumm falsch, jetzt sichtbar kaputt), aber "siehe Konsole" ist auf dem
+    Handy nicht einsehbar. Fehlertext wird jetzt direkt im Ergebnis-Feld
+    angezeigt statt nur in der Browser-Konsole. Ursache des Fehlers selbst
+    noch nicht gefunden — BOS_KETTE.berechne() mit realistischen Nicht-
+    Null-Werten lokal simuliert (Node), lief dort fehlerfrei durch, also
+    vermutlich kein reiner Kette-Logikfehler. Nächster Schritt: echten
+    Fehlertext von Ulf abwarten statt weiter zu raten.
+
+  2026-08-31 · v0.12 · Fix
+    produkt_config.json nachgereicht (Ulf) — Felder name/legacyKey/einheit/
+    schnellrechnerRelevant bestätigt korrekt, keine Änderung nötig. Drei
+    reale Bugs in bos_verbrauch_durchschnitt.js gefunden und behoben
+    (falscher Suffix-Anhang, rollierendes Zeitfenster auf historischem
+    Import, fehlendes orderBy-Index-Problem) — siehe dortiges
+    Änderungsprotokoll.
+
+  WICHTIGER HINWEIS ZU VERBLEIBENDEN ANNAHMEN (§0 BOS_NEUER_SATELLIT_
+  CHECKLISTE.md): bos_produktionskette.js, bos_app_registry.js,
+  bos_launcher_roles.js, bos_permissions.js, produkt_config_felder.json,
+  produkt_config.json sind jetzt verifiziert. Weiterhin ohne echte Datei
+  gebaut:
+    - bos_access.js — Einbindung folgt dem in bos_permissions.js
+      dokumentierten Kopf-Kommentar, die Datei selbst lag nicht vor
+    - bos_hamster.js-Integration läuft komplett innerhalb von
+      bos_produktionskette.js selbst (verbrauchAn()) — dieser Satellit
+      ruft es nie direkt auf, insofern hier kein eigenes Risiko
+  → Vor Live-Einsatz: bos_access.js gegenprüfen.
+  ------------------------------------------------------------
+-->
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Schnellrechner · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift/Radien) neben dem Theme — siehe bos_density_sync.js Kopfkommentar / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bos-bg);
+    color: var(--bos-text);
+    font-family: var(--bos-font-body, 'Barlow', sans-serif);
+    min-height: 100vh;
+  }
+
+  /* ── Kopfleiste ─────────────────────────────────────────── */
+  .sr-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); background: var(--bos-surface);
+    border-bottom: 1px solid var(--bos-border);
+  }
+  .sr-title {
+    font-family: var(--bos-font-display, 'Fraunces'); font-weight: 900;
+    font-size: var(--bos-font-xl, 1.3rem); letter-spacing: 0.3px;
+  }
+  .sr-title span { color: var(--bos-amber); font-style: italic; }
+  .sr-help-btn {
+    /* Fixe Symbol-Taste, bewusst nicht Teil der Text-/Abstands-Dichte-Skala — siehe SCHNELLRECHNER_DOKU.md */
+    width: var(--bos-space-xl, 32px); height: var(--bos-space-xl, 32px);
+    border-radius: 50%; border: none;
+    background: var(--bos-amber); color: #fff; font-weight: 900;
+    cursor: pointer; box-shadow: var(--bos-shadow-sm);
+  }
+
+  /* ── Querformat: zwei "Buchseiten" ──────────────────────── */
+  /* Bewusst KEIN min-height mehr (war 70vh) — das Tool ist ein kleiner
+     Rechner, keine Vollbild-Anwendung. Höhe ergibt sich aus dem Inhalt,
+     align-items:start verhindert, dass das Grid die Seiten trotzdem auf
+     volle verfügbare Fensterhöhe streckt (Ulf, 31.08.: "ist kein kleines
+     Tool... ist biiig" — Feedback aus dem echten Launcher-Fenster). */
+  /* ── Äußerer Layout-Rahmen: zentriert das Buch, ab Breite für eine
+     dritte Spalte (Sondertage) Platz — siehe BOS_NEUER_SATELLIT_
+     CHECKLISTE.md §3a / SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md.
+     Bei schmalem/normalem Fenster ist #sr-sondertage-slot leer und
+     display:none (siehe unten) — .sr-layout zentriert dann .sr-book
+     allein, exakt wie vorher margin:auto es tat. */
+  .sr-layout {
+    display: flex; justify-content: center; align-items: start;
+    gap: var(--bos-space-lg, 24px); flex-wrap: wrap;
+  }
+  /* ── Eingabe/Ergebnis als zwei eigenständige Karten ──────────────
+     Ulf, 02.09.2026 (Screenshot mit sichtbarem Sondertage-Panel):
+     einheitlicher wirken lassen, alle Flächen wie kleine eigene Fenster
+     statt der alten Buchseiten-Optik (verbundene Seiten, gemeinsamer
+     Rand, Buchrücken-Linie) — die war für zwei Panels gedacht, jetzt
+     sind es strukturell drei (siehe #sr-sondertage-slot). Frühere
+     Buchrücken-Linie und die asymmetrischen Radien/Ränder von
+     .sr-page-left/-right sind deshalb entfallen, echter Abstand (gap)
+     zwischen den Karten stattdessen. Klassennamen sr-page-left/-right
+     bewusst im HTML belassen (semantische Markierung Eingabe/Ergebnis),
+     auch wenn sie jetzt keine eigene CSS-Regel mehr brauchen. */
+  .sr-book {
+    /* max-width/gap/breakpoint sind Layout-Konstanten, keine Text-/
+       Abstandsdichte — bewusst nicht tokenisiert, siehe BOS_DICHTE_DOKU.md */
+    display: grid; grid-template-columns: 1fr 1fr; align-items: start;
+    gap: var(--bos-space-md, 18px); max-width: 900px; margin: var(--bos-space-lg, 20px) 0; padding: 0 var(--bos-space-sm, 16px);
+  }
+  .sr-page {
+    background: var(--bos-surface); border: 1px solid var(--bos-border);
+    border-radius: var(--bos-radius-lg);
+    padding: var(--bos-space-lg, 22px); position: relative;
+  }
+  @media (max-width: 860px) {
+    .sr-book { grid-template-columns: 1fr; }
+  }
+
+  /* ── Sondertage als eigene dritte Spalte bei ausreichender Breite ──
+     Ulf, 02.09.2026 (Screenshot, maximiertes Launcher-Fenster): Breite
+     ungenutzt, Sondertage-Liste als Seiten-Panel vorgeschlagen. Bewusst
+     eigener, deutlich höherer Breakpoint als die 860px-Buchseiten-Grenze
+     oben — erst wenn WIRKLICH Platz für eine dritte Spalte da ist, nicht
+     schon beim Umschalten auf die zweispaltige Ansicht. Unterhalb dieser
+     Breite bleibt der Slot leer/unsichtbar und #sr-sondertage-section
+     sitzt unverändert an ihrer ursprünglichen Stelle in #sr-links-inhalt
+     (siehe srLayoutAnpassen() im Script-Teil) — am mobilen/normalen
+     Erlebnis ändert sich dadurch nichts. */
+  #sr-sondertage-slot { display: none; }
+  @media (min-width: 1300px) {
+    #sr-sondertage-slot {
+      display: block; width: 320px; flex-shrink: 0;
+      background: var(--bos-surface); border: 1px solid var(--bos-border);
+      border-radius: var(--bos-radius-lg); padding: var(--bos-space-lg, 22px);
+      margin: var(--bos-space-lg, 20px) 0;
+    }
+    /* Der Höhen-Deckel auf #sr-tage-liste war gegen die einspaltige
+       Stapel-Ansicht austariert (siehe Kopfkommentar v0.14) — im eigenen
+       Seiten-Panel steht vertikal mehr Platz zur Verfügung, ohne dass die
+       Seite dadurch "lang" wird, also hier großzügiger. */
+    #sr-sondertage-slot #sr-tage-liste { max-height: 480px; }
+  }
+
+  .sr-label {
+    font-family: var(--bos-font-label, 'Barlow Condensed'); font-weight: 800;
+    font-size: var(--bos-font-xs, 0.72rem); letter-spacing: 1px; text-transform: uppercase;
+    color: var(--bos-amber); margin-bottom: var(--bos-space-xs, 10px);
+  }
+  .sr-section { margin-bottom: var(--bos-space-lg, 22px); }
+
+  /* ── Froster-Poka-Yoke ──────────────────────────────────── */
+  .sr-froster-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+    border-radius: inherit; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: var(--bos-space-sm, 16px); z-index: 20;
+    padding: var(--bos-space-xl, 30px);
+  }
+  .sr-froster-frage { font-family: var(--bos-font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); text-align: center; color: #fff; }
+  .sr-froster-group { display: flex; gap: var(--bos-space-sm, 12px); width: 100%; max-width: 340px; }
+  .sr-f-btn {
+    flex: 1; padding: var(--bos-space-md, 18px) var(--bos-space-xs, 10px); border-radius: var(--bos-radius-md);
+    min-height: var(--bos-tap-min, 44px);
+    border: 2px solid var(--bos-border-strong); background: var(--bos-surface);
+    color: var(--bos-text); font-weight: 800; cursor: pointer; font-size: var(--bos-font-md, 0.9rem);
+  }
+  .sr-f-btn.yes:hover, .sr-f-btn.yes.active { border-color: var(--bos-green); background: color-mix(in srgb, var(--bos-green) 15%, transparent); color: var(--bos-green); }
+  .sr-f-btn.no:hover, .sr-f-btn.no.active { border-color: var(--bos-red); background: color-mix(in srgb, var(--bos-red) 15%, transparent); color: var(--bos-red); }
+
+  .sr-froster-cache-tag {
+    display: inline-flex; align-items: center; gap: var(--bos-space-2xs, 6px); font-size: var(--bos-font-xs, 0.72rem);
+    font-weight: 800; color: var(--bos-green); background: color-mix(in srgb, var(--bos-green) 12%, transparent);
+    border: 1px solid var(--bos-green); border-radius: 999px; padding: var(--bos-space-3xs, 4px) var(--bos-space-xs, 10px); cursor: pointer;
+  }
+
+  /* ── Eingabefelder, gesperrt bis Froster beantwortet ───── */
+  .sr-locked { opacity: 0.35; pointer-events: none; filter: blur(1.5px); transition: var(--bos-transition, 0.25s); }
+
+  select, input[type="number"] {
+    width: 100%; padding: var(--bos-space-xs, 12px) var(--bos-space-sm, 14px); border-radius: var(--bos-radius-sm);
+    min-height: var(--bos-tap-min, 44px);
+    border: 1.5px solid var(--bos-border-strong); background: var(--bos-bg-soft);
+    color: var(--bos-text); font-family: inherit; font-weight: 700; font-size: var(--bos-font-md, 0.95rem);
+  }
+  select:focus, input:focus { outline: none; border-color: var(--bos-amber); }
+
+  .sr-bestand-row { display: grid; grid-template-columns: 1fr 90px; gap: var(--bos-space-xs, 10px); margin-top: var(--bos-space-2xs, 8px); }
+  .sr-bestand-frisch { font-size: var(--bos-font-xs, 0.68rem); font-weight: 800; color: var(--bos-green); margin-top: var(--bos-space-2xs, 6px); }
+  .sr-bestand-warn {
+    display: none; margin-top: var(--bos-space-2xs, 8px); padding: var(--bos-space-2xs, 8px) var(--bos-space-sm, 12px); border-radius: var(--bos-radius-sm);
+    background: color-mix(in srgb, var(--bos-red) 12%, transparent); border: 1.5px solid var(--bos-red);
+    color: var(--bos-red); font-weight: 800; font-size: var(--bos-font-sm, 0.78rem);
+  }
+  input.sr-bestand-veraltet { border-color: var(--bos-red); }
+
+  /* ── Datentopf-Umschalter (manuell/offiziell) ──────────── */
+  .sr-datentopf-group { display: flex; gap: var(--bos-space-2xs, 8px); }
+  .sr-datentopf-btn {
+    flex: 1; padding: var(--bos-space-xs, 10px) var(--bos-space-2xs, 8px); border-radius: var(--bos-radius-sm);
+    min-height: var(--bos-tap-min, 44px);
+    border: 1.5px solid var(--bos-border-strong); background: var(--bos-bg-soft);
+    color: var(--bos-text-dim); font-weight: 800; font-size: var(--bos-font-sm, 0.82rem); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: var(--bos-space-2xs, 6px);
+  }
+  .sr-datentopf-btn.aktiv { border-color: var(--bos-amber); color: var(--bos-amber); background: color-mix(in srgb, var(--bos-amber) 12%, transparent); }
+  .sr-datentopf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .sr-datentopf-badge {
+    font-size: var(--bos-font-2xs, 0.62rem); font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
+    background: var(--bos-border-strong); color: var(--bos-text-dim); border-radius: 999px; padding: var(--bos-space-3xs, 2px) var(--bos-space-2xs, 6px);
+  }
+
+  /* ── Datum-Dropdowns mit Verbindungs-Animation ─────────── */
+  .sr-datum-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--bos-space-xs, 10px); }
+  .sr-datum-connector { position: relative; height: 3px; background: var(--bos-border); border-radius: 2px; overflow: hidden; }
+  .sr-datum-connector::after {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: var(--sr-tage-prozent, 0%); background: var(--bos-amber);
+    transition: width var(--bos-transition, 0.4s) var(--bos-ease, ease);
+  }
+  .sr-datum-tage-label {
+    text-align: center; font-family: var(--bos-font-label); font-weight: 800;
+    font-size: var(--bos-font-xs, 0.72rem); color: var(--bos-amber); margin-top: var(--bos-space-2xs, 6px);
+    transition: var(--bos-transition, 0.3s);
+  }
+  @keyframes sr-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  .sr-pulse { animation: sr-pulse 0.35s var(--bos-ease, ease); }
+
+  /* ── Produktionstage / Hamster / geschlossen ───────────── */
+  /* Feste Höhe + eigener Scroll statt die ganze Seite in die Länge zu
+     ziehen — 13-14 Zeilen (2-Wochen-Fenster) wären sonst der Hauptgrund
+     für einen "riesigen" Rechner (Ulf, 01.09.2026). Zeigt ca. 4 Zeilen,
+     Rest per Scroll — einfacher als Ein-/Ausklappen und ohne zusätzlichen
+     Klick immer sofort bedienbar. */
+  #sr-tage-liste {
+    max-height: 220px; overflow-y: auto; border-radius: var(--bos-radius-sm);
+    border: 1px solid var(--bos-border);
+  }
+  .sr-tag-row {
+    display: flex; align-items: center; gap: var(--bos-space-xs, 10px); padding: var(--bos-space-2xs, 8px) var(--bos-space-xs, 10px);
+    border-bottom: 1px solid var(--bos-border); font-size: var(--bos-font-sm, 0.85rem);
+  }
+  .sr-tag-row:last-child { border-bottom: none; }
+  .sr-tag-name { flex: 1; font-weight: 700; }
+  .sr-tag-name.veraltet { opacity: 0.4; text-decoration: line-through; }
+  .sr-mini-btn {
+    padding: var(--bos-space-2xs, 5px) var(--bos-space-xs, 9px); border-radius: var(--bos-radius-sm); border: 1.5px solid var(--bos-border-strong);
+    background: var(--bos-bg-soft); color: var(--bos-text-dim); font-weight: 800; font-size: var(--bos-font-xs, 0.7rem); cursor: pointer;
+  }
+  .sr-mini-btn.aktiv-zu { border-color: var(--bos-red); color: var(--bos-red); }
+  .sr-mini-btn.aktiv-hamster { border-color: var(--bos-amber); color: var(--bos-amber); }
+  .sr-cache-hinweis { font-size: var(--bos-font-2xs, 0.65rem); color: var(--bos-text-faint); margin-top: var(--bos-space-2xs, 6px); }
+
+  /* ── Sondertage einklappbar — Ulf, 02.09.2026 (Hochformat-Screenshot):
+     nimmt im mobilen Hochformat zu viel Platz vor dem Ergebnis weg.
+     Standard: eingeklappt (das Übliche ist "kein Sondertag diese Woche"),
+     Badge zeigt die Anzahl aktiver Markierungen, damit nichts unsichtbar
+     "verschwindet". Im breiten Seiten-Panel (#sr-sondertage-slot) spielt
+     Platz keine Rolle mehr — dort immer voll ausgeklappt, kein Kopf-Klick
+     nötig (siehe #sr-sondertage-slot-Override unten). */
+  .sr-sondertage-kopf {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    background: none; border: none; padding: 0; margin-bottom: var(--bos-space-xs, 10px);
+    cursor: pointer; font: inherit; color: inherit; min-height: var(--bos-tap-min, 44px);
+  }
+  .sr-sondertage-badge {
+    display: inline-flex; align-items: center; justify-content: center; margin-left: var(--bos-space-2xs, 6px);
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+    background: var(--bos-amber); color: #1a1208; font-size: var(--bos-font-2xs, 0.65rem); font-weight: 900;
+  }
+  .sr-sondertage-chevron { color: var(--bos-text-dim); font-size: var(--bos-font-md, 0.95rem); }
+  .sr-sondertage-body { display: none; }
+  .sr-sondertage-section.aufgeklappt .sr-sondertage-body { display: block; }
+  #sr-sondertage-slot .sr-sondertage-kopf { display: none; }
+  #sr-sondertage-slot .sr-sondertage-body { display: block !important; }
+
+  /* ── Ergebnis-Seite rechts ──────────────────────────────── */
+  /* 5xl statt 4xl: der Hero-Wert hier ist bewusst größer als z.B. im
+     Taschenrechner — es ist die wichtigste Zahl der Seite (wie viel
+     produziert werden muss), siehe BOS_DICHTE_DOKU.md. */
+  .sr-res-val { font-family: var(--bos-font-display); font-size: var(--bos-font-5xl, 4rem); font-weight: 900; color: var(--bos-amber); line-height: 0.95; text-align: center; }
+  .sr-res-unit { text-align: center; font-weight: 800; color: var(--bos-text-dim); margin-bottom: var(--bos-space-md, 18px); }
+  table.sr-calc { width: 100%; border-collapse: collapse; font-size: var(--bos-font-sm, 0.88rem); }
+  table.sr-calc td { padding: var(--bos-space-2xs, 9px) var(--bos-space-3xs, 4px); border-bottom: 1px solid var(--bos-border); }
+  .sr-row-warn-luecke { color: var(--bos-red); font-weight: 800; }
+  .sr-row-warn-knapp { color: var(--bos-amber); font-weight: 800; }
+  .sr-empty-hint { color: var(--bos-text-faint); text-align: center; padding: var(--bos-space-xl, 40px) var(--bos-space-2xs, 10px); font-size: var(--bos-font-md, 0.9rem); }
+
+  /* ── Hilfe-Sheet ────────────────────────────────────────── */
+  #sr-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #sr-hilfe-inhalt-wrap { background: var(--bos-surface); border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; max-width:680px; margin:40px auto 0; padding: var(--bos-space-lg, 20px) var(--bos-space-md, 18px) var(--bos-space-xl, 40px); min-height:50vh; }
+  .sr-hilfe-schritt { margin-bottom: var(--bos-space-md, 18px); padding-bottom: var(--bos-space-sm, 14px); border-bottom:1px dashed var(--bos-border); }
+  .sr-hilfe-titel { font-weight:900; color: var(--bos-amber); margin-bottom: var(--bos-space-3xs, 5px); }
+  .sr-hilfe-text { font-size: var(--bos-font-sm, 0.85rem); line-height:1.6; color: var(--bos-text-dim); white-space: pre-line; }
+</style>
+</head>
+<body>
+
+<!-- ═══ Pflicht-Block Body-Anfang (§2 Checkliste) ═══ -->
+<script>var BOS_APP_ID = 'schnellrechner';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<!-- ═══ Firebase (§4 Checkliste) ═══ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+
+<!-- ═══ Host-Funktionen — Reihenfolge wegen Abhängigkeiten wichtig ═══ -->
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_hamster.js"></script>
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_froster.js"></script>
+<script src="../bos_produktionskette.js"></script>
+
+<div class="sr-header">
+  <div class="sr-title">Schnell<span>rechner</span></div>
+  <button class="sr-help-btn" onclick="srOeffneHilfe()">?</button>
+</div>
+
+<div class="sr-layout">
+<!-- Sondertage-Slot bewusst VOR dem Buch im Markup — Ulf, 02.09.2026:
+     Sondertage soll links stehen, damit Eingabe+Ergebnis (die eigentliche
+     Rechen-Einheit) als zusammenhängendes Paar rechts davon lesbar bleiben,
+     statt hinter dem Ergebnis zu hängen. Sondertage ist inhaltlich ohnehin
+     eine Eingabe (beeinflusst die Rechnung wie Zeitraum/Fehlmenge) — links
+     der Eingabe zu stehen passt daher auch zur Eingabe-vor-Ergebnis-Logik.
+     Inhaltlich bleibt srLayoutAnpassen() unverändert: die Position dieses
+     leeren Slots bestimmt nur, WO der verschobene Knoten optisch landet. -->
+<div id="sr-sondertage-slot"></div>
+<div class="sr-book">
+
+  <!-- ═══════════════ LINKE BUCHSEITE — EINGABE ═══════════════ -->
+  <div class="sr-page sr-page-left" style="position:relative;">
+
+    <!-- Froster-Poka-Yoke-Overlay: nur sichtbar, wenn kein frischer Cache-Wert existiert -->
+    <div class="sr-froster-overlay" id="sr-froster-overlay">
+      <div class="sr-froster-frage">❄️ Ist der Froster für morgen<br>schon fertig vorbereitet?</div>
+      <div class="sr-froster-group">
+        <button class="sr-f-btn yes" onclick="srSetzeFroster(true)">FERTIG</button>
+        <button class="sr-f-btn no" onclick="srSetzeFroster(false)">NOCH NICHT</button>
+      </div>
+    </div>
+
+    <div id="sr-links-inhalt" class="sr-locked">
+
+      <div class="sr-section">
+        <div class="sr-label">Froster-Status</div>
+        <span class="sr-froster-cache-tag" id="sr-froster-cache-tag" style="display:none;" onclick="srFrosterZuruecksetzen()"></span>
+      </div>
+
+      <div class="sr-section">
+        <div class="sr-label">Produkt</div>
+        <select id="sr-prod-select" onchange="srProduktGewechselt()">
+          <option value="">— Produkt wählen —</option>
+        </select>
+        <div class="sr-bestand-row">
+          <div id="sr-bestand-einheit-hint" class="sr-cache-hinweis" style="align-self:center;"></div>
+          <input type="number" id="sr-bestand-input" placeholder="Bestand" oninput="srBerechne()">
+        </div>
+        <div class="sr-bestand-frisch" id="sr-bestand-frisch" style="display:none;"></div>
+        <div class="sr-bestand-warn" id="sr-bestand-warn">⚠️ Zählung älter als 24 Std. oder nicht vorhanden — Bestand bitte manuell eintragen</div>
+      </div>
+
+      <div class="sr-section">
+        <div class="sr-label">Datenquelle (Verbrauch)</div>
+        <div class="sr-datentopf-group">
+          <button class="sr-datentopf-btn aktiv" id="sr-datentopf-manuell" onclick="srSetzeDatentopf('manuell')">Manuell</button>
+          <button class="sr-datentopf-btn" id="sr-datentopf-offiziell" onclick="srSetzeDatentopf('offiziell')" title="Zeigt noch keine echten Daten — die Erfassung dafür existiert im System noch nicht">Offiziell</button>
+        </div>
+      </div>
+
+      <div class="sr-section">
+        <div class="sr-label">Zeitraum</div>
+        <div class="sr-datum-row">
+          <select id="sr-start-select" disabled></select>
+          <div></div>
+          <select id="sr-ziel-select" onchange="srZielGewechselt()"></select>
+        </div>
+        <div class="sr-datum-connector"></div>
+        <div class="sr-datum-tage-label" id="sr-datum-tage-label">–</div>
+      </div>
+
+      <div class="sr-section" id="sr-fehlmenge-section" style="display:none;">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <input type="checkbox" id="sr-fehlmenge-checkbox" onchange="srFehlmengeUmschalten(this.checked)" style="width:18px; height:18px; accent-color:var(--bos-red); cursor:pointer; flex-shrink:0;">
+          <span class="sr-label" style="margin:0;">Fehlmenge für morgen? ⚠️</span>
+          <span id="sr-fehlmenge-einheit-hint" class="sr-cache-hinweis" style="margin:0;"></span>
+        </label>
+        <input type="number" id="sr-fehlmenge-input" placeholder="0" oninput="srBerechne()" style="display:none; margin-top:10px;">
+      </div>
+
+      <div class="sr-section sr-sondertage-section" id="sr-sondertage-section">
+        <button type="button" class="sr-sondertage-kopf" id="sr-sondertage-kopf" onclick="srSondertageUmschalten()">
+          <span class="sr-label" style="margin:0;">Sondertage<span id="sr-sondertage-badge" class="sr-sondertage-badge" style="display:none;"></span></span>
+          <span class="sr-sondertage-chevron" id="sr-sondertage-chevron">▸</span>
+        </button>
+        <div class="sr-sondertage-body" id="sr-sondertage-body">
+          <div class="sr-cache-hinweis" style="margin-top:6px; margin-bottom:10px;">„zu" = Tag geschlossen, 🐹 = Hamster-Stufe (mehrfach tippen zum Weiterschalten). Zeigt die nächsten zwei Wochen, unabhängig vom gewählten Zieldatum.</div>
+          <div id="sr-tage-liste"></div>
+          <div class="sr-cache-hinweis">Gilt nur 30 Min. lokal auf diesem Gerät — unabhängig von der echten Hamster-Verwaltung im Zeitkontext.</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ═══════════════ RECHTE BUCHSEITE — AUFSCHLÜSSELUNG ═══════════════ -->
+  <div class="sr-page sr-page-right">
+    <div id="sr-ergebnis-leer" class="sr-empty-hint">Produkt wählen und Froster-Frage beantworten,<br>dann erscheint hier die Berechnung.</div>
+    <div id="sr-ergebnis-inhalt" style="display:none;">
+      <div id="sr-verlaesslich-warnung" style="display:none; border-radius:var(--bos-radius-sm); padding:10px 14px; margin-bottom:16px; font-weight:800; font-size:0.82rem; text-align:center; border:1.5px solid;"></div>
+      <div class="sr-label" style="text-align:center;">Produktion nötig</div>
+      <div class="sr-res-val" id="sr-res-val">0</div>
+      <div class="sr-res-unit" id="sr-res-unit">BLECHE</div>
+      <table class="sr-calc" id="sr-calc-table"></table>
+    </div>
+  </div>
+
+</div>
+</div><!-- /sr-layout -->
+
+<!-- ═══ Hilfe-Sheet ═══ -->
+<div id="sr-hilfe-modal" onclick="if(event.target===this)srSchliesseHilfe()">
+  <div id="sr-hilfe-inhalt-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:900;color:var(--bos-amber);font-size:1.05rem;">❓ Anleitung</div>
+      <button onclick="srSchliesseHilfe()" style="background:none;border:none;font-size:1.3rem;color:var(--bos-text-dim);cursor:pointer;">✕</button>
+    </div>
+    <div id="sr-hilfe-inhalt"></div>
+  </div>
+</div>
+
+<script>
+// ── i18n-Hook (§6 Checkliste — Pflicht, auch wenn aktuell nur Deutsch) ──
+const I18N_DE = {};
+function t(key) { return I18N_DE[key] || key; }
+
+// ── Konstanten ────────────────────────────────────────────────────────
+const CACHE_DAUER_MS = 30 * 60 * 1000; // 30 Minuten, wie mit Ulf abgestimmt
+const TAGE_LANG = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag']; // BOS-Index Mo=0…So=6
+const LS_FROSTER = 'bos_schnellrechner_froster_lokal';
+const LS_OVERRIDES = 'bos_schnellrechner_tagesoverrides_lokal';
+
+// ── Zustand ───────────────────────────────────────────────────────────
+let heute = new Date(); heute.setHours(0,0,0,0);
+let heuteBosIdx = (heute.getDay() === 0) ? 6 : heute.getDay() - 1; // BOS Mo=0…So=6
+let produktConfig = [];
+let aktuellesProdukt = null; // {legacyKey, name, einheit}
+let frosterFertig = null;    // true/false/null
+let datentopf = 'manuell';   // 'manuell' | 'offiziell' (offiziell noch deaktiviert, siehe srSetzeDatentopf)
+let zielOffset = 3;
+let letztesErgebnis = null;
+let srSondertageOffen = false; // Default eingeklappt, siehe CSS-Kommentar zu .sr-sondertage-kopf
+
+// Festes Anzeige-Fenster für Zieldatum-Auswahl UND Produktionstage-Liste:
+// endet immer am Sonntag der Folgewoche, unabhängig vom aktuell gewählten
+// Zieldatum — deshalb hier einmalig berechnet, nicht aus zielOffset abgeleitet.
+// Ulf, 31.08.2026: "zweiwöchige Abdeckung der Tage, endend am Sonntag der
+// Folgewoche" — bewusst kalender-verankert statt fixer Tageszahl, damit die
+// Länge unabhängig vom Wochentag von "heute" immer bis zu einem Sonntag reicht.
+const tageBisSonntagDieseWoche = 6 - heuteBosIdx;
+const FIXES_FENSTER_ENDE = tageBisSonntagDieseWoche + 7;
+
+// ── Produkt-Config laden, nach schnellrechnerRelevant filtern ──────────
+// Gegen echte produkt_config_felder.json verifiziert (31.08.2026): Feld
+// heißt schnellrechnerRelevant, ein wiederbelebtes V1-Feld (stand vorher
+// in "bewusst_nicht_migrierte_v1_flags", jetzt dort entfernt und als
+// echter Glossar-Eintrag ergänzt).
+async function srLadeProdukte() {
+  try {
+    const antwort = await fetch('../produkt_config.json', { cache: 'no-store' });
+    const alle = await antwort.json();
+    produktConfig = alle.filter(p => p.schnellrechnerRelevant === true);
+  } catch (fehler) {
+    console.warn('Schnellrechner: produkt_config.json nicht ladbar.', fehler);
+    produktConfig = [];
+  }
+  const sel = document.getElementById('sr-prod-select');
+  produktConfig
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+    .forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.legacyKey; opt.textContent = p.name;
+      sel.appendChild(opt);
+    });
+}
+
+// ── Froster-Poka-Yoke ────────────────────────────────────────────────
+function srLadeFrosterCache() {
+  try {
+    const roh = JSON.parse(localStorage.getItem(LS_FROSTER) || 'null');
+    if (roh && (Date.now() - roh.ts) < CACHE_DAUER_MS) return roh;
+  } catch (fehler) { /* kaputter Cache-Eintrag ignorieren */ }
+  return null;
+}
+function srPruefeFrosterGate() {
+  const cache = srLadeFrosterCache();
+  const overlay = document.getElementById('sr-froster-overlay');
+  const inhalt = document.getElementById('sr-links-inhalt');
+  const tag = document.getElementById('sr-froster-cache-tag');
+  // Sondertage sitzt je nach Fensterbreite entweder in #sr-links-inhalt
+  // oder im ausgelagerten #sr-sondertage-slot (siehe srLayoutAnpassen())
+  // — die Sperre muss in beiden Fällen mitziehen, deshalb hier immer
+  // zusätzlich über die ID angesteuert statt über den aktuellen Elternknoten.
+  const tageSection = document.getElementById('sr-sondertage-section');
+  if (cache) {
+    frosterFertig = cache.wert;
+    overlay.style.display = 'none';
+    inhalt.classList.remove('sr-locked');
+    if (tageSection) tageSection.classList.remove('sr-locked');
+    const minAlt = Math.round((Date.now() - cache.ts) / 60000);
+    tag.style.display = 'inline-flex';
+    tag.textContent = (cache.wert ? '❄️ Fertig' : '❌ Noch nicht') + ' · übernommen vor ' + minAlt + ' Min · ändern';
+  } else {
+    frosterFertig = null;
+    overlay.style.display = 'flex';
+    inhalt.classList.add('sr-locked');
+    if (tageSection) tageSection.classList.add('sr-locked');
+    tag.style.display = 'none';
+  }
+  srAktualisiereFehlmengeSichtbarkeit();
+}
+function srSetzeFroster(wert) {
+  frosterFertig = wert;
+  localStorage.setItem(LS_FROSTER, JSON.stringify({ wert, ts: Date.now() }));
+  srPruefeFrosterGate();
+  srBerechne();
+}
+function srFrosterZuruecksetzen() {
+  localStorage.removeItem(LS_FROSTER);
+  srPruefeFrosterGate();
+}
+function srAktualisiereFehlmengeSichtbarkeit() {
+  document.getElementById('sr-fehlmenge-section').style.display = frosterFertig ? 'block' : 'none';
+  if (!frosterFertig) {
+    document.getElementById('sr-fehlmenge-checkbox').checked = false;
+    document.getElementById('sr-fehlmenge-input').style.display = 'none';
+    document.getElementById('sr-fehlmenge-input').value = '';
+  }
+}
+function srFehlmengeUmschalten(checked) {
+  document.getElementById('sr-fehlmenge-input').style.display = checked ? 'block' : 'none';
+  if (!checked) document.getElementById('sr-fehlmenge-input').value = '';
+  srBerechne();
+}
+
+// ── Frosterbestand: Interpreter aus bos_froster.js ─────────────────────
+// ── Einheiten-Umrechnung Stück ↔ Produkt-Einheit ────────────────────────
+// ANNAHME (01.09.2026, nach mehreren Bugs diese Session lieber explizit
+// benannt statt still vorausgesetzt): legacyKey endet für alle bisher
+// getesteten Produkte auf "_stueck" (hasenberger_stueck, kaesebroetchen_
+// stueck, kornknacker_stueck, bestätigt gegen echte produkt_config.json).
+// Daraus geschlossen: Verbrauch (verbrauch_manuell UND verbrauch_offiziell)
+// UND Frosterbestand (bos_froster.js, gleicher legacyKey) sind intern
+// durchgehend in STÜCK. stueckProBlech ist die Brücke zur Einheit, in der
+// die Bäckerei tatsächlich denkt (meist "bleche"). Ulf, 01.09.2026: "das
+// sind Stückzahlen, damit kann ich nicht soviel anfangen" — deshalb ab
+// hier überall Umrechnung, kein Umschalter (er selbst: "Standard mäßig auf
+// Bleche... oder immer Bleche angeben" — einfachere der beiden Varianten
+// gewählt).
+//
+// 06.09.2026 · KORREKTUR: die oben offen gelassene Gegenprüfung ist jetzt
+// erfolgt (live an den Produktionsplaner-Stationsseiten aufgefallen) —
+// die Annahme war zur Hälfte falsch. Verbrauch ist tatsächlich in Stück
+// (Annahme bleibt für Verbrauch bestehen). Frosterbestand dagegen NICHT
+// — froster_inventur.html erfasst durchgehend in Bleche (bzw. der
+// jeweiligen Produkt-Einheit), nie in Stück. Der "_stueck"-Suffix im
+// legacyKey ist ein reiner Namensrest aus der alten produkt_config.json
+// (die früher zusätzlich einen echten Stück-Wert pro Produkt hatte, beim
+// Aufräumen entfernt, Feldname aber nicht angepasst) — keine tatsächliche
+// Einheitsangabe mehr. srEinheitFaktor() wird deshalb ab sofort NICHT
+// mehr auf den Frosterbestand angewendet (siehe srSyncBestand()), nur
+// noch auf Verbrauch/Kette wie schon bisher.
+function srEinheitFaktor() {
+  const f = aktuellesProdukt?.stueckProBlech;
+  return (typeof f === 'number' && f > 0 && aktuellesProdukt?.einheit !== 'stueck') ? f : 1;
+}
+function srEinheitLabel() {
+  return (aktuellesProdukt?.einheit || 'stück');
+}
+
+async function srSyncBestand() {
+  const input = document.getElementById('sr-bestand-input');
+  const frischLabel = document.getElementById('sr-bestand-frisch');
+  const warnBox = document.getElementById('sr-bestand-warn');
+  if (!aktuellesProdukt) return;
+
+  input.value = ''; input.classList.remove('sr-bestand-veraltet');
+  frischLabel.style.display = 'none'; warnBox.style.display = 'none';
+
+  try {
+    await window.BOS_AUTH_READY;
+    const res = await window.BOS_FROSTER.holeBestand(window.db, aktuellesProdukt.legacyKey);
+    if (res.veraltet) {
+      input.classList.add('sr-bestand-veraltet');
+      warnBox.style.display = 'block';
+    } else {
+      // 06.09.2026 · Fix: res.bestand ist bereits in Bleche (siehe Korrektur
+      // im Kommentar oben) — keine Umrechnung mehr, nur noch Rundung auf
+      // 1 Nachkommastelle (Firestore könnte z.B. 37.0 statt 37 liefern).
+      input.value = Math.round((res.bestand || 0) * 10) / 10;
+      const d = new Date(res.ts);
+      frischLabel.textContent = '✓ Zählung vom ' + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '. ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      frischLabel.style.display = 'block';
+    }
+  } catch (fehler) {
+    console.warn('Schnellrechner: Frosterbestand nicht ladbar, manuelle Eingabe erforderlich.', fehler);
+    input.classList.add('sr-bestand-veraltet');
+    warnBox.style.display = 'block';
+  }
+  srBerechne();
+}
+
+// ── Zeitraum: Start-/Ziel-Dropdowns + Animation ────────────────────────
+function srBaueDatumSelects() {
+  const startSel = document.getElementById('sr-start-select');
+  const zielSel = document.getElementById('sr-ziel-select');
+  startSel.innerHTML = '<option>' + srFormatTag(0) + ' (Heute)</option>';
+
+  zielSel.innerHTML = '';
+  for (let i = 1; i <= FIXES_FENSTER_ENDE; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = srFormatTag(i);
+    if (i === zielOffset) opt.selected = true;
+    zielSel.appendChild(opt);
+  }
+  srAktualisiereDatumAnimation();
+}
+function srFormatTag(offset) {
+  const d = new Date(heute); d.setDate(heute.getDate() + offset);
+  return TAGE_LANG[(heuteBosIdx + offset) % 7].substring(0,2) + ' ' + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.';
+}
+function srZielGewechselt() {
+  zielOffset = parseInt(document.getElementById('sr-ziel-select').value, 10);
+  srAktualisiereDatumAnimation();
+  srBaueTagesliste();
+  srBerechne();
+}
+function srAktualisiereDatumAnimation() {
+  const connector = document.querySelector('.sr-datum-connector');
+  const prozent = Math.min(100, (zielOffset / FIXES_FENSTER_ENDE) * 100);
+  connector.style.setProperty('--sr-tage-prozent', prozent + '%');
+  const label = document.getElementById('sr-datum-tage-label');
+  label.textContent = zielOffset + (zielOffset === 1 ? ' Tag' : ' Tage');
+  label.classList.remove('sr-pulse'); void label.offsetWidth; label.classList.add('sr-pulse');
+}
+
+// ── Produktionstage / lokale Hamster- & Geschlossen-Overrides ─────────
+function srLadeOverrideCache() {
+  try {
+    const roh = JSON.parse(localStorage.getItem(LS_OVERRIDES) || 'null');
+    if (roh && (Date.now() - roh.ts) < CACHE_DAUER_MS) return roh;
+  } catch (fehler) { /* ignorieren */ }
+  return { ts: Date.now(), tage: {} };
+}
+function srSpeichereOverride(offset, feld, wert) {
+  const cache = srLadeOverrideCache();
+  if (!cache.tage[offset]) cache.tage[offset] = { geschlossen: false, hamsterStufe: 0 };
+  cache.tage[offset][feld] = wert;
+  cache.ts = Date.now(); // Cache-Uhr bei jeder Änderung neu starten
+  localStorage.setItem(LS_OVERRIDES, JSON.stringify(cache));
+  srBaueTagesliste();
+  srBerechne();
+}
+function srBaueTagesliste() {
+  const wrap = document.getElementById('sr-tage-liste'); wrap.innerHTML = '';
+  const cache = srLadeOverrideCache();
+  for (let i = 1; i <= FIXES_FENSTER_ENDE; i++) {
+    const ov = cache.tage[i] || { geschlossen: false, hamsterStufe: 0 };
+    const row = document.createElement('div');
+    row.className = 'sr-tag-row';
+    if (i === zielOffset) row.style.borderLeft = '3px solid var(--bos-amber)';
+
+    row.innerHTML = `
+      <span class="sr-tag-name ${ov.geschlossen ? 'veraltet' : ''}">${srFormatTag(i)}${i === zielOffset ? ' 🎯' : ''}</span>
+      <button class="sr-mini-btn ${ov.geschlossen ? 'aktiv-zu' : ''}" onclick="srSpeichereOverride(${i},'geschlossen',${!ov.geschlossen})">zu</button>
+      <button class="sr-mini-btn ${ov.hamsterStufe > 0 ? 'aktiv-hamster' : ''}" onclick="srHamsterWeiterschalten(${i}, ${ov.hamsterStufe})">🐹${ov.hamsterStufe > 0 ? ' ' + ov.hamsterStufe : ''}</button>
+    `;
+    wrap.appendChild(row);
+  }
+  srAktualisiereSondertageBadge(cache);
+}
+function srHamsterWeiterschalten(offset, aktuell) {
+  const naechste = (aktuell + 1) % 4; // 0→1→2→3→0
+  srSpeichereOverride(offset, 'hamsterStufe', naechste);
+}
+
+// ── Sondertage einklappen/ausklappen (nur relevant, solange die Sektion
+// inline steht — im breiten Seiten-Panel per CSS immer ausgeklappt,
+// siehe #sr-sondertage-slot-Regel) ─────────────────────────────────────
+function srSondertageUmschalten() {
+  srSondertageOffen = !srSondertageOffen;
+  srRenderSondertageKopf();
+}
+function srRenderSondertageKopf() {
+  const section = document.getElementById('sr-sondertage-section');
+  const chevron = document.getElementById('sr-sondertage-chevron');
+  if (!section || !chevron) return;
+  section.classList.toggle('aufgeklappt', srSondertageOffen);
+  chevron.textContent = srSondertageOffen ? '▾' : '▸';
+}
+function srAktualisiereSondertageBadge(cache) {
+  const badge = document.getElementById('sr-sondertage-badge');
+  if (!badge) return;
+  cache = cache || srLadeOverrideCache();
+  const anzahl = Object.values(cache.tage || {}).filter(function (ov) {
+    return ov.geschlossen || ov.hamsterStufe > 0;
+  }).length;
+  if (anzahl > 0) {
+    badge.textContent = anzahl;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ── Datenquelle (manuell/offiziell) ─────────────────────────────────
+// Beide Datentöpfe liefern seit 31.08.2026 echte Daten über
+// BOS_VERBRAUCH.holeWochenbedarf(db, legacyKey, einstellungen, datentopf) —
+// holeOffizielleWerte() wurde dafür in bos_verbrauch_durchschnitt.js
+// ergänzt (anderes Dokumentschema als manuell, siehe dortiger Kopf-
+// Kommentar). Kein stilles Vermischen: jeder Datentopf fragt weiterhin nur
+// seinen eigenen Firestore-`type` ab. Datenknappheit wird nicht mehr
+// pauschal am Datentopf festgemacht, sondern am echten `verlaesslich[]`-
+// Signal pro Wochentag (siehe srRenderErgebnis) — betrifft "manuell" bei
+// Kaltstart-Produkten genauso wie "offiziell".
+function srSetzeDatentopf(wert) {
+  datentopf = wert;
+  document.getElementById('sr-datentopf-manuell').classList.toggle('aktiv', wert === 'manuell');
+  document.getElementById('sr-datentopf-offiziell').classList.toggle('aktiv', wert === 'offiziell');
+  srBerechne();
+}
+
+// ── Produktwechsel ──────────────────────────────────────────────────
+function srProduktGewechselt() {
+  const key = document.getElementById('sr-prod-select').value;
+  aktuellesProdukt = produktConfig.find(p => p.legacyKey === key) || null;
+  document.getElementById('sr-bestand-einheit-hint').textContent = aktuellesProdukt ? 'in ' + srEinheitLabel() : '';
+  document.getElementById('sr-fehlmenge-einheit-hint').textContent = aktuellesProdukt ? '(in ' + srEinheitLabel() + ')' : '';
+  document.getElementById('sr-ergebnis-inhalt').style.display = 'none';
+  document.getElementById('sr-ergebnis-leer').style.display = 'block';
+  if (aktuellesProdukt) srSyncBestand();
+}
+
+// ── Kette aufrufen und Ergebnis rendern ────────────────────────────
+async function srBerechne() {
+  if (!aktuellesProdukt || frosterFertig === null) return;
+  // Eingaben kommen jetzt in Produkt-Einheit (Bleche) vom Nutzer — die
+  // Kette rechnet intern in Stück (siehe srEinheitFaktor()-Kommentar),
+  // deshalb hier hoch multipliziert, unten beim Rendern wieder runter.
+  const einheitFaktor = srEinheitFaktor();
+  const bestandEingabe = parseFloat(document.getElementById('sr-bestand-input').value) || 0;
+  const fehlmengeEingabe = parseFloat(document.getElementById('sr-fehlmenge-input').value) || 0;
+  const bestand = bestandEingabe * einheitFaktor;
+  const fehlmenge = fehlmengeEingabe * einheitFaktor;
+
+  try {
+    await window.BOS_AUTH_READY;
+    // BOS_VERBRAUCH.holeWochenbedarf() kennt seit 31.08.2026 beide Datentöpfe
+    // (holeOffizielleWerte() ergänzt, siehe dortiges Änderungsprotokoll) —
+    // kein lokaler Nullstand mehr nötig, echte Daten für beide Fälle.
+    const einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
+    const wochenbedarf = await window.BOS_VERBRAUCH.holeWochenbedarf(window.db, aktuellesProdukt.legacyKey, einstellungen, datentopf);
+
+    let tagesTypen = {};
+    try {
+      tagesTypen = await window.BOS_KETTE.ermittleTagesTypen(window.db, heute, zielOffset);
+    } catch (fehler) {
+      console.warn('Schnellrechner: Zeitkontext nicht ladbar, rechne ohne Sondertage.', fehler);
+    }
+    // Lokale 30-Min-Overrides (Hamster/geschlossen) legen sich über die
+    // Firestore-Zeitkontext-Antwort — Session-Simulation, kein Schreiben.
+    const overrideCache = srLadeOverrideCache();
+    for (const [offset, ov] of Object.entries(overrideCache.tage || {})) {
+      if (ov.geschlossen) tagesTypen[offset] = 'zu';
+      else if (ov.hamsterStufe > 0) tagesTypen[offset] = 'hamster_' + ov.hamsterStufe;
+    }
+
+    // Bewusst vereinfacht (Ulf, 31.08.2026): keine Produktionstag-Auswahl
+    // mehr — dieses Tool ist reiner Rechner, keine Tages-Planung ("keine
+    // Zwitter mehr"). prodTage bleibt leer, damit BOS_KETTE die reine
+    // Verbrauchskette simuliert, ohne je Produktion einzurechnen — die
+    // Kennzahl kommt stattdessen aus gesamtVerbrauch - Anfangsbestand
+    // (siehe srRenderErgebnis). gesperrtWerte/manuelleWerte/batchSize/
+    // gleichmaessig entfallen dadurch ebenfalls, sie wirken nur innerhalb
+    // der prodTage-Verteilung. Tages-Planung mit "leichten Planern" bleibt
+    // eigenes, künftiges Tool (vgl. station_broetchenstrasse.html).
+    const ergebnis = window.BOS_KETTE.berechne({
+      needs: wochenbedarf.needs,
+      startBestand: bestand,
+      frosterFertig: frosterFertig,
+      zielOff: zielOffset,
+      heute: heute,
+      tagesTypen: tagesTypen,
+      fehlmengeAbs: (frosterFertig && fehlmenge > 0) ? fehlmenge : 0
+    });
+
+    letztesErgebnis = ergebnis;
+    srRenderErgebnis(ergebnis, bestandEingabe, (frosterFertig && fehlmengeEingabe > 0) ? fehlmengeEingabe : 0, wochenbedarf.verlaesslich, einheitFaktor);
+  } catch (fehler) {
+    console.error('Schnellrechner: Berechnung fehlgeschlagen.', fehler);
+    document.getElementById('sr-ergebnis-leer').style.display = 'block';
+    // Fehlertext direkt im UI statt nur in der Konsole — auf dem Handy ist
+    // die Konsole nicht erreichbar (Ulf, 01.09.2026).
+    document.getElementById('sr-ergebnis-leer').innerHTML =
+      '⚠️ Berechnung fehlgeschlagen:<br><span style="font-family:monospace; font-size:0.8em; color:var(--bos-red);">' +
+      String(fehler?.message || fehler).replace(/</g, '&lt;') + '</span>';
+    document.getElementById('sr-ergebnis-inhalt').style.display = 'none';
+  }
+}
+
+function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verlaesslich, einheitFaktor) {
+  document.getElementById('sr-ergebnis-leer').style.display = 'none';
+  document.getElementById('sr-ergebnis-inhalt').style.display = 'block';
+
+  // Datenbasierte Warnung statt pauschal "offiziell = unzuverlässig" (galt
+  // nur, solange es dort keine Leseslogik gab — seit holeOffizielleWerte()
+  // in bos_verbrauch_durchschnitt.js, 31.08.2026, gilt dasselbe Signal für
+  // beide Datentöpfe: verlaesslich[] sagt pro Wochentag, ob die Mindest-
+  // stichprobe erreicht wurde. Betrifft ebenso "manuell" bei Kaltstart-
+  // Produkten wie eingangs "Kornknacker".
+  const alleUnzuverlaessig = verlaesslich?.length > 0 && verlaesslich.every(v => v === false);
+  const teilweiseUnzuverlaessig = !alleUnzuverlaessig && verlaesslich?.some(v => v === false);
+  const warnungBox = document.getElementById('sr-verlaesslich-warnung');
+  if (alleUnzuverlaessig) {
+    warnungBox.style.display = 'block';
+    warnungBox.style.borderColor = 'var(--bos-red)'; warnungBox.style.color = 'var(--bos-red)';
+    warnungBox.style.background = 'color-mix(in srgb, var(--bos-red) 12%, transparent)';
+    warnungBox.textContent = '⚠️ Keine ausreichenden Verbrauchsdaten (' + (datentopf === 'offiziell' ? 'Offiziell' : 'Manuell') + ') für dieses Produkt — Ergebnis nicht verlässlich!';
+  } else if (teilweiseUnzuverlaessig) {
+    warnungBox.style.display = 'block';
+    warnungBox.style.borderColor = 'var(--bos-amber)'; warnungBox.style.color = 'var(--bos-amber)';
+    warnungBox.style.background = 'color-mix(in srgb, var(--bos-amber) 12%, transparent)';
+    warnungBox.textContent = '◌ Für einzelne Wochentage gibt es wenig Vergleichswerte (' + (datentopf === 'offiziell' ? 'Offiziell' : 'Manuell') + ') — Ergebnis ist teilweise eine Schätzung.';
+  } else {
+    warnungBox.style.display = 'none';
+  }
+
+  // BOS_KETTE rechnet intern in Stück — für die Anzeige hier konsequent
+  // durch einheitFaktor geteilt (siehe srEinheitFaktor()-Kommentar).
+  // anfangsbestandBleche/fehlmengeBleche kommen schon in Bleche rein (waren
+  // vor dem Kette-Aufruf mit dem Faktor hochgerechnet worden), deshalb hier
+  // NICHT nochmal umrechnen — nur die Stück-Rückgabewerte der Kette.
+  const einheit = srEinheitLabel();
+  const rund1 = x => Math.round((x / einheitFaktor) * 10) / 10;
+
+  // Fehlmenge fließt rechnerisch korrekt ein (BOS_KETTE zieht sie intern
+  // vom Startbestand ab, siehe kette[0].bestand) — hier bewusst als EIGENE
+  // Zeile sichtbar gemacht statt versteckt in einem reduzierten Anfangs-
+  // bestand, genau das war früher die Quelle wiederkehrender "ist die
+  // Fehlmenge wirklich drin?"-Zweifel (Ulf, 31.08.2026).
+  // Aufgerundet (nicht nur gerundet) — man kann kein halbes Blech backen.
+  const hauptwert = Math.max(0, Math.ceil(rund1(ergebnis.gesamtVerbrauch) + fehlmengeBleche - anfangsbestandBleche));
+  document.getElementById('sr-res-val').textContent = hauptwert;
+  document.getElementById('sr-res-unit').textContent = einheit.toUpperCase();
+
+  let html = `<tr><td>Gesamtverbrauch</td><td style="text-align:right;">${rund1(ergebnis.gesamtVerbrauch)} ${einheit}</td></tr>`;
+  if (fehlmengeBleche > 0) {
+    html += `<tr class="sr-row-warn-luecke"><td>+ Fehlmenge morgen ⚠️</td><td style="text-align:right;">+${fehlmengeBleche} ${einheit}</td></tr>`;
+  }
+  html += `<tr style="color:var(--bos-green);"><td>− Anfangsbestand</td><td style="text-align:right;">-${anfangsbestandBleche} ${einheit}</td></tr>`;
+
+  (ergebnis.kette || []).forEach(tag => {
+    if (tag.istHeute) return; // heute hat keinen eigenen Verbrauch
+    const warnKlasse = tag.warnung === 'luecke' ? 'sr-row-warn-luecke' : (tag.warnung === 'knapp' ? 'sr-row-warn-knapp' : '');
+    const warnIcon = tag.warnung === 'luecke' ? ' ⚠️ Lücke' : (tag.warnung === 'knapp' ? ' ◌ Knapp' : '');
+    const tagLabel = tag.tagKurz + ' ' + pad2(tag.datum.getDate()) + '.' + pad2(tag.datum.getMonth() + 1) + '.';
+    const mengeSpalte = tag.gedecktDurchFroster
+      ? '<span style="color:var(--bos-green);">❄️ Froster</span>'
+      : rund1(tag.verbrauch);
+    html += `<tr class="${warnKlasse}"><td>${tagLabel}${warnIcon}</td><td style="text-align:right;">${mengeSpalte}</td></tr>`;
+  });
+  html += `<tr style="border-top:2px solid var(--bos-border);"><td style="font-weight:900;">Rechnerischer Endstand ${hauptwert > 0 ? '(ohne Produktion)' : ''}</td><td style="text-align:right;font-weight:900;">${ergebnis.endlager != null ? rund1(ergebnis.endlager) : '–'} ${einheit}</td></tr>`;
+  document.getElementById('sr-calc-table').innerHTML = html;
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// ── Hilfe-Sheet (§7 Checkliste — kanonischer Text, Doku-Fassung ist Quelle) ──
+function srOeffneHilfe() {
+  const inhalt = document.getElementById('sr-hilfe-inhalt');
+  inhalt.innerHTML = SR_HILFE_SCHRITTE.map(s =>
+    `<div class="sr-hilfe-schritt"><div class="sr-hilfe-titel">${s[0]}</div><div class="sr-hilfe-text">${s[1]}</div></div>`
+  ).join('');
+  document.getElementById('sr-hilfe-modal').style.display = 'block';
+}
+function srSchliesseHilfe() { document.getElementById('sr-hilfe-modal').style.display = 'none'; }
+
+const SR_HILFE_SCHRITTE = [
+  ['Wofür ist der Schnellrechner?', 'Er sagt dir für ein einzelnes Produkt, wie viel du bis zu einem bestimmten Tag produzieren musst — auf Basis des bisherigen Verbrauchs, deines aktuellen Frosterbestands und eventueller Sondertage.'],
+  ['Schritt 1: Froster-Frage beantworten', 'Bevor irgendetwas anderes eingegeben werden kann, musst du beantworten: Ist der Froster für morgen schon fertig vorbereitet? Diese Antwort wird für 30 Minuten auf diesem Gerät gemerkt — tippe auf den grünen Haken oben, wenn du sie ändern willst. Danach musst du sie neu beantworten.'],
+  ['Schritt 2: Produkt wählen', 'Der Bestand wird automatisch aus der letzten Froster-Zählung übernommen, wenn diese jünger als 24 Stunden ist. Siehst du einen roten Rahmen und eine Warnung, ist die Zählung zu alt oder existiert nicht — dann bitte den aktuellen Bestand von Hand eintragen. Alle Mengen (Bestand, Fehlmenge, Ergebnis) sind durchgehend in der Einheit des Produkts angegeben (meist Bleche), nicht in Stück — steht als kleiner Hinweis neben dem jeweiligen Feld.'],
+  ['Datenquelle (Verbrauch)', 'Der Verbrauch pro Tag kommt entweder aus "Manuell" (händisch im System erfasste Werte) oder aus "Offiziell" (migrierte historische Zahlen). Für welche Wochentage zu wenige Vergleichswerte vorliegen, siehst du an einer gelben oder roten Warnung über dem Ergebnis — das kann in beiden Datentöpfen passieren, nicht nur bei "Offiziell".'],
+  ['Schritt 3: Zieldatum wählen', 'Wähle rechts im Dropdown, bis zu welchem Tag der Bestand reichen soll. Je weiter der Tag entfernt ist, desto weiter füllt sich der Balken zwischen den beiden Datumsfeldern.'],
+  ['Schritt 4: Fehlmenge (nur wenn Froster fertig)', 'Reicht der vorbereitete Froster-Bestand trotzdem nicht für morgen, hakst du das Kästchen an — dann erscheint ein Feld für die fehlende Menge, die zusätzlich eingerechnet wird. Ohne Haken bleibt das Feld verborgen.'],
+  ['Schritt 5: Sondertage markieren (optional)', 'Der Bereich ist standardmäßig eingeklappt — ein Tipp auf die Überschrift öffnet ihn. Eine kleine Zahl neben „Sondertage" zeigt an, wie viele Tage aktuell markiert sind, auch wenn der Bereich zu ist. Aufgeklappt zeigt die Liste immer die nächsten zwei Wochen, unabhängig vom gewählten Zieldatum (der Zieltag ist mit 🎯 markiert) — die Box ist auf ein paar Zeilen begrenzt, restliche Tage per Scroll erreichbar. Über die Knöpfe "zu" und 🐹 kannst du einzelne Tage als geschlossen markieren oder eine Hamster-Stufe (erhöhter Bedarf, z. B. vor Feiertagen) setzen — gilt nur 30 Minuten auf diesem Gerät und ist unabhängig von der echten Hamster-Verwaltung im System. Ist dein Fenster breit genug (z. B. maximiertes Launcher-Fenster auf einem großen Bildschirm), erscheint diese Liste als eigenes Feld neben statt unter der Eingabe, dort immer ausgeklappt.'],
+  ['Ergebnis lesen', 'Rechts erscheint die benötigte Produktionsmenge groß, darunter die Aufschlüsselung: Gesamtverbrauch minus Anfangsbestand, sowie pro Tag der tatsächliche Verbrauch dieses Tages. "Lücke" bedeutet: der Bedarf dieses Tages ist nicht gedeckt. "Knapp" bedeutet: es reicht heute noch, aber morgen nicht mehr. Der Schnellrechner plant keine einzelnen Produktionstage — er sagt dir nur, wie viel insgesamt nötig ist. Wann genau produziert wird, entscheidest du selbst oder mit einem separaten Planer.']
+];
+
+// ── Bauteile-Layout: Sondertage bei ausreichender Breite als eigene
+// Spalte neben dem Buch statt darin gestapelt ──────────────────────
+// Konzept: BOS_NEUER_SATELLIT_CHECKLISTE.md §3a,
+// SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md. Bewegt den ECHTEN
+// #sr-sondertage-section-Knoten (appendChild verschiebt, klont nicht —
+// Inhalt/Zustand/Listener bleiben erhalten) zwischen seinem normalen
+// Platz in #sr-links-inhalt (dort war er zuletzt, deshalb reicht
+// appendChild ohne Positionsangabe für den Rückweg) und dem separaten
+// #sr-sondertage-slot außerhalb des Buchs. Kein Klon, keine zweite
+// #sr-tage-liste — genau ein Knoten, ein Ort zur Zeit.
+const srWideMQ = window.matchMedia('(min-width: 1300px)');
+function srLayoutAnpassen() {
+  const tageSection = document.getElementById('sr-sondertage-section');
+  const slot = document.getElementById('sr-sondertage-slot');
+  const normalerOrt = document.getElementById('sr-links-inhalt');
+  if (!tageSection || !slot || !normalerOrt) return;
+  if (srWideMQ.matches) {
+    slot.appendChild(tageSection);
+  } else {
+    normalerOrt.appendChild(tageSection);
+  }
+}
+srWideMQ.addEventListener('change', srLayoutAnpassen);
+
+// ── Start ────────────────────────────────────────────────────────────
+(async function srInit() {
+  srPruefeFrosterGate();
+  srBaueDatumSelects();
+  srBaueTagesliste();
+  srRenderSondertageKopf();
+  srLayoutAnpassen();
+  await srLadeProdukte();
+})();
+</script>
+</body>
+</html>

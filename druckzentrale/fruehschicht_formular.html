@@ -1,0 +1,473 @@
+<!--
+  2026-09-03 · v0.1 · Feature
+    Erstversion. Rebuild von "Modul A" aus der Alt-System-Druckzentrale
+    (druckzentrale_modul_a.js, Referenzdatei lag vor: druckzentrale.zip,
+    Ulf 03.09.2026) als eigenständiger V2-Satellit — erstes Kind des
+    neuen `druckzentrale`-Hubs. Zweiter Aufrufer von bos_druck.js
+    (SESSION_2026-09-01_STANDARD_DRUCK_KONZEPT.md §5), validiert das
+    Muster gegen einen komplexeren Fall (mehrere Zeilentypen, Tabelle).
+
+    Formular-Gedächtnis-Trick aus V1 (live-DOM-Werte per setAttribute
+    vor dem Druck einfrieren) entfällt bewusst: der Druckinhalt wird
+    hier direkt als sauberer HTML-String aus dem aktuellen JS-Zustand
+    gebaut (analog zur Checkliste in schnelldruck.html) — die V1-
+    Krücke war nur nötig, weil V1 die Live-DOM per .innerHTML gedruckt
+    hat. Ausgewählte Werte werden dabei als Kästchen (.fs-box) statt
+    echter <select>-Elemente gedruckt — druckt sich sauberer.
+
+    Extra-Zeilen bewusst weiterhin nur lokal (localStorage), keine
+    Firestore-Anbindung — Entscheidung Ulf, 03.09.2026 ("nur lokal,
+    pro Gerät, wie bisher").
+
+    Guten-Morgen-Digital-Snapshot (V1 Modul J: Formular-Eingaben online
+    bereitstellen, künftig Basis für ein "was liegt heute an" samt
+    Produktionsplanung) bewusst NICHT mitgebaut — Ulf, 03.09.2026: gute
+    Idee, aber für später vormerken, mit Firestore deutlich pflegeleichter
+    als der alte Datei-Download-Upload-Weg. Siehe BOS_BAUSTELLEN.md.
+
+    Schilder-Modul (V1, eigener Tab, 470 Zeilen) bewusst nicht angefasst
+    — komplett eigenes Thema, nicht Teil dieses Hubs.
+-->
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Frühschicht-Formular · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Muss vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  /* Lokale Aliase — Werte 1:1 aus bos_design_tokens.css, gleiches
+     Muster wie schnelldruck.html (Fallback falls Datei mal nicht lädt) */
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-raised: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --border-soft: var(--bos-border, rgba(255,255,255,0.08));
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --faint: var(--bos-text-faint, #736656);
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --red: var(--bos-red, #d6584a);
+    --radius-sm: var(--bos-radius-sm, 6px);
+    --radius-md: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', Georgia, serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', 'Arial Narrow', sans-serif);
+  }
+  * { box-sizing: border-box; }
+  body { padding-bottom: 3rem; }
+
+  .fh-chrome { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .fh-header {
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 680px; margin: 0 auto; padding: var(--bos-space-sm, 14px) var(--bos-space-sm, 16px);
+  }
+  .fh-title-block { display: flex; flex-direction: column; gap: var(--bos-space-3xs, 2px); }
+  .fh-title { font-family: var(--font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); color: var(--text); }
+  .fh-meta { font-family: var(--font-label); font-size: var(--bos-font-xs, 0.68rem); letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+  .fh-help-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--amber);
+    border-radius: var(--radius-sm); width: 34px; height: 34px; font-size: var(--bos-font-md, 1rem); cursor: pointer;
+  }
+
+  .content { max-width: 680px; margin: 0 auto; padding: var(--bos-space-md, 18px) var(--bos-space-sm, 16px) 0; }
+  @media (min-width: 820px)  { .fh-header, .content { max-width: 920px; } }
+  @media (min-width: 1180px) { .fh-header, .content { max-width: 1100px; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: var(--bos-space-md, 18px); margin-bottom: var(--bos-space-md, 16px); }
+  .field-label { display: block; font-family: var(--font-label); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); font-size: var(--bos-font-xs, 0.72rem); margin-bottom: var(--bos-space-2xs, 7px); }
+
+  /* Produktzeile */
+  .fh-row { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) 0; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+  .fh-row:last-child { border-bottom: none; }
+  .fh-row-name { flex: 1; min-width: 150px; font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.92rem); }
+  .fh-row select { width: 70px; flex: 0 0 auto; }
+  .fh-row .fh-suffix { font-size: var(--bos-font-sm, 0.78rem); color: var(--dim); }
+  .fh-pair { display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); }
+  .fh-pair select { width: 70px; flex: 0 0 auto; }
+  .fh-pair-sep { color: var(--faint); font-weight: 700; }
+
+  select.bos-input { -webkit-appearance: none; appearance: none; cursor: pointer; }
+
+  /* Extra-Zeilen */
+  .fh-extra-row { display: flex; align-items: center; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-2xs, 6px) 0; }
+  .fh-extra-row input[type=text] { flex: 1; }
+  .fh-extra-row select { width: 70px; flex: 0 0 auto; }
+  .fh-extra-del { background: none; border: none; color: var(--dim); font-size: var(--bos-font-lg, 1.1rem); cursor: pointer; padding: 0 4px; flex: 0 0 auto; }
+  .fh-extra-del:hover { color: var(--red); }
+  .fh-add-btn { background: transparent; border: 1px dashed var(--border); color: var(--dim); border-radius: var(--radius-sm); padding: var(--bos-space-2xs, 7px) var(--bos-space-sm, 12px); font-family: var(--font-label); font-size: var(--bos-font-sm, 0.78rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; margin-top: var(--bos-space-xs, 8px); }
+  .fh-add-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* Notiz-Zeilen ("noch in den Koma/Froster stellen") — zweispaltig wie
+     die alte Tabellenzeile (Text links, Zielort rechts), nicht gestapelt.
+     Ulf-Feedback 03.09.2026 (Screenshot): erste Fassung war gestapelt und
+     die Auswahlbox lief über die volle Breite — Ursache war, dass
+     .bos-input width:100% setzt und die alte Regel das nicht
+     überschrieben hat. Jetzt explizit width:auto auf die Zielort-Auswahl. */
+  .fh-notiz-row { display: flex; gap: var(--bos-space-sm, 12px); align-items: flex-start; padding: var(--bos-space-xs, 10px) 0; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+  .fh-notiz-row:last-of-type { border-bottom: none; }
+  .fh-notiz-text { flex: 1 1 220px; }
+  .fh-notiz-text textarea { width: 100%; resize: vertical; min-height: 44px; }
+  .fh-notiz-dest { flex: 0 0 auto; display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); font-size: var(--bos-font-sm, 0.82rem); color: var(--dim); white-space: nowrap; padding-top: var(--bos-space-2xs, 6px); }
+  .fh-notiz-dest select { width: auto; min-width: 130px; flex: 0 0 auto; }
+
+  .druck-optionen { display: flex; gap: var(--bos-space-xs, 8px); margin-bottom: var(--bos-space-3xs, 4px); }
+  .pill { font-family: var(--font-label); font-size: var(--bos-font-sm, 0.78rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 0 var(--bos-space-sm, 13px); height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-raised); color: var(--dim); cursor: pointer; }
+  .pill.active { background: var(--amber); border-color: var(--amber); color: #1a1208; }
+
+  .btn { font-family: var(--font-label); font-size: var(--bos-font-sm, 0.82rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; border-radius: var(--radius-sm); padding: 0.75em 1.2em; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: var(--bos-space-xs, 8px); }
+  .btn-amber { background: var(--amber); color: #1a1208; }
+  .btn-amber:hover { background: var(--amber-bright); }
+  .btn-main { width: 100%; margin-top: var(--bos-space-md, 18px); }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .datum-hint { text-align: center; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-xs, 10px); letter-spacing: .04em; }
+
+  /* Hilfe Bottom Sheet — Muster aus schnelldruck.html */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 9999; display: flex; align-items: flex-end; }
+  .sheet-overlay.hidden { display: none !important; }
+  .sheet { background: var(--surface); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: var(--bos-space-sm, 14px) var(--bos-space-md, 20px) var(--bos-space-lg, 24px); border-top: 1px solid var(--border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto var(--bos-space-sm, 16px); }
+  .sheet h2 { font-family: var(--font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); margin: 0 0 var(--bos-space-sm, 14px); color: var(--text); }
+  .sheet .sec { margin-bottom: var(--bos-space-sm, 16px); }
+  .sheet .sec h3 { font-family: var(--font-label); text-transform: uppercase; letter-spacing: .04em; font-size: var(--bos-font-sm, 0.78rem); color: var(--amber); margin: 0 0 var(--bos-space-2xs, 5px); }
+  .sheet .sec p { font-size: var(--bos-font-md, 0.9rem); color: var(--text); line-height: 1.6; margin: 0; }
+  .sheet button.secondary { width: 100%; background: transparent; border: 1px solid var(--amber); color: var(--amber); margin-top: var(--bos-space-xs, 8px); padding: var(--bos-space-xs, 11px) var(--bos-space-sm, 16px); border-radius: var(--radius-sm); font-family: var(--font-label); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'fruehschicht_formular';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<script src="../bos_druck.js"></script>
+
+<div class="fh-chrome">
+  <div class="fh-header">
+    <div class="fh-title-block">
+      <div class="fh-title">Frühschicht-Formular</div>
+      <div class="fh-meta">Täglich · Extra-Zeilen lokal gespeichert</div>
+    </div>
+    <button class="fh-help-btn" onclick="oeffneHilfe()" aria-label="Hilfe">❓</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="card">
+    <span class="field-label">Produkte</span>
+    <div id="fh-rows"></div>
+    <div id="fh-extra-rows"></div>
+    <button class="fh-add-btn" onclick="fhAddExtraRow()">+ Zeile hinzufügen</button>
+  </div>
+
+  <div class="card">
+    <span class="field-label">Noch hinstellen</span>
+    <div id="fh-notiz-rows"></div>
+    <button class="fh-add-btn" onclick="fhAddNotizRow()">+ Zeile hinzufügen</button>
+  </div>
+
+  <div class="card">
+    <span class="field-label">Anmerkungen</span>
+    <textarea id="fh-anmerkungen" class="bos-input" rows="4" placeholder="Hinweise, Sonderaufträge, Besonderheiten…" style="resize: vertical;"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="field-label">Druckoptionen</div>
+    <div class="druck-optionen">
+      <button class="pill active" data-toggle="kopf" onclick="toggleOption('kopf')">Kopf/Fuß</button>
+      <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
+    </div>
+    <button class="btn btn-amber btn-main" onclick="drucken()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Drucken
+    </button>
+    <div class="datum-hint" id="datum-hint"></div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Hilfe Bottom Sheet -->
+<div id="hilfe-sheet" class="sheet-overlay hidden" onclick="if(event.target===this) schliesseHilfe()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Hilfe · Frühschicht-Formular</h2>
+    <div class="sec">
+      <h3>Wofür ist diese Seite?</h3>
+      <p>Der tägliche Zettel für die Frühschicht — wie viele Bleche von welchem Produkt abgesetzt werden sollen, plus was noch in den Koma oder Froster gestellt werden muss. Zahlen eintragen und drucken.</p>
+    </div>
+    <div class="sec">
+      <h3>Extra-Zeilen</h3>
+      <p>Über „+ Zeile hinzufügen" bei den Produkten lässt sich ein zusätzliches Produkt eintragen, das nicht in der festen Liste steht. Diese Zeilen merkt sich das Gerät für den nächsten Ausdruck — aber nur auf diesem Gerät, nicht geräteübergreifend.</p>
+    </div>
+    <div class="sec">
+      <h3>Noch hinstellen</h3>
+      <p>Freitext-Notizen mit Auswahl, wohin es kommt (Koma 7, Schrippen-Koma oder Froster). Über „+ Zeile hinzufügen" gibt es bei Bedarf mehr Zeilen.</p>
+    </div>
+    <div class="sec">
+      <h3>Die zwei Schalter vor dem Drucken</h3>
+      <p><strong>Kopf/Fuß:</strong> BäckereiOS-Logo mit Datum/Uhrzeit oben, Fußzeile unten. Ausgeschaltet druckt nur der reine Inhalt.</p>
+      <p><strong>Farbe:</strong> Ausgeschaltet druckt der komplette Ausdruck in Graustufen.</p>
+    </div>
+    <div class="sec">
+      <h3>Wichtig</h3>
+      <p>Die eingetragenen Mengen selbst werden nicht gespeichert — nur die Extra-Zeilen. Nach dem Neuladen der Seite sind die Mengen wieder leer, bereit für den nächsten Tag.</p>
+    </div>
+    <button class="secondary" onclick="schliesseHilfe()">Schließen</button>
+  </div>
+</div>
+
+<script>
+  /* ── Fixe Produktzeilen ─────────────────────────────────────── */
+  var FIXE_ROWS = [
+    { id: 'schoko',     label: 'Schokocroissants',    suffix: 'Bleche absetzen' },
+    { id: 'laugen',     label: 'Laugenecken',          suffix: 'Bleche absetzen' },
+    { id: 'butter',     label: 'Buttercroissants',     suffix: 'Bleche absetzen' },
+    { id: 'minibutter', label: 'Minibuttercroissants', suffix: 'Bleche absetzen' },
+    { id: 'minischoko', label: 'Minischokocroissants', suffix: 'Bleche absetzen' },
+    { id: 'kaese',      label: 'Käsebrötchen belegen', suffix: 'Bleche' }
+  ];
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildSelect(sel, max, step) {
+    step = step || 1;
+    sel.innerHTML = '';
+    var empty = document.createElement('option');
+    empty.value = ''; empty.textContent = '';
+    sel.appendChild(empty);
+    for (var v = 0; v <= max; v += step) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = Number.isInteger(v) ? String(v) : v.toFixed(1);
+      sel.appendChild(o);
+    }
+  }
+
+  function renderFixedRows() {
+    var wrap = document.getElementById('fh-rows');
+    wrap.innerHTML = '';
+
+    // Mohn + Sesam: Sonderfall, Doppel-Feld in halben Schritten
+    var row = document.createElement('div');
+    row.className = 'fh-row';
+    row.innerHTML =
+      '<span class="fh-row-name">Mohn + Sesam</span>' +
+      '<div class="fh-pair">' +
+        '<select class="bos-input" id="fh-mohn"></select>' +
+        '<span class="fh-pair-sep">/</span>' +
+        '<select class="bos-input" id="fh-sesam"></select>' +
+      '</div>';
+    wrap.appendChild(row);
+    buildSelect(document.getElementById('fh-mohn'), 20, 0.5);
+    buildSelect(document.getElementById('fh-sesam'), 20, 0.5);
+
+    FIXE_ROWS.forEach(function(item) {
+      var r = document.createElement('div');
+      r.className = 'fh-row';
+      r.innerHTML =
+        '<span class="fh-row-name">' + escapeHtml(item.label) + '</span>' +
+        '<select class="bos-input" id="fh-' + item.id + '"></select>' +
+        '<span class="fh-suffix">' + escapeHtml(item.suffix) + '</span>';
+      wrap.appendChild(r);
+      buildSelect(document.getElementById('fh-' + item.id), 30);
+    });
+  }
+
+  /* ── Extra-Zeilen (localStorage, nur dieses Gerät) ─────────────── */
+  var EXTRA_LS_KEY = 'BOS_FS_EXTRA_v1';
+
+  function ladeExtra() {
+    try {
+      var d = JSON.parse(localStorage.getItem(EXTRA_LS_KEY));
+      return Array.isArray(d) ? d.filter(function(x) { return x && (x.name || x.val); }) : [];
+    } catch(e) { return []; }
+  }
+  function speichereExtra() {
+    var rows = [];
+    document.querySelectorAll('.fh-extra-row').forEach(function(el) {
+      rows.push({ name: el.querySelector('input').value, val: el.querySelector('select').value });
+    });
+    try { localStorage.setItem(EXTRA_LS_KEY, JSON.stringify(rows)); } catch(e) {}
+  }
+  function machExtraZeile(name, val) {
+    var div = document.createElement('div');
+    div.className = 'fh-extra-row';
+    div.innerHTML =
+      '<input type="text" class="bos-input" placeholder="Produkt…">' +
+      '<select class="bos-input"></select>' +
+      '<span class="fh-suffix">Bleche</span>' +
+      '<button class="fh-extra-del" title="Entfernen">×</button>';
+    var inp = div.querySelector('input');
+    var sel = div.querySelector('select');
+    inp.value = name || '';
+    buildSelect(sel, 30);
+    if (val) sel.value = val;
+    inp.addEventListener('input', speichereExtra);
+    sel.addEventListener('change', speichereExtra);
+    div.querySelector('.fh-extra-del').addEventListener('click', function() {
+      div.remove();
+      speichereExtra();
+    });
+    return div;
+  }
+  function fhAddExtraRow() {
+    var wrap = document.getElementById('fh-extra-rows');
+    wrap.appendChild(machExtraZeile('', ''));
+    speichereExtra();
+  }
+  function initExtra() {
+    var wrap = document.getElementById('fh-extra-rows');
+    ladeExtra().forEach(function(item) {
+      wrap.appendChild(machExtraZeile(item.name, item.val));
+    });
+  }
+
+  /* ── Notiz-Zeilen ("Noch hinstellen") ──────────────────────────── */
+  function machNotizZeile() {
+    var div = document.createElement('div');
+    div.className = 'fh-notiz-row';
+    div.innerHTML =
+      '<div class="fh-notiz-text"><textarea class="bos-input" placeholder=""></textarea></div>' +
+      '<div class="fh-notiz-dest">Noch in den' +
+      '<select class="bos-input">' +
+        '<option>Koma 7</option>' +
+        '<option>Schrippen-Koma</option>' +
+        '<option>Froster</option>' +
+      '</select> stellen</div>';
+    return div;
+  }
+  function fhAddNotizRow() {
+    document.getElementById('fh-notiz-rows').appendChild(machNotizZeile());
+  }
+
+  /* ── Druckoptionen — Entscheidung Ulf, 01.09.2026 (siehe bos_druck.js) */
+  var druckOptionen = { kopf: true, farbe: true };
+  function toggleOption(art) {
+    druckOptionen[art] = !druckOptionen[art];
+    document.querySelectorAll('[data-toggle="' + art + '"]').forEach(function(btn) {
+      btn.classList.toggle('active', druckOptionen[art]);
+    });
+  }
+
+  /* ── Drucken ────────────────────────────────────────────────────
+     Werte werden hier direkt aus dem aktuellen Zustand als sauberer
+     HTML-String gebaut (kein Formular-Gedächtnis-Trick nötig, siehe
+     Kopfkommentar). Ausgewählte Zahlen erscheinen als Kästchen
+     (.fs-box), leere Felder als leeres Kästchen zum Reinschreiben. */
+  var PRINT_CSS = [
+    '.fs-page{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:10pt;}',
+    '.fs-gruss{font-weight:700;font-size:11pt;margin-bottom:16px;line-height:1.5;}',
+    '.fs-item{display:flex;align-items:center;padding:6px 0;font-size:10pt;page-break-inside:avoid;break-inside:avoid;}',
+    '.fs-item.fs-zebra{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
+    '.fs-name{width:220px;font-weight:700;flex-shrink:0;}',
+    '.fs-box{display:inline-block;min-width:34px;border:1px solid #000;padding:3px 10px;text-align:center;font-weight:700;}',
+    '.fs-sep{margin:0 6px;font-weight:700;}',
+    '.fs-suffix{margin-left:12px;color:#333;}',
+    '.fs-notiz-table{width:100%;border-collapse:collapse;margin-top:20px;}',
+    '.fs-notiz-table td{border:1px solid #000;padding:8px 10px;vertical-align:top;font-size:9.5pt;}',
+    '.fs-anmerkungen{border:1px solid #000;padding:10px;min-height:100px;margin-top:20px;}',
+    '.fs-anmerkungen-label{font-weight:700;text-transform:uppercase;font-size:8.5pt;color:#555;margin-bottom:6px;}'
+  ].join('\n');
+
+  function drucken() {
+    var html = '<div class="fs-page">';
+    html += '<div class="fs-gruss">Guten Morgen liebe Frühschicht,<br>Bitte noch:</div>';
+
+    var mohn  = document.getElementById('fh-mohn').value;
+    var sesam = document.getElementById('fh-sesam').value;
+    html += '<div class="fs-item fs-zebra"><span class="fs-name">Mohn + Sesam</span>' +
+            '<span class="fs-box">' + (mohn || '&nbsp;') + '</span><span class="fs-sep">/</span>' +
+            '<span class="fs-box">' + (sesam || '&nbsp;') + '</span></div>';
+
+    FIXE_ROWS.forEach(function(item, i) {
+      var val = document.getElementById('fh-' + item.id).value;
+      html += '<div class="fs-item' + (i % 2 === 0 ? ' fs-zebra' : '') + '">' +
+              '<span class="fs-name">' + escapeHtml(item.label) + '</span>' +
+              '<span class="fs-box">' + (val || '&nbsp;') + '</span>' +
+              '<span class="fs-suffix">' + escapeHtml(item.suffix) + '</span></div>';
+    });
+
+    var extraI = 0;
+    document.querySelectorAll('.fh-extra-row').forEach(function(el) {
+      var name = el.querySelector('input').value.trim();
+      var val  = el.querySelector('select').value;
+      if (!name && !val) return;
+      html += '<div class="fs-item' + ((FIXE_ROWS.length + extraI) % 2 === 0 ? ' fs-zebra' : '') + '">' +
+              '<span class="fs-name">' + escapeHtml(name || '—') + '</span>' +
+              '<span class="fs-box">' + (val || '&nbsp;') + '</span>' +
+              '<span class="fs-suffix">Bleche</span></div>';
+      extraI++;
+    });
+
+    var notizRows = document.querySelectorAll('.fh-notiz-row');
+    if (notizRows.length) {
+      html += '<table class="fs-notiz-table"><tbody>';
+      notizRows.forEach(function(el) {
+        var text = el.querySelector('textarea').value.trim();
+        var ort  = el.querySelector('select').value;
+        html += '<tr><td>' + (text ? escapeHtml(text).replace(/\n/g, '<br>') : '&nbsp;') + '</td>' +
+                '<td style="white-space:nowrap;">Noch in den <strong>' + escapeHtml(ort) + '</strong> stellen</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+
+    var anm = document.getElementById('fh-anmerkungen').value.trim();
+    html += '<div class="fs-anmerkungen"><div class="fs-anmerkungen-label">Anmerkungen</div>' +
+            (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
+
+    html += '</div>';
+
+    BOS_DRUCK.drucken({
+      inhaltHTML: html,
+      appName: 'Frühschicht-Formular',
+      mitKopf: druckOptionen.kopf,
+      farbig: druckOptionen.farbe,
+      extraCSS: PRINT_CSS
+    });
+  }
+
+  /* ── Hilfe ──────────────────────────────────────────────────────── */
+  function oeffneHilfe() { document.getElementById('hilfe-sheet').classList.remove('hidden'); }
+  function schliesseHilfe() { document.getElementById('hilfe-sheet').classList.add('hidden'); }
+
+  /* ── Datum-Hinweis ──────────────────────────────────────────────── */
+  function formatDatum(d) {
+    var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    var monate = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    return tage[d.getDay()] + ', ' + d.getDate() + '. ' + monate[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  document.getElementById('datum-hint').textContent = 'Ausdruck-Datum: ' + formatDatum(new Date());
+
+  /* ── Init ───────────────────────────────────────────────────────── */
+  renderFixedRows();
+  initExtra();
+  for (var i = 0; i < 3; i++) fhAddNotizRow();
+</script>
+</body>
+</html>

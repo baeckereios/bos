@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="de">
+<!--
+  MODUL: produkt_config/produkt_config_sync.html — Produkt-Config Sync
+  CHANGELOG
+    2026-10-04 · 14:24 · v-online-1 · Aufräumen
+      PIN-Gate entfernt (Vorbereitung Online-Gang). Der PIN stand im
+      Klartext im öffentlichen Quelltext und prüfte nur im Browser — kein
+      Schutz. Zugang regelt der Zugriffs-Guard (Registry: roles ['admin']),
+      Schreibrechte auf "produkte" setzt der Server über die Firestore-
+      Regeln durch. bos_pin_config.js wurde mit entfernt. Die Seite startet
+      jetzt direkt mit initApp(); Hilfetext angepasst. Nebenbei: der
+      Verbindungsfehler in initApp() zeigt jetzt err.message statt nur
+      "Fehler" (Fehlermeldungs-Regel).
+    2026-09-28 · 10:33 · v-schluessel-1 · Fix
+      Import lehnt eine Datei mit doppeltem legacyKey vor jedem Schreiben ab
+      und nennt die betroffenen Schlüssel sichtbar in der Statuszeile (nicht
+      nur in der Konsole). Vorher prüfte der Import nur auf FEHLENDE
+      Schlüssel; bei doppelten schrieb batch.set() das zweite Produkt still
+      über das erste (Dokument-ID = legacyKey). Siehe
+      SESSION_2026-09-28_TEIGECKEN_STUFE1_BAU.md, Teil B.
+    (davor) kein Datei-Changelog — Geschichte in PRODUKT_CONFIG_SYNC_DOKU.md
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Produkt-Config Sync</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1710; --surface: #26221a; --amber: #c9932e;
+    --text: #f0ebe0; --dim: #9c9484; --red: #e0655f;
+    --green: #6cbf6c; --border: #3a3428;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Barlow', system-ui, sans-serif; min-height:100vh;
+  }
+  header {
+    padding:18px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; background:var(--bg); z-index:5;
+  }
+  h1 { font-family:'Fraunces', serif; font-size:1.2rem; margin:0; }
+  .badge { font-size:.7rem; letter-spacing:.04em; color:var(--amber); text-transform:uppercase; }
+  main { padding:18px; max-width:640px; margin:0 auto; }
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:18px; margin-bottom:16px;
+  }
+  .card h2 { font-family:'Fraunces', serif; font-size:1.05rem; margin:0 0 8px; }
+  .card p.desc { font-size:.85rem; color:var(--dim); line-height:1.4; margin:0 0 12px; }
+  button {
+    background:var(--amber); color:#1a1710; border:none;
+    padding:14px 18px; border-radius:10px; font-weight:700;
+    font-size:.95rem; width:100%; cursor:pointer;
+  }
+  button:disabled { opacity:.35; cursor:not-allowed; }
+  input[type=file], input[type=password] {
+    width:100%; background:#14120d; border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:10px; font-size:.9rem;
+  }
+  .preview {
+    font-size:.82rem; color:var(--dim); margin:10px 0; white-space:pre-wrap;
+    background:#14120d; border-radius:8px; padding:10px; border:1px solid var(--border);
+  }
+  .status { font-size:.82rem; margin-top:8px; min-height:1.2em; }
+  .status.ok { color:var(--green); }
+  .status.err { color:var(--red); }
+  .gate { /* seit 04.10.2026 ungenutzt (PIN-Gate entfernt), Regeln bleiben als Vorlage */
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100vh; gap:14px; padding:0 30px; text-align:center;
+  }
+  .gate input { width:160px; text-align:center; font-size:1.4rem; letter-spacing:.2em; }
+  .gate button { width:160px; }
+  .hidden { display:none !important; }
+  .row { margin-top:10px; }
+  code { background:#14120d; padding:1px 5px; border-radius:4px; font-size:.85em; }
+
+  .help-btn {
+    width:auto; background:transparent; border:1px solid var(--border);
+    color:var(--amber); padding:6px 11px; border-radius:8px; font-size:1rem;
+  }
+  .sheet-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:50;
+    display:flex; align-items:flex-end;
+  }
+  .sheet {
+    background:var(--surface); width:100%; max-height:85vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:14px 20px 24px;
+    border-top:1px solid var(--border);
+  }
+  .sheet-handle {
+    width:40px; height:4px; background:var(--border); border-radius:2px;
+    margin:0 auto 14px;
+  }
+  .sheet h2 { font-family:'Fraunces', serif; font-size:1.15rem; margin:0 0 14px; }
+  .sheet .sec { margin-bottom:16px; }
+  .sheet .sec h3 { font-size:.9rem; color:var(--amber); margin:0 0 4px; }
+  .sheet .sec p { font-size:.87rem; color:var(--text); line-height:1.5; margin:0; }
+  .sheet button.secondary {
+    background:transparent; border:1px solid var(--amber); color:var(--amber); margin-top:6px;
+  }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'produkt_config_sync';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+<div id="app">
+  <header>
+    <h1>Produkt-Config · Sync</h1>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="badge" id="fsStatus">Firestore: prüfe…</span>
+      <button id="helpOpenBtn" class="help-btn" title="Hilfe">❓</button>
+    </div>
+  </header>
+
+  <div id="helpSheet" class="sheet-overlay hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="helpTitle"></h2>
+      <div id="helpContent"></div>
+      <button id="helpCloseBtn" class="secondary">Schließen</button>
+    </div>
+  </div>
+
+  <main>
+
+    <div class="card">
+      <h2>📥 Import — Datei → Firestore</h2>
+      <p class="desc">
+        JSON-Array mit Produkt-Stammdaten hochladen (jedes Element braucht <code>legacyKey</code>).
+        Schreibt jedes Produkt als eigenes Dokument, Dokument-ID = <code>legacyKey</code>.
+        Last-Write-Wins — bestehende Dokumente mit gleicher ID werden überschrieben, sonst bleibt alles unberührt.
+      </p>
+      <input type="file" id="importFile" accept=".json">
+      <div id="importPreview" class="preview hidden"></div>
+      <div class="row">
+        <button id="importBtn" disabled>Vorschau gegen Firestore prüfen</button>
+      </div>
+      <div id="importConfirmRow" class="row hidden">
+        <button id="importConfirmBtn">✓ Jetzt in Firestore schreiben</button>
+      </div>
+      <div id="importStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>📤 Export — Firestore → Datei</h2>
+      <p class="desc">
+        Lädt den aktuellen Stand aus Firestore und erzeugt eine <code>produkt_config.json</code> zum
+        Download. Diese Datei danach manuell im Repo ersetzen (GitHub-Weboberfläche reicht) —
+        erst dann sehen die Lese-Satelliten (Froster-Inventur, NFC-Stationen, mega_erfassung …) die Änderung.
+      </p>
+      <button id="exportBtn">Aus Firestore laden &amp; herunterladen</button>
+      <div id="exportStatus" class="status"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+
+<script>
+// ==========================================================================
+// KONFIGURATION — bewusst oben, damit Annahmen sofort sichtbar sind
+// ==========================================================================
+var COLLECTION = "produkte"; // Annahme — siehe SESSION_2026-08-27_PRODUKT_CONFIG_ZWITTER.md, offener Punkt #2
+// Pfad "../bos_firebase_config.js" oben geht davon aus, dass diese Datei eine
+// Ordner-Ebene unter dem Repo-Root liegt (analog froster_inventur.html). Liegt
+// sie im Root selbst: Pfad auf "./bos_firebase_config.js" ändern.
+
+// PIN-Gate entfernt 04.10.2026 — Zugang regelt der Zugriffs-Guard, Schreibrechte die Firestore-Regeln.
+initApp();
+
+// ==========================================================================
+// Hilfe (Standard-Muster: einfaches helpData-Objekt + Bottom-Sheet, siehe
+// Fundament §5.2 "Hilfe-Slot pro Seite" — Hotspot/Spotlight nur für komplexe
+// Rechner, hier bewusst die einfache Variante)
+// ==========================================================================
+var helpData = {
+  title: "Was ist das hier?",
+  sections: [
+    {
+      heading: "Wofür ist diese Seite?",
+      text: "Verbindet zwei Orte, an denen Produktdaten liegen: die Datei produkt_config.json (die Froster-Inventur, NFC-Stationsseiten und andere Seiten lesen) und die Datenbank (Firestore), in der künftig mehrere Personen Produktdaten pflegen können. Diese Seite überträgt Daten zwischen beiden — in beide Richtungen."
+    },
+    {
+      heading: "Was macht der Import?",
+      text: "Eine Datei mit Produktdaten wird ausgewählt und in die Datenbank geschrieben. Vorher zeigt die Seite eine Vorschau: wie viele Produkte sind neu, wie viele geändert, wie viele bleiben gleich. Erst nach Bestätigung wird tatsächlich geschrieben. Bestehende Produkte mit gleichem Namen (legacyKey) werden dabei überschrieben — nichts wird stillschweigend gemischt. Enthält die Datei denselben Produkt-Schlüssel zweimal, lehnt die Seite sie sofort ab und nennt die betroffenen Schlüssel — dann wird gar nichts geschrieben, auch nicht der Rest."
+    },
+    {
+      heading: "Was macht der Export?",
+      text: "Holt den aktuellen Stand aller Produkte aus der Datenbank und lädt sie als Datei herunter. Diese Datei muss danach manuell die alte produkt_config.json im System ersetzen — erst dann sehen die anderen Seiten die Änderungen. Der Export ist gleichzeitig Backup und Vorbereitung für diesen Veröffentlichen-Schritt."
+    },
+    {
+      heading: "Für wen ist das gedacht?",
+      text: "Nur für die Person(en), die Produktdaten pflegen — die Seite ist deshalb nur mit Admin-Rolle erreichbar. Für den täglichen Betrieb (Froster zählen, Produktion planen usw.) wird diese Seite nicht gebraucht."
+    },
+    {
+      heading: "Wichtig zu wissen",
+      text: "Diese Seite entfernt keine Produkte aus der Datenbank — sie legt neue an oder überschreibt bestehende. Ein Produkt komplett löschen geht hierüber bisher nicht."
+    }
+  ]
+};
+
+function renderHelp() {
+  document.getElementById('helpTitle').textContent = helpData.title;
+  var html = '';
+  helpData.sections.forEach(function (s) {
+    html += '<div class="sec"><h3>' + s.heading + '</h3><p>' + s.text + '</p></div>';
+  });
+  document.getElementById('helpContent').innerHTML = html;
+}
+renderHelp();
+
+document.getElementById('helpOpenBtn').onclick = function () {
+  document.getElementById('helpSheet').classList.remove('hidden');
+};
+document.getElementById('helpCloseBtn').onclick = function () {
+  document.getElementById('helpSheet').classList.add('hidden');
+};
+document.getElementById('helpSheet').addEventListener('click', function (e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
+function initApp() {
+  var statusEl = document.getElementById('fsStatus');
+  if (!window.BOS_AUTH_READY) {
+    statusEl.textContent = 'Firestore: bos_firebase_config.js fehlt';
+    return;
+  }
+  window.BOS_AUTH_READY.then(function () {
+    statusEl.textContent = 'Firestore: verbunden';
+  }).catch(function (err) {
+    statusEl.textContent = 'Firestore: Fehler — ' + (err && err.message ? err.message : String(err)); // echte Meldung sichtbar (Regel seit 04.10.2026)
+    console.error(err);
+  });
+}
+
+// ==========================================================================
+// Import
+// ==========================================================================
+var importedData = null;
+
+document.getElementById('importFile').onchange = function (e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (evt) {
+    var previewEl = document.getElementById('importPreview');
+    var statusEl = document.getElementById('importStatus');
+    var btn = document.getElementById('importBtn');
+    try {
+      var data = JSON.parse(evt.target.result);
+      if (!Array.isArray(data)) throw new Error("Erwarte ein JSON-Array");
+      var ohneKey = data.filter(function (p) { return !p.legacyKey; });
+      if (ohneKey.length > 0) {
+        throw new Error(ohneKey.length + " Produkt(e) ohne legacyKey — abgebrochen, keine Erfindung von IDs");
+      }
+      // NEU 28.09.2026 (Teil B): doppelte Schlüssel sperren die ganze Datei.
+      // Dokument-ID = legacyKey — zwei gleiche Schlüssel hießen, dass
+      // batch.set() das zweite Produkt still über das erste schreibt.
+      var zaehler = {};
+      data.forEach(function (p) { zaehler[p.legacyKey] = (zaehler[p.legacyKey] || 0) + 1; });
+      var doppelt = Object.keys(zaehler).filter(function (k) { return zaehler[k] > 1; }).sort();
+      if (doppelt.length > 0) {
+        throw new Error("Doppelte legacyKey in der Datei — abgebrochen, nichts geschrieben: " +
+          doppelt.map(function (k) { return k + " (" + zaehler[k] + "×)"; }).join(", ") +
+          ". Im Editor eins der Produkte löschen bzw. neu anlegen, dann die Datei erneut herunterladen.");
+      }
+      importedData = data;
+      previewEl.textContent = data.length + " Produkte in der Datei. Beispiel: " +
+        data[0].name + " (" + data[0].legacyKey + ")";
+      previewEl.classList.remove('hidden');
+      btn.disabled = false;
+      statusEl.textContent = '';
+    } catch (err) {
+      console.error('[Produkt-Config Sync] Import abgelehnt:', err);
+      importedData = null;
+      previewEl.classList.add('hidden');
+      btn.disabled = true;
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.className = 'status err';
+    }
+  };
+  reader.readAsText(file);
+};
+
+document.getElementById('importBtn').onclick = function () {
+  if (!importedData) return;
+  var statusEl = document.getElementById('importStatus');
+  statusEl.textContent = 'Lade aktuellen Firestore-Stand …';
+  statusEl.className = 'status';
+  db.collection(COLLECTION).get().then(function (snapshot) {
+    var existing = {};
+    snapshot.forEach(function (doc) { existing[doc.id] = doc.data(); });
+    var neu = 0, geaendert = 0, unveraendert = 0;
+    importedData.forEach(function (p) {
+      if (!existing[p.legacyKey]) neu++;
+      else if (JSON.stringify(existing[p.legacyKey]) !== JSON.stringify(p)) geaendert++;
+      else unveraendert++;
+    });
+    document.getElementById('importPreview').textContent =
+      importedData.length + " Produkte — " + neu + " neu, " + geaendert + " geändert, " + unveraendert + " unverändert.";
+    statusEl.textContent = '';
+    document.getElementById('importConfirmRow').classList.remove('hidden');
+  }).catch(function (err) {
+    statusEl.textContent = '✗ ' + err.message;
+    statusEl.className = 'status err';
+  });
+};
+
+document.getElementById('importConfirmBtn').onclick = function () {
+  if (!importedData) return;
+  var btn = this;
+  var statusEl = document.getElementById('importStatus');
+  btn.disabled = true;
+  btn.textContent = 'Schreibe …';
+
+  // Firestore-Batches sind auf 500 Schreibvorgänge begrenzt.
+  // Bei aktuell 87 Produkten unproblematisch — bei künftigem Wachstum ggf. chunken.
+  var batch = db.batch();
+  var col = db.collection(COLLECTION);
+  importedData.forEach(function (p) {
+    batch.set(col.doc(p.legacyKey), p);
+  });
+
+  batch.commit().then(function () {
+    statusEl.textContent = '✓ ' + importedData.length + ' Produkte in Firestore geschrieben.';
+    statusEl.className = 'status ok';
+    document.getElementById('importConfirmRow').classList.add('hidden');
+    btn.disabled = false;
+    btn.textContent = '✓ Jetzt in Firestore schreiben';
+  }).catch(function (err) {
+    statusEl.textContent = '✗ ' + err.message;
+    statusEl.className = 'status err';
+    btn.disabled = false;
+    btn.textContent = '✓ Jetzt in Firestore schreiben';
+  });
+};
+
+// ==========================================================================
+// Export
+// ==========================================================================
+document.getElementById('exportBtn').onclick = function () {
+  var statusEl = document.getElementById('exportStatus');
+  statusEl.textContent = 'Lade aus Firestore …';
+  statusEl.className = 'status';
+  db.collection(COLLECTION).get().then(function (snapshot) {
+    var arr = [];
+    snapshot.forEach(function (doc) { arr.push(doc.data()); });
+    arr.sort(function (a, b) { return (a.legacyKey || '').localeCompare(b.legacyKey || ''); });
+
+    var blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'produkt_config.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = '✓ ' + arr.length + ' Produkte heruntergeladen. Jetzt manuell im Repo ersetzen.';
+    statusEl.className = 'status ok';
+  }).catch(function (err) {
+    statusEl.textContent = '✗ ' + err.message;
+    statusEl.className = 'status err';
+  });
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Krankmelder · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: krankmelder.html
+  ZWECK: Baustein 3 aus SESSION_2026-09-12_KONTO_KRANKMELDER_KONZEPT.md.
+         Eigener, klar getrennter Einstiegspunkt für den Eilfall
+         "Person hat sich krank gemeldet" — eigene Zielfunktion als die
+         normale Wochenplanung: möglichst wenig an den Tagen ANDERER
+         ändern, wo es geht, aber offen für Neusortierung, wenn das ein
+         besseres Ergebnis liefert (Ulf, 12.09.2026).
+  ZWEITEILUNG DES ZEITRAUMS: der gewählte Krankheits-Zeitraum kann über
+         die aktuelle Woche hinausgehen. Für Tage in noch NICHT
+         offiziellen (zukünftigen) Wochen reicht ein normaler
+         Krankheits-Eintrag in 'abwesenheiten' — der bestehende
+         Entwürfe/Offizieller-Plan-Ablauf berücksichtigt den automatisch.
+         NUR für Tage in BEREITS offiziellen Wochen braucht es die echte
+         Korrektur-Engine (krankmelder_berechnung.js) — die sind ja schon
+         fest zugewiesen und veröffentlicht.
+  ZWEI STRATEGIEN NEBENEINANDER je betroffenem Tag: 'minimal' (alle
+         bestehenden Zuweisungen anderer Personen bleiben fix, nur die
+         Lücke wird neu gefüllt) und 'neu' (kompletter Neudurchlauf,
+         kann mehr als eine Person umsortieren). Ulf wählt pro Tag.
+         Siehe krankmelder_berechnung.js-Kopf für die technische Basis
+         (beide nutzen denselben rechenmodul.js-Aufruf, nur mit
+         unterschiedlichem manuelleZuweisungen-Argument).
+  VERZICHT AUF FREIEN TAG: für eine verbleibende Lücke kann JEDE aktive
+         Person manuell eingesetzt werden, auch wer an dem Tag laut Plan
+         eigentlich frei hatte — das zählt dann als "Verzicht" und
+         erhöht deren freieTageSchuld im Ausgleichskonto (siehe
+         AUSGLEICHSKONTO_DOKU.md). Ulf, 12.09.2026: "macht es nicht
+         schon Sinn, die Logik dahingehend zu bauen und später den
+         Schaden in einer Statistik zu erfassen" — bewusst NUR die
+         Zählung, keine automatische Nachhol-/Bevorzugungs-Logik (die
+         ist noch nicht entworfen, bleibt vorerst Handarbeit).
+  ABSICHERUNG IST EIGENSTÄNDIG, nicht Teil des Offizieller-Plan-Gates
+         (Ulf: "ich würde das eigenständig machen... klare Trennung").
+         Speichern (Entwurf, kein Live-Effekt — Raum für die "kurze
+         Gedenkpause", z. B. um erst einen Kollegen zu fragen) und
+         Veröffentlichen (macht die Korrektur live) SIND hier die
+         vollständige Absicherung, keine weitere Bestätigung nötig.
+  DATENFLUSS: bos_access_guard.js (roles: admin, produktionsleitung) →
+         Person + Von/Bis wählen → Zeitraum in "bereits offizielle
+         Wochen" (Korrektur nötig) und "übrige Tage" (normaler
+         Krankheits-Eintrag reicht) aufteilen → je betroffenem Tag beide
+         Strategien berechnen (krankmelder_berechnung.js) → Ulf wählt
+         pro Tag, füllt verbleibende Lücken manuell → Speichern (nur
+         Arbeitsspeicher) → Veröffentlichen: schreibt (1) EINEN
+         Abwesenheiten-Eintrag über den GANZEN Von-Bis-Zeitraum, (2) die
+         gewählten Korrekturen in die betroffenen plaene/<Montag>-
+         Dokumente (nur die geänderten Tage), (3) bei Verzicht:
+         freieTageSchuld-Erhöhung in konten/<personId>.
+  SCHNITTSTELLEN: abwesenheiten (schreibend, grund:'krankheit'),
+         plaene/<Montag> (lesend + schreibend, nur betroffene Tage),
+         konten/<personId> (schreibend, nur freieTageSchuld),
+         personen/positionen (lesend), krankmelder_berechnung.js +
+         rechenmodul.js (Berechnung, beide unverändert genutzt).
+  BEKANNTE OFFENE PUNKTE:
+    - Keine automatische Nachhol-/Bevorzugungs-Logik für freieTageSchuld
+      — bewusst zurückgestellt, siehe oben.
+    - Kein Zurücknehmen einer bereits veröffentlichten Korrektur aus
+      dieser Seite heraus — müsste manuell in offizieller_plan.html
+      o. ä. korrigiert werden.
+    - Cross-Schicht-Vorschläge (manuellePruefung aus rechenmodul.js)
+      fließen in die Berechnung ein, werden aber nicht gesondert
+      hervorgehoben — erscheinen einfach als Zuweisung, wenn die
+      Kaskade sie zieht.
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Zeitraum-Aufteilung, zwei Strategien je Tag,
+      manuelles Lücken-Füllen mit Verzicht-Erkennung, Speichern/
+      Veröffentlichen als eigenständige zweistufige Absicherung.
+    2026-09-14 · v0.2 · NACHGETRAGEN am 16.09.2026 (T-36)
+      Schichtwechsel-Vorschlag je offener Position
+      (findeGuenstigstenWechselVorschlag), inkl. vollständiger Anwendung
+      mehrstufiger Ketten über data-schritte. Steht im Code, hatte hier
+      nie einen Eintrag.
+    2026-09-16 · 10:14 · v0.3 · Feature (T-71)
+      Ein Verzicht nimmt jetzt die Gutschrift des hergegebenen Tages
+      zurück, nicht nur freieTageSchuld +1. Gelesen wird der gebuchte
+      Betrag aus plaene/<montag>.kontoBuchung (seit 16.09. von
+      offizieller_plan.html geschrieben) -- nicht neu berechnet, sonst
+      liefe er auseinander, sobald jemand die Punkte-Werte verstellt.
+      Fehlt das Protokoll (ältere Pläne), wird NICHTS abgezogen, nur die
+      Schuld gebucht. Zurückgenommen werden Saldo UND die Zähler des
+      Tages (wunschtagScore, Kombis) -- sie behaupteten sonst etwas, das
+      nicht mehr stimmt. wochenGezaehlt bleibt bewusst stehen: die Woche
+      zählt weiter mit, nur mit 0 Punkten. Der Konto-Teil läuft in einer
+      runTransaction und löscht die zurückgenommenen Protokoll-Einträge,
+      damit ein zweiter Lauf nicht doppelt abzieht.
+    2026-09-26 · Schritt 5 (Namens-Fundament, K-7) · Umbau
+      Namen kommen aus bos_namen.js (Namensliste in Firestore, NE-6):
+      Rufname > Beschreibung > lokale Datei als Kürzel („M. · lokal“, nur
+      bis Schritt 8) > „P07 · kein Name hinterlegt“ — nie leer, nie
+      undefined. anzeigeName() ist nur noch ein Einzeiler auf
+      BOS_NAMEN.anzeige(); Auswahllisten zeigen „Rufname (Beschreibung)“
+      (NE-7, BOS_NAMEN.auswahl). Die Namensliste lädt einmal zusammen mit
+      den Personen (personenUndNamen()); ist sie nicht lesbar, steht der
+      Grund sichtbar oben. Die lokale Datei bleibt bis Schritt 8 Rückfall.
+    2026-09-26 · Schritt 8 (Namens-Fundament) · Rückbau
+      Die lokale Namensdatei ist in Rente: keine Einbindung von
+      bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei.
+      Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
+      Beschreibung > „P07 · kein Name hinterlegt“).
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../rechenmodul.js"></script>
+<script src="../krankmelder_berechnung.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:720px; margin:0 auto;}
+  .abschnitt-titel{ font-family:var(--font-label); font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size: var(--bos-font-xs,.74rem); color:var(--dim); margin: var(--bos-space-lg,22px) 0 var(--bos-space-xs,8px); }
+  .abschnitt-titel:first-child{margin-top:0;}
+  .bos-input, select.bos-input, input.bos-input{ width:100%; padding: var(--bos-space-sm,11px) var(--bos-space-sm,12px); background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius); color:var(--text); font-family:var(--font-body); font-size: var(--bos-font-md,.92rem); }
+  .zwei-spalten{display:grid; grid-template-columns:1fr 1fr; gap: var(--bos-space-sm,10px);}
+  .lade-hinweis, .leer-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+
+  .btn{ font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.03em; font-size: var(--bos-font-sm,.85rem); border-radius:var(--radius); padding: var(--bos-space-sm,12px); cursor:pointer; border:none; text-align:center; }
+  .btn-berechnen{width:100%; margin-top: var(--bos-space-md,16px); background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#1b1305; box-shadow:0 4px 18px var(--amber-glow);}
+  .btn-berechnen:disabled{opacity:.5; cursor:wait;}
+
+  .hinweis-box{font-size: var(--bos-font-sm,.85rem); color:var(--dim); line-height:1.5; margin: var(--bos-space-sm,12px) 0; padding: var(--bos-space-sm,12px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);}
+  .hinweis-box.amber{color:var(--amber-bright); background:var(--amber-glow); border-color:var(--amber);}
+
+  .tag-karte{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-md,16px); margin-bottom: var(--bos-space-md,16px);}
+  .tag-titel{font-family:var(--font-display); font-weight:800; font-size: var(--bos-font-md,1rem); margin-bottom: var(--bos-space-sm,10px);}
+  .strategie-wahl{display:flex; gap: var(--bos-space-xs,8px); margin-bottom: var(--bos-space-sm,10px);}
+  .strategie-btn{flex:1; padding: var(--bos-space-sm,10px); border-radius:var(--radius); border:1px solid var(--border-strong); background:var(--surface-2); color:var(--text); font-family:var(--font-label); font-weight:700; font-size: var(--bos-font-xs,.78rem); cursor:pointer; text-align:center;}
+  .strategie-btn .luecken-zahl{display:block; font-family:var(--font-display); font-size: var(--bos-font-lg,1.15rem); margin-top:2px;}
+  .strategie-btn.gewaehlt{border-color:var(--amber); background:var(--amber-glow); color:var(--amber-bright);}
+  .strategie-btn.gewaehlt .luecken-zahl{color:var(--amber-bright);}
+
+  .zuweisung-zeile{display:flex; align-items:center; justify-content:space-between; gap: var(--bos-space-sm,10px); padding: 6px 0; border-bottom:1px solid var(--border); font-size: var(--bos-font-sm,.85rem);}
+  .zuweisung-zeile:last-child{border-bottom:none;}
+  .zuweisung-pos{color:var(--dim); flex-shrink:0;}
+  .zuweisung-person{font-weight:700; text-align:right;}
+  .zuweisung-person.luecke{color:var(--danger); font-weight:400;}
+  .zuweisung-zeile select{max-width:180px;}
+  .verzicht-hinweis{font-size: var(--bos-font-2xs,.68rem); color:var(--amber-bright); display:block;}
+  /* Ergänzt 14.09.2026 (Krankmelder-Anbindung ans Punktesystem) */
+  .wechsel-vorschlag-zeile{
+    font-size: var(--bos-font-xs,.78rem); color:var(--text); background:var(--amber-glow);
+    border:1px solid var(--amber); border-radius:var(--radius); padding: var(--bos-space-2xs,6px) var(--bos-space-sm,10px);
+    margin-bottom: var(--bos-space-2xs,6px); display:flex; align-items:center; flex-wrap:wrap; gap: var(--bos-space-2xs,6px);
+  }
+  .wechsel-vorschlag-kette{color:var(--dim); font-size: var(--bos-font-2xs,.7rem);}
+
+  .aktion-block{ display:flex; flex-direction:column; gap: var(--bos-space-xs,8px); margin-top: var(--bos-space-lg,20px); }
+  .btn-speichern{background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong);}
+  .btn-veroeffentlichen{background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#1b1305;}
+  .btn-veroeffentlichen:disabled{opacity:.5; cursor:not-allowed;}
+  .aktion-hinweis{font-size: var(--bos-font-xs,.76rem); color:var(--dim); text-align:center;}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen-sheet{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_krankmelder';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Krankmelder</h1>
+</header>
+
+<main>
+  <div class="abschnitt-titel">Person</div>
+  <select class="bos-input" id="kPerson"><option value="">Lade Personen …</option></select>
+
+  <div class="abschnitt-titel">Zeitraum</div>
+  <div class="zwei-spalten">
+    <input type="date" class="bos-input" id="kVon">
+    <input type="date" class="bos-input" id="kBis">
+  </div>
+
+  <button type="button" class="btn btn-berechnen" id="berechnenBtn">Berechnen</button>
+
+  <div id="ergebnisBox"></div>
+
+  <div class="aktion-block" id="aktionBlock" style="display:none;">
+    <button type="button" class="btn btn-speichern" id="speichernBtn">Speichern</button>
+    <button type="button" class="btn btn-veroeffentlichen" id="veroeffentlichenBtn" disabled>Veröffentlichen</button>
+    <div class="aktion-hinweis" id="aktionHinweis">Erst speichern, dann freigeschaltet.</div>
+  </div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert der Krankmelder?</h2>
+    <p>Für den Eilfall: eine Person meldet sich krank, ein Teil des Zeitraums betrifft bereits VERÖFFENTLICHTE Pläne.</p>
+    <p>Tage in noch nicht offiziellen (zukünftigen) Wochen brauchen keine besondere Behandlung — ein normaler Krankheitseintrag reicht, die normale Wochenplanung berücksichtigt ihn von selbst.</p>
+    <p>Für Tage in BEREITS offiziellen Wochen zeigt dieses Werkzeug zwei Möglichkeiten: "Minimal verändert" lässt alle anderen Zuweisungen unangetastet, nur die Lücke wird neu gefüllt. "Neu sortiert" rechnet den ganzen Tag frisch — kann mehr Personen umstellen, aber manchmal weniger Lücken übrig lassen.</p>
+    <p>Bleibt eine Lücke offen, kannst du von Hand jede aktive Person einsetzen — auch jemanden, der eigentlich frei hatte. Das zählt dann als Verzicht auf den freien Tag und wird im Ausgleichskonto vermerkt (reine Zählung, keine automatische Nachholung).</p>
+    <p>"Speichern" merkt sich deine Auswahl nur im Browser — Raum für eine kurze Pause, z. B. um erst jemanden zu fragen, ob er einspringt. Erst "Veröffentlichen" macht alles live.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var TAGE_LABEL = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function fehlertext(err) { return escHtml((err && err.message) || String(err)); }
+  function isoDatum(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function formatDatumKurz(d) { return TAGE_LABEL[d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.'; }
+  function montagDerWoche(d) {
+    var kopie = new Date(d);
+    var diff = (kopie.getDay() + 6) % 7; // 0 = Montag
+    kopie.setDate(kopie.getDate() - diff);
+    return kopie;
+  }
+
+  var personenListe = [];
+  var positionenListe = [];
+  var abwesenheitenListe = [];
+
+  // Schritt 5 (Namens-Fundament, 26.09.2026): EINE Namensfunktion für alle
+  // Planungsseiten — bos_namen.js (Rufname > Beschreibung > lokal als
+  // Kürzel > "P07 · kein Name hinterlegt"). Die frühere eigene Kopie, die
+  // Vor- und Nachname aus der lokalen Datei zusammensetzte, ist entfernt.
+  function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
+  // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
+  function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
+  // Personen UND Namensliste zusammen laden; liefert wie vorher den
+  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  function personenUndNamen() {
+    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
+      .then(function (r) { return r[0]; });
+  }
+
+  // { datumISO: { montag, planRef, ergebnisse: {minimal, neu}, gewaehlt: 'minimal'|'neu'|null,
+  //   kombiniert: {posId: personId}, luecken: [posId,...], verzicht: [personId,...] } }
+  var tagesZustand = {};
+  var betroffeneWochen = {}; // { montagIso: { plan, planTage: [...] } }
+  var uebrigeTageOhneKorrektur = []; // Tage außerhalb offizieller Wochen -- nur Info
+
+  function ladePersonenUndPositionen() {
+    return Promise.all([
+      personenUndNamen(),
+      window.db.collection('positionen').get(),
+      window.db.collection('abwesenheiten').get()
+    ]).then(function (ergebnisse) {
+      personenListe = [];
+      ergebnisse[0].forEach(function (doc) { personenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+      positionenListe = [];
+      ergebnisse[1].forEach(function (doc) { positionenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+      abwesenheitenListe = [];
+      ergebnisse[2].forEach(function (doc) { abwesenheitenListe.push(doc.data()); });
+      var sel = document.getElementById('kPerson');
+      sel.innerHTML = '<option value="">— Person wählen —</option>' +
+        personenListe.filter(function (p) { return p.aktiv !== false; })
+          .sort(function (a, b) { return anzeigeName(a.id).localeCompare(anzeigeName(b.id), 'de'); })
+          .map(function (p) { return '<option value="' + p.id + '">' + escHtml(auswahlName(p.id)) + '</option>'; }).join('');
+    }).catch(function (err) {
+      console.error('[Krankmelder] Personen-Lesefehler:', err);
+      document.getElementById('kPerson').innerHTML = '<option value="">Laden fehlgeschlagen</option>';
+    });
+  }
+
+  function alleTageZwischen(vonIso, bisIso) {
+    var tage = [];
+    var d = new Date(vonIso + 'T00:00:00');
+    var ende = new Date(bisIso + 'T00:00:00');
+    while (d <= ende) { tage.push(isoDatum(d)); d.setDate(d.getDate() + 1); }
+    return tage;
+  }
+
+  function berechnen() {
+    var personId = document.getElementById('kPerson').value;
+    var von = document.getElementById('kVon').value;
+    var bis = document.getElementById('kBis').value;
+    var box = document.getElementById('ergebnisBox');
+    if (!personId) { alert('Bitte eine Person wählen.'); return; }
+    if (!von || !bis || von > bis) { alert('Bitte einen gültigen Zeitraum wählen (Von ≤ Bis).'); return; }
+
+    var btn = document.getElementById('berechnenBtn');
+    btn.disabled = true; btn.textContent = 'Berechnet …';
+    box.innerHTML = '<div class="lade-hinweis">Lade betroffene Wochen …</div>';
+    tagesZustand = {}; betroffeneWochen = {}; uebrigeTageOhneKorrektur = [];
+    document.getElementById('aktionBlock').style.display = 'none';
+
+    var alleTage = alleTageZwischen(von, bis);
+    var montageDerTage = {}; // datumISO -> montagIso
+    alleTage.forEach(function (t) { montageDerTage[t] = isoDatum(montagDerWoche(new Date(t + 'T00:00:00'))); });
+    var betroffeneMontage = Array.from(new Set(Object.values(montageDerTage)));
+
+    Promise.all(betroffeneMontage.map(function (montagIso) {
+      return window.db.collection('plaene').doc(montagIso).get().then(function (doc) {
+        return { montagIso: montagIso, doc: doc };
+      });
+    })).then(function (ergebnisse) {
+      ergebnisse.forEach(function (r) {
+        if (r.doc.exists && r.doc.data().status === 'offiziell') {
+          betroffeneWochen[r.montagIso] = r.doc.data();
+        }
+      });
+
+      alleTage.forEach(function (t) {
+        var montagIso = montageDerTage[t];
+        var plan = betroffeneWochen[montagIso];
+        if (!plan) { uebrigeTageOhneKorrektur.push(t); return; }
+        var planTag = (plan.tage || []).find(function (tag) { return tag.datumISO === t; });
+        if (!planTag) { uebrigeTageOhneKorrektur.push(t); return; } // z.B. Sonntag ohne Sonntagsplan-Eintrag
+
+        var krankheitsEreignis = { personId: personId, von: t, bis: t, grund: 'krankheit', bindend: true, begruendung: null };
+        var ereignisseFuerAufruf = abwesenheitenListe.concat([krankheitsEreignis]);
+
+        var ergMinimal = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(planTag, personId, personenListe, positionenListe, ereignisseFuerAufruf, 'minimal');
+        var ergNeu = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(planTag, personId, personenListe, positionenListe, ereignisseFuerAufruf, 'neu');
+
+        tagesZustand[t] = {
+          montagIso: montagIso,
+          planTag: planTag,
+          ereignisse: ereignisseFuerAufruf,
+          ergebnisse: { minimal: ergMinimal, neu: ergNeu },
+          gewaehlt: null,
+          kombiniert: {},
+          luecken: [],
+          verzicht: {}
+        };
+      });
+
+      btn.disabled = false; btn.textContent = 'Berechnen';
+      renderErgebnis(personId);
+    }).catch(function (err) {
+      console.error('[Krankmelder] Berechnung fehlgeschlagen:', err);
+      btn.disabled = false; btn.textContent = 'Berechnen';
+      box.innerHTML = '<div class="leer-hinweis">Berechnung fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+
+  function positionsName(posId, schichtErgebnis) {
+    var pos = (schichtErgebnis.aktivePositionen || []).find(function (p) { return p.id === posId; });
+    return pos ? pos.name : posId;
+  }
+
+  function waehleStrategie(datumISO, strategie) {
+    var zustand = tagesZustand[datumISO];
+    zustand.gewaehlt = strategie;
+    var erg = zustand.ergebnisse[strategie];
+    var kombiniert = Object.assign({}, erg.nacht.zuweisungen, erg.frueh.zuweisungen, erg.sonntag.zuweisungen);
+    var luecken = [].concat(erg.nacht.luecken || [], erg.frueh.luecken || [], erg.sonntag.luecken || []);
+    zustand.kombiniert = kombiniert;
+    zustand.luecken = luecken;
+    zustand.verzicht = {};
+    renderTagKarte(datumISO);
+    aktualisiereAktionZustand();
+  }
+
+  function ermittleAlleAktivenPositionenFuerTag(zustand, strategie) {
+    var erg = zustand.ergebnisse[strategie];
+    return [].concat(erg.nacht.aktivePositionen || [], erg.frueh.aktivePositionen || [], erg.sonntag.aktivePositionen || []);
+  }
+
+  function setzeLueckeManuell(datumISO, posId, personId) {
+    var zustand = tagesZustand[datumISO];
+    if (!personId) { delete zustand.kombiniert[posId]; if (zustand.luecken.indexOf(posId) === -1) zustand.luecken.push(posId); delete zustand.verzicht[posId]; renderTagKarte(datumISO); return; }
+    zustand.kombiniert[posId] = personId;
+    zustand.luecken = zustand.luecken.filter(function (p) { return p !== posId; });
+    // Verzicht-Erkennung: hatte diese Person laut URSPRÜNGLICHEM Plan an
+    // diesem Tag frei (also NICHT bereits irgendwo in planTag.*.zuweisungen)?
+    var warUrspruenglichEingeteilt = ['nacht', 'frueh', 'sonntag'].some(function (schicht) {
+      var erg = zustand.planTag[schicht] || {};
+      return Object.keys(erg.zuweisungen || {}).some(function (p) { return erg.zuweisungen[p] === personId; });
+    });
+    if (!warUrspruenglichEingeteilt) { zustand.verzicht[posId] = personId; } else { delete zustand.verzicht[posId]; }
+    renderTagKarte(datumISO);
+    aktualisiereAktionZustand();
+  }
+
+  function renderTagKarte(datumISO) {
+    var karte = document.getElementById('tagkarte-' + datumISO);
+    if (!karte) return;
+    var zustand = tagesZustand[datumISO];
+    var d = new Date(datumISO + 'T00:00:00');
+
+    var strategieHtml = ['minimal', 'neu'].map(function (s) {
+      var luecken = window.BOS_KRANKMELDER_BERECHNUNG.zaehleLuecken(zustand.ergebnisse[s]);
+      var label = s === 'minimal' ? 'Minimal verändert' : 'Neu sortiert';
+      return '<button type="button" class="strategie-btn' + (zustand.gewaehlt === s ? ' gewaehlt' : '') + '" data-strategie="' + s + '" data-datum="' + datumISO + '">' + label + '<span class="luecken-zahl">' + luecken + ' Lücken</span></button>';
+    }).join('');
+
+    var zeilenHtml = '';
+    if (zustand.gewaehlt) {
+      var aktivePositionen = ermittleAlleAktivenPositionenFuerTag(zustand, zustand.gewaehlt);
+      var aktivePersonenSortiert = personenListe.filter(function (p) { return p.aktiv !== false; })
+        .sort(function (a, b) { return anzeigeName(a.id).localeCompare(anzeigeName(b.id), 'de'); });
+      zeilenHtml = aktivePositionen.map(function (pos) {
+        var personId = zustand.kombiniert[pos.id];
+        var istLuecke = !personId;
+        var optionen = '<option value="">— offen —</option>' + aktivePersonenSortiert.map(function (p) {
+          return '<option value="' + p.id + '"' + (p.id === personId ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
+        }).join('');
+        // Ergänzt 14.09.2026 (Ulf: "läuft das System mit den Punkten
+        // aus dem normalen System... wirklich effizient und richtig?" --
+        // bisher nein, siehe SESSION_2026-09-13_PUNKTESYSTEM_KONZEPT.md
+        // §10). Für jede noch offene Position: ein Cross-Schicht-
+        // Vorschlag MIT Schichtwechsel, günstige Richtung bevorzugt
+        // (findeGuenstigstenWechselVorschlag() in
+        // krankmelder_berechnung.js) -- nur eine Anzeige, die dieselbe
+        // manuelle Zuweisung wie das Dropdown darunter auslöst, kein
+        // separater Mechanismus.
+        var wechselVorschlagHtml = '';
+        if (istLuecke) {
+          var vorschlag = window.BOS_KRANKMELDER_BERECHNUNG.findeGuenstigstenWechselVorschlag(
+            zustand.ergebnisse[zustand.gewaehlt], pos.id, personenListe, datumISO, zustand.ereignisse
+          );
+          if (vorschlag) {
+            // WICHTIG: bei einer mehrstufigen Kette (Tiefe > 1) reicht es
+            // nicht, nur die oberste Position zu setzen -- jede dabei
+            // aufgebrochene Position braucht ihre eigene Nachbesetzung.
+            // Die komplette Kette wird deshalb als JSON im Button
+            // mitgegeben und beim Klick vollständig, Schritt für
+            // Schritt, über setzeLueckeManuell() angewendet.
+            var schritteJson = escHtml(JSON.stringify(vorschlag.schritte));
+            var kettenHinweis = vorschlag.schritte.length > 1
+              ? ' <span class="wechsel-vorschlag-kette">(' + vorschlag.schritte.length + ' Schritte)</span>' : '';
+            wechselVorschlagHtml = '<div class="wechsel-vorschlag-zeile">Vorschlag (Schichtwechsel): <strong>' + escHtml(anzeigeName(vorschlag.personId)) + '</strong>' + kettenHinweis +
+              '<button type="button" class="btn-vorschlagen wechsel-vorschlag-btn" style="width:auto; margin-left:8px;" data-datum="' + datumISO + '" data-schritte="' + schritteJson + '">Übernehmen</button></div>';
+          }
+        }
+        return '<div class="zuweisung-zeile"><span class="zuweisung-pos">' + escHtml(pos.name) + '</span>' +
+          '<span>' + (istLuecke
+            ? wechselVorschlagHtml + '<select class="bos-input" style="width:auto;" data-pos="' + pos.id + '" data-datum="' + datumISO + '">' + optionen + '</select>'
+            : ('<span class="zuweisung-person">' + escHtml(anzeigeName(personId)) + '</span>' + (zustand.verzicht[pos.id] ? '<span class="verzicht-hinweis">Verzicht auf freien Tag</span>' : '') +
+               '<br><select class="bos-input" style="width:auto; margin-top:4px;" data-pos="' + pos.id + '" data-datum="' + datumISO + '">' + optionen + '</select>')) +
+          '</span></div>';
+      }).join('');
+    }
+
+    karte.innerHTML =
+      '<div class="tag-titel">' + escHtml(formatDatumKurz(d)) + '</div>' +
+      '<div class="strategie-wahl">' + strategieHtml + '</div>' +
+      (zustand.gewaehlt ? zeilenHtml : '<div class="hinweis-box">Strategie wählen, um die Zuweisungen zu sehen.</div>');
+
+    karte.querySelectorAll('[data-strategie]').forEach(function (btn) {
+      btn.addEventListener('click', function () { waehleStrategie(btn.dataset.datum, btn.dataset.strategie); });
+    });
+    karte.querySelectorAll('select[data-pos]').forEach(function (sel) {
+      sel.addEventListener('change', function () { setzeLueckeManuell(sel.dataset.datum, sel.dataset.pos, sel.value); });
+    });
+    karte.querySelectorAll('.wechsel-vorschlag-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var schritte = JSON.parse(btn.dataset.schritte);
+        // Jeden Schritt der Kette einzeln anwenden -- bei einer
+        // mehrstufigen Kette (siehe Kommentar oben) müssen ALLE
+        // aufgebrochenen Positionen nachbesetzt werden, nicht nur die
+        // ursprüngliche Lücke. setzeLueckeManuell() rendert die Karte
+        // bei jedem Aufruf neu -- das ist bei mehreren Schritten
+        // hintereinander unnötig, aber harmlos (jede Zwischen-Anzeige
+        // ist für sich schon korrekt).
+        schritte.forEach(function (schritt) {
+          setzeLueckeManuell(btn.dataset.datum, schritt.positionId, schritt.personId);
+        });
+      });
+    });
+  }
+
+  function renderErgebnis(personId) {
+    var box = document.getElementById('ergebnisBox');
+    var betroffeneTage = Object.keys(tagesZustand).sort();
+    var html = '';
+
+    if (betroffeneTage.length) {
+      html += '<div class="abschnitt-titel">Korrektur nötig — bereits offizielle Wochen</div>';
+      html += betroffeneTage.map(function (t) { return '<div class="tag-karte" id="tagkarte-' + t + '"></div>'; }).join('');
+    }
+    if (uebrigeTageOhneKorrektur.length) {
+      html += '<div class="hinweis-box">' + uebrigeTageOhneKorrektur.length + ' weitere(r) Tag(e) im Zeitraum ohne bereits offizielle Woche — dafür reicht der normale Krankheitseintrag, keine gesonderte Korrektur nötig.</div>';
+    }
+    if (!betroffeneTage.length && !uebrigeTageOhneKorrektur.length) {
+      html = '<div class="leer-hinweis">Kein Tag im gewählten Zeitraum gefunden.</div>';
+    }
+    box.innerHTML = html;
+    betroffeneTage.forEach(function (t) { renderTagKarte(t); });
+    document.getElementById('aktionBlock').style.display = 'block';
+    aktualisiereAktionZustand();
+  }
+
+  function aktualisiereAktionZustand() {
+    var betroffeneTage = Object.keys(tagesZustand);
+    var alleGewaehlt = betroffeneTage.every(function (t) { return tagesZustand[t].gewaehlt; });
+    document.getElementById('veroeffentlichenBtn').disabled = !(gespeichert && alleGewaehlt);
+  }
+
+  var gespeichert = false;
+
+  document.getElementById('berechnenBtn').addEventListener('click', berechnen);
+
+  document.getElementById('speichernBtn').addEventListener('click', function () {
+    var betroffeneTage = Object.keys(tagesZustand);
+    if (betroffeneTage.length && !betroffeneTage.every(function (t) { return tagesZustand[t].gewaehlt; })) {
+      alert('Bitte für jeden betroffenen Tag eine Strategie wählen.');
+      return;
+    }
+    gespeichert = true;
+    document.getElementById('aktionHinweis').textContent = 'Gespeichert (nur im Browser) — Veröffentlichen macht es live.';
+    aktualisiereAktionZustand();
+  });
+
+  document.getElementById('veroeffentlichenBtn').addEventListener('click', function () {
+    var personId = document.getElementById('kPerson').value;
+    var von = document.getElementById('kVon').value;
+    var bis = document.getElementById('kBis').value;
+    var btn = document.getElementById('veroeffentlichenBtn');
+    btn.disabled = true; btn.textContent = 'Veröffentlicht …';
+
+    var batch = window.db.batch();
+
+    // 1) Ein Abwesenheiten-Eintrag über den GANZEN Zeitraum -- greift
+    // automatisch für alle noch nicht offiziellen Wochen.
+    batch.set(window.db.collection('abwesenheiten').doc(), {
+      personId: personId, grund: 'krankheit', von: von, bis: bis, begruendung: null,
+      erstelltAm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // 2) Je betroffener Woche: nur die geänderten Tage im plaene-Dokument
+    // aktualisieren (tage-Array komplett neu geschrieben, da Firestore
+    // keine Teil-Array-Updates erlaubt -- andere Tage bleiben dabei
+    // unverändert, weil wir dieselbe planTag-Referenz für sie behalten).
+    var schuldnerDeltas = {}; // personId -> Anzahl Verzicht-Tage
+    // Ergänzt 16.09.2026 (T-71): welcher Verzicht an welchem TAG und in
+    // welcher Woche -- nötig, um im Konto genau den Betrag zurückzunehmen,
+    // der für diesen Tag gutgeschrieben wurde.
+    var ruecknahmen = []; // { montagIso, personId, datumISO }
+
+    Object.keys(betroffeneWochen).forEach(function (montagIso) {
+      var plan = betroffeneWochen[montagIso];
+      var neueTage = plan.tage.map(function (planTag) {
+        var zustand = tagesZustand[planTag.datumISO];
+        if (!zustand || !zustand.gewaehlt) return planTag; // dieser Tag war nicht betroffen
+        var neuerTag = { datumISO: planTag.datumISO };
+        ['nacht', 'frueh', 'sonntag'].forEach(function (schicht) {
+          var aktivePositionen = ermittleAlleAktivenPositionenFuerTag(zustand, zustand.gewaehlt).filter(function (p) {
+            return zustand.ergebnisse[zustand.gewaehlt][schicht].aktivePositionen.some(function (ap) { return ap.id === p.id; });
+          });
+          var zuweisungen = {}; var luecken = [];
+          aktivePositionen.forEach(function (pos) {
+            var pid = zustand.kombiniert[pos.id];
+            if (pid) zuweisungen[pos.id] = pid; else luecken.push(pos.id);
+          });
+          neuerTag[schicht] = { zuweisungen: zuweisungen, luecken: luecken };
+        });
+        neuerTag.ueberzaehlig = zustand.ergebnisse[zustand.gewaehlt].ueberzaehlig || [];
+        neuerTag.lehrschicht = zustand.ergebnisse[zustand.gewaehlt].lehrschicht || [];
+        Object.keys(zustand.verzicht).forEach(function (posId) {
+          var pid = zustand.verzicht[posId];
+          schuldnerDeltas[pid] = (schuldnerDeltas[pid] || 0) + 1;
+          ruecknahmen.push({ montagIso: montagIso, personId: pid, datumISO: planTag.datumISO });
+        });
+        return neuerTag;
+      });
+      batch.set(window.db.collection('plaene').doc(montagIso), { tage: neueTage, krankmelderKorrekturAm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+
+    // 3) Konto: Verzicht-Schuld buchen UND die Gutschrift des
+    // hergegebenen Tages zurücknehmen (T-71, 16.09.2026).
+    //
+    // WARUM ZURÜCKNEHMEN: der Plan war offiziell, das Konto also längst
+    // verbucht -- die Person hat für diesen Tag Punkte bekommen. Gibt
+    // sie ihn her, behielte sie Punkte für einen Tag, den sie nie
+    // hatte. Bis zum 16.09. war das kosmetisch (der Saldo war reine
+    // Anzeige); seit der Konto-Rückkopplung (T-68) entscheidet er mit
+    // und würde sie künftig dafür benachteiligen, dass sie eingesprungen
+    // ist -- also genau das Gegenteil dessen, was freieTageSchuld sagen
+    // soll.
+    //
+    // WARUM NACHLESEN STATT NEU RECHNEN: der gebuchte Betrag steht seit
+    // 16.09. in plaene/<montag>.kontoBuchung. Neu berechnen würde den
+    // kompletten Kontext aus offizieller_plan.html duplizieren -- und
+    // einen anderen Betrag liefern, sobald jemand zwischendurch die
+    // Punkte-Werte verstellt hat. Fehlt das Protokoll (Pläne von vor
+    // dieser Änderung), wird NICHTS zurückgenommen, nur die Schuld
+    // gebucht: falsch wäre, einen geratenen Betrag abzuziehen.
+    //
+    // wochenGezaehlt bleibt bewusst unangetastet: die Woche zählt weiter
+    // mit, nur eben mit 0 Punkten -- "war da, hat nichts bekommen". Sie
+    // herauszurechnen würde die Ungerechtigkeit aus der Statistik
+    // entfernen, statt sie auszugleichen.
+    function verbucheKontoAenderungen() {
+      var montage = ruecknahmen.map(function (r) { return r.montagIso; }).filter(function (m, i, a) { return a.indexOf(m) === i; });
+      if (!Object.keys(schuldnerDeltas).length) return Promise.resolve();
+      return window.db.runTransaction(function (transaction) {
+        return Promise.all(montage.map(function (m) { return transaction.get(window.db.collection('plaene').doc(m)); })).then(function (docs) {
+          var buchungProWoche = {};
+          docs.forEach(function (doc, i) { buchungProWoche[montage[i]] = (doc.data() || {}).kontoBuchung || {}; });
+
+          var abzug = {}; // personId -> { saldo, wunschtagScore, montagKombi, samstagKombi }
+          ruecknahmen.forEach(function (r) {
+            var b = ((buchungProWoche[r.montagIso] || {})[r.personId] || {})[r.datumISO];
+            if (!b) return; // kein Protokoll -> nichts zurücknehmen
+            var a = abzug[r.personId] = abzug[r.personId] || { saldo: 0, wunschtagScore: 0, montagKombi: 0, samstagKombi: 0 };
+            a.saldo += (b.saldo || 0);
+            a.wunschtagScore += (b.wunschtagScore || 0);
+            a.montagKombi += (b.montagKombi || 0);
+            a.samstagKombi += (b.samstagKombi || 0);
+          });
+
+          Object.keys(schuldnerDeltas).forEach(function (pid) {
+            var a = abzug[pid] || { saldo: 0, wunschtagScore: 0, montagKombi: 0, samstagKombi: 0 };
+            transaction.set(window.db.collection('konten').doc(pid), {
+              freieTageSchuld: firebase.firestore.FieldValue.increment(schuldnerDeltas[pid]),
+              saldo: firebase.firestore.FieldValue.increment(-a.saldo),
+              wunschtagScore: firebase.firestore.FieldValue.increment(-a.wunschtagScore),
+              montagKombi: firebase.firestore.FieldValue.increment(-a.montagKombi),
+              samstagKombi: firebase.firestore.FieldValue.increment(-a.samstagKombi),
+              aktualisiertAm: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          });
+
+          // Protokoll der zurückgenommenen Tage entfernen, damit ein
+          // zweiter Lauf über dieselben Tage nicht erneut abzieht.
+          ruecknahmen.forEach(function (r) {
+            var pfad = {};
+            pfad['kontoBuchung.' + r.personId + '.' + r.datumISO] = firebase.firestore.FieldValue.delete();
+            transaction.update(window.db.collection('plaene').doc(r.montagIso), pfad);
+          });
+          return true;
+        });
+      });
+    }
+
+    batch.commit().then(verbucheKontoAenderungen).then(function () {
+      btn.textContent = 'Veröffentlicht';
+      document.getElementById('aktionHinweis').textContent = 'Live — Krankheitseintrag gespeichert, betroffene Pläne korrigiert.';
+    }).catch(function (err) {
+      console.error('[Krankmelder] Veröffentlichen fehlgeschlagen:', err);
+      btn.disabled = false; btn.textContent = 'Veröffentlichen';
+      document.getElementById('aktionHinweis').textContent = 'Fehlgeschlagen: ' + fehlertext(err);
+    });
+  });
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen-sheet'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen-sheet'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen-sheet'); });
+
+  /* ==== Start ==== */
+  document.getElementById('kVon').value = isoDatum(new Date());
+  (window.BOS_AUTH_READY || Promise.resolve()).then(ladePersonenUndPositionen).catch(function (err) {
+    console.error('[Krankmelder] Start fehlgeschlagen:', err);
+    document.getElementById('kPerson').innerHTML = '<option value="">Laden fehlgeschlagen</option>';
+  });
+
+})();
+</script>
+</body>
+</html>

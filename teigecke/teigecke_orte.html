@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: teigecke/teigecke_orte.html — Teigecke · Orte (Einrichten: Orte, Zutaten, Schilder)
+  Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
+  CHANGELOG
+    2026-10-03 · 14:47 · v0.2 · Refactor (QR-Teil zieht in die Wurzel)
+      ANWEISUNG_2026-10-03_NFC_QR_ZENTRALE_STUFE1.md (KC, 11:51).
+      Adresse und QR kommen aus ../bos_qr.js und ../qrcode.min.js, keine
+      eigene Kopie mehr. Das Feld „QR-Adresse“ ist weg (Knopf, Dialog,
+      Speicherwert bos_teigecke_qr_basis; der alte Wert wird beim Laden
+      einmal entfernt). Solange BOS nicht online ist (BOS_QR.darfAusgeben
+      falsch), druckt die Seite das Schild ohne Code mit leerem Feld und
+      sagt das oben und beim Drucken (Ulf, 03.10.2026, 11:38).
+    2026-10-03 · 04:42 · v0.1 · Erstfassung (Auszug aus teigecke_nacht.html + Neues)
+      ANWEISUNG_2026-10-02_TEIGECKE_ORTE_HUB.md (KC 03.10., 03:42), Bauplan
+      SESSION_2026-10-03_TEIGECKE_ORTE_HUB_BAU.md (freigegeben).
+      Von der Nachtseite hierher gezogen: Orte und Zutaten anlegen, ändern,
+      archivieren, Schilder drucken, Zutaten aus den Startdaten einlesen.
+      Neu: Kennung = Bereich + Nummer, von BOS vergeben (Dokumentname =
+      Kennung, Anlegen in einer Transaktion); Orte nach Bereich gruppiert;
+      „Zutaten hierher holen“ (mehrere auf einmal); Reihenfolge auf dem
+      Schild mit Pfeilen (Feld schildFolge); Wort eines Bereichs ändern;
+      Schild A4 quer mit QR (qrcode.min.js, MIT) und eingepasster Schrift;
+      Aufruf mit ?ort=B01 und Suchfeld; QR-Adresse automatisch, lokal
+      überschreibbar. Orte werden nicht mehr aus einer Datei eingelesen.
+      Regelstand-Probe mit eigener Fassung (teigecke-orte-2026-10-03, RK §14).
+      Schreiben nur mit Haken „Wagen & Zutaten“; das Schloss ist die Regel.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Teigecke Orte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="teigecke_seite.css">
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge nach Checkliste §2a und
+     bos_standalone_login.js-Kopf. Direkt aufrufbar (Lesezeichen, QR-Code
+     vom Schild: …/teigecke_orte.html?ort=B01). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'teigecke_orte';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="teigecke_logik.js"></script>
+<script src="../bos_qr.js"></script>
+<script src="../qrcode.min.js"></script>
+
+<div class="kopfbereich">
+<header>
+    <div class="kopf-titel">
+      <h1 class="bos-title" data-i18n="titel">Teigecke · Orte</h1>
+      <div class="backtag"><a class="link-btn" href="teigecke_nacht.html" data-i18n="zur_nacht">‹ Teigecke Nacht</a></div>
+    </div>
+    <div class="kopf-knoepfe">
+      <button type="button" class="bos-btn pflege-btn" id="pflegeBtn" aria-pressed="false" hidden data-i18n="pflegen">✎ Pflegen</button>
+      <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+    </div>
+  </header>
+</div>
+
+<div id="verbindungLeiste" role="status" hidden></div>
+<div id="regelLeiste" class="hinweis rot" role="alert" hidden></div>
+
+<div id="fehlerLeiste" role="alert" hidden>
+  <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main>
+  <div id="ladeStatus" class="status" data-i18n="lade">Lade Daten …</div>
+  <div id="ansichtOrte"></div>
+</main>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="editSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="editTitel"></h2>
+    <div id="editInhalt"></div>
+    <div id="editFehler" class="sheet-fehler" role="alert"></div>
+    <div id="editInfo" class="sheet-info"></div>
+    <div class="sheet-knoepfe" id="editKnoepfe"></div>
+  </div>
+</div>
+
+<input type="file" id="importDatei" accept=".json,application/json" hidden>
+<div id="toast" role="status" hidden></div>
+<div id="schildMessung" aria-hidden="true"></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Teigecke · Orte — Seiten-Kopf: was teigecke_seite.js erwartet.
+   KEINE Daten im Code: keine Zutaten-, Teig- oder Mengenangaben (Repo
+   ist öffentlich). Die Bereichs-Vorgaben (Backstube, Kühlung …) in
+   teigecke_logik.js sind allgemeine Wörter, nur Vorschläge.
+   ================================================================== */
+const L = window.BOS_TEIGECKE_LOGIK;
+const COL = { orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', sicherungen: 'teigecke_sicherungen' };
+/* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§14).
+   test_teigecke.js vergleicht beides automatisch. */
+const FELDER = {
+  teigecke_orte: ['kennung', 'name', 'art', 'beschreibung', 'sort', 'bereich', 'bereichName', 'schildFolge', 'geloescht'],
+  teigecke_zutaten: ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'geloescht']
+};
+const HAKEN_FUER = {
+  teigecke_orte: 'wagen', teigecke_zutaten: 'wagen'
+};
+const REGEL_FASSUNG = 'teigecke-orte-2026-10-03';
+const REGEL_DATEI = 'firestore_regeln_2026-10-04_nfc_sammelblatt.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege; seit 04.10.2026 RK §15) */
+/* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
+   Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
+try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Drei mögliche Gründe: (1) Dir fehlt der passende Haken (🧺 Wagen & Zutaten, 🥣 Teige, 📜 Rezepte) bzw. für die Nachtwerte die Rolle Backstube/Produktionsleitung. (2) Du bist mit dem Generalschlüssel 👑 angemeldet — der schreibt in der Teigecke nie. (3) Die Regeln sind älter als diese Seite (die Seite schickt Felder, die die alte Regel nicht kennt) — Regelstand in der Firebase-Konsole prüfen.',
+  err_perm_regel_alt: 'Wahrscheinlich Grund (3): Beim Laden passte der Regelstand nicht zur Seite. ',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_zeit: 'Keine Antwort vom Server nach {s} s — vermutlich kein Netz. Die Änderung kann noch nachträglich ankommen: später neu laden und nachsehen.',
+  err_unbehandelt: 'Unerwarteter Fehler',
+  err_laden: 'Laden „{was}“',
+  err_konto: 'Konto lesen (Pflege-Recht)',
+  err_speichern: 'Speichern',
+  err_gegenlesen: 'Gegenlesen nach abgelehntem Speichern',
+  offline_pflege: 'Ohne Verbindung wird nichts dauerhaft geändert (nur Nachtwerte).',
+  warte_uebertragung: 'Die letzte Änderung wird noch übertragen — bitte kurz warten.',
+  ausstehend: '⏳ Änderungen werden übertragen …',
+  regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Speichern kann deshalb abgelehnt werden. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  konflikt: 'Inzwischen von {wer} geändert, neu geladen, bitte erneut speichern.',
+  v_pflicht: '„{feld}“ fehlt.',
+  v_zu_lang: '„{feld}“ ist zu lang (höchstens {max} Zeichen).',
+  kein_konto: 'Keine Anmeldung erkannt — Pflege nicht möglich. Anzeigen geht trotzdem.',
+  ohne_zuhause: '🚧 Noch ohne Zuhause',
+  ort_leer: 'noch keine Zutaten',
+  schild: '🖨 Schild',
+  alle_schilder: '🖨 Alle Schilder drucken',
+  keine_schilder: 'Kein Ort zum Drucken vorhanden.',
+  err_drucken: 'Drucken',
+  neu_ort: '＋ Ort',
+  neu_zutat: '＋ Zutat',
+  e_titel_ort: 'Ort bearbeiten',
+  e_titel_ort_neu: 'Neuer Ort',
+  e_titel_zutat: 'Zutat bearbeiten',
+  e_titel_zutat_neu: 'Neue Zutat',
+  f_name: 'Name',
+  f_art: 'Art',
+  ort_art_ort: 'anderer Ort',
+  ort_art_wagen: 'Wagen',
+  f_beschreibung: 'Beschreibung (optional)',
+  f_sort: 'Reihenfolge im Gang (optional)',
+  f_sort_hilfe: 'Kleinere Zahl = weiter vorne in der Einsammelliste. Leer = hinten, nach Kennung sortiert.',
+  f_zuhause: 'Zuhause',
+  f_zuhause_ohne: '— noch ohne Zuhause —',
+  f_gebinde: 'Gebinde (optional)',
+  f_gebinde_hilfe: 'Größe des Sacks/Eimers, z. B. 25 und kg. Nur zur Anzeige; wird später für den Verbrauch in Gebinden gebraucht.',
+  f_einheit_leer: '—',
+  v_name_doppelt: '„{wert}“ gibt es schon.',
+  v_sort: 'Reihenfolge muss eine Zahl sein.',
+  v_gebinde: 'Gebindegröße muss eine Zahl über 0 sein.',
+  sperre_ort: 'Archivieren geht nicht: an diesem Ort liegen noch {liste}. Erst ein anderes Zuhause geben.',
+  sperre_zutat: 'Archivieren geht nicht: die Zutat steht noch in {liste}. Erst dort herausnehmen.',
+  archivieren: 'Archivieren',
+  archiviert: '✓ Archiviert',
+  wiederherstellen: '↩ Wiederherstellen',
+  wiederhergestellt: '✓ Wiederhergestellt',
+  archiv_zeigen: 'Archiv zeigen',
+  archiv_verbergen: 'Archiv verbergen',
+  archiv_leer: 'Nichts archiviert.',
+  speichern: 'Speichern',
+  gespeichert: '✓ Gespeichert',
+  abbrechen: 'Abbrechen',
+  schliessen: 'Schließen',
+  bearbeiten: '✎',
+  pflegen: '✎ Pflegen',
+  lade: 'Lade Daten …',
+  fehler_titel: '⚠ Fehler',
+  ausblenden: 'ausblenden',
+  import_json: 'Die Datei ist kein gültiges JSON: {msg}',
+  import_los: 'Übernehmen ({n} Einträge)',
+  import_nichts: 'Nichts Neues in der Datei.',
+  import_fehler_titel: 'Fehler — so wird nichts übernommen:',
+  import_hinweise_titel: 'Hinweise:',
+  import_haken_fehlen: 'Für diese Datei fehlen dir die Haken: {liste}. Es wird nichts geschrieben.',
+  haken_wagen: '🧺 Wagen & Zutaten',
+  folge_hoch: 'nach oben',
+  folge_runter: 'nach unten',
+  produkte_spiegel: 'Produktliste vom Gerät (Stand {zeit})',
+  titel: 'Teigecke · Orte',
+  err_haken_fehlt: 'Dafür fehlt dir der Haken 🧺 Wagen & Zutaten in der Kontenverwaltung.',
+  offline_stand: '📴 Ohne Verbindung — Stand von {zeit}. Ändern geht erst wieder mit Netz.',
+  f_keine_zutaten: 'Keine Zutaten zur Auswahl.',
+  err_adresse: 'Adresse der Seite lesen',
+  nur_lesen: 'Du siehst die Orte, kannst aber nichts ändern: Dafür braucht dein Konto den Haken 🧺 Wagen & Zutaten.',
+  orte_leer: 'Noch kein Ort angelegt. Mit „＋ Ort“ den ersten anlegen: Bereich wählen, BOS vergibt die Nummer.',
+  ohne_zuhause_karte: 'Antippen und ein Zuhause wählen — oder an einem Ort „Zutaten hierher holen“.',
+  ohne_zuhause_erst_ort: 'Erst einen Ort anlegen, dann die Zutaten dorthin holen.',
+  archiv_orte: 'Orte',
+  archiv_zutaten: 'Zutaten',
+  zur_nacht: '‹ Teigecke Nacht',
+  suche_label: 'Kennung suchen',
+  suche_knopf: 'Öffnen',
+  suche_format: '„{text}“ ist keine Kennung. Eine Kennung ist ein Buchstabe und eine Nummer, z. B. B01.',
+  suche_nichts: 'Den Ort {kennung} gibt es nicht (mehr).',
+  suche_archiviert: 'Der Ort {kennung} ist archiviert. Er steht unten im Archiv.',
+  bereich_anzahl: '{n} Ort(e)',
+  bereich_ohne_wort: '(ohne Wort)',
+  bereich_wort_aendern: 'Wort ändern',
+  bereich_angleichen: 'Wörter angleichen',
+  bereich_uneinig: 'Im Bereich {bereich} stehen verschiedene Wörter an den Orten: {liste}. Bitte angleichen, sonst steht auf den Schildern Verschiedenes.',
+  bereich_fremd: 'Orte mit alter Kennung',
+  bereich_fremd_text: 'Diese Orte haben keine Kennung nach dem Muster „Buchstabe + Nummer“. Sie stammen aus einer älteren Fassung und lassen sich hier nicht ändern. Bitte Ulf Bescheid geben.',
+  bereich_neu: '＋ neuer Bereich …',
+  f_bereich: 'Bereich',
+  f_bereich_hilfe: 'Der Buchstabe der Kennung. Er darf für einen Raum oder für eine Art von Platz stehen.',
+  f_bereich_buchstabe: 'Buchstabe',
+  f_bereich_buchstabe_hilfe: 'Ein Buchstabe von A bis Z. Hat ein Bereich seinen ersten Ort, bleibt der Buchstabe fest.',
+  f_bereich_wort: 'Wort dazu',
+  f_bereich_wort_hilfe: 'Steht auf dem Schild unter der Kennung. Später jederzeit änderbar.',
+  f_kennung_vorschau: 'Kennung',
+  f_kennung_vorschau_hilfe: 'Vergibt BOS: die nächste freie Nummer in diesem Bereich. Legt gerade jemand anderes einen Ort an, kann es die übernächste werden.',
+  f_kennung_fest: 'Kennung',
+  f_kennung_fest_hilfe: 'Bleibt für immer bei diesem Ort — auch wenn sich sein Inhalt ändert.',
+  f_name_ort: 'Name (optional)',
+  f_name_ort_hilfe: 'Z. B. „Wagen am Kneter“. Steht klein unter der Kennung.',
+  v_bereich: 'Der Bereich braucht genau einen Buchstaben von A bis Z.',
+  ort_angelegt: '✓ {kennung} angelegt',
+  holen: '＋ Zutaten hierher',
+  holen_titel: 'Zutaten nach {kennung} holen',
+  holen_ohne: 'Noch ohne Zuhause ({n}) — antippen, was hierher gehört',
+  holen_keine: 'Alle Zutaten haben ein Zuhause.',
+  holen_andere: 'Zutaten von anderen Orten umziehen ({n})',
+  holen_los: 'Hierher holen',
+  holen_nichts: 'Nichts ausgewählt.',
+  holen_fertig: '✓ {n} Zutat(en) wohnen jetzt in {kennung}',
+  schildfolge: '↕ Reihenfolge',
+  schildfolge_titel: 'Reihenfolge auf dem Schild — {kennung}',
+  schildfolge_hilfe: 'So stehen die Zutaten auf dem Schild und in der Karte. Das ist nicht die „Reihenfolge im Gang“ (die sortiert die Orte in der Einsammelliste).',
+  schildfolge_alphabet: 'Wieder alphabetisch',
+  bereich_wort_titel: 'Wort für Bereich {bereich}',
+  bereich_wort_erklaerung: 'Das Wort steht auf den Schildern aller {n} Orte im Bereich {bereich}. Nach dem Ändern die Schilder neu drucken. Der Buchstabe bleibt.',
+  bereich_wort_gleich: 'Das Wort steht schon überall so.',
+  bereich_wort_fertig: '✓ Wort an {n} Ort(en) geändert — Schilder neu drucken',
+  reihe_laeuft: 'Schreibe {i} von {n} …',
+  reihe_abbruch: 'Abgebrochen bei {i} von {n}. Alles davor ist gespeichert; einfach noch einmal ausführen.',
+  startdaten: '📂 Zutaten einlesen',
+  import_titel: 'Zutaten aus der Startdaten-Datei einlesen',
+  import_zusammenfassung_zutaten: 'Neu: {zutaten} Zutaten. Schon vorhanden (wird übersprungen): {vorhanden}.',
+  import_fertig: '✓ Übernommen: {n} Zutaten, jede mit eigener Sicherung.',
+  import_orte_nicht: 'Die Datei enthält {n} Ort(e). Orte werden nicht mehr eingelesen — sie werden hier von Hand angelegt, BOS vergibt die Nummer.',
+  import_ort_ignoriert: '{n} Zutat(en) nennen in der Datei einen Ort. Das wird überlesen; sie kommen ohne Zuhause an.',
+  import_teige_nicht: 'Die Datei enthält {n} Teig(e). Teige liest „Teigecke Nacht“ ein, nicht diese Seite.',
+  qr_ohne_hinweis: 'BäckereiOS ist noch nicht online. Schilder werden deshalb ohne Code gedruckt, mit einem leeren Feld an seiner Stelle. Nach dem Online-Gang die Schilder einmal neu drucken.',
+  qr_ohne_toast: 'Schild ohne Code gedruckt, weil BäckereiOS noch nicht online ist. Nach dem Online-Gang einmal neu drucken.',
+  druck_zu_voll_titel: 'Zu viele Zutaten für ein Blatt',
+  druck_zu_voll: 'Auf diesen Schildern haben nicht alle Zutaten Platz, selbst mit der kleinsten Schrift ({pt} pt): {liste}. Besser den Ort teilen. Trotzdem drucken schneidet unten ab.',
+  druck_trotzdem: 'Trotzdem drucken'
+};
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, haken: { wagen: false, teige: false, rezepte: false },
+  pflegeModus: false, zeigeArchiv: false,
+  orte: [], zutaten: [], teige: [], orteGeladen: false, geladen: false,
+  verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
+  regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
+  startOrt: null, treffer: null, sucheMeldung: '', sucheText: ''
+};
+let abos = [];
+</script>
+<script src="teigecke_seite.js"></script>
+<script>
+'use strict';
+/* ==================================================================
+   Teigecke · Orte — Seitenlogik. Gerüst: teigecke_seite.js. Rechnen und
+   Schild: teigecke_logik.js (mit node testbar).
+   ================================================================== */
+/* ---------- Kurzwege ---------- */
+const zm = function () { return L.nachId(S.zutaten); };
+const om = function () { return L.nachId(S.orte); };
+function pflegtWagen() { return S.pflegeModus && S.haken.wagen && online(); }
+function ortText(o) { return o.kennung + (o.bereichName ? ' · ' + o.bereichName : '') + (o.name ? ' · ' + o.name : ''); }
+function standHeute() {
+  const h = new Date();   /* lokal rechnen, nie toISOString() */
+  return String(h.getDate()).padStart(2, '0') + '.' + String(h.getMonth() + 1).padStart(2, '0') + '.' + h.getFullYear();
+}
+
+/* ---------- QR-Code: Adresse und Zeichnen kommen aus ../bos_qr.js ----------
+   Adresse = Wurzel von BOS + Pfad dieser Seite aus der Registry + ?ort=Kennung.
+   Kein Feld, kein Speicherwert. Maßgeblich für „mit Code oder ohne“ ist
+   BOS_QR.darfAusgeben(): nur https und nicht lokal. Solange BOS nicht online
+   ist, wird das Schild OHNE Code gedruckt, mit leerem Feld (Ulf, 03.10.2026). */
+function qrErlaubt() {
+  if (!window.BOS_QR) throw new Error('bos_qr.js nicht geladen');
+  return window.BOS_QR.darfAusgeben(window.location.href);
+}
+function qrPfad() {
+  const app = (window.BOS_APPS || []).find(function (a) { return a.id === window.BOS_APP_ID; });
+  if (!app || !app.url) throw new Error('bos_app_registry.js: Eintrag „' + window.BOS_APP_ID + '“ ohne Adresse');
+  return app.url;
+}
+function qrFuer(kennung) {
+  if (!window.BOS_QR) throw new Error('bos_qr.js nicht geladen');
+  return window.BOS_QR.qrFuer(window.BOS_QR.adresse(qrPfad(), '?ort=' + encodeURIComponent(String(kennung || '').toUpperCase())));
+}
+/* Für die Anzeige: ein Ladefehler von bos_qr.js soll die Liste nicht leeren.
+   Der Druck selbst meldet ihn sichtbar (druckeSchilder). */
+function qrErlaubtStill() { try { return qrErlaubt(); } catch (e) { return false; } }
+
+/* ---------- Laden ---------- */
+function abonniereStamm() {
+  abos.forEach(function (ab) { ab(); });
+  abos = [
+    aboCollection('orte', function (a) { S.orte = a; S.orteGeladen = true; pruefeStartOrt(); }),
+    aboCollection('zutaten', function (a) { S.zutaten = a; }),
+    aboCollection('teige', function (a) { S.teige = a; })   /* nur lesen: Löschschutz der Zutaten */
+  ];
+}
+function pruefeStartOrt() {
+  if (!S.startOrt || !S.orteGeladen) return;
+  const text = S.startOrt; S.startOrt = null;
+  zeigeOrt(text);
+}
+/* Öffnet die Karte eines Orts (Aufruf mit ?ort=B01, QR, Suchfeld). */
+function zeigeOrt(text) {
+  const z = L.kennungZerlegen(text);
+  if (!z) { S.treffer = null; S.sucheMeldung = t('suche_format', { text: String(text || '').trim() }); render(); return; }
+  const ort = L.sucheOrt(S.orte, z.kennung);
+  if (!ort) { S.treffer = null; S.sucheMeldung = t('suche_nichts', { kennung: z.kennung }); render(); return; }
+  S.treffer = ort.id;
+  S.sucheMeldung = ort.geloescht ? t('suche_archiviert', { kennung: ort.kennung }) : '';
+  if (ort.geloescht) S.zeigeArchiv = true;
+  render();
+  const karte = document.querySelector('[data-ort-karte="' + ort.id + '"]');
+  if (karte && karte.scrollIntoView) karte.scrollIntoView({ block: 'center' });
+}
+async function start() {
+  wendeI18nAn();
+  renderHilfe();
+  if (!window.db || !window.BOS_AUTH_READY) {
+    zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt'));
+    return;
+  }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; }
+  catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); return; }
+  S.kennung = (nutzer && nutzer.email) ? nutzer.email.split('@')[0] : null;
+  if (!S.kennung) toast(t('kein_konto'));
+  try { S.startOrt = new URLSearchParams(window.location.search).get('ort'); }
+  catch (err) { zeigeFehler(t('err_adresse'), err); }
+  await ladeKonto();
+  S.pflegeModus = !!S.haken.wagen;   /* Einrichtungs-Seite: mit Haken gleich im Stift */
+  abonniereStamm();
+  S.geladen = true;
+  document.getElementById('ladeStatus').hidden = true;
+  document.getElementById('pflegeBtn').hidden = !S.haken.wagen;
+  render();
+  if (S.kennung) pruefeRegelstand();
+}
+window.addEventListener('online', planeRender);
+window.addEventListener('offline', planeRender);
+async function neuLaden() { render(); }
+function oeffneNachCol(col, id) {
+  if (col === COL.orte) oeffneOrt(id);
+  else if (col === COL.zutaten) oeffneZutat(id);
+}
+
+/* ---------- Rendern ---------- */
+function zutatZeileHTML(z) {
+  const g = L.gebindeText(z);
+  return '<li>' + (pflegtWagen()
+    ? '<button type="button" class="zutat-tap" data-aktion="bearbeiten-zutat" data-id="' + esc(z.id) + '">' + esc(z.name) + ' ✎</button>'
+    : '<span>' + esc(z.name) + '</span>') + (g ? '<span class="gebinde">' + esc(g) + '</span>' : '') + '</li>';
+}
+function ortKarteHTML(ort, zutaten, archiv) {
+  const zut = L.zutatenInSchildFolge(ort, zutaten).map(zutatZeileHTML).join('');
+  let knoepfe = '';
+  if (archiv) {
+    if (pflegtWagen()) knoepfe = '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="orte" data-id="' + esc(ort.id) + '">' + esc(t('wiederherstellen')) + '</button>';
+  } else {
+    knoepfe = '<button type="button" class="bos-btn" data-aktion="schild" data-id="' + esc(ort.id) + '">' + esc(t('schild')) + '</button>';
+    if (pflegtWagen()) knoepfe +=
+      '<button type="button" class="bos-btn" data-aktion="holen" data-id="' + esc(ort.id) + '">' + esc(t('holen')) + '</button>' +
+      (zutaten.length > 1 ? '<button type="button" class="bos-btn" data-aktion="schildfolge" data-id="' + esc(ort.id) + '">' + esc(t('schildfolge')) + '</button>' : '') +
+      '<button type="button" class="bos-btn" data-aktion="bearbeiten-ort" data-id="' + esc(ort.id) + '" aria-label="' + esc(t('e_titel_ort')) + '">' + esc(t('bearbeiten')) + '</button>';
+  }
+  return '<div class="karte' + (archiv ? ' archiviert' : '') + (S.treffer === ort.id ? ' treffer' : '') + '" data-ort-karte="' + esc(ort.id) + '">' +
+    '<div class="karte-kopf"><div><span class="ort-kennung">' + esc(ort.kennung) + '</span> <span class="badge">' + esc(t(ort.art === 'ort' ? 'ort_art_ort' : 'ort_art_wagen')) + '</span>' +
+      '<div class="karte-unter">' + esc([ort.bereichName, ort.name, ort.beschreibung].filter(Boolean).join(' · ')) + '</div></div>' +
+      '<div class="karte-knoepfe">' + knoepfe + '</div></div>' +
+    (archiv ? '' : (zut ? '<ul class="liste">' + zut + '</ul>' : '<div class="karte-unter">' + esc(t('ort_leer')) + '</div>')) +
+  '</div>';
+}
+function archivHTML(name) {
+  const arch = (S[name] || []).filter(function (x) { return x.geloescht; });
+  let html = '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-umschalten">' + esc(t(S.zeigeArchiv ? 'archiv_verbergen' : 'archiv_zeigen')) + ' (' + esc(t(name === 'orte' ? 'archiv_orte' : 'archiv_zutaten')) + ': ' + arch.length + ')</button></div>';
+  if (!S.zeigeArchiv) return html;
+  if (!arch.length) return html + '<p class="status">' + esc(t('archiv_leer')) + '</p>';
+  return html + arch.slice().sort(name === 'orte' ? L.kennungVergleich : function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); }).map(function (x) {
+    if (name === 'orte') return ortKarteHTML(x, [], true);
+    return '<div class="karte archiviert"><div class="karte-kopf"><div><h3>' + esc(x.name) + '</h3></div><div class="karte-knoepfe">' +
+      '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="zutaten" data-id="' + esc(x.id) + '">' + esc(t('wiederherstellen')) + '</button></div></div></div>';
+  }).join('');
+}
+function render() {
+  if (!S.geladen) return;
+  renderVerbindung();
+  document.getElementById('pflegeBtn').setAttribute('aria-pressed', S.pflegeModus ? 'true' : 'false');
+  if (fokusIn(document.querySelector('main'))) { renderAufgeschoben = true; return; }
+  renderOrte();
+}
+function renderOrte() {
+  const el = document.getElementById('ansichtOrte');
+  const orte = L.aktiv(S.orte).slice().sort(L.kennungVergleich);
+  const inhalt = L.ortInhalt(S.orte, S.zutaten);
+  const bereiche = L.bereichsListe(S.orte);
+  let html = '';
+  if (!qrErlaubtStill()) html += '<div class="hinweis baustelle">' + esc(t('qr_ohne_hinweis')) + '</div>';
+  if (!S.haken.wagen && S.kennung) html += '<div class="hinweis blau">' + esc(t('nur_lesen')) + '</div>';
+  html += '<div class="such-zeile"><input class="bos-input" id="sucheFeld" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="B01" aria-label="' + esc(t('suche_label')) + '">' +
+    '<button type="button" class="bos-btn" data-aktion="suchen">' + esc(t('suche_knopf')) + '</button></div>';
+  if (S.sucheMeldung) html += '<div class="hinweis rot" id="sucheMeldung">' + esc(S.sucheMeldung) + '</div>';
+  html += '<div class="pflege-leiste">';
+  if (orte.length) html += '<button type="button" class="bos-btn" data-aktion="alle-schilder">' + esc(t('alle_schilder')) + '</button>';
+  if (pflegtWagen()) {
+    html += '<button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-ort">' + esc(t('neu_ort')) + '</button>' +
+      '<button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-zutat">' + esc(t('neu_zutat')) + '</button>' +
+      '<button type="button" class="bos-btn" data-aktion="startdaten">' + esc(t('startdaten')) + '</button>';
+  }
+  if (S.pflegeModus && S.haken.wagen && !online()) html += '<span class="klein">' + esc(t('offline_pflege')) + '</span>';
+  html += '</div>';
+  if (inhalt._ohne.length) {
+    html += '<div class="karte"><div class="karte-kopf"><div><span class="ort-kennung" style="color:var(--bos-text-faint);font-size:var(--bos-font-lg,1.15rem)">' + esc(t('ohne_zuhause')) + ' (' + inhalt._ohne.length + ')</span>' +
+      '<div class="karte-unter">' + esc(t(orte.length ? 'ohne_zuhause_karte' : 'ohne_zuhause_erst_ort')) + '</div></div></div><ul class="liste">' +
+      inhalt._ohne.map(zutatZeileHTML).join('') + '</ul></div>';
+  }
+  if (!orte.length) html += '<p class="status">' + esc(t('orte_leer')) + '</p>';
+  bereiche.filter(function (b) { return orte.some(function (o) { return o.bereich === b.bereich || (L.kennungZerlegen(o.kennung) || {}).bereich === b.bereich; }); }).forEach(function (b) {
+    const meine = orte.filter(function (o) { return (L.kennungZerlegen(o.kennung) || {}).bereich === b.bereich; });
+    html += '<div class="bereich-kopf"><span class="bereich-buchstabe">' + esc(b.bereich) + '</span><h2 class="bos-title">' + esc(b.namen.join(' / ') || t('bereich_ohne_wort')) + '</h2>' +
+      '<span class="klein">' + esc(t('bereich_anzahl', { n: meine.length })) + '</span>' +
+      (pflegtWagen() ? '<button type="button" class="link-btn" data-aktion="bereich-wort" data-bereich="' + esc(b.bereich) + '">' + esc(t(b.namen.length > 1 ? 'bereich_angleichen' : 'bereich_wort_aendern')) + '</button>' : '') + '</div>';
+    if (b.namen.length > 1) html += '<div class="hinweis rot">' + esc(t('bereich_uneinig', { bereich: b.bereich, liste: b.namen.join(', ') })) + '</div>';
+    html += meine.map(function (o) { return ortKarteHTML(o, inhalt[o.id] || [], false); }).join('');
+  });
+  const fremd = orte.filter(function (o) { return !L.kennungZerlegen(o.kennung); });
+  if (fremd.length) html += '<div class="bereich-kopf"><h2 class="bos-title">' + esc(t('bereich_fremd')) + '</h2></div><div class="hinweis rot">' + esc(t('bereich_fremd_text')) + '</div>' +
+    fremd.map(function (o) { return ortKarteHTML(o, inhalt[o.id] || [], false); }).join('');
+  if (pflegtWagen()) html += archivHTML('orte') + archivHTML('zutaten');
+  el.innerHTML = html;
+  const feld = document.getElementById('sucheFeld');
+  if (feld && S.sucheText) feld.value = S.sucheText;
+}
+
+/* ---------- Formular: Ort ---------- */
+function bereichWahl() {
+  const z = editZustand;
+  const liste = L.bereichsListe(S.orte);
+  if (z.bereichWahl === '+') {
+    const b = wert('fBereichNeu').toUpperCase();
+    const vorhanden = liste.filter(function (x) { return x.bereich === b; })[0] || null;
+    return { bereich: b, name: vorhanden && vorhanden.belegt ? vorhanden.name : wert('fBereichName'), belegt: !!(vorhanden && vorhanden.belegt), neu: true };
+  }
+  const e = liste.filter(function (x) { return x.bereich === z.bereichWahl; })[0] || null;
+  if (!e) return { bereich: '', name: '', belegt: false };
+  return { bereich: e.bereich, name: e.belegt ? e.name : (document.getElementById('fBereichName') ? wert('fBereichName') : e.name), belegt: e.belegt };
+}
+function bereichFelderHTML() {
+  const z = editZustand, liste = L.bereichsListe(S.orte);
+  const optionen = liste.map(function (b) {
+    return '<option value="' + esc(b.bereich) + '"' + (z.bereichWahl === b.bereich ? ' selected' : '') + '>' + esc(b.bereich + ' · ' + (b.name || '?') + (b.belegt ? ' (' + t('bereich_anzahl', { n: b.anzahl }) + ')' : '')) + '</option>';
+  }).join('') + '<option value="+"' + (z.bereichWahl === '+' ? ' selected' : '') + '>' + esc(t('bereich_neu')) + '</option>';
+  const e = liste.filter(function (x) { return x.bereich === z.bereichWahl; })[0] || null;
+  let html = feldHTML(t('f_bereich'), '<select class="bos-input" id="fBereich" data-bereich-wahl>' + optionen + '</select>', t('f_bereich_hilfe'));
+  if (z.bereichWahl === '+') {
+    html += feldHTML(t('f_bereich_buchstabe'), eingabe('fBereichNeu', z.bereichNeu || '', 'maxlength="1" autocapitalize="characters" autocomplete="off" data-bereich-eingabe style="max-width:90px;text-transform:uppercase"'), t('f_bereich_buchstabe_hilfe')) +
+      feldHTML(t('f_bereich_wort'), eingabe('fBereichName', z.bereichName || '', 'maxlength="30" data-bereich-eingabe'));
+  } else if (e && !e.belegt) {
+    html += feldHTML(t('f_bereich_wort'), eingabe('fBereichName', z.bereichName != null ? z.bereichName : e.name, 'maxlength="30" data-bereich-eingabe'), t('f_bereich_wort_hilfe'));
+  }
+  return html + '<div class="feld"><label class="bos-label">' + esc(t('f_kennung_vorschau')) + '</label><div class="kennung-vorschau" id="kennungVorschau">…</div><div class="feld-hilfe">' + esc(t('f_kennung_vorschau_hilfe')) + '</div></div>';
+}
+function zeigeKennungVorschau() {
+  const el = document.getElementById('kennungVorschau');
+  if (!el || !editZustand || editZustand.typ !== 'ort' || editZustand.id) return;
+  const w = bereichWahl();
+  const k = L.bereichGueltig(w.bereich) ? L.kennungBilden(w.bereich, L.naechsteNummer(S.orte, w.bereich)) : null;
+  el.textContent = k ? k + (w.name ? ' · ' + w.name : '') : '–';
+}
+function oeffneOrt(id) {
+  const ort = id ? om()[id] : { kennung: '', name: '', art: 'wagen', beschreibung: '' };
+  if (id && !ort) { zeigeFehler(t('e_titel_ort'), { message: t('suche_nichts', { kennung: id }) }); return; }
+  const liste = L.bereichsListe(S.orte);
+  const ersteWahl = (liste.filter(function (b) { return b.belegt; })[0] || liste[0] || { bereich: '+' }).bereich;
+  editZustand = { typ: 'ort', id: id || null, art: ort.art === 'ort' ? 'ort' : 'wagen', bereichWahl: id ? null : ersteWahl, bereichNeu: '', bereichName: null };
+  zeichneOrtForm(ort);
+}
+function zeichneOrtForm(ort) {
+  const z = editZustand, id = z.id;
+  const artKnopf = function (art) {
+    return '<button type="button" class="chip" data-aktion="ort-art" data-art="' + art + '" aria-pressed="' + (z.art === art) + '">' + esc(t(art === 'ort' ? 'ort_art_ort' : 'ort_art_wagen')) + '</button>';
+  };
+  const kopf = id
+    ? '<div class="feld"><label class="bos-label">' + esc(t('f_kennung_fest')) + '</label><div class="kennung-vorschau">' + esc(ort.kennung) + (ort.bereichName ? ' · ' + esc(ort.bereichName) : '') + '</div><div class="feld-hilfe">' + esc(t('f_kennung_fest_hilfe')) + '</div></div>'
+    : bereichFelderHTML();
+  oeffneEdit(t(id ? 'e_titel_ort' : 'e_titel_ort_neu'),
+    kopf +
+    feldHTML(t('f_name_ort'), eingabe('fName', ort.name, 'maxlength="60"'), t('f_name_ort_hilfe')) +
+    feldHTML(t('f_art'), '<div class="chips" id="fArt">' + artKnopf('wagen') + artKnopf('ort') + '</div>') +
+    feldHTML(t('f_beschreibung'), eingabe('fBeschreibung', ort.beschreibung, 'maxlength="120"')) +
+    feldHTML(t('f_sort'), eingabe('fSort', typeof ort.sort === 'number' ? ort.sort : '', 'inputmode="numeric"'), t('f_sort_hilfe')),
+    [{ aktion: 'speichern', text: t('speichern'), klasse: 'bos-btn--amber' }].concat(id ? [{ aktion: 'archivieren', text: t('archivieren'), klasse: 'gefahr' }] : []).concat([{ aktion: 'abbrechen', text: t('abbrechen') }]));
+  zeigeKennungVorschau();
+}
+/* Bereich im Formular gewechselt: Eingaben merken, Formular neu zeichnen. */
+function bereichGewechselt() {
+  const z = editZustand;
+  if (!z || z.typ !== 'ort' || z.id) return;
+  const gemerkt = { name: wert('fName'), art: z.art, beschreibung: wert('fBeschreibung'), sort: parseZahl(wert('fSort')) };
+  z.bereichWahl = document.getElementById('fBereich').value;
+  z.bereichName = null; z.bereichNeu = '';
+  zeichneOrtForm(gemerkt);
+}
+
+/* ---------- Formular: Zutat (wie bisher auf der Nachtseite) ---------- */
+function oeffneZutat(id) {
+  const z = id ? zm()[id] : { name: '', ortId: '', gebindeEinheit: '' };
+  if (id && !z) return;
+  editZustand = { typ: 'zutat', id: id || null };
+  const orte = L.aktiv(S.orte).slice().sort(L.kennungVergleich);
+  const optionen = '<option value="">' + esc(t('f_zuhause_ohne')) + '</option>' + orte.map(function (o) {
+    return '<option value="' + esc(o.id) + '"' + (o.id === z.ortId ? ' selected' : '') + '>' + esc(ortText(o)) + '</option>';
+  }).join('');
+  const einheiten = L.EINHEITEN.map(function (e) { return '<option value="' + e + '"' + ((z.gebindeEinheit || '') === e ? ' selected' : '') + '>' + esc(e || t('f_einheit_leer')) + '</option>'; }).join('');
+  oeffneEdit(t(id ? 'e_titel_zutat' : 'e_titel_zutat_neu'),
+    feldHTML(t('f_name'), eingabe('fName', z.name, 'maxlength="60"')) +
+    feldHTML(t('f_zuhause'), '<select class="bos-input" id="fOrt">' + optionen + '</select>') +
+    feldHTML(t('f_gebinde'), '<div class="feld-zeile">' + eingabe('fGebinde', typeof z.gebindeGroesse === 'number' ? z.gebindeGroesse : '', 'inputmode="decimal"') +
+      '<select class="bos-input" id="fEinheit" style="max-width:110px">' + einheiten + '</select></div>', t('f_gebinde_hilfe')),
+    [{ aktion: 'speichern', text: t('speichern'), klasse: 'bos-btn--amber' }].concat(id ? [{ aktion: 'archivieren', text: t('archivieren'), klasse: 'gefahr' }] : []).concat([{ aktion: 'abbrechen', text: t('abbrechen') }]));
+}
+
+/* ---------- Speichern ---------- */
+async function speichereEdit() {
+  const z = editZustand;
+  if (!z) return;
+  if (z.typ === 'ort') return speichereOrt();
+  if (z.typ !== 'zutat') return;
+  const name = wert('fName'), ortId = wert('fOrt'), gebText = wert('fGebinde'), einheit = wert('fEinheit');
+  let fehler = pruefeText(t('f_name'), name, 60);
+  if (!fehler && L.namensKonflikt(S.zutaten, name, z.id)) fehler = t('v_name_doppelt', { wert: name });
+  let geb;
+  if (!fehler && gebText) { geb = parseZahl(gebText); if (!(geb > 0)) fehler = t('v_gebinde'); }
+  const daten = { name: name, ortId: ortId, gebindeEinheit: einheit, geloescht: false };
+  if (L.istZahl(geb) && geb > 0) daten.gebindeGroesse = geb;
+  if (fehler) { editFehler(fehler); return; }
+  const vorher = z.id ? (zm()[z.id] || null) : null;
+  await fuehreSchreibenAus(COL.zutaten, z.id, daten, z.id ? 'aendern' : 'anlegen', vorher, t('gespeichert'));
+}
+async function speichereOrt() {
+  const z = editZustand;
+  const name = wert('fName'), beschreibung = wert('fBeschreibung'), sortText = wert('fSort');
+  let fehler = name.length > 60 ? t('v_zu_lang', { feld: t('f_name_ort'), max: 60 }) : '';
+  let sort;
+  if (!fehler && sortText) { sort = parseZahl(sortText); if (!L.istZahl(sort)) fehler = t('v_sort'); }
+  const basis = { name: name, art: z.art, beschreibung: beschreibung, geloescht: false };
+  if (L.istZahl(sort)) basis.sort = sort;
+  if (z.id) {
+    /* Ändern: Kennung, Bereich und Schild-Reihenfolge bleiben, wie sie sind. */
+    const alt = om()[z.id];
+    if (!alt) { editFehler(t('suche_nichts', { kennung: z.id })); return; }
+    if (fehler) { editFehler(fehler); return; }
+    const daten = Object.assign({ kennung: alt.kennung, bereich: alt.bereich, bereichName: alt.bereichName || '' }, basis);
+    if (Array.isArray(alt.schildFolge)) daten.schildFolge = alt.schildFolge;
+    await fuehreSchreibenAus(COL.orte, z.id, daten, 'aendern', alt, t('gespeichert'));
+    return;
+  }
+  const w = bereichWahl();
+  if (!fehler && !L.bereichGueltig(w.bereich)) fehler = t('v_bereich');
+  if (!fehler && !w.name) fehler = t('v_pflicht', { feld: t('f_bereich_wort') });
+  if (!fehler && w.name.length > 30) fehler = t('v_zu_lang', { feld: t('f_bereich_wort'), max: 30 });
+  if (fehler) { editFehler(fehler); return; }
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  document.getElementById('editInfo').textContent = '…';
+  try {
+    const start = L.naechsteNummer(S.orte, w.bereich);
+    const k = await schreibeNeuEindeutig(COL.orte, function (versuch) {
+      const kennung = L.kennungBilden(w.bereich, start + versuch);
+      if (!kennung) return null;
+      return { id: L.ortIdAus(kennung), kennung: kennung, daten: Object.assign({ kennung: kennung, bereich: w.bereich, bereichName: w.name }, basis) };
+    });
+    schliesseEdit();
+    toast(t('ort_angelegt', { kennung: k.kennung }));
+    S.treffer = k.id;
+    render();
+  } catch (err) {
+    document.getElementById('editInfo').textContent = '';
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(t('err_speichern'), err);
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
+}
+async function archiviereEdit() {
+  const z = editZustand;
+  if (!z || !z.id) return;
+  if (z.typ === 'ort') {
+    const dort = L.zutatenAmOrt(z.id, S.zutaten);
+    if (dort.length) { editFehler(t('sperre_ort', { liste: dort.map(function (x) { return x.name; }).join(', ') })); return; }
+    const ort = om()[z.id];
+    await fuehreSchreibenAus(COL.orte, z.id, Object.assign({}, ort, { geloescht: true }), 'archivieren', ort, t('archiviert'));
+  } else if (z.typ === 'zutat') {
+    const teige = L.teigeMitZutat(z.id, S.teige);
+    if (teige.length) { editFehler(t('sperre_zutat', { liste: teige.map(function (x) { return x.name; }).join(', ') })); return; }
+    const zut = zm()[z.id];
+    await fuehreSchreibenAus(COL.zutaten, z.id, Object.assign({}, zut, { geloescht: true }), 'archivieren', zut, t('archiviert'));
+  }
+}
+async function stelleWiederHer(name, id) {
+  const dok = L.nachId(S[name])[id];
+  if (!dok) return;
+  if (!S.haken[HAKEN_FUER[COL[name]]]) { zeigeFehler(t('wiederherstellen'), { message: t('err_haken_fehlt') }); return; }
+  if (name === 'zutaten' && L.namensKonflikt(S.zutaten, dok.name, id)) { zeigeFehler(t('wiederherstellen'), { message: t('v_name_doppelt', { wert: dok.name }) }); return; }
+  try {
+    await schreibe(COL[name], id, Object.assign({}, dok, { geloescht: false }), 'wiederherstellen', dok);
+    toast(t('wiederhergestellt'));
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(COL[name], id, dok);
+      if (konflikt) { console.error('[Teigecke] Wiederherstellen abgelehnt: veralteter Stand', err); zeigeFehler(t('wiederherstellen'), { message: konflikt }); return; }
+    }
+    zeigeFehler(t('err_speichern'), err);
+  }
+}
+
+/* ---------- Mehrere Schreibvorgänge nacheinander (jeder mit Sicherung) ----------
+   Für „Zutaten hierher holen“, „Wort des Bereichs ändern“ und das Einlesen.
+   Bricht beim ersten Fehler ab und sagt, wie weit es kam. */
+async function schreibeReihe(titel, auftraege, fertigText) {
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  const info = document.getElementById('editInfo');
+  let i = 0;
+  try {
+    for (const a of auftraege) {
+      i++; info.textContent = t('reihe_laeuft', { i: i, n: auftraege.length });
+      await schreibe(a.col, a.id, a.daten, a.aktion, a.vorher, true);
+    }
+    schliesseEdit();
+    toast(fertigText);
+    render();
+  } catch (err) {
+    info.textContent = t('reihe_abbruch', { i: i, n: auftraege.length });
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(titel, err);
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
+}
+
+/* ---------- Zutaten hierher holen (mehrere auf einmal) ---------- */
+function oeffneHolen(ortId) {
+  const ort = om()[ortId];
+  if (!ort) return;
+  editZustand = { typ: 'holen', id: ortId, auswahl: { holen: new Set() } };
+  const inhalt = L.ortInhalt(S.orte, S.zutaten);
+  const andere = L.aktiv(S.zutaten).filter(function (x) { return x.ortId && x.ortId !== ortId && om()[x.ortId] && !om()[x.ortId].geloescht; })
+    .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  oeffneEdit(t('holen_titel', { kennung: ort.kennung }),
+    '<div class="bos-label">' + esc(t('holen_ohne', { n: inhalt._ohne.length })) + '</div><div class="hol-liste">' +
+    (inhalt._ohne.length ? chipAuswahlHTML('holen', inhalt._ohne.map(function (x) { return { id: x.id, text: x.name }; })) : '<p class="feld-hilfe">' + esc(t('holen_keine')) + '</p>') + '</div>' +
+    (andere.length ? '<details><summary class="klein">' + esc(t('holen_andere', { n: andere.length })) + '</summary><div class="hol-liste">' +
+      chipAuswahlHTML('holen', andere.map(function (x) { return { id: x.id, text: x.name + ' (' + om()[x.ortId].kennung + ')' }; })) + '</div></details>' : ''),
+    [{ aktion: 'holen-speichern', text: t('holen_los'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+async function speichereHolen() {
+  const z = editZustand;
+  if (!z || z.typ !== 'holen') return;
+  const ids = Array.from(z.auswahl.holen);
+  if (!ids.length) { editFehler(t('holen_nichts')); return; }
+  const auftraege = ids.map(function (id) { const alt = zm()[id]; return { col: COL.zutaten, id: id, daten: Object.assign({}, alt, { ortId: z.id }), aktion: 'aendern', vorher: alt }; });
+  await schreibeReihe(t('holen_titel', { kennung: om()[z.id].kennung }), auftraege, t('holen_fertig', { n: ids.length, kennung: om()[z.id].kennung }));
+}
+
+/* ---------- Reihenfolge auf dem Schild (Pfeile, Ulf 03.10.2026) ---------- */
+function oeffneSchildFolge(ortId) {
+  const ort = om()[ortId];
+  if (!ort) return;
+  editZustand = { typ: 'schildfolge', id: ortId, liste: L.zutatenInSchildFolge(ort, L.zutatenAmOrt(ortId, S.zutaten)).map(function (x) { return x.id; }) };
+  zeichneSchildFolge();
+}
+function zeichneSchildFolge() {
+  const z = editZustand, ort = om()[z.id], liste = z.liste;
+  const zeilen = liste.map(function (id, i) {
+    const x = zm()[id];
+    return '<div class="folge-zeile"><span class="fz-nr">' + (i + 1) + '.</span><span class="fz-name">' + esc(x ? x.name : id) + '</span>' +
+      '<button type="button" class="bos-btn" data-aktion="sf-hoch" data-index="' + i + '"' + (i === 0 ? ' disabled' : '') + ' aria-label="' + esc(t('folge_hoch')) + '">▲</button>' +
+      '<button type="button" class="bos-btn" data-aktion="sf-runter" data-index="' + i + '"' + (i === liste.length - 1 ? ' disabled' : '') + ' aria-label="' + esc(t('folge_runter')) + '">▼</button></div>';
+  }).join('');
+  oeffneEdit(t('schildfolge_titel', { kennung: ort.kennung }), '<div class="klein">' + esc(t('schildfolge_hilfe')) + '</div>' + zeilen,
+    [{ aktion: 'sf-speichern', text: t('speichern'), klasse: 'bos-btn--amber' }, { aktion: 'sf-alphabet', text: t('schildfolge_alphabet') }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+async function speichereSchildFolge(alphabetisch) {
+  const z = editZustand;
+  if (!z || z.typ !== 'schildfolge') return;
+  const alt = om()[z.id];
+  const daten = Object.assign({}, alt, { schildFolge: alphabetisch ? [] : L.schildFolgeBereinigt(z.liste, L.zutatenAmOrt(z.id, S.zutaten)) });
+  await fuehreSchreibenAus(COL.orte, z.id, daten, 'aendern', alt, t('gespeichert'));
+}
+
+/* ---------- Wort eines Bereichs ändern / angleichen ---------- */
+function oeffneBereichWort(bereich) {
+  const b = L.bereichsListe(S.orte).filter(function (x) { return x.bereich === bereich; })[0];
+  if (!b) return;
+  editZustand = { typ: 'bereichwort', bereich: bereich };
+  oeffneEdit(t('bereich_wort_titel', { bereich: bereich }),
+    '<p class="sheet-info">' + esc(t('bereich_wort_erklaerung', { bereich: bereich, n: b.anzahl })) + '</p>' +
+    feldHTML(t('f_bereich_wort'), eingabe('fBereichWort', b.name, 'maxlength="30"')),
+    [{ aktion: 'bereich-wort-speichern', text: t('speichern'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+async function speichereBereichWort() {
+  const z = editZustand;
+  if (!z || z.typ !== 'bereichwort') return;
+  const wort = wert('fBereichWort');
+  const fehler = pruefeText(t('f_bereich_wort'), wort, 30);
+  if (fehler) { editFehler(fehler); return; }
+  /* alle Orte des Bereichs, auch archivierte — sonst kehrt das alte Wort beim Wiederherstellen zurück */
+  const betroffen = S.orte.filter(function (o) { const k = L.kennungZerlegen(o.kennung); return k && k.bereich === z.bereich && (o.bereichName || '') !== wort; });
+  if (!betroffen.length) { schliesseEdit(); toast(t('bereich_wort_gleich')); return; }
+  const auftraege = betroffen.map(function (o) { return { col: COL.orte, id: o.id, daten: Object.assign({}, o, { bereichName: wort }), aktion: 'aendern', vorher: o }; });
+  await schreibeReihe(t('bereich_wort_titel', { bereich: z.bereich }), auftraege, t('bereich_wort_fertig', { n: betroffen.length }));
+}
+
+/* ---------- Startdaten: nur noch neue ZUTATEN (Ulf, 03.10.2026) ----------
+   Orte werden von Hand angelegt (BOS vergibt die Nummer); Teige liest die
+   Nachtseite bzw. später „Teige & Rezepte“ ein. */
+let importZustand = null;
+function starteImport() { const i = document.getElementById('importDatei'); i.value = ''; i.click(); }
+document.getElementById('importDatei').addEventListener('change', function (e) {
+  const datei = e.target.files && e.target.files[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onerror = function () { zeigeFehler(t('import_titel'), leser.error || new Error('Datei nicht lesbar')); };
+  leser.onload = function () {
+    let json;
+    try { json = JSON.parse(leser.result); }
+    catch (err) { oeffneEdit(t('import_titel'), '<p class="sheet-fehler">' + esc(t('import_json', { msg: err.message })) + '</p>', [{ aktion: 'abbrechen', text: t('schliessen') }]); return; }
+    const hinweise = [];
+    let nurZutaten = json;
+    if (json && typeof json === 'object' && !Array.isArray(json)) {
+      if (Array.isArray(json.orte) && json.orte.length) hinweise.push(t('import_orte_nicht', { n: json.orte.length }));
+      const mitOrt = Array.isArray(json.zutaten) ? json.zutaten.filter(function (x) { return x && x.ort; }).length : 0;
+      if (mitOrt) hinweise.push(t('import_ort_ignoriert', { n: mitOrt }));
+      if (Array.isArray(json.teige) && json.teige.length) hinweise.push(t('import_teige_nicht', { n: json.teige.length }));
+      nurZutaten = { version: json.version, zutaten: Array.isArray(json.zutaten) ? json.zutaten.map(function (x) {
+        if (!x || typeof x !== 'object') return x;
+        const k = Object.assign({}, x); delete k.ort; return k;
+      }) : json.zutaten };
+    }
+    const ergebnis = L.importPlan(nurZutaten, { orte: [], zutaten: S.zutaten, teige: [] }, []);
+    const neu = ergebnis.plan.zutaten.filter(function (x) { return x.aktion === 'neu'; });
+    const vorhanden = ergebnis.plan.zutaten.length - neu.length;
+    if (neu.length && !S.haken.wagen) ergebnis.fehler.push(t('import_haken_fehlen', { liste: t('haken_wagen') }));
+    importZustand = { neu: neu };
+    let html = '<p class="sheet-info">' + esc(t('import_zusammenfassung_zutaten', { zutaten: neu.length, vorhanden: vorhanden })) + '</p>';
+    if (ergebnis.fehler.length) html += '<p class="sheet-fehler">' + esc(t('import_fehler_titel')) + '</p><ul class="import-liste">' + ergebnis.fehler.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    const alleHinweise = hinweise.concat(ergebnis.hinweise);
+    if (alleHinweise.length) html += '<p class="sheet-info">' + esc(t('import_hinweise_titel')) + '</p><ul class="import-liste">' + alleHinweise.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    const knoepfe = [];
+    if (!ergebnis.fehler.length && neu.length) knoepfe.push({ aktion: 'import-los', text: t('import_los', { n: neu.length }), klasse: 'bos-btn--amber' });
+    else if (!ergebnis.fehler.length) html += '<p class="sheet-info">' + esc(t('import_nichts')) + '</p>';
+    knoepfe.push({ aktion: 'abbrechen', text: t('abbrechen') });
+    editZustand = { typ: 'import' };
+    oeffneEdit(t('import_titel'), html, knoepfe);
+  };
+  leser.readAsText(datei);
+});
+async function fuehreImportAus() {
+  if (!importZustand) return;
+  const auftraege = importZustand.neu.map(function (e) { return { col: COL.zutaten, id: null, daten: L.zutatDokument(e.daten, {}), aktion: 'anlegen', vorher: null }; });
+  importZustand = null;
+  await schreibeReihe(t('import_titel'), auftraege, t('import_fertig', { n: auftraege.length }));
+}
+
+/* ---------- Drucken (immer über bos_druck.js, nie direkt) ----------
+   Die Schrift der Zutatenliste wird je Schild eingepasst: größte Schrift,
+   bei der nichts über das Blatt läuft (gemessen in einem unsichtbaren
+   Nachbau mit demselben CSS). Passt es selbst mit der kleinsten Schrift
+   nicht, wird das VOR dem Druck gesagt, nicht abgeschnitten. */
+function messeSchild(ort, zutaten, qr, stand, qrLeer) {
+  const halter = document.getElementById('schildMessung');
+  let pt = L.SCHILD_SCHRIFT_MAX_PT, passt = false;
+  for (; pt >= L.SCHILD_SCHRIFT_MIN_PT; pt--) {
+    halter.innerHTML = '<style>' + L.SCHILD_CSS + '</style>' + L.schildHTML(ort, zutaten, { stand: stand, qrSvg: qr, qrLeer: qrLeer, schriftPt: pt });
+    const s = halter.querySelector('.schild'), liste = halter.querySelector('.schild-liste'), fuss = halter.querySelector('.schild-fuss');
+    if (!liste) { passt = true; break; }
+    passt = s.scrollHeight <= s.clientHeight + 1 && s.scrollWidth <= s.clientWidth + 1 &&
+      liste.getBoundingClientRect().bottom <= fuss.getBoundingClientRect().top + 0.5;
+    if (passt) break;
+  }
+  halter.innerHTML = '';
+  return { pt: Math.max(pt, L.SCHILD_SCHRIFT_MIN_PT), passt: passt };
+}
+function druckeSchilder(orte, trotzdem) {
+  try {
+    if (!orte.length) { toast(t('keine_schilder')); return; }
+    if (!window.BOS_DRUCK) throw new Error('bos_druck.js nicht geladen');
+    const inhalt = L.ortInhalt(S.orte, S.zutaten), stand = standHeute();
+    const mitCode = qrErlaubt();   /* wirft sichtbar, wenn bos_qr.js fehlt */
+    const zuVoll = [];
+    const seiten = orte.map(function (o) {
+      const zutaten = L.zutatenInSchildFolge(o, inhalt[o.id] || []);
+      const qr = mitCode ? qrFuer(o.kennung) : '';
+      const m = messeSchild(o, zutaten, qr, stand, !mitCode);
+      if (!m.passt) zuVoll.push(o.kennung + ' (' + zutaten.length + ')');
+      return L.schildHTML(o, zutaten, { stand: stand, qrSvg: qr, qrLeer: !mitCode, schriftPt: m.pt });
+    });
+    if (zuVoll.length && !trotzdem) {
+      editZustand = { typ: 'druckfrage', orte: orte.map(function (o) { return o.id; }) };
+      oeffneEdit(t('druck_zu_voll_titel'), '<p class="sheet-fehler">' + esc(t('druck_zu_voll', { liste: zuVoll.join(', '), pt: L.SCHILD_SCHRIFT_MIN_PT })) + '</p>',
+        [{ aktion: 'druck-trotzdem', text: t('druck_trotzdem'), klasse: 'gefahr' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+      return;
+    }
+    if (!mitCode) toast(t('qr_ohne_toast'));
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: seiten.join(''), appName: 'Teigecke Orte', mitKopf: false, farbig: false,
+      extraCSS: L.SCHILD_CSS + L.SCHILD_DRUCK_CSS, ausrichtung: 'landscape'
+    });
+  } catch (err) { zeigeFehler(t('err_drucken'), err); }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-aktion'), id = el.getAttribute('data-id');
+  switch (a) {
+    case 'suchen': { const f = document.getElementById('sucheFeld'); S.sucheText = f.value; f.blur(); zeigeOrt(f.value); break; }
+    case 'schild': druckeSchilder([om()[id]].filter(Boolean)); break;
+    case 'alle-schilder': druckeSchilder(L.aktiv(S.orte).slice().sort(L.kennungVergleich)); break;
+    case 'druck-trotzdem': { const ids = (editZustand && editZustand.orte) || []; schliesseEdit(); druckeSchilder(ids.map(function (x) { return om()[x]; }).filter(Boolean), true); break; }
+    case 'neu-ort': oeffneOrt(null); break;
+    case 'bearbeiten-ort': oeffneOrt(id); break;
+    case 'neu-zutat': oeffneZutat(null); break;
+    case 'bearbeiten-zutat': oeffneZutat(id); break;
+    case 'ort-art':
+      if (editZustand) { editZustand.art = el.getAttribute('data-art'); document.querySelectorAll('#fArt .chip').forEach(function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-art') === editZustand.art ? 'true' : 'false'); }); }
+      break;
+    case 'holen': oeffneHolen(id); break;
+    case 'holen-speichern': speichereHolen(); break;
+    case 'schildfolge': oeffneSchildFolge(id); break;
+    case 'sf-hoch': case 'sf-runter':
+      if (editZustand && editZustand.typ === 'schildfolge') { editZustand.liste = L.verschiebe(editZustand.liste, Number(el.getAttribute('data-index')), a === 'sf-hoch' ? -1 : 1); zeichneSchildFolge(); }
+      break;
+    case 'sf-speichern': speichereSchildFolge(false); break;
+    case 'sf-alphabet': speichereSchildFolge(true); break;
+    case 'bereich-wort': oeffneBereichWort(el.getAttribute('data-bereich')); break;
+    case 'bereich-wort-speichern': speichereBereichWort(); break;
+    case 'chip': {
+      if (!editZustand || !editZustand.auswahl) break;
+      const menge = editZustand.auswahl[el.getAttribute('data-feld')];
+      if (menge.has(id)) menge.delete(id); else menge.add(id);
+      el.setAttribute('aria-pressed', menge.has(id) ? 'true' : 'false');
+      break;
+    }
+    case 'speichern': speichereEdit(); break;
+    case 'archivieren': archiviereEdit(); break;
+    case 'abbrechen': schliesseEdit(); break;
+    case 'wiederherstellen': stelleWiederHer(el.getAttribute('data-col'), id); break;
+    case 'archiv-umschalten': S.zeigeArchiv = !S.zeigeArchiv; render(); break;
+    case 'startdaten': starteImport(); break;
+    case 'import-los': fuehreImportAus(); break;
+  }
+});
+document.addEventListener('change', function (e) {
+  if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bereich-wahl')) bereichGewechselt();
+});
+document.addEventListener('input', function (e) {
+  const el = e.target;
+  if (el && el.hasAttribute && el.hasAttribute('data-bereich-eingabe')) {
+    if (editZustand) { if (el.id === 'fBereichNeu') editZustand.bereichNeu = el.value; if (el.id === 'fBereichName') editZustand.bereichName = el.value; }
+    zeigeKennungVorschau();
+  }
+  if (el && el.id === 'sucheFeld') S.sucheText = el.value;
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && e.target && e.target.id === 'sucheFeld') { e.preventDefault(); S.sucheText = e.target.value; e.target.blur(); zeigeOrt(e.target.value); }
+});
+document.getElementById('pflegeBtn').addEventListener('click', function () {
+  if (!S.haken.wagen) return;
+  S.pflegeModus = !S.pflegeModus;
+  render();
+});
+document.getElementById('editSheet').addEventListener('click', function (e) { if (e.target === this) schliesseEdit(); });
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in der Modul-Doku) ---------- */
+const helpData = {
+  title: 'Teigecke · Orte — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'Hier richtest du die Teigecke ein: Orte anlegen, jeder Zutat ihr Zuhause geben, Schilder drucken. Das ist Arbeit in Ruhe, nicht für nebenbei am Kneter. Nachts sagt „Teigecke Nacht“ beim Einsammeln nur noch, an welchem Ort etwas steht.' },
+    { heading: 'Was ist eine Kennung?', text: 'Jeder Ort hat eine Kennung aus einem Buchstaben und einer Nummer, zum Beispiel B01. Der Buchstabe ist der Bereich (B = Backstube, K = Kühlung …), die Nummer zählt BOS von selbst hoch: B01, B02, B03. Einmal B01, immer B01 — die Kennung bleibt bei ihrem Ort, egal was sich an seinem Inhalt ändert. Fällt ein Ort weg, bleibt seine Nummer leer; ein neuer Ort bekommt immer die nächste Nummer am Ende.' },
+    { heading: 'Einen Ort anlegen', text: 'Oben „✎ Pflegen“ einschalten, dann „＋ Ort“. Bereich wählen oder mit „neuer Bereich“ einen Buchstaben und ein Wort dazu festlegen. Die Kennung siehst du als Vorschau, tippen kannst du sie nicht. Name, Beschreibung und „Reihenfolge im Gang“ sind freiwillig. „Reihenfolge im Gang“ sortiert die Orte nachts in der Einsammelliste: kleinere Zahl = weiter vorn.' },
+    { heading: 'Zutaten ein Zuhause geben', text: 'Oben steht „Noch ohne Zuhause“ mit allen Zutaten, die noch nirgends wohnen. Am schnellsten geht es am Ort selbst: „＋ Zutaten hierher“, alle antippen, die dorthin gehören, „Hierher holen“. Einzelne Zutaten änderst du durch Antippen (Name, Zuhause, Gebinde). Neue Zutaten legst du mit „＋ Zutat“ an oder liest sie mit „Zutaten einlesen“ aus der Startdaten-Datei ein.' },
+    { heading: 'Reihenfolge auf dem Schild', text: 'Mit „↕ Reihenfolge“ schiebst du die Zutaten eines Orts mit den Pfeilen ▲▼ in die Reihenfolge, in der sie auf dem Schild stehen sollen. Ohne eigene Reihenfolge stehen sie alphabetisch. Das hat nichts mit der „Reihenfolge im Gang“ zu tun.' },
+    { heading: 'Schilder drucken', text: '„🖨 Schild“ druckt das Schild eines Orts, „Alle Schilder drucken“ alle hintereinander: DIN A4 quer, ein Ort je Blatt. Links groß die Kennung, rechts die Zutaten mit Gebinde, unten links ein QR-Code (solange BäckereiOS noch nicht online ist: ein leeres Feld). Die Schrift wird so groß gewählt, wie es auf das Blatt passt. Passt es gar nicht, sagt die Seite das vor dem Druck. Im Druckdialog auf „Querformat“ achten.' },
+    { heading: 'Der QR-Code', text: 'Wer den QR-Code mit dem Handy scannt, landet nach der Anmeldung direkt auf der Karte dieses Orts: Zutat ändern, Schild neu drucken, fertig. Du kannst eine Kennung auch oben ins Suchfeld tippen. Solange BäckereiOS noch nicht online ist, druckt die Seite das Schild ohne Code: an seiner Stelle bleibt ein leeres Feld. Die Seite sagt das oben und beim Drucken. Nach dem Online-Gang die Schilder einmal neu drucken, dann ist der Code drauf.' },
+    { heading: 'Wort eines Bereichs ändern', text: 'Neben dem Bereich steht „Wort ändern“. Das neue Wort gilt für alle Orte des Bereichs; danach die Schilder neu drucken. Der Buchstabe bleibt, sobald ein Bereich einen Ort hat.' },
+    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Einen Ort kannst du erst archivieren, wenn dort keine Zutat mehr wohnt; eine Zutat erst, wenn sie in keinem Teig mehr steht. Archiviertes steht unten im Archiv und lässt sich wiederherstellen.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf die Orte jeder mit Konto. Ändern kann nur, wer in der Kontenverwaltung den Haken „🧺 Wagen & Zutaten“ hat. Die Haken „Teige“ und „Rezepte“ gelten hier nicht.' },
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ hat drei mögliche Gründe: Dir fehlt der Haken, du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt hier nie), oder die Firestore-Regeln sind älter als diese Seite — dann steht oben ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat neu geladen, einfach noch einmal speichern. Ohne Netz lässt sich hier nichts ändern.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.title;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.sections.map(function (s) {
+    return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>';
+  }).join('');
+}
+document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = false; });
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

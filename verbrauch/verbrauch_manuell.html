@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Verbrauch – Manuelle Erfassung · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Design-System: die echte, bereits im Repo-Root existierende
+     bos_design_tokens.css — siehe SESSION_2026-08-28_DESIGN_TOKENS_
+     KONSOLIDIERUNG.md. (Vorher stand hier fälschlich eine von Claude
+     erfundene Version, weil die echte Datei übersehen wurde.) -->
+<!-- Theme-Sync: liest das Profil-Theme aus dem Launcher-State, MUSS vor
+     bos_design_tokens.css stehen (siehe bos_theme_sync.js, Kopf-Kommentar) -->
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  /* 28.08.2026: Auf die echten --bos-*-Tokens umgestellt (dunkel/amber,
+     Nachtschicht-Leitstand-Palette) — vorher war hier ein komplett hell
+     geratenes Farbschema, weil die echte bos_design_tokens.css beim
+     ersten Bau übersehen wurde. --vm-info-* nutzt --bos-blue, dort
+     ausdrücklich als "Neutral-Akzent" vorgesehen — hier für Hinweise
+     genutzt, nicht kühlungsspezifisch wie bei froster_inventur.html. */
+  :root {
+    --vm-bg: var(--bos-bg, #16120e);
+    --vm-oberflaeche: var(--bos-surface, #221b14);
+    --vm-oberflaeche-2: var(--bos-surface-raised, #2b2218);
+    --vm-text: var(--bos-text, #f3ece1);
+    --vm-text-schwach: var(--bos-text-dim, #ab9c8a);
+    --vm-primary: var(--bos-amber, #c07a10);
+    --vm-primary-hell: var(--bos-amber-bright, #e0973a);
+    --vm-rand: var(--bos-border, rgba(255,255,255,0.08));
+    --vm-warnung: var(--bos-red, #d6584a);
+    --vm-warnung-bg: rgba(214,88,74,0.15);
+    --vm-info-bg: rgba(74,143,214,0.16);
+    --vm-info-text: var(--bos-blue, #4a8fd6);
+    --vm-radius: var(--bos-radius-md, 14px);
+    --vm-abstand: 16px;
+    --vm-font-display: var(--bos-font-display, 'Fraunces', serif);
+    --vm-font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --vm-font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--vm-bg);
+    color: var(--vm-text);
+    font-family: var(--vm-font-body);
+    font-size: var(--bos-font-lg, 17px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #app { max-width: 720px; margin: 0 auto; padding: var(--vm-abstand); padding-bottom: var(--bos-space-xl, 96px); }
+
+  .bos-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--vm-abstand);
+  }
+  .bos-header h1 { font-family: var(--vm-font-display); font-size: var(--bos-font-xl, 22px); margin: 0; font-weight: 700; }
+
+  .icon-btn {
+    background: var(--vm-oberflaeche);
+    border: 1px solid var(--vm-rand);
+    border-radius: 999px;
+    width: 40px; height: 40px;
+    font-size: var(--bos-font-lg, 18px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--vm-text);
+  }
+
+  section { margin-bottom: var(--bos-space-md, 20px); }
+
+  .karte {
+    background: var(--vm-oberflaeche);
+    border: 1px solid var(--vm-rand);
+    border-radius: var(--vm-radius);
+    padding: var(--vm-abstand);
+  }
+
+  .datum-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); flex-wrap: wrap; }
+  .datum-zeile label { font-family: var(--vm-font-label); font-weight: 700; letter-spacing: .02em; }
+  .datum-zeile input[type="date"] {
+    font-family: var(--vm-font-body); font-size: var(--bos-font-md, 16px); padding: var(--bos-space-xs, 8px) var(--bos-space-xs, 10px); border-radius: 8px;
+    border: 1px solid var(--vm-rand); background: var(--vm-oberflaeche-2); color: var(--vm-text);
+    color-scheme: dark;
+  }
+  #wochentagAnzeige { font-family: var(--vm-font-label); font-weight: 700; color: var(--vm-primary-hell); }
+
+  .info-hinweis, .warn-hinweis, .hinweis-block {
+    border-radius: var(--vm-radius);
+    padding: var(--bos-space-sm, 12px) var(--bos-space-sm, 14px);
+    font-size: var(--bos-font-md, 15px);
+    margin-bottom: var(--bos-space-sm, 16px);
+  }
+  .info-hinweis { background: var(--vm-info-bg); color: var(--vm-info-text); border: 1px solid var(--vm-rand); }
+  .warn-hinweis { background: var(--vm-warnung-bg); color: var(--vm-text); border: 1px solid var(--vm-warnung); }
+  .hinweis-block { background: var(--vm-oberflaeche); border: 1px dashed var(--vm-rand); color: var(--vm-text-schwach); }
+
+  .poka-yoke-block p { margin-top: 0; font-family: var(--vm-font-label); font-weight: 700; letter-spacing: .01em; }
+  .poka-yoke-buttons { display: flex; gap: var(--bos-space-sm, 12px); flex-wrap: wrap; }
+  .poka-btn {
+    flex: 1 1 160px;
+    padding: var(--bos-space-sm, 14px) var(--bos-space-sm, 12px);
+    font-family: var(--vm-font-label);
+    font-weight: 700;
+    letter-spacing: .02em;
+    font-size: var(--bos-font-md, 16px);
+    border-radius: var(--vm-radius);
+    border: 2px solid var(--vm-rand);
+    background: var(--vm-oberflaeche-2);
+    color: var(--vm-text);
+    cursor: pointer;
+  }
+  .poka-btn.aktiv {
+    border-color: var(--vm-primary);
+    background: var(--vm-primary);
+    color: #1b1305;
+    font-weight: 800;
+  }
+  .status-text { font-family: var(--vm-font-label); font-size: var(--bos-font-sm, 14px); color: var(--vm-text-schwach); margin: var(--bos-space-xs, 8px) 0 0; }
+
+  .produkt-liste { display: flex; flex-direction: column; gap: var(--bos-space-xs, 10px); }
+  .produkt-zeile {
+    display: flex; align-items: center; gap: var(--bos-space-sm, 12px);
+    background: var(--vm-oberflaeche);
+    border: 1px solid var(--vm-rand);
+    border-radius: var(--vm-radius);
+    padding: var(--bos-space-sm, 12px) var(--bos-space-sm, 14px);
+  }
+  .produkt-name { flex: 1; font-weight: 600; }
+  .produkt-menge {
+    width: 84px; font-family: var(--vm-font-body); font-size: var(--bos-font-lg, 17px); padding: var(--bos-space-xs, 8px); text-align: center;
+    border-radius: 8px; border: 1px solid var(--vm-rand); background: var(--vm-oberflaeche-2); color: var(--vm-text);
+  }
+  .produkt-einheit { color: var(--vm-text-schwach); font-size: var(--bos-font-sm, 14px); width: 40px; }
+
+  /* Stück/Bleche-Umschalter: ersetzt den statischen .produkt-einheit-Span nur
+     bei Produkten mit umschaltbarer Einheit (einheit gesetzt und nicht "stueck"). */
+  .produkt-zeile { flex-wrap: wrap; }
+  .einheit-toggle {
+    font-family: var(--vm-font-label);
+    font-size: var(--bos-font-xs, 12px);
+    font-weight: 700;
+    letter-spacing: .02em;
+    padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px);
+    border-radius: 8px;
+    border: 1px solid var(--vm-rand);
+    background: var(--vm-oberflaeche-2);
+    color: var(--vm-text-schwach);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .einheit-toggle:active { background: var(--vm-primary); color: #1b1305; }
+  .einheit-ungenau-hinweis {
+    font-family: var(--vm-font-label);
+    font-size: var(--bos-font-xs, 11px);
+    font-weight: 800;
+    letter-spacing: .02em;
+    color: var(--vm-warnung);
+    white-space: nowrap;
+  }
+  .ausreisser-toggle {
+    display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); font-size: var(--bos-font-sm, 13px); color: var(--vm-text-schwach);
+    white-space: nowrap;
+  }
+  .ausreisser-toggle input { width: 20px; height: 20px; accent-color: var(--vm-primary); }
+
+  .primary-btn {
+    width: 100%;
+    padding: var(--bos-space-sm, 16px);
+    font-family: var(--vm-font-label);
+    font-size: var(--bos-font-lg, 17px);
+    font-weight: 800;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    border-radius: var(--vm-radius);
+    border: none;
+    background: linear-gradient(180deg, var(--vm-primary-hell), var(--vm-primary));
+    color: #1b1305;
+    cursor: pointer;
+    box-shadow: 0 4px 18px var(--bos-amber-glow, rgba(192,122,16,.38));
+  }
+  .primary-btn:disabled { background: var(--vm-oberflaeche-2); color: var(--vm-text-schwach); cursor: not-allowed; box-shadow: none; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.72);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .modal-box {
+    background: var(--vm-oberflaeche);
+    border-top: 1px solid var(--vm-rand);
+    width: 100%; max-width: 720px;
+    border-radius: 18px 18px 0 0;
+    padding: var(--vm-abstand);
+    max-height: 80vh; overflow-y: auto;
+  }
+  .modal-box h2 { font-family: var(--vm-font-display); margin-top: 0; }
+  .ausreisser-eintrag {
+    background: var(--vm-warnung-bg);
+    border: 1px solid var(--vm-warnung);
+    border-radius: 10px;
+    padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px);
+    margin-bottom: var(--bos-space-xs, 10px);
+    font-size: var(--bos-font-md, 15px);
+  }
+  .ausreisser-eintrag strong { display: block; margin-bottom: var(--bos-space-3xs, 2px); }
+  .grundlage-link {
+    display: block; margin-top: var(--bos-space-xs, 8px); background: none; border: none; padding: 0;
+    font-family: var(--vm-font-label); font-weight: 700; font-size: var(--bos-font-sm, 13px);
+    color: var(--vm-info-text); text-decoration: underline; cursor: pointer;
+  }
+
+  /* Grundlage-Sheet (31.08.2026) — Vorbild "Der Wurm" aus dem Altsystem,
+     bewusst ohne das Maskottchen selbst (siehe SESSION_2026-08-31_
+     BERECHNUNGSGRUNDLAGE_ANZEIGE.md). */
+  .grundlage-wochentage { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 6px); margin-top: var(--bos-space-xs, 10px); }
+  .gw-zeile { border: 1px solid var(--vm-rand); border-radius: 10px; overflow: hidden; background: var(--vm-oberflaeche-2); }
+  .gw-kopf {
+    display: flex; justify-content: space-between; align-items: center; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px);
+    font-family: var(--vm-font-label); font-weight: 700; cursor: pointer;
+  }
+  .gw-badge { font-size: var(--bos-font-sm, 13px); color: var(--vm-text-schwach); }
+  .gw-badge.warnung { color: var(--vm-warnung); }
+  .gw-liste { display: none; padding: 0 var(--bos-space-sm, 12px) var(--bos-space-xs, 10px); }
+  .gw-zeile.offen .gw-liste { display: block; }
+  .gw-eintrag { display: flex; justify-content: space-between; padding: var(--bos-space-3xs, 4px) 0; font-size: var(--bos-font-sm, 13px); border-top: 1px solid var(--vm-rand); }
+  .gw-eintrag:first-child { border-top: none; }
+  .gw-eintrag.leer { color: var(--vm-text-schwach); border-top: none; }
+
+  .bottom-sheet {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 60;
+  }
+  .bottom-sheet-inhalt {
+    background: var(--vm-oberflaeche);
+    border-top: 1px solid var(--vm-rand);
+    width: 100%; max-width: 720px;
+    border-radius: 18px 18px 0 0;
+    padding: var(--vm-abstand);
+    max-height: 85vh; overflow-y: auto;
+    position: relative;
+  }
+  .bottom-sheet-inhalt h2 { font-family: var(--vm-font-display); margin-top: var(--bos-space-xs, 8px); }
+  .bottom-sheet-inhalt h3 { font-family: var(--vm-font-label); letter-spacing: .02em; color: var(--vm-primary-hell); margin-bottom: var(--bos-space-3xs, 4px); }
+  .bottom-sheet-inhalt p { color: var(--vm-text); line-height: 1.5; }
+  #hilfeSchliessen { position: absolute; top: 12px; right: 12px; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header class="bos-header">
+    <h1 data-i18n="titel"></h1>
+    <button id="hilfeBtn" class="icon-btn" aria-label="Hilfe" type="button">❓</button>
+  </header>
+
+  <div id="zugriffGesperrt" class="hinweis-block" hidden>
+    <p data-i18n="keinZugriff"></p>
+  </div>
+  <!-- ^ Ungenutzt seit der Umstellung auf den echten bos_access_guard.js,
+       seit 04.09.2026 durch bos_standalone_login.js ersetzt (bringt ebenfalls
+       sein eigenes Sperr-Overlay mit). Bewusst stehen gelassen statt entfernt,
+       für den Fall, dass eine eigene, dezentere Inline-Meldung später doch
+       gewünscht ist — aktuell ohne Funktion. -->
+  <main id="hauptbereich">
+
+    <section class="karte datum-zeile">
+      <label for="datumInput" data-i18n="datumLabel"></label>
+      <input type="date" id="datumInput">
+      <span id="wochentagAnzeige"></span>
+    </section>
+
+    <div id="feiertagsHinweis" class="info-hinweis" hidden></div>
+
+    <div id="mehrfachWarnung" class="warn-hinweis" hidden></div>
+
+    <section class="karte poka-yoke-block">
+      <p data-i18n="pokaYokeFrage"></p>
+      <div class="poka-yoke-buttons">
+        <button type="button" id="btnNormalerTag" class="poka-btn" data-i18n="pokaYokeNormal"></button>
+        <button type="button" id="btnBesondererTag" class="poka-btn" data-i18n="pokaYokeBesonders"></button>
+      </div>
+      <p id="besondererTagStatus" class="status-text"></p>
+    </section>
+
+    <section id="produktListe" class="produkt-liste" hidden></section>
+
+    <p id="keineProdukteHinweis" class="hinweis-block" hidden data-i18n="keineProdukte"></p>
+
+    <button type="button" id="speichernBtn" class="primary-btn" disabled data-i18n="speichern"></button>
+    <p id="speicherStatus" class="status-text"></p>
+
+  </main>
+</div>
+
+<!-- Poka-Yoke-Bestätigung bei automatischem Ausreißer-Alarm -->
+<div id="ausreisserModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h2 data-i18n="ausreisserTitel"></h2>
+    <p data-i18n="ausreisserErklaerung"></p>
+    <div id="ausreisserListe"></div>
+    <div class="poka-yoke-buttons">
+      <button type="button" id="btnZurueckPruefen" class="poka-btn" data-i18n="ausreisserZurueck"></button>
+      <button type="button" id="btnTrotzdemSpeichern" class="poka-btn" data-i18n="ausreisserTrotzdem"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Hilfe-Bottom-Sheet -->
+<div id="hilfeSheet" class="bottom-sheet" hidden>
+  <div class="bottom-sheet-inhalt">
+    <button id="hilfeSchliessen" class="icon-btn" aria-label="Schließen" type="button">✕</button>
+    <h2 data-i18n="hilfeTitel"></h2>
+
+    <h3 data-i18n="hilfeWofuerTitel"></h3>
+    <p data-i18n="hilfeWofuerText"></p>
+
+    <h3 data-i18n="hilfeAblaufTitel"></h3>
+    <p data-i18n="hilfeAblaufText"></p>
+
+    <h3 data-i18n="hilfeEinheitTitel"></h3>
+    <p data-i18n="hilfeEinheitText"></p>
+
+    <h3 data-i18n="hilfeBesondersTitel"></h3>
+    <p data-i18n="hilfeBesondersText"></p>
+
+    <h3 data-i18n="hilfeAusreisserTitel"></h3>
+    <p data-i18n="hilfeAusreisserText"></p>
+
+    <h3 data-i18n="hilfeFeiertageTitel"></h3>
+    <p data-i18n="hilfeFeiertageText"></p>
+
+    <h3 data-i18n="hilfeGrenzenTitel"></h3>
+    <p data-i18n="hilfeGrenzenText"></p>
+
+    <h3 data-i18n="hilfeGrundlageTitel"></h3>
+    <p data-i18n="hilfeGrundlageText"></p>
+  </div>
+</div>
+
+<!-- Grundlage-Sheet (31.08.2026) — zeigt beim Ausreißer-Alarm auf Wunsch,
+     welche Tage tatsächlich im bisherigen Schnitt stecken. Vorbild: "Der
+     Wurm" aus dem Altsystem, bewusst ohne das Maskottchen selbst. Details:
+     SESSION_2026-08-31_BERECHNUNGSGRUNDLAGE_ANZEIGE.md. -->
+<div id="grundlageSheet" class="bottom-sheet" hidden>
+  <div class="bottom-sheet-inhalt">
+    <button id="grundlageSchliessen" class="icon-btn" aria-label="Schließen" type="button">✕</button>
+    <h2 id="grundlageTitel"></h2>
+    <div id="grundlageInhalt"></div>
+  </div>
+</div>
+
+<!-- Firebase (Reihenfolge verbindlich, siehe Fundament §1.1) — am 04.09.2026
+     nach vorne gezogen: bos_standalone_login.js braucht Firebase +
+     bos_accounts.js VOR sich selbst geladen, siehe unten. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+
+<!-- Standalone-Login-Voraussetzungen (NEU 04.09.2026, siehe bos_standalone_login.js
+     Kopf-Kommentar): bos_launcher_backgrounds.js MUSS vor bos_accounts.js stehen,
+     liefert die Zwischensilbe für die Schlüsselberechnung. -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_accounts.js"></script>
+
+<!-- Zugriff: erwartet BOS_APP_ID + Registry + Profile + Permissions VOR sich
+     selbst, genau in dieser Reihenfolge (siehe bos_standalone_login.js,
+     Kopf-Kommentar). Blockiert sich bei Bedarf selbst per eigenem Overlay —
+     es gibt keine Funktion, die man separat aufruft. ANNAHME: 'verbrauch_manuell'
+     als BOS_APP_ID ist noch nicht durch einen echten Registry-Eintrag bestätigt
+     (siehe VERBRAUCH_MANUELL_DOKU.md §7) — muss beim Eintragen in
+     bos_app_registry.js exakt übereinstimmen, sonst bleibt die Seite laut
+     bos_access.js absichtlich offen (fail-open), statt fälschlich zu sperren.
+     ERSETZT bos_access_guard.js (Thema 2, 04.09.2026): diese Seite kann jetzt
+     auch direkt per NFC/QR ohne vorherigen Launcher-Aufruf geöffnet werden. -->
+<script>var BOS_APP_ID = 'verbrauch_manuell';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+
+<!-- Zeitkontext-Referenz: MUSS vor bos_verbrauch_durchschnitt.js stehen.
+     Liefert BOS_IST_BESONDERER_TAG() — genutzt sowohl für den Feiertags-/
+     Ferien-Ausschluss aus der Vergleichsbasis (bos_verbrauch_durchschnitt.js,
+     Kopfkommentar "ZEITKONTEXT-ANBINDUNG") als auch für den Feiertags-Hinweis
+     unten in Abschnitt 4 dieses Skripts. Fehlt sie, degradiert beides
+     graceful (kein Ausschluss, kein Hinweis) statt abzustürzen. Neu:
+     29.08.2026, siehe BOS_ZEITKONTEXT_DOKU.md. -->
+<script src="../bos_zeitkontext_referenz.js"></script>
+
+<!-- Zentrale Durchschnitts-/Ausreißer-Logik, mehrere Aufrufer -->
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* -----------------------------------------------------------
+   * 1) i18n-Hook (Pflicht-Baustein, siehe Fundament §5.2)
+   *    Aktuell nur Deutsch — Struktur erlaubt spätere Sprachen,
+   *    ohne die Seite neu schreiben zu müssen.
+   * --------------------------------------------------------- */
+  const I18N_DE = {
+    titel: 'Verbrauch – Manuelle Erfassung',
+    keinZugriff: 'Kein Zugriff für deine Rolle. Diese Seite ist für Bäcker, Konditoren und Admin gedacht.',
+    datumLabel: 'Datum',
+    pokaYokeFrage: 'Ist heute ein normaler Tag oder ein besonderer Tag (Ferien, Feiertag, Ausnahme)?',
+    pokaYokeNormal: 'Normaler Tag',
+    pokaYokeBesonders: 'Ferien / besonderer Tag',
+    keineProdukte: 'Für die manuelle Erfassung sind aktuell keine Produkte freigeschaltet. In produkt_config.json muss bei den gewünschten Produkten das Feld „manuelleErfassung": true gesetzt sein.',
+    speichern: 'Speichern',
+    ausreisserTitel: 'Ungewöhnliche Werte',
+    ausreisserErklaerung: 'Diese Werte weichen deutlich vom bisherigen Schnitt für diesen Wochentag ab. Bitte kurz prüfen, bevor gespeichert wird.',
+    ausreisserZurueck: 'Zurück, Wert prüfen',
+    ausreisserTrotzdem: 'Trotzdem speichern',
+    hilfeTitel: 'Hilfe zu dieser Seite',
+    hilfeWofuerTitel: 'Wofür ist diese Seite?',
+    hilfeWofuerText: 'Hier wird schnell und ohne Foto oder KI eingetragen, wie viel von einzelnen Produkten an einem Tag verbraucht wurde. Das ist gedacht für den Fall, dass nur grob der Verbrauch von ein paar Produkten festgehalten werden soll – zum Beispiel um später ungefähr zu wissen, wie viele Bleche Hasenpfoten ein normaler Dienstag im Schnitt braucht. Es erscheinen nur Produkte, die dafür extra freigeschaltet wurden – nicht die komplette Produktliste.',
+    hilfeAblaufTitel: 'Wie läuft die Eingabe ab?',
+    hilfeAblaufText: 'Zuerst das Datum prüfen (steht meist schon auf heute). Danach muss aktiv gewählt werden, ob es ein normaler oder ein besonderer Tag ist – das Speichern ist erst danach möglich. Dann bei den gewünschten Produkten die Menge eintragen. Nicht ausgefüllte Produkte werden einfach übersprungen, es muss nicht jedes Produkt befüllt werden. Zum Schluss auf „Speichern" tippen.',
+    hilfeEinheitTitel: 'Was bedeutet der Bleche/Stück-Knopf?',
+    hilfeEinheitText: 'Bei manchen Produkten gibt es neben dem Zahlenfeld einen kleinen Knopf zum Umschalten zwischen „Bleche" und „Stück". Blechzählen ist immer eine Schätzung – wer die tatsächliche Stückzahl kennt, sollte lieber umschalten und die genaue Anzahl eintragen, das ist deutlich präziser. Die Seite rechnet im Hintergrund automatisch in Bleche um, damit die Zahlen mit der bisherigen Erfassung vergleichbar bleiben. Bei Produkten ohne diesen Knopf bleibt die Eingabe wie gewohnt.',
+    hilfeBesondersTitel: 'Was bedeutet „besonderer Tag"?',
+    hilfeBesondersText: 'Damit ist gemeint: Ferien, ein Feiertag, oder sonst ein Tag, der vom normalen Geschäft abweicht (zum Beispiel wegen einer Veranstaltung oder einer Baustelle vor der Tür). Diese Markierung wird zusammen mit den Zahlen gespeichert, damit spätere Auswertungen ungewöhnliche Tage nicht mit normalen Tagen vermischen. Es wird keine Notiz dazu verlangt – ein einfaches Ja oder Nein reicht.',
+    hilfeAusreisserTitel: 'Was bedeutet die Warnung bei „Ungewöhnliche Werte"?',
+    hilfeAusreisserText: 'Die Seite merkt sich im Hintergrund, was für ein Produkt an einem bestimmten Wochentag bisher üblich war. Ein neuer Wert gilt aber erst dann als ungewöhnlich, wenn er gleichzeitig zwei Bedingungen erfüllt: er muss um eine bestimmte Menge UND um einen bestimmten Prozentsatz vom bisherigen Durchschnitt abweichen (aktuell mindestens 5 Einheiten und mindestens 30 %). Der Grund für diese doppelte Prüfung: bei einem Produkt, von dem sonst nur wenige Stück am Tag verkauft werden, wäre schon eine kleine Änderung eine große prozentuale Abweichung, ohne dass etwas Ungewöhnliches passiert ist – erst wenn beides zusammen zutrifft, ist es wirklich auffällig. Vor dem Speichern erscheint dann eine Nachfrage – so kann ein Tippfehler (zum Beispiel eine Null zu viel) auffallen, bevor er gespeichert wird. Wenn der Wert stimmt, kann trotzdem gespeichert werden. Bei Produkten, zu denen es noch zu wenige bisherige Einträge gibt, erscheint diese Warnung noch nicht – dafür braucht es erst ein paar gesammelte Werte. Neben jedem Produkt steht außerdem ein Kästchen mit dem ⚠️-Zeichen zum selbst Anhaken: wer schon beim Eintragen weiß, dass eine Zahl für genau dieses eine Produkt ungewöhnlich ist (zum Beispiel wegen eines bekannten besonderen Grundes), kann sie hier vorab als „ungewöhnlich" markieren. Für so markierte Werte erscheint beim Speichern keine Rückfrage mehr – die Markierung wird aber trotzdem mit gespeichert, für spätere Auswertungen.',
+    hilfeFeiertageTitel: 'Was passiert an Feiertagen und in den Ferien?',
+    hilfeFeiertageText: 'Solche Tage fließen nicht in den Vergleich mit ein, auf dem die Warnung von eben beruht – ein Weihnachtstag mit ungewöhnlichem Verbrauch würde sonst den normalen Dienstags-Durchschnitt verfälschen. Eintragen kann man an diesen Tagen trotzdem ganz normal.',
+    hilfeGrenzenTitel: 'Wichtig zu wissen',
+    hilfeGrenzenText: 'Diese Zahlen sind bewusst ein zweiter, eigener Datentopf – getrennt von der offiziellen, gründlich geprüften Verbrauchshistorie. Sie werden nirgends automatisch mit den offiziellen Zahlen vermischt. Das macht diese Eingabe schnell und unkompliziert, aber die Werte sind entsprechend weniger genau geprüft als die offizielle Erfassung. Pro Tag sollte nur einmal eingetragen werden – bei einem zweiten Versuch am selben Tag erscheint ein Hinweis, gespeichert werden kann trotzdem.',
+    hilfeGrundlageTitel: 'Was zeigt „Grundlage anzeigen" beim Ausreißer-Alarm?',
+    hilfeGrundlageText: 'Bei einer Ausreißer-Warnung lässt sich mit einem Tipp nachsehen, welche bisherigen Werte genau in den angezeigten Schnitt eingeflossen sind – pro Wochentag, mit Datum. So lässt sich nachvollziehen, ob der Schnitt auf einer schmalen oder breiten Datenbasis steht, statt ihm blind vertrauen (oder misstrauen) zu müssen. Ein ⚠️ bei einem Wochentag heißt: weniger Vergleichswerte gefunden als eigentlich als Ziel eingestellt ist – kein Fehler, nur ein Hinweis auf eine dünnere Grundlage für genau diesen Tag.',
+    grundlageAnzeigen: 'Grundlage anzeigen',
+    grundlageTitel: 'Berechnungsgrundlage',
+    grundlageLaedt: 'Lädt …',
+    grundlageFehler: 'Grundlage konnte nicht geladen werden. Verbindung/Firestore-Zugriff prüfen.',
+    grundlageModusStichprobe: 'Stichprobe: Ziel {n} Werte je Wochentag, Suchfenster {w} Wochen zurück.',
+    grundlageModusKontiguierlich: 'Kontiguierlich: alle Werte der letzten {t} Tage, kein festes Ziel je Wochentag.',
+    grundlageZeitraum: 'Verwendeter Zeitraum',
+    grundlageKeineWerte: 'Keine Werte für diesen Wochentag gefunden.'
+  };
+
+  function t(key) { return I18N_DE[key] || key; }
+
+  function wendeI18nAn() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+  }
+  wendeI18nAn();
+
+  /* -----------------------------------------------------------
+   * 2) Rollen-Check — läuft bereits VOR diesem Skript, siehe
+   *    <script src="../bos_standalone_login.js"> im Kopf der Datei
+   *    (bis 03.09.2026 war das bos_access_guard.js — seit Thema 2,
+   *    04.09.2026, ersetzt, da diese Seite jetzt auch standalone per
+   *    NFC/QR geöffnet werden kann).
+   *    Der Login/Guard blockiert sich bei Bedarf selbst per eigenem
+   *    Overlay (kein Aufruf/keine Rückgabe nötig) — die frühere Version
+   *    hier rief eine erfundene, nicht existierende API auf
+   *    (BOS_ACCESS_GUARD.pruefeRolle()) und ist ersatzlos entfernt.
+   *    Das #zugriffGesperrt-Element in der Seite ist damit ebenfalls
+   *    überflüssig geworden (bringt sein eigenes Overlay mit) und
+   *    bleibt unsichtbar/ungenutzt stehen.
+   * --------------------------------------------------------- */
+
+  /* -----------------------------------------------------------
+   * 3) Grundzustand
+   * --------------------------------------------------------- */
+  const WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+  const zustand = {
+    produkte: [],           // gefilterte Liste (manuelleErfassung === true)
+    besondererTag: null,    // null = noch nicht gewählt (Poka-Yoke aktiv)
+    pruefungLaeuft: false
+  };
+
+  const el = {
+    datumInput: document.getElementById('datumInput'),
+    wochentagAnzeige: document.getElementById('wochentagAnzeige'),
+    feiertagsHinweis: document.getElementById('feiertagsHinweis'),
+    mehrfachWarnung: document.getElementById('mehrfachWarnung'),
+    btnNormalerTag: document.getElementById('btnNormalerTag'),
+    btnBesondererTag: document.getElementById('btnBesondererTag'),
+    besondererTagStatus: document.getElementById('besondererTagStatus'),
+    produktListe: document.getElementById('produktListe'),
+    keineProdukteHinweis: document.getElementById('keineProdukteHinweis'),
+    speichernBtn: document.getElementById('speichernBtn'),
+    speicherStatus: document.getElementById('speicherStatus'),
+    ausreisserModal: document.getElementById('ausreisserModal'),
+    ausreisserListe: document.getElementById('ausreisserListe'),
+    btnZurueckPruefen: document.getElementById('btnZurueckPruefen'),
+    btnTrotzdemSpeichern: document.getElementById('btnTrotzdemSpeichern'),
+    hilfeBtn: document.getElementById('hilfeBtn'),
+    hilfeSheet: document.getElementById('hilfeSheet'),
+    hilfeSchliessen: document.getElementById('hilfeSchliessen'),
+    grundlageSheet: document.getElementById('grundlageSheet'),
+    grundlageTitel: document.getElementById('grundlageTitel'),
+    grundlageInhalt: document.getElementById('grundlageInhalt'),
+    grundlageSchliessen: document.getElementById('grundlageSchliessen')
+  };
+
+  function heutigesDatumISO() {
+    const jetzt = new Date();
+    const offset = jetzt.getTimezoneOffset();
+    const lokal = new Date(jetzt.getTime() - offset * 60000);
+    return lokal.toISOString().slice(0, 10);
+  }
+
+  function wochentagVonISODatum(isoDatum) {
+    const [jahr, monat, tag] = isoDatum.split('-').map(Number);
+    const d = new Date(jahr, monat - 1, tag);
+    return WOCHENTAGE[d.getDay()];
+  }
+
+  /* -----------------------------------------------------------
+   * 4) Feiertags-/Ferien-Hinweis (rein informativ, setzt NIE das
+   *    besondererTag-Flag automatisch — aktive Wahl bleibt beim
+   *    Nutzer, siehe SESSION_2026-08-18_VERBRAUCHSUEBERSICHT_DOKU.md §3.1)
+   *
+   *    29.08.2026 — verdrahtet: die Datenquelle (bos_zeitkontext_
+   *    referenz.js) ist jetzt eingebunden (siehe Kopf der Datei), der
+   *    bisherige Platzhalter (lieferte immer null) ist ersetzt durch
+   *    einen echten Umkreis-Lookup. Umkreis-Toleranz war im Konzept als
+   *    offener Punkt markiert ("z. B. ±3 Tage") — hier auf 3 Tage
+   *    festgelegt, änderbar über FEIERTAGS_UMKREIS_TAGE.
+   *    Graceful Degradation bleibt erhalten: fehlt die Referenzdatei
+   *    (BOS_IST_BESONDERER_TAG undefiniert), liefert die Funktion
+   *    weiterhin null — kein Hinweis, kein Fehler.
+   * --------------------------------------------------------- */
+  const FEIERTAGS_UMKREIS_TAGE = 3;
+
+  function lokalesISODatum(d) {
+    // Bewusst KEIN d.toISOString() — konvertiert auf UTC und führt in
+    // deutschen Zeitzonen nachts zu Off-by-one-Fehlern (bekannter Bug,
+    // siehe FEHLENDE_TAGE_DOKU.md).
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  function pruefeFeiertagsNaehe(isoDatum) {
+    if (!isoDatum || typeof window.BOS_IST_BESONDERER_TAG !== 'function') return null;
+    const [jahr, monat, tag] = isoDatum.split('-').map(Number);
+    const basis = new Date(jahr, monat - 1, tag);
+    for (let versatz = -FEIERTAGS_UMKREIS_TAGE; versatz <= FEIERTAGS_UMKREIS_TAGE; versatz++) {
+      const d = new Date(basis);
+      d.setDate(d.getDate() + versatz);
+      const info = window.BOS_IST_BESONDERER_TAG(lokalesISODatum(d));
+      if (info) return 'liegt in der Nähe von ' + info.name;
+    }
+    return null;
+  }
+
+  function aktualisiereFeiertagsHinweis() {
+    const hinweis = pruefeFeiertagsNaehe(el.datumInput.value);
+    if (hinweis) {
+      el.feiertagsHinweis.textContent = 'ℹ️ ' + hinweis;
+      el.feiertagsHinweis.hidden = false;
+    } else {
+      el.feiertagsHinweis.hidden = true;
+    }
+  }
+
+  /* -----------------------------------------------------------
+   * 5) Weiche Mehrfach-Prüfung (max. 1x/Tag, Fumbling-Schutz)
+   * --------------------------------------------------------- */
+  async function pruefeVorhandenenEintrag() {
+    el.mehrfachWarnung.hidden = true;
+    const datum = el.datumInput.value;
+    if (!datum) return;
+    try {
+      const snap = await window.db.collection('bos_events')
+        .where('type', '==', 'verbrauch_manuell')
+        .where('datum', '==', datum)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        let uhrzeit = '';
+        if (data.ts && typeof data.ts.toDate === 'function') {
+          uhrzeit = ' um ' + data.ts.toDate().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+        }
+        el.mehrfachWarnung.textContent = 'Für dieses Datum wurde bereits einmal erfasst' + uhrzeit + '. Ein weiterer Eintrag ist möglich, wird aber zusätzlich gespeichert (kein Überschreiben).';
+        el.mehrfachWarnung.hidden = false;
+      }
+    } catch (fehler) {
+      console.warn('Mehrfach-Prüfung fehlgeschlagen, wird übersprungen:', fehler);
+    }
+  }
+
+  /* -----------------------------------------------------------
+   * 6) Poka-Yoke „Besonderer Tag"
+   * --------------------------------------------------------- */
+  function waehleBesondererTag(wert) {
+    zustand.besondererTag = wert;
+    el.btnNormalerTag.classList.toggle('aktiv', wert === false);
+    el.btnBesondererTag.classList.toggle('aktiv', wert === true);
+    el.besondererTagStatus.textContent = wert === true
+      ? 'Gewählt: Ferien / besonderer Tag'
+      : 'Gewählt: Normaler Tag';
+    el.produktListe.hidden = false;
+    aktualisiereSpeichernButton();
+  }
+
+  el.btnNormalerTag.addEventListener('click', () => waehleBesondererTag(false));
+  el.btnBesondererTag.addEventListener('click', () => waehleBesondererTag(true));
+
+  /* -----------------------------------------------------------
+   * 6a) Stück/Bleche-Umschalter — Umschaltbarkeits-Regel
+   *
+   *    Grund: Blechzählen ist strukturell ungenauer als Stückzählen
+   *    (eine Schätzung bleibt eine Schätzung, egal wie viele Nach-
+   *    kommastellen die Umrechnung erzeugt) — echte Genauigkeit gibt
+   *    es nur, wenn tatsächlich Einzelstücke gezählt wurden. Dieser
+   *    Umschalter gibt die Wahl, in der Einheit einzutragen, die im
+   *    Moment sicher bekannt ist.
+   *
+   *    Nur für Produkte mit gesetzter, nicht-Stück-Einheit — sonst
+   *    unverändertes Zahlenfeld wie bisher. Gegen die echte
+   *    produkt_config.json geprüft (29.08.2026): einheit fehlt bei
+   *    53/87 Produkten (Datenlücke in der Config, nicht hier zu
+   *    raten), ist "stueck" bei 16, "bleche" bei 16, "Rote Dielen"
+   *    bei 2. stueckProBlech ist bei allen 87 Produkten gesetzt.
+   * --------------------------------------------------------- */
+  function istEinheitenUmschaltbar(produkt) {
+    const e = (produkt.einheit || '').trim().toLowerCase();
+    if (!e || e === 'stueck' || e === 'stück') return false;
+    if (!produkt.stueckProBlech) return false; // Sicherheitsnetz, keine Umrechnungsbasis ohne diesen Wert
+    return true;
+  }
+
+  /* -----------------------------------------------------------
+   * 7) Produktliste laden (Opt-in über produkt_config.json)
+   * --------------------------------------------------------- */
+  async function ladeProdukte() {
+    let alleProdukte = [];
+    try {
+      const antwort = await fetch('../produkt_config.json', { cache: 'no-store' });
+      alleProdukte = await antwort.json();
+    } catch (fehler) {
+      console.error('produkt_config.json konnte nicht geladen werden:', fehler);
+      el.keineProdukteHinweis.hidden = false;
+      return;
+    }
+
+    zustand.produkte = (alleProdukte || []).filter(p => p.manuelleErfassung === true);
+
+    if (zustand.produkte.length === 0) {
+      el.keineProdukteHinweis.hidden = false;
+      return;
+    }
+
+    el.produktListe.innerHTML = '';
+    zustand.produkte.forEach(produkt => {
+      const zeile = document.createElement('div');
+      zeile.className = 'produkt-zeile';
+      zeile.dataset.legacyKey = produkt.legacyKey;
+
+      const name = document.createElement('span');
+      name.className = 'produkt-name';
+      name.textContent = produkt.name || produkt.legacyKey;
+
+      const menge = document.createElement('input');
+      menge.type = 'number';
+      menge.min = '0';
+      menge.step = '1';
+      menge.inputMode = 'numeric';
+      menge.className = 'produkt-menge';
+      menge.setAttribute('aria-label', 'Menge für ' + (produkt.name || produkt.legacyKey));
+
+      const ausreisserLabel = document.createElement('label');
+      ausreisserLabel.className = 'ausreisser-toggle';
+      const ausreisserCheckbox = document.createElement('input');
+      ausreisserCheckbox.type = 'checkbox';
+      ausreisserCheckbox.className = 'ausreisser-checkbox';
+      ausreisserLabel.appendChild(ausreisserCheckbox);
+      ausreisserLabel.appendChild(document.createTextNode('⚠️'));
+
+      zeile.appendChild(name);
+      zeile.appendChild(menge);
+
+      if (istEinheitenUmschaltbar(produkt)) {
+        zeile.dataset.umschaltbar = 'true';
+        zeile.dataset.stueckProBlech = produkt.stueckProBlech;
+        zeile.dataset.einheitModus = 'bleche'; // Default: unverändertes Verhalten wie bisher
+
+        const einheitToggle = document.createElement('button');
+        einheitToggle.type = 'button';
+        einheitToggle.className = 'einheit-toggle';
+        einheitToggle.textContent = 'Bleche';
+        einheitToggle.setAttribute('aria-label', 'Eingabe-Einheit umschalten für ' + (produkt.name || produkt.legacyKey) + ', aktuell Bleche');
+
+        const ungenauHinweis = document.createElement('span');
+        ungenauHinweis.className = 'einheit-ungenau-hinweis';
+        ungenauHinweis.textContent = 'sehr ungenau';
+
+        einheitToggle.addEventListener('click', () => {
+          const neuerModus = zeile.dataset.einheitModus === 'bleche' ? 'stueck' : 'bleche';
+          zeile.dataset.einheitModus = neuerModus;
+          einheitToggle.textContent = neuerModus === 'bleche' ? 'Bleche' : 'Stück';
+          einheitToggle.setAttribute('aria-label', 'Eingabe-Einheit umschalten für ' + (produkt.name || produkt.legacyKey) + ', aktuell ' + einheitToggle.textContent);
+          ungenauHinweis.hidden = (neuerModus !== 'bleche') ? true : false;
+        });
+
+        zeile.appendChild(einheitToggle);
+        zeile.appendChild(ungenauHinweis);
+      } else {
+        const einheit = document.createElement('span');
+        einheit.className = 'produkt-einheit';
+        einheit.textContent = produkt.einheit || '';
+        zeile.appendChild(einheit);
+      }
+
+      zeile.appendChild(ausreisserLabel);
+      el.produktListe.appendChild(zeile);
+    });
+  }
+
+  function aktualisiereSpeichernButton() {
+    el.speichernBtn.disabled = (zustand.besondererTag === null) || zustand.pruefungLaeuft;
+  }
+
+  /* -----------------------------------------------------------
+   * 8) Speichern (inkl. automatischer Ausreißer-Check)
+   * --------------------------------------------------------- */
+  function sammleEintraege() {
+    const eintraege = [];
+    el.produktListe.querySelectorAll('.produkt-zeile').forEach(zeile => {
+      const mengeInput = zeile.querySelector('.produkt-menge');
+      const wert = mengeInput.value;
+      if (wert === '' || wert === null) return; // nicht ausgefüllt -> überspringen
+      const mengeEingegeben = Number(wert);
+      if (Number.isNaN(mengeEingegeben) || mengeEingegeben < 0) return;
+
+      // Stück->Bleche-Umrechnung: der Ausreißer-Check (SCHWELLE_ABSOLUT) ist auf
+      // Bleche-Größenordnung geeicht, siehe BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md §5
+      // Punkt 4 — deshalb ist IMMER das Bleche-Äquivalent die maßgebliche, gespeicherte
+      // und verglichene Zahl, nie der rohe Stückwert. mengeRoh/erfasstAls bleiben nur
+      // zur Nachvollziehbarkeit erhalten, fließen nirgends in Vergleich/Schnitt ein.
+      //
+      // WICHTIG: nur bei umschaltbaren Zeilen gesetzt. Für alle anderen Produkte
+      // (u. a. die Schlawiner-Familie mit nativer Stück-Einheit) bliebe ein
+      // hartkodiertes erfasstAls:'bleche' schlicht falsch — die haben gar keine
+      // Bleche-Grundlage. Verhalten dort bewusst unverändert zu vorher.
+      const umschaltbar = zeile.dataset.umschaltbar === 'true';
+      const einheitModus = umschaltbar ? (zeile.dataset.einheitModus || 'bleche') : null;
+      let menge = mengeEingegeben;
+      if (umschaltbar && einheitModus === 'stueck') {
+        const stueckProBlech = Number(zeile.dataset.stueckProBlech);
+        menge = stueckProBlech > 0 ? mengeEingegeben / stueckProBlech : mengeEingegeben;
+      }
+
+      const eintrag = {
+        legacyKey: zeile.dataset.legacyKey,
+        menge: menge,
+        ausreisser: zeile.querySelector('.ausreisser-checkbox').checked
+      };
+      if (umschaltbar) {
+        eintrag.erfasstAls = einheitModus;
+        eintrag.mengeRoh = mengeEingegeben;
+      }
+      eintraege.push(eintrag);
+    });
+    return eintraege;
+  }
+
+  async function pruefeAlleAufAusreisser(wochentag, eintraege) {
+    const zuPruefen = eintraege.filter(e => !e.ausreisser); // manuell schon geflaggte nicht erneut nachfragen
+    const ergebnisse = await Promise.all(zuPruefen.map(e =>
+      window.BOS_VERBRAUCH.pruefeAusreisser(window.db, e.legacyKey, wochentag, e.menge)
+        .then(res => ({ eintrag: e, ergebnis: res }))
+    ));
+    return ergebnisse.filter(r => r.ergebnis.pruefungAktiv && r.ergebnis.auffaellig);
+  }
+
+  function formatiereEintragAnzeige(eintrag) {
+    if (eintrag.erfasstAls === 'stueck') {
+      return eintrag.mengeRoh + ' Stück (≈ ' + eintrag.menge.toFixed(2) + ' Bleche)';
+    }
+    if (eintrag.erfasstAls === 'bleche') {
+      return eintrag.menge + ' Bleche';
+    }
+    return String(eintrag.menge); // unverändert wie bisher, kein Einheiten-Kontext bekannt
+  }
+
+  function zeigeAusreisserModal(auffaelligeListe) {
+    el.ausreisserListe.innerHTML = '';
+    const wochentag = wochentagVonISODatum(el.datumInput.value);
+    auffaelligeListe.forEach(({ eintrag, ergebnis }) => {
+      const produkt = zustand.produkte.find(p => p.legacyKey === eintrag.legacyKey);
+      const box = document.createElement('div');
+      box.className = 'ausreisser-eintrag';
+      const name = produkt ? (produkt.name || produkt.legacyKey) : eintrag.legacyKey;
+      box.innerHTML = '<strong>' + name + '</strong>' +
+        'Eingegeben: ' + formatiereEintragAnzeige(eintrag) + ' · bisheriger Schnitt (' + ergebnis.anzahl + ' Werte): ' + ergebnis.durchschnitt.toFixed(1) + ' Bleche' +
+        '<button type="button" class="grundlage-link">' + t('grundlageAnzeigen') + '</button>';
+      el.ausreisserListe.appendChild(box);
+
+      // Grundlage-Abfrage bewusst erst bei Tipp auf den Link, nicht schon
+      // beim Öffnen des Modals — sie ist teurer (7 Wochentage x Query statt
+      // 1) und wird nur gebraucht, wenn tatsächlich nachgesehen werden will.
+      box.querySelector('.grundlage-link').addEventListener('click', () => {
+        zeigeGrundlage(eintrag.legacyKey, name, wochentag);
+      });
+    });
+    el.ausreisserModal.hidden = false;
+  }
+
+  /* -----------------------------------------------------------
+   * 8a) Grundlage anzeigen — Transparenz-Ansicht hinter dem Ausreißer-
+   *     Alarm, Vorbild "Der Wurm" aus dem Altsystem (ohne Maskottchen,
+   *     siehe SESSION_2026-08-31_BERECHNUNGSGRUNDLAGE_ANZEIGE.md).
+   * --------------------------------------------------------- */
+  const WOCHENTAGE_KURZ = { Montag: 'Mo', Dienstag: 'Di', Mittwoch: 'Mi', Donnerstag: 'Do', Freitag: 'Fr', Samstag: 'Sa', Sonntag: 'So' };
+
+  function formatDatumKurz(isoStr) {
+    const teile = isoStr.split('-');
+    return teile[2] + '.' + teile[1] + '.';
+  }
+
+  async function zeigeGrundlage(legacyKey, produktName, hervorgehobenerWochentag) {
+    el.grundlageTitel.textContent = t('grundlageTitel') + ' — ' + produktName;
+    el.grundlageInhalt.innerHTML = '<p class="status-text">' + t('grundlageLaedt') + '</p>';
+    el.grundlageSheet.hidden = false;
+
+    let grundlage;
+    try {
+      grundlage = await window.BOS_VERBRAUCH.holeBerechnungsgrundlage(window.db, legacyKey);
+    } catch (fehler) {
+      console.warn('Grundlage konnte nicht geladen werden:', fehler);
+      el.grundlageInhalt.innerHTML = '<p class="warn-hinweis">' + t('grundlageFehler') + '</p>';
+      return;
+    }
+
+    const modusText = grundlage.modus === 'stichprobe'
+      ? t('grundlageModusStichprobe')
+          .replace('{n}', grundlage.einstellungen.stichprobeAnzahl)
+          .replace('{w}', grundlage.einstellungen.suchfensterWochen)
+      : t('grundlageModusKontiguierlich').replace('{t}', grundlage.einstellungen.kontiguierlichTage);
+
+    let html = '<p class="status-text">' + modusText + '</p>';
+    if (grundlage.juengstes) {
+      html += '<p class="status-text">' + t('grundlageZeitraum') + ': ' +
+        formatDatumKurz(grundlage.aeltestes) + ' – ' + formatDatumKurz(grundlage.juengstes) + '</p>';
+    }
+
+    html += '<div class="grundlage-wochentage">';
+    grundlage.wochentage.forEach(w => {
+      const offen = w.wochentag === hervorgehobenerWochentag;
+      const badge = w.ziel === null
+        ? w.gefunden + ' Werte'
+        : w.gefunden + '/' + w.ziel + (w.vollstaendig ? ' ✓' : ' ⚠️');
+      html += '<div class="gw-zeile' + (offen ? ' offen' : '') + '" data-gw-toggle="' + w.wochentag + '">';
+      html += '<div class="gw-kopf"><span>' + WOCHENTAGE_KURZ[w.wochentag] + '</span>' +
+        '<span class="gw-badge' + (w.vollstaendig ? '' : ' warnung') + '">' + badge + '</span></div>';
+      html += '<div class="gw-liste">';
+      if (w.werte.length === 0) {
+        html += '<div class="gw-eintrag leer">' + t('grundlageKeineWerte') + '</div>';
+      } else {
+        w.werte.forEach(x => {
+          html += '<div class="gw-eintrag"><span>' + formatDatumKurz(x.datum) + '</span><span>' + x.wert + '</span></div>';
+        });
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+
+    el.grundlageInhalt.innerHTML = html;
+    el.grundlageInhalt.querySelectorAll('[data-gw-toggle]').forEach(zeile => {
+      zeile.querySelector('.gw-kopf').addEventListener('click', () => zeile.classList.toggle('offen'));
+    });
+  }
+
+  async function schreibeDokument(eintraege) {
+    const datum = el.datumInput.value;
+    const wochentag = wochentagVonISODatum(datum);
+    await window.db.collection('bos_events').add({
+      type: 'verbrauch_manuell',
+      datum: datum,
+      wochentag: wochentag,
+      besondererTag: zustand.besondererTag,
+      ts: firebase.firestore.FieldValue.serverTimestamp(),
+      eintraege: eintraege
+    });
+  }
+
+  async function starteSpeichern() {
+    if (zustand.besondererTag === null) return;
+
+    const eintraege = sammleEintraege();
+    if (eintraege.length === 0) {
+      el.speicherStatus.textContent = 'Keine Mengen eingegeben — nichts zu speichern.';
+      return;
+    }
+
+    zustand.pruefungLaeuft = true;
+    aktualisiereSpeichernButton();
+    el.speicherStatus.textContent = 'Prüfe Werte …';
+
+    const wochentag = wochentagVonISODatum(el.datumInput.value);
+    let auffaellig = [];
+    try {
+      auffaellig = await pruefeAlleAufAusreisser(wochentag, eintraege);
+    } catch (fehler) {
+      console.warn('Ausreißer-Check fehlgeschlagen, wird übersprungen:', fehler);
+    }
+
+    if (auffaellig.length > 0) {
+      zustand.pruefungLaeuft = false;
+      aktualisiereSpeichernButton();
+      el.speicherStatus.textContent = '';
+      zeigeAusreisserModal(auffaellig);
+      zustand._ausstehendeEintraege = eintraege;
+      zustand._auffaelligeKeys = auffaellig.map(a => a.eintrag.legacyKey);
+      return;
+    }
+
+    await tatsaechlichSpeichern(eintraege);
+  }
+
+  async function tatsaechlichSpeichern(eintraege) {
+    el.speicherStatus.textContent = 'Speichert …';
+    try {
+      await schreibeDokument(eintraege);
+      el.speicherStatus.textContent = '✓ Gespeichert.';
+      formularZuruecksetzen();
+    } catch (fehler) {
+      console.error('Speichern fehlgeschlagen:', fehler);
+      el.speicherStatus.textContent = 'Fehler beim Speichern — bitte erneut versuchen.';
+    } finally {
+      zustand.pruefungLaeuft = false;
+      aktualisiereSpeichernButton();
+    }
+  }
+
+  function formularZuruecksetzen() {
+    zustand.besondererTag = null;
+    el.btnNormalerTag.classList.remove('aktiv');
+    el.btnBesondererTag.classList.remove('aktiv');
+    el.besondererTagStatus.textContent = '';
+    el.produktListe.hidden = true;
+    el.produktListe.querySelectorAll('.produkt-menge').forEach(i => i.value = '');
+    el.produktListe.querySelectorAll('.ausreisser-checkbox').forEach(c => c.checked = false);
+    aktualisiereSpeichernButton();
+  }
+
+  el.speichernBtn.addEventListener('click', starteSpeichern);
+
+  el.btnZurueckPruefen.addEventListener('click', () => {
+    el.ausreisserModal.hidden = true;
+    zustand._ausstehendeEintraege = null;
+    zustand._auffaelligeKeys = null;
+  });
+
+  el.btnTrotzdemSpeichern.addEventListener('click', async () => {
+    el.ausreisserModal.hidden = true;
+    const eintraege = zustand._ausstehendeEintraege || [];
+    const auffaelligeKeys = zustand._auffaelligeKeys || [];
+    // Bestätigte Ausreißer bekommen automatisch das Ausreisser-Flag,
+    // damit spätere Auswertungen sie korrekt einordnen können.
+    eintraege.forEach(e => {
+      if (auffaelligeKeys.includes(e.legacyKey)) e.ausreisser = true;
+    });
+    zustand.pruefungLaeuft = true;
+    await tatsaechlichSpeichern(eintraege);
+  });
+
+  /* -----------------------------------------------------------
+   * 9) Hilfe-Bottom-Sheet
+   * --------------------------------------------------------- */
+  el.hilfeBtn.addEventListener('click', () => { el.hilfeSheet.hidden = false; });
+  el.hilfeSchliessen.addEventListener('click', () => { el.hilfeSheet.hidden = true; });
+  el.grundlageSchliessen.addEventListener('click', () => { el.grundlageSheet.hidden = true; });
+
+  /* -----------------------------------------------------------
+   * 10) Init
+   * --------------------------------------------------------- */
+  el.datumInput.addEventListener('change', () => {
+    el.wochentagAnzeige.textContent = el.datumInput.value ? wochentagVonISODatum(el.datumInput.value) : '';
+    aktualisiereFeiertagsHinweis();
+    pruefeVorhandenenEintrag();
+  });
+
+  async function init() {
+    el.datumInput.value = heutigesDatumISO();
+    el.wochentagAnzeige.textContent = wochentagVonISODatum(el.datumInput.value);
+    aktualisiereFeiertagsHinweis();
+
+    await ladeProdukte();
+    await window.BOS_AUTH_READY;
+    await pruefeVorhandenenEintrag();
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>

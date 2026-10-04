@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<!-- 2026-10-04 · 14:39 · Online-Gang: Nachnamen von Kollegen in den Kommentaren
+     dieser Datei durch Platzhalter („Person R“ usw.) ersetzt — das Repo wird
+     öffentlich. Nur Kommentare, kein Code. Siehe 2026-10-04_ONLINE_GANG.md. -->
+<title>Wochen-Spielwiese — SchichtPlaner V2</title>
+<style>
+  :root {
+    --bg: #1b1712; --surface: #251f19; --surface-2: #2e261e; --border: #3d342a;
+    --text: #f1e9dc; --text-dim: #a89a86; --accent: #c88a4a; --accent-dim: #8a5f34;
+    --good: #7a9b6e; --bad: #b9634f; --warn: #c8a84a; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.4; padding-bottom: 64px;
+  }
+  header { padding: 24px 18px 18px; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0 0 6px; font-size: 1.3rem; font-weight: 700; }
+  header p { margin: 0; color: var(--text-dim); font-size: 0.88rem; max-width: 62ch; }
+  main { padding: 18px; max-width: 760px; margin: 0 auto; }
+  section { margin-bottom: 26px; }
+  h2 {
+    font-size: 0.95rem; color: var(--accent); border-bottom: 1px solid var(--border);
+    padding-bottom: 8px; margin: 0 0 14px;
+  }
+  h3 { font-size: 0.9rem; margin: 0 0 8px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); border-radius: 8px; padding: 9px 14px; font-size: 0.85rem;
+  }
+  button:hover { border-color: var(--accent-dim); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #1b1712; font-weight: 600; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  input, select {
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px; font-size: 0.86rem; font-family: inherit;
+  }
+  label { display: block; font-size: 0.72rem; color: var(--text-dim); margin-bottom: 4px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1; min-width: 130px; }
+  .checkbox-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .checkbox-row input { width: auto; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 7px; padding: 6px 12px; font-size: 0.8rem; cursor: pointer;
+  }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #1b1712; font-weight: 600; }
+  .list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 0.85rem;
+    transition: background-color 0.3s;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-item.highlight { background-color: rgba(200, 138, 74, 0.22); border-radius: 8px; }
+  .item-meta { color: var(--text-dim); font-size: 0.78rem; }
+  .icon-btn { background: transparent; border: none; color: var(--text-dim); font-size: 1.1rem; padding: 2px 8px; }
+  .icon-btn:hover { color: var(--bad); }
+  .empty-hint { color: var(--text-dim); font-size: 0.82rem; font-style: italic; }
+  #import-input { display: none; }
+  .status { font-size: 0.78rem; color: var(--text-dim); margin-top: 6px; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 16px; text-align: center; flex: 1; min-width: 110px;
+  }
+  .stat-box .zahl { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+  .stat-box.gut .zahl { color: var(--good); }
+  .stat-box.schlecht .zahl { color: var(--bad); }
+  .stat-box .label { font-size: 0.72rem; color: var(--text-dim); }
+  .frei-uebersicht { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .frei-chip {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-size: 0.82rem;
+  }
+  .frei-chip .tag { color: var(--accent); font-weight: 600; }
+  .tag-card { margin-bottom: 18px; }
+  .tag-card h3 { color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .schicht-zeile { margin-bottom: 10px; }
+  .schicht-zeile .schicht-titel { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 4px; }
+  .pos-row {
+    display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 6px;
+    margin-bottom: 3px; font-size: 0.82rem; background: var(--surface-2);
+  }
+  .pos-row.luecke { background: rgba(185, 99, 79, 0.18); border: 1px solid var(--bad); }
+  .pos-row .person { font-weight: 600; }
+  .pos-row .person.luecke-text { color: var(--bad); font-weight: 600; }
+  .pruefung-box {
+    background: rgba(200, 168, 74, 0.12); border: 1px solid var(--warn); border-radius: 8px;
+    padding: 8px 10px; font-size: 0.78rem; margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Wochen-Spielwiese</h1>
+  <p>Kompletter Durchlauf: freie Tage verteilen + Positionen für die ganze
+  Woche besetzen, mit euren echten Daten. Reines Ausprobieren, kein
+  offizieller Plan.</p>
+</header>
+
+<main>
+  <section>
+    <h2>Datengrundlage</h2>
+    <div class="card">
+      <button id="btn-import-pools">Eigene positionen_pools.json laden</button>
+      <input type="file" id="import-input" accept="application/json">
+      <div class="status" id="daten-status">Startdaten: Positionsstruktur ohne Namen (Datenschutz, 09.09.2026) — Pools sind leer. Eigene Datei laden oder Personen unten manuell eintragen.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Sitzung sichern</h2>
+    <div class="card">
+      <button class="btn-primary" id="btn-export-sitzung">Sitzung als Datei speichern</button>
+      <button id="btn-import-sitzung">Sitzung laden</button>
+      <input type="file" id="import-sitzung-input" accept="application/json">
+      <div class="status">Enthält Personen, Positionen, Ereignisse und Wunschtage — einmal exportiert, kannst du die Datei
+      hierherschicken oder später wieder reinladen, um genau an diesem Stand weiterzumachen.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Personen verwalten</h2>
+    <div class="card">
+      <div class="row">
+        <div><label>Name</label><input type="text" id="pn-name" placeholder="z. B. Meier"></div>
+        <div><label>Status</label>
+          <select id="pn-status">
+            <option value="mitarbeiter">Mitarbeiter (Fachkraft)</option>
+            <option value="azubi">Azubi</option>
+            <option value="produktionshelfer">Produktionshelfer</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div><label>Stammschicht</label>
+          <select id="pn-stammschicht">
+            <option value="nacht">Nacht</option>
+            <option value="frueh">Früh</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="display:block; margin-bottom:6px;">Arbeitstage (alle an = keine Einschränkung, 5 oder weniger = kein zusätzlicher freier Tag mehr nötig)</label>
+        <div class="chip-row" id="pn-arbeitstage">
+          <button type="button" class="chip active" data-tag="mo">Mo</button>
+          <button type="button" class="chip active" data-tag="di">Di</button>
+          <button type="button" class="chip active" data-tag="mi">Mi</button>
+          <button type="button" class="chip active" data-tag="do">Do</button>
+          <button type="button" class="chip active" data-tag="fr">Fr</button>
+          <button type="button" class="chip active" data-tag="sa">Sa</button>
+          <button type="button" class="chip active" data-tag="so">So</button>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="pn-keine-rotation">
+          <label for="pn-keine-rotation" style="margin:0;">Auch bei 6 (oder 7) Arbeitstagen kein zusätzlicher rotierender freier Tag nötig — für Personen, die wirklich jeden markierten Tag arbeiten, nur wenige Stunden (09.09.2026)</label>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="display:block; margin-bottom:6px;">Rotierender freier Tag nur an diesen Tagen möglich (optional, alle an = keine zusätzliche Einschränkung — nur relevant bei 6 Arbeitstagen)</label>
+        <div class="chip-row" id="pn-freietagoptionen">
+          <button type="button" class="chip active" data-tag="mo">Mo</button>
+          <button type="button" class="chip active" data-tag="di">Di</button>
+          <button type="button" class="chip active" data-tag="mi">Mi</button>
+          <button type="button" class="chip active" data-tag="do">Do</button>
+          <button type="button" class="chip active" data-tag="fr">Fr</button>
+          <button type="button" class="chip active" data-tag="sa">Sa</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="display:block; margin-bottom:6px;">Gesperrte Schichten (nie einteilen, auch bei Pool-Mitgliedschaft — 09.09.2026; keine Auswahl = keine Sperre)</label>
+        <div class="chip-row" id="pn-gesperrteschichten">
+          <button type="button" class="chip" data-tag="nacht">Nacht</button>
+          <button type="button" class="chip" data-tag="frueh">Früh</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;" id="pn-bearbeitungshinweis"></div>
+      <div style="margin-top:10px;">
+        <button class="btn-primary" id="btn-add-person">+ Person hinzufügen</button>
+        <button id="btn-bearbeitung-abbrechen" style="display:none;">Abbrechen</button>
+      </div>
+    </div>
+    <div class="card" id="personen-liste"></div>
+  </section>
+
+  <section>
+    <h2>Bestehende Verfügbarkeits-Ereignisse (§3)</h2>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Person</label>
+          <select id="ev-person"></select>
+        </div>
+        <div>
+          <label>Grund</label>
+          <select id="ev-grund">
+            <option value="urlaub">Urlaub</option>
+            <option value="krankheit">Krankheit</option>
+            <option value="schule">Schule (Azubi)</option>
+            <option value="sperrtag">Sperrtag (Termin o. ä.)</option>
+            <option value="feiertag">Feiertag</option>
+            <option value="fruehschichtEinsatz">Frühschicht-Einsatz</option>
+            <option value="sonstiges">Sonstiges</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" id="ev-block-row" style="display:none; margin-top:8px;">
+        <div>
+          <label>Block (diese Woche)</label>
+          <select id="ev-block">
+            <option value="anfang">Mo / Di / Mi — Anfang</option>
+            <option value="ende">Do / Fr / Sa — Ende</option>
+          </select>
+        </div>
+      </div>
+      <div class="status" id="ev-fruehschicht-hinweis" style="display:none;">
+        Nimmt die Person für diese drei Tage aus der Nachtschicht raus, erscheint stattdessen bei der Frühschicht. Der rotierende freie Tag rutscht automatisch auf einen der übrigen drei Tage — der Block sperrt sich selbst als Kandidat.
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div><label>Von</label><input type="date" id="ev-von"></div>
+        <div><label>Bis</label><input type="date" id="ev-bis"></div>
+      </div>
+      <div class="checkbox-row" id="ev-folgt-row" style="display:none;">
+        <input type="checkbox" id="ev-folgt-freier-tag">
+        <label for="ev-folgt-freier-tag" style="margin:0;">Der reguläre freie Tag muss direkt danach folgen (z. B. Schule Donnerstag → frei Freitag)</label>
+      </div>
+      <div class="status" id="ev-sperrtag-hinweis" style="display:none;">
+        Zählt NICHT als Ersatz für den regulären freien Tag — der steht der Person zusätzlich weiterhin zu.
+      </div>
+      <div style="margin-top:10px;"><button class="btn-primary" id="btn-add-ereignis">+ Ereignis hinzufügen</button></div>
+    </div>
+    <div class="card" id="ereignis-liste"><div class="empty-hint">Noch keine Ereignisse.</div></div>
+  </section>
+
+  <section>
+    <h2>Wunschtage (§11, nicht bindend)</h2>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Person</label>
+          <select id="wu-person"></select>
+        </div>
+        <div>
+          <label>Gewünschter Tag</label>
+          <input type="date" id="wu-datum">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; cursor:pointer;">
+          <input type="checkbox" id="wu-wichtig" style="width:auto;">
+          wichtig (z. B. Arzttermin) — zählt stärker gegenüber anderen Wunschtagen, geht aber nie vor Lücken-Vermeidung
+        </label>
+      </div>
+      <div style="margin-top:10px;"><button class="btn-primary" id="btn-add-wunsch">+ Wunschtag hinzufügen</button></div>
+    </div>
+    <div class="card" id="wunsch-liste"><div class="empty-hint">Noch keine Wunschtage.</div></div>
+  </section>
+
+  <section>
+    <h2>Manuelle Zuweisung (05.09.2026)</h2>
+    <div class="card">
+      <p class="item-meta" style="margin:0 0 10px;">Übersteuert die Kaskade direkt für einen Tag — z. B. "eine Person statt der sonst vorgesehenen am Ofen". Der reguläre freie Tag der eingeteilten Person weicht bei der nächsten Berechnung automatisch auf einen anderen Tag aus.</p>
+      <div class="row">
+        <div><label>Person</label><select id="mz-person"></select></div>
+        <div><label>Datum</label><input type="date" id="mz-datum"></div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div><label>Schicht</label>
+          <select id="mz-schicht">
+            <option value="nacht">Nachtschicht</option>
+            <option value="frueh">Frühschicht</option>
+            <option value="sonntag">Sonntag</option>
+          </select>
+        </div>
+        <div><label>Position</label><select id="mz-position"></select></div>
+      </div>
+      <div style="margin-top:10px;"><button class="btn-primary" id="btn-add-manuell">+ Zuweisung hinzufügen</button></div>
+    </div>
+    <div class="card" id="manuell-liste"><div class="empty-hint">Noch keine manuellen Zuweisungen.</div></div>
+  </section>
+
+  <section>
+    <h2>Woche berechnen</h2>
+    <div class="card">
+      <div class="row">
+        <div><label>Montag der Woche</label><input type="date" id="wochen-start"></div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <div><button class="btn-primary" id="btn-verteilen" style="width:100%;">Freie Tage verteilen &amp; Woche besetzen</button></div>
+        <div><button id="btn-varianten" style="width:100%;">3 Varianten anzeigen</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <label style="margin-bottom:6px; display:block;">Ausgleichstag diese Woche — meist nicht nötig, nur bei Feiertags- oder Sonntagsarbeit</label>
+      <div class="row">
+        <div><label>Person</label><select id="wa-person"></select></div>
+        <div><label>Hat gearbeitet</label><select id="wa-grund">
+          <option value="feiertag">Feiertag</option>
+          <option value="sonntag">Sonntag</option>
+        </select></div>
+      </div>
+      <div class="row" id="wa-feiertag-datum-zeile" style="margin-top:10px;">
+        <div><label>Datum des Feiertags</label><input type="date" id="wa-feiertag-datum"></div>
+      </div>
+      <div style="margin-top:10px;"><button id="btn-add-ausgleich" style="width:100%;">+ Ausgleichstag eintragen</button></div>
+      <div id="ausgleich-liste" style="margin-top:10px;"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ergebnis</h2>
+    <div id="ergebnis"><div class="empty-hint">Noch nichts berechnet.</div></div>
+  </section>
+
+  <section>
+    <h2>Was-wäre-wenn: Person testweise verschieben</h2>
+    <div class="card">
+      <p class="item-meta" style="margin:0 0 10px;">Rein explorativ — verändert nichts, bis du unten ausdrücklich "Übernehmen" klickst.</p>
+      <div class="row">
+        <div><label>Person</label><select id="sim-person"></select></div>
+        <div><label>Ziel-Schicht</label>
+          <select id="sim-schicht">
+            <option value="nacht">Nachtschicht</option>
+            <option value="frueh">Frühschicht</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div style="flex:1 1 100%;"><label>Nur für eine Position (optional)</label>
+          <select id="sim-position"><option value="">Alle Positionen der Zielschicht</option></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div><label>Von</label><input type="date" id="sim-von"></div>
+        <div><label>Bis</label><input type="date" id="sim-bis"></div>
+      </div>
+      <div style="margin-top:10px;"><button class="btn-primary" id="btn-simulieren">Simulieren</button></div>
+    </div>
+    <div id="simulation-ergebnis"></div>
+  </section>
+</main>
+
+<script src="rechenmodul.js"></script>
+<script src="freie_tage_verteilung.js"></script>
+<script>
+/* ============ rechenmodul.js ============ */
+/* ============ freie_tage_verteilung.js ============ */
+// Ergänzt 09.09.2026 (Ulf: Vortags-Ruhezeit-Warnung bei Nacht-Cross-
+// Schicht) — Gegenstück zu naechsterTag, für den Vortags-Check unten.
+function vorherigerTag(datumISO) {
+  const d = new Date(datumISO + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10);
+}
+
+// Ergänzt 09.09.2026 (Ulf: "im alten System wurden auch Tauschmöglich-
+// keiten zwischen Tagen innerhalb einer Schicht vorgeschlagen — wir
+// greifen sehr schnell auf Cross-Schicht zurück"). V1 hatte dafür
+// `berechneVorschlaege` in fluss_logik.js: für einen Lücken-Tag
+// Personen suchen, deren automatisch verteilter freier Tag genau auf
+// diesen Tag fällt, testweise auf jeden anderen Wochentag verschieben,
+// ganze Woche neu rechnen, nur übernehmen wenn die Gesamt-Lückenzahl
+// sinkt. Hier dieselbe Idee, aber pro einzelner Lücke statt als
+// eigener Wochen-weiter Knopf — erscheint direkt neben der
+// Cross-Schicht-Prüfung als mildere Alternative (kein Schichtwechsel
+// nötig). Namensgleiche Idee, eigenständig für V2 nachgebaut, kein
+// Code aus fluss_logik.js übernommen.
+
+/** Zählt Nacht+Früh-Lücken über die ganze Mo–Sa-Woche für ein
+ * gegebenes Ereignis-Set — Vergleichsgrundlage für den Tausch-Test. */
+function gesamtLuecken(testEreignisse, wochenStartISO) {
+  const tage = wochentageMoSa(wochenStartISO);
+  let summe = 0;
+  for (const d of tage) {
+    const t = berechneTagAlleSchichten(d, personen, positionen, testEreignisse, manuelleZuweisungen);
+    summe += t.nacht.luecken.length + t.frueh.luecken.length;
+  }
+  return summe;
+}
+
+/** Sucht für eine konkrete Lücke (Position, Tag) eine Person aus
+ * demselben Pool, deren automatisch verteilter freier Tag genau auf
+ * diesen Tag fällt, und die sich auf einen anderen Wochentag
+ * verschieben ließe, ohne die Gesamt-Lückenzahl der Woche zu
+ * verschlechtern. Wunsch-Tage (wunschtage[personId] === luckenTag)
+ * werden nie angetastet — das ist ein gegebenes Versprechen, kein
+ * Zufallsplatz. Gibt den ersten gefundenen, tatsächlich
+ * verbessernden Vorschlag zurück, oder null.
+ */
+function findeTauschVorschlag(positionId, luckenTag, wochenStartISO) {
+  const position = positionen.find(p => p.id === positionId);
+  if (!position) return null;
+  const tage = wochentageMoSa(wochenStartISO);
+  const basisLuecken = gesamtLuecken(ereignisse, wochenStartISO);
+
+  for (const personId of position.pool) {
+    const person = personen.find(pp => pp.id === personId);
+    if (!person) continue;
+    const freierTagEvent = ereignisse.find(e =>
+      e.personId === personId && e.grund === 'freierTag' &&
+      e.von === luckenTag && e.bis === luckenTag
+    );
+    if (!freierTagEvent) continue;
+    if (wunschtage[personId] === luckenTag) continue; // Wunsch, nicht anfassen
+
+    for (const kandidatTag of tage) {
+      if (kandidatTag === luckenTag) continue;
+      if (hatBindendeSperre(personId, kandidatTag, ereignisse.filter(e => e !== freierTagEvent))) continue;
+      const wochentagKey = wochentag(kandidatTag);
+      if (person.arbeitstage && !person.arbeitstage.includes(wochentagKey)) continue;
+      if (person.freieTagOptionen && !person.freieTagOptionen.includes(wochentagKey)) continue;
+      if (manuelleZuweisungen.some(z => z.personId === personId && z.datumISO === kandidatTag)) continue;
+
+      const testEreignisse = ereignisse.filter(e => e !== freierTagEvent)
+        .concat([{ ...freierTagEvent, von: kandidatTag, bis: kandidatTag }]);
+      if (gesamtLuecken(testEreignisse, wochenStartISO) < basisLuecken) {
+        return { personId, vonTag: luckenTag, aufTag: kandidatTag };
+      }
+    }
+  }
+  return null;
+}
+
+/** Führt einen von findeTauschVorschlag gefundenen Tausch aus: alten
+ * freien Tag entfernen, neuen an anderer Stelle eintragen. Reiner
+ * Ereignis-Edit, kein Neu-Verwürfeln der übrigen Woche. */
+function fuehreTauschAus(personId, vonTag, aufTag) {
+  ereignisse = ereignisse.filter(e =>
+    !(e.personId === personId && e.grund === 'freierTag' && e.von === vonTag && e.bis === vonTag)
+  );
+  ereignisse.push({ personId, von: aufTag, bis: aufTag, grund: 'freierTag', bindend: true, begruendung: null });
+}
+
+// Ergänzt 09.09.2026 (Ulf: Wochen-Konfiguration für Feiertags-/
+// Sonntagsausgleich) — anders als die anderen Vorschlagsarten hier
+// KEIN Vorschlag zum Bestätigen, sondern eine garantierte Vergabe:
+// wer als "hat Feiertag/Sonntag gearbeitet" für eine Woche eingetragen
+// ist, bekommt automatisch einen zusätzlichen freien Tag in
+// derselben Woche, ohne Rückfrage — das ist ein Anspruch, keine
+// Optimierungsfrage. Steht jemand in beiden Listen, macht die
+// Mechanik selbst daraus zwei Zusatztage statt einer eigenen Regel
+// für den "Doppelfall" zu brauchen.
+/** Sucht für eine Person einen ZUSÄTZLICHEN freien Tag in der Woche
+ * (zusätzlich zu ihrem normalen, schon verteilten freien Tag) — wählt
+ * den Kandidaten mit der niedrigsten resultierenden Gesamt-
+ * Lückenzahl. Gibt null zurück, wenn kein einziger Tag infrage kommt. */
+function findeZusaetzlichenFreienTag(personId, wochenStartISO) {
+  const person = personen.find(p => p.id === personId);
+  if (!person) return null;
+  const tage = wochentageMoSa(wochenStartISO);
+  // Ergänzt 09.09.2026 (Person F-Fall: Feiertag UND Sonntag in
+  // derselben Woche) — der Zusatztag darf niemals auf einen Tag
+  // fallen, an dem diese Person laut Feiertags-Ausgleich arbeitet.
+  // Ohne das schlug diese Suche versehentlich genau den Feiertag als
+  // "zusätzlichen" Tag vor, weil sie ihn sonst wie jeden anderen
+  // Kandidaten behandelt hätte.
+  const ausgeschlossen = sammleAusgeschlosseneTage(wochenStartISO)[personId] || [];
+  let bester = null;
+  let besteLuecken = Infinity;
+  for (const kandidatTag of tage) {
+    if (ausgeschlossen.includes(kandidatTag)) continue;
+    if (hatBindendeSperre(personId, kandidatTag, ereignisse)) continue;
+    const wochentagKey = wochentag(kandidatTag);
+    if (person.arbeitstage && !person.arbeitstage.includes(wochentagKey)) continue;
+    if (person.freieTagOptionen && !person.freieTagOptionen.includes(wochentagKey)) continue;
+    if (manuelleZuweisungen.some(z => z.personId === personId && z.datumISO === kandidatTag)) continue;
+    // Schon der normale freie Tag dieser Person? Dann wäre es kein
+    // ZUSÄTZLICHER Tag, sondern derselbe — überspringen.
+    if (ereignisse.some(e => e.personId === personId && e.grund === 'freierTag' && e.von === kandidatTag)) continue;
+    const testEreignisse = ereignisse.concat([{ personId, von: kandidatTag, bis: kandidatTag, grund: 'freierTag', bindend: true, begruendung: null }]);
+    const luecken = gesamtLuecken(testEreignisse, wochenStartISO);
+    if (luecken < besteLuecken) { besteLuecken = luecken; bester = kandidatTag; }
+  }
+  return bester;
+}
+
+/** Baut aus wochenAusgleich die Ausschluss-Liste für verteileFreieTage:
+ * personId -> [Feiertagsdatum, ...], für alle Feiertag-Einträge dieser
+ * Woche mit gesetztem Datum. Sonntag-Einträge brauchen das nicht (kein
+ * Ausschluss, echter Zusatztag, siehe wendeWochenAusgleichAn). */
+function sammleAusgeschlosseneTage(wochenStartISO) {
+  const ausgeschlossen = {};
+  for (const eintrag of wochenAusgleich) {
+    if (eintrag.wochenStart !== wochenStartISO || eintrag.grund !== 'feiertag' || !eintrag.datum) continue;
+    if (!ausgeschlossen[eintrag.personId]) ausgeschlossen[eintrag.personId] = [];
+    ausgeschlossen[eintrag.personId].push(eintrag.datum);
+  }
+  return ausgeschlossen;
+}
+
+/** Feiertag-Fall (anders als Sonntag!): kein Zusatztag, sondern
+ * Korrektur, falls der ganz normale freie Tag dieser Person
+ * ausgerechnet auf den Feiertag gefallen ist, an dem sie arbeitet.
+ * Verschiebt ihn dann auf einen anderen Wochentag — reiner Tausch,
+ * kein Plus. Bewusst OHNE den Wunschtag-Schutz von findeErsatzTagFuer:
+ * hätte die Person zufällig genau den Feiertag als Wunschtag notiert,
+ * ist der jetzt ohnehin hinfällig, sie arbeitet ja. Rührt nichts an,
+ * wenn der freie Tag gar nicht auf dem Feiertag liegt (schon durch
+ * den Ausschluss in wuerfleVersuch korrekt woanders gelandet) —
+ * dadurch von selbst wiederholungssicher, kein Marker nötig. */
+function korrigiereFeiertagsKollision(personId, feiertagDatum, wochenStartISO) {
+  const freierTagEvent = ereignisse.find(e =>
+    e.personId === personId && e.grund === 'freierTag' &&
+    e.von === feiertagDatum && e.bis === feiertagDatum &&
+    !(e.begruendung && e.begruendung.startsWith('ausgleich:')) // niemals einen schon vergebenen Ausgleichstag anfassen
+  );
+  if (!freierTagEvent) return; // liegt eh nicht auf dem Feiertag -- nichts zu tun
+  const person = personen.find(p => p.id === personId);
+  if (!person) return;
+  const tage = wochentageMoSa(wochenStartISO);
+  const basisLuecken = gesamtLuecken(ereignisse, wochenStartISO);
+  for (const kandidatTag of tage) {
+    if (kandidatTag === feiertagDatum) continue;
+    if (hatBindendeSperre(personId, kandidatTag, ereignisse.filter(e => e !== freierTagEvent))) continue;
+    const wochentagKey = wochentag(kandidatTag);
+    if (person.arbeitstage && !person.arbeitstage.includes(wochentagKey)) continue;
+    if (person.freieTagOptionen && !person.freieTagOptionen.includes(wochentagKey)) continue;
+    if (manuelleZuweisungen.some(z => z.personId === personId && z.datumISO === kandidatTag)) continue;
+    const testEreignisse = ereignisse.filter(e => e !== freierTagEvent)
+      .concat([{ ...freierTagEvent, von: kandidatTag, bis: kandidatTag }]);
+    if (gesamtLuecken(testEreignisse, wochenStartISO) <= basisLuecken) {
+      fuehreTauschAus(personId, feiertagDatum, kandidatTag);
+      return;
+    }
+  }
+  // Kein Tag gefunden, der die Lueckenzahl nicht verschlechtert --
+  // bleibt vorerst wie es ist, sichtbar für Ulf über die normale
+  // Ereignis-Anzeige, kein stiller Fehlschlag.
+}
+
+/** Vergibt automatisch den Feiertags-/Sonntagsausgleich für alle in
+ * `wochenAusgleich` für diese Woche eingetragenen Personen — läuft
+ * wie loeseFreieTagKonflikte bei jedem Rendern automatisch mit.
+ * Feiertag und Sonntag brauchen unterschiedliche Mechanik (09.09.2026,
+ * Ulf: "am Ende kommt jeder Kollege auf die gleiche Anzahl freier
+ * Tage" — Feiertag ist VERSCHIEBEN, Sonntag ist ECHTES PLUS):
+ * - Feiertag: korrigiereFeiertagsKollision (reiner Tausch, kein Plus)
+ * - Sonntag: findeZusaetzlichenFreienTag (echter Zusatztag), markiert
+ *   über begruendung, damit ein erneutes Rendern nicht doppelt vergibt
+ */
+function wendeWochenAusgleichAn(wochenStartISO) {
+  const tage = wochentageMoSa(wochenStartISO);
+  const wochenEndeISO = tage[tage.length - 1];
+  const eintraege = wochenAusgleich.filter(w => w.wochenStart === wochenStartISO);
+  for (const eintrag of eintraege) {
+    if (eintrag.grund === 'feiertag') {
+      if (eintrag.datum) korrigiereFeiertagsKollision(eintrag.personId, eintrag.datum, wochenStartISO);
+      continue;
+    }
+    const marker = 'ausgleich:' + eintrag.grund;
+    const schonVergeben = ereignisse.some(e =>
+      e.personId === eintrag.personId && e.grund === 'freierTag' &&
+      e.begruendung === marker && e.von >= wochenStartISO && e.von <= wochenEndeISO
+    );
+    if (schonVergeben) continue;
+    const tag = findeZusaetzlichenFreienTag(eintrag.personId, wochenStartISO);
+    if (tag) {
+      ereignisse.push({ personId: eintrag.personId, von: tag, bis: tag, grund: 'freierTag', bindend: true, begruendung: marker });
+    }
+  }
+}
+
+// Ergänzt 09.09.2026 (Ulf, Person O/Person R/22-Uhr-Fund) — dritte
+// Vorschlagsart neben Cross-Schicht-Bestätigung und Tausch-Vorschlag.
+// `versucheTausch` in rechenmodul.js (Schritt 4, §18) versucht schon
+// automatisch genau diese Art Umleitung — funktioniert aber nur mit
+// Personen, die WIRKLICH verfügbar sind (`istEinsetzbar`). Ulfs
+// eigener Fund ging weiter: er hat bewusst jemandes REGULÄREN freien
+// Tag überstimmt (Person O), um dadurch eine andere Person (Person R)
+// für die eigentliche Lücke freizumachen. Genau das darf kein
+// automatischer Mechanismus im Stillen tun — das ist eine bewusste
+// Entscheidung, wie Cross-Schicht auch. Diese Funktion sucht deshalb
+// gezielt nach genau diesem Fall: jemand aus dem Lücken-Pool ist
+// schon anderswo eingeteilt (X→Q); wer aus Qs Pool könnte einspringen,
+// wenn NUR sein regulärer freier Tag (nicht Urlaub/Krankheit/Sperrtag)
+// überstimmt wird? Ergebnis wird als Vorschlag angezeigt, nie
+// automatisch angewendet.
+function findeUmleitungsVorschlag(positionId, luckenTag, wochenStartISO) {
+  const position = positionen.find(p => p.id === positionId);
+  if (!position) return null;
+  const ergebnis = berechneTagAlleSchichten(luckenTag, personen, positionen, ereignisse, manuelleZuweisungen);
+  const alleZuweisungen = { ...ergebnis.nacht.zuweisungen, ...ergebnis.frueh.zuweisungen };
+  const wochentagKey = wochentag(luckenTag);
+
+  for (const xId of position.pool) {
+    if (!xId) continue;
+    const x = personen.find(p => p.id === xId);
+    if (!x) continue;
+    // Ist X an diesem Tag schon anderswo eingeteilt? (Sonst wäre die
+    // normale Kaskade oder versucheTausch schon fündig geworden.)
+    const qId = Object.keys(alleZuweisungen).find(posId => alleZuweisungen[posId] === xId);
+    if (!qId) continue;
+    const qPos = positionen.find(p => p.id === qId);
+    if (!qPos) continue;
+    if (istRuhezeitRelevanterWechsel(x, position, luckenTag, ereignisse) && !hatCrossSchichtZuweisung(xId, luckenTag, ereignisse)) continue;
+
+    for (const yId of qPos.pool) {
+      if (!yId || yId === xId) continue;
+      if (Object.values(alleZuweisungen).includes(yId)) continue; // schon anderswo gebunden
+      const y = personen.find(p => p.id === yId);
+      if (!y) continue;
+      // Y muss GENAU wegen eines regulären freien Tags fehlen — jeder
+      // andere Grund (Urlaub, Krankheit, Sperrtag, Feiertag) bleibt
+      // unangetastet, wird hier bewusst nicht vorgeschlagen.
+      const freierTagEvent = ereignisse.find(e => e.personId === yId && e.grund === 'freierTag' && e.von <= luckenTag && luckenTag <= e.bis);
+      if (!freierTagEvent) continue;
+      const andereSperre = ereignisse.some(e => e.personId === yId && e.bindend && e.grund !== 'freierTag' && e.von <= luckenTag && luckenTag <= e.bis);
+      if (andereSperre) continue;
+      if (y.arbeitstage && !y.arbeitstage.includes(wochentagKey)) continue;
+      if (y.gesperrteSchichten && y.gesperrteSchichten.includes(qPos.schicht)) continue;
+      if (istRuhezeitRelevanterWechsel(y, qPos, luckenTag, ereignisse) && !hatCrossSchichtZuweisung(yId, luckenTag, ereignisse)) continue;
+
+      // Kann Y seinen freien Tag stattdessen an einem anderen
+      // Wochentag bekommen? Wenn ja, verliert niemand etwas — genau
+      // dieselbe Suche wie findeTauschVorschlag, hier auf Y angewendet.
+      // Ergänzt 09.09.2026 (Ulf: "sie bekommt doch einen freien Tag,
+      // der wandert doch nur woanders hin?") — ursprünglich ließ diese
+      // Funktion Ys freierTag-Eintrag unangetastet stehen, während sie
+      // gleichzeitig eingeteilt wurde: widersprüchlicher Zustand
+      // (gleichzeitig "frei" UND "eingeteilt" angezeigt), kein echter
+      // Verlust, aber auch kein echter Ersatz — einfach unsauber.
+      const ersatzTag = findeErsatzTagFuer(yId, luckenTag, wochenStartISO);
+
+      return { xId, pId: position.id, qId, qName: qPos.name, yId, ersatzTag };
+    }
+  }
+  return null;
+}
+
+/** Sucht für eine Person einen anderen erlaubten Wochentag als neuen
+ * freien Tag, ohne dass sich die Gesamt-Lückenzahl der Woche
+ * verschlechtert — dieselbe Prüfung wie findeTauschVorschlag, nur
+ * ohne die Bedingung "hat an luckenTag schon einen freien Tag" davor.
+ * Gibt den Wochentag zurück, oder null wenn keiner passt (dann verliert
+ * die Person ihren freien Tag diese Woche wirklich, ohne Ersatz). */
+function findeErsatzTagFuer(personId, vonTag, wochenStartISO) {
+  const person = personen.find(p => p.id === personId);
+  if (!person) return null;
+  const tage = wochentageMoSa(wochenStartISO);
+  const freierTagEvent = ereignisse.find(e => e.personId === personId && e.grund === 'freierTag' && e.von === vonTag && e.bis === vonTag);
+  if (!freierTagEvent) return null;
+  if (wunschtage[personId] === vonTag) return null; // Wunsch, nicht anfassen
+  const basisLuecken = gesamtLuecken(ereignisse, wochenStartISO);
+  for (const kandidatTag of tage) {
+    if (kandidatTag === vonTag) continue;
+    if (hatBindendeSperre(personId, kandidatTag, ereignisse.filter(e => e !== freierTagEvent))) continue;
+    const wochentagKey = wochentag(kandidatTag);
+    if (person.arbeitstage && !person.arbeitstage.includes(wochentagKey)) continue;
+    if (person.freieTagOptionen && !person.freieTagOptionen.includes(wochentagKey)) continue;
+    if (manuelleZuweisungen.some(z => z.personId === personId && z.datumISO === kandidatTag)) continue;
+    const testEreignisse = ereignisse.filter(e => e !== freierTagEvent)
+      .concat([{ ...freierTagEvent, von: kandidatTag, bis: kandidatTag }]);
+    // Hier reicht "nicht schlechter" statt "besser" — die Umleitung
+    // selbst löst die eigentliche Lücke schon, wir wollen nur wissen,
+    // ob das Verschieben von Ys Tag NICHTS zusätzlich verschlechtert.
+    if (gesamtLuecken(testEreignisse, wochenStartISO) <= basisLuecken) {
+      return kandidatTag;
+    }
+  }
+  return null;
+}
+
+/** Wendet einen Umleitungs-Vorschlag an: zwei manuelle Zuweisungen auf
+ * einmal (Y übernimmt Qs Platz, X wechselt zur ursprünglichen Lücke).
+ * Findet sich für Y ein Ersatztag, wird ihr freierTag-Eintrag dorthin
+ * verschoben (niemand verliert etwas) — findet sich keiner, wird der
+ * Eintrag entfernt statt widersprüchlich stehen zu bleiben (Y verliert
+ * den freien Tag diese Woche wirklich, ohne Ausgleich; das entspricht
+ * genau der Warnung, die vor dem Klick angezeigt wurde). */
+function wendeUmleitungAn(xId, pId, qId, yId, datumISO, ersatzTag) {
+  manuelleZuweisungen = manuelleZuweisungen.filter(z => !(z.datumISO === datumISO && (z.positionId === pId || z.positionId === qId)));
+  manuelleZuweisungen.push({ datumISO, positionId: qId, personId: yId });
+  manuelleZuweisungen.push({ datumISO, positionId: pId, personId: xId });
+  if (ersatzTag) {
+    fuehreTauschAus(yId, datumISO, ersatzTag);
+  } else {
+    // Kein Ersatztag gefunden — Y verliert den freien Tag diese Woche
+    // wirklich, ohne Ausgleich. Eintrag entfernen statt ihn
+    // widersprüchlich stehen zu lassen (sonst erscheint Y gleichzeitig
+    // als "frei" UND als "eingeteilt" — derselbe Fehler wie eben, nur
+    // im anderen Zweig).
+    ereignisse = ereignisse.filter(e =>
+      !(e.personId === yId && e.grund === 'freierTag' && e.von === datumISO && e.bis === datumISO)
+    );
+  }
+}
+
+/* ============ Daten & UI ============ */
+// Korrektur 09.09.2026 (Ulf: "reale Namen in Code, der öffentlich
+// einsehbar sein wird") — bis hierher standen echte Kollegen-Namen
+// direkt als Startdaten im Quelltext. Landet diese Datei in einem
+// GitHub-Pages-Repo, wird sie als statische Datei ausgeliefert, roh
+// abrufbar für jeden mit der URL — unabhängig davon, ob das Repo
+// selbst öffentlich oder privat ist (GitHub weist selbst darauf hin:
+// auch private Repos können öffentlich erreichbare Pages haben).
+// Zugriffs-Wächter wie `bos_access_guard.js` schützen nur die UI,
+// nicht den rohen Abruf einer Datei. Deshalb jetzt leer — echte Daten
+// kommen ausschließlich über "Eigene positionen_pools.json laden"
+// oder manuelle Eingabe, bleiben rein im Browser-Speicher dieser
+// Sitzung und damit nie Teil einer Datei, die committet werden könnte.
+let personen = [];
+
+const POSITIONEN_STANDARD = [
+  { id: 'teigmacher_n', name: 'Teigmacher', schicht: 'nacht', prioritaet: 1, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'kamut', name: 'Kamut', schicht: 'nacht', prioritaet: 1, tage: ['mo','di','mi','do','fr'], pool: [] },
+  { id: 'ofen', name: 'Ofen (auch sonntags)', schicht: 'nacht', prioritaet: 1, tage: ['mo','di','mi','do','fr','sa','so'], pool: [] },
+  { id: 'rheon', name: 'Rheon', schicht: 'nacht', prioritaet: 2, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'versand_e1', name: 'Versand E1', schicht: 'nacht', prioritaet: 3, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'versand_e2', name: 'Versand E2', schicht: 'nacht', prioritaet: 3, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'uhr22', name: '22 Uhr', schicht: 'nacht', prioritaet: 3, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'pos_1788915115559', name: 'Kuchenversand', schicht: 'nacht', prioritaet: 1, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'pos_1788915169742', name: 'Konditorei Nacht 1', schicht: 'nacht', prioritaet: 1, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'pos_1788915280537', name: 'Konditorei Nacht 2', schicht: 'nacht', prioritaet: 1, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'broetchenstrasse', name: 'Brötchenstraße (auch sonntags)', schicht: 'frueh', prioritaet: 1, tage: ['mo','di','mi','do','fr','sa','so'], pool: [], schichtneutral: true },
+  { id: 'rondo', name: 'Rondo', schicht: 'frueh', prioritaet: 2, tage: ['mo','di','mi'], pool: [] },
+  { id: 'teigmacher_f', name: 'Teigmacher (Früh)', schicht: 'frueh', prioritaet: 2, tage: ['mo','di','mi','do','fr','sa'], pool: [] },
+  { id: 'kuchenposten', name: 'Kuchenposten', schicht: 'frueh', prioritaet: 2, tage: ['mo'], pool: [] },
+  { id: 'teigposten_so', name: 'Teigposten', schicht: 'sonntag', prioritaet: 1, tage: ['so'], pool: [] },
+  { id: 'frosterposten_so', name: 'Frosterposten', schicht: 'sonntag', prioritaet: 3, tage: ['so'], pool: [] },
+  { id: 'schlawinerposten_so', name: 'Schlawinerposten', schicht: 'sonntag', prioritaet: 3, tage: ['so'], pool: [] },
+];
+
+let positionen = POSITIONEN_STANDARD;
+let ereignisse = [];
+let wunschtage = {}; // personId -> datumISO
+let wichtigeWunschtage = {}; // personId -> true, 09.09.2026 (Arzttermin-Fall)
+let wochenAusgleich = []; // { personId, wochenStart, grund: 'feiertag'|'sonntag' }, 09.09.2026
+let manuelleZuweisungen = []; // { datumISO, positionId, personId }
+let aktuellerWochenStart = null;
+let bearbeitetePersonId = null; // 09.09.2026 (Ulf): Attribute-Bearbeitung bestehender Personen
+
+const SCHICHT_LABEL = { nacht: 'Nachtschicht', frueh: 'Frühschicht', sonntag: 'Sonntag' };
+const GRUND_LABEL = { freierTag: 'freier Tag', urlaub: 'Urlaub', krankheit: 'Krankheit', schule: 'Schule', sperrtag: 'Sperrtag', feiertag: 'Feiertag', fruehschichtEinsatz: 'Frühschicht-Einsatz', sonstiges: 'Sonstiges' };
+const TAG_LABEL = { mo: 'Montag', di: 'Dienstag', mi: 'Mittwoch', do: 'Donnerstag', fr: 'Freitag', sa: 'Samstag', so: 'Sonntag' };
+
+function personName(id) { const p = personen.find(p => p.id === id); return p ? p.name : id; }
+function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Präzisiert 09.09.2026 (Ulf): Namen im Ergebnis anklickbar machen,
+// springt zur Person in "Personen verwalten" zum Nachbearbeiten,
+// statt dass man sie unten in der Liste erst suchen muss.
+function personLink(id) {
+  return `<span class="person-link" data-person="${escHtml(id)}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px;">${escHtml(personName(id))}</span>`;
+}
+// Neu 09.09.2026 (Ulf: "Dropdown bei den Namen im Plan?") — Optionen
+// für das Umbesetzungs-Dropdown einer Position: Pool zuerst (das sind
+// die "vorgesehenen" Kandidaten), dann alle übrigen aktiven Personen
+// darunter — bewusst nicht auf den Pool beschränkt, damit sich genau
+// die Cross-Schicht-Fälle testen lassen, um die es hier ja geht.
+function optionenFuerPosition(pos, aktuellePersonId) {
+  const poolIds = (pos.pool || []).filter(Boolean);
+  const poolSet = new Set(poolIds);
+  const andere = personen.filter(p => p.aktiv && !poolSet.has(p.id)).map(p => p.id).sort((a, b) => personName(a).localeCompare(personName(b)));
+  const option = id => `<option value="${escHtml(id)}"${id === aktuellePersonId ? ' selected' : ''}>${escHtml(personName(id))}</option>`;
+  let html = `<option value=""${!aktuellePersonId ? ' selected' : ''}>— Lücke —</option>`;
+  if (poolIds.length) html += `<optgroup label="Pool">${poolIds.map(option).join('')}</optgroup>`;
+  if (andere.length) html += `<optgroup label="Andere">${andere.map(option).join('')}</optgroup>`;
+  return html;
+}
+// Delegierter Klick-Handler (funktioniert auch nach Neu-Rendern von
+// #ergebnis, da er auf document.body sitzt statt auf einzelnen Links).
+// Öffnet direkt die Attribute-Bearbeitung (09.09.2026, Ulf: "anklicken
+// und dadurch editieren") statt nur zur Person zu scrollen.
+document.body.addEventListener('click', (e) => {
+  const link = e.target.closest('.person-link');
+  if (!link) return;
+  startePersonBearbeitung(link.dataset.person);
+});
+
+function initSelects() {
+  const opts = personen.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('');
+  document.getElementById('ev-person').innerHTML = opts;
+  document.getElementById('wu-person').innerHTML = opts;
+  document.getElementById('sim-person').innerHTML = opts;
+  document.getElementById('mz-person').innerHTML = opts;
+  document.getElementById('wa-person').innerHTML = opts;
+  aktualisierePositionsAuswahl();
+  aktualisiereMzPositionsAuswahl();
+}
+
+function aktualisierePositionsAuswahl() {
+  const zielSchicht = document.getElementById('sim-schicht').value;
+  const passende = positionen.filter(p => p.schicht === zielSchicht);
+  document.getElementById('sim-position').innerHTML =
+    '<option value="">Alle Positionen der Zielschicht</option>' +
+    passende.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('');
+}
+document.getElementById('sim-schicht').addEventListener('change', aktualisierePositionsAuswahl);
+
+function aktualisiereMzPositionsAuswahl() {
+  const schicht = document.getElementById('mz-schicht').value;
+  const passende = positionen.filter(p => p.schicht === schicht);
+  document.getElementById('mz-position').innerHTML = passende.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('');
+}
+document.getElementById('mz-schicht').addEventListener('change', aktualisiereMzPositionsAuswahl);
+
+// --- Personen verwalten ---
+document.getElementById('pn-arbeitstage').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  chip.classList.toggle('active');
+});
+document.getElementById('pn-freietagoptionen').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  chip.classList.toggle('active');
+});
+document.getElementById('pn-gesperrteschichten').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  chip.classList.toggle('active');
+});
+function personenformularZuruecksetzen() {
+  document.getElementById('pn-name').value = '';
+  document.getElementById('pn-name').disabled = false;
+  document.getElementById('pn-status').value = 'mitarbeiter';
+  document.getElementById('pn-stammschicht').value = 'nacht';
+  document.querySelectorAll('#pn-arbeitstage .chip, #pn-freietagoptionen .chip').forEach(c => c.classList.add('active'));
+  document.getElementById('pn-keine-rotation').checked = false;
+  document.querySelectorAll('#pn-gesperrteschichten .chip').forEach(c => c.classList.remove('active'));
+  bearbeitetePersonId = null;
+  document.getElementById('btn-add-person').textContent = '+ Person hinzufügen';
+  document.getElementById('btn-bearbeitung-abbrechen').style.display = 'none';
+  document.getElementById('pn-bearbeitungshinweis').innerHTML = '';
+}
+
+// Neu 09.09.2026 (Ulf): bestehende Personen nachträglich bearbeiten,
+// nicht nur aktiv/inaktiv schalten oder löschen+neu anlegen. Der Name
+// bleibt bewusst gesperrt — er ist zugleich die ID, auf die Pools,
+// Ereignisse, Wunschtage und manuelle Zuweisungen verweisen; eine
+// Umbenennung würde all das zerreißen. Alle anderen Attribute sind
+// frei änderbar.
+function startePersonBearbeitung(id) {
+  const p = personen.find(pp => pp.id === id);
+  if (!p) return;
+  bearbeitetePersonId = id;
+  document.getElementById('pn-name').value = p.name;
+  document.getElementById('pn-name').disabled = false;
+  document.getElementById('pn-status').value = p.status;
+  document.getElementById('pn-stammschicht').value = p.stammschicht;
+  const arbeitstage = p.arbeitstage || ['mo','di','mi','do','fr','sa','so'];
+  document.querySelectorAll('#pn-arbeitstage .chip').forEach(c => c.classList.toggle('active', arbeitstage.includes(c.dataset.tag)));
+  document.getElementById('pn-keine-rotation').checked = !!p.keinRotierenderFreierTag;
+  const freieTagOptionen = p.freieTagOptionen || ['mo','di','mi','do','fr','sa'];
+  document.querySelectorAll('#pn-freietagoptionen .chip').forEach(c => c.classList.toggle('active', freieTagOptionen.includes(c.dataset.tag)));
+  const gesperrteSchichten = p.gesperrteSchichten || [];
+  document.querySelectorAll('#pn-gesperrteschichten .chip').forEach(c => c.classList.toggle('active', gesperrteSchichten.includes(c.dataset.tag)));
+  document.getElementById('btn-add-person').textContent = 'Änderungen speichern';
+  document.getElementById('btn-bearbeitung-abbrechen').style.display = '';
+  document.getElementById('pn-bearbeitungshinweis').innerHTML = `<div class="item-meta">Bearbeite: <strong>${escHtml(p.name)}</strong> — Name jetzt änderbar (09.09.2026, Ulfs Übersetzer-Idee): intern bleibt die feste ID <code>${escHtml(p.id)}</code>, Pools/Ereignisse verlinken darauf, nicht auf den Anzeigenamen</div>`;
+  document.querySelector('#personen-liste').closest('section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.getElementById('btn-bearbeitung-abbrechen').addEventListener('click', personenformularZuruecksetzen);
+
+document.getElementById('btn-add-person').addEventListener('click', () => {
+  const status = document.getElementById('pn-status').value;
+  const stammschicht = document.getElementById('pn-stammschicht').value;
+  const aktiveTage = Array.from(document.querySelectorAll('#pn-arbeitstage .chip.active')).map(c => c.dataset.tag);
+  const arbeitstage = aktiveTage.length < 7 ? aktiveTage : undefined; // alle 7 an = keine Einschraenkung
+  const keinRotierenderFreierTag = document.getElementById('pn-keine-rotation').checked || undefined;
+  const aktiveFreieTagOptionen = Array.from(document.querySelectorAll('#pn-freietagoptionen .chip.active')).map(c => c.dataset.tag);
+  const freieTagOptionen = aktiveFreieTagOptionen.length < 6 ? aktiveFreieTagOptionen : undefined; // alle 6 an = keine zusaetzliche Einschraenkung
+  const aktiveGesperrteSchichten = Array.from(document.querySelectorAll('#pn-gesperrteschichten .chip.active')).map(c => c.dataset.tag);
+  const gesperrteSchichten = aktiveGesperrteSchichten.length ? aktiveGesperrteSchichten : undefined; // keine Auswahl = keine Sperre
+
+  if (bearbeitetePersonId) {
+    const p = personen.find(pp => pp.id === bearbeitetePersonId);
+    const neuerName = document.getElementById('pn-name').value.trim();
+    if (!neuerName) { alert('Bitte einen Namen eingeben.'); return; }
+    // Neu 09.09.2026 (Ulfs Nachfrage): die ID ist der EINGEFRORENE
+    // ursprüngliche Name, kein generischer Code — deshalb kann ein
+    // neuer Anzeigename zufällig mit dem (Anzeige- oder internen)
+    // Namen einer ANDEREN Person kollidieren. Kein technischer Bruch
+    // (jede ID bleibt ihre eigene, echte Verknüpfung), aber verwirrend
+    // beim Lesen — deshalb hier nur eine Warnung, kein Blockieren.
+    const kollision = personen.find(pp => pp.id !== bearbeitetePersonId && (pp.name === neuerName || pp.id === neuerName));
+    if (kollision && !confirm(`"${neuerName}" gibt es schon (${kollision.name}, intern: ${kollision.id}). Beide bleiben technisch getrennt, aber in Listen nicht mehr unterscheidbar. Trotzdem speichern?`)) return;
+    // Nur `name` (Anzeige) ändert sich, `id` (die tatsächliche
+    // Verknüpfung in Pools/Ereignissen/Wunschtagen/manuellen
+    // Zuweisungen) bleibt für immer die beim Anlegen vergebene —
+    // Ulfs Übersetzer-Idee: id und Anzeigename waren im Code schon
+    // getrennte Felder, nur die Oberfläche hat sie bisher künstlich
+    // synchron gehalten.
+    if (p) Object.assign(p, { name: neuerName, status, stammschicht, arbeitstage, keinRotierenderFreierTag, freieTagOptionen, gesperrteSchichten });
+    personenformularZuruecksetzen();
+    initSelects();
+    renderPersonenListe();
+    if (aktuellerWochenStart) renderAktuelleWoche(aktuellerWochenStart);
+    return;
+  }
+
+  const name = document.getElementById('pn-name').value.trim();
+  if (!name) { alert('Bitte einen Namen eingeben.'); return; }
+  if (personen.some(p => p.id === name)) { alert('Diese Person gibt es schon.'); return; }
+  personen.push({ id: name, name, stammschicht, status, aktiv: true, einsatzfaehig: true, arbeitstage, keinRotierenderFreierTag, freieTagOptionen, gesperrteSchichten });
+  personenformularZuruecksetzen();
+  initSelects();
+  renderPersonenListe();
+});
+function renderPersonenListe() {
+  const c = document.getElementById('personen-liste');
+  if (!personen.length) { c.innerHTML = '<div class="empty-hint">Noch keine Personen.</div>'; return; }
+  c.innerHTML = personen.map((p, i) => {
+    const tageText = p.arbeitstage ? p.arbeitstage.map(t => TAG_LABEL[t].slice(0,2)).join(', ') : 'alle Tage';
+    const rotationHinweis = (p.arbeitstage && p.arbeitstage.length <= 5) || p.keinRotierenderFreierTag
+      ? ' (kein zusätzlicher freier Tag nötig)'
+      : '';
+    const freieTagText = p.freieTagOptionen ? `<div class="item-meta">Freier Tag nur: ${p.freieTagOptionen.map(t => TAG_LABEL[t].slice(0,2)).join(', ')}</div>` : '';
+    const gesperrt = p.gesperrteSchichten || [];
+    const gesperrtChips = ['nacht', 'frueh'].map(s =>
+      `<button type="button" class="chip${gesperrt.includes(s) ? ' active' : ''}" data-action="toggle-gesperrt" data-idx="${i}" data-schicht="${s}" style="font-size:0.72rem; padding:3px 8px;">${s === 'nacht' ? 'Nacht' : 'Früh'} gesperrt</button>`
+    ).join('');
+    const umbenanntHinweis = p.id !== p.name ? ` <span class="item-meta">(intern: ${escHtml(p.id)})</span>` : '';
+    return `<div class="list-item" data-person-row="${escHtml(p.id)}">
+      <div>
+        <strong>${escHtml(p.name)}</strong>${umbenanntHinweis} <span class="item-meta">— ${p.status}, ${p.stammschicht}${p.aktiv ? '' : ', inaktiv'}</span>
+        <div class="item-meta">Arbeitstage: ${tageText}${rotationHinweis}</div>
+        ${freieTagText}
+        <div class="chip-row" style="margin-top:5px;">${gesperrtChips}</div>
+      </div>
+      <div>
+        <button class="icon-btn" data-action="edit-person" data-idx="${i}" title="Bearbeiten">✎</button>
+        <button class="icon-btn" data-action="toggle-aktiv" data-idx="${i}" title="${p.aktiv ? 'Deaktivieren' : 'Aktivieren'}">${p.aktiv ? '⏸' : '▶'}</button>
+        <button class="icon-btn" data-action="remove-person" data-idx="${i}">×</button>
+      </div>
+    </div>`;
+  }).join('');
+  c.querySelectorAll('button[data-action="edit-person"]').forEach(btn => btn.addEventListener('click', () => {
+    startePersonBearbeitung(personen[Number(btn.dataset.idx)].id);
+  }));
+  c.querySelectorAll('button[data-action="toggle-aktiv"]').forEach(btn => btn.addEventListener('click', () => {
+    personen[Number(btn.dataset.idx)].aktiv = !personen[Number(btn.dataset.idx)].aktiv;
+    renderPersonenListe();
+  }));
+  c.querySelectorAll('button[data-action="toggle-gesperrt"]').forEach(btn => btn.addEventListener('click', () => {
+    const person = personen[Number(btn.dataset.idx)];
+    const schicht = btn.dataset.schicht;
+    const liste = new Set(person.gesperrteSchichten || []);
+    if (liste.has(schicht)) liste.delete(schicht); else liste.add(schicht);
+    person.gesperrteSchichten = liste.size ? Array.from(liste) : undefined;
+    renderPersonenListe();
+  }));
+  c.querySelectorAll('button[data-action="remove-person"]').forEach(btn => btn.addEventListener('click', () => {
+    personen.splice(Number(btn.dataset.idx), 1);
+    initSelects();
+    renderPersonenListe();
+  }));
+}
+
+document.getElementById('ev-grund').addEventListener('change', (e) => {
+  const istSperrtagTyp = (e.target.value === 'schule' || e.target.value === 'sperrtag');
+  document.getElementById('ev-folgt-row').style.display = istSperrtagTyp ? 'flex' : 'none';
+  document.getElementById('ev-sperrtag-hinweis').style.display = istSperrtagTyp ? 'block' : 'none';
+  const istFruehschichtEinsatz = e.target.value === 'fruehschichtEinsatz';
+  document.getElementById('ev-block-row').style.display = istFruehschichtEinsatz ? 'flex' : 'none';
+  document.getElementById('ev-fruehschicht-hinweis').style.display = istFruehschichtEinsatz ? 'block' : 'none';
+  if (istFruehschichtEinsatz) fuelleBlockDaten();
+});
+// Ergänzt 09.09.2026 (Ulf: "wie Urlaub, nur nicht auf den Bahamas
+// sondern in der Frühschicht") — rechnet den gewählten Block (Mo/Di/
+// Mi oder Do/Fr/Sa) relativ zum aktuell geladenen Wochen-Start in
+// konkrete Von/Bis-Daten um. Reine UI-Ausfüllhilfe, editierbar
+// danach — die eigentliche Sperre kommt allein aus bindend:true,
+// siehe hatBindendeSperre in rechenmodul.js.
+function fuelleBlockDaten() {
+  const wochenStart = document.getElementById('wochen-start').value;
+  if (!wochenStart) return;
+  const block = document.getElementById('ev-block').value;
+  const start = new Date(wochenStart + 'T00:00:00Z');
+  const offsetVon = block === 'ende' ? 3 : 0;
+  const von = new Date(start); von.setUTCDate(start.getUTCDate() + offsetVon);
+  const bis = new Date(von); bis.setUTCDate(von.getUTCDate() + 2);
+  document.getElementById('ev-von').value = von.toISOString().slice(0, 10);
+  document.getElementById('ev-bis').value = bis.toISOString().slice(0, 10);
+}
+document.getElementById('ev-block').addEventListener('change', fuelleBlockDaten);
+document.getElementById('btn-add-ereignis').addEventListener('click', () => {
+  const personId = document.getElementById('ev-person').value;
+  const grund = document.getElementById('ev-grund').value;
+  const von = document.getElementById('ev-von').value;
+  const bis = document.getElementById('ev-bis').value || von;
+  if (!von) { alert('Bitte ein "Von"-Datum angeben.'); return; }
+  const folgtFreierTag = (grund === 'schule' || grund === 'sperrtag') && document.getElementById('ev-folgt-freier-tag').checked;
+  ereignisse.push({ personId, grund, von, bis, bindend: true, folgtFreierTag, begruendung: null });
+  renderEreignisse();
+});
+function renderEreignisse() {
+  const c = document.getElementById('ereignis-liste');
+  if (!ereignisse.length) { c.innerHTML = '<div class="empty-hint">Noch keine Ereignisse.</div>'; return; }
+  c.innerHTML = ereignisse.map((e, i) => `
+    <div class="list-item">
+      <div><strong>${escHtml(personName(e.personId))}</strong> — ${GRUND_LABEL[e.grund] || e.grund}
+        <div class="item-meta">${e.von}${e.bis !== e.von ? ' bis ' + e.bis : ''}${e.folgtFreierTag ? ' · freier Tag folgt direkt danach' : ''}</div></div>
+      <button class="icon-btn" data-idx="${i}">×</button>
+    </div>`).join('');
+  c.querySelectorAll('button[data-idx]').forEach(btn => btn.addEventListener('click', () => { ereignisse.splice(Number(btn.dataset.idx), 1); renderEreignisse(); }));
+}
+
+document.getElementById('btn-add-wunsch').addEventListener('click', () => {
+  const personId = document.getElementById('wu-person').value;
+  const datum = document.getElementById('wu-datum').value;
+  if (!datum) { alert('Bitte ein Datum angeben.'); return; }
+  wunschtage[personId] = datum;
+  if (document.getElementById('wu-wichtig').checked) wichtigeWunschtage[personId] = true;
+  else delete wichtigeWunschtage[personId];
+  document.getElementById('wu-wichtig').checked = false;
+  renderWunschtage();
+});
+function renderWunschtage() {
+  const c = document.getElementById('wunsch-liste');
+  const eintraege = Object.entries(wunschtage);
+  if (!eintraege.length) { c.innerHTML = '<div class="empty-hint">Noch keine Wunschtage.</div>'; return; }
+  c.innerHTML = eintraege.map(([personId, datum]) => `
+    <div class="list-item">
+      <div><strong>${escHtml(personName(personId))}</strong> <span class="item-meta">wünscht sich ${datum}${wichtigeWunschtage[personId] ? ' · <strong style="color:#8a5a2e;">⭐ wichtig</strong>' : ''}</span></div>
+      <button class="icon-btn" data-pid="${escHtml(personId)}">×</button>
+    </div>`).join('');
+  c.querySelectorAll('button[data-pid]').forEach(btn => btn.addEventListener('click', () => { delete wunschtage[btn.dataset.pid]; delete wichtigeWunschtage[btn.dataset.pid]; renderWunschtage(); }));
+}
+
+const AUSGLEICH_LABEL = { feiertag: 'Feiertag', sonntag: 'Sonntag' };
+document.getElementById('wa-grund').addEventListener('change', function() {
+  document.getElementById('wa-feiertag-datum-zeile').style.display = this.value === 'feiertag' ? '' : 'none';
+});
+document.getElementById('btn-add-ausgleich').addEventListener('click', () => {
+  const personId = document.getElementById('wa-person').value;
+  const grund = document.getElementById('wa-grund').value;
+  const wochenStart = document.getElementById('wochen-start').value;
+  if (!wochenStart) { alert('Bitte zuerst den Montag der Woche oben angeben.'); return; }
+  let datum = null;
+  if (grund === 'feiertag') {
+    datum = document.getElementById('wa-feiertag-datum').value;
+    if (!datum) { alert('Bitte das Datum des Feiertags angeben — sonst weiß die Verteilung nicht, welchen Tag sie für diese Person ausschließen soll.'); return; }
+  }
+  if (wochenAusgleich.some(w => w.personId === personId && w.wochenStart === wochenStart && w.grund === grund)) return; // schon eingetragen
+  wochenAusgleich.push({ personId, wochenStart, grund, datum });
+  renderAusgleichListe();
+  if (aktuellerWochenStart === wochenStart) renderAktuelleWoche(wochenStart);
+});
+function renderAusgleichListe() {
+  const c = document.getElementById('ausgleich-liste');
+  const wochenStart = document.getElementById('wochen-start').value;
+  const eintraege = wochenAusgleich.filter(w => w.wochenStart === wochenStart);
+  if (!eintraege.length) { c.innerHTML = '<div class="empty-hint">Diese Woche: keine Ausgleichstage eingetragen.</div>'; return; }
+  c.innerHTML = eintraege.map((w, i) => `
+    <div class="list-item">
+      <div><strong>${escHtml(personName(w.personId))}</strong> <span class="item-meta">hat ${AUSGLEICH_LABEL[w.grund]}${w.grund === 'feiertag' && w.datum ? ` (${w.datum})` : ''} gearbeitet</span></div>
+      <button class="icon-btn" data-idx="${i}">×</button>
+    </div>`).join('');
+  c.querySelectorAll('button[data-idx]').forEach(btn => btn.addEventListener('click', () => {
+    const entfernt = eintraege[Number(btn.dataset.idx)];
+    wochenAusgleich = wochenAusgleich.filter(w => w !== entfernt);
+    // Bei Sonntag: bereits vergebenen Zusatztag wieder entfernen, nicht
+    // nur die Konfiguration. Bei Feiertag gibt es keinen eigenen,
+    // markierten Zusatztag zum Entfernen (nur eine Verschiebung des
+    // ganz normalen freien Tags) — die bleibt bewusst stehen, korrigierbar
+    // wie jede andere manuelle Änderung über die Ereignis-Liste.
+    if (entfernt.grund !== 'feiertag') {
+      ereignisse = ereignisse.filter(e => !(e.personId === entfernt.personId && e.grund === 'freierTag' && e.begruendung === 'ausgleich:' + entfernt.grund));
+    }
+    renderAusgleichListe();
+    if (aktuellerWochenStart === wochenStart) renderAktuelleWoche(wochenStart);
+  }));
+}
+document.getElementById('wochen-start').addEventListener('change', renderAusgleichListe);
+
+function schnappeAufMontag(datumISO) {
+  const d = new Date(datumISO + 'T00:00:00Z');
+  const tag = d.getUTCDay(); // 0=So, 1=Mo, ...
+  const rueckAufMontag = tag === 0 ? -6 : (1 - tag);
+  d.setUTCDate(d.getUTCDate() + rueckAufMontag);
+  return d.toISOString().slice(0, 10);
+}
+
+// Korrektur 09.09.2026 (Ulf, Ausweichtag-Test einer Person) — Fund
+// dabei: mit
+// identischen Eingaben liefert `verteileFreieTage` bei jedem Aufruf
+// unterschiedliche Ergebnisse (Zufalls-Versuche, nicht deterministisch).
+// Bisher rief JEDE Änderung (Ereignis hinzufügen, manuelle Zuweisung,
+// Cross-Schicht-Bestätigung, jetzt auch die neuen Dropdowns) wieder
+// `berechneUndRenderWoche` auf, was die komplette Woche jedes Mal neu
+// verwürfelte — nicht nur für die betroffene Person, für praktisch
+// alle. `berechneUndRenderWoche` ist jetzt die bewusste
+// Neu-Verteilung (nur noch an "Freie Tage verteilen & Woche besetzen"
+// und "Diese Variante übernehmen" gebunden) und schreibt ihr Ergebnis
+// dauerhaft in `ereignisse` — alle anderen Änderungen rendern über
+// `renderAktuelleWoche` nur noch mit dem bereits feststehenden Stand.
+function persistiereFreieTage(wochenStart, neueFreieTagEreignisse) {
+  const tage = wochentageMoSa(wochenStart);
+  ereignisse = ereignisse.filter(e => !(e.grund === 'freierTag' && tage.includes(e.von)));
+  ereignisse = ereignisse.concat(neueFreieTagEreignisse);
+}
+
+// Neu 09.09.2026 (Ulf, Ausweichtag-Test einer Person) — nach jeder
+// kleinen
+// Änderung prüfen, ob ein bereits feststehender freier Tag jetzt mit
+// einer neuen manuellen Zuweisung oder Cross-Schicht-Bestätigung
+// derselben Person kollidiert. Betroffene Personen bekommen NUR FÜR
+// SICH einen neuen freien Tag ausgewürfelt (mehrere Versuche,
+// wenigste Lücken gewinnt) — alle anderen bereits feststehenden
+// freien Tage bleiben unangetastet. Genau das Verhalten, das Ulf im
+// Test beobachtet hat (freier Tag weicht automatisch aus), nur
+// jetzt gezielt statt über eine komplette Neu-Verwürfelung der Woche.
+function loeseFreieTagKonflikte(wochenStart) {
+  const tage = wochentageMoSa(wochenStart);
+  const persistierte = ereignisse.filter(e => e.grund === 'freierTag' && tage.includes(e.von));
+  const betroffeneIds = persistierte.filter(eintrag =>
+    manuelleZuweisungen.some(z => z.personId === eintrag.personId && z.datumISO === eintrag.von) ||
+    ereignisse.some(e => e.personId === eintrag.personId && e.grund === 'crossSchichtEinsatz' && e.von <= eintrag.von && eintrag.von <= e.bis)
+  ).map(e => e.personId);
+  if (!betroffeneIds.length) return;
+
+  ereignisse = ereignisse.filter(e => !(e.grund === 'freierTag' && tage.includes(e.von) && betroffeneIds.includes(e.personId)));
+  const betroffenePersonen = rotationspersonen(personen, wochenStart, ereignisse).filter(p => betroffeneIds.includes(p.id));
+  if (!betroffenePersonen.length) return;
+
+  let bester = null;
+  for (let i = 0; i < 80; i++) {
+    const teilZuweisung = wuerfleVersuch(betroffenePersonen, wochenStart, wunschtage, {}, ereignisse, manuelleZuweisungen);
+    const bewertung = bewerteVersuch(teilZuweisung, wochenStart, personen, positionen, ereignisse, wunschtage, manuelleZuweisungen, wichtigeWunschtage);
+    if (!bester || bewertung.luecken < bester.bewertung.luecken) bester = { teilZuweisung, bewertung };
+    if (bester.bewertung.luecken === 0) break;
+  }
+  if (bester) ereignisse = ereignisse.concat(zuEreignissen(bester.teilZuweisung));
+}
+
+function renderAktuelleWoche(wochenStart) {
+  if (!wochenStart) return;
+  wendeWochenAusgleichAn(wochenStart);
+  loeseFreieTagKonflikte(wochenStart);
+  const tage = wochentageMoSa(wochenStart);
+  const tagesErgebnisse = tage.map(datumISO => ({ datumISO, ergebnis: berechneTagAlleSchichten(datumISO, personen, positionen, ereignisse, manuelleZuweisungen) }));
+  const freieTageDieseWoche = ereignisse.filter(e => e.grund === 'freierTag' && tage.includes(e.von));
+  let wunschtageErfuellt = 0;
+  for (const [personId, datumISO] of Object.entries(wunschtage)) {
+    if (freieTageDieseWoche.some(e => e.personId === personId && e.von === datumISO)) wunschtageErfuellt++;
+  }
+  // Ergänzt 09.09.2026 (Arzttermin-Fall) — welche als "wichtig"
+  // markierten Wünsche in DIESER Woche NICHT erfüllt wurden, damit
+  // Ulf das sieht statt es nur in der reinen Zahl zu erahnen.
+  const unerfuellteWichtigeWuensche = Object.entries(wunschtage)
+    .filter(([personId]) => wichtigeWunschtage[personId])
+    .filter(([personId, datumISO]) => !freieTageDieseWoche.some(e => e.personId === personId && e.von === datumISO))
+    .map(([personId, datumISO]) => ({ personId, datumISO }));
+  renderWochenErgebnis(wochenStart, { ereignisse: freieTageDieseWoche, wunschtageErfuellt, unerfuellteWichtigeWuensche }, tagesErgebnisse);
+}
+
+function berechneUndRenderWoche(wochenStart) {
+  const verteilung = verteileFreieTage(wochenStart, personen, positionen, ereignisse, { wunschtage, wichtigeWunschtage, manuelleZuweisungen, ausgeschlosseneTage: sammleAusgeschlosseneTage(wochenStart) });
+  persistiereFreieTage(wochenStart, verteilung.ereignisse);
+  renderAktuelleWoche(wochenStart);
+}
+
+document.getElementById('btn-add-manuell').addEventListener('click', () => {
+  const personId = document.getElementById('mz-person').value;
+  const datumISO = document.getElementById('mz-datum').value;
+  const positionId = document.getElementById('mz-position').value;
+  if (!datumISO) { alert('Bitte ein Datum wählen.'); return; }
+  if (!positionId) { alert('Für diese Schicht ist keine Position vorhanden.'); return; }
+  manuelleZuweisungen = manuelleZuweisungen.filter(z => !(z.datumISO === datumISO && z.positionId === positionId));
+  manuelleZuweisungen.push({ datumISO, positionId, personId });
+  renderManuelleZuweisungen();
+});
+function renderManuelleZuweisungen() {
+  const c = document.getElementById('manuell-liste');
+  if (!manuelleZuweisungen.length) { c.innerHTML = '<div class="empty-hint">Noch keine manuellen Zuweisungen.</div>'; return; }
+  c.innerHTML = manuelleZuweisungen.map((z, i) => {
+    const pos = positionen.find(p => p.id === z.positionId) || {};
+    return `<div class="list-item">
+      <div><strong>${escHtml(personName(z.personId))}</strong> → ${escHtml(pos.name || z.positionId)}
+        <div class="item-meta">${z.datumISO} · ${TAG_LABEL[wochentag(z.datumISO)]}</div></div>
+      <button class="icon-btn" data-idx="${i}">×</button>
+    </div>`;
+  }).join('');
+  c.querySelectorAll('button[data-idx]').forEach(btn => btn.addEventListener('click', () => {
+    manuelleZuweisungen.splice(Number(btn.dataset.idx), 1);
+    renderManuelleZuweisungen();
+  }));
+}
+
+document.getElementById('btn-verteilen').addEventListener('click', () => {
+  let wochenStart = document.getElementById('wochen-start').value;
+  if (!wochenStart) { alert('Bitte den Montag der Woche wählen.'); return; }
+  const korrigiert = schnappeAufMontag(wochenStart);
+  if (korrigiert !== wochenStart) {
+    wochenStart = korrigiert;
+    document.getElementById('wochen-start').value = wochenStart;
+  }
+  aktuellerWochenStart = wochenStart;
+  const btn = document.getElementById('btn-verteilen');
+  btn.disabled = true; btn.textContent = 'Berechne …';
+  setTimeout(() => {
+    berechneUndRenderWoche(wochenStart);
+    btn.disabled = false; btn.textContent = 'Freie Tage verteilen & Woche besetzen';
+  }, 30);
+});
+
+document.getElementById('btn-varianten').addEventListener('click', () => {
+  let wochenStart = document.getElementById('wochen-start').value;
+  if (!wochenStart) { alert('Bitte den Montag der Woche wählen.'); return; }
+  wochenStart = schnappeAufMontag(wochenStart);
+  document.getElementById('wochen-start').value = wochenStart;
+  aktuellerWochenStart = wochenStart;
+  const btn = document.getElementById('btn-varianten');
+  btn.disabled = true; btn.textContent = 'Berechne …';
+  setTimeout(() => {
+    const varianten = verteileFreieTageVarianten(wochenStart, personen, positionen, ereignisse, { varianten: 3, wunschtage, wichtigeWunschtage, manuelleZuweisungen, ausgeschlosseneTage: sammleAusgeschlosseneTage(wochenStart) });
+    renderVarianten(wochenStart, varianten);
+    btn.disabled = false; btn.textContent = '3 Varianten anzeigen';
+  }, 30);
+});
+
+function renderVarianten(wochenStart, varianten) {
+  let html = `<div class="card"><h3 style="margin-top:0;">${varianten.length} Varianten gefunden</h3>`;
+  html += varianten.map((v, i) => {
+    const freieTageText = v.ereignisse.map(e => `${escHtml(personName(e.personId))} ${TAG_LABEL[wochentag(e.von)]}`).join(', ');
+    return `<div class="pos-row" style="flex-direction:column; align-items:flex-start; padding:10px;">
+      <div style="display:flex; justify-content:space-between; width:100%;">
+        <strong>Variante ${i + 1}</strong>
+        <span>${v.luecken} Lücken</span>
+      </div>
+      <div class="item-meta" style="margin:6px 0;">${freieTageText}</div>
+      <button class="btn-cross" data-idx="${i}">Diese Variante übernehmen</button>
+    </div>`;
+  }).join('');
+  html += `</div>`;
+  document.getElementById('ergebnis').innerHTML = html;
+  document.getElementById('ergebnis').querySelectorAll('button[data-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const variante = varianten[Number(btn.dataset.idx)];
+      // Korrektur 09.09.2026 (Ulf): "übernehmen" hieß bisher nur
+      // einmalig anzeigen, nicht wirklich speichern — bei der
+      // nächsten Änderung war die Variante wieder weg. Jetzt echt
+      // dauerhaft wie bei "Freie Tage verteilen".
+      persistiereFreieTage(wochenStart, variante.ereignisse);
+      aktuellerWochenStart = wochenStart;
+      renderAktuelleWoche(wochenStart);
+    });
+  });
+}
+
+// Hinweis 09.09.2026 (Ulf): die frühere "eng"-Berechnung über den
+// ganzen aktiven Zeitraum einer Position (ersterUndLetzterNoetigerTag,
+// gebaut am 05.09.2026 wegen einer versehentlichen Wochen-Bindung bei
+// einer Person)
+// ist raus — beide Cross-Schicht-Knöpfe binden jetzt direkt an den
+// Tag, an dem die Lücke auftrat (siehe Klick-Handler unten). Löst
+// diesen Fall gleich mit, nur direkter.
+
+// Klick auf einen der beiden Cross-Schicht-Knöpfe bei einem
+// manuelle-Prüfung-Vorschlag: bezieht sich jetzt fest auf den Tag, an
+// dem die Lücke tatsächlich auftrat (09.09.2026, Ulfs Konditorei-Fall
+// — vorher band das auch "eng" oft über die ganze Woche, weil die
+// betroffene Position an fast jedem Tag aktiv war). "eng" bindet nur
+// an diese eine Position an diesem Tag; "breit" an die ganze
+// Zielschicht, aber ebenfalls nur an diesem einen Tag.
+document.getElementById('ergebnis').addEventListener('click', (e) => {
+  const freistellenBtn = e.target.closest('.btn-freistellen');
+  if (freistellenBtn) {
+    const datum = freistellenBtn.dataset.datum;
+    const sel = document.querySelector(`.freistellen-auswahl[data-datum="${CSS.escape(datum)}"]`);
+    const personId = sel ? sel.value : '';
+    if (!personId) { alert('Bitte eine Person auswählen.'); return; }
+    ereignisse.push({ personId, von: datum, bis: datum, grund: 'freierTag', bindend: true, folgtFreierTag: false, begruendung: null });
+    renderEreignisse();
+    renderAktuelleWoche(aktuellerWochenStart);
+    return;
+  }
+  const btn = e.target.closest('.btn-cross');
+  if (btn && aktuellerWochenStart) {
+    const personId = btn.dataset.person;
+    const zielSchicht = btn.dataset.schicht;
+    const scope = btn.dataset.scope;
+    const datum = btn.dataset.datum;
+    if (!datum) return;
+    const zielPosition = scope === 'eng' ? btn.dataset.position : null;
+    ereignisse.push({ personId, von: datum, bis: datum, grund: 'crossSchichtEinsatz', zielSchicht, zielPosition, bindend: false, begruendung: null });
+    renderAktuelleWoche(aktuellerWochenStart);
+    return;
+  }
+  const tauschBtn = e.target.closest('.btn-tausch');
+  if (tauschBtn && aktuellerWochenStart) {
+    fuehreTauschAus(tauschBtn.dataset.person, tauschBtn.dataset.von, tauschBtn.dataset.auf);
+    renderEreignisse();
+    renderAktuelleWoche(aktuellerWochenStart);
+    return;
+  }
+  const umleitungBtn = e.target.closest('.btn-umleitung');
+  if (umleitungBtn && aktuellerWochenStart) {
+    wendeUmleitungAn(umleitungBtn.dataset.x, umleitungBtn.dataset.p, umleitungBtn.dataset.q, umleitungBtn.dataset.y, umleitungBtn.dataset.datum, umleitungBtn.dataset.ersatz || null);
+    renderEreignisse();
+    renderManuelleZuweisungen();
+    renderAktuelleWoche(aktuellerWochenStart);
+  }
+});
+// Neu 09.09.2026 (Ulf): direkte Umbesetzung einer Position über das
+// Dropdown im Plan, statt erst zum "Manuelle Zuweisung"-Formular
+// scrollen und Datum/Schicht/Position erneut auswählen zu müssen.
+// Schreibt in dieselbe `manuelleZuweisungen`-Liste wie das Formular —
+// beide bleiben also synchron und gegenseitig sichtbar/löschbar.
+document.getElementById('ergebnis').addEventListener('change', (e) => {
+  const sel = e.target.closest('.zuweisung-dropdown');
+  if (!sel || !aktuellerWochenStart) return;
+  const datumISO = sel.dataset.datum;
+  const positionId = sel.dataset.position;
+  const personId = sel.value;
+  manuelleZuweisungen = manuelleZuweisungen.filter(z => !(z.datumISO === datumISO && z.positionId === positionId));
+  if (personId) manuelleZuweisungen.push({ datumISO, positionId, personId });
+  renderManuelleZuweisungen();
+  renderAktuelleWoche(aktuellerWochenStart);
+});
+
+function renderWochenErgebnis(wochenStart, verteilung, tagesErgebnisse) {
+  const gesamtLuecken = tagesErgebnisse.reduce((sum, t) => sum + t.ergebnis.nacht.luecken.length + t.ergebnis.frueh.luecken.length + t.ergebnis.sonntag.luecken.length, 0);
+  const anzahlWunschtage = Object.keys(wunschtage).length;
+
+  let html = `<div class="stats">
+    <div class="stat-box ${gesamtLuecken === 0 ? 'gut' : 'schlecht'}"><div class="zahl">${gesamtLuecken}</div><div class="label">Lücken gesamt</div></div>
+    <div class="stat-box"><div class="zahl">${verteilung.wunschtageErfuellt}/${anzahlWunschtage}</div><div class="label">Wunschtage erfüllt</div></div>
+  </div>`;
+
+  if (verteilung.unerfuellteWichtigeWuensche && verteilung.unerfuellteWichtigeWuensche.length) {
+    html += `<div class="item-meta" style="color:#8a5a2e; margin:6px 0;">⭐ Nicht erfüllt trotz Wichtig-Markierung: ${verteilung.unerfuellteWichtigeWuensche.map(w => `${escHtml(personName(w.personId))} (${TAG_LABEL[wochentag(w.datumISO)]})`).join(', ')}</div>`;
+  }
+
+  html += `<div class="frei-uebersicht">` + verteilung.ereignisse.map(e =>
+    `<div class="frei-chip">${personLink(e.personId)} <span class="tag">${TAG_LABEL[wochentag(e.von)]}</span> frei</div>`
+  ).join('') + `</div>`;
+
+  // Ergänzt 09.09.2026 (Ulf, Person L-Fall) — SchichtPlaner benennt
+  // eine Nachtschicht nach dem Tag, FÜR den sie ist, nicht nach dem
+  // Tag, an dem sie beginnt: "Nacht [Dienstag]" startet bereits
+  // Montagabend (Ulf: Frühschichtende ~13 Uhr, Nachtschichtbeginn ~20
+  // Uhr, je nach Position etwas später). Der relevante Vergleichstag
+  // für eine Cross-Schicht-Bestätigung in die Nacht ist deshalb der
+  // VORTAG, nicht derselbe datumISO — das prüfte bisher nichts. Die
+  // andere Richtung (Nacht endet morgens, dieselbe Person selben Tag
+  // in die Früh) ist bereits strukturell ausgeschlossen (`verplant`
+  // wird pro Tag über beide Schichten hinweg geführt, s.
+  // rechenmodul.js), braucht also keinen eigenen Check. Reiner
+  // Hinweis, keine Blockade — passt zum "Vermerk statt echter
+  // Uhrzeiten-Rechnung"-Prinzip; die 13/20-Uhr-Angabe ist Ulfs grober
+  // Richtwert, keine exakte Positions-Uhrzeit.
+  const fruehAnwesendJeTag = {};
+  for (const { datumISO, ergebnis } of tagesErgebnisse) {
+    const anwesend = new Set(Object.values(ergebnis.frueh.zuweisungen));
+    for (const id of (ergebnis.ueberzaehlig || [])) {
+      const p = personen.find(pp => pp.id === id);
+      if (p && p.stammschicht === 'frueh') anwesend.add(id);
+    }
+    fruehAnwesendJeTag[datumISO] = anwesend;
+  }
+
+  for (const { datumISO, ergebnis } of tagesErgebnisse) {
+    const tagLabel = TAG_LABEL[wochentag(datumISO)];
+    // Wer heute per Frühschicht-Einsatz aus der Nachtschicht raus ist
+    // — separat von "Ohne Position, aber da", weil das kein Zufall
+    // ist, sondern eine gezielte Zuweisung (09.09.2026).
+    const fruehschichtEinsatzHeute = ereignisse
+      .filter(e => e.grund === 'fruehschichtEinsatz' && e.bindend && e.von <= datumISO && datumISO <= e.bis)
+      .map(e => e.personId);
+    // Dedupliziert nach (personId, von, grund) — verhindert Doppel-
+    // Anzeige, seit freie-Tage-Ereignisse dauerhaft in `ereignisse`
+    // landen (09.09.2026, siehe persistiereFreieTage) UND weiterhin
+    // separat über `verteilung.ereignisse` für die Übersichts-Chips
+    // oben gereicht werden.
+    const gesehenSignaturen = new Set();
+    const alleEreignisseFuerTag = ereignisse.concat(verteilung.ereignisse).filter(e => {
+      if (!e.bindend || e.von > datumISO || datumISO > e.bis) return false;
+      if (e.grund === 'fruehschichtEinsatz') return false; // kein echtes Fehlen, eigene Anzeige bei der Frühschicht
+      const signatur = e.personId + '|' + e.von + '|' + e.grund;
+      if (gesehenSignaturen.has(signatur)) return false;
+      gesehenSignaturen.add(signatur);
+      return true;
+    });
+    const freiHeuteHtml = alleEreignisseFuerTag.length
+      ? `<div class="item-meta" style="margin-bottom:10px;">Frei: ${alleEreignisseFuerTag.map(e => `${personLink(e.personId)} (${GRUND_LABEL[e.grund] || e.grund})`).join(', ')}</div>`
+      : `<div class="item-meta" style="margin-bottom:10px;">Niemand hat heute regulär frei.</div>`;
+    // Neu 09.09.2026 (Ulf: "geht noch nicht mit freien Tag") — direkt
+    // im Tages-Kärtchen jemanden für GENAU diesen Tag freistellen,
+    // ohne erst zum Ereignis-Formular weiter oben scrollen zu müssen.
+    // Schreibt ein normales `grund: 'freierTag'`-Ereignis, taucht also
+    // auch in "Bestehende Verfügbarkeits-Ereignisse" auf und ist dort
+    // wieder entfernbar.
+    const freistellenHtml = `<div class="row" style="margin-bottom:12px; align-items:flex-end; gap:6px;">
+      <div style="flex:1; min-width:0;"><select class="freistellen-auswahl" data-datum="${datumISO}" style="width:100%; font-size:0.8rem;">
+        <option value="">Person freistellen …</option>
+        ${personen.filter(p => p.aktiv).map(p => `<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('')}
+      </select></div>
+      <button class="btn-freistellen" data-datum="${datumISO}" style="font-size:0.78rem; padding:8px 10px; white-space:nowrap;">Frei setzen</button>
+    </div>`;
+    // Präzisiert 09.09.2026 (Ulf): überzählige Personen nach ihrer
+    // Stammschicht gruppieren statt in einer Flachliste — sie sind ja
+    // da und arbeiten, nur ohne feste Position an diesem Tag.
+    const ueberzaehligeByStammschicht = { nacht: [], frueh: [] };
+    for (const id of (ergebnis.ueberzaehlig || [])) {
+      const p = personen.find(pp => pp.id === id);
+      if (p && ueberzaehligeByStammschicht[p.stammschicht]) ueberzaehligeByStammschicht[p.stammschicht].push(id);
+    }
+    html += `<div class="tag-card card"><h3>${tagLabel} · ${datumISO}</h3>${freiHeuteHtml}${freistellenHtml}`;
+    for (const schicht of ['nacht', 'frueh', 'sonntag']) {
+      const e = ergebnis[schicht];
+      const ueberzaehligeHier = ueberzaehligeByStammschicht[schicht] || [];
+      const hatFruehschichtEinsatzHeute = schicht === 'frueh' && fruehschichtEinsatzHeute.length > 0;
+      if (e.aktivePositionen.length === 0 && !ueberzaehligeHier.length && !hatFruehschichtEinsatzHeute) continue;
+      html += `<div class="schicht-zeile"><div class="schicht-titel">${SCHICHT_LABEL[schicht]}</div>`;
+      html += e.aktivePositionen.map(pos => {
+        const zugewiesen = e.zuweisungen[pos.id];
+        const istLuecke = e.luecken.includes(pos.id);
+        const lehrlinge = (ergebnis.lehrschicht || []).filter(l => l.positionId === pos.id && l.begleitetPersonId === zugewiesen);
+        const lehrschichtHtml = lehrlinge.length
+          ? `<div class="item-meta" style="margin-top:2px;">+ Lehrschicht: ${lehrlinge.map(l => personLink(l.personId)).join(', ')}</div>`
+          : '';
+        // Ergänzt 09.09.2026 (Ulf: "im alten System wurden auch Tausch-
+        // möglichkeiten zwischen Tagen vorgeschlagen — wir greifen sehr
+        // schnell auf Cross-Schicht zurück") — mildere Alternative zur
+        // Cross-Schicht-Bestätigung: kein Schichtwechsel, nur jemandes
+        // freier Tag innerhalb der Woche verschoben.
+        let tauschHtml = '';
+        if (istLuecke) {
+          const vorschlag = findeTauschVorschlag(pos.id, datumISO, wochenStart);
+          if (vorschlag) {
+            tauschHtml = `<div class="item-meta" style="margin-top:4px; color:#2e6b8a;">
+              💡 ${personLink(vorschlag.personId)}s freien Tag von ${TAG_LABEL[wochentag(vorschlag.vonTag)]} auf ${TAG_LABEL[wochentag(vorschlag.aufTag)]} verschieben — löst diese Lücke, ganz ohne Cross-Schicht.
+              <button class="btn-tausch" data-person="${escHtml(vorschlag.personId)}" data-von="${vorschlag.vonTag}" data-auf="${vorschlag.aufTag}" style="display:block; margin-top:4px; padding:3px 9px; font-size:0.72rem;">Tauschen</button>
+            </div>`;
+          } else {
+            const umleitung = findeUmleitungsVorschlag(pos.id, datumISO, wochenStart);
+            if (umleitung) {
+              tauschHtml = `<div class="item-meta" style="margin-top:4px; color:#8a5a2e;">
+                🔀 ${personLink(umleitung.xId)} übernimmt diese Position, ${personLink(umleitung.yId)} übernimmt dafür ${escHtml(umleitung.qName)}${umleitung.ersatzTag
+                  ? ` — ${personLink(umleitung.yId)} bekommt den freien Tag stattdessen ${TAG_LABEL[wochentag(umleitung.ersatzTag)]}. Kostet niemanden etwas.`
+                  : ` — ${personLink(umleitung.yId)} hätte diese Woche dann keinen freien Tag mehr, kein Ersatztag gefunden.`}
+                <button class="btn-umleitung" data-x="${escHtml(umleitung.xId)}" data-p="${escHtml(umleitung.pId)}" data-q="${escHtml(umleitung.qId)}" data-y="${escHtml(umleitung.yId)}" data-datum="${datumISO}" data-ersatz="${umleitung.ersatzTag || ''}" style="display:block; margin-top:4px; padding:3px 9px; font-size:0.72rem;">Umleiten</button>
+              </div>`;
+            }
+          }
+        }
+        return `<div class="pos-row ${istLuecke ? 'luecke' : ''}" style="flex-direction:column; align-items:flex-start;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+            <span>${escHtml(pos.name)}</span>
+            <select class="zuweisung-dropdown" data-datum="${datumISO}" data-position="${pos.id}" style="max-width:58%; font-size:0.8rem;">
+              ${optionenFuerPosition(pos, zugewiesen)}
+            </select>
+          </div>
+          ${lehrschichtHtml}
+          ${tauschHtml}
+        </div>`;
+      }).join('');
+      if (ueberzaehligeHier.length) {
+        // Präzisiert 09.09.2026 (Ulfs Nachfrage): sichtbar machen,
+        // WARUM jemand ohne Position da ist — dauerhaft gesperrt für
+        // diese Schicht (gesperrteSchichten) vs. heute nur zufällig
+        // überzählig. Beides landet weiterhin in derselben Zeile
+        // (bleibt bei ihrer Stammschicht sichtbar), aber mit Hinweis.
+        const eintraege = ueberzaehligeHier.map(id => {
+          const p = personen.find(pp => pp.id === id);
+          const gesperrt = p && p.gesperrteSchichten && p.gesperrteSchichten.includes(schicht);
+          return personLink(id) + (gesperrt ? ' <span class="item-meta">(gesperrt)</span>' : '');
+        });
+        html += `<div class="item-meta" style="margin-top:6px;">Ohne Position, aber da: ${eintraege.join(', ')}</div>`;
+        // Ergänzt 09.09.2026 (Ulf: reiner Hinweis, kein automatisches
+        // Auslösen — "nach Arbeitsaufkommen entscheiden" bleibt seine
+        // Entscheidung, das System kennt das Arbeitsaufkommen nicht).
+        // Bewusst nur Mo–Fr, nicht Samstag: dort ist ein Überschuss
+        // erwünschte Reserve (§ Bewertung oben), keine Verschwendung —
+        // dieselbe Ausnahme wie bei wochentagUeberschussNacht.
+        if (schicht === 'nacht' && wochentag(datumISO) !== 'sa') {
+          html += `<div class="item-meta" style="margin-top:2px; color:#8a5a2e;">In der Nachtschicht gibt es einen personellen Überschuss.</div>`;
+        }
+      }
+      if (schicht === 'frueh' && fruehschichtEinsatzHeute.length) {
+        html += `<div class="item-meta" style="margin-top:6px;">+ Frühschicht-Einsatz: ${fruehschichtEinsatzHeute.map(id => personLink(id)).join(', ')}</div>`;
+      }
+      if (e.manuellePruefung.length) {
+        // Korrektur 09.09.2026 (Ulf, Konditorei-Fall): die beiden
+        // Knöpfe bezogen sich zuvor auf alle Tage, an denen die
+        // Position in der Woche aktiv ist — bei Positionen mit Mo–Sa
+        // quasi die ganze Woche. Bestätigt wurde aber immer nur die
+        // Lücke EINES konkreten Tages. Jetzt beide Knöpfe fest auf
+        // `datumISO` (diesen Tag) beschränkt — der Unterschied
+        // zwischen "eng"/"breit" ist jetzt nur noch die Position
+        // (nur diese eine vs. die ganze Schicht an diesem Tag), nicht
+        // mehr der Zeitraum.
+        html += `<div class="pruefung-box">${e.manuellePruefung.map(m => {
+          const pos = positionen.find(p => p.id === m.positionId) || {};
+          let vortagWarnung = '';
+          if (schicht === 'nacht') {
+            const vortag = vorherigerTag(datumISO);
+            const vortagSet = fruehAnwesendJeTag[vortag];
+            if (vortagSet && vortagSet.has(m.personId)) {
+              vortagWarnung = `<div class="item-meta" style="color:#b45309; margin:2px 0 4px;">⚠ war laut Plan am Vortag (${vortag}) in der Frühschicht — Nachtschicht beginnt schon abends, grob gerechnet (Frühschichtende ~13 Uhr, Nachtschichtbeginn ~20 Uhr) nur ~7 Std. Pause. Unter der gesetzlichen Mindestruhezeit von 11 Std. (§5 ArbZG).</div>`;
+            }
+          }
+          return `
+          <div style="margin-bottom:8px;">
+            ${personLink(m.personId)} für ${escHtml(pos.name || m.positionId)} — manuelle Prüfung<br>
+            ${vortagWarnung}
+            <button class="btn-cross" data-person="${escHtml(m.personId)}" data-schicht="${schicht}" data-position="${escHtml(m.positionId)}" data-datum="${datumISO}" data-scope="eng" style="margin:4px 6px 0 0;padding:3px 9px;font-size:0.72rem;">nur für ${escHtml(pos.name)}, heute</button>
+            <button class="btn-cross" data-person="${escHtml(m.personId)}" data-schicht="${schicht}" data-position="" data-datum="${datumISO}" data-scope="breit" style="margin:4px 0 0 0;padding:3px 9px;font-size:0.72rem;">für die ganze ${SCHICHT_LABEL[schicht]}, heute</button>
+          </div>`;
+        }).join('')}</div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  document.getElementById('ergebnis').innerHTML = html;
+}
+
+document.getElementById('btn-import-pools').addEventListener('click', () => document.getElementById('import-input').click());
+document.getElementById('import-input').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      positionen = data.positions || data;
+      document.getElementById('daten-status').textContent = 'Eigene Datei geladen: ' + file.name;
+    } catch (err) { alert('Datei konnte nicht gelesen werden.'); }
+  };
+  reader.readAsText(file); e.target.value = '';
+});
+
+document.getElementById('btn-export-sitzung').addEventListener('click', () => {
+  const sitzung = {
+    exportiertAm: new Date().toISOString(),
+    wochenStart: document.getElementById('wochen-start').value,
+    personen, positionen, ereignisse, wunschtage, wichtigeWunschtage, wochenAusgleich, manuelleZuweisungen
+  };
+  const blob = new Blob([JSON.stringify(sitzung, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'wochen_spielwiese_sitzung.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('btn-import-sitzung').addEventListener('click', () => document.getElementById('import-sitzung-input').click());
+document.getElementById('import-sitzung-input').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.personen) personen = data.personen;
+      if (data.positionen) positionen = data.positionen;
+      if (data.ereignisse) ereignisse = data.ereignisse;
+      if (data.wunschtage) wunschtage = data.wunschtage;
+      if (data.wichtigeWunschtage) wichtigeWunschtage = data.wichtigeWunschtage;
+      if (data.wochenAusgleich) wochenAusgleich = data.wochenAusgleich;
+      if (data.manuelleZuweisungen) manuelleZuweisungen = data.manuelleZuweisungen;
+      if (data.wochenStart) document.getElementById('wochen-start').value = data.wochenStart;
+      initSelects();
+      renderPersonenListe(); renderEreignisse(); renderWunschtage(); renderAusgleichListe(); renderManuelleZuweisungen();
+      document.getElementById('daten-status').textContent = 'Sitzung geladen aus: ' + file.name;
+    } catch (err) { alert('Datei konnte nicht gelesen werden.'); }
+  };
+  reader.readAsText(file); e.target.value = '';
+});
+
+function naechsterMontag() {
+  const jetzt = new Date();
+  const heuteISO = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, '0')}-${String(jetzt.getDate()).padStart(2, '0')}`;
+  const d = new Date(heuteISO + 'T00:00:00Z');
+  const tag = d.getUTCDay(); const diff = (tag === 1) ? 0 : (8 - tag) % 7;
+  d.setUTCDate(d.getUTCDate() + diff); return d.toISOString().slice(0, 10);
+}
+
+// ============ Was-wäre-wenn-Simulator ============
+// Berechnet eine komplette Mo-Sa-Woche mit ZUSÄTZLICHEN (rein
+// hypothetischen) Ereignissen, ohne die echten `ereignisse` zu
+// verändern — Grundlage für den Vorher/Nachher-Vergleich.
+function berechneWocheMitZusatz(wochenStart, zusatzEreignisse) {
+  const testBasis = ereignisse.concat(zusatzEreignisse);
+  const verteilung = verteileFreieTage(wochenStart, personen, positionen, testBasis, { wunschtage, wichtigeWunschtage, manuelleZuweisungen, ausgeschlosseneTage: sammleAusgeschlosseneTage(wochenStart) });
+  const alleEreignisse = testBasis.concat(verteilung.ereignisse);
+  const tage = wochentageMoSa(wochenStart);
+  return tage.map(datumISO => ({ datumISO, ergebnis: berechneTagAlleSchichten(datumISO, personen, positionen, alleEreignisse, manuelleZuweisungen) }));
+}
+function lueckenSchluessel(tagesErgebnisse) {
+  const liste = [];
+  for (const { datumISO, ergebnis } of tagesErgebnisse) {
+    for (const schicht of ['nacht', 'frueh', 'sonntag']) {
+      for (const posId of ergebnis[schicht].luecken) {
+        liste.push({ schluessel: datumISO + '|' + schicht + '|' + posId, datumISO, schicht, posId });
+      }
+    }
+  }
+  return liste;
+}
+function lueckenLabel(eintrag) {
+  const posName = (positionen.find(p => p.id === eintrag.posId) || {}).name || eintrag.posId;
+  return `${TAG_LABEL[wochentag(eintrag.datumISO)]} · ${SCHICHT_LABEL[eintrag.schicht]} · ${posName}`;
+}
+
+let letzteSimulation = null;
+
+document.getElementById('btn-simulieren').addEventListener('click', () => {
+  const personId = document.getElementById('sim-person').value;
+  const zielSchicht = document.getElementById('sim-schicht').value;
+  const zielPosition = document.getElementById('sim-position').value || null;
+  const von = document.getElementById('sim-von').value;
+  const bis = document.getElementById('sim-bis').value || von;
+  if (!von) { alert('Bitte mindestens ein "Von"-Datum wählen.'); return; }
+
+  const wochenStart = aktuellerWochenStart || schnappeAufMontag(von);
+  const btn = document.getElementById('btn-simulieren');
+  btn.disabled = true; btn.textContent = 'Simuliere …';
+
+  setTimeout(() => {
+    const hypothetischesEreignis = { personId, von, bis, grund: 'crossSchichtEinsatz', zielSchicht, zielPosition, bindend: false, begruendung: null };
+    const vorher = berechneWocheMitZusatz(wochenStart, []);
+    const nachher = berechneWocheMitZusatz(wochenStart, [hypothetischesEreignis]);
+
+    const vorherListe = lueckenSchluessel(vorher);
+    const nachherListe = lueckenSchluessel(nachher);
+    const vorherSet = new Set(vorherListe.map(x => x.schluessel));
+    const nachherSet = new Set(nachherListe.map(x => x.schluessel));
+    const geloest = vorherListe.filter(x => !nachherSet.has(x.schluessel));
+    const neu = nachherListe.filter(x => !vorherSet.has(x.schluessel));
+
+    letzteSimulation = hypothetischesEreignis;
+    renderSimulation(vorherListe.length, nachherListe.length, geloest, neu, personId, zielSchicht, zielPosition, von, bis);
+    btn.disabled = false; btn.textContent = 'Simulieren';
+  }, 30);
+});
+
+function renderSimulation(vorherN, nachherN, geloest, neu, personId, zielSchicht, zielPosition, von, bis) {
+  const posName = zielPosition ? (positionen.find(p => p.id === zielPosition) || {}).name : null;
+  let html = `<div class="card">
+    <div class="item-meta" style="margin-bottom:10px;">
+      ${escHtml(personName(personId))} testweise in ${SCHICHT_LABEL[zielSchicht]}${posName ? ' (nur ' + escHtml(posName) + ')' : ' (alle Positionen)'},
+      ${von}${bis !== von ? ' bis ' + bis : ''}
+    </div>
+    <div class="stats">
+      <div class="stat-box"><div class="zahl">${vorherN}</div><div class="label">Lücken vorher</div></div>
+      <div class="stat-box ${nachherN < vorherN ? 'gut' : (nachherN > vorherN ? 'schlecht' : '')}"><div class="zahl">${nachherN}</div><div class="label">Lücken nachher</div></div>
+    </div>`;
+  if (geloest.length) {
+    html += `<div class="item-meta" style="margin-bottom:6px;"><strong style="color:var(--good);">Gelöst:</strong> ${geloest.map(lueckenLabel).join(', ')}</div>`;
+  }
+  if (neu.length) {
+    html += `<div class="item-meta" style="margin-bottom:6px;"><strong style="color:var(--bad);">Neu entstanden:</strong> ${neu.map(lueckenLabel).join(', ')}</div>`;
+  }
+  if (!geloest.length && !neu.length) {
+    html += `<div class="item-meta">Kein Unterschied zur aktuellen Lage.</div>`;
+  }
+  html += `<button class="btn-primary" id="btn-simulation-uebernehmen" style="margin-top:10px;">Diese Zuweisung übernehmen</button></div>`;
+  document.getElementById('simulation-ergebnis').innerHTML = html;
+  document.getElementById('btn-simulation-uebernehmen').addEventListener('click', () => {
+    ereignisse.push(letzteSimulation);
+    renderEreignisse();
+    if (aktuellerWochenStart) renderAktuelleWoche(aktuellerWochenStart);
+    document.getElementById('simulation-ergebnis').innerHTML = '<div class="item-meta">Übernommen — steht jetzt in den Ereignissen oben.</div>';
+  });
+}
+
+initSelects();
+document.getElementById('wochen-start').value = naechsterMontag();
+document.getElementById('sim-von').value = naechsterMontag();
+document.getElementById('mz-datum').value = naechsterMontag();
+renderManuelleZuweisungen();
+renderPersonenListe();
+renderAusgleichListe();
+</script>
+
+</body>
+</html>

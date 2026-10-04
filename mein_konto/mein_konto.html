@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Mein Konto · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: mein_konto.html
+  ZWECK: Eigenständiger Satellit (wie wunschtag.html/urlaub_anfrage.html),
+         zeigt EINER Person ihre eigenen drei Ausgleichskonto-Werte
+         (Saldo, Samstag-/Montag-Kombi, Wunschtag-Score) — die
+         personalisierte Ansicht, die über die Hub-Kachel
+         bankkonto.html technisch nicht ging (Launcher-Profile sind
+         nicht mit SchichtPlaner-Personen verknüpft, siehe dortiger
+         Kopf). Über den bestehenden Konto-Login (bos_standalone_login.js)
+         geht es sehr wohl: dort läuft dieselbe bosKontoId, die auch
+         Wunschtag/Urlaub-Anfrage/Sonntag-Ablehnung nutzen, um sich
+         später einer Person zuordnen zu lassen.
+  ANLASS: Ulf, 12.09.2026 — Bankkonto (Hub-Kachel) war für alle vier
+         Rollen sichtbar, zeigte aber JEDEN vollständig ("vertrauliche
+         Daten... nicht vor den Augen der Kollegen"). Zwei-Teil-Lösung:
+         (1) bankkonto.html auf admin/produktionsleitung eingeschränkt
+         (siehe dortiger Changelog), (2) dieser Satellit hier für die
+         persönliche Ansicht.
+  DATENFLUSS: bos_standalone_login.js (Login-Kette, siehe Kopf-Kommentar
+         dort) → aktives Profil → kontoId → Firestore personen (Suche
+         nach bosKontoId === kontoId) → falls gefunden: Firestore
+         konten/<personId> lesen → Anzeige. Seit Schritt 6 (27.09.2026)
+         zusätzlich: namen lesen, namen/<eigene Nummer>.rufname schreiben.
+  SCHNITTSTELLEN: Firestore personen (nur lesend, Suche nach bosKontoId),
+         konten/<personId> (nur lesend, siehe ausgleichskonto_berechnung.js
+         für das Schema und AUSGLEICHSKONTO_DOKU.md für die Punktwerte).
+  BEKANNTE OFFENE PUNKTE:
+    - Ohne verknüpftes Konto (bosKontoId noch nicht in personen_editor.html
+      oder konten_verwaltung.html eingetragen) zeigt diese Seite einen
+      klaren Hinweis statt Zahlen — kein Fallback-Rateversuch über den
+      Namen, da das zu falschen Zuordnungen führen könnte.
+    - Keine Historie der einzelnen Wochen-Beiträge, nur der laufende
+      Gesamtstand — wie bankkonto.html.
+
+  CHANGELOG
+    2026-09-27 · v-Namensfundament-6 · Feature (Schritt 6, NE-5, NE-6, NF-26)
+      - „Dein Name im Plan“: Feld für den eigenen Rufnamen (höchstens 20
+        Zeichen, nur Text), Speichern und Leeren. Geschrieben wird nur
+        namen/<eigene Nummer>.rufname über die normale Sitzung (Regel seit
+        Schritt 3, Besitzer-Zweig). Gibt es den Namen schon bei einer
+        anderen Person (Rufname oder Beschreibung, ohne Groß/Klein und
+        Randleerzeichen): „Den gibt es schon, magst du etwas
+        dazuschreiben?“ — gespeichert wird erst ein anderer Name (Prüfung
+        nur hier, NE-5). Ohne Rufnamen ein freundlicher Hinweis, wie man im
+        Plan heißt. Ohne Namenseintrag: Hinweis „Ulf trägt ihn ein“. Konto
+        ohne verknüpfte Person: kein Feld, der bisherige Hinweis bleibt.
+      - Oben steht der Name aus der Namensliste (Rufname, sonst
+        Beschreibung) statt der Konto-Notiz.
+      - NF-26: der Alttext „echtes Konto … (Vorname, Geburtsdatum, PIN)“
+        ist raus; jetzt: an der Tür mit Kennung und Passwort anmelden.
+      - DATENFLUSS erweitert: liest namen (alle, einmal), schreibt
+        namen/<eigene Nummer>.rufname.
+    2026-09-26 · v-Namensfundament · Fix (N-12, Kontroll-Chat)
+      Sind mehrere Personen mit dem eigenen Konto verknüpft, zeigt die Seite
+      keine Zahlen mehr, sondern die Nummern und die Bitte, Ulf Bescheid zu
+      geben. Vorher: still die erste Person (snap.docs[0]) — womöglich ein
+      fremder Kontostand. Normalfall (genau eine Person) unverändert.
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Login wie Wunschtag, zeigt bei verknüpftem Konto
+      die eigenen vier Werte, sonst einen Hinweis zur Verknüpfung.
+    2026-09-12 · 23:05 · v0.2 · Feature
+      Fünfter Wert "Schuld (Einsprünge)" ergänzt -- freieTageSchuld aus
+      krankmelder.html (Baustein 3).
+    2026-09-16 · 10:14 · v0.3 · Feature (T-72)
+      Sechster Wert "Gezählte Wochen" (wochenGezaehlt). bankkonto.html
+      hatte ihn seit dem 15.09., die persönliche Ansicht nicht -- also
+      ausgerechnet dort nicht, wo er am meisten hilft: ohne ihn steht
+      der Saldo ohne Bezugsgröße da, und "niedrig" heißt vielleicht
+      "war wenig Wochen dabei" statt "hat wenig bekommen".
+    2026-09-16 · 22:05 · v0.4 · Fix (T-77)
+      bos_theme_sync.js eingebunden. UND bos_design_tokens.css, die hier als einziger Seite ganz fehlte -- die --bos-*-Tokens waren dadurch undefiniert und es griffen durchgehend die fest eingebauten Dunkel-Fallbacks des lokalen :root-Blocks. Das data-theme="dark" am
+      <html>-Tag galt damit unabhaengig vom Launcher-Profil -- die Seite
+      lief IMMER dunkel, egal was der Nutzer eingestellt hatte. Genau das
+      Problem, das am 28.08.2026 fuer die Hub-Kacheln geloest wurde
+      (SESSION_2026-08-28_THEME_SYNC.md); dieser Satellit entstand am
+      12.09. und hat den Einbau nie bekommen. Gefunden durch Ulfs Frage
+      "ist Systemdesign denn ueberhaupt eingebunden?".
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Ergaenzt 16.09.2026 (T-77): bos_theme_sync.js liest das Theme des
+     aktiven Launcher-Profils und setzt data-theme auf DIESEM Dokument --
+     jede Seite laeuft in einem eigenen iframe-Fenster, ein data-theme des
+     Launchers gilt hier nicht automatisch. MUSS vor bos_design_tokens.css
+     stehen, sonst blitzt kurz das falsche Theme auf. Das data-theme="dark"
+     am <html>-Tag bleibt bewusst als Vorbelegung stehen: es gilt, bis das
+     Skript laeuft, und auch dann, wenn es (etwa bei einem stumm
+     fehlgeschlagenen Script-Load, siehe T-74) gar nicht laeuft. -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:480px; margin:0 auto;}
+  .warte-box{ text-align:center; padding: var(--bos-space-xl,40px) var(--bos-space-md,20px); color:var(--dim); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); font-size: var(--bos-font-md,.94rem); line-height:1.6; }
+  .warte-box.fehler{color:var(--danger); border-color:var(--danger);}
+  .bos-btn{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-sm,.82rem); border-radius:8px; padding: 10px 18px; cursor:pointer; border:none; }
+  .bos-btn--amber{background:var(--amber); color:#1a1208;}
+
+  .konto-name{font-size: var(--bos-font-sm,.85rem); color:var(--dim); margin-bottom: var(--bos-space-md,16px); text-align:center;}
+  /* Schritt 6: eigener Rufname */
+  .rufname-box{ margin-top: var(--bos-space-lg,24px); padding: var(--bos-space-md,16px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+  .rufname-box h2{ font-size: var(--bos-font-md,.94rem); margin:0 0 8px; }
+  .rufname-zeile{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .rufname-zeile input{ flex:1; min-width:160px; }
+  .rufname-hinweis{ font-size: var(--bos-font-sm,.85rem); color:var(--dim); margin:8px 0 0; line-height:1.5; }
+  .rufname-status{ font-size: var(--bos-font-sm,.85rem); margin:8px 0 0; }
+  .rufname-status.fehler{ color:var(--danger); }
+  .rufname-status.ok{ color:var(--good, #7dc47d); }
+  .werte-grid{display:grid; grid-template-columns:1fr 1fr; gap: var(--bos-space-sm,12px);}
+  .wert-karte{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-md,16px); text-align:center;}
+  .wert-karte.saldo{grid-column:1 / -1; background:var(--surface-2); border-color:var(--amber);}
+  .wert-zahl{font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.8rem); color:var(--amber-bright);}
+  .wert-karte.saldo .wert-zahl{font-size: var(--bos-font-3xl,2.2rem);}
+  .wert-label{font-family:var(--font-label); font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--dim); margin-top:4px;}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen-sheet{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<!-- Standalone-Login-Kette (Reihenfolge bindend, siehe bos_standalone_login.js Kopf-Kommentar) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'mein_konto';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Mein Konto</h1>
+</header>
+
+<main id="main">
+  <div class="warte-box" id="warteBox">Einen Moment …</div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Was bedeuten diese Zahlen?</h2>
+    <p><b>Saldo:</b> laufender, gewichteter Punktestand deiner freien Tage — ein normaler Tag zählt 1, ein erfüllter Wunschtag 1,5, ein Montag mit freiem Sonntag davor 1,5, ein Samstag mit freiem Sonntag danach 2. Treffen an einem Tag mehrere Boni zu, zählt nur der höchste.</p>
+    <p><b>Samstag-/Montag-Kombi:</b> wie oft ein "echtes" verlängertes Wochenende dabei war.</p>
+    <p><b>Wunschtag-Score:</b> wie oft ein von dir eingereichter Wunschtag tatsächlich erfüllt wurde.</p>
+    <p><b>Schuld (Einsprünge):</b> wie oft du über den Krankmelder auf einen eigentlich freien Tag verzichtet hast, um für jemand Krankes einzuspringen. Reine Zählung, keine automatische Nachholung — sprich bei Bedarf direkt an.</p>
+    <p>Alle Werte fließen nur aus offiziellen Plänen ein, nicht aus Entwürfen.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function fehlertext(err) { return escHtml((err && err.message) || String(err)); }
+
+  function runden(n) {
+    var r = Math.round((n || 0) * 10) / 10;
+    return r % 1 === 0 ? String(r) : r.toFixed(1);
+  }
+
+  function leseAktivesProfil() {
+    var raw;
+    try { raw = localStorage.getItem('bos_launcher_state_v2'); } catch (e) { return null; }
+    if (!raw) return null;
+    var state;
+    try { state = JSON.parse(raw); } catch (e) { return null; }
+    if (!state || !state.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(state.localProfiles || []);
+    return alle.find(function (p) { return p.id === state.activeProfileId; }) || null;
+  }
+  function hatZugriff(profil) {
+    if (!window.BOS_ACCESS) return true;
+    return window.BOS_ACCESS.can(window.BOS_APP_ID, profil.role, profil.kontoOverrides);
+  }
+  function ermittleKontoId(profil) {
+    if (profil.kontoSchluessel) return profil.kontoSchluessel;
+    if (profil.id && profil.id.indexOf('konto_') === 0) return profil.id.slice(6);
+    return null;
+  }
+
+  function renderWerte(profil, konto, anzeigeName) {
+    var box = document.getElementById('main');
+    box.innerHTML =
+      '<div class="konto-name">' + escHtml(anzeigeName || profil.name || '') + '</div>' +
+      '<div class="werte-grid">' +
+      '<div class="wert-karte saldo"><div class="wert-zahl">' + runden(konto.saldo) + '</div><div class="wert-label">Saldo</div></div>' +
+      '<div class="wert-karte"><div class="wert-zahl">' + (konto.samstagKombi || 0) + '</div><div class="wert-label">Samstag-Kombi</div></div>' +
+      '<div class="wert-karte"><div class="wert-zahl">' + (konto.montagKombi || 0) + '</div><div class="wert-label">Montag-Kombi</div></div>' +
+      '<div class="wert-karte"><div class="wert-zahl">' + (konto.wunschtagScore || 0) + '</div><div class="wert-label">Wunschtag-Score</div></div>' +
+      '<div class="wert-karte"><div class="wert-zahl">' + (konto.freieTageSchuld || 0) + '</div><div class="wert-label">Schuld (Einsprünge)</div></div>' +
+      // Ergänzt 16.09.2026 (T-72): bankkonto.html bekam diese Zahl am
+      // 15.09., die persönliche Ansicht nicht -- ausgerechnet dort, wo
+      // sie am meisten hilft. Ohne sie steht der Saldo ohne Bezugsgröße
+      // da: niedrig heißt dann vielleicht "war wenig Wochen dabei" und
+      // nicht "hat wenig bekommen".
+      '<div class="wert-karte"><div class="wert-zahl">' + (konto.wochenGezaehlt || 0) + '</div><div class="wert-label">Gezählte Wochen</div></div>' +
+      '</div>' +
+      '<div id="rufnameBereich"></div>';
+  }
+
+  /* ==== Schritt 6 (Namens-Fundament, NE-5, NE-6): eigener Rufname ====
+     Geschrieben wird NUR namen/<eigene Nummer>.rufname, über die normale
+     Sitzung — die Regel (Schritt 3, Besitzer-Zweig) erlaubt genau das:
+     nur das Feld rufname, höchstens 20 Zeichen, nur wenn personen/<Nr>
+     mit dem eigenen Konto verknüpft ist. Ob es den Namen schon gibt, prüft
+     NUR diese Seite (NE-5), Groß/Klein und Randleerzeichen egal (wie K-8),
+     gegen Rufname UND Beschreibung aller anderen Personen — sonst stünden
+     im Plan zwei gleiche Namen. */
+  var RUFNAME_MAX = 20;
+  function klein(t) { return String(t == null ? '' : t).trim().toLocaleLowerCase('de'); }
+
+  function rufnamePruefen(wert, eigeneNr, alleNamen) {
+    var w = String(wert == null ? '' : wert).trim();
+    if (w.length > RUFNAME_MAX) return 'Höchstens ' + RUFNAME_MAX + ' Zeichen — das sind ' + w.length + '.';
+    if (/[\u0000-\u001f<>]/.test(w)) return 'Bitte nur Text — ohne < > und Steuerzeichen.';
+    if (!w) return null;                                  // leeren ist erlaubt
+    var k = klein(w);
+    var doppelt = Object.keys(alleNamen).some(function (nr) {
+      if (nr === eigeneNr) return false;
+      var e = alleNamen[nr] || {};
+      return klein(e.rufname) === k || klein(e.beschreibung) === k;
+    });
+    if (doppelt) return 'Den gibt es schon, magst du etwas dazuschreiben?';
+    return null;
+  }
+
+  function renderRufname(personId, alleNamen, namenFehler) {
+    var ziel = document.getElementById('rufnameBereich');
+    if (!ziel) return;
+    if (namenFehler) {
+      ziel.innerHTML = '<div class="rufname-box"><h2>Dein Name im Plan</h2><p class="rufname-status fehler">Namensliste nicht lesbar: ' + fehlertext(namenFehler) + '</p></div>';
+      return;
+    }
+    var eintrag = alleNamen[personId];
+    if (!eintrag) {
+      ziel.innerHTML = '<div class="rufname-box"><h2>Dein Name im Plan</h2><p class="rufname-hinweis">Für dich ist noch kein Name hinterlegt — Ulf trägt ihn ein. Danach kannst du dir hier einen Rufnamen aussuchen.</p></div>';
+      return;
+    }
+    var ruf = String(eintrag.rufname || '');
+    ziel.innerHTML =
+      '<div class="rufname-box"><h2>Dein Name im Plan</h2>' +
+      '<div class="rufname-zeile"><input type="text" class="bos-input" id="rufnameInput" maxlength="' + RUFNAME_MAX + '" placeholder="Rufname, z. B. Jojo">' +
+      '<button type="button" class="bos-btn bos-btn--amber" id="rufnameSpeichern">Speichern</button>' +
+      '<button type="button" class="bos-btn" id="rufnameLeeren">Leeren</button></div>' +
+      '<p class="rufname-hinweis" id="rufnameHinweis"></p>' +
+      '<p class="rufname-status" id="rufnameStatus"></p></div>';
+    document.getElementById('rufnameInput').value = ruf;
+    zeigeRufnameHinweis(eintrag);
+    document.getElementById('rufnameSpeichern').addEventListener('click', function () {
+      speichereRufname(personId, document.getElementById('rufnameInput').value, alleNamen);
+    });
+    document.getElementById('rufnameLeeren').addEventListener('click', function () {
+      document.getElementById('rufnameInput').value = '';
+      speichereRufname(personId, '', alleNamen);
+    });
+  }
+
+  function zeigeRufnameHinweis(eintrag) {
+    var h = document.getElementById('rufnameHinweis');
+    if (!h) return;
+    h.textContent = String(eintrag.rufname || '').trim()
+      ? 'So stehst du im Plan und auf dem Aushang. Ändern oder leeren geht jederzeit.'
+      : 'Du hast noch keinen Rufnamen — im Plan stehst du als „' + (eintrag.beschreibung || '') + '“. Wenn du magst, such dir hier einen aus (höchstens ' + RUFNAME_MAX + ' Zeichen).';
+  }
+
+  function rufnameStatus(text, art) {
+    var st = document.getElementById('rufnameStatus');
+    if (!st) return;
+    st.textContent = text; st.className = 'rufname-status' + (art ? ' ' + art : '');
+  }
+
+  function speichereRufname(personId, roh, alleNamen) {
+    var wert = String(roh == null ? '' : roh).trim();
+    var grund = rufnamePruefen(wert, personId, alleNamen);
+    if (grund) { rufnameStatus(grund, 'fehler'); return; }
+    var knopf = document.getElementById('rufnameSpeichern');
+    if (knopf) knopf.disabled = true;
+    rufnameStatus('Speichert …');
+    window.db.collection('namen').doc(personId).update({ rufname: wert }).then(function () {
+      alleNamen[personId] = Object.assign({}, alleNamen[personId], { rufname: wert });
+      rufnameStatus(wert ? '✓ Gespeichert — im Plan stehst du jetzt als „' + wert + '“.' : '✓ Rufname geleert — im Plan steht wieder „' + (alleNamen[personId].beschreibung || '') + '“.', 'ok');
+      zeigeRufnameHinweis(alleNamen[personId]);
+      var kn = document.querySelector('.konto-name');
+      if (kn) kn.textContent = wert || alleNamen[personId].beschreibung || kn.textContent;
+    }).catch(function (err) {
+      console.error('[Mein Konto] Rufname speichern fehlgeschlagen:', err);
+      rufnameStatus('Nicht gespeichert: ' + ((err && err.code) ? err.code + ' — ' : '') + ((err && err.message) || String(err)), 'fehler');
+    }).then(function () { if (knopf) knopf.disabled = false; });
+  }
+
+  function warteAufProfil() {
+    var profil = leseAktivesProfil();
+    if (!profil) { setTimeout(warteAufProfil, 250); return; }
+    if (!hatZugriff(profil)) return; // bos_standalone_login.js zeigt bereits "Kein Zugriff"
+    var kontoId = ermittleKontoId(profil);
+    if (!kontoId) {
+      document.getElementById('main').innerHTML =
+        '<div class="warte-box fehler">Auf diesem Gerät ist kein Konto angemeldet — bitte an der Tür mit deiner Kennung und deinem Passwort anmelden.' +
+        '<br><br><button type="button" class="bos-btn bos-btn--amber" id="neuAnmeldenBtn">Neu anmelden</button></div>';
+      document.getElementById('neuAnmeldenBtn').addEventListener('click', function () {
+        if (!confirm('Setzt die Anmeldung auf diesem Gerät zurück — danach meldest du dich an der Tür mit Kennung und Passwort an. Fortfahren?')) return;
+        try {
+          var raw = localStorage.getItem('bos_launcher_state_v2');
+          var state = raw ? JSON.parse(raw) : null;
+          if (state) { state.activeProfileId = null; localStorage.setItem('bos_launcher_state_v2', JSON.stringify(state)); }
+        } catch (e) { /* nichts zu tun -- Reload versucht es trotzdem */ }
+        location.reload();
+      });
+      return;
+    }
+
+    (window.BOS_AUTH_READY || Promise.resolve()).then(function () {
+      return window.db.collection('personen').where('bosKontoId', '==', kontoId).get();
+    }).then(function (snap) {
+      if (snap.empty) {
+        document.getElementById('main').innerHTML =
+          '<div class="warte-box">Dein Konto ist noch nicht mit einer Person im SchichtPlaner verknüpft — bitte sag Bescheid, damit das eingetragen wird. Erst danach lassen sich deine Zahlen hier anzeigen.</div>';
+        return null;
+      }
+      // 26.09.2026 (N-12): Mehr als eine Person mit diesem Konto verknüpft?
+      // Vorher nahm die Seite still die erste — ein Kollege sah dann
+      // womöglich einen fremden Kontostand. Jetzt: keine Zahlen, sichtbarer
+      // Hinweis mit den Nummern.
+      if (snap.size > 1) {
+        var nummern = snap.docs.map(function (d) { return d.id; }).sort(function (a, b) {
+          return (parseInt(a.slice(1), 10) || 0) - (parseInt(b.slice(1), 10) || 0) || a.localeCompare(b);
+        });
+        console.error('[Mein Konto] Mehrere Personen mit Konto ' + kontoId + ' verknüpft:', nummern);
+        document.getElementById('main').innerHTML =
+          '<div class="warte-box fehler">Mit deinem Konto sind mehrere Personen verknüpft (' + escHtml(nummern.join(', ')) +
+          ') — bitte Ulf Bescheid geben, bis dahin werden keine Zahlen angezeigt.</div>';
+        return null;
+      }
+      var personId = snap.docs[0].id;
+      // Schritt 6: Namensliste einmal lesen (für den Namen oben, das
+      // Rufname-Feld und die Doppelprüfung). Scheitert NUR das, bleiben die
+      // Zahlen sichtbar und der Grund steht beim Rufname-Feld.
+      var namenFehler = null;
+      var namenPromise = window.db.collection('namen').get().then(function (ns) {
+        var alle = {}; ns.forEach(function (d) { alle[d.id] = d.data() || {}; }); return alle;
+      }).catch(function (f) { console.error('[Mein Konto] Namensliste nicht lesbar:', f); namenFehler = f; return {}; });
+      return Promise.all([window.db.collection('konten').doc(personId).get(), namenPromise]).then(function (r) {
+        var doc = r[0], alleNamen = r[1], e = alleNamen[personId];
+        var anzeige = e ? (String(e.rufname || '').trim() || e.beschreibung) : null;
+        renderWerte(profil, doc.exists ? doc.data() : { saldo: 0, samstagKombi: 0, montagKombi: 0, wunschtagScore: 0, freieTageSchuld: 0, wochenGezaehlt: 0 }, anzeige);
+        renderRufname(personId, alleNamen, namenFehler);
+      });
+    }).catch(function (err) {
+      console.error('[Mein Konto] Laden fehlgeschlagen:', err);
+      document.getElementById('main').innerHTML = '<div class="warte-box fehler">Laden fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+  warteAufProfil();
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen-sheet'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen-sheet'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen-sheet'); });
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Einstellungen · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: einstellungen.html
+  ZWEI: eigene Reihenfolge der
+         Personen im Dienstplan (Entwürfe/Tab 2), inklusive Leerzeilen
+         zur optischen Gruppierung. Zweite Funktion (12.09.2026, Ulf:
+         "nicht personenspezifisch, sondern allgemein"): eine
+         allgemeine Standard-Obergrenze Sonntage/Feiertage pro
+         Kalendermonat, für alle Personen ohne eigenen Wert im Personen-
+         Editor. Bewusst als eigene Kachel statt in Entwürfe/Sonntagsplan
+         hineingequetscht — "Einstellungen" war ohnehin schon als
+         Hub-Kachel geplant, künftige weitere Anzeige-/Verhaltens-
+         Einstellungen haben hier einen natürlichen Platz.
+  DRITTE FUNKTION (14.09.2026, Ulf: "sollten wir den Editor als neuen
+         Tab in die Einstellungen übernehmen?"): die 12 Punktesystem-
+         Gewichte für die gewichtete Wochen-Bewertung in Entwürfe
+         (SchichtPlaner V2) — siehe SESSION_2026-09-13_PUNKTESYSTEM_
+         KONZEPT.md für die vollständige Herleitung jedes Wertes,
+         KETTEN_GENERATOR_DOKU.md für den Gesamtzusammenhang. War
+         zunächst als eigenständiger Editor mit Datei-Download geplant
+         (kein Live-Schreibzugriff, wie produkt_config_editor.html) —
+         Ulf entschied sich dann ausdrücklich für Live-Firestore, für
+         Konsistenz mit den beiden anderen Einstellungen dieser Seite.
+         Der eigenständige `punktesystem_gewichte_editor.html` ist damit
+         NICHT mehr der aktuelle Weg (Datei `punktesystem_gewichte.json`
+         ebenfalls nicht mehr die Quelle — beide historisch, nicht
+         gepflegt).
+  DATENFLUSS: bos_access_guard.js (roles: admin, produktionsleitung) →
+         Firestore personen (aktive, lesend) + bos_namen.js für
+         Namen → Firestore einstellungen/dienstplan_reihenfolge,
+         einstellungen/sonntag_standard UND
+         einstellungen/punktesystem_gewichte (alle drei lesend +
+         schreibend, ein gemeinsamer Speichern-Knopf).
+         Ohne gespeicherte Reihenfolge: Vorbelegung alphabetisch
+         (identisch zum bisherigen Default in entwuerfe.html). Ohne
+         gespeicherte Punktesystem-Gewichte: Vorbelegung mit den im
+         Rechenkern eingebauten Standardwerten.
+  SCHNITTSTELLEN:
+    - Firestore-Dokument einstellungen/dienstplan_reihenfolge:
+      { nacht: [personId|''|...], frueh: [personId|''|...] } — Element
+      '' (leerer String) = Leerzeile an dieser Stelle. entwuerfe.html
+      liest dieses Dokument für die Zeilenreihenfolge der Dienstplan-
+      Tabelle, fällt bei fehlendem Dokument auf alphabetisch zurück.
+    - Firestore-Dokument einstellungen/sonntag_standard:
+      { obergrenze: number|null }. sonntagsplan.html liest dieses
+      Dokument als Fallback für Personen ohne eigenes
+      maxSonntageProMonat — siehe dortiger Changelog für die geänderte
+      Bedeutung von "Feld leer" (nicht mehr "keine Grenze", sondern
+      "dieser Standard greift").
+    - Firestore-Dokument einstellungen/punktesystem_gewichte: flaches
+      Objekt mit den 12 Schlüsseln aus GEWICHTE_STANDARD (camelCase,
+      identisch zu freie_tage_verteilung.js). entwuerfe.html liest
+      dieses Dokument beim Start und ruft setzeGewichte() auf; fehlt
+      das Dokument, gelten die im Rechenkern eingebauten Standardwerte.
+  BEKANNTE OFFENE PUNKTE:
+    - Keine Prüfung auf doppelt ausgewählte Personen innerhalb einer
+      Gruppe — unkritisch, Entwürfe zeigt sie dann halt zweimal.
+    - Nur zwei Gruppen (Nacht/Früh) — Sonntag hat keine eigene
+      Personen-Tabelle in Entwürfe, daher hier nicht relevant.
+    - Punktesystem-Gewichte: keine Wertebereichs-Prüfung (z. B. dass
+      der 1-Tag-Puffer-Wert kleiner als der Direkt-Wert bleibt) — die
+      Erklärungstexte weisen zwar darauf hin, verhindern eine
+      widersprüchliche Eingabe aber nicht aktiv.
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Zwei Gruppen (Nacht/Früh), Dropdown-Zeilen wie beim
+      Pool-Editor in positionen_editor.html (vertrautes Bedienmuster),
+      inklusive Leerzeilen-Option.
+    2026-09-12 · v0.2 · Feature
+      Ulf: allgemeine (nicht personenspezifische) Standard-Obergrenze für
+      Sonntage/Feiertage pro Monat. Neues Feld + Firestore-Dokument
+      einstellungen/sonntag_standard, ein gemeinsamer Speichern-Knopf für
+      beide Einstellungen dieser Kachel.
+    2026-09-14 · v0.3 · Feature
+      Punktesystem-Gewichte als dritte Kachel-Funktion ergänzt, live
+      nach Firestore (siehe DRITTE FUNKTION oben für die
+      Architektur-Entscheidung).
+    2026-09-16 · 09:51 · v0.4 · Feature (T-68) + Korrektur
+      Dreizehntes Gewicht "Ausgleich nach Kontostand"
+      (kontoAusgleichGewicht, Standard 3 -- ungetesteter Startwert).
+      Ausserdem korrigiert: die Erklärung zum Wert "Überschuss in einer
+      Feiertagswoche" warnte, er habe keine praktische Wirkung. Das
+      stimmte bis heute (die Feiertagsliste erreichte die Generierung
+      nicht), ist mit T-14 aber erledigt -- Warnung ersetzt.
+    2026-09-16 · 10:14 · v0.5 · Feature (T-10)
+      Vierzehntes Gewicht "Ausgleich für Einsprünge"
+      (schuldAusgleichGewicht, Standard 12 -- ungetesteter Startwert).
+      Bewusst getrennt vom Ausgleich nach Kontostand: zwei Aussagen,
+      zwei Zahlen.
+    2026-09-26 · Schritt 5 (Namens-Fundament, K-7) · Umbau
+      Namen kommen aus bos_namen.js (Namensliste in Firestore, NE-6):
+      Rufname > Beschreibung > lokale Datei als Kürzel („M. · lokal“, nur
+      bis Schritt 8) > „P07 · kein Name hinterlegt“ — nie leer, nie
+      undefined. anzeigeName() ist nur noch ein Einzeiler auf
+      BOS_NAMEN.anzeige(); Auswahllisten zeigen „Rufname (Beschreibung)“
+      (NE-7, BOS_NAMEN.auswahl). Die Namensliste lädt einmal zusammen mit
+      den Personen (personenUndNamen()); ist sie nicht lesbar, steht der
+      Grund sichtbar oben. Die lokale Datei bleibt bis Schritt 8 Rückfall.
+      K-9: die Vorbelegung der Dienstplan-Reihenfolge (nur ohne
+      gespeicherten Stand) sortiert nach Nummer statt nach Anzeige.
+    2026-09-26 · Schritt 8 (Namens-Fundament) · Rückbau
+      Die lokale Namensdatei ist in Rente: keine Einbindung von
+      bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei.
+      Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
+      Beschreibung > „P07 · kein Name hinterlegt“).
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:100px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:640px; margin:0 auto;}
+  .abschnitt-titel{ font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-sm,.82rem); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin: var(--bos-space-lg,22px) 0 var(--bos-space-xs,10px) var(--bos-space-3xs,4px); }
+  .abschnitt-titel:first-child{margin-top:0;}
+
+  .slot-row{ display:flex; align-items:center; gap: var(--bos-space-xs,8px); margin-bottom: var(--bos-space-2xs,6px); }
+  .slot-nr{ font-family:var(--font-label); font-size: var(--bos-font-xs,.74rem); color:var(--dim-2); width:22px; flex-shrink:0; text-align:right; }
+  .slot-row select{flex:1;}
+  .slot-row select.slot-leer{color:var(--dim); font-style:italic;}
+  .btn-add-slot{ margin-top: var(--bos-space-2xs,4px); font-family:var(--font-label); font-size: var(--bos-font-sm,.8rem); padding: 8px 12px; color:var(--amber-bright); background:transparent; border:1px dashed var(--border-strong); border-radius:8px; cursor:pointer; width:100%; }
+  .speichern-leiste{ position:fixed; left:0; right:0; bottom:0; padding: var(--bos-space-sm,12px) var(--bos-space-sm,14px) calc(14px + env(safe-area-inset-bottom)); background:linear-gradient(0deg, var(--bg) 60%, transparent); z-index:30; }
+  .speichern-btn{ width:100%; max-width:640px; margin:0 auto; display:block; font-family:var(--font-label); font-weight:800; letter-spacing:.05em; text-transform:uppercase; font-size: var(--bos-font-md,1rem); color:#1b1305; background:linear-gradient(180deg, var(--amber-bright), var(--amber)); border:none; border-radius:var(--radius); padding: var(--bos-space-sm,16px); cursor:pointer; }
+  .speichern-btn:disabled{opacity:.6; cursor:wait;}
+  .lade-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); }
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen-sheet{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  /* Ergänzt 14.09.2026 (Punktesystem-Gewichte, aus dem eigenständigen
+     Editor hierher übernommen -- siehe Kopf-Kommentar). */
+  .pkt-untertitel{ font-family:var(--font-label); font-weight:800; text-transform:uppercase; letter-spacing:.06em; font-size: var(--bos-font-xs,.74rem); color:var(--amber-bright); margin: var(--bos-space-md,18px) 0 var(--bos-space-xs,8px); }
+  .pkt-untertitel:first-of-type{margin-top:0;}
+  .wert-karte{ background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding: var(--bos-space-xs,10px) var(--bos-space-sm,12px) 6px; margin-bottom: var(--bos-space-2xs,8px); }
+  .wert-zeile{display:flex; align-items:center; gap: var(--bos-space-xs,8px);}
+  .wert-label{flex:1; font-weight:700; font-size: var(--bos-font-sm,.85rem);}
+  .wert-input{width:84px; text-align:right; font-size: var(--bos-font-md,1rem); font-family:var(--font-display); font-weight:700; padding: 6px 8px; border-radius:8px; border:1px solid var(--border-strong); background:var(--surface); color:var(--amber-bright);}
+  .frage-btn{width:26px; height:26px; border-radius:50%; border:1px solid var(--border-strong); background:var(--surface); color:var(--dim); font-family:var(--font-label); font-weight:800; cursor:pointer; flex-shrink:0;}
+  .frage-btn.offen{background:var(--amber); border-color:var(--amber); color:#1a1410;}
+  .wert-kurz{color:var(--dim-2); font-size: .68rem; margin-top:3px;}
+  .wert-erklaerung{display:none; margin-top: var(--bos-space-xs,8px); padding-top: var(--bos-space-xs,8px); border-top:1px solid var(--border); font-size: .78rem; line-height:1.6;}
+  .wert-erklaerung.offen{display:block;}
+  .wert-erklaerung p{margin: 0 0 6px;}
+  .wert-erklaerung .hoeher, .wert-erklaerung .niedriger{display:block; margin: 6px 0;}
+  .wert-erklaerung .hoeher strong, .wert-erklaerung .niedriger strong{color:var(--amber-bright);}
+  .wert-erklaerung .achtung{color:var(--danger); font-weight:700;}
+  .wert-erklaerung .warnung-box{background:var(--amber-glow); border:1px solid var(--amber); border-radius:8px; padding: var(--bos-space-xs,8px); margin-top:6px;}
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_einstellungen';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Einstellungen</h1>
+</header>
+
+<div class="abschnitt-titel" style="max-width:640px; margin-left:auto; margin-right:auto; padding: 0 var(--bos-space-sm,14px);">Sonntagsplan</div>
+<div style="max-width:640px; margin:0 auto; padding: 0 var(--bos-space-sm,14px);">
+  <div class="feld" style="margin-bottom: var(--bos-space-lg,22px);">
+    <label class="bos-label" for="sonntagObergrenze">Standard-Obergrenze Sonntage + Feiertage pro Kalendermonat</label>
+    <input type="number" class="bos-input" id="sonntagObergrenze" min="0" placeholder="z. B. 2">
+    <p class="feld-hinweis" style="font-size:.76rem; color:var(--dim); margin-top:6px;">Gilt für alle Personen ohne eigenen Wert im Personen-Editor (Feld dort leer = dieser Standard greift). Einzelne Personen bleiben dort weiterhin individuell übersteuerbar.</p>
+  </div>
+</div>
+
+<!-- Ergänzt 14.09.2026 (Ulf: "sollten wir den Editor als neuen Tab in
+     die Einstellungen übernehmen?"). Aus dem ursprünglich eigenständigen
+     punktesystem_gewichte_editor.html hierher übernommen, mit einer
+     bewussten Architektur-Änderung: hier gilt (wie beim Rest dieser
+     Seite) Live-Schreibzugriff nach Firestore, KEIN Datei-Download mehr
+     -- Ulfs ausdrückliche Entscheidung, für Konsistenz mit
+     dienstplan_reihenfolge/sonntag_standard. Der eigenständige Editor
+     ist damit nicht mehr der aktuelle Weg, siehe Kopf-Kommentar. -->
+<div class="abschnitt-titel" style="max-width:640px; margin-left:auto; margin-right:auto; padding: 0 var(--bos-space-sm,14px);">Punktesystem-Gewichte</div>
+<div style="max-width:640px; margin:0 auto; padding: 0 var(--bos-space-sm,14px) var(--bos-space-lg,22px);">
+  <p class="feld-hinweis" style="font-size:.76rem; color:var(--dim); margin: 0 0 var(--bos-space-sm,12px);">Steuert die gewichtete Wochen-Bewertung in Entwürfe (SchichtPlaner V2) — bei jedem Wert erklärt der ❓-Knopf, was eine Änderung tatsächlich bewirkt.</p>
+
+  <div class="pkt-untertitel">Schichtwechsel — Richtung &amp; Puffer</div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Früh → Nacht, direkt (kein Ruhetag davor)</span>
+      <button type="button" class="frage-btn" data-ziel="e-schichtwechselFruehNachtDirekt">?</button>
+      <input type="number" class="wert-input" id="f-schichtwechselFruehNachtDirekt" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 50 — der teuerste Einzelwert im ganzen System.</div>
+    <div class="wert-erklaerung" id="e-schichtwechselFruehNachtDirekt">
+      <p>Kosten dafür, dass jemand aus der Frühschicht OHNE einen einzigen
+      freien Tag davor direkt in der Nachtschicht anfängt — der teuerste
+      Fall, weil zwischen Frühschicht-Ende und Nachtschicht-Beginn
+      derselbe Kalendertag nur wenige Stunden liegen.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> das System weicht einem sofortigen
+      Wechsel noch entschiedener aus — nimmt dafür eher einen kleinen
+      Wochentag-Überschuss oder einen Azubi-Einsatz in Kauf, wenn das den
+      direkten Wechsel vermeidet.</span>
+      <span class="niedriger"><strong>Niedriger setzen:</strong> ein sofortiger Wechsel wird als
+      weniger schlimm bewertet — bei sonst gleicher Lückenzahl könnte er
+      dadurch öfter vorkommen, auch wenn ein Tag Vorlauf ohne
+      Mehraufwand möglich gewesen wäre.</span>
+      <div class="warnung-box">Sollte GRÖSSER bleiben als die beiden Puffer-Werte darunter
+      — sonst hätte das System keinen Grund mehr, einen Ruhetag vor dem
+      Wechsel überhaupt zu bevorzugen, und die ganze Abstufung
+      "mehr Ruhe davor = günstiger" würde ins Leere laufen.</div>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Früh → Nacht, ein freier Tag davor</span>
+      <button type="button" class="frage-btn" data-ziel="e-schichtwechselFruehNacht1TagPuffer">?</button>
+      <input type="number" class="wert-input" id="f-schichtwechselFruehNacht1TagPuffer" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 20.</div>
+    <div class="wert-erklaerung" id="e-schichtwechselFruehNacht1TagPuffer">
+      <p>Kosten, wenn zwischen dem letzten Frühschicht-Tag und dem ersten
+      Nacht-Tag genau EIN freier Tag liegt.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> auch der "sanfte" Wechsel mit einem
+      Tag Vorlauf wird teurer bewertet — das System bevorzugt Verteilungen
+      mit weniger Wechseln insgesamt noch stärker, selbst wenn ein Tag
+      Puffer schon eingeplant war.</span>
+      <span class="niedriger"><strong>Niedriger setzen:</strong> ein Wechsel mit einem Tag Vorlauf
+      wird fast kostenlos — das System könnte ihn großzügig nutzen, ohne
+      ihn gegen andere Lösungen abzuwägen.</span>
+      <div class="warnung-box">Sollte zwischen dem Direkt-Wert darüber und dem
+      Wochenend-Wert darunter liegen — sonst ergibt die Abstufung
+      "mehr Ruhe = günstiger" keinen Sinn mehr.</div>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Früh → Nacht, Wochenende davor (2+ Tage)</span>
+      <button type="button" class="frage-btn" data-ziel="e-schichtwechselFruehNacht2PlusPuffer">?</button>
+      <input type="number" class="wert-input" id="f-schichtwechselFruehNacht2PlusPuffer" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 10 — günstigster der drei Früh→Nacht-Werte.</div>
+    <div class="wert-erklaerung" id="e-schichtwechselFruehNacht2PlusPuffer">
+      <p>Kosten, wenn zwei oder mehr freie Tage direkt vor dem Wechsel
+      liegen (typischerweise ein Wochenende) — die innere Uhr hatte am
+      meisten Zeit, sich vorzubereiten.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> selbst ein gut vorbereiteter Wechsel
+      wird stärker vermieden — nähert sich in der Wirkung den beiden
+      teureren Werten an, macht den Unterschied zwischen "gut
+      vorbereitet" und "kurzfristig" für das System kleiner.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 0):</strong> ein gut vorbereiteter
+      Wechsel wird faktisch kostenlos — dieselbe Behandlung wie
+      Nacht→Früh weiter unten.</span>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Nacht → Früh (Rückkehr in die Frühschicht)</span>
+      <button type="button" class="frage-btn" data-ziel="e-schichtwechselNachtFrueh">?</button>
+      <input type="number" class="wert-input" id="f-schichtwechselNachtFrueh" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 0 — bewusst immer kostenlos, siehe Erklärung.</div>
+    <div class="wert-erklaerung" id="e-schichtwechselNachtFrueh">
+      <p>Die Begründung für 0 ist keine Verhandlungssache über "wie
+      schlimm" der Wechsel ist, sondern eine Zeitstruktur-Tatsache:
+      Nachtschicht endet früh morgens, Frühschicht beginnt frühmorgens
+      am NÄCHSTEN Kalendertag — dazwischen liegen automatisch rund 24
+      Stunden, unabhängig davon, ob noch ein freier Tag eingeschoben
+      ist oder nicht. Das Zeitproblem, das Früh→Nacht teuer macht
+      (derselbe Kalendertag, nur wenige Stunden dazwischen), existiert
+      hier schlicht nicht.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> nur sinnvoll, wenn sich diese
+      Grundannahme über die Tagesstruktur ändert — sonst bestraft man
+      einen Wechsel, der laut eigener Begründung gar kein Problem ist.
+      Das System würde dann anfangen, RÜCKKEHR-Wechsel genauso zu
+      vermeiden wie den Weg hinein — mit spürbaren Folgen für die
+      Konzentrations-Funktion (Schweizer Käse) und den Krankmelder,
+      die beide gerade DAVON profitieren, dass die Rückkehr frei ist.</span>
+      <span class="niedriger"><strong>Niedriger setzen:</strong> nicht möglich — 0 ist bereits der
+      niedrigstmögliche sinnvolle Wert (negative Kosten würden bedeuten,
+      ein Wechsel wäre eine "Belohnung", das war nie die Absicht).</span>
+    </div>
+  </div>
+
+  <div class="pkt-untertitel">Ausflug-Aufschlag</div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Aufschlag: nur 1 Tag im anderen Modus</span>
+      <button type="button" class="frage-btn" data-ziel="e-ausflugAufschlag1Tag">?</button>
+      <input type="number" class="wert-input" id="f-ausflugAufschlag1Tag" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 25 — zusätzlich zu den Wechsel-Kosten oben.</div>
+    <div class="wert-erklaerung" id="e-ausflugAufschlag1Tag">
+      <p>Zusätzlicher Aufschlag (nicht statt, sondern OBEN AUF die
+      Wechsel-Kosten), wenn jemand nur für EINEN einzigen Tag in den
+      anderen Modus wechselt, bevor er wieder zurückwechselt — die
+      Umstellung der inneren Uhr "lohnt sich" dann kaum, weil sie gleich
+      wieder rückgängig gemacht wird.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> kurze Ausflüge werden noch
+      unattraktiver — das System bevorzugt bei einem nötigen Wechsel
+      noch stärker LÄNGERE, zusammenhängende Aufenthalte im anderen
+      Modus (3+ Tage, wo der Aufschlag ganz entfällt) statt eines
+      kurzen Abstechers.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 0):</strong> kurze Ausflüge werden
+      nicht mehr besonders bestraft — das System könnte häufiger jemanden
+      für nur einen Tag rüberschicken und gleich wieder zurückholen,
+      ohne dass das als eigener Nachteil zählt.</span>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Aufschlag: 2 Tage im anderen Modus</span>
+      <button type="button" class="frage-btn" data-ziel="e-ausflugAufschlag2Tage">?</button>
+      <input type="number" class="wert-input" id="f-ausflugAufschlag2Tage" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 12 — die Hälfte des 1-Tag-Werts.</div>
+    <div class="wert-erklaerung" id="e-ausflugAufschlag2Tage">
+      <p>Wie oben, aber für einen 2-tägigen Ausflug — schon etwas
+      "lohnender" als ein einzelner Tag, deshalb per Ulfs eigener Regel
+      ("je länger, desto weniger schlimm") bewusst nur die Hälfte des
+      1-Tag-Aufschlags.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> nähert sich dem 1-Tag-Wert an — macht
+      den Unterschied zwischen "1 Tag" und "2 Tage" für das System
+      kleiner. Wird er GRÖSSER als der 1-Tag-Wert, kehrt sich die
+      eigentlich gewollte Abstufung um: ein 2-Tage-Ausflug würde dann
+      schlimmer bewertet als ein 1-Tage-Ausflug, was der ursprünglichen
+      Logik widerspricht.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 0):</strong> ein 2-Tage-Ausflug wird
+      genauso behandelt wie ein "richtiger" Aufenthalt (3+ Tage) — kein
+      Unterschied mehr zwischen den beiden.</span>
+    </div>
+  </div>
+
+  <div class="pkt-untertitel">Azubi &amp; Wunschtage</div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Azubi statt Fachkraft (pro Einsatz-Tag)</span>
+      <button type="button" class="frage-btn" data-ziel="e-azubiEinsatzPunkte">?</button>
+      <input type="number" class="wert-input" id="f-azubiEinsatzPunkte" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 10.</div>
+    <div class="wert-erklaerung" id="e-azubiEinsatzPunkte">
+      <p><strong>Wichtig zu wissen, bevor du diesen Wert änderst:</strong> der
+      Azubi wird im Rechenkern selbst (rechenmodul.js) schon als
+      strukturell bevorzugter Fallback behandelt — VOR einem
+      Schichtwechsel, sobald keine Fachkraft der eigenen Schicht mehr
+      übrig ist. DAS ändert sich durch diesen Wert nicht. Dieser Wert
+      wirkt nur bei der WOCHEN-Bewertung: welche von mehreren möglichen
+      Verteilungen der freien Tage am Ende die wenigsten Azubi-Einsätze
+      braucht.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> das System nimmt bei der Wahl der
+      freien Tage eher einen kleinen Wochentag-Überschuss oder einen
+      günstigen Schichtwechsel in Kauf, wenn dadurch ein Azubi-Einsatz
+      vermieden wird.</span>
+      <span class="niedriger"><strong>Niedriger setzen:</strong> Azubi-Einsätze werden bei der
+      Wochen-Bewertung als weniger relevant behandelt — bei einer engen
+      Abwägung könnte eine Verteilung mit mehr Azubi-Tagen gewinnen, nur
+      weil sie in anderer Hinsicht (z. B. Wunschtage) leicht besser
+      abschneidet.</span>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Erfüllter Wunschtag (normal)</span>
+      <button type="button" class="frage-btn" data-ziel="e-wunschtagPunkte">?</button>
+      <input type="number" class="wert-input" id="f-wunschtagPunkte" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 10 — wirkt als Abzug von den Gesamtkosten (Belohnung).</div>
+    <div class="wert-erklaerung" id="e-wunschtagPunkte">
+      <p>Anders als alle Werte oben ist das kein Kosten-, sondern ein
+      Belohnungs-Wert: pro erfülltem Wunsch wird diese Zahl von den
+      Gesamtkosten ABGEZOGEN. Ein Wunsch, der bereits ohne jeden
+      Aufwand erfüllt worden wäre, bringt trotzdem den vollen Abzug.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> das System nimmt eher einen kleinen
+      Nachteil an anderer Stelle (etwas mehr Wochentag-Überschuss, ein
+      zusätzlicher Azubi-Einsatz) in Kauf, wenn es dafür einen Wunschtag
+      erfüllen kann.</span>
+      <span class="niedriger"><strong>Niedriger setzen:</strong> Wunschtage werden bei einem
+      Konflikt eher zugunsten anderer Kriterien geopfert.</span>
+      <div class="warnung-box">Wichtig: die Anzeige "X von Y Wünschen erfüllt" in Entwürfe
+      zeigt die ECHTE, ungewichtete Anzahl — eine Änderung an diesem Wert
+      wirkt sich NUR auf die interne Auswahl zwischen mehreren Varianten
+      aus, NICHT auf die angezeigte Zahl.</div>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Multiplikator für "wichtige" Wunschtage</span>
+      <button type="button" class="frage-btn" data-ziel="e-wichtigGewicht">?</button>
+      <input type="number" class="wert-input" id="f-wichtigGewicht" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 5 — ein wichtiger Wunsch zählt wie 5 normale.</div>
+    <div class="wert-erklaerung" id="e-wichtigGewicht">
+      <p>Multiplikator, kein eigenständiger Punktwert: ein als "wichtig"
+      markierter Wunsch (z. B. Arzttermin-Fall) bringt beim Erfüllen
+      diesen Faktor MAL den Wert von "Erfüllter Wunschtag (normal)"
+      oben — bei Standardwerten also 5 × 10 = 50 Punkte Abzug.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> wichtige Wünsche werden noch
+      dominanter — das System nimmt fast jeden anderen Nachteil in Kauf,
+      um sie zu erfüllen, auch strukturelle Dinge wie einen zusätzlichen
+      Schichtwechsel.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 1):</strong> ein "wichtiger" Wunsch wird
+      genauso behandelt wie ein normaler — der ⭐-Stern in der
+      Detail-Ansicht hätte dann nur noch eine informative, keine
+      rechnerische Wirkung mehr.</span>
+    </div>
+  </div>
+
+  <div class="pkt-untertitel">Wochentag-Überschuss (Nachtschicht)</div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Überschuss Montag–Freitag (pro Person, pro Tag)</span>
+      <button type="button" class="frage-btn" data-ziel="e-wochentagUeberschussMoFr">?</button>
+      <input type="number" class="wert-input" id="f-wochentagUeberschussMoFr" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 45 — der höchste Einzelwert im ganzen System.</div>
+    <div class="wert-erklaerung" id="e-wochentagUeberschussMoFr">
+      <p>Kosten pro Nacht-Person, die an einem normalen Werktag mehr da
+      ist, als die Positionen brauchen — Verschwendung von Arbeitszeit.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> das System vermeidet Werktags-
+      Überschuss noch entschiedener — nimmt dafür eher einen
+      Schichtwechsel oder einen Azubi-Einsatz in Kauf, auch wenn die
+      eigentlich teurer eingepreist sind.</span>
+      <span class="niedriger"><strong>Niedriger setzen:</strong> Werktags-Überschuss wird als
+      weniger schlimm bewertet.</span>
+      <div class="warnung-box"><span class="achtung">Achtung, Verhältnis zu den
+      Schichtwechsel-Werten:</span> mit 45 ist dieser Wert bereits jetzt
+      höher als jeder einzelne Schichtwechsel-Wert (max. 50, aber selten
+      voll ausgeschöpft) — er dominiert die Bewertung fast immer, sobald
+      überhaupt ein Überschuss möglich ist. Senkst du ihn stark (z. B.
+      unter 20), könnten Schichtwechsel-Kosten plötzlich SCHWERER wiegen
+      als ein Werktags-Überschuss — das würde das bisherige Verhältnis
+      der beiden Kriterien zueinander umkehren.</div>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Überschuss Samstag (pro Person, pro Tag)</span>
+      <button type="button" class="frage-btn" data-ziel="e-wochentagUeberschussSamstag">?</button>
+      <input type="number" class="wert-input" id="f-wochentagUeberschussSamstag" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 10 — bewusst deutlich niedriger als Mo-Fr.</div>
+    <div class="wert-erklaerung" id="e-wochentagUeberschussSamstag">
+      <p>Wie oben, aber samstags — bewusst niedriger, weil ein
+      Überschuss an diesem Tag meist unproblematisch bis nützlich ist
+      (mehr zu tun, mehr Kundschaft).</p>
+      <span class="hoeher"><strong>Höher setzen (bis zum Mo-Fr-Wert):</strong> Samstag würde
+      dann genauso streng behandelt wie ein Werktag — der ursprüngliche
+      Grund für die niedrigere Zahl entfällt damit.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 0):</strong> Samstags-Überschuss wird
+      komplett kostenlos — das System hätte keinen Grund mehr, ihn zu
+      vermeiden, selbst wenn er unnötig wäre.</span>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Überschuss in einer Feiertagswoche</span>
+      <button type="button" class="frage-btn" data-ziel="e-wochentagUeberschussFeiertagswoche">?</button>
+      <input type="number" class="wert-input" id="f-wochentagUeberschussFeiertagswoche" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 0.</div>
+    <div class="wert-erklaerung" id="e-wochentagUeberschussFeiertagswoche">
+      <p>Dieser Wert ist seit dem 16.09.2026 wirksam — Entwürfe gibt die
+      offenen Feiertage der gewählten Woche jetzt an die Berechnung
+      weiter. (Bis dahin stand hier ein Hinweis, dass der Wert folgenlos
+      ist; das stimmt nicht mehr.) Geschlossene Feiertage zählen bewusst
+      nicht mit: an einem geschlossenen Tag arbeitet niemand, es gibt
+      also auch keinen Überschuss zu bewerten.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> ein Überschuss in einer Feiertagswoche
+      wird dann ähnlich streng behandelt wie an einem normalen Werktag.</span>
+      <span class="niedriger"><strong>Niedriger/unverändert lassen:</strong> passt zu Ulfs
+      Begründung ("an solchen Tagen gibt es oft mehr zu tun") — ein
+      Überschuss soll dann praktisch kostenlos bleiben.</span>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Ausgleich nach Kontostand</span>
+      <button type="button" class="frage-btn" data-ziel="e-kontoAusgleichGewicht">?</button>
+      <input type="number" class="wert-input" id="f-kontoAusgleichGewicht" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 3 — Punkte je 0,1 Abweichung vom Team-Schnitt. Ungetesteter Startwert.</div>
+    <div class="wert-erklaerung" id="e-kontoAusgleichGewicht">
+      <p>Der einzige Wert, der über die einzelne Woche hinausblickt. Die
+      Verteilung der freien Tage ist für sich genommen gedächtnislos —
+      sie weiß nicht, wer letzte Woche den Samstag hatte. Dieser Wert
+      koppelt das Ausgleichskonto zurück: wer im Schnitt bereits mehr
+      wertvolle freie Tage bekommen hat als das Team, für den wird ein
+      weiterer wertvoller Tag teurer; wer darunter liegt, für den
+      billiger.</p>
+      <p>Verglichen wird <strong>Saldo geteilt durch gezählte Wochen</strong>, nicht der
+      rohe Saldo — sonst würden langjährige Kollegen strukturell anders
+      behandelt als neue. Wer weniger als vier gezählte Wochen hat,
+      fließt gar nicht ein; zwischen vier und acht Wochen steigt die
+      Wirkung langsam an, statt schlagartig einzusetzen.</p>
+      <p>Priorisierte Wunschtage sind ausgenommen — sie erhöhen den
+      Saldo nicht über den normalen Tageswert hinaus. Wer regelmäßig
+      einen festen Termin hat (Arzt, Behörde), soll dafür keinen
+      Fairness-Nachteil bekommen. Normale Wunschtage zählen dagegen
+      voll mit, und genau das ist der Sinn: wer selten einen Wunsch
+      äußert, steht bei seinem einen Wunsch vor denen, die jede Woche
+      wünschen.</p>
+      <p class="achtung">Eine Lücke bleibt auch hier die absolute Grenze. Dieser Wert
+      entscheidet erst zwischen Lösungen, die ohnehin gleich wenige
+      Lücken haben — er kann niemals eine unbesetzte Position
+      verursachen.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> der Ausgleich über die Wochen greift
+      schneller, kann aber Wunschtage und günstige Schichtfolgen
+      überstimmen — jemand bekommt seinen Wunsch dann eher nicht, weil
+      er zuletzt schon gut dran war.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 0):</strong> bei 0 ist die Rückkopplung
+      komplett aus, die Verteilung verhält sich wieder rein
+      wochenbezogen — genau wie vor dem 16.09.2026.</span>
+    </div>
+  </div>
+
+  <div class="wert-karte">
+    <div class="wert-zeile">
+      <span class="wert-label">Ausgleich für Einsprünge</span>
+      <button type="button" class="frage-btn" data-ziel="e-schuldAusgleichGewicht">?</button>
+      <input type="number" class="wert-input" id="f-schuldAusgleichGewicht" step="1">
+    </div>
+    <div class="wert-kurz">Standard: 12 — Punkte je offenem Einsprung. Ungetesteter Startwert.</div>
+    <div class="wert-erklaerung" id="e-schuldAusgleichGewicht">
+      <p>Wer kurzfristig auf einen bereits zugesagten freien Tag
+      verzichtet hat, weil jemand ausgefallen ist, sammelt damit eine
+      offene "Schuld" (Spalte <em>Schuld</em> im Bankkonto). Dieser Wert
+      bestimmt, wie stark ein solcher Einsprung bei der nächsten
+      Verteilung nachwirkt: ein guter freier Tag wird für diese Person
+      günstiger, sie kommt also eher dran.</p>
+      <p>Bewusst getrennt vom Ausgleich nach Kontostand darüber — das
+      sind zwei verschiedene Aussagen. Der Kontostand sagt "was habe ich
+      bekommen", die Schuld sagt "ich habe zugesagte Freizeit
+      hergegeben". In einer Zahl vermischt könnte man später nicht mehr
+      erkennen, welcher der beiden Effekte gerade wirkt.</p>
+      <p>Anders als beim Kontostand gibt es hier <strong>keine
+      Mindestwochen</strong>: wer einmal eingesprungen ist, hat den
+      Anspruch sofort, auch in der ersten Woche. Die Schuld baut sich um
+      1 ab, sobald die Person einen überdurchschnittlich guten freien
+      Tag bekommen hat — der reguläre Rotationstag, den sie ohnehin
+      bekommen hätte, zählt dafür nicht.</p>
+      <p class="achtung">Beim Justieren ist das die grobe Schraube und
+      der Ausgleich nach Kontostand die feine. Ein hergegebener Tag soll
+      deutlich schwerer wiegen als "war zuletzt gut dran". Auch hier
+      gilt: eine Lücke kann dieser Wert niemals verursachen.</p>
+      <span class="hoeher"><strong>Höher setzen:</strong> Einsprünge werden schneller
+      ausgeglichen, können aber Wunschtage anderer überstimmen.</span>
+      <span class="niedriger"><strong>Niedriger setzen (bis 0):</strong> bei 0 bleibt die Schuld
+      eine reine Anzeige ohne Wirkung — wie vor dem 16.09.2026.</span>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+  <div class="lade-hinweis">Lade …</div>
+</main>
+
+<div class="speichern-leiste" id="speichernLeiste" style="display:none;">
+  <button type="button" class="speichern-btn" id="speichernBtn">Speichern</button>
+</div>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert diese Seite?</h2>
+    <p><b>Standard-Obergrenze Sonntage/Feiertage:</b> gilt für jede Person ohne eigenen Wert im Personen-Editor. Einzelne Personen lassen sich dort weiterhin individuell übersteuern (höher oder niedriger).</p>
+    <p><b>Reihenfolge:</b> legt fest, in welcher Reihenfolge Personen in der Dienstplan-Tabelle (Entwürfe, Tab 2) erscheinen — getrennt nach Nacht- und Frühschicht.</p>
+    <p>„— Leerzeile —" fügt eine optische Lücke ein, z. B. um Bäckerei und Konditorei innerhalb einer Schicht zu trennen.</p>
+    <p>Ohne gespeicherte Reihenfolge sortiert Entwürfe weiterhin alphabetisch — das ändert sich erst, wenn hier gespeichert wird.</p>
+    <p><b>Punktesystem-Gewichte:</b> steuern, wie Entwürfe bei der Wochen-Suche verschiedene Verteilungen der freien Tage gegeneinander abwägt (Schichtwechsel, Azubi-Einsätze, Wochentag-Überschuss, Wunschtage). Bei jedem Wert erklärt der ❓-Knopf ausführlich, was eine Änderung bewirkt — vor dem Ändern lesen, manche Werte hängen in ihrer Wirkung voneinander ab.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var personenListe = [];
+  var reihenfolge = { nacht: [], frueh: [] };
+  // Ergänzt 14.09.2026 (Punktesystem-Gewichte) -- exakt dieselben
+  // Standardwerte wie GEWICHTE_STANDARD in freie_tage_verteilung.js.
+  // Nur für die Vorbelegung hier, falls noch nie gespeichert wurde --
+  // die eigentliche Quelle der Wahrheit bleibt der Rechenkern selbst.
+  var GEWICHTE_STANDARD = {
+    schichtwechselFruehNachtDirekt: 50, schichtwechselFruehNacht1TagPuffer: 20,
+    schichtwechselFruehNacht2PlusPuffer: 10, schichtwechselNachtFrueh: 0,
+    ausflugAufschlag1Tag: 25, ausflugAufschlag2Tage: 12,
+    azubiEinsatzPunkte: 10, wunschtagPunkte: 10, wichtigGewicht: 5,
+    wochentagUeberschussMoFr: 45, wochentagUeberschussSamstag: 10, wochentagUeberschussFeiertagswoche: 0,
+    kontoAusgleichGewicht: 3, schuldAusgleichGewicht: 12
+  };
+  var GEWICHTE_FELDER = Object.keys(GEWICHTE_STANDARD);
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function fehlertext(err) { return escHtml((err && err.message) || String(err)); }
+
+  // Schritt 5 (Namens-Fundament, 26.09.2026): EINE Namensfunktion für alle
+  // Planungsseiten — bos_namen.js (Rufname > Beschreibung > lokal als
+  // Kürzel > "P07 · kein Name hinterlegt"). Die frühere eigene Kopie, die
+  // Vor- und Nachname aus der lokalen Datei zusammensetzte, ist entfernt.
+  function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
+  // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
+  function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
+  // K-9: Nummer als Zahl (P9 < P10 < P100); fremde IDs ans Ende.
+  function nummerZahl(id) { var m = /^P(\d+)$/.exec(id); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; }
+  // Personen UND Namensliste zusammen laden; liefert wie vorher den
+  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  function personenUndNamen() {
+    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
+      .then(function (r) { return r[0]; });
+  }
+
+
+  function optionenHtml(ausgewaehlt) {
+    var html = '<option value="">— Leerzeile —</option>';
+    personenListe.forEach(function (p) {
+      html += '<option value="' + p.id + '"' + (p.id === ausgewaehlt ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
+    });
+    if (ausgewaehlt && !personenListe.find(function (p) { return p.id === ausgewaehlt; })) {
+      html += '<option value="' + ausgewaehlt + '" selected>' + escHtml(auswahlName(ausgewaehlt)) + ' (nicht mehr aktiv)</option>';
+    }
+    return html;
+  }
+
+  function gruppeHtml(schluessel, label) {
+    var slots = reihenfolge[schluessel];
+    var zeilen = slots.map(function (wert, i) {
+      return '<div class="slot-row">' +
+        '<span class="slot-nr">' + (i + 1) + '.</span>' +
+        '<select class="bos-input' + (wert ? '' : ' slot-leer') + '" data-gruppe="' + schluessel + '" data-index="' + i + '" data-action="set-slot">' + optionenHtml(wert) + '</select>' +
+        '<button type="button" class="icon-btn" data-gruppe="' + schluessel + '" data-index="' + i + '" data-action="remove-slot" title="Zeile entfernen">×</button>' +
+        '</div>';
+    }).join('');
+    return '<div class="abschnitt-titel">' + label + '</div><div id="gruppe-' + schluessel + '">' + zeilen + '</div>' +
+      '<button type="button" class="btn-add-slot" data-gruppe="' + schluessel + '" data-action="add-slot">+ Zeile hinzufügen</button>';
+  }
+
+  function render() {
+    document.getElementById('main').innerHTML = gruppeHtml('nacht', 'Nachtschicht') + gruppeHtml('frueh', 'Frühschicht');
+    document.getElementById('speichernLeiste').style.display = 'block';
+  }
+
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.action === 'set-slot') {
+      reihenfolge[t.dataset.gruppe][Number(t.dataset.index)] = t.value;
+      render();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t.dataset || !t.dataset.action) return;
+    if (t.dataset.action === 'add-slot') {
+      reihenfolge[t.dataset.gruppe].push('');
+      render();
+    } else if (t.dataset.action === 'remove-slot') {
+      reihenfolge[t.dataset.gruppe].splice(Number(t.dataset.index), 1);
+      render();
+    }
+  });
+
+  document.getElementById('speichernBtn').addEventListener('click', function () {
+    var btn = document.getElementById('speichernBtn');
+    btn.disabled = true; btn.textContent = 'Speichert …';
+    var obergrenzeRoh = document.getElementById('sonntagObergrenze').value;
+    var obergrenze = obergrenzeRoh === '' ? null : Math.max(0, parseInt(obergrenzeRoh, 10) || 0);
+    // Ergänzt 14.09.2026: Punktesystem-Gewichte -- jedes Feld einzeln
+    // lesen, bei ungültiger/leerer Eingabe den Standardwert für genau
+    // dieses Feld verwenden (nie NaN nach Firestore schreiben).
+    var gewichte = {};
+    GEWICHTE_FELDER.forEach(function (feld) {
+      var el = document.getElementById('f-' + feld);
+      var wert = el ? parseFloat(el.value) : NaN;
+      gewichte[feld] = isNaN(wert) ? GEWICHTE_STANDARD[feld] : wert;
+    });
+    Promise.all([
+      window.db.collection('einstellungen').doc('dienstplan_reihenfolge').set(reihenfolge),
+      window.db.collection('einstellungen').doc('sonntag_standard').set({ obergrenze: obergrenze }),
+      window.db.collection('einstellungen').doc('punktesystem_gewichte').set(gewichte)
+    ]).then(function () {
+      btn.disabled = false; btn.textContent = 'Speichern';
+      alert('Gespeichert.');
+    }).catch(function (err) {
+      console.error('[Einstellungen] Speichern fehlgeschlagen:', err);
+      btn.disabled = false; btn.textContent = 'Speichern';
+      alert('Speichern fehlgeschlagen: ' + fehlertext(err));
+    });
+  });
+
+  // Ergänzt 14.09.2026: ❓-Buttons bei den Punktesystem-Gewichten --
+  // klappen die zugehörige Erklärung auf/zu. Reines Anzeige-Verhalten,
+  // keine Firestore-Interaktion, deshalb hier registriert statt erst
+  // nach dem Laden.
+  document.querySelectorAll('.frage-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var ziel = document.getElementById(btn.dataset.ziel);
+      var offen = ziel.classList.toggle('offen');
+      btn.classList.toggle('offen', offen);
+      btn.textContent = offen ? '✕' : '?';
+    });
+  });
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen-sheet'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen-sheet'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen-sheet'); });
+
+  /* ==== Start ==== */
+  function start() {
+    Promise.all([
+      personenUndNamen(),
+      window.db.collection('einstellungen').doc('dienstplan_reihenfolge').get(),
+      window.db.collection('einstellungen').doc('sonntag_standard').get(),
+      window.db.collection('einstellungen').doc('punktesystem_gewichte').get()
+    ]).then(function (ergebnisse) {
+      personenListe = [];
+      ergebnisse[0].forEach(function (doc) {
+        var d = doc.data();
+        if (d.aktiv !== false) personenListe.push(Object.assign({ id: doc.id }, d));
+      });
+
+      if (ergebnisse[1].exists) {
+        var gespeichert = ergebnisse[1].data();
+        reihenfolge.nacht = gespeichert.nacht || [];
+        reihenfolge.frueh = gespeichert.frueh || [];
+      } else {
+        // Kein gespeicherter Stand -- alphabetisch vorbelegen (identisch
+        // zum bisherigen Default in entwuerfe.html), damit der erste
+        // Aufruf nicht leer startet.
+        ['nacht', 'frueh'].forEach(function (schicht) {
+          // K-9 (Schritt 5): Vorbelegung nach NUMMER, nicht nach Anzeige —
+          // eine gespeicherte Reihenfolge darf sich nicht verschieben, weil
+          // jemand seinen Rufnamen ändert.
+          reihenfolge[schicht] = personenListe.filter(function (p) { return p.stammschicht === schicht; })
+            .sort(function (a, b) { return nummerZahl(a.id) - nummerZahl(b.id) || a.id.localeCompare(b.id); })
+            .map(function (p) { return p.id; });
+        });
+      }
+
+      if (ergebnisse[2].exists && ergebnisse[2].data().obergrenze != null) {
+        document.getElementById('sonntagObergrenze').value = ergebnisse[2].data().obergrenze;
+      }
+
+      // Ergänzt 14.09.2026: Punktesystem-Gewichte -- gespeicherte Werte
+      // oder, falls noch nie gespeichert, die eingebauten Standardwerte
+      // (identisch zu GEWICHTE_STANDARD in freie_tage_verteilung.js).
+      var gespeicherteGewichte = ergebnisse[3].exists ? ergebnisse[3].data() : {};
+      GEWICHTE_FELDER.forEach(function (feld) {
+        var el = document.getElementById('f-' + feld);
+        if (el) el.value = (gespeicherteGewichte[feld] !== undefined ? gespeicherteGewichte[feld] : GEWICHTE_STANDARD[feld]);
+      });
+
+      render();
+    }).catch(function (err) {
+      console.error('[Einstellungen] Laden fehlgeschlagen:', err);
+      document.getElementById('main').innerHTML = '<div class="lade-hinweis">Laden fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+  (window.BOS_AUTH_READY || Promise.resolve()).then(start).catch(start);
+
+})();
+</script>
+</body>
+</html>

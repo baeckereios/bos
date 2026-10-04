@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Verbrauch – Werkstatt · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Design-System: identisches Einbindungsmuster wie verbrauch_manuell.html -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  .hidden { display: none !important; }
+
+  #app { max-width: 720px; margin: 0 auto; padding: var(--bos-space-md, 18px); padding-bottom: var(--bos-space-xl, 64px); }
+
+  .bos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--bos-space-md, 18px); }
+  .bos-header h1 { font-family: var(--bos-font-display); font-size: var(--bos-font-xl, 1.3rem); margin: 0; font-weight: 700; }
+  .icon-btn {
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: 999px;
+    width: 40px; height: 40px; font-size: var(--bos-font-lg, 1.1rem);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--bos-text);
+  }
+
+  .status-err { color: var(--bos-red); font-size: var(--bos-font-sm, .82rem); }
+  .status-ok { color: var(--bos-green); font-size: var(--bos-font-sm, .82rem); }
+
+  .hinweis-block {
+    background: var(--bos-surface); border: 1px dashed var(--bos-border); color: var(--bos-text-dim);
+    border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px); font-size: var(--bos-font-md, .95rem);
+  }
+
+  .tag-liste { display: flex; flex-direction: column; gap: var(--bos-space-xs, 10px); }
+  .tag-karte {
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md, 14px);
+    padding: var(--bos-space-sm, 14px); display: flex; align-items: center; gap: var(--bos-space-sm, 12px);
+    cursor: pointer;
+  }
+  .tag-karte:active { border-color: var(--bos-amber); }
+  .tag-info { flex: 1; min-width: 0; }
+  .tag-datum { font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-md, 1rem); }
+  .tag-meta { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim); margin-top: 2px; }
+  .tag-badge {
+    font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .7rem); font-weight: 700;
+    padding: var(--bos-space-3xs, 3px) var(--bos-space-2xs, 7px); border-radius: 999px;
+    background: rgba(214,88,74,0.16); color: var(--bos-red); white-space: nowrap;
+  }
+  .tag-loeschen {
+    background: transparent; border: 1px solid var(--bos-border); color: var(--bos-text-dim);
+    border-radius: var(--bos-radius-sm, 6px); width: 36px; height: 36px; font-size: 1rem; cursor: pointer; flex: none;
+  }
+
+  .detail-header { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); margin-bottom: var(--bos-space-xs, 6px); }
+  .zurueck-btn { background: transparent; border: none; color: var(--bos-amber); font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-md, 1rem); cursor: pointer; padding: 0; }
+  .detail-titel { font-family: var(--bos-font-display); font-size: var(--bos-font-lg, 1.2rem); margin: 0; flex: 1; }
+  .detail-meta { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim); margin-bottom: var(--bos-space-sm, 14px); }
+
+  .besonders-toggle { display: flex; gap: var(--bos-space-xs, 8px); margin-bottom: var(--bos-space-md, 16px); }
+  .besonders-btn {
+    flex: 1; padding: var(--bos-space-xs, 10px); font-family: var(--bos-font-label); font-weight: 700;
+    border-radius: var(--bos-radius-sm, 6px); border: 2px solid var(--bos-border); background: var(--bos-bg-soft);
+    color: var(--bos-text); cursor: pointer; font-size: var(--bos-font-sm, .85rem);
+  }
+  .besonders-btn.aktiv { border-color: var(--bos-amber); background: var(--bos-amber); color: #1b1305; }
+
+  .eintrag-zeile {
+    display: flex; align-items: center; gap: var(--bos-space-sm, 10px); flex-wrap: wrap;
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md, 14px);
+    padding: var(--bos-space-sm, 12px); margin-bottom: var(--bos-space-xs, 8px);
+  }
+  .eintrag-name { flex: 1 1 140px; min-width: 0; }
+  .eintrag-name strong { display: block; font-weight: 600; }
+  .eintrag-roh { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); }
+  .eintrag-menge { width: 84px; font-size: var(--bos-font-md, 1rem); padding: var(--bos-space-2xs, 7px); text-align: center; border-radius: 8px; border: 1px solid var(--bos-border-strong); background: var(--bos-bg-soft); color: var(--bos-text); }
+  .eintrag-ausreisser-label { display: flex; align-items: center; gap: 4px; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); white-space: nowrap; }
+  .eintrag-ausreisser { width: 20px; height: 20px; accent-color: var(--bos-amber); }
+  .eintrag-del { background: transparent; border: 1px solid var(--bos-border); color: var(--bos-text-dim); border-radius: var(--bos-radius-sm, 6px); width: 34px; height: 34px; cursor: pointer; flex: none; }
+
+  .aktion-reihe { display: flex; gap: var(--bos-space-sm, 12px); margin-top: var(--bos-space-md, 18px); }
+  .aktion-reihe .bos-btn { flex: 1; }
+  .btn-gefahr { background: rgba(214,88,74,0.14); border-color: var(--bos-red); color: var(--bos-red); }
+  .btn-gefahr:hover { background: rgba(214,88,74,0.22); }
+
+  .bos-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50; display: flex; align-items: center; justify-content: center; padding: var(--bos-space-md, 20px); }
+  .bos-modal { max-width: 320px; width: 100%; padding: var(--bos-space-lg, 22px); display: flex; flex-direction: column; gap: var(--bos-space-xs, 10px); background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md, 14px); }
+  .bos-modal .bos-btn-row { display: flex; gap: var(--bos-space-xs, 10px); margin-top: var(--bos-space-2xs, 6px); }
+  .bos-modal .bos-btn-row .bos-btn { flex: 1; }
+
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 60; display: flex; align-items: flex-end; }
+  .sheet { background: var(--bos-surface); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: var(--bos-space-sm, 14px) var(--bos-space-md, 20px) var(--bos-space-lg, 24px); border-top: 1px solid var(--bos-border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--bos-border); border-radius: 2px; margin: 0 auto var(--bos-space-sm, 14px); }
+  .sheet h2 { font-family: var(--bos-font-display); font-size: var(--bos-font-lg, 1.15rem); margin: 0 0 var(--bos-space-sm, 14px); }
+  .sheet .sec { margin-bottom: var(--bos-space-sm, 16px); }
+  .sheet .sec h3 { font-size: var(--bos-font-md, .9rem); color: var(--bos-amber); margin: 0 0 4px; }
+  .sheet .sec p { font-size: var(--bos-font-sm, .87rem); color: var(--bos-text); line-height: 1.5; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- Zugriff — Rollen-Guard (Fumbling-Schutz), muss 'admin' sein. WICHTIG:
+     bos_permissions.js braucht "verbrauch_werkstatt: true" im admin-Block,
+     sonst ist diese Seite laut bos_access.js fail-open für JEDE Rolle
+     (siehe VERBRAUCH_WERKSTATT_DOKU.md). Reihenfolge bindend, siehe
+     bos_access_guard.js Kopf-Kommentar. -->
+<script>var BOS_APP_ID = 'verbrauch_werkstatt';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+<!-- PIN-Schleuse entfernt 22.09.2026 (B-24). Sie war ein Vergleich im
+     Browser gegen einen Wert aus der öffentlich ausgelieferten
+     bos_pin_config.js ("reiner Fumbling-Schutz fürs Ansehen") — vor einer
+     Seite, deren schreibende Aktionen ohnehin das Admin-Passwort über
+     adminReauth() verlangen und serverseitig an istAdmin() hängen.
+     Das Ansehen schützen der Rollen-Guard (nur admin) und seit Etappe 5
+     die Firestore-Regeln (hatKonto). -->
+
+<div id="app">
+  <header class="bos-header">
+    <h1>Verbrauch-Werkstatt</h1>
+    <button id="hilfeBtn" class="icon-btn" aria-label="Hilfe" type="button">❓</button>
+  </header>
+
+  <p id="ladeHinweis" class="hinweis-block">Lädt …</p>
+  <p id="leerHinweis" class="hinweis-block" hidden>Noch keine „Verbrauch (manuell)“-Einträge in der Datenbank.</p>
+
+  <section id="listenAnsicht">
+    <div id="tagListe" class="tag-liste"></div>
+  </section>
+
+  <section id="detailAnsicht" hidden>
+    <div class="detail-header">
+      <button class="zurueck-btn" id="zurueckBtn" type="button">← Liste</button>
+      <h2 class="detail-titel" id="detailTitel"></h2>
+    </div>
+    <p class="detail-meta" id="detailMeta"></p>
+
+    <div class="besonders-toggle">
+      <button type="button" class="besonders-btn" id="btnNormal">Normaler Tag</button>
+      <button type="button" class="besonders-btn" id="btnBesonders">Ferien / besonderer Tag</button>
+    </div>
+
+    <div id="eintraegeListe"></div>
+    <p id="detailStatus" style="font-size:.85rem;color:var(--bos-text-dim); min-height: 1.2em;"></p>
+
+    <div class="aktion-reihe">
+      <button class="bos-btn btn-gefahr" id="dokLoeschenBtn" type="button">🗑 Tag löschen</button>
+      <button class="bos-btn bos-btn--amber" id="speichernBtn" type="button" disabled>Änderungen speichern</button>
+    </div>
+  </section>
+
+  <div id="adminAuthOverlay" class="bos-modal-overlay hidden">
+    <div class="bos-modal">
+      <div class="bos-title" style="font-size:1.1rem;">Admin-Anmeldung</div>
+      <p style="color:var(--bos-text-dim); font-size:.85rem; margin:0;">Ändern oder Löschen verlangt eine kurze Anmeldung mit dem Admin-Konto.</p>
+      <input type="password" id="adminPwInput" class="bos-input" placeholder="Admin-Passwort">
+      <p id="adminPwErr" class="status-err hidden"></p>
+      <div class="bos-btn-row">
+        <button class="bos-btn" id="adminPwCancel">Abbrechen</button>
+        <button class="bos-btn bos-btn--amber" id="adminPwConfirm">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="hilfeSheet" class="sheet-overlay hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>Hilfe zu dieser Seite</h2>
+      <div class="sec"><h3>Wofür ist diese Seite?</h3><p>Zum Nachsehen und Korrigieren einzelner Tage aus der manuellen Verbrauchserfassung — für den Fall, dass beim Eintragen ein Fehler passiert ist (falsche Zahl, falscher Tag) oder ein Testeintrag wieder raus muss.</p></div>
+      <div class="sec"><h3>Warum eine extra Anmeldung beim Speichern/Löschen?</h3><p>Ansehen geht mit dem PIN wie bei den anderen Admin-Werkzeugen. Ändern oder Löschen ist der einzige Ort im System, an dem bereits erfasste Messwerte verschwinden oder sich rückwirkend ändern können — deshalb verlangt das eine gesonderte Anmeldung mit dem Admin-Passwort, getrennt vom PIN.</p></div>
+      <div class="sec"><h3>Was heißt „Tag löschen“?</h3><p>Entfernt den kompletten Eintrag für diesen Tag unwiderruflich aus der Datenbank — alle darin enthaltenen Produktwerte sind danach weg. Für einzelne Produkte reicht das 🗑 neben der jeweiligen Zeile, ohne den ganzen Tag zu löschen.</p></div>
+      <div class="sec"><h3>Was bedeutet „erfasst als Stück“?</h3><p>Manche Werte wurden ursprünglich in Stück eingetragen und automatisch in Bleche umgerechnet. Der Wert, der hier bearbeitet wird, ist immer der maßgebliche Bleche-Wert — der Stück-Rohwert daneben ist nur zur Information und wird beim Speichern nicht automatisch mit angepasst.</p></div>
+      <button class="bos-btn" id="hilfeSchliessen" style="width:100%;">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<!-- MUSS vor bos_accounts.js — liefert BOS_BV.silbe()/adminKennung() -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_accounts.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* -----------------------------------------------------------
+   * Datentopf als Parameter, nicht hart verdrahtet — Ulf-Entscheidung
+   * 04.09.2026: froster_zaehlung bewusst außen vor (Neuzählung
+   * korrigiert sich selbst, nur zählkundiges Personal). Weg zu
+   * 'verbrauch_offiziell' offen halten, sobald es dort einen laufenden
+   * Import/laufende Erfassung gibt — dann reicht eine kleine Auswahl in
+   * der UI plus ggf. eine zweite orderBy-lose Abfrage wie unten.
+   * --------------------------------------------------------- */
+  var AKTUELLER_TYP = 'verbrauch_manuell';
+
+  var WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+  function wochentagVonISODatum(isoDatum) {
+    var teile = isoDatum.split('-').map(Number);
+    var d = new Date(teile[0], teile[1] - 1, teile[2]);
+    return WOCHENTAGE[d.getDay()];
+  }
+  function formatDatumDE(isoDatum) {
+    var teile = isoDatum.split('-');
+    return teile[2] + '.' + teile[1] + '.' + teile[0];
+  }
+
+  /* Start ohne PIN-Schleuse (entfernt 22.09.2026, siehe Kommentar im HTML).
+     initApp() wird am Ende dieses Skripts aufgerufen — dort sind alle
+     Funktionen und Zustandsvariablen definiert, die es braucht. */
+
+  /* -----------------------------------------------------------
+   * Hilfe
+   * --------------------------------------------------------- */
+  document.getElementById('hilfeBtn').onclick = function () { document.getElementById('hilfeSheet').classList.remove('hidden'); };
+  document.getElementById('hilfeSchliessen').onclick = function () { document.getElementById('hilfeSheet').classList.add('hidden'); };
+  document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
+
+  /* -----------------------------------------------------------
+   * Produktnamen-Lookup — alle 87 Produkte, nicht nur die aktuell für
+   * manuelleErfassung freigeschalteten: ein älteres Dokument kann Werte
+   * für Produkte enthalten, die inzwischen wieder ausgeschaltet wurden.
+   * --------------------------------------------------------- */
+  var produktNamen = {};
+  function ladeProduktNamen() {
+    return fetch('../produkt_config.json', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (liste) {
+        (liste || []).forEach(function (p) { produktNamen[p.legacyKey] = p.name || p.legacyKey; });
+      })
+      .catch(function (fehler) {
+        console.warn('produkt_config.json konnte nicht geladen werden, zeige Rohschlüssel:', fehler);
+      });
+  }
+  function produktName(legacyKey) { return produktNamen[legacyKey] || legacyKey; }
+
+  /* -----------------------------------------------------------
+   * Dokumente laden — reiner Gleichheitsfilter (kein Composite-Index
+   * nötig). Sortierung (neuestes Datum zuerst) bewusst clientseitig:
+   * where()+orderBy() auf unterschiedlichen Feldern bräuchte einen
+   * Composite-Index, den es für bos_events noch nicht gibt. Bei der
+   * aktuell überschaubaren Menge an manuellen Erfassungen unkritisch.
+   * --------------------------------------------------------- */
+  var dokumente = [];
+
+  function ladeDokumente() {
+    return window.db.collection('bos_events')
+      .where('type', '==', AKTUELLER_TYP)
+      .get()
+      .then(function (snap) {
+        dokumente = [];
+        snap.forEach(function (doc) {
+          dokumente.push(Object.assign({ id: doc.id }, doc.data()));
+        });
+        dokumente.sort(function (a, b) {
+          if (a.datum !== b.datum) return a.datum < b.datum ? 1 : -1;
+          var ta = (a.ts && a.ts.toDate) ? a.ts.toDate().getTime() : 0;
+          var tb = (b.ts && b.ts.toDate) ? b.ts.toDate().getTime() : 0;
+          return tb - ta;
+        });
+      });
+  }
+
+  function renderListe() {
+    var container = document.getElementById('tagListe');
+    container.innerHTML = '';
+    document.getElementById('leerHinweis').hidden = dokumente.length > 0;
+
+    dokumente.forEach(function (dok) {
+      var karte = document.createElement('div');
+      karte.className = 'tag-karte';
+
+      var info = document.createElement('div');
+      info.className = 'tag-info';
+      var datumEl = document.createElement('div');
+      datumEl.className = 'tag-datum';
+      datumEl.textContent = formatDatumDE(dok.datum) + ' · ' + (dok.wochentag || wochentagVonISODatum(dok.datum));
+      var metaEl = document.createElement('div');
+      metaEl.className = 'tag-meta';
+      var anzahlAusreisser = (dok.eintraege || []).filter(function (e) { return e.ausreisser; }).length;
+      var metaTeile = [(dok.eintraege || []).length + ' Einträge'];
+      if (dok.besondererTag) metaTeile.push('Besonderer Tag');
+      metaEl.textContent = metaTeile.join(' · ');
+      info.appendChild(datumEl);
+      info.appendChild(metaEl);
+
+      karte.appendChild(info);
+
+      if (anzahlAusreisser > 0) {
+        var badge = document.createElement('span');
+        badge.className = 'tag-badge';
+        badge.textContent = '⚠️ ' + anzahlAusreisser;
+        karte.appendChild(badge);
+      }
+
+      var loeschBtn = document.createElement('button');
+      loeschBtn.type = 'button';
+      loeschBtn.className = 'tag-loeschen';
+      loeschBtn.title = 'Diesen Tag löschen';
+      loeschBtn.textContent = '🗑';
+      loeschBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!confirm('Eintrag vom ' + formatDatumDE(dok.datum) + ' wirklich unwiderruflich löschen?')) return;
+        oeffneAdminAuth({ typ: 'dokumentLoeschen', dokId: dok.id, datum: dok.datum });
+      });
+      karte.appendChild(loeschBtn);
+
+      karte.addEventListener('click', function () { oeffneDetail(dok.id); });
+      container.appendChild(karte);
+    });
+  }
+
+  /* -----------------------------------------------------------
+   * Detail-Ansicht
+   * --------------------------------------------------------- */
+  var aktuellesDokId = null;
+  var arbeitsKopie = null; // { eintraege: [...], besondererTag: bool }
+  var detailGeaendert = false;
+
+  function oeffneDetail(dokId) {
+    var dok = dokumente.find(function (d) { return d.id === dokId; });
+    if (!dok) return;
+    aktuellesDokId = dokId;
+    arbeitsKopie = {
+      eintraege: (dok.eintraege || []).map(function (e) { return Object.assign({}, e); }),
+      besondererTag: !!dok.besondererTag
+    };
+    detailGeaendert = false;
+
+    document.getElementById('detailTitel').textContent = formatDatumDE(dok.datum) + ' · ' + (dok.wochentag || wochentagVonISODatum(dok.datum));
+    var zeitInfo = '';
+    if (dok.ts && dok.ts.toDate) {
+      zeitInfo = 'Erfasst am ' + dok.ts.toDate().toLocaleDateString('de-DE') + ' um ' + dok.ts.toDate().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+    }
+    if (dok.zuletztBearbeitet && dok.zuletztBearbeitet.toDate) {
+      zeitInfo += (zeitInfo ? ' · ' : '') + 'zuletzt korrigiert am ' + dok.zuletztBearbeitet.toDate().toLocaleDateString('de-DE');
+    }
+    document.getElementById('detailMeta').textContent = zeitInfo;
+    document.getElementById('detailStatus').textContent = '';
+    document.getElementById('speichernBtn').disabled = true;
+
+    document.getElementById('listenAnsicht').hidden = true;
+    document.getElementById('detailAnsicht').hidden = false;
+    renderDetail();
+  }
+
+  function schliesseDetail() {
+    aktuellesDokId = null;
+    arbeitsKopie = null;
+    detailGeaendert = false;
+    document.getElementById('detailAnsicht').hidden = true;
+    document.getElementById('listenAnsicht').hidden = false;
+  }
+  document.getElementById('zurueckBtn').addEventListener('click', function () {
+    if (detailGeaendert && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+    schliesseDetail();
+  });
+
+  function markiereDetailGeaendert() {
+    detailGeaendert = true;
+    document.getElementById('speichernBtn').disabled = false;
+    document.getElementById('detailStatus').textContent = 'Ungespeicherte Änderungen';
+  }
+
+  function aktualisiereBesondersButtons() {
+    document.getElementById('btnNormal').classList.toggle('aktiv', arbeitsKopie.besondererTag === false);
+    document.getElementById('btnBesonders').classList.toggle('aktiv', arbeitsKopie.besondererTag === true);
+  }
+  document.getElementById('btnNormal').addEventListener('click', function () {
+    arbeitsKopie.besondererTag = false; aktualisiereBesondersButtons(); markiereDetailGeaendert();
+  });
+  document.getElementById('btnBesonders').addEventListener('click', function () {
+    arbeitsKopie.besondererTag = true; aktualisiereBesondersButtons(); markiereDetailGeaendert();
+  });
+
+  function renderDetail() {
+    aktualisiereBesondersButtons();
+    var liste = document.getElementById('eintraegeListe');
+    liste.innerHTML = '';
+
+    arbeitsKopie.eintraege.forEach(function (eintrag, idx) {
+      var zeile = document.createElement('div');
+      zeile.className = 'eintrag-zeile';
+
+      var name = document.createElement('div');
+      name.className = 'eintrag-name';
+      var stark = document.createElement('strong');
+      stark.textContent = produktName(eintrag.legacyKey);
+      name.appendChild(stark);
+      if (eintrag.erfasstAls === 'stueck') {
+        var roh = document.createElement('div');
+        roh.className = 'eintrag-roh';
+        roh.textContent = 'erfasst als ' + eintrag.mengeRoh + ' Stück';
+        name.appendChild(roh);
+      }
+
+      var mengeInput = document.createElement('input');
+      mengeInput.type = 'number';
+      mengeInput.step = '0.01';
+      mengeInput.className = 'eintrag-menge';
+      mengeInput.value = eintrag.menge;
+      mengeInput.setAttribute('aria-label', 'Menge (Bleche) für ' + produktName(eintrag.legacyKey));
+      mengeInput.addEventListener('input', function () {
+        var wert = Number(mengeInput.value);
+        arbeitsKopie.eintraege[idx].menge = Number.isNaN(wert) ? 0 : wert;
+        markiereDetailGeaendert();
+      });
+
+      var ausreisserLabel = document.createElement('label');
+      ausreisserLabel.className = 'eintrag-ausreisser-label';
+      var ausreisserCb = document.createElement('input');
+      ausreisserCb.type = 'checkbox';
+      ausreisserCb.className = 'eintrag-ausreisser';
+      ausreisserCb.checked = !!eintrag.ausreisser;
+      ausreisserCb.addEventListener('change', function () {
+        arbeitsKopie.eintraege[idx].ausreisser = ausreisserCb.checked;
+        markiereDetailGeaendert();
+      });
+      ausreisserLabel.appendChild(ausreisserCb);
+      ausreisserLabel.appendChild(document.createTextNode('⚠️'));
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'eintrag-del';
+      delBtn.title = 'Diesen Produktwert entfernen';
+      delBtn.textContent = '🗑';
+      delBtn.addEventListener('click', function () {
+        arbeitsKopie.eintraege.splice(idx, 1);
+        markiereDetailGeaendert();
+        renderDetail();
+      });
+
+      zeile.appendChild(name);
+      zeile.appendChild(mengeInput);
+      zeile.appendChild(ausreisserLabel);
+      zeile.appendChild(delBtn);
+      liste.appendChild(zeile);
+    });
+
+    if (arbeitsKopie.eintraege.length === 0) {
+      var leer = document.createElement('p');
+      leer.className = 'hinweis-block';
+      leer.textContent = 'Keine Produktwerte mehr übrig — „Änderungen speichern“ würde ein leeres Dokument hinterlassen. Eher „Tag löschen“ verwenden.';
+      liste.appendChild(leer);
+    }
+  }
+
+  /* -----------------------------------------------------------
+   * Admin-Anmeldung — 1:1 dasselbe Muster wie konten_verwaltung.html
+   * --------------------------------------------------------- */
+  var pendingAdminAktion = null;
+
+  function oeffneAdminAuth(aktion) {
+    pendingAdminAktion = aktion;
+    document.getElementById('adminPwInput').value = '';
+    document.getElementById('adminPwErr').classList.add('hidden');
+    document.getElementById('adminAuthOverlay').classList.remove('hidden');
+    document.getElementById('adminPwInput').focus();
+  }
+  document.getElementById('speichernBtn').addEventListener('click', function () {
+    oeffneAdminAuth({ typ: 'speichern', dokId: aktuellesDokId, eintraege: arbeitsKopie.eintraege, besondererTag: arbeitsKopie.besondererTag });
+  });
+  document.getElementById('dokLoeschenBtn').addEventListener('click', function () {
+    var dok = dokumente.find(function (d) { return d.id === aktuellesDokId; });
+    if (!dok || !confirm('Eintrag vom ' + formatDatumDE(dok.datum) + ' wirklich unwiderruflich löschen?')) return;
+    oeffneAdminAuth({ typ: 'dokumentLoeschen', dokId: aktuellesDokId, datum: dok.datum, ausDetail: true });
+  });
+  document.getElementById('adminPwCancel').addEventListener('click', function () {
+    document.getElementById('adminAuthOverlay').classList.add('hidden');
+    pendingAdminAktion = null;
+  });
+  document.getElementById('adminPwInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('adminPwConfirm').click();
+  });
+
+  document.getElementById('adminPwConfirm').addEventListener('click', function () {
+    var pw = document.getElementById('adminPwInput').value;
+    var errEl = document.getElementById('adminPwErr');
+    var btn = this;
+    if (!pw || !pendingAdminAktion) return;
+    btn.disabled = true;
+    var aktion = pendingAdminAktion;
+
+    window.BOS_ACCOUNTS.adminReauth(pw)
+      .then(function () {
+        var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+        if (aktion.typ === 'dokumentLoeschen') {
+          return adminDb.collection('bos_events').doc(aktion.dokId).delete();
+        }
+        return adminDb.collection('bos_events').doc(aktion.dokId).update({
+          eintraege: aktion.eintraege,
+          besondererTag: aktion.besondererTag,
+          zuletztBearbeitet: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      })
+      .then(function () { return window.BOS_ACCOUNTS.adminReauthEnde(); })
+      .then(function () {
+        document.getElementById('adminAuthOverlay').classList.add('hidden');
+        btn.disabled = false;
+        pendingAdminAktion = null;
+
+        var warDetailSpeichern = (aktion.typ === 'speichern');
+        var dokIdFuerReopen = aktion.dokId;
+
+        if (aktion.typ === 'dokumentLoeschen' && aktion.ausDetail) {
+          schliesseDetail();
+        } else if (warDetailSpeichern) {
+          detailGeaendert = false;
+          document.getElementById('detailStatus').textContent = '✓ Gespeichert';
+        }
+
+        return ladeDokumente().then(function () {
+          renderListe();
+          if (warDetailSpeichern && document.getElementById('detailAnsicht').hidden === false) {
+            oeffneDetail(dokIdFuerReopen);
+          }
+        });
+      })
+      .catch(function (fehler) {
+        console.warn('Verbrauch-Werkstatt: Aktion fehlgeschlagen', fehler);
+        errEl.textContent = 'Falsches Passwort oder Fehler beim Speichern.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        window.BOS_ACCOUNTS.adminReauthEnde().catch(function () {});
+      });
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (detailGeaendert) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  /* -----------------------------------------------------------
+   * Init
+   * --------------------------------------------------------- */
+  function initApp() {
+    if (!window.BOS_AUTH_READY || !window.db || !window.BOS_ACCOUNTS) {
+      document.getElementById('ladeHinweis').textContent = 'Firestore/Accounts-Modul fehlt.';
+      return;
+    }
+    window.BOS_AUTH_READY
+      .then(function () { return Promise.all([ladeProduktNamen(), ladeDokumente()]); })
+      .then(function () {
+        document.getElementById('ladeHinweis').hidden = true;
+        renderListe();
+      })
+      .catch(function (fehler) {
+        console.error('Verbrauch-Werkstatt: Laden fehlgeschlagen', fehler);
+        // Grund sichtbar machen (22.09.2026): "Verbindung prüfen" führte bei
+        // einer Regelablehnung in die Irre — der Grund stand nur in der Konsole.
+        var code = (fehler && fehler.code) || '';
+        document.getElementById('ladeHinweis').textContent =
+          code === 'permission-denied'
+            ? 'Laden fehlgeschlagen: keine Berechtigung (die Regeln lassen diesen Zugriff nicht zu).'
+            : 'Laden fehlgeschlagen: ' + ((fehler && fehler.message) || String(fehler));
+      });
+  }
+
+  // Start — früher hinter der PIN-Schleuse, seit 22.09.2026 direkt.
+  initApp();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Froster · Inventur — BäckereiOS</title>
+
+<!--
+  MODUL: froster_inventur.html
+  ZWECK: Erster Satellit im BOS-V2-Rebuild. Reine Ist-Zustand-Erfassung des
+         Frosterbestands ("was liegt gerade drin"). Keine Berechnung, keine
+         Fehlmengen-Logik — das passiert in der Bedeutungs-Schicht im Host.
+  DATENFLUSS: produkt_config.json (Auto-Fetch "../produkt_config.json" oder
+         manueller Upload) → gefiltert nach frosterZustaendigkeit !== 'nein'
+         → Poka-Yoke-Abfrage "Vorbereitung fertig?" pro aktiver Zuständigkeits-
+         Gruppe (blockierend, keine Vorauswahl — sakrosankt, siehe Manifest)
+         → Zählung durch Nutzer → EIN Snapshot-Dokument pro Absenden nach
+         Firestore-Collection "bos_events" (type: 'froster_zaehlung').
+  SCHNITTSTELLEN: produkt_config.json (Feld frosterZustaendigkeit: 'nein' |
+         'baecker' | 'konditoren' | 'sonstige', optional frosterSort: number,
+         optional einheit: string, Freitext, Fallback 'bleche' — seit v0.4),
+         bos_firebase_config.js (zentrale, geteilte Firebase-Config — siehe
+         eigene Doku dort), Firestore (Mechanik-Schicht, Anonymous Auth).
+  BEKANNTE OFFENE PUNKTE: bos_firebase_config.js muss einmal projektweit mit
+         echten Werten befüllt werden (siehe Doku dort). Ordnerpfad zu
+         produkt_config.json noch nicht final, da Satelliten-Ordnerstruktur
+         im Rebuild noch nicht feststeht — Auto-Fetch-Pfad ggf. anpassen.
+         Host-seitiger Handler für type: 'froster_zaehlung' (Bedeutungs-
+         Schicht, "letzter Wert pro Produkt gewinnt", Verrechnung von
+         vorbereitungFertig mit der Kette) existiert noch nicht und ist der
+         nächste Schritt.
+
+  CHANGELOG
+    2026-08-16 · v0.1 · Feature
+      Erste Version. Ist-Zustand-Zählung, Gruppierung nach
+      frosterZustaendigkeit, Fortschrittsanzeige, Snapshot-Write nach
+      Firestore (append-only, ein Dokument pro Zählvorgang).
+    2026-08-16 · v0.2 · Refactor
+      Firebase-Config aus der Seite raus, zentral in bos_firebase_config.js
+      ausgelagert (analog bos_design_tokens.css) — keine Duplikate mehr
+      pro Satellit.
+    2026-08-16 · v0.3 · Feature
+      Poka-Yoke „Vorbereitung für morgen fertig?" ergänzt — pro aktiver
+      Zuständigkeits-Gruppe einzeln, blockierend, keine Vorauswahl (sakro-
+      sanktes UX-Muster aus altem System übernommen). Antwort fließt als
+      vorbereitungFertig: {gruppe: bool} ins Snapshot-Dokument. Bleibt reine
+      Ist-Beobachtung — keine Interpretation, das macht weiterhin der Host.
+    2026-08-28 · v0.4 · Fix
+      Feld "einheit" wurde bisher komplett ignoriert — jede Zeile zeigte
+      unabhängig vom tatsächlichen Produkt hart codiert "Bl." (Bleche) an.
+      Zeigt jetzt den echten Wert aus produkt_config.json (z. B. "stueck",
+      "rote Diele", "Lochblech" — das Feld ist seit heute bewusst Freitext,
+      siehe SESSION_2026-08-28_PRODUKT_CONFIG_FELD_GLOSSAR.md). Fehlt das
+      Feld bei einem Produkt, bleibt "bleche" als Fallback — entspricht dem
+      bisherigen Anzeigeverhalten, keine Überraschung für unveränderte Fälle.
+    2026-08-28 · v0.5 · Refactor
+      Bindet jetzt tatsächlich die echte, bereits existierende
+      bos_design_tokens.css ein (vorher gar nicht verlinkt, obwohl das
+      data-theme="dark"-Attribut oben schon länger dafür vorbereitet war).
+      Lokale Farbnamen (--bg, --amber, --frost, ...) bleiben als Alias
+      bestehen, damit der Rest der Datei unangetastet bleibt, zeigen aber
+      jetzt auf die echten --bos-*-Tokens. --frost/--frost-dim hatten keine
+      Entsprechung im Tokens-System — auf --bos-blue umgestellt, dort
+      ausdrücklich als "Neutral-Akzent (z.B. Kühlung)" vorgesehen, exakt
+      der Anwendungsfall dieser Seite. Sichtbare Änderung: Akzent-/Rand-
+      Nuancen verschieben sich leicht auf die echten System-Werte. Siehe
+      SESSION_2026-08-28_DESIGN_TOKENS_KONSOLIDIERUNG.md.
+    2026-08-28 · v0.6 · Fix
+      bos_theme_sync.js eingebunden — vorher lief diese Seite immer im
+      eigenen, fest codierten data-theme="dark", unabhängig davon, was
+      im Launcher-Profil tatsächlich eingestellt war (Ulf hatte z. B.
+      "Hell" gewählt, die Seite zeigte trotzdem dunkel). Liest jetzt
+      beim Laden das echte Profil-Theme aus bos_launcher_state_v2 und
+      setzt data-theme entsprechend. Siehe SESSION_2026-08-28_THEME_
+      SYNC.md.
+    2026-09-01 · v0.7 · Feature
+      Systemweite Dichte-Einstellung (Standard/Kompakt), siehe
+      BOS_DICHTE_DOKU.md. bos_density_sync.js eingebunden, Abstände/
+      Schriftgrößen im Style-Block auf var(--bos-space-*)/var(--bos-
+      font-*) umgestellt (automatisiert mit anschließender manueller
+      Prüfung aller Ausreißer). EINE Stelle bewusst NICHT umgestellt:
+      body padding-bottom:110px — das ist der Klarabstand für den
+      fixierten Button unten, keine Komfort-Abstandswahl. Hätte er im
+      Kompakt-Modus mitgeschrumpft, hätte der Button Inhalte verdeckt.
+      Eckenradien (--radius) waren schon vorher an --bos-radius-md
+      aliasiert (v0.5) und reagieren dadurch automatisch mit, ohne
+      dass hier etwas geändert werden musste.
+    2026-09-04 · v0.8 · Fix
+      Vier von Ulf gemeldete Punkte behoben: (1) Kommentar-Ende oben hatte
+      ein überzähliges spitzes-Klammer-Zeichen direkt am Schluss (Tippfehler
+      beim vorherigen Fix) — das brach <head> vorzeitig ab (Browser-
+      Fehlerkorrektur beim ersten Nicht-Leerzeichen-Zeichen), das Zeichen
+      erschien sichtbar ganz oben im Fenster, noch vor dem Header. (2)
+      initFirebase() rief noch selbst firebase.initializeApp() mit einem
+      globalen "BOS_FIREBASE_CONFIG"-Objekt auf — dieser Kontrakt ist seit
+      der Weiterentwicklung von bos_firebase_config.js überholt: die Datei
+      initialisiert Firebase inzwischen selbst und stellt direkt window.db
+      / window.BOS_AUTH_READY bereit (siehe BOS_ABHAENGIGKEITEN.md, 2.1,
+      ✅). Der doppelte initializeApp()-Aufruf lief seither ins Leere
+      (BOS_FIREBASE_CONFIG war nie definiert → früher Return), wodurch die
+      Seite dauerhaft "Firebase ist noch nicht konfiguriert" zeigte, egal
+      ob der Host oben "Firestore: verbunden" meldet — beide Meldungen
+      beziehen sich auf unterschiedliche Firebase-Zustände (Host- vs.
+      Iframe-Kontext), waren hier aber zusätzlich durch den veralteten
+      Kontrakt entkoppelt. (3) .einheit hatte nur max-width:80px statt
+      width:80px — je nach Länge des Einheiten-Texts ("bleche" vs. "Rote
+      Dielen") wanderte dadurch das ganze .input-wrap unterschiedlich weit
+      nach links, die Zähl-Boxen standen zickzack statt untereinander. (4)
+      --bg-deep war ein hart codierter, nicht themenfähiger Fast-Schwarz-
+      Ton (#0c0a07) im Header-Gradient — blieb auch im hellen Theme
+      schwarz, während der Rest der Seite korrekt hell wurde. Header nutzt
+      jetzt var(--surface) statt des Gradients; --bg-deep entfernt. Siehe
+      SESSION_2026-09-04_FROSTER_INVENTUR_UI_FIXES.md.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat-SDK, kein Build-Tool nötig) — Version am 04.09.2026 von
+     10.12.0 auf 10.12.2 vereinheitlicht (war ungeplante Drift, kein Vorsatz). -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<!-- Zentrale BOS-Firebase-Config — eine Quelle für Host + alle Satelliten -->
+<script src="../bos_firebase_config.js"></script>
+
+<!-- Standalone-Login-Voraussetzungen (NEU 04.09.2026, siehe bos_standalone_login.js
+     Kopf-Kommentar): bos_launcher_backgrounds.js MUSS vor bos_accounts.js stehen,
+     liefert die Zwischensilbe für die Schlüsselberechnung. -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_accounts.js"></script>
+
+<!-- Zentrale BOS-Design-Tokens — existiert schon länger, war hier bisher
+     nur nie eingebunden (siehe SESSION_2026-08-28_DESIGN_TOKENS_
+     KONSOLIDIERUNG.md). Bringt außerdem einen Basis-Reset mit (box-sizing,
+     Fokus-Ring, prefers-reduced-motion) — die entsprechenden eigenen
+     Regeln unten könnten künftig entfernt werden, bleiben hier aber
+     unangetastet stehen, um nichts zu riskieren. -->
+<!-- Theme-Sync: liest das Profil-Theme aus dem Launcher-State, MUSS vor
+     bos_design_tokens.css stehen (siehe bos_theme_sync.js, Kopf-Kommentar) -->
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border, rgba(255,255,255,0.08));
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    /* --bos-blue ist im Tokens-System ausdrücklich als "Neutral-Akzent,
+       z.B. Kühlung" vorgesehen — passt exakt zur Froster-Seite, deshalb
+       hier verwendet statt eines eigenen Frost-Tons. */
+    --frost: var(--bos-blue, #4a8fd6);
+    --frost-dim: rgba(74,143,214,0.16);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --dim-2: var(--bos-text-faint, #736656);
+    --good: var(--bos-green, #4caf7d);
+    --danger: var(--bos-red, #d6584a);
+    --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin: 0;padding: 0;}
+  body{
+    background:
+      radial-gradient(ellipse at top, rgba(169,214,232,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    padding-bottom:110px; /* Klarabstand für den fixierten Button unten (Zeile ~285) — bewusst NICHT Teil der Dichte-Skala, siehe BOS_DICHTE_DOKU.md */
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ===== Header ===== */
+  header{
+    padding: var(--bos-space-lg, 22px) var(--bos-space-md, 18px) var(--bos-space-sm, 16px);
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+    position:sticky; top:0; z-index:20;
+  }
+  .eyebrow{
+    font-family:var(--font-label);
+    font-weight:700;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-size: var(--bos-font-xs, .72rem);
+    color:var(--frost);
+    display:flex; align-items:center; gap: var(--bos-space-xs, 8px);
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--frost);box-shadow:0 0 8px var(--frost);}
+  h1{
+    font-family:var(--font-display);
+    font-weight:900;
+    font-size: var(--bos-font-2xl, 1.7rem);
+    margin: var(--bos-space-3xs, 4px) 0 var(--bos-space-3xs, 2px);
+    letter-spacing:-.01em;
+  }
+  .zeit{
+    font-family:var(--font-label);
+    color:var(--dim);
+    font-size: var(--bos-font-sm, .85rem);
+    letter-spacing:.02em;
+  }
+
+  /* Fortschritts-Rail — echte Info, kein Dekor: zeigt Zähl-Fortschritt */
+  .progress-wrap{margin-top: var(--bos-space-sm, 14px);}
+  .progress-label{
+    display:flex; justify-content:space-between;
+    font-family:var(--font-label); font-size: var(--bos-font-sm, .78rem);
+    color:var(--dim); margin-bottom: var(--bos-space-2xs, 6px); letter-spacing:.03em;
+  }
+  .progress-label b{color:var(--amber-bright); font-weight:700;}
+  .rail{
+    height:6px; border-radius:4px; background:var(--surface-2);
+    overflow:hidden; position:relative;
+    border:1px solid var(--border);
+  }
+  .rail-fill{
+    height:100%; width:0%;
+    background:linear-gradient(90deg, var(--amber), var(--amber-bright));
+    box-shadow:0 0 10px var(--amber-glow);
+    transition:width .25s ease;
+  }
+
+  /* ===== Main ===== */
+  main{padding: var(--bos-space-sm, 16px) var(--bos-space-sm, 14px) var(--bos-space-xs, 8px); max-width:640px; margin: 0 auto;}
+
+  .gruppe{margin-bottom: var(--bos-space-lg, 22px);}
+  .gruppe-titel{
+    font-family:var(--font-label);
+    font-weight:800;
+    font-size: var(--bos-font-sm, .82rem);
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--dim);
+    margin: 0 0 var(--bos-space-xs, 8px) var(--bos-space-3xs, 4px);
+    display:flex; align-items:center; gap: var(--bos-space-xs, 8px);
+  }
+  .gruppe-titel .zahl{color:var(--dim-2); font-weight:600;}
+
+  .zeile{
+    display:flex; align-items:center; gap: var(--bos-space-sm, 12px);
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding: var(--bos-space-sm, 12px) var(--bos-space-sm, 12px) var(--bos-space-sm, 12px) var(--bos-space-sm, 14px);
+    margin-bottom: var(--bos-space-xs, 8px);
+    position:relative;
+    overflow:hidden;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  /* Signatur-Element: amberner Rail-Strich links, wie die Ablage-Streben
+     am Gär-Wagen — erscheint erst, wenn eine Zeile tatsächlich gezählt wurde */
+  .zeile::before{
+    content:'';
+    position:absolute; left:0; top:8px; bottom:8px; width:3px;
+    border-radius:2px;
+    background:transparent;
+    transition:background .2s ease, box-shadow .2s ease;
+  }
+  .zeile.gezaehlt::before{
+    background:var(--amber);
+    box-shadow:0 0 8px var(--amber-glow);
+  }
+  .zeile.gezaehlt{border-color:#4a3821;}
+
+  .produkt-name{
+    flex:1;
+    font-size: var(--bos-font-md, .98rem);
+    font-weight:600;
+    color:var(--text);
+  }
+  .zeile.gezaehlt .produkt-name{color:var(--amber-bright);}
+
+  .input-wrap{
+    display:flex; align-items:center; gap: var(--bos-space-2xs, 6px);
+    flex-shrink:0;
+  }
+  input.zaehl-input{
+    width:64px;
+    text-align:center;
+    font-family:var(--font-body);
+    font-size: var(--bos-font-lg, 1.05rem);
+    font-weight:600;
+    color:var(--text);
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding: var(--bos-space-xs, 9px) var(--bos-space-3xs, 4px);
+    -moz-appearance:textfield;
+  }
+  input.zaehl-input:focus{
+    outline:none; border-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber-glow);
+  }
+  .einheit{
+    font-family:var(--font-label); font-size: var(--bos-font-xs, .74rem); color:var(--dim);
+    width:80px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  /* ===== Status / Lade-Zustände ===== */
+  .status-box{
+    text-align:center; padding: var(--bos-space-xl, 40px) var(--bos-space-md, 20px); color:var(--dim);
+    font-family:var(--font-body); font-size: var(--bos-font-md, .95rem);
+  }
+  .status-box.fehler{color:var(--danger);}
+  .upload-btn{
+    margin-top: var(--bos-space-sm, 14px); display:inline-block;
+    font-family:var(--font-label); font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; font-size: var(--bos-font-sm, .82rem);
+    color:var(--bg); background:var(--frost);
+    padding: var(--bos-space-xs, 10px) var(--bos-space-md, 18px); border-radius:8px; cursor:pointer; border:none;
+  }
+  input[type=file]{display:none;}
+
+  /* ===== Sticky Submit ===== */
+  .submit-bar{
+    position:fixed; left:0; right:0; bottom:0;
+    padding: var(--bos-space-sm, 12px) var(--bos-space-sm, 14px) calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, var(--bg) 60%, transparent);
+    z-index:30;
+  }
+  .submit-btn{
+    width:100%; max-width:640px; margin: 0 auto; display:block;
+    font-family:var(--font-label); font-weight:800; letter-spacing:.05em;
+    text-transform:uppercase; font-size: var(--bos-font-md, 1rem);
+    color:#1b1305;
+    background:linear-gradient(180deg, var(--amber-bright), var(--amber));
+    border:none; border-radius:var(--radius);
+    padding: var(--bos-space-sm, 16px); cursor:pointer;
+    box-shadow:0 4px 18px var(--amber-glow);
+  }
+  .submit-btn:disabled{
+    background:var(--surface-2); color:var(--dim-2);
+    box-shadow:none; cursor:not-allowed;
+  }
+  .submit-hint{
+    text-align:center; font-family:var(--font-label); font-size: var(--bos-font-xs, .74rem);
+    color:var(--dim); margin-top: var(--bos-space-xs, 8px); letter-spacing:.02em;
+  }
+
+  /* ===== Hilfe-Button + Bottom Sheet ===== */
+  .hilfe-btn{
+    position:absolute; top:20px; right:16px;
+    width:34px; height:34px; border-radius:50%;
+    background:var(--surface-2); border:1px solid var(--border);
+    color:var(--dim); font-family:var(--font-label); font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.72);
+    z-index:50; display:none; align-items:flex-end;
+  }
+  .sheet-overlay.offen{display:flex;}
+  .sheet{
+    background:var(--surface); border-top:1px solid var(--border);
+    border-radius:18px 18px 0 0; padding: var(--bos-space-lg, 22px) var(--bos-space-md, 20px) calc(24px + env(safe-area-inset-bottom));
+    width:100%; max-width:640px; margin: 0 auto;
+  }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl, 1.25rem); margin: 0 0 var(--bos-space-sm, 12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md, .94rem); margin: 0 0 var(--bos-space-xs, 10px);}
+  .sheet-schluss{
+    margin-top: var(--bos-space-sm, 16px); width:100%; padding: var(--bos-space-sm, 12px); border-radius:8px;
+    background:var(--surface-2); border:1px solid var(--border);
+    color:var(--text); font-family:var(--font-label); font-weight:700;
+    text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm, .82rem);
+    cursor:pointer;
+  }
+
+  /* ===== Erfolgs-Ansicht ===== */
+  .erfolg{
+    text-align:center; padding: var(--bos-space-xl, 60px) var(--bos-space-lg, 24px);
+  }
+  .erfolg .glyph{
+    width:64px; height:64px; border-radius:50%;
+    background:var(--amber-glow); border:2px solid var(--amber);
+    display:flex; align-items:center; justify-content:center;
+    font-size: var(--bos-font-2xl, 1.8rem); margin: 0 auto var(--bos-space-md, 18px);
+  }
+  .erfolg h2{font-family:var(--font-display); font-size: var(--bos-font-xl, 1.4rem); margin: 0 0 var(--bos-space-xs, 8px);}
+  .erfolg p{color:var(--dim); font-size: var(--bos-font-md, .92rem); margin: 0 0 var(--bos-space-lg, 24px);}
+  .neu-btn{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; font-size: var(--bos-font-sm, .85rem); color:var(--bg);
+    background:var(--frost); border:none; border-radius:8px;
+    padding: var(--bos-space-sm, 12px) var(--bos-space-lg, 22px); cursor:pointer;
+  }
+
+  /* ===== Poka-Yoke: "Vorbereitung fertig?" pro Zuständigkeits-Gruppe =====
+     Sakrosanktes UX-Muster (aus altem System übernommen): 2 Buttons pro
+     Frage, keine Vorauswahl, blockiert vollständig bis jede aktive Gruppe
+     aktiv beantwortet wurde. Wird NIE verändert, egal wie die Anfrage
+     formuliert ist. */
+  .pk-overlay{
+    position:fixed; inset:0; z-index:200;
+    background:rgba(0,0,0,.92);
+    display:flex; align-items:center; justify-content:center;
+    padding: var(--bos-space-md, 20px);
+  }
+  .pk-overlay.ausblenden{opacity:0; transition:opacity .18s ease; pointer-events:none;}
+  .pk-card{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding: var(--bos-space-lg, 24px) var(--bos-space-md, 20px); width:100%; max-width:420px;
+  }
+  .pk-frage{
+    font-family:var(--font-display); font-weight:700; font-size: var(--bos-font-xl, 1.25rem);
+    color:var(--text); margin-bottom: var(--bos-space-3xs, 4px); line-height:1.3;
+  }
+  .pk-sub{
+    font-family:var(--font-body); font-size: var(--bos-font-sm, .86rem); color:var(--dim);
+    margin-bottom: var(--bos-space-md, 18px);
+  }
+  .pk-row{margin-bottom: var(--bos-space-sm, 14px);}
+  .pk-row-label{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; font-size: var(--bos-font-sm, .8rem); color:var(--dim);
+    margin-bottom: var(--bos-space-xs, 8px);
+  }
+  .pk-row-btns{display:flex; gap: var(--bos-space-xs, 10px);}
+  .pk-btn{
+    flex:1; padding: var(--bos-space-sm, 14px) var(--bos-space-xs, 8px); border-radius:10px;
+    border:1px solid var(--border); background:var(--surface-2);
+    color:var(--text); font-family:var(--font-label); font-weight:700;
+    font-size: var(--bos-font-md, .92rem); letter-spacing:.02em; cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .pk-btn.gewaehlt{
+    border-color:var(--amber); background:var(--amber-glow);
+    color:var(--amber-bright);
+  }
+  .pk-confirm{
+    width:100%; margin-top: var(--bos-space-xs, 8px); padding: var(--bos-space-sm, 15px); border-radius:10px; border:none;
+    font-family:var(--font-label); font-weight:800; letter-spacing:.05em;
+    text-transform:uppercase; font-size: var(--bos-font-md, .92rem); color:#1b1305;
+    background:linear-gradient(180deg, var(--amber-bright), var(--amber));
+    cursor:pointer;
+  }
+  .pk-confirm:disabled{
+    background:var(--surface-2); color:var(--dim-2); cursor:not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'freezer_inventur';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<!-- ERSETZT bos_access_guard.js (Thema 2, 04.09.2026): diese Seite kann jetzt
+     auch direkt per NFC/QR ohne vorherigen Launcher-Aufruf geöffnet werden —
+     siehe bos_standalone_login.js Kopf-Kommentar für die Begründung. -->
+<script src="../bos_standalone_login.js"></script>
+
+<div class="pk-overlay" id="pkOverlay">
+  <div class="pk-card">
+    <div class="pk-frage" id="pkFrage">Vorbereitung für morgen schon fertig?</div>
+    <div class="pk-sub" id="pkSub">Bitte für jede Zuständigkeit einzeln angeben — keine Vorauswahl möglich.</div>
+    <div class="pk-rows" id="pkRows">
+      <div class="status-box" style="padding:10px 0;">Lade Zuständigkeiten …</div>
+    </div>
+    <button class="pk-confirm" id="pkConfirm" disabled>Bestätigen</button>
+  </div>
+</div>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span><span id="eyebrowText">Ist-Zustand</span></div>
+  <h1 id="titelText">Froster · Inventur</h1>
+  <div class="zeit" id="zeitText">—</div>
+  <div class="progress-wrap" id="progressWrap" style="display:none;">
+    <div class="progress-label">
+      <span id="progressLabel">0 / 0 erfasst</span>
+    </div>
+    <div class="rail"><div class="rail-fill" id="railFill"></div></div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="status-box" id="statusBox">
+    Lade Produktliste …
+  </div>
+</main>
+
+<div class="submit-bar" id="submitBar" style="display:none;">
+  <button class="submit-btn" id="submitBtn" disabled>Zählung absenden</button>
+  <div class="submit-hint" id="submitHint">Leer gelassene Produkte gelten als nicht geprüft.</div>
+</div>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie zähle ich?</h2>
+    <p>Diese Seite erfasst nur, <b style="color:var(--text)">was gerade tatsächlich im Froster liegt</b> — trag bei jedem Produkt die Anzahl Bleche ein, die du siehst.</p>
+    <p>Beim Öffnen fragt die Seite pro Zuständigkeit: „Vorbereitung für morgen schon fertig?" Damit ist gemeint, ob die Teiglinge für morgen bereits aus dem Froster geholt und zusammengestellt wurden. Ist das schon erledigt, zählt der morgige Verbrauch nicht mehr auf diese Zählung — sonst schon. Auch das ist nur eine Beobachtung von dir, keine Berechnung.</p>
+    <p>Lass ein Feld leer, wenn du dieses Produkt nicht geprüft hast. Eine leere Zeile bedeutet „nicht gezählt", nicht „null Stück im Froster" — das ist ein wichtiger Unterschied für die Auswertung.</p>
+    <p>Was mit den Zahlen passiert — ob etwas fehlt, was produziert werden muss — wird automatisch woanders im System berechnet. Hier zählst du nur, sonst nichts.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+/* ==== i18n-Hook (minimal, DE-only bisher — Sprachumfang noch offen) ==== */
+const STR = {
+  ladeProdukte: 'Lade Produktliste …',
+  fehlerConfig: 'produkt_config.json konnte nicht automatisch geladen werden.',
+  manuellHochladen: 'Manuell hochladen',
+  keineProdukte: 'Keine Produkte mit Froster-Zuständigkeit gefunden. Bitte in produkt_config.json das Feld "frosterZustaendigkeit" pflegen.',
+  progress: (n,total) => `${n} / ${total} erfasst`,
+  submit: 'Zählung absenden',
+  submitSenden: 'Wird gesendet …',
+  submitLeer: 'Trage mindestens einen Wert ein.',
+  submitOk: 'Leer gelassene Produkte gelten als nicht geprüft.',
+  authFehlt: 'Firebase ist noch nicht konfiguriert — Zählung kann nicht gesendet werden.',
+  erfolgTitel: 'Zählung gespeichert',
+  erfolgText: (n) => `${n} Produkte erfasst und an den Host übermittelt.`,
+  neueZaehlung: 'Neue Zählung starten',
+  gruppen: { baecker: 'Bäcker', konditoren: 'Konditoren', sonstige: 'Sonstige' },
+  pkFrage: (tag, datum) => `Vorbereitung für ${tag}, ${datum} schon fertig?`,
+  pkSub: 'Bitte für jede Zuständigkeit einzeln angeben — keine Vorauswahl möglich.',
+  pkJa: '✓ Ja',
+  pkNein: '✗ Nein',
+  pkBestaetigen: 'Bestätigen'
+};
+function t(key, ...args){
+  const v = STR[key];
+  return typeof v === 'function' ? v(...args) : (v !== undefined ? v : key);
+}
+
+/* ==== FIREBASE-INIT ====
+   Nutzt BOS_FIREBASE_CONFIG aus der zentral eingebundenen
+   bos_firebase_config.js (siehe <script>-Tag im <head>). Keine eigene
+   Config mehr in dieser Datei — einmal zentral pflegen, überall gültig. */
+let db = null, auth = null, authBereit = false, firebaseKonfiguriert = false;
+
+function initFirebase(){
+  /* 2026-09-04 · Fix: bos_firebase_config.js initialisiert Firebase seit
+     Längerem SELBST (window.db / window.BOS_AUTH_READY, siehe
+     BOS_ABHAENGIGKEITEN.md 2.1). Diese Seite rief hier bisher zusätzlich
+     ein eigenes firebase.initializeApp(BOS_FIREBASE_CONFIG) auf — ein
+     Kontrakt aus v0.2 (16.08.), den bos_firebase_config.js nicht mehr
+     erfüllt. BOS_FIREBASE_CONFIG war dadurch nie definiert, die Funktion
+     brach hier immer sofort ab, firebaseKonfiguriert blieb dauerhaft
+     false. */
+  if (typeof window.db === 'undefined' || typeof window.BOS_AUTH_READY === 'undefined') {
+    console.error('[Froster-Inventur] bos_firebase_config.js nicht gefunden, nicht eingebunden oder liefert window.db/window.BOS_AUTH_READY nicht.');
+    return;
+  }
+  db = window.db;
+  auth = firebase.auth();
+  firebaseKonfiguriert = true;
+  window.BOS_AUTH_READY.then(function(){
+    authBereit = true;
+    aktualisiereSubmitZustand();
+  }).catch(function(err){
+    console.error('[Froster-Inventur] Auth-Fehler:', err);
+    aktualisiereSubmitZustand();
+  });
+}
+
+/* ==== Zeit / Header ==== */
+function renderZeit(){
+  const jetzt = new Date();
+  const tage = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const tag = tage[jetzt.getDay()];
+  const dd = String(jetzt.getDate()).padStart(2,'0');
+  const mm = String(jetzt.getMonth()+1).padStart(2,'0');
+  const hh = String(jetzt.getHours()).padStart(2,'0');
+  const min = String(jetzt.getMinutes()).padStart(2,'0');
+  document.getElementById('zeitText').textContent = `${tag}. ${dd}.${mm}. · ${hh}:${min} Uhr`;
+}
+renderZeit();
+setInterval(renderZeit, 30000);
+
+/* ==== Produktliste laden ==== */
+let PRODUKTE = [];      // {legacyKey, name, zustaendigkeit, sort}
+let ZAEHLUNGEN = {};    // legacyKey -> Zahl (nur tatsächlich eingetragene Werte)
+
+const GRUPPEN_REIHENFOLGE = ['baecker','konditoren','sonstige'];
+
+/* ==== Poka-Yoke: "Vorbereitung fertig?" pro Zuständigkeits-Gruppe ====
+   Sakrosankt (siehe Manifest): 2 Buttons pro Gruppe, keine Vorauswahl,
+   blockiert bis JEDE aktive Gruppe aktiv beantwortet wurde. Läuft erst,
+   sobald PRODUKTE bekannt ist (Config geladen) — vorher weiß die Seite
+   nicht, welche Gruppen überhaupt existieren. */
+let vorbereitungAntworten = {}; // gruppe -> true/false
+
+function initPokaYoke(){
+  const overlay = document.getElementById('pkOverlay');
+  overlay.style.display = 'flex';
+  overlay.classList.remove('ausblenden');
+
+  const morgen = new Date();
+  morgen.setDate(morgen.getDate() + 1);
+  const tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  const tagName = tage[morgen.getDay()];
+  const dd = String(morgen.getDate()).padStart(2,'0');
+  const mm = String(morgen.getMonth()+1).padStart(2,'0');
+
+  document.getElementById('pkFrage').textContent = t('pkFrage', tagName, dd+'.'+mm+'.');
+  document.getElementById('pkSub').textContent = t('pkSub');
+
+  const aktiveGruppen = GRUPPEN_REIHENFOLGE.filter(function(g){
+    return PRODUKTE.some(function(p){ return p.zustaendigkeit === g; });
+  });
+
+  let html = '';
+  aktiveGruppen.forEach(function(g){
+    html += '<div class="pk-row" data-gruppe="' + g + '">' +
+            '<div class="pk-row-label">' + t('gruppen')[g] + '</div>' +
+            '<div class="pk-row-btns">' +
+            '<button class="pk-btn" data-wert="true">' + t('pkJa') + '</button>' +
+            '<button class="pk-btn" data-wert="false">' + t('pkNein') + '</button>' +
+            '</div></div>';
+  });
+  document.getElementById('pkRows').innerHTML = html;
+  document.getElementById('pkConfirm').textContent = t('pkBestaetigen');
+
+  document.querySelectorAll('.pk-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const row = btn.closest('.pk-row');
+      const gruppe = row.dataset.gruppe;
+      vorbereitungAntworten[gruppe] = (btn.dataset.wert === 'true');
+      row.querySelectorAll('.pk-btn').forEach(function(b){ b.classList.remove('gewaehlt'); });
+      btn.classList.add('gewaehlt');
+      pruefePkVollstaendig(aktiveGruppen);
+    });
+  });
+}
+
+function pruefePkVollstaendig(aktiveGruppen){
+  const alleBeantwortet = aktiveGruppen.every(function(g){
+    return vorbereitungAntworten.hasOwnProperty(g);
+  });
+  document.getElementById('pkConfirm').disabled = !alleBeantwortet;
+}
+
+document.getElementById('pkConfirm').addEventListener('click', function(){
+  const overlay = document.getElementById('pkOverlay');
+  overlay.classList.add('ausblenden');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 180);
+
+  renderListe();
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('submitBar').style.display = 'block';
+  aktualisiereProgress();
+  aktualisiereSubmitZustand();
+});
+
+function ladeConfigAuto(){
+  fetch('../produkt_config.json', { cache: 'no-store' })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(verarbeiteConfig)
+    .catch(function(){ zeigeManuellenUpload(); });
+}
+
+function verarbeiteConfig(data){
+  PRODUKTE = data
+    .filter(function(cfg){
+      return cfg.legacyKey && cfg.frosterZustaendigkeit && cfg.frosterZustaendigkeit !== 'nein';
+    })
+    .map(function(cfg){
+      return {
+        legacyKey: cfg.legacyKey,
+        name: cfg.name || cfg.legacyKey,
+        zustaendigkeit: cfg.frosterZustaendigkeit,
+        sort: (typeof cfg.frosterSort === 'number') ? cfg.frosterSort : null,
+        // 2026-08-28: einheit wird jetzt aus produkt_config.json übernommen statt
+        // hart "Bl." anzuzeigen. Fallback 'bleche' für die ca. 60% Produkte ohne
+        // explizites Feld, entspricht dem bisherigen Anzeigeverhalten dieser Seite.
+        einheit: cfg.einheit || 'bleche'
+      };
+    });
+
+  if (PRODUKTE.length === 0) {
+    document.getElementById('main').innerHTML =
+      '<div class="status-box fehler">' + t('keineProdukte') + '</div>';
+    document.getElementById('pkOverlay').style.display = 'none';
+    return;
+  }
+
+  initPokaYoke();
+}
+
+function zeigeManuellenUpload(){
+  const overlay = document.getElementById('pkOverlay');
+  overlay.classList.add('ausblenden');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 180);
+
+  document.getElementById('main').innerHTML =
+    '<div class="status-box fehler">' + t('fehlerConfig') +
+    '<br><label class="upload-btn">' + t('manuellHochladen') +
+    '<input type="file" id="fileInput" accept="application/json"></label></div>';
+  document.getElementById('fileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      try {
+        const data = JSON.parse(evt.target.result);
+        verarbeiteConfig(data);
+      } catch(err) {
+        document.getElementById('statusBox').textContent = 'Ungültige JSON-Datei.';
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function renderListe(){
+  const gruppiert = { baecker: [], konditoren: [], sonstige: [] };
+  PRODUKTE.forEach(function(p){ gruppiert[p.zustaendigkeit].push(p); });
+
+  GRUPPEN_REIHENFOLGE.forEach(function(g){
+    gruppiert[g].sort(function(a,b){
+      if (a.sort !== null && b.sort !== null) return a.sort - b.sort;
+      if (a.sort !== null) return -1;
+      if (b.sort !== null) return 1;
+      return a.name.localeCompare(b.name, 'de');
+    });
+  });
+
+  let html = '';
+  GRUPPEN_REIHENFOLGE.forEach(function(g){
+    const liste = gruppiert[g];
+    if (liste.length === 0) return;
+    html += '<div class="gruppe">';
+    html += '<div class="gruppe-titel">' + t('gruppen')[g] +
+            ' <span class="zahl">· ' + liste.length + '</span></div>';
+    liste.forEach(function(p){
+      html += '<div class="zeile" id="zeile_' + p.legacyKey + '">' +
+              '<div class="produkt-name">' + p.name + '</div>' +
+              '<div class="input-wrap">' +
+              '<input class="zaehl-input" type="number" step="0.5" min="0" ' +
+              'inputmode="decimal" placeholder="—" data-key="' + p.legacyKey + '">' +
+              '<span class="einheit" title="' + p.einheit + '">' + p.einheit + '</span>' +
+              '</div></div>';
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('main').innerHTML = html;
+
+  document.querySelectorAll('.zaehl-input').forEach(function(input){
+    input.addEventListener('input', function(){
+      const key = input.dataset.key;
+      const val = input.value.trim();
+      const zeile = document.getElementById('zeile_' + key);
+      if (val === '') {
+        delete ZAEHLUNGEN[key];
+        zeile.classList.remove('gezaehlt');
+      } else {
+        ZAEHLUNGEN[key] = parseFloat(val);
+        zeile.classList.add('gezaehlt');
+      }
+      aktualisiereProgress();
+      aktualisiereSubmitZustand();
+    });
+  });
+}
+
+function aktualisiereProgress(){
+  const n = Object.keys(ZAEHLUNGEN).length;
+  const total = PRODUKTE.length;
+  document.getElementById('progressLabel').textContent = t('progress', n, total);
+  document.getElementById('railFill').style.width = (total > 0 ? (n/total*100) : 0) + '%';
+}
+
+/* ==== Submit ==== */
+function aktualisiereSubmitZustand(){
+  const btn = document.getElementById('submitBtn');
+  const hint = document.getElementById('submitHint');
+  const anzahl = Object.keys(ZAEHLUNGEN).length;
+
+  if (!firebaseKonfiguriert) {
+    btn.disabled = true;
+    hint.textContent = t('authFehlt');
+    return;
+  }
+  if (anzahl === 0) {
+    btn.disabled = true;
+    hint.textContent = t('submitLeer');
+    return;
+  }
+  if (!authBereit) {
+    btn.disabled = true;
+    hint.textContent = 'Verbinde …';
+    return;
+  }
+  btn.disabled = false;
+  hint.textContent = t('submitOk');
+  btn.textContent = t('submit');
+}
+
+document.getElementById('submitBtn').addEventListener('click', function(){
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = t('submitSenden');
+
+  const dokument = {
+    type: 'froster_zaehlung',
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+    geraet: (auth && auth.currentUser) ? auth.currentUser.uid : null,
+    zaehlungen: ZAEHLUNGEN,
+    vorbereitungFertig: vorbereitungAntworten
+  };
+
+  db.collection('bos_events').add(dokument)
+    .then(function(){
+      zeigeErfolg(Object.keys(ZAEHLUNGEN).length);
+    })
+    .catch(function(err){
+      console.error('[Froster-Inventur] Sende-Fehler:', err);
+      btn.disabled = false;
+      btn.textContent = t('submit');
+      document.getElementById('submitHint').textContent = 'Senden fehlgeschlagen — erneut versuchen.';
+    });
+});
+
+function zeigeErfolg(anzahl){
+  document.getElementById('submitBar').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('main').innerHTML =
+    '<div class="erfolg">' +
+    '<div class="glyph">✓</div>' +
+    '<h2>' + t('erfolgTitel') + '</h2>' +
+    '<p>' + t('erfolgText', anzahl) + '</p>' +
+    '<button class="neu-btn" id="neuBtn">' + t('neueZaehlung') + '</button>' +
+    '</div>';
+  document.getElementById('neuBtn').addEventListener('click', function(){
+    ZAEHLUNGEN = {};
+    document.getElementById('submitBar').style.display = 'block';
+    document.getElementById('progressWrap').style.display = 'block';
+    renderListe();
+    aktualisiereProgress();
+    aktualisiereSubmitZustand();
+  });
+}
+
+/* ==== Hilfe-Sheet ==== */
+document.getElementById('hilfeBtn').addEventListener('click', function(){
+  document.getElementById('hilfeOverlay').classList.add('offen');
+});
+document.getElementById('hilfeSchluss').addEventListener('click', function(){
+  document.getElementById('hilfeOverlay').classList.remove('offen');
+});
+document.getElementById('hilfeOverlay').addEventListener('click', function(e){
+  if (e.target === this) this.classList.remove('offen');
+});
+
+/* ==== Start ==== */
+initFirebase();
+ladeConfigAuto();
+</script>
+</body>
+</html>

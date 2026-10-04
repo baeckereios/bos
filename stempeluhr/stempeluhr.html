@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Stempeluhr · BäckereiOS</title>
+
+<!-- Theme-Sync (falls im echten BOS-Ordner eingebunden: wendet das aktive Profil-Theme an,
+     bevor die Tokens-CSS lädt). Datei liegt in diesem Chat nicht vor -- Pfad/Verhalten nach
+     BOS_ABHAENGIGKEITEN.md angenommen, nicht verifiziert. Fehlt die Datei, greift einfach
+     nur data-theme="dark" oben. -->
+<script src="../bos_theme_sync.js" onerror="console.info('bos_theme_sync.js nicht gefunden -- Standard-Dark bleibt aktiv.')"></script>
+<script src="../bos_density_sync.js" onerror="console.info('bos_density_sync.js nicht gefunden -- Standard-Dichte bleibt aktiv.')"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css" onerror="console.info('bos_design_tokens.css nicht gefunden -- lokale Fallback-Werte greifen.')">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&family=Fraunces:wght@700;900&display=swap" rel="stylesheet">
+
+<style>
+  /* ---- Alle Werte gehen über var(--bos-*, Fallback) -- läuft die echte
+     bos_design_tokens.css mit, gewinnt sie automatisch. Token-Namen nach
+     BOS_NEUER_SATELLIT_CHECKLISTE.md §3, Datei selbst lag in diesem Chat nicht vor. ---- */
+  :root{ color-scheme: dark; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bos-bg,#171009);
+    color:var(--bos-text,#f4ead9);
+    font-family:var(--bos-font-body,'Barlow',sans-serif);
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  h1,h2{margin:0;font-family:var(--bos-font-display,'Fraunces',serif);font-weight:900;}
+  .label{
+    font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+    color:var(--bos-text-dim,#b3a189);font-size:.78rem;
+  }
+
+  .wrap{max-width:480px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+
+  .top-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 0;}
+  .top-bar h1{font-size:1.5rem;display:flex;align-items:center;gap:8px;}
+  .live-clock{
+    font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    font-weight:800;font-size:1.3rem;font-variant-numeric:tabular-nums;
+    color:var(--bos-amber-bright,#e0972a);
+  }
+  .icon-btn{
+    background:var(--bos-surface,#241c12);
+    border:1px solid var(--bos-border,rgba(255,255,255,.12));
+    color:var(--bos-text,#f4ead9);
+    border-radius:var(--bos-radius-sm,6px);
+    width:38px;height:38px;font-size:1.1rem;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .icon-btn:active{transform:scale(.94);}
+
+  .subtitle{
+    padding:0 4px;font-size:.85rem;color:var(--bos-text-dim,#b3a189);
+    margin-top:-6px;
+  }
+
+  .card{
+    background:var(--bos-surface,#241c12);
+    border:1px solid var(--bos-border,rgba(255,255,255,.1));
+    border-radius:var(--bos-radius-md,14px);
+    padding:16px;
+    box-shadow:var(--bos-shadow-md,0 8px 22px rgba(0,0,0,.35));
+  }
+
+  /* Stempel-Button */
+  .stamp-card{text-align:center;}
+  .stamp-btn{
+    width:100%;border:none;border-radius:var(--bos-radius-lg,22px);
+    padding:26px 12px;
+    font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    font-weight:900;font-size:1.5rem;letter-spacing:.02em;color:#1a1206;
+    cursor:pointer;
+    transition:background-color var(--bos-transition,.25s) var(--bos-ease,ease), transform .1s;
+  }
+  .stamp-btn:active{transform:scale(.98);}
+  .stamp-btn.aus{background:var(--bos-green,#4caf6b);color:#0d1f12;}
+  .stamp-btn.ein{background:var(--bos-red,#d9544a);color:#2a0805;box-shadow:0 0 0 4px color-mix(in srgb, var(--bos-red,#d9544a) 25%, transparent);}
+  .stamp-btn.pause{background:var(--bos-purple,#8a63c9);color:#1c1030;box-shadow:0 0 0 4px color-mix(in srgb, var(--bos-purple,#8a63c9) 25%, transparent);}
+  .stamp-secondary-btn{
+    margin-top:10px;width:100%;
+    background:transparent;
+    border:1px solid var(--bos-border,rgba(255,255,255,.18));
+    color:var(--bos-text-dim,#b3a189);
+    border-radius:999px;padding:9px 18px;
+    font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    font-weight:700;font-size:.92rem;cursor:pointer;
+  }
+  .stamp-secondary-btn:active{transform:scale(.97);}
+  .timer-line{
+    margin-top:12px;font-variant-numeric:tabular-nums;
+    font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    font-size:1.05rem;color:var(--bos-text-dim,#b3a189);
+  }
+  .timer-line b{color:var(--bos-amber-bright,#e0972a);font-size:1.3rem;}
+
+  /* Listen */
+  .row-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .entry-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 0;border-bottom:1px solid var(--bos-border,rgba(255,255,255,.08));
+    cursor:pointer;
+  }
+  .entry-row:last-child{border-bottom:none;}
+  .entry-row .zeit{font-variant-numeric:tabular-nums;}
+  .entry-row .dauer{font-weight:700;color:var(--bos-amber-bright,#e0972a);}
+  .laeuft-tag{
+    font-size:.72rem;padding:2px 7px;border-radius:999px;
+    background:color-mix(in srgb, var(--bos-red,#d9544a) 25%, transparent);
+    color:var(--bos-red,#d9544a);font-weight:700;margin-left:6px;
+  }
+  .pause-tag{
+    font-size:.72rem;padding:2px 7px;border-radius:999px;
+    background:color-mix(in srgb, var(--bos-purple,#8a63c9) 22%, transparent);
+    color:var(--bos-purple,#8a63c9);font-weight:700;margin-left:6px;
+  }
+  .empty-hint{color:var(--bos-text-faint,#8a7c67);font-size:.9rem;padding:6px 0;}
+
+  .btn{
+    background:var(--bos-surface-raised,#2c2216);
+    border:1px solid var(--bos-border,rgba(255,255,255,.14));
+    color:var(--bos-text,#f4ead9);
+    border-radius:var(--bos-radius-sm,6px);
+    padding:9px 14px;font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    font-weight:700;font-size:.9rem;cursor:pointer;
+  }
+  .btn.amber{background:var(--bos-amber,#c07a10);color:#1a1206;border-color:var(--bos-amber,#c07a10);}
+  .btn.danger{color:var(--bos-red,#d9544a);border-color:var(--bos-red,#d9544a);background:transparent;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .btn.small{padding:6px 10px;font-size:.8rem;}
+
+  /* Wochenwechsel */
+  .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  table.week-table{width:100%;border-collapse:collapse;font-size:.92rem;}
+  table.week-table td, table.week-table th{padding:6px 4px;text-align:left;}
+  table.week-table th{color:var(--bos-text-dim,#b3a189);font-weight:600;font-size:.78rem;text-transform:uppercase;}
+  table.week-table tr.heute td{color:var(--bos-amber-bright,#e0972a);font-weight:700;}
+  table.week-table td:last-child, table.week-table th:last-child{text-align:right;}
+  .saldo-plus{color:var(--bos-green,#4caf6b);font-weight:700;}
+  .saldo-minus{color:var(--bos-red,#d9544a);font-weight:700;}
+  .week-summary{margin-top:10px;padding-top:10px;border-top:1px solid var(--bos-border,rgba(255,255,255,.1));display:flex;justify-content:space-between;font-size:.95rem;}
+
+  .wochentyp-row{
+    margin-top:10px;padding-top:10px;border-top:1px solid var(--bos-border,rgba(255,255,255,.1));
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:.82rem;color:var(--bos-text-dim,#b3a189);
+  }
+  .wochentyp-toggle{display:flex;gap:6px;}
+  .wochentyp-btn{
+    padding:5px 11px;border-radius:999px;font-size:.78rem;font-weight:700;
+    font-family:var(--bos-font-label,'Barlow Condensed',sans-serif);
+    background:var(--bos-surface-raised,#2c2216);
+    border:1px solid var(--bos-border,rgba(255,255,255,.14));
+    color:var(--bos-text-dim,#b3a189);cursor:pointer;
+  }
+  .wochentyp-btn.aktiv{background:var(--bos-amber,#c07a10);color:#1a1206;border-color:var(--bos-amber,#c07a10);}
+
+  .local-hint{
+    padding:0 4px;font-size:.78rem;color:var(--bos-text-faint,#8a7c67);
+    display:flex;align-items:center;gap:5px;
+  }
+
+  /* Overlays / Bottom Sheets */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.offen{display:flex;}
+  .sheet{
+    background:var(--bos-surface,#241c12);
+    border-radius:20px 20px 0 0;
+    border:1px solid var(--bos-border,rgba(255,255,255,.12));
+    width:100%;max-width:480px;max-height:88vh;overflow-y:auto;
+    padding:18px 18px 26px;
+  }
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .sheet h2{font-size:1.2rem;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:.82rem;color:var(--bos-text-dim,#b3a189);margin-bottom:4px;}
+  .field input{
+    width:100%;padding:10px 11px;border-radius:var(--bos-radius-sm,6px);
+    border:1px solid var(--bos-border,rgba(255,255,255,.16));
+    background:var(--bos-bg-soft,#1d1610);color:var(--bos-text,#f4ead9);
+    font-family:var(--bos-font-body,'Barlow',sans-serif);font-size:.95rem;
+  }
+  .hint{font-size:.78rem;color:var(--bos-text-faint,#8a7c67);margin-top:4px;}
+  .divider{height:1px;background:var(--bos-border,rgba(255,255,255,.1));margin:16px 0;}
+  .help-text p{line-height:1.5;font-size:.93rem;color:var(--bos-text,#f4ead9);}
+  .help-text b{color:var(--bos-amber-bright,#e0972a);}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top-bar">
+    <h1>🕐 Stempeluhr</h1>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="live-clock" id="liveClock">--:--:--</div>
+      <button class="icon-btn" id="btnHelp" title="Hilfe">❓</button>
+      <button class="icon-btn" id="btnSettings" title="Einstellungen">⚙️</button>
+    </div>
+  </div>
+  <div class="subtitle" id="sollSubtitle"></div>
+  <div class="local-hint">🔒 Alle Daten bleiben lokal auf diesem Gerät — nichts wird hochgeladen oder synchronisiert.</div>
+
+  <!-- Stempel-Button -->
+  <div class="card stamp-card">
+    <button class="stamp-btn aus" id="stampBtn">Einstempeln</button>
+    <button class="stamp-secondary-btn" id="stampSecondaryBtn" style="display:none;"></button>
+    <div class="timer-line" id="timerLine"></div>
+  </div>
+
+  <!-- Heute -->
+  <div class="card">
+    <div class="row-title">
+      <h2 style="font-size:1.05rem;">Heute</h2>
+      <button class="btn small" id="btnManuell">+ Eintrag</button>
+    </div>
+    <div id="heuteListe"></div>
+    <div class="btn-row" style="margin-top:4px;">
+      <div class="label" style="margin:0;">Summe heute:</div>
+      <b id="heuteSumme">0:00 Std</b>
+    </div>
+  </div>
+
+  <!-- Woche -->
+  <div class="card">
+    <div class="week-nav">
+      <button class="icon-btn" id="btnWocheZurueck">‹</button>
+      <div class="label" id="wocheLabel">Diese Woche</div>
+      <button class="icon-btn" id="btnWocheVor">›</button>
+    </div>
+    <table class="week-table" id="wocheTabelle">
+      <thead><tr><th>Tag</th><th>Ist</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="week-summary">
+      <span>Woche gesamt: <b id="wocheIst">0,0 Std</b> · Soll <span id="wocheSoll">–</span></span>
+      <span id="wocheSaldo">–</span>
+    </div>
+    <div class="wochentyp-row">
+      <span id="wochentypInfo">Ø 0,0 Std/Tag</span>
+      <div class="wochentyp-toggle">
+        <button class="wochentyp-btn" id="btnWochentyp5" type="button">5 Tage</button>
+        <button class="wochentyp-btn" id="btnWochentyp6" type="button">6 Tage</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Eintrag bearbeiten/anlegen -->
+<div class="overlay" id="entryOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="entryTitel">Eintrag</h2>
+      <button class="icon-btn" data-close="entryOverlay">✕</button>
+    </div>
+    <div class="field">
+      <label>Beginn</label>
+      <input type="datetime-local" id="entryStart">
+    </div>
+    <div class="field">
+      <label>Ende (leer lassen = läuft noch)</label>
+      <input type="datetime-local" id="entryEnde">
+    </div>
+    <div class="btn-row">
+      <button class="btn amber" id="btnEntrySpeichern">Speichern</button>
+      <button class="btn danger" id="btnEntryLoeschen" style="display:none;">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Einstellungen -->
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>Einstellungen</h2>
+      <button class="icon-btn" data-close="settingsOverlay">✕</button>
+    </div>
+
+    <div class="field">
+      <label>Wochenstunden (Soll)</label>
+      <input type="number" id="einWochenstunden" step="0.5" min="0" placeholder="z. B. 40">
+    </div>
+    <div class="field">
+      <label>Standard-Arbeitstage pro Woche</label>
+      <input type="number" id="einArbeitstage" step="1" min="1" max="7" value="5">
+      <div class="hint" id="durchschnittHint">Ø 0,0 Std/Tag</div>
+      <div class="hint">Gilt als Vorgabe, wenn für eine einzelne Woche nichts anderes markiert ist — dafür in der Wochen-Karte „5 Tage"/„6 Tage" antippen.</div>
+    </div>
+    <div class="btn-row"><button class="btn amber" id="btnEinstellungenSpeichern">Speichern</button></div>
+
+    <div class="divider"></div>
+
+    <div class="label" style="margin-bottom:8px;">Datensicherung</div>
+    <p class="hint" style="margin-top:-4px;">Alle Daten liegen nur lokal in diesem Browser auf diesem Gerät. Regelmäßig sichern, besonders vor einem Browser-/Gerätewechsel.</p>
+    <div class="btn-row">
+      <button class="btn" id="btnExportCsv">CSV exportieren</button>
+      <button class="btn" id="btnExportJson">Sicherung (JSON)</button>
+      <button class="btn" id="btnImportJson">Sicherung einspielen</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+    <div class="btn-row">
+      <button class="btn danger" id="btnAllesLoeschen">Alle Daten löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hilfe -->
+<div class="overlay" id="helpOverlay">
+  <div class="sheet help-text">
+    <div class="sheet-head">
+      <h2>Hilfe</h2>
+      <button class="icon-btn" data-close="helpOverlay">✕</button>
+    </div>
+    <p><b>Wofür ist diese Seite?</b><br>
+    Eine private Stempeluhr für dich selbst — auf „Einstempeln" bzw. „Ausstempeln" tippen, die Zeit dazwischen wird automatisch erfasst.</p>
+    <p><b>Wo werden die Daten gespeichert?</b><br>
+    Ausschließlich lokal in diesem Browser, auf diesem Gerät — keine Firestore-/Cloud-Anbindung, niemand sonst sieht das.</p>
+    <p><b>Was ist, wenn ich das Ausstempeln vergessen habe?</b><br>
+    Über „+ Eintrag" bzw. durch Antippen eines bestehenden Eintrags lässt sich Beginn und Ende jederzeit von Hand nachtragen oder korrigieren. Ein Eintrag ohne Ende gilt als „läuft noch".</p>
+    <p><b>Wie wird die Wochenübersicht berechnet?</b><br>
+    Ein Eintrag zählt für den Tag, an dem er begonnen hat — auch bei Nachtschichten über Mitternacht hinweg wird die volle Dauer dem Start-Tag zugerechnet, nicht aufgeteilt. Das Wochen-Soll kommt aus den Wochenstunden in den Einstellungen; die „Ø Std/Tag"-Angabe dort ist nur ein Richtwert (Wochenstunden ÷ Arbeitstage).</p>
+    <p><b>Was mache ich bei einer 6-Tage-Woche?</b><br>
+    Das Wochen-Soll (Stunden) bleibt gleich, egal ob 5 oder 6 Tage — nur die Verteilung ändert sich. In der Wochen-Karte lässt sich unten „5 Tage" oder „6 Tage" antippen, um für genau diese eine Woche den Ø-Std/Tag-Wert korrekt anzuzeigen. Ohne Markierung gilt der Standard aus den Einstellungen. Nochmaliges Antippen der aktiven Markierung setzt die Woche wieder auf den Standard zurück. Der Soll/Ist-Vergleich selbst ändert sich dadurch nicht — er rechnet immer mit der vollen Wochensumme gegen die feste Wochenstunden-Zahl.</p>
+    <p><b>Wie funktioniert der Pause-Button?</b><br>
+    Solange eingestempelt ist, gibt es unter dem großen Button einen kleinen zweiten: „☕ Pause". Antippen pausiert die Arbeitszeit, ohne den Tag zu beenden — der große Button zeigt dann „Weiterarbeiten" zum Fortsetzen. Die Pausenzeit wird automatisch von der Dauer abgezogen und taucht beim Eintrag als eigene Markierung auf. Während einer Pause lässt sich über den kleinen Button auch direkt ausstempeln, falls es nicht weitergeht. Nachträglich lassen sich einzelne Pausen aktuell nicht von Hand bearbeiten — nur live über den Button. Wer stattdessen ganz normal aus- und wieder einstempelt (ohne den Pause-Button), bekommt wie bisher zwei getrennte Einträge — auch das schließt die Lücke dazwischen aus.</p>
+    <p><b>Wie kommen die Daten woanders hin?</b><br>
+    Über „CSV exportieren" in den Einstellungen — alle Einträge mit Datum, Beginn, Ende und Dauer, zum Öffnen in Excel/LibreOffice. „Sicherung (JSON)" ist eine vollständige Rohkopie, gedacht zum Umzug auf ein neues Gerät oder als Backup — über „Sicherung einspielen" wieder einlesbar (ersetzt dabei den aktuellen lokalen Stand vollständig).</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var SPEICHER_KEY = 'bos_stempeluhr_privat_v1';
+
+  var state = ladeState();
+  var wochenOffset = 0;
+  var bearbeiteEintragId = null; // null = neuer Eintrag im Modal
+
+  // ---------- Speicher ----------
+  function ladeState(){
+    try{
+      var raw = localStorage.getItem(SPEICHER_KEY);
+      if(!raw) return {wochenstunden:0, arbeitstage:5, eintraege:[], wochenTypen:{}};
+      var parsed = JSON.parse(raw);
+      parsed.eintraege = (parsed.eintraege || []).map(function(e){
+        e.pausen = e.pausen || [];
+        return e;
+      });
+      parsed.wochenstunden = parsed.wochenstunden || 0;
+      parsed.arbeitstage = parsed.arbeitstage || 5;
+      parsed.wochenTypen = parsed.wochenTypen || {}; // { 'YYYY-MM-DD' (Montag) : 5 oder 6 } -- Ausnahme vom Standard-Arbeitstage-Wert für genau diese Woche
+      return parsed;
+    }catch(e){
+      console.error('Stempeluhr: Speicher konnte nicht gelesen werden, starte leer.', e);
+      return {wochenstunden:0, arbeitstage:5, eintraege:[], wochenTypen:{}};
+    }
+  }
+  function speichereState(){
+    localStorage.setItem(SPEICHER_KEY, JSON.stringify(state));
+  }
+
+  // ---------- Hilfsfunktionen ----------
+  function uid(prefix){
+    return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+  function laufenderEintrag(){
+    return state.eintraege.find(function(e){ return !e.ende; }) || null;
+  }
+  function laufendePause(eintrag){
+    if(!eintrag) return null;
+    return (eintrag.pausen || []).find(function(p){ return !p.ende; }) || null;
+  }
+  function pausenDauerMs(eintrag){
+    var summe = 0;
+    (eintrag.pausen || []).forEach(function(p){
+      var pStart = new Date(p.start);
+      var pEnde = p.ende ? new Date(p.ende) : new Date(); // laufende Pause: bis jetzt zählen
+      summe += (pEnde - pStart);
+    });
+    return summe;
+  }
+  function nettoDauerMs(eintrag){
+    var start = new Date(eintrag.start);
+    var endeZeitpunkt = eintrag.ende ? new Date(eintrag.ende) : new Date(); // laufender Eintrag: bis jetzt
+    var brutto = endeZeitpunkt - start;
+    return Math.max(0, brutto - pausenDauerMs(eintrag));
+  }
+  function heutigeEintraege(){
+    var heuteKey = datumKey(new Date());
+    return state.eintraege
+      .filter(function(e){ return datumKey(e.start) === heuteKey; })
+      .sort(function(a,b){ return new Date(b.start) - new Date(a.start); });
+  }
+  function datumKey(d){
+    var dt = new Date(d);
+    return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+  }
+  function montagVon(datum){
+    var d = new Date(datum);
+    d.setHours(0,0,0,0);
+    var tag = d.getDay(); // 0 = Sonntag
+    var diff = (tag === 0) ? -6 : 1 - tag;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+  function formatUhrzeit(d){
+    return new Date(d).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  }
+  function formatTagKurz(d){
+    return new Date(d).toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit'});
+  }
+  function formatDatumKurz(d){
+    return new Date(d).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'});
+  }
+  function formatDauerHM(ms){
+    if(ms < 0) ms = 0;
+    var minGesamt = Math.round(ms/60000);
+    var h = Math.floor(minGesamt/60), m = minGesamt%60;
+    return h + ':' + String(m).padStart(2,'0') + ' Std';
+  }
+  function formatDauerDezimal(ms, vorzeichen){
+    var h = ms/3600000;
+    var text = Math.abs(h).toFixed(1).replace('.', ',') + ' Std';
+    if(vorzeichen) text = (h >= 0 ? '+' : '−') + text;
+    return text;
+  }
+  function toLocalInput(iso){
+    var d = new Date(iso);
+    var off = d.getTimezoneOffset();
+    var lokal = new Date(d.getTime() - off*60000);
+    return lokal.toISOString().slice(0,16);
+  }
+  function fromLocalInput(value){
+    return new Date(value).toISOString();
+  }
+  function downloadBlob(inhalt, dateiname, mime){
+    var blob = new Blob([inhalt], {type: mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = dateiname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function oeffneOverlay(id){ document.getElementById(id).classList.add('offen'); }
+  function schliesseOverlay(id){ document.getElementById(id).classList.remove('offen'); }
+
+  // ---------- Rendering ----------
+  function renderSubtitle(){
+    var el = document.getElementById('sollSubtitle');
+    el.textContent = 'Soll ' + String(state.wochenstunden).replace('.', ',') + ' Std/Woche';
+  }
+
+  function renderStampCard(){
+    var btn = document.getElementById('stampBtn');
+    var sekBtn = document.getElementById('stampSecondaryBtn');
+    var laufend = laufenderEintrag();
+    if(!laufend){
+      btn.textContent = 'Einstempeln';
+      btn.className = 'stamp-btn aus';
+      sekBtn.style.display = 'none';
+      document.getElementById('timerLine').textContent = '';
+      return;
+    }
+    var pause = laufendePause(laufend);
+    if(pause){
+      btn.textContent = '▶ Weiterarbeiten';
+      btn.className = 'stamp-btn pause';
+      sekBtn.textContent = 'Ausstempeln';
+      sekBtn.style.display = 'block';
+    } else {
+      btn.textContent = 'Ausstempeln';
+      btn.className = 'stamp-btn ein';
+      sekBtn.textContent = '☕ Pause';
+      sekBtn.style.display = 'block';
+    }
+    aktualisiereLaufendenTimer();
+  }
+  function aktualisiereLaufendenTimer(){
+    var timerLine = document.getElementById('timerLine');
+    var laufend = laufenderEintrag();
+    if(!laufend){ timerLine.textContent = ''; return; }
+    var netto = nettoDauerMs(laufend);
+    var pause = laufendePause(laufend);
+    if(pause){
+      timerLine.innerHTML = 'Pause seit ' + formatUhrzeit(new Date(pause.start)) + ' Uhr · bisher <b>' + formatDauerHM(netto) + '</b> gearbeitet';
+    } else {
+      timerLine.innerHTML = 'Seit ' + formatUhrzeit(new Date(laufend.start)) + ' Uhr · <b>' + formatDauerHM(netto) + '</b>';
+    }
+  }
+
+  function renderHeute(){
+    var liste = document.getElementById('heuteListe');
+    var summeEl = document.getElementById('heuteSumme');
+    liste.innerHTML = '';
+
+    var eintraege = heutigeEintraege();
+    if(eintraege.length === 0){
+      var hint = document.createElement('div');
+      hint.className = 'empty-hint';
+      hint.textContent = 'Heute noch kein Eintrag.';
+      liste.appendChild(hint);
+    }
+    var summeMs = 0;
+    eintraege.forEach(function(e){
+      var start = new Date(e.start);
+      var ende = e.ende ? new Date(e.ende) : null;
+      var dauerMs = nettoDauerMs(e);
+      var pausenMs = pausenDauerMs(e);
+      summeMs += dauerMs;
+
+      var row = document.createElement('div');
+      row.className = 'entry-row';
+      row.innerHTML =
+        '<span class="zeit">' + formatUhrzeit(start) + ' – ' + (ende ? formatUhrzeit(ende) : '…') +
+          (ende ? '' : '<span class="laeuft-tag">läuft</span>') +
+          (pausenMs > 0 ? '<span class="pause-tag">−' + formatDauerHM(pausenMs) + '</span>' : '') +
+        '</span>' +
+        '<span class="dauer">' + formatDauerHM(dauerMs) + '</span>';
+      row.addEventListener('click', function(){ oeffneEintragModal(e.id); });
+      liste.appendChild(row);
+    });
+    summeEl.textContent = formatDauerHM(summeMs);
+  }
+
+  function aktuellerAnsichtsMontag(){
+    var bezug = new Date();
+    bezug.setDate(bezug.getDate() + wochenOffset*7);
+    return montagVon(bezug);
+  }
+
+  function renderWoche(){
+    var tbody = document.querySelector('#wocheTabelle tbody');
+    tbody.innerHTML = '';
+    var label = document.getElementById('wocheLabel');
+    var istEl = document.getElementById('wocheIst');
+    var sollEl = document.getElementById('wocheSoll');
+    var saldoEl = document.getElementById('wocheSaldo');
+
+    var montag = aktuellerAnsichtsMontag();
+    var montagKey = datumKey(montag);
+    var arbeitstageDieseWoche = state.wochenTypen[montagKey] || state.arbeitstage;
+
+    label.textContent = wochenOffset === 0 ? 'Diese Woche' : (wochenOffset < 0 ? 'Vor ' + Math.abs(wochenOffset) + ' Woche(n)' : 'In ' + wochenOffset + ' Woche(n)');
+
+    var heuteKey = datumKey(new Date());
+    var wocheSummeMs = 0;
+
+    for(var i=0;i<7;i++){
+      var tag = new Date(montag);
+      tag.setDate(tag.getDate()+i);
+      var tagKey = datumKey(tag);
+      var tagSummeMs = 0;
+      state.eintraege.forEach(function(e){
+        if(datumKey(e.start) !== tagKey) return;
+        tagSummeMs += nettoDauerMs(e);
+      });
+      wocheSummeMs += tagSummeMs;
+
+      var tr = document.createElement('tr');
+      if(tagKey === heuteKey) tr.className = 'heute';
+      tr.innerHTML = '<td>' + formatTagKurz(tag) + '</td><td>' + (tagSummeMs > 0 ? formatDauerHM(tagSummeMs) : '–') + '</td>';
+      tbody.appendChild(tr);
+    }
+
+    var sollStd = state.wochenstunden || 0;
+    var sollMs = sollStd * 3600000;
+    var saldoMs = wocheSummeMs - sollMs;
+
+    istEl.textContent = formatDauerDezimal(wocheSummeMs, false);
+    sollEl.textContent = String(sollStd).replace('.', ',') + ' Std';
+    saldoEl.textContent = formatDauerDezimal(saldoMs, true);
+    saldoEl.className = saldoMs >= 0 ? 'saldo-plus' : 'saldo-minus';
+
+    var ds = arbeitstageDieseWoche ? (sollStd / arbeitstageDieseWoche) : 0;
+    document.getElementById('wochentypInfo').textContent = 'Ø ' + ds.toFixed(1).replace('.', ',') + ' Std/Tag';
+    document.getElementById('btnWochentyp5').className = 'wochentyp-btn' + (arbeitstageDieseWoche === 5 ? ' aktiv' : '');
+    document.getElementById('btnWochentyp6').className = 'wochentyp-btn' + (arbeitstageDieseWoche === 6 ? ' aktiv' : '');
+  }
+
+  function setzeWochentyp(tage){
+    var montagKey = datumKey(aktuellerAnsichtsMontag());
+    if(state.wochenTypen[montagKey] === tage){
+      delete state.wochenTypen[montagKey]; // erneutes Antippen der aktiven Markierung = zurück auf Standard
+    } else {
+      state.wochenTypen[montagKey] = tage;
+    }
+    speichereState();
+    renderWoche();
+  }
+  document.getElementById('btnWochentyp5').addEventListener('click', function(){ setzeWochentyp(5); });
+  document.getElementById('btnWochentyp6').addEventListener('click', function(){ setzeWochentyp(6); });
+
+  function renderAlles(){
+    renderSubtitle();
+    renderStampCard();
+    renderHeute();
+    renderWoche();
+  }
+
+  // ---------- Eintrag-Modal ----------
+  function oeffneEintragModal(eintragId){
+    bearbeiteEintragId = eintragId || null;
+    var titel = document.getElementById('entryTitel');
+    var startInput = document.getElementById('entryStart');
+    var endeInput = document.getElementById('entryEnde');
+    var loeschBtn = document.getElementById('btnEntryLoeschen');
+
+    if(bearbeiteEintragId){
+      var e = state.eintraege.find(function(x){ return x.id === bearbeiteEintragId; });
+      titel.textContent = 'Eintrag bearbeiten';
+      startInput.value = toLocalInput(e.start);
+      endeInput.value = e.ende ? toLocalInput(e.ende) : '';
+      loeschBtn.style.display = 'inline-block';
+    } else {
+      titel.textContent = 'Eintrag hinzufügen';
+      var jetzt = new Date();
+      startInput.value = toLocalInput(jetzt.toISOString());
+      endeInput.value = '';
+      loeschBtn.style.display = 'none';
+    }
+    oeffneOverlay('entryOverlay');
+  }
+
+  document.getElementById('btnEntrySpeichern').addEventListener('click', function(){
+    var startInput = document.getElementById('entryStart');
+    var endeInput = document.getElementById('entryEnde');
+    if(!startInput.value){ alert('Bitte einen Beginn angeben.'); return; }
+    var startIso = fromLocalInput(startInput.value);
+    var endeIso = endeInput.value ? fromLocalInput(endeInput.value) : null;
+    if(endeIso && new Date(endeIso) <= new Date(startIso)){
+      alert('Das Ende muss nach dem Beginn liegen.');
+      return;
+    }
+    if(bearbeiteEintragId){
+      var e = state.eintraege.find(function(x){ return x.id === bearbeiteEintragId; });
+      e.start = startIso; e.ende = endeIso;
+    } else {
+      state.eintraege.push({id: uid('e_'), start: startIso, ende: endeIso, pausen: []});
+    }
+    speichereState();
+    schliesseOverlay('entryOverlay');
+    renderAlles();
+  });
+  document.getElementById('btnEntryLoeschen').addEventListener('click', function(){
+    if(!confirm('Diesen Eintrag wirklich löschen?')) return;
+    state.eintraege = state.eintraege.filter(function(x){ return x.id !== bearbeiteEintragId; });
+    speichereState();
+    schliesseOverlay('entryOverlay');
+    renderAlles();
+  });
+
+  // ---------- Einstellungen ----------
+  function befuelleEinstellungenFelder(){
+    document.getElementById('einWochenstunden').value = state.wochenstunden;
+    document.getElementById('einArbeitstage').value = state.arbeitstage;
+    aktualisiereDurchschnittHint();
+  }
+  function aktualisiereDurchschnittHint(){
+    var std = parseFloat(document.getElementById('einWochenstunden').value) || 0;
+    var tage = parseFloat(document.getElementById('einArbeitstage').value) || 1;
+    document.getElementById('durchschnittHint').textContent = 'Ø ' + (std/tage).toFixed(1).replace('.', ',') + ' Std/Tag';
+  }
+  document.getElementById('einWochenstunden').addEventListener('input', aktualisiereDurchschnittHint);
+  document.getElementById('einArbeitstage').addEventListener('input', aktualisiereDurchschnittHint);
+
+  document.getElementById('btnEinstellungenSpeichern').addEventListener('click', function(){
+    state.wochenstunden = parseFloat(document.getElementById('einWochenstunden').value) || 0;
+    state.arbeitstage = Math.min(7, Math.max(1, parseInt(document.getElementById('einArbeitstage').value, 10) || 5));
+    speichereState();
+    schliesseOverlay('settingsOverlay');
+    renderAlles();
+  });
+
+  // ---------- Export / Import ----------
+  document.getElementById('btnExportCsv').addEventListener('click', function(){
+    var zeilen = [['Datum','Start','Ende','Pause (Std)','Netto (Std)']];
+    var sortiert = state.eintraege.slice().sort(function(a,b){ return new Date(a.start) - new Date(b.start); });
+    sortiert.forEach(function(e){
+      var start = new Date(e.start);
+      var ende = e.ende ? new Date(e.ende) : null;
+      var pauseStd = pausenDauerMs(e) / 3600000;
+      var nettoStd = ende ? (nettoDauerMs(e)/3600000) : null;
+      zeilen.push([
+        formatDatumKurz(start),
+        formatUhrzeit(start),
+        ende ? formatUhrzeit(ende) : '(läuft)',
+        pauseStd > 0 ? pauseStd.toFixed(2).replace('.', ',') : '',
+        nettoStd !== null ? nettoStd.toFixed(2).replace('.', ',') : ''
+      ]);
+    });
+    var csv = zeilen.map(function(z){ return z.join(';'); }).join('\r\n');
+    downloadBlob('\uFEFF' + csv, 'stempeluhr_export_' + datumKey(new Date()) + '.csv', 'text/csv;charset=utf-8');
+  });
+
+  document.getElementById('btnExportJson').addEventListener('click', function(){
+    downloadBlob(JSON.stringify(state, null, 2), 'stempeluhr_sicherung_' + datumKey(new Date()) + '.json', 'application/json');
+  });
+
+  document.getElementById('btnImportJson').addEventListener('click', function(){
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', function(ev){
+    var datei = ev.target.files[0];
+    if(!datei) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var eingelesen = JSON.parse(e.target.result);
+        if(!eingelesen.eintraege){ throw new Error('Format passt nicht.'); }
+        if(!confirm('Sicherung einspielen? Das ersetzt alle aktuell auf diesem Gerät gespeicherten Stempeluhr-Daten.')) return;
+        state = {
+          wochenstunden: eingelesen.wochenstunden || 0,
+          arbeitstage: eingelesen.arbeitstage || 5,
+          eintraege: (eingelesen.eintraege || []).map(function(e){ e.pausen = e.pausen || []; return e; }),
+          wochenTypen: eingelesen.wochenTypen || {}
+        };
+        speichereState();
+        renderAlles();
+        alert('Sicherung eingespielt.');
+      }catch(err){
+        alert('Diese Datei konnte nicht gelesen werden: ' + err.message);
+      }
+      document.getElementById('importFile').value = '';
+    };
+    reader.readAsText(datei);
+  });
+
+  document.getElementById('btnAllesLoeschen').addEventListener('click', function(){
+    if(!confirm('Wirklich ALLE Stempeluhr-Daten auf diesem Gerät löschen? Das kann nicht rückgängig gemacht werden — vorher lieber exportieren.')) return;
+    if(!confirm('Sicher? Das entfernt alle Einträge unwiderruflich.')) return;
+    state = {wochenstunden: state.wochenstunden, arbeitstage: state.arbeitstage, eintraege:[], wochenTypen:{}};
+    speichereState();
+    renderAlles();
+  });
+
+  // ---------- Stempel-Klick ----------
+  document.getElementById('stampBtn').addEventListener('click', function(){
+    var laufend = laufenderEintrag();
+    if(!laufend){
+      // Einstempeln
+      state.eintraege.push({id: uid('e_'), start: new Date().toISOString(), ende: null, pausen: []});
+    } else {
+      var pause = laufendePause(laufend);
+      if(pause){
+        // Weiterarbeiten: laufende Pause beenden
+        pause.ende = new Date().toISOString();
+      } else {
+        // Ausstempeln
+        laufend.ende = new Date().toISOString();
+      }
+    }
+    speichereState();
+    renderAlles();
+  });
+
+  document.getElementById('stampSecondaryBtn').addEventListener('click', function(){
+    var laufend = laufenderEintrag();
+    if(!laufend) return;
+    var pause = laufendePause(laufend);
+    if(pause){
+      // Sekundär während Pause: direkt ausstempeln (Pause und Tag enden gleichzeitig)
+      var jetzt = new Date().toISOString();
+      pause.ende = jetzt;
+      laufend.ende = jetzt;
+    } else {
+      // Sekundär im Normalbetrieb: Pause starten
+      laufend.pausen = laufend.pausen || [];
+      laufend.pausen.push({id: uid('pa_'), start: new Date().toISOString(), ende: null});
+    }
+    speichereState();
+    renderAlles();
+  });
+
+  document.getElementById('btnManuell').addEventListener('click', function(){
+    oeffneEintragModal(null);
+  });
+
+  // ---------- Wochen-Navigation ----------
+  document.getElementById('btnWocheZurueck').addEventListener('click', function(){ wochenOffset--; renderWoche(); });
+  document.getElementById('btnWocheVor').addEventListener('click', function(){ wochenOffset++; renderWoche(); });
+
+  // ---------- Overlays öffnen/schließen ----------
+  document.getElementById('btnSettings').addEventListener('click', function(){ befuelleEinstellungenFelder(); oeffneOverlay('settingsOverlay'); });
+  document.getElementById('btnHelp').addEventListener('click', function(){ oeffneOverlay('helpOverlay'); });
+  document.querySelectorAll('[data-close]').forEach(function(btn){
+    btn.addEventListener('click', function(){ schliesseOverlay(btn.getAttribute('data-close')); });
+  });
+  document.querySelectorAll('.overlay').forEach(function(ov){
+    ov.addEventListener('click', function(ev){ if(ev.target === ov) ov.classList.remove('offen'); });
+  });
+
+  // ---------- Live-Uhr ----------
+  function tick(){
+    document.getElementById('liveClock').textContent = new Date().toLocaleTimeString('de-DE');
+    aktualisiereLaufendenTimer();
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  // ---------- Start ----------
+  renderAlles();
+  if(state.wochenstunden === 0 && state.eintraege.length === 0){
+    setTimeout(function(){ befuelleEinstellungenFelder(); oeffneOverlay('settingsOverlay'); }, 300);
+  }
+})();
+</script>
+</body>
+</html>

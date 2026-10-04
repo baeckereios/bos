@@ -1,0 +1,699 @@
+<!--
+  taschenrechner.html — BäckereiOS V2
+  ------------------------------------------------------------
+  2026-09-02 · v0.5 · Fix
+    Ulf, Feedback zum Schnellrechner (dortiges Sondertage-Panel, gleiche
+    Session, siehe dortiges Änderungsprotokoll v0.17): Buchseiten-Optik
+    zugunsten eigenständiger, einheitlich wirkender Karten aufgegeben —
+    .tk-page-left/-right teilen sich jetzt dieselbe .tk-page-Regel (voller
+    Rand, voller Radius), Buchrücken-Linie entfernt, echter gap statt 0.
+    Betrifft hier nur die Optik von Eingabe/Rechenweg.
+    BEWUSST NICHT übernommen: die Verschiebung nach links, die beim
+    Schnellrechner zusätzlich für die Sondertage-Sektion gemacht wurde.
+    Dortige Begründung war, dass Sondertage inhaltlich eine Eingabe ist
+    und deshalb links der Eingabe stehen sollte (Eingabe-vor-Ergebnis-
+    Reihenfolge). Der Verlauf hier ist das Gegenteil — eine Historie
+    vergangener ERGEBNISSE, kein Eingabewert —, gehört also inhaltlich
+    zur Ergebnis-Seite und bleibt rechts stehen. Keine Ulf-Anweisung
+    unbeachtet gelassen, sondern eine andere Ausgangslage als beim
+    Schnellrechner (siehe Antwort im Chat).
+
+  2026-09-02 · v0.4 · Feature
+    Ulf, Screenshot aus dem echten Launcher-Fenster (Schnellrechner,
+    maximiert) + Folgegespräch: Breite oberhalb der 900px-Buchseiten
+    bleibt ungenutzt. Konzept: BOS_NEUER_SATELLIT_CHECKLISTE.md §3a,
+    SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md. Dort ausdrücklich
+    entschieden: Verlauf NUR als Breiten-Bonus (#tk-history-slot, ab
+    1300px, reine CSS-Media-Query — kein Reparenting nötig, da der
+    Verlauf anders als beim Schnellrechner keine bestehende, an eine
+    Sperre gebundene Sektion ist, sondern eine komplett neue Fläche).
+    Bei Standardbreite/Mobile bleibt der Taschenrechner exakt wie bisher,
+    KEIN Verlauf sichtbar — die Begründung aus v0.1 ("kleiner Standard-
+    Satellit, keine Abstraktion auf Vorrat") bleibt für diesen Fall
+    unverändert gültig, das hier ist keine Kehrtwende, sondern eine
+    breitenabhängige Ausnahme davon. Rein session-lokal wie der Rest des
+    Taschenrechners (kein Firestore), auf 30 Einträge begrenzt. Tippen auf
+    einen Verlaufseintrag lädt seine Formel zurück in die Eingabe. Hilfe-
+    Text ergänzt.
+
+  2026-09-01 · v0.1 · Feature
+    Erstversion. Kleiner Standard-Satellit: Grundrechenarten mit
+    einfachen Klammern, Ergebnis + Rechenweg nach dem Vorbild des
+    Schnellrechners (zwei "Buchseiten": links Eingabe/Tastenfeld,
+    rechts Aufschlüsselung). Anders als der Schnellrechner rein
+    mathematisch, kein Bezug zu Produkten/Verbrauch/Kette.
+
+    Bewusste Entscheidungen (Ulf hat nur "Grundrechenarten + Klammern
+    + Rechenweg wie Schnellrechner" vorgegeben, Rest technische
+    Umsetzung):
+    - Rechenweg = tatsächliche Auswertungsreihenfolge (Klammern zuerst,
+      dann Punkt-vor-Strich, dann Strichrechnung), nicht die Reihenfolge
+      der Eingabe. Jeder binäre Rechenschritt eine eigene Zeile.
+    - Eingabe als Tastenfeld mit laufender Formelanzeige (kein reines
+      Ein-Zahl-nach-der-anderen wie ein Taschenrechner ohne Klammern —
+      ohne sichtbare Formel wären Klammern beim Tippen nicht kontrollierbar).
+    - Dezimaltrennzeichen Komma (deutsche Konvention), Tausenderpunkt nur
+      in der Anzeige (Rechenweg/Ergebnis), NIE in der editierbaren Formel
+      (würde die Eingabe verwirren/mehrdeutig machen).
+    - Bewusst KEIN Verlauf mehrerer Rechnungen (Tape/Bon) — nicht verlangt,
+      "kleiner Standard-Satellit", keine Abstraktion auf Vorrat.
+    - Bewusst KEINE Firebase-Einbindung — dieses Tool liest/schreibt
+      nichts, rein clientseitig. Erster Satellit ohne Firebase; keine
+      Abweichung von einer Regel, einfach das erste Tool, das wirklich
+      keine Daten braucht.
+    - Registry-Eintrag OHNE roles-Feld → für alle Konten sofort sichtbar,
+      auch vor Rollenzuteilung (siehe BOS_ACCOUNTS_DOKU.md, Taschenrechner
+      wird dort bereits als Beispiel für ein "allgemeines Werkzeug" im
+      Hilfetext genannt). Kein Eintrag in bos_permissions.js nötig —
+      laut bos_access.js fail-open für jeden dort nicht gelisteten
+      Satelliten (bewusst genutzt, nicht übersehen).
+    - Icon 🖩 gewählt, weil 🧮 (freezer_inventur) und 🔢 (schnellrechner)
+      bereits vergeben sind. Farbe Blau (--bos-blue), da laut Design-
+      Tokens "Neutral-Akzent" — passt zu einem rollenunabhängigen
+      Allzweck-Werkzeug besser als Amber (Produktions-Zahlen-Tools) oder
+      Lila (Admin/System-Tools).
+
+  WICHTIGER HINWEIS ZU VERBLEIBENDEN ANNAHMEN (§0 BOS_NEUER_SATELLIT_
+  CHECKLISTE.md): bos_design_tokens.css, bos_app_registry.js,
+  bos_access_guard.js, bos_access.js, bos_theme_sync.js sowie
+  schnellrechner.html als Stil-Vorlage wurden diese Session im Original
+  gesehen und geprüft. Weiterhin NICHT im Original gesehen, nur per
+  Pflicht-Block referenziert (unverändert, keine inhaltliche Annahme
+  nötig, da nur eingebunden, nicht ausgewertet): bos_launcher_profiles.js,
+  bos_permissions.js.
+  ------------------------------------------------------------
+
+  2026-09-01 · v0.2 · Fix
+    Ulf, 01.09. (Screenshot aus dem echten Launcher-Fenster): "← Zurück"
+    ergab im Live-Betrieb einen verschachtelten Launcher-in-Launcher —
+    der Link navigierte den eigenen Satelliten-IFRAME zu launcher.html,
+    der Launcher stellte dabei offenbar seinen zuletzt offenen
+    Fenster-Zustand wieder her und öffnete darin erneut ein
+    Taschenrechner-Fenster, verschachtelt in sich selbst. Link ersatzlos
+    entfernt — das Fenster-Chrome des Launchers hat ohnehin ein eigenes
+    Schließen-Kreuz, der Link war nur 1:1 aus schnellrechner.html
+    übernommen und dort nie unter echten Bedingungen (innerhalb des
+    Fenster-Managers) angeklickt/getestet worden. ANNAHME (launcher.html
+    lag nie vor, siehe §0 Checkliste): vermutlich stellt der Launcher
+    beim eigenen Laden offene Fenster aus einem gemeinsamen
+    localStorage-Zustand wieder her — das würde erklären, warum das
+    verschachtelte Launcher-Fenster sofort wieder ein Taschenrechner-
+    Fenster enthielt, statt leer zu sein. Nicht am Original verifiziert.
+    Derselbe Link-Aufbau existiert vermutlich unverändert in
+    schnellrechner.html und jedem weiteren nach diesem Muster gebauten
+    Satelliten — dort nicht angefasst (außerhalb des Scopes dieser
+    Session), aber als Verdacht in TASCHENRECHNER_DOKU.md vermerkt.
+
+  2026-09-01 · v0.3 · Feature
+    Ulf, nach Feedback zur Button-/Schriftgröße ("filigraner, wie bei
+    Windows... einstellbar machen?"): systemweite Dichte-Einstellung
+    begonnen. bos_design_tokens.css um eine Abstands-/Schrift-/Radius-
+    Skala erweitert (--bos-space-*/--bos-font-*, umschaltbar über
+    html[data-density="compact"], Standard bleibt der bisherige Look).
+    Neuer bos_density_sync.js (1:1 nach bos_theme_sync.js-Muster) liest
+    die Einstellung pro Profil. Dieser Satellit vollständig auf die neuen
+    Tokens umgestellt (keine hart codierten px/rem-Werte mehr außer ein
+    paar bewusst ausgenommenen Struktur-Konstanten, siehe CSS-Kommentare).
+    Da der Launcher noch keine eigene Umschalt-UI hat, provisorischer
+    Test-Knopf in der Kopfleiste ergänzt (schreibt in dieselbe reale
+    localStorage-Stelle, die eine künftige Launcher-UI nutzen würde — kein
+    Wegwerf-Zustand, nur ein Wegwerf-Knopf, siehe BOS_DICHTE_DOKU.md §0).
+    schnellrechner.html bewusst NICHT in diesem Zug angefasst — dort schon
+    mehrfach mühsam auf die richtige Größe austariert (siehe eigenes
+    Änderungsprotokoll, v0.7), ein blinder Tokens-Umbau ohne visuelle
+    Prüfmöglichkeit hätte reales Regressions-Risiko. Retrofit dort erst
+    nach Ulfs OK. Restliche Satelliten (froster_inventur, verbrauch_manuell,
+    zeitkontext_editor, produkt_config_editor/-sync,
+    verbrauch_einstellungen_editor, konten_verwaltung) ebenfalls noch
+    NICHT umgestellt — lagen diese Session nicht vor.
+-->
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Taschenrechner · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift/Radien) neben dem Theme (Farben) — siehe bos_density_sync.js Kopfkommentar -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bos-bg);
+    color: var(--bos-text);
+    font-family: var(--bos-font-body, 'Barlow', sans-serif);
+    min-height: 100vh;
+  }
+
+  /* ── Kopfleiste ─────────────────────────────────────────── */
+  .tk-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); background: var(--bos-surface);
+    border-bottom: 1px solid var(--bos-border);
+  }
+  .tk-title {
+    font-family: var(--bos-font-display, 'Fraunces'); font-weight: 900;
+    font-size: var(--bos-font-xl, 1.3rem); letter-spacing: 0.3px;
+  }
+  .tk-title span { color: var(--bos-blue); font-style: italic; }
+  .tk-help-btn {
+    /* Fixe Symbol-Taste, bewusst nicht Teil der Text-/Abstands-Dichte-Skala
+       (ein rundes Icon-Element, kein Text) — siehe TASCHENRECHNER_DOKU.md §... */
+    width: var(--bos-space-xl, 32px); height: var(--bos-space-xl, 32px);
+    border-radius: 50%; border: none;
+    background: var(--bos-blue); color: #fff; font-weight: 900;
+    cursor: pointer; box-shadow: var(--bos-shadow-sm);
+  }
+  /* ── Äußerer Layout-Rahmen: zentriert das Buch, ab Breite Platz für den
+     Verlauf daneben — siehe BOS_NEUER_SATELLIT_CHECKLISTE.md §3a /
+     SESSION_2026-09-02_LAYOUT_BREITE_KONZEPT.md. #tk-history-slot ist
+     unterhalb des Breakpoints per Media Query ausgeblendet, .tk-layout
+     zentriert dann .tk-book allein — genau wie vorher margin:auto es tat. */
+  .tk-layout {
+    display: flex; justify-content: center; align-items: start;
+    gap: var(--bos-space-lg, 24px); flex-wrap: wrap;
+  }
+  /* ── Eingabe/Ergebnis als zwei eigenständige Karten ──────────────
+     Ulf, 02.09.2026 — gleiche Entscheidung wie beim Schnellrechner
+     (dort ausgelöst, siehe dortiges Änderungsprotokoll v0.17): keine
+     verbundene Buchseiten-Optik mehr, stattdessen kleine eigenständige
+     Fenster wie das Verlauf-Panel, einheitlich über beide Rechner. */
+  .tk-book {
+    /* max-width/gap/breakpoint sind Layout-Konstanten, keine Text-/Abstands-
+       dichte — bewusst nicht tokenisiert, siehe BOS_DICHTE_DOKU.md §Grenzen */
+    display: grid; grid-template-columns: 1fr 1fr; align-items: start;
+    gap: var(--bos-space-md, 18px); max-width: 900px; margin: var(--bos-space-lg, 20px) 0; padding: 0 var(--bos-space-sm, 16px);
+  }
+  .tk-page {
+    background: var(--bos-surface); border: 1px solid var(--bos-border);
+    border-radius: var(--bos-radius-lg);
+    padding: var(--bos-space-lg, 22px); position: relative;
+  }
+  @media (max-width: 860px) {
+    .tk-book { grid-template-columns: 1fr; }
+  }
+
+  /* ── Verlauf — reiner Breiten-Bonus, siehe Kopfkommentar ─────────
+     Ulf, 02.09.2026 (Screenshot, maximiertes Launcher-Fenster): Breite
+     ungenutzt. Entscheidung: NUR ab ausreichender Breite sichtbar, bei
+     Standardbreite/Mobile bleibt der Taschenrechner exakt wie bisher
+     (kein Verlauf) — die Begründung dafür aus v0.1 ("kleiner Standard-
+     Satellit, keine Abstraktion auf Vorrat") bleibt für diesen Fall
+     gültig, siehe BOS_NEUER_SATELLIT_CHECKLISTE.md §3a. Rein CSS-
+     gesteuert (kein Reparenting nötig wie beim Schnellrechner — der
+     Verlauf ist eine neue Fläche, kein vorhandener, an eine Sperre
+     gebundener Abschnitt), deshalb reicht eine Media Query. */
+  #tk-history-slot { display: none; }
+  @media (min-width: 1300px) {
+    #tk-history-slot {
+      display: flex; flex-direction: column; width: 300px; flex-shrink: 0;
+      background: var(--bos-surface); border: 1px solid var(--bos-border);
+      border-radius: var(--bos-radius-lg); padding: var(--bos-space-lg, 22px);
+      margin: var(--bos-space-lg, 20px) 0; max-height: 560px;
+    }
+  }
+  .tk-history-liste { overflow-y: auto; flex: 1; margin-top: var(--bos-space-xs, 10px); }
+  .tk-history-item {
+    width: 100%; text-align: right; background: none; border: none; border-bottom: 1px dashed var(--bos-border);
+    padding: var(--bos-space-2xs, 8px) var(--bos-space-3xs, 2px); cursor: pointer; font-family: inherit;
+  }
+  .tk-history-item:last-child { border-bottom: none; }
+  .tk-history-item:hover .tk-history-formel { color: var(--bos-blue); }
+  .tk-history-formel { display: block; font-size: var(--bos-font-xs, 0.72rem); color: var(--bos-text-faint); word-break: break-all; }
+  .tk-history-ergebnis { display: block; font-family: var(--bos-font-display); font-weight: 700; font-size: var(--bos-font-md, 0.95rem); color: var(--bos-text); }
+  .tk-history-empty { color: var(--bos-text-faint); font-size: var(--bos-font-sm, 0.85rem); text-align: center; padding: var(--bos-space-lg, 24px) var(--bos-space-2xs, 8px); }
+  .tk-history-clear {
+    background: none; border: 1px solid var(--bos-border); color: var(--bos-text-dim); border-radius: var(--bos-radius-sm);
+    padding: var(--bos-space-2xs, 8px); font-family: var(--bos-font-label); font-size: var(--bos-font-xs, 0.72rem); font-weight: 700;
+    text-transform: uppercase; letter-spacing: .03em; cursor: pointer; margin-top: var(--bos-space-xs, 10px); flex-shrink: 0;
+  }
+  .tk-history-clear:hover { border-color: var(--bos-red); color: var(--bos-red); }
+
+  .tk-label {
+    font-family: var(--bos-font-label, 'Barlow Condensed'); font-weight: 800;
+    font-size: var(--bos-font-xs, 0.72rem); letter-spacing: 1px; text-transform: uppercase;
+    color: var(--bos-blue); margin-bottom: var(--bos-space-2xs, 10px);
+  }
+
+  /* ── Formel-Anzeige (linke Seite) ───────────────────────── */
+  .tk-anzeige-wrap {
+    background: var(--bos-bg-soft); border: 1.5px solid var(--bos-border-strong);
+    border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 16px) var(--bos-space-sm, 14px);
+    margin-bottom: var(--bos-space-sm, 16px);
+    min-height: calc(var(--bos-tap-min, 44px) + var(--bos-space-xs, 20px));
+    display: flex; align-items: center; justify-content: flex-end;
+  }
+  .tk-anzeige {
+    font-family: var(--bos-font-display, 'Fraunces'); font-weight: 700;
+    font-size: var(--bos-font-2xl, 1.6rem); text-align: right; word-break: break-all;
+    color: var(--bos-text); line-height: 1.25; width: 100%;
+  }
+  .tk-anzeige.tk-anzeige--leer { color: var(--bos-text-faint); font-weight: 600; font-size: var(--bos-font-xl, 1.3rem); }
+
+  /* ── Tastenfeld ─────────────────────────────────────────── */
+  .tk-keypad {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--bos-space-2xs, 9px);
+  }
+  .tk-key {
+    font-family: var(--bos-font-label, 'Barlow Condensed'); font-weight: 800;
+    font-size: var(--bos-font-lg, 1.15rem); padding: var(--bos-space-sm, 14px) var(--bos-space-2xs, 6px);
+    min-height: var(--bos-tap-min, 44px);
+    border-radius: var(--bos-radius-sm);
+    border: 1.5px solid var(--bos-border-strong); background: var(--bos-surface-raised);
+    color: var(--bos-text); cursor: pointer; transition: var(--bos-transition-fast);
+  }
+  .tk-key:hover { border-color: var(--bos-blue); }
+  .tk-key:active { transform: scale(0.96); }
+  .tk-key--zero { grid-column: span 2; }
+  .tk-key--op { color: var(--bos-blue); border-color: var(--bos-blue); background: color-mix(in srgb, var(--bos-blue) 10%, var(--bos-surface-raised)); }
+  .tk-key--paren { color: var(--bos-text-dim); font-family: var(--bos-font-body); font-weight: 700; }
+  .tk-key--clear { color: var(--bos-red); border-color: var(--bos-red); }
+  .tk-key--ghost { color: var(--bos-text-dim); }
+  .tk-key--eq {
+    width: 100%; margin-top: var(--bos-space-2xs, 9px);
+    padding: var(--bos-space-sm, 15px) var(--bos-space-2xs, 6px); font-size: var(--bos-font-xl, 1.25rem);
+    min-height: var(--bos-tap-min, 44px);
+    background: var(--bos-blue); border-color: var(--bos-blue); color: #fff;
+  }
+  .tk-key--eq:hover { background: var(--bos-amber-bright); border-color: var(--bos-amber-bright); }
+
+  /* ── Ergebnis-Seite rechts ──────────────────────────────── */
+  .tk-formel-echo {
+    text-align: center; font-size: var(--bos-font-sm, 0.8rem); color: var(--bos-text-faint);
+    margin-bottom: var(--bos-space-2xs, 6px); word-break: break-all;
+  }
+  .tk-res-val { font-family: var(--bos-font-display); font-size: var(--bos-font-4xl, 3.4rem); font-weight: 900; color: var(--bos-blue); line-height: 1; text-align: center; word-break: break-all; }
+  table.tk-calc { width: 100%; border-collapse: collapse; font-size: var(--bos-font-sm, 0.88rem); margin-top: var(--bos-space-sm, 18px); }
+  table.tk-calc td { padding: var(--bos-space-2xs, 9px) var(--bos-space-3xs, 4px); border-bottom: 1px solid var(--bos-border); }
+  table.tk-calc tr:last-child td { border-bottom: none; }
+  .tk-empty-hint { color: var(--bos-text-faint); text-align: center; padding: var(--bos-space-xl, 40px) var(--bos-space-2xs, 10px); font-size: var(--bos-font-md, 0.9rem); }
+  .tk-fehler-box {
+    margin-top: var(--bos-space-sm, 16px); padding: var(--bos-space-2xs, 12px) var(--bos-space-sm, 14px); border-radius: var(--bos-radius-sm);
+    background: color-mix(in srgb, var(--bos-red) 12%, transparent); border: 1.5px solid var(--bos-red);
+    color: var(--bos-red); font-weight: 700; font-size: var(--bos-font-sm, 0.85rem); text-align: center;
+  }
+  .tk-einzelzahl-hint { color: var(--bos-text-faint); text-align: center; padding: var(--bos-space-2xs, 14px) var(--bos-space-2xs, 10px); font-size: var(--bos-font-sm, 0.82rem); }
+
+  /* ── Hilfe-Sheet, identisches Muster zum Schnellrechner ──── */
+  #tk-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #tk-hilfe-inhalt-wrap { background: var(--bos-surface); border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; max-width:680px; margin:40px auto 0; padding: var(--bos-space-lg, 20px) var(--bos-space-md, 18px) var(--bos-space-xl, 40px); min-height:50vh; }
+  .tk-hilfe-schritt { margin-bottom: var(--bos-space-md, 18px); padding-bottom: var(--bos-space-sm, 14px); border-bottom:1px dashed var(--bos-border); }
+  .tk-hilfe-titel { font-weight:900; color: var(--bos-blue); margin-bottom: var(--bos-space-3xs, 5px); }
+  .tk-hilfe-text { font-size: var(--bos-font-sm, 0.85rem); line-height:1.6; color: var(--bos-text-dim); white-space: pre-line; }
+</style>
+</head>
+<body>
+
+<!-- ═══ Pflicht-Block Body-Anfang (§2 Checkliste) ═══ -->
+<script>var BOS_APP_ID = 'taschenrechner';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<div class="tk-header">
+  <div class="tk-title">Taschen<span>rechner</span></div>
+  <button class="tk-help-btn" onclick="tkOeffneHilfe()">?</button>
+</div>
+
+<div class="tk-layout">
+<div class="tk-book">
+
+  <!-- ═══════════════ LINKE BUCHSEITE — EINGABE ═══════════════ -->
+  <div class="tk-page tk-page-left">
+    <div class="tk-label">Formel</div>
+    <div class="tk-anzeige-wrap">
+      <div class="tk-anzeige tk-anzeige--leer" id="tk-anzeige">0</div>
+    </div>
+    <div class="tk-keypad">
+      <button class="tk-key tk-key--clear" onclick="tkTaste('C')">C</button>
+      <button class="tk-key tk-key--ghost" onclick="tkTaste('⌫')">⌫</button>
+      <button class="tk-key tk-key--paren" onclick="tkTaste('(')">(</button>
+      <button class="tk-key tk-key--paren" onclick="tkTaste(')')">)</button>
+
+      <button class="tk-key" onclick="tkTaste('7')">7</button>
+      <button class="tk-key" onclick="tkTaste('8')">8</button>
+      <button class="tk-key" onclick="tkTaste('9')">9</button>
+      <button class="tk-key tk-key--op" onclick="tkTaste('÷')">÷</button>
+
+      <button class="tk-key" onclick="tkTaste('4')">4</button>
+      <button class="tk-key" onclick="tkTaste('5')">5</button>
+      <button class="tk-key" onclick="tkTaste('6')">6</button>
+      <button class="tk-key tk-key--op" onclick="tkTaste('×')">×</button>
+
+      <button class="tk-key" onclick="tkTaste('1')">1</button>
+      <button class="tk-key" onclick="tkTaste('2')">2</button>
+      <button class="tk-key" onclick="tkTaste('3')">3</button>
+      <button class="tk-key tk-key--op" onclick="tkTaste('−')">−</button>
+
+      <button class="tk-key tk-key--zero" onclick="tkTaste('0')">0</button>
+      <button class="tk-key" onclick="tkTaste(',')">,</button>
+      <button class="tk-key tk-key--op" onclick="tkTaste('+')">+</button>
+    </div>
+    <button class="tk-key tk-key--eq" onclick="tkGleich()">=</button>
+  </div>
+
+  <!-- ═══════════════ RECHTE BUCHSEITE — RECHENWEG ═══════════════ -->
+  <div class="tk-page tk-page-right">
+    <div id="tk-ergebnis-leer" class="tk-empty-hint">Formel eingeben und = drücken,<br>dann erscheint hier der Rechenweg.</div>
+    <div id="tk-ergebnis-inhalt" style="display:none;">
+      <div class="tk-formel-echo" id="tk-formel-echo"></div>
+      <div class="tk-label" style="text-align:center;">Ergebnis</div>
+      <div class="tk-res-val" id="tk-res-val">0</div>
+      <div id="tk-einzelzahl-hint" class="tk-einzelzahl-hint" style="display:none;">Nur eine Zahl eingegeben — kein Rechenweg.</div>
+      <table class="tk-calc" id="tk-calc-table"></table>
+    </div>
+    <div id="tk-fehler-box" class="tk-fehler-box" style="display:none;"></div>
+  </div>
+
+</div>
+<!-- Verlauf-Panel — ab Breakpoint sichtbar (CSS), Inhalt kommt aus
+     tkRenderVerlauf(), siehe Script-Teil. -->
+<div id="tk-history-slot">
+  <div class="tk-label" style="margin-bottom:0;">Verlauf</div>
+  <div class="tk-history-liste" id="tk-history-liste"></div>
+  <button class="tk-history-clear" onclick="tkVerlaufLeeren()">Verlauf leeren</button>
+</div>
+</div><!-- /tk-layout -->
+
+<!-- ═══ Hilfe-Sheet ═══ -->
+<div id="tk-hilfe-modal" onclick="if(event.target===this)tkSchliesseHilfe()">
+  <div id="tk-hilfe-inhalt-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:900;color:var(--bos-blue);font-size:1.05rem;">❓ Anleitung</div>
+      <button onclick="tkSchliesseHilfe()" style="background:none;border:none;font-size:1.3rem;color:var(--bos-text-dim);cursor:pointer;">✕</button>
+    </div>
+    <div id="tk-hilfe-inhalt"></div>
+  </div>
+</div>
+
+<script>
+// ── i18n-Hook (§6 Checkliste — Pflicht, auch wenn aktuell nur Deutsch) ──
+const I18N_DE = {};
+function t(key) { return I18N_DE[key] || key; }
+
+// ── Zustand ───────────────────────────────────────────────────────────
+let tkAusdruck = '';               // aktuell editierte Formel, exakt wie getippt (Komma als Dezimaltrennzeichen)
+let tkErgebnisAngezeigt = false;   // true direkt nach "=", steuert das "weiterrechnen vs. neu beginnen"-Verhalten
+let tkLetzterWertKompakt = '';     // letztes Ergebnis, tokenizer-sicher als Fortsetzungs-Text (kein Tausenderpunkt!)
+// Verlauf — reiner Breiten-Bonus (§3a, siehe Kopfkommentar), rein session-
+// lokal wie der Rest des Taschenrechners, keine Persistenz. Neuester
+// Eintrag zuerst, auf 30 begrenzt gegen unbegrenztes Wachstum.
+let tkVerlauf = [];
+const TK_VERLAUF_MAX = 30;
+
+// ── Tastenfeld-Eingabe ───────────────────────────────────────────────
+function tkTaste(zeichen) {
+  if (zeichen === 'C') { tkClear(); return; }
+  if (zeichen === '⌫') { tkBackspace(); return; }
+  tkAnhaengen(zeichen);
+}
+
+function tkAnhaengen(zeichen) {
+  if (tkErgebnisAngezeigt) {
+    // Nach einem Ergebnis: Operator tippen = damit weiterrechnen,
+    // alles andere (Zahl, Klammer) = neue Rechnung beginnen.
+    const istOperator = (zeichen === '+' || zeichen === '−' || zeichen === '×' || zeichen === '÷');
+    tkAusdruck = istOperator ? tkLetzterWertKompakt : '';
+    tkErgebnisAngezeigt = false;
+    tkVersteckeErgebnis();
+  }
+  tkAusdruck += zeichen;
+  tkRenderAnzeige();
+}
+
+function tkClear() {
+  tkAusdruck = '';
+  tkErgebnisAngezeigt = false;
+  tkRenderAnzeige();
+  tkVersteckeErgebnis();
+}
+
+function tkBackspace() {
+  if (tkErgebnisAngezeigt) { tkClear(); return; } // nach "=" hat Löschen keinen sinnvollen Teil-Zustand, siehe Kopfkommentar
+  tkAusdruck = tkAusdruck.slice(0, -1);
+  tkRenderAnzeige();
+}
+
+function tkRenderAnzeige() {
+  const el = document.getElementById('tk-anzeige');
+  if (!tkAusdruck) {
+    el.textContent = '0';
+    el.classList.add('tk-anzeige--leer');
+  } else {
+    el.textContent = tkAusdruck;
+    el.classList.remove('tk-anzeige--leer');
+  }
+}
+
+function tkVersteckeErgebnis() {
+  document.getElementById('tk-ergebnis-leer').style.display = 'block';
+  document.getElementById('tk-ergebnis-inhalt').style.display = 'none';
+  document.getElementById('tk-fehler-box').style.display = 'none';
+}
+
+// ── Rechenkern: Tokenizer → Parser (Klammern + Punkt-vor-Strich) → Auswertung ──
+// Reihenfolge fest wie in der Schule: zuerst Klammern (rekursiv), dann
+// Punktrechnung (× ÷), dann Strichrechnung (+ −) — durch die Grammatik
+// selbst erzwungen (parseExpr → parseTerm → parseFactor), nicht durch
+// eine nachträgliche Prioritäts-Prüfung. Der Rechenweg entsteht dabei
+// automatisch in der richtigen Reihenfolge: tkAuswerten() protokolliert
+// jeden binären Schritt erst NACHDEM beide Seiten fertig ausgewertet sind
+// (Post-Order) — das ist exakt die Reihenfolge, in der ein Mensch die
+// Formel von innen nach außen abarbeiten würde.
+
+function tkTokenize(ausdruck) {
+  const tokens = [];
+  let i = 0;
+  while (i < ausdruck.length) {
+    const ch = ausdruck[i];
+    if (ch === ' ') { i++; continue; }
+    if (/[0-9]/.test(ch) || ch === ',') {
+      let start = i;
+      while (i < ausdruck.length && /[0-9,]/.test(ausdruck[i])) i++;
+      const roh = ausdruck.slice(start, i);
+      const zahl = parseFloat(roh.replace(',', '.'));
+      if (isNaN(zahl)) throw new Error('Ungültige Zahl: „' + roh + '"');
+      tokens.push({ typ: 'zahl', wert: zahl });
+      continue;
+    }
+    if (ch === '+') { tokens.push({ typ: 'op', wert: '+' }); i++; continue; }
+    if (ch === '−' || ch === '-') { tokens.push({ typ: 'op', wert: '-' }); i++; continue; }
+    if (ch === '×' || ch === '*') { tokens.push({ typ: 'op', wert: '*' }); i++; continue; }
+    if (ch === '÷' || ch === '/') { tokens.push({ typ: 'op', wert: '/' }); i++; continue; }
+    if (ch === '(') { tokens.push({ typ: 'klammerAuf' }); i++; continue; }
+    if (ch === ')') { tokens.push({ typ: 'klammerZu' }); i++; continue; }
+    throw new Error('Unbekanntes Zeichen: „' + ch + '"');
+  }
+  return tokens;
+}
+
+function tkParse(tokens) {
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const consume = () => tokens[pos++];
+
+  function parseExpr() {
+    let knoten = parseTerm();
+    while (peek() && peek().typ === 'op' && (peek().wert === '+' || peek().wert === '-')) {
+      const opTok = consume();
+      knoten = { typ: 'bin', op: opTok.wert, links: knoten, rechts: parseTerm() };
+    }
+    return knoten;
+  }
+  function parseTerm() {
+    let knoten = parseFactor();
+    while (peek() && peek().typ === 'op' && (peek().wert === '*' || peek().wert === '/')) {
+      const opTok = consume();
+      knoten = { typ: 'bin', op: opTok.wert, links: knoten, rechts: parseFactor() };
+    }
+    return knoten;
+  }
+  function parseFactor() {
+    const tok = peek();
+    if (!tok) throw new Error('Die Formel ist unvollständig.');
+    if (tok.typ === 'op' && tok.wert === '-') { consume(); return { typ: 'neg', wert: parseFactor() }; }
+    if (tok.typ === 'op' && tok.wert === '+') { consume(); return parseFactor(); }
+    if (tok.typ === 'klammerAuf') {
+      consume();
+      const inhalt = parseExpr();
+      const schluss = peek();
+      if (!schluss || schluss.typ !== 'klammerZu') throw new Error('Eine Klammer wurde nicht geschlossen.');
+      consume();
+      return { typ: 'klammer', wert: inhalt };
+    }
+    if (tok.typ === 'zahl') { consume(); return { typ: 'zahl', wert: tok.wert }; }
+    throw new Error('Unerwartetes Zeichen in der Formel.');
+  }
+
+  const baum = parseExpr();
+  if (pos < tokens.length) {
+    if (peek().typ === 'klammerZu') throw new Error('Zu viele schließende Klammern.');
+    throw new Error('Unerwartete Zeichen in der Formel.');
+  }
+  return baum;
+}
+
+function tkAuswerten(knoten, schritte) {
+  switch (knoten.typ) {
+    case 'zahl': return knoten.wert;
+    case 'klammer': return tkAuswerten(knoten.wert, schritte);
+    case 'neg': return -tkAuswerten(knoten.wert, schritte);
+    case 'bin': {
+      const a = tkAuswerten(knoten.links, schritte);
+      const b = tkAuswerten(knoten.rechts, schritte);
+      let ergebnis, opSymbol;
+      switch (knoten.op) {
+        case '+': ergebnis = a + b; opSymbol = '+'; break;
+        case '-': ergebnis = a - b; opSymbol = '−'; break;
+        case '*': ergebnis = a * b; opSymbol = '×'; break;
+        case '/':
+          if (b === 0) throw new Error('Division durch 0 ist nicht möglich.');
+          ergebnis = a / b; opSymbol = '÷'; break;
+      }
+      schritte.push({ a, op: opSymbol, b, ergebnis });
+      return ergebnis;
+    }
+  }
+}
+
+// ── Zahlenformatierung ───────────────────────────────────────────────
+// "Gross" = hübsch fürs Auge (Tausenderpunkt, Komma), nur zum Anzeigen.
+// "Kompakt" = tokenizer-sicher (kein Tausenderpunkt!), einzige Form, die
+// nach "=" wieder in tkAusdruck zurückgeschrieben werden darf.
+function tkFormatGross(n) {
+  if (!isFinite(n)) return '—';
+  const gerundet = Math.round(n * 1e10) / 1e10; // Fließkomma-Reste wie 0,1+0,2 wegrunden
+  return gerundet.toLocaleString('de-DE', { maximumFractionDigits: 10 });
+}
+function tkFormatKompakt(n) {
+  const gerundet = Math.round(n * 1e10) / 1e10;
+  return String(gerundet).replace('.', ',');
+}
+
+// ── "=" auswerten und Rechenweg rendern ─────────────────────────────
+function tkGleich() {
+  if (!tkAusdruck.trim()) return;
+  try {
+    const tokens = tkTokenize(tkAusdruck);
+    if (!tokens.length) return;
+    const baum = tkParse(tokens);
+    const schritte = [];
+    const ergebnis = tkAuswerten(baum, schritte);
+
+    tkLetzterWertKompakt = tkFormatKompakt(ergebnis);
+    tkErgebnisAngezeigt = true;
+    tkRenderErgebnis(tkAusdruck, ergebnis, schritte);
+
+    tkVerlauf.unshift({ formel: tkAusdruck, ergebnis: tkFormatGross(ergebnis) });
+    if (tkVerlauf.length > TK_VERLAUF_MAX) tkVerlauf.length = TK_VERLAUF_MAX;
+    tkRenderVerlauf();
+  } catch (fehler) {
+    tkRenderFehler(fehler.message || String(fehler));
+  }
+}
+
+function tkRenderErgebnis(formel, ergebnis, schritte) {
+  document.getElementById('tk-ergebnis-leer').style.display = 'none';
+  document.getElementById('tk-fehler-box').style.display = 'none';
+  document.getElementById('tk-ergebnis-inhalt').style.display = 'block';
+
+  document.getElementById('tk-formel-echo').textContent = formel + ' =';
+  document.getElementById('tk-res-val').textContent = tkFormatGross(ergebnis);
+
+  const einzelzahlHint = document.getElementById('tk-einzelzahl-hint');
+  const tabelle = document.getElementById('tk-calc-table');
+
+  if (schritte.length === 0) {
+    // Formel war nur eine einzelne Zahl (ggf. in Klammern/negiert) — kein
+    // Rechenweg zum Zeigen, siehe Kopfkommentar.
+    einzelzahlHint.style.display = 'block';
+    tabelle.innerHTML = '';
+    return;
+  }
+  einzelzahlHint.style.display = 'none';
+
+  let html = '';
+  schritte.forEach(function (s, idx) {
+    const istLetzter = idx === schritte.length - 1;
+    const stil = istLetzter ? 'font-weight:900;' : '';
+    html += '<tr><td style="' + stil + '">' + tkFormatGross(s.a) + ' ' + s.op + ' ' + tkFormatGross(s.b) + '</td>' +
+      '<td style="text-align:right;' + stil + '">= ' + tkFormatGross(s.ergebnis) + '</td></tr>';
+  });
+  tabelle.innerHTML = html;
+}
+
+function tkRenderFehler(text) {
+  document.getElementById('tk-ergebnis-leer').style.display = 'none';
+  document.getElementById('tk-ergebnis-inhalt').style.display = 'none';
+  const box = document.getElementById('tk-fehler-box');
+  box.style.display = 'block';
+  box.textContent = '⚠️ ' + text;
+}
+
+// ── Verlauf — nur sichtbar, wenn das Fenster breit genug ist (CSS),
+// aber unabhängig davon immer im Hintergrund mitgeführt, damit er sofort
+// vollständig dasteht, sobald das Fenster vergrößert wird. ────────────
+function tkRenderVerlauf() {
+  const liste = document.getElementById('tk-history-liste');
+  if (!liste) return; // Element existiert immer im Markup, Schutz schadet trotzdem nicht
+  if (tkVerlauf.length === 0) {
+    liste.innerHTML = '<div class="tk-history-empty">Noch keine Rechnung.</div>';
+    return;
+  }
+  liste.innerHTML = tkVerlauf.map(function (e, idx) {
+    return '<button class="tk-history-item" onclick="tkVerlaufEintragLaden(' + idx + ')">' +
+      '<span class="tk-history-formel">' + e.formel + ' =</span>' +
+      '<span class="tk-history-ergebnis">' + e.ergebnis + '</span></button>';
+  }).join('');
+}
+function tkVerlaufEintragLaden(idx) {
+  const eintrag = tkVerlauf[idx];
+  if (!eintrag) return;
+  tkAusdruck = eintrag.formel;
+  tkErgebnisAngezeigt = false;
+  tkRenderAnzeige();
+  tkVersteckeErgebnis();
+}
+function tkVerlaufLeeren() {
+  tkVerlauf = [];
+  tkRenderVerlauf();
+}
+
+// ── Hilfe-Sheet (§7 Checkliste — kanonischer Text, Doku-Fassung ist Quelle) ──
+function tkOeffneHilfe() {
+  const inhalt = document.getElementById('tk-hilfe-inhalt');
+  inhalt.innerHTML = TK_HILFE_SCHRITTE.map(function (s) {
+    return '<div class="tk-hilfe-schritt"><div class="tk-hilfe-titel">' + s[0] + '</div><div class="tk-hilfe-text">' + s[1] + '</div></div>';
+  }).join('');
+  document.getElementById('tk-hilfe-modal').style.display = 'block';
+}
+function tkSchliesseHilfe() { document.getElementById('tk-hilfe-modal').style.display = 'none'; }
+
+const TK_HILFE_SCHRITTE = [
+  ['Wofür ist der Taschenrechner?', 'Ein normaler Rechner für die Grundrechenarten (plus, minus, mal, geteilt) — mit dem Zusatz, dass du auch runde Klammern verwenden kannst, um die Reihenfolge einer Rechnung selbst zu bestimmen. Steht allen offen, unabhängig von deiner Rolle.'],
+  ['Formel eingeben', 'Tippe die Formel Zeichen für Zeichen über das Tastenfeld ein — sie erscheint oben in der Anzeige, genau so wie du sie eintippst. Mit ⌫ löschst du das letzte Zeichen, mit C die ganze Formel.'],
+  ['Klammern nutzen', 'Mit ( und ) kannst du einen Teil der Formel einklammern, damit er zuerst berechnet wird — genau wie auf dem Papier. Ohne Klammern gilt Punkt-vor-Strich: mal und geteilt werden vor plus und minus gerechnet.'],
+  ['Rechenweg lesen', 'Nach = erscheint rechts (bzw. bei schmalem Bildschirm darunter) das Ergebnis groß, und darunter jeder einzelne Rechenschritt als eigene Zeile — in der Reihenfolge, in der er tatsächlich berechnet wurde: zuerst Klammern, dann mal/geteilt, dann plus/minus. Bei einer Formel ohne Rechenschritt (nur eine einzelne Zahl) erscheint kein Rechenweg.'],
+  ['Nach dem Ergebnis weiterrechnen', 'Tippst du nach = direkt eine Zahl oder eine Klammer, beginnt eine ganz neue Formel. Tippst du stattdessen zuerst +, −, × oder ÷, rechnet der Taschenrechner mit dem letzten Ergebnis weiter.'],
+  ['Fehlermeldungen', 'Bei einer nicht geschlossenen Klammer, einer unvollständigen Formel oder einer Division durch 0 erscheint eine rote Fehlermeldung statt eines Ergebnisses — die Formel bleibt dabei erhalten, du kannst sie mit ⌫ korrigieren.'],
+  ['Verlauf (nur bei breitem Fenster)', 'Ist dein Fenster breit genug — zum Beispiel ein maximiertes Launcher-Fenster auf einem großen Bildschirm —, erscheint rechts neben dem Rechenweg ein Verlauf deiner bisherigen Rechnungen dieser Sitzung. Tippst du einen Eintrag an, wird seine Formel wieder in die Eingabe übernommen. Auf schmalen Bildschirmen bzw. im Hochformat gibt es das nicht — dort bleibt der Taschenrechner wie gewohnt einfach ohne Verlauf. „Verlauf leeren" löscht die Liste. Nichts davon wird gespeichert — nach dem Schließen der Seite ist der Verlauf weg, genauso wie der Rest des Taschenrechners.']
+];
+
+// ── Start ────────────────────────────────────────────────────────────
+tkRenderAnzeige();
+tkRenderVerlauf();
+</script>
+</body>
+</html>

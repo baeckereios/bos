@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- BäckereiOS App-Symbol · 04.10.2026 · Palette aus bos_design_tokens.css
+       (Ofenkohle #16120e, Honig #c07a10, Glut #e0973a, Mehl #f3ece1).
+       Motiv: Brotlaib mit drei Einschnitten vor Glutschein.
+       Die PNG-Dateien daneben sind die Vorlage für Manifest und Startbildschirm;
+       diese SVG ist die bearbeitbare Quelle (gleiche Geometrie). -->
+  <defs>
+    <radialGradient id="glut" cx="50%" cy="55%" r="50%">
+      <stop offset="0%" stop-color="#e0973a" stop-opacity="0.55"/>
+      <stop offset="60%" stop-color="#c07a10" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#16120e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="kruste" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0973a"/>
+      <stop offset="100%" stop-color="#9a5f0c"/>
+    </linearGradient>
+    <clipPath id="boden"><rect x="0" y="0" width="512" height="358"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#16120e"/>
+  <circle cx="256" cy="280" r="230" fill="url(#glut)"/>
+  <ellipse cx="256" cy="302" rx="164" ry="138" fill="url(#kruste)" clip-path="url(#boden)"/>
+  <g stroke="#16120e" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.92">
+    <path d="M172 236 L210 300"/><path d="M238 214 L276 278"/><path d="M304 214 L342 278"/>
+  </g>
+  <g stroke="#f3ece1" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.6">
+    <path d="M178 233 L216 297"/><path d="M244 211 L282 275"/><path d="M310 211 L348 275"/>
+  </g>
+</svg>

@@ -1,0 +1,488 @@
+<!--
+  2026-09-03 · v0.1 · Feature
+    Erstversion. Rebuild von "Modul I" aus der Alt-System-Druckzentrale
+    (druckzentrale_modul_i.js, Referenzdatei lag vor: druckzentrale.zip,
+    Ulf 03.09.2026) als eigenständiger V2-Satellit — zweites Kind des
+    neuen `druckzentrale`-Hubs, Geschwister von fruehschicht_formular.html.
+
+    Gleiche Bauweise wie dort: Druck läuft über BOS_DRUCK.drucken(),
+    kein Formular-Gedächtnis-Trick nötig (Druckinhalt wird aus dem
+    aktuellen JS-Zustand als HTML-String gebaut, nicht aus der Live-DOM
+    kopiert). Ausgewählte Werte drucken als Kästchen statt echter
+    <select>-Elemente.
+
+    Unterschied zu Modul A: zwei Tages-Spalten (Sonntag/Montag) pro
+    Produkt statt einer, Grußzeile editierbar (war in V1 bei Modul I
+    schon editierbar, bei Modul A nicht — hier bewusst beibehalten,
+    keine Vereinheitlichung ungefragt draufgesattelt).
+
+    Extra-Zeilen nur lokal (localStorage) — gleiche Entscheidung wie bei
+    fruehschicht_formular.html, Ulf 03.09.2026.
+
+    Guten-Morgen-Digital-Snapshot (V1 Modul J) bewusst nicht mitgebaut,
+    siehe Kopfkommentar fruehschicht_formular.html / BOS_BAUSTELLEN.md.
+-->
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Absetz-Formular · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-raised: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --border-soft: var(--bos-border, rgba(255,255,255,0.08));
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --faint: var(--bos-text-faint, #736656);
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --red: var(--bos-red, #d6584a);
+    --radius-sm: var(--bos-radius-sm, 6px);
+    --radius-md: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', Georgia, serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', 'Arial Narrow', sans-serif);
+  }
+  * { box-sizing: border-box; }
+  body { padding-bottom: 3rem; }
+
+  .af-chrome { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .af-header {
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 680px; margin: 0 auto; padding: var(--bos-space-sm, 14px) var(--bos-space-sm, 16px);
+  }
+  .af-title-block { display: flex; flex-direction: column; gap: var(--bos-space-3xs, 2px); }
+  .af-title { font-family: var(--font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); color: var(--text); }
+  .af-meta { font-family: var(--font-label); font-size: var(--bos-font-xs, 0.68rem); letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+  .af-help-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--amber);
+    border-radius: var(--radius-sm); width: 34px; height: 34px; font-size: var(--bos-font-md, 1rem); cursor: pointer;
+  }
+
+  .content { max-width: 680px; margin: 0 auto; padding: var(--bos-space-md, 18px) var(--bos-space-sm, 16px) 0; }
+  @media (min-width: 820px)  { .af-header, .content { max-width: 920px; } }
+  @media (min-width: 1180px) { .af-header, .content { max-width: 1100px; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: var(--bos-space-md, 18px); margin-bottom: var(--bos-space-md, 16px); }
+  .field-label { display: block; font-family: var(--font-label); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); font-size: var(--bos-font-xs, 0.72rem); margin-bottom: var(--bos-space-2xs, 7px); }
+
+  #af-gruss { width: 100%; resize: vertical; min-height: 50px; font-weight: 700; }
+
+  .af-th-row { display: flex; align-items: center; padding: 0 0 var(--bos-space-2xs, 6px); font-family: var(--font-label); font-size: var(--bos-font-xs, 0.68rem); text-transform: uppercase; letter-spacing: .05em; color: var(--faint); border-bottom: 1px solid var(--border-soft); margin-bottom: var(--bos-space-2xs, 6px); }
+  .af-th-name { flex: 1; }
+  .af-th-day { width: 64px; text-align: center; flex-shrink: 0; }
+
+  .af-row { display: flex; align-items: center; gap: var(--bos-space-sm, 10px); padding: var(--bos-space-2xs, 7px) 0; border-bottom: 1px solid var(--border-soft); }
+  .af-row:last-child { border-bottom: none; }
+  .af-row-name { flex: 1; font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.9rem); }
+  .af-row select { width: 64px; flex: 0 0 auto; }
+  .af-sep-row { font-family: var(--font-label); font-size: var(--bos-font-xs, 0.7rem); text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: var(--bos-space-sm, 12px) 0 var(--bos-space-2xs, 4px); border-top: 1px solid var(--border-soft); margin-top: var(--bos-space-2xs, 4px); }
+
+  select.bos-input { -webkit-appearance: none; appearance: none; cursor: pointer; }
+
+  .af-extra-row { display: flex; align-items: center; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-2xs, 6px) 0; }
+  .af-extra-row input[type=text] { flex: 1; }
+  .af-extra-row select { width: 64px; flex: 0 0 auto; }
+  .af-extra-del { background: none; border: none; color: var(--dim); font-size: var(--bos-font-lg, 1.1rem); cursor: pointer; padding: 0 4px; flex: 0 0 auto; }
+  .af-extra-del:hover { color: var(--red); }
+  .af-add-btn { background: transparent; border: 1px dashed var(--border); color: var(--dim); border-radius: var(--radius-sm); padding: var(--bos-space-2xs, 7px) var(--bos-space-sm, 12px); font-family: var(--font-label); font-size: var(--bos-font-sm, 0.78rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; margin-top: var(--bos-space-xs, 8px); }
+  .af-add-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  .af-mosa-row { display: flex; align-items: center; gap: var(--bos-space-xs, 8px); flex-wrap: wrap; font-size: var(--bos-font-md, 0.9rem); color: var(--text); }
+  .af-mosa-row select { width: 64px; flex: 0 0 auto; }
+  .af-mosa-row span.dim { color: var(--dim); }
+
+  .druck-optionen { display: flex; gap: var(--bos-space-xs, 8px); margin-bottom: var(--bos-space-3xs, 4px); }
+  .pill { font-family: var(--font-label); font-size: var(--bos-font-sm, 0.78rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 0 var(--bos-space-sm, 13px); height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-raised); color: var(--dim); cursor: pointer; }
+  .pill.active { background: var(--amber); border-color: var(--amber); color: #1a1208; }
+
+  .btn { font-family: var(--font-label); font-size: var(--bos-font-sm, 0.82rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; border-radius: var(--radius-sm); padding: 0.75em 1.2em; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: var(--bos-space-xs, 8px); }
+  .btn-amber { background: var(--amber); color: #1a1208; }
+  .btn-amber:hover { background: var(--amber-bright); }
+  .btn-main { width: 100%; margin-top: var(--bos-space-md, 18px); }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .datum-hint { text-align: center; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-xs, 10px); letter-spacing: .04em; }
+
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 9999; display: flex; align-items: flex-end; }
+  .sheet-overlay.hidden { display: none !important; }
+  .sheet { background: var(--surface); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: var(--bos-space-sm, 14px) var(--bos-space-md, 20px) var(--bos-space-lg, 24px); border-top: 1px solid var(--border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto var(--bos-space-sm, 16px); }
+  .sheet h2 { font-family: var(--font-display); font-weight: 900; font-size: var(--bos-font-lg, 1.15rem); margin: 0 0 var(--bos-space-sm, 14px); color: var(--text); }
+  .sheet .sec { margin-bottom: var(--bos-space-sm, 16px); }
+  .sheet .sec h3 { font-family: var(--font-label); text-transform: uppercase; letter-spacing: .04em; font-size: var(--bos-font-sm, 0.78rem); color: var(--amber); margin: 0 0 var(--bos-space-2xs, 5px); }
+  .sheet .sec p { font-size: var(--bos-font-md, 0.9rem); color: var(--text); line-height: 1.6; margin: 0; }
+  .sheet button.secondary { width: 100%; background: transparent; border: 1px solid var(--amber); color: var(--amber); margin-top: var(--bos-space-xs, 8px); padding: var(--bos-space-xs, 11px) var(--bos-space-sm, 16px); border-radius: var(--radius-sm); font-family: var(--font-label); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'absetz_formular';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<script src="../bos_druck.js"></script>
+
+<div class="af-chrome">
+  <div class="af-header">
+    <div class="af-title-block">
+      <div class="af-title">Absetz-Formular</div>
+      <div class="af-meta" id="af-wochenend-meta">Wochenende</div>
+    </div>
+    <button class="af-help-btn" onclick="oeffneHilfe()" aria-label="Hilfe">❓</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="card">
+    <span class="field-label">Grußzeile</span>
+    <textarea id="af-gruss" class="bos-input" rows="2">Guten Morgen! Bitte setzt folgende Sachen ab:</textarea>
+  </div>
+
+  <div class="card">
+    <span class="field-label">Produkte</span>
+    <div class="af-th-row">
+      <span class="af-th-name">Produkt</span>
+      <span class="af-th-day" id="af-th-so">So</span>
+      <span class="af-th-day" id="af-th-mo">Mo</span>
+    </div>
+    <div id="af-rows"></div>
+
+    <div class="af-sep-row">Käsebrötchen</div>
+    <div class="af-row">
+      <span class="af-row-name">Käsebrötchen belegen</span>
+      <select class="bos-input" id="af-kaese-so"></select>
+      <select class="bos-input" id="af-kaese-mo"></select>
+    </div>
+
+    <div id="af-extra-rows"></div>
+    <button class="af-add-btn" onclick="afAddExtraRow()">+ Zeile hinzufügen</button>
+  </div>
+
+  <div class="card">
+    <span class="field-label">Mohn und Sesam</span>
+    <div class="af-mosa-row">
+      Bitte <select class="bos-input" id="af-mohn"></select>
+      <span>Bleche Mohnbrötchen</span>
+      <span class="dim">+</span>
+      <select class="bos-input" id="af-sesam"></select>
+      <span>Bleche Sesambrötchen</span>
+      <span class="dim">fertig machen</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="field-label">Anmerkungen</span>
+    <textarea id="af-anmerkungen" class="bos-input" rows="4" placeholder="Hinweise, Sonderaufträge, Besonderheiten…" style="resize: vertical;"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="field-label">Druckoptionen</div>
+    <div class="druck-optionen">
+      <button class="pill active" data-toggle="kopf" onclick="toggleOption('kopf')">Kopf/Fuß</button>
+      <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
+    </div>
+    <button class="btn btn-amber btn-main" onclick="drucken()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Drucken
+    </button>
+    <div class="datum-hint" id="datum-hint"></div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Hilfe Bottom Sheet -->
+<div id="hilfe-sheet" class="sheet-overlay hidden" onclick="if(event.target===this) schliesseHilfe()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Hilfe · Absetz-Formular</h2>
+    <div class="sec">
+      <h3>Wofür ist diese Seite?</h3>
+      <p>Der Wochenend-Zettel — was am Sonntag und was am Montag von welchem Produkt abgesetzt werden soll, in zwei getrennten Spalten. Die Spaltenköpfe zeigen automatisch das nächste Sonntag-/Montag-Datum.</p>
+    </div>
+    <div class="sec">
+      <h3>Grußzeile</h3>
+      <p>Frei editierbar — falls mal eine andere Begrüßung oder ein Zusatz-Hinweis rein soll.</p>
+    </div>
+    <div class="sec">
+      <h3>Extra-Zeilen</h3>
+      <p>Über „+ Zeile hinzufügen" lässt sich ein zusätzliches Produkt eintragen. Diese Zeilen merkt sich das Gerät für den nächsten Ausdruck — aber nur auf diesem Gerät, nicht geräteübergreifend.</p>
+    </div>
+    <div class="sec">
+      <h3>Die zwei Schalter vor dem Drucken</h3>
+      <p><strong>Kopf/Fuß:</strong> BäckereiOS-Logo mit Datum/Uhrzeit oben, Fußzeile unten. Ausgeschaltet druckt nur der reine Inhalt.</p>
+      <p><strong>Farbe:</strong> Ausgeschaltet druckt der komplette Ausdruck in Graustufen.</p>
+    </div>
+    <div class="sec">
+      <h3>Wichtig</h3>
+      <p>Die eingetragenen Mengen selbst werden nicht gespeichert — nur die Extra-Zeilen. Nach dem Neuladen der Seite sind die Mengen wieder leer.</p>
+    </div>
+    <button class="secondary" onclick="schliesseHilfe()">Schließen</button>
+  </div>
+</div>
+
+<script>
+  /* ── Fixe Produktzeilen ─────────────────────────────────────── */
+  var PRODUKTE = [
+    { id: 'buttercroissant', label: 'Buttercroissant' },
+    { id: 'schokocroissant', label: 'Schokocroissant' },
+    { id: 'laugenecken',     label: 'Laugenecken' },
+    { id: 'minibutter',      label: 'Mini Buttercroissant' },
+    { id: 'minischoko',      label: 'Mini Schokocroissant' }
+  ];
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildSelect(sel, max) {
+    sel.innerHTML = '';
+    var empty = document.createElement('option');
+    empty.value = ''; empty.textContent = '';
+    sel.appendChild(empty);
+    for (var n = 1; n <= max; n++) {
+      var o = document.createElement('option');
+      o.value = n; o.textContent = n;
+      sel.appendChild(o);
+    }
+  }
+
+  /* ── Nächstes Wochenende (So/Mo) ───────────────────────────────── */
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function naechstesWochenende() {
+    var heute = new Date();
+    var dow = heute.getDay(); // 0=So .. 6=Sa
+    var tageBisSo = (7 - dow) % 7 || 7;
+    var so = new Date(heute); so.setDate(heute.getDate() + tageBisSo);
+    var mo = new Date(so); mo.setDate(so.getDate() + 1);
+    return {
+      so: so, mo: mo,
+      soLabel: 'So ' + pad(so.getDate()) + '.' + pad(so.getMonth() + 1) + '.',
+      moLabel: 'Mo ' + pad(mo.getDate()) + '.' + pad(mo.getMonth() + 1) + '.'
+    };
+  }
+
+  function renderRows() {
+    var wrap = document.getElementById('af-rows');
+    wrap.innerHTML = '';
+    PRODUKTE.forEach(function(p) {
+      var r = document.createElement('div');
+      r.className = 'af-row';
+      r.innerHTML =
+        '<span class="af-row-name">' + escapeHtml(p.label) + '</span>' +
+        '<select class="bos-input" id="af-' + p.id + '-so"></select>' +
+        '<select class="bos-input" id="af-' + p.id + '-mo"></select>';
+      wrap.appendChild(r);
+      buildSelect(document.getElementById('af-' + p.id + '-so'), 50);
+      buildSelect(document.getElementById('af-' + p.id + '-mo'), 50);
+    });
+    buildSelect(document.getElementById('af-kaese-so'), 50);
+    buildSelect(document.getElementById('af-kaese-mo'), 50);
+    buildSelect(document.getElementById('af-mohn'), 20);
+    buildSelect(document.getElementById('af-sesam'), 20);
+  }
+
+  /* ── Extra-Zeilen (localStorage, nur dieses Gerät) ─────────────── */
+  var EXTRA_LS_KEY = 'BOS_AF_EXTRA_v1';
+
+  function ladeExtra() {
+    try {
+      var d = JSON.parse(localStorage.getItem(EXTRA_LS_KEY));
+      return Array.isArray(d) ? d.filter(function(x) { return x && (x.name || x.so || x.mo); }) : [];
+    } catch(e) { return []; }
+  }
+  function speichereExtra() {
+    var rows = [];
+    document.querySelectorAll('.af-extra-row').forEach(function(el) {
+      var sels = el.querySelectorAll('select');
+      rows.push({ name: el.querySelector('input').value, so: sels[0].value, mo: sels[1].value });
+    });
+    try { localStorage.setItem(EXTRA_LS_KEY, JSON.stringify(rows)); } catch(e) {}
+  }
+  function machExtraZeile(name, so, mo) {
+    var div = document.createElement('div');
+    div.className = 'af-extra-row';
+    div.innerHTML =
+      '<input type="text" class="bos-input" placeholder="Produkt…">' +
+      '<select class="bos-input"></select>' +
+      '<select class="bos-input"></select>' +
+      '<button class="af-extra-del" title="Entfernen">×</button>';
+    var inp = div.querySelector('input');
+    var sels = div.querySelectorAll('select');
+    inp.value = name || '';
+    buildSelect(sels[0], 50);
+    buildSelect(sels[1], 50);
+    if (so) sels[0].value = so;
+    if (mo) sels[1].value = mo;
+    inp.addEventListener('input', speichereExtra);
+    sels[0].addEventListener('change', speichereExtra);
+    sels[1].addEventListener('change', speichereExtra);
+    div.querySelector('.af-extra-del').addEventListener('click', function() {
+      div.remove();
+      speichereExtra();
+    });
+    return div;
+  }
+  function afAddExtraRow() {
+    var wrap = document.getElementById('af-extra-rows');
+    wrap.appendChild(machExtraZeile('', '', ''));
+    speichereExtra();
+  }
+  function initExtra() {
+    var wrap = document.getElementById('af-extra-rows');
+    ladeExtra().forEach(function(item) {
+      wrap.appendChild(machExtraZeile(item.name, item.so, item.mo));
+    });
+  }
+
+  /* ── Druckoptionen ──────────────────────────────────────────────── */
+  var druckOptionen = { kopf: true, farbe: true };
+  function toggleOption(art) {
+    druckOptionen[art] = !druckOptionen[art];
+    document.querySelectorAll('[data-toggle="' + art + '"]').forEach(function(btn) {
+      btn.classList.toggle('active', druckOptionen[art]);
+    });
+  }
+
+  /* ── Drucken ──────────────────────────────────────────────────────
+     Gleiches Prinzip wie fruehschicht_formular.html: HTML-String aus
+     aktuellem Zustand bauen, ausgewählte Zahlen als Kästchen drucken. */
+  var PRINT_CSS = [
+    '.af-page{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:10pt;}',
+    '.af-gruss{font-weight:700;font-size:11.5pt;margin-bottom:20px;line-height:1.5;border-bottom:2px solid #000;padding-bottom:6px;}',
+    '.af-table{width:100%;border-collapse:collapse;margin-bottom:16px;}',
+    '.af-table col.af-col-name{width:56%;}',
+    '.af-table col.af-col-day{width:22%;}',
+    '.af-table th{font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;font-weight:400;padding:0 8px 7px;text-align:left;border-bottom:1.5px solid #aaa;}',
+    '.af-table th.af-c{text-align:center;}',
+    '.af-table td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:middle;}',
+    '.af-table tbody tr:last-child td{border-bottom:none;}',
+    '.af-table tr.af-zebra td{background:#f2f2f2;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
+    '.af-table td.af-c{text-align:center;}',
+    '.af-box{display:inline-block;min-width:30px;border:1px solid #000;padding:3px 8px;text-align:center;font-weight:700;}',
+    '.af-sep-row td{background:#e8e8e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:5px 8px;border-top:1.5px solid #aaa;border-bottom:1px solid #ccc;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;}',
+    '.af-block{border:1px solid #ccc;margin-bottom:16px;}',
+    '.af-block-head{background:#e8e8e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:5px 10px;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;border-bottom:1px solid #ccc;}',
+    '.af-block-body{padding:10px;font-size:10pt;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
+    '.af-anm-label{font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#777;margin-bottom:6px;}',
+    '.af-anm-text{border:1px solid #bbb;padding:10px 12px;min-height:90px;}'
+  ].join('\n');
+
+  function drucken() {
+    var dates = naechstesWochenende();
+    var gruss = document.getElementById('af-gruss').value.trim();
+
+    var html = '<div class="af-page">';
+    html += '<div class="af-gruss">' + (gruss ? escapeHtml(gruss).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
+
+    html += '<table class="af-table"><colgroup><col class="af-col-name"><col class="af-col-day"><col class="af-col-day"></colgroup>';
+    html += '<thead><tr><th>Produkt</th><th class="af-c">' + dates.soLabel + '</th><th class="af-c">' + dates.moLabel + '</th></tr></thead>';
+    html += '<tbody>';
+
+    PRODUKTE.forEach(function(p, i) {
+      var so = document.getElementById('af-' + p.id + '-so').value;
+      var mo = document.getElementById('af-' + p.id + '-mo').value;
+      html += '<tr class="' + (i % 2 === 0 ? 'af-zebra' : '') + '">' +
+              '<td>' + escapeHtml(p.label) + '</td>' +
+              '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span></td>' +
+              '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
+    });
+
+    html += '<tr class="af-sep-row"><td>Käsebrötchen</td><td class="af-c">' + dates.soLabel + '</td><td class="af-c">' + dates.moLabel + '</td></tr>';
+    var kso = document.getElementById('af-kaese-so').value;
+    var kmo = document.getElementById('af-kaese-mo').value;
+    html += '<tr><td>Käsebrötchen belegen</td>' +
+            '<td class="af-c"><span class="af-box">' + (kso || '&nbsp;') + '</span></td>' +
+            '<td class="af-c"><span class="af-box">' + (kmo || '&nbsp;') + '</span></td></tr>';
+
+    var extraI = 0;
+    document.querySelectorAll('.af-extra-row').forEach(function(el) {
+      var name = el.querySelector('input').value.trim();
+      var sels = el.querySelectorAll('select');
+      var so = sels[0].value, mo = sels[1].value;
+      if (!name && !so && !mo) return;
+      html += '<tr class="' + (extraI % 2 === 0 ? 'af-zebra' : '') + '">' +
+              '<td>' + escapeHtml(name || '—') + '</td>' +
+              '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span></td>' +
+              '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
+      extraI++;
+    });
+
+    html += '</tbody></table>';
+
+    var mohn = document.getElementById('af-mohn').value;
+    var sesam = document.getElementById('af-sesam').value;
+    html += '<div class="af-block"><div class="af-block-head">Mohn und Sesam</div>' +
+            '<div class="af-block-body">Bitte <span class="af-box">' + (mohn || '&nbsp;') + '</span> Bleche Mohnbrötchen + ' +
+            '<span class="af-box">' + (sesam || '&nbsp;') + '</span> Bleche Sesambrötchen fertig machen</div></div>';
+
+    var anm = document.getElementById('af-anmerkungen').value.trim();
+    html += '<div class="af-anm-label">Anmerkungen</div>' +
+            '<div class="af-anm-text">' + (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
+
+    html += '</div>';
+
+    BOS_DRUCK.drucken({
+      inhaltHTML: html,
+      appName: 'Absetz-Formular',
+      mitKopf: druckOptionen.kopf,
+      farbig: druckOptionen.farbe,
+      extraCSS: PRINT_CSS
+    });
+  }
+
+  /* ── Hilfe ──────────────────────────────────────────────────────── */
+  function oeffneHilfe() { document.getElementById('hilfe-sheet').classList.remove('hidden'); }
+  function schliesseHilfe() { document.getElementById('hilfe-sheet').classList.add('hidden'); }
+
+  /* ── Datum-Hinweise ─────────────────────────────────────────────── */
+  function formatDatum(d) {
+    var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    var monate = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    return tage[d.getDay()] + ', ' + d.getDate() + '. ' + monate[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  document.getElementById('datum-hint').textContent = 'Ausdruck-Datum: ' + formatDatum(new Date());
+
+  /* ── Init ───────────────────────────────────────────────────────── */
+  renderRows();
+  initExtra();
+  var dates = naechstesWochenende();
+  document.getElementById('af-th-so').textContent = dates.soLabel;
+  document.getElementById('af-th-mo').textContent = dates.moLabel;
+  document.getElementById('af-wochenend-meta').textContent = dates.soLabel + ' / ' + dates.moLabel;
+
+  /* Grußzeile: Auto-Resize */
+  var grussEl = document.getElementById('af-gruss');
+  grussEl.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = this.scrollHeight + 'px';
+  });
+</script>
+</body>
+</html>

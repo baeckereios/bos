@@ -1,0 +1,2445 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Konten & Rollen</title>
+<!--
+  MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
+  CHANGELOG
+    2026-10-04 · 14:39 · Online-Gang · Aufräumen
+      Kommentar bei geschuetzteKonten(): alte Admin-Kennung im Klartext
+      entfernt (stand dort als Erinnerung, gehört nicht ins öffentliche
+      Repo). robots noindex im Kopf. Keine Logikänderung.
+    2026-09-29 · 19:45 · v-Teigecke-2 · Feature
+      Konto-Karte, Stammdaten: drei Teigecke-Haken statt einem.
+      „🧺 Wagen & Zutaten pflegen“ (Feld teigeckePflege, bisher „Teigecke
+      pflegen“), neu „🥣 Teige pflegen“ (teigeckeTeige) und „📜 Rezepte
+      pflegen“ (teigeckeRezepte). Alle drei in derselben Sammelaktion.
+      Die Regel prüft jeden Haken getrennt (RK §11). Siehe
+      SESSION_2026-09-29_TEIGECKE_STUFE2_BAU.md.
+    2026-09-28 · 10:33 · v-Teigecke-1 · Feature
+      Konto-Karte, Reiter Stammdaten: neuer Haken „Teigecke pflegen“
+      (Feld teigeckePflege), gespeichert in derselben Sammelaktion wie Rolle,
+      Zugriffe und Taskboard-Haken (kein zweites Passwort). Die
+      Firestore-Regel prüft den Haken serverseitig (RK §10). Siehe
+      SESSION_2026-09-28_TEIGECKEN_STUFE1_BAU.md.
+    2026-09-27 · v-Namensfundament-4c · Umbau (NF-56, NF-57)
+      - NF-56: „+ Konto anlegen“ (Kennung frei eintippen, „Wer ist das?“,
+        Grundkonto) samt Code entfernt — er prüfte nur vorhandene Dokumente
+        und hätte gelöschte Kennungen (test01) neu vergeben (gegen NE-25).
+        Neue Konten nur noch über den Kontenzähler; Sonderfälle über die
+        Konsole (neuer Hilfetext „Wie lege ich ein neues Konto an?“). Die
+        Fehleranzeige oben heißt jetzt kontenErr.
+      - NF-57: „Neue Konten vorbereiten“ steht oben an seiner Stelle, als
+        Karte im Stil der Konto-Zeilen, mit Ablauf-Zeile, beschrifteten
+        Feldern Bereich und Anzahl nebeneinander, Knopf in Bernstein; auf
+        schmalem Hochkant-Bildschirm volle Breite.
+    2026-09-27 · v-Namensfundament-4b · Feature (N-41, Gegenrichtung zu K-19)
+      Reiter „Namen“ (Speichern), „+ Neue Person“ und Beschriften (b): eine
+      neue oder geänderte Beschreibung, die dem Rufnamen oder der
+      Beschreibung einer ANDEREN Person gleicht (ohne Groß/Klein und
+      Randleerzeichen, K-8) — auch zwei gleiche neue Beschreibungen im selben
+      Speichervorgang —, löst eine WARNUNG mit Rückfrage aus („im Plan
+      stünden zwei gleiche Namen“), sichtbar auch in der Statuszeile. Keine
+      Sperre: „Trotzdem speichern“ geht. Unveränderte Einträge werden nicht
+      geprüft.
+    2026-09-27 · v-Namensfundament-4 · Feature (Schritt 4, §12, NF-47, K-16)
+      - Abschnitt „Unbestätigt“ heißt „Rohlinge“. Neu darüber: „Rohlinge
+        nach Muster anlegen“ — Bereich und Anzahl, die Seite liest den
+        Kontenzähler einstellungen/konten_nummern_<bereich> (fehlt er:
+        Startwert aus der Liste, von Ulf bestätigt, NE-25), schlägt die
+        Kennungen vor (Adressen zum Kopieren, Logins mit Wegwerf-Passwort,
+        NF-47) und legt nach „Logins sind angelegt“ alle Dokumente und den
+        Zähler in EINER Transaktion an (bricht ab, wenn sich der Zähler
+        geändert hat oder eine Kennung schon existiert).
+      - Konto-Karte eines Rohlings: „Beschriften“ — (a) vorhandene Person
+        (Person ohne Konto, mit Beschreibung; N-21), (b) neue Person
+        (Nummernzähler, Namenseintrag), (c) Ort. Jeweils EINE Transaktion,
+        Rolle, art und Haken im selben Zug (NE-12). Keine Nachnamen-Sperre
+        (12.2 berichtigt, Schritt 8).
+      - Freigeschaltete Konten: „Zugangsblatt drucken …“ — der Dialog
+        erzeugt ein Passwort (12 Zeichen, ohne verwechselbare), Ulf setzt
+        es in der Konsole und druckt (DIN A4: Name, Kennung, Passwort,
+        Anleitung; ohne QR, NE-26; ohne Adresse). Das Passwort lebt nur im
+        Dialog: beim Schließen, nach dem Druck, beim Sperren und in der
+        Leerlauf-Sperre gelöscht; nie gespeichert.
+    2026-09-26 · v-Namensfundament-2 · Feature (Schritt 2, §11, K-12/K-14)
+      Konto-Karte, Reiter „Konto“, neuer Abschnitt „Freigabe“: Art (Person /
+      Ort / System — reine Seiteninformation, K-12), Haken „Freigeschaltet“
+      mit sichtbarem Grund, wenn er noch nicht gesetzt werden darf (Rolle;
+      Person mit Beschreibung bzw. Ort mit Name; System nur für den
+      Generalschlüssel — NE-12, nur die Seite prüft). 🛡: am Generalschlüssel
+      und am angemeldeten Konto lässt sich der Haken nicht entfernen. Knopf
+      „Weggang“ (K-14, NE-24): Haken raus und Verknüpfung lösen in einem
+      Batch, danach „Login in der Konsole löschen oder deaktivieren“. Die
+      Liste zeigt je Konto ✓ freigeschaltet / 🔒 nicht freigeschaltet.
+      Setzt nichts voraus, was erst mit Schritt 2(c) kommt (NF-46).
+    2026-09-26 · v-Namensfundament-8 · Rückbau (Schritt 8, §10.8)
+      Die lokale Namensdatei ist in Rente: bos_lokal_daten.js nicht mehr
+      eingebunden; im Reiter „Namen“ keine Spalte „lokal“, keine Kürzel-
+      Vorschläge, kein Haken „übernehmen“, keine Knöpfe „Alle Vorschläge
+      übernehmen / Alle zurücksetzen“, keine Marke „noch Kürzel“ und keine
+      Nachnamen-Sperre mehr (kuerzelVorschlag, istLokalerNachname,
+      lokalerNameAnzeige entfernt) — es gibt keine Nachnamen-Quelle mehr.
+      Zeilen ohne Eintrag sind leer („Beschreibung eintragen“), gespeichert
+      wird nur Getipptes. anzeigeNamePerson(): Beschreibung, sonst
+      „P07 · kein Name hinterlegt“. Beim Laden wird der alte
+      Browserspeicher-Schlüssel bos_lokal_personen einmalig geräumt.
+    2026-09-26 · v-Namensfundament-3c · Fix (NF-37, Fund j)
+      Gelbe Kürzel-Vorschläge werden NICHT mehr automatisch gespeichert.
+      Je Zeile ein Haken „übernehmen“, im Kopf „alle Vorschläge
+      übernehmen“ und „alle zurücksetzen“ (nimmt nur die Haken zurück,
+      Getipptes bleibt). Tippen in ein Feld übernimmt die Zeile wie
+      bisher. Kopfzeile zählt „übernommen / offen“; die Rückfrage nennt
+      nur, was wirklich geschrieben wird. Dazu: ein gespeicherter Eintrag,
+      dessen Beschreibung noch dem Kürzel-Vorschlag gleicht (Speichern vor
+      NF-37), wird als „noch Kürzel“ markiert (gelb, kein Fehler) und
+      gezählt. Batch-Aufbau, kuerzelVorschlag() und istLokalerNachname()
+      unverändert.
+    2026-09-26 · v-Namensfundament-3b · Fix (NF-35, NF-32, N-27)
+      - Reiter „Namen“: neue Spalte „lokal“ neben der Nummer — Vor- und
+        Nachname aus der lokalen Datei, grau, schreibgeschützt, NUR
+        Anzeige (geht nie in die Datenbank; NE-8 unberührt, der einzige
+        Weg nach Firestore bleibt kuerzelVorschlag()). Ohne lokale Datei
+        leer. Inaktive Nummern tragen ein ⏸ an der Nummer (NF-35).
+      - Reiter „Namen“: Verknüpfung auf ein Konto, das es in bos_accounts
+        nicht gibt (Altlast vor der Kontenumstellung, z. B. P04), rot mit
+        Knopf „lösen“ — vorgemerkt wie das Rufname-Leeren, geschrieben mit
+        „Namen speichern“ im selben Batch (personen/<Nr>.bosKontoId = null,
+        Admin-Sitzung). Neu verknüpfen nur im Reiter „Konten“ (N-27).
+      - Reiter „Konten“: Kennung klein in JEDER Zeile, wie beim geschützten
+        Konto; die Rückfrage beim Löschen nennt die Kennung (NF-32).
+    2026-09-26 · v-Namensfundament-3 · Feature (Schritt 3 mit 3a)
+      Neuer Reiter „Namen“ (NE-19: Personen werden ab jetzt NUR hier
+      angelegt; der Personen-Editor ist reine Konfiguration):
+      - Tabelle aller Personen, numerisch sortiert: Nummer · Beschreibung
+        (Eingabe) · Rufname (Anzeige, „leeren“) · Konto · aktiv. Dazu
+        Namenseinträge ohne Person (gelöschte Personen, NE-18: bleiben).
+      - Personen ohne Eintrag: Beschreibung vorbelegt mit dem Kürzel aus
+        der lokalen Datei (kuerzelVorschlag — die EINZIGE Stelle, an der
+        lokale Namen in ein Feld gelangen, das nach Firestore geht; nur
+        Anfangsbuchstaben, nie der Nachname, NE-8), gelb markiert.
+      - „Speichern“ schreibt alle neuen und geänderten Einträge in EINEM
+        Batch über die Admin-Sitzung (Regel: 0 Zugriffe je Eintrag).
+      - „Rufname leeren“ (NE-6): wird vorgemerkt (durchgestrichen,
+        „zurück“ möglich) und mit „Namen speichern“ im selben Batch
+        geschrieben — so gehen getippte Beschreibungen nicht verloren.
+      - NE-8, zweite Sicherung: eine Beschreibung, die einem Nachnamen aus
+        der lokalen Datei gleicht, wird abgelehnt (Speichern und Neu).
+      - Ist die Namensliste nicht lesbar: Grund sichtbar, Speichern und
+        „+ Neue Person“ gesperrt, Konten bleiben bedienbar.
+      - „+ Neue Person“: EINE Transaktion — Nummernzähler lesen, Nummer =
+        max(Zähler, höchste vorhandene) + 1, prüfen, dass es sie nicht
+        gibt, dann Person, Namenseintrag und Zähler in einem Zug.
+      - Verweis auf den Personen-Editor für die Einsatzdaten (N-23).
+      - anzeigeNamePerson(): erst die Beschreibung aus namen, dann lokal.
+      - Leerlauf-Sperre und 🔒 berücksichtigen ungespeicherte Namen.
+    2026-09-26 · v-Namensfundament-1 · Umbau (Kontenliste zu)
+      Ulf, 26.09.2026: "ausschließlich ein Admintool. Niemand außer mir."
+      - Die Seite zeigt NICHTS mehr ohne Admin-Passwort. Beim Öffnen
+        erscheint die Admin-Anmeldung; erst danach werden Konten und
+        Personen geladen — beides über die isolierte Admin-Sitzung
+        (BOS_ACCOUNTS.adminFirestore()), nicht mehr über window.db.
+        Grund: ab der neuen Regel darf window.db nur noch das EIGENE
+        Konto lesen, auch mit Rolle admin.
+      - Die Admin-Sitzung bleibt, solange die Seite offen ist (Aktionen
+        fragen nicht mehr jedes Mal), wird aber nie gespeichert
+        (Persistence NONE in bos_accounts.js) und beim Verlassen der
+        Seite abgemeldet. Neuer Knopf 🔒 "Sperren" im Kopf.
+      - Personen werden getrennt geladen: scheitert das, erscheint der
+        Grund sichtbar, die Konten bleiben trotzdem bedienbar. Das ist der
+        Reparaturweg ("Ventil"), falls ein Konto-Dokument kaputt ist.
+      - Verknüpfung Konto ↔ Person schreibt beide Personen in EINEM
+        Schreibvorgang (batch) über die Admin-Sitzung — nie mehr halb.
+      - NACHTRAG 26.09. (N-15, Ulfs Freigabe, 5 Minuten): Die Admin-Sitzung
+        sperrt sich nach 5 Minuten ohne Eingabe selbst, wie 🔒 Sperren.
+        Eine Minute vorher erscheint oben ein Streifen mit Countdown; jede
+        Eingabe (Tippen, Taste, Scrollen) setzt die Zeit zurück. Gemessen
+        wird mit Zeitstempeln, nicht mit einem langen Timer — ein Tablet,
+        dessen Tab im Hintergrund lag, sperrt beim Zurückkommen sofort.
+        Ungespeicherte Änderungen gehen dabei verloren; der Streifen und
+        die Meldung danach sagen das.
+      - Schutz vor Selbstaussperrung: das Admin-Konto und das gerade
+        angemeldete Konto lassen sich weder löschen noch in der Rolle
+        ändern (🛡). Andere Konten normal.
+      - Hilfetext auf den Stand ohne Selbstregistrierung gebracht,
+        Geburtsdatum nur noch angezeigt, wenn eins da ist (Altkonten).
+      Vorher: Liste las über window.db, Passwort nur beim Speichern.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow+Condensed:wght@700&family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<style>
+  body { min-height: 100vh; }
+  header {
+    padding: var(--bos-space-md, 18px) var(--bos-space-md, 20px); border-bottom: 1px solid var(--bos-border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--bos-bg); z-index: 5; gap: var(--bos-space-sm, 12px);
+  }
+  header h1 { font-size: var(--bos-font-lg, 1.15rem); }
+  .bos-badge { font-size: var(--bos-font-xs, .7rem); letter-spacing: .04em; color: var(--bos-amber); text-transform: uppercase; }
+  main { padding: var(--bos-space-md, 18px); }
+
+  .status-err { color: var(--bos-red); font-size: var(--bos-font-sm, .82rem); }
+  .status-ok { color: var(--bos-green); font-size: var(--bos-font-sm, .82rem); }
+  .hidden { display: none !important; }
+
+  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--bos-amber); cursor: pointer; }
+  select.bos-input { width: auto; min-width: 160px; }
+
+  .save-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--bos-space-sm, 14px); margin-top: var(--bos-space-sm, 16px); }
+
+  /* ==========================================================================
+     Listen statt Matrix-Tabelle — Konten- UND Rollen-Tab, siehe
+     SESSION_2026-09-05_KONTEN_ROLLEN_KARTE_KONZEPT.md. Klick auf eine
+     Zeile öffnet die Karte (analog produkt_config_editor.html), Zugriffs-
+     Haken/Rechte-Matrix leben nur noch dort, gruppiert nach Bereich.
+     ========================================================================== */
+  .sektion-kopf { display: flex; align-items: baseline; gap: var(--bos-space-xs, 10px); margin: 0 0 var(--bos-space-xs, 10px); }
+  .sektion-kopf h2 { font-family: var(--bos-font-display); font-size: var(--bos-font-md, .95rem); }
+  .sektion-kopf .anzahl { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); }
+  .sektion-unbestaetigt {
+    border: 1px solid var(--bos-red); border-radius: var(--bos-radius-md);
+    background: rgba(214,88,74,.07); padding: var(--bos-space-sm, 14px);
+    margin-bottom: var(--bos-space-lg, 22px);
+  }
+  .sektion-unbestaetigt .sektion-kopf h2, .sektion-unbestaetigt .sektion-kopf .anzahl { color: var(--bos-red); }
+  .sektion-bestaetigt { margin-bottom: var(--bos-space-lg, 22px); }
+
+  .entry-list { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 7px); }
+  .entry-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--bos-space-2xs, 8px) var(--bos-space-sm, 13px);
+    padding: var(--bos-space-xs, 11px) var(--bos-space-sm, 14px);
+    background: var(--bos-surface); border: 1px solid var(--bos-border);
+    border-radius: var(--bos-radius-md); cursor: pointer;
+  }
+  .entry-row:hover { border-color: var(--bos-amber); }
+  .entry-row .entry-icon { font-size: 1.25rem; width: 1.5em; text-align: center; flex-shrink: 0; }
+  .entry-row .entry-name { flex: 1; font-size: var(--bos-font-md, .95rem); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry-row .entry-sub { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); font-weight: 400; }
+  .entry-row select { max-width: 190px; flex-shrink: 0; }
+  .entry-row .entry-del {
+    flex-shrink: 0; background: none; border: 1px solid var(--bos-border); color: var(--bos-text-dim);
+    width: 32px; height: 32px; border-radius: var(--bos-radius-sm); font-size: .8rem; cursor: pointer;
+  }
+  .entry-row .entry-del:hover { background: var(--bos-red); border-color: var(--bos-red); color: #1a1208; }
+  .leer-hinweis { color: var(--bos-text-faint); font-size: var(--bos-font-sm, .85rem); padding: var(--bos-space-sm, 14px) 0; }
+
+  .rolle-neu-form {
+    display: flex; flex-wrap: wrap; gap: var(--bos-space-xs, 10px); align-items: center;
+    padding: var(--bos-space-sm, 14px); border: 1px dashed var(--bos-border-strong); border-radius: var(--bos-radius-md);
+    margin-bottom: var(--bos-space-sm, 14px);
+  }
+  /* NF-57 (27.09.2026): „Neue Konten vorbereiten“ — derselbe Kartenstil
+     wie die Konto-Zeilen (Fläche, Rand, Radius), Felder beschriftet,
+     auf schmalen Bildschirmen ohne Quetschen. */
+  .neue-konten-karte {
+    display: flex; flex-direction: column; gap: var(--bos-space-xs, 10px);
+    padding: var(--bos-space-sm, 14px); margin-bottom: var(--bos-space-sm, 14px);
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md);
+  }
+  .neue-konten-karte .nk-titel { font-family: var(--bos-font-display); font-size: var(--bos-font-md, .95rem); font-weight: 700; }
+  .neue-konten-karte .nk-ablauf { font-size: var(--bos-font-xs, .75rem); color: var(--bos-text-dim); line-height: 1.5; }
+  .neue-konten-karte .nk-felder { display: grid; grid-template-columns: minmax(0, 1fr) 6.5em; gap: var(--bos-space-xs, 10px); }
+  .neue-konten-karte .nk-feld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .neue-konten-karte .nk-feld span { font-size: var(--bos-font-xs, .72rem); letter-spacing: .05em; text-transform: uppercase; color: var(--bos-amber); font-weight: 700; }
+  .neue-konten-karte .nk-feld .bos-input { width: 100%; min-width: 0; box-sizing: border-box; }
+  .neue-konten-karte .nk-knopf { align-self: flex-start; }
+  .neue-konten-karte .nk-status { font-size: .8rem; margin: 0; }
+  .neue-konten-karte code { word-break: break-all; }
+  @media (max-width: 480px) { .neue-konten-karte .nk-knopf { align-self: stretch; } }
+  .rolle-neu-form input[type="text"]#neueRolleIcon { width: 60px; flex: none; }
+  .rolle-neu-form input[type="text"]#neueRolleName { flex: 1; min-width: 140px; }
+  .rolle-neu-form input[type="text"]#neueRolleId { width: 170px; flex: none; }
+
+  /* ── Karte: zentriertes Pop-up mit Tabs, 1:1-Muster aus produkt_config_editor.html
+       (SESSION_2026-09-04_PRODUKTKARTE_KONZEPT.md) — eine Bearbeitungsstelle statt
+       verstreuter Inline-Felder, hier für Konto UND Rolle wiederverwendet. ── */
+  /* Compound-Selektor statt nur .karte-overlay: .sheet-overlay setzt weiter
+     unten align-items:flex-end (Bottom-Sheet-Standard) — bei gleicher
+     Spezifität würde die spätere Regel gewinnen. Höhere Spezifität macht
+     das unabhängig von der Reihenfolge im Stylesheet sicher. */
+  .sheet-overlay.karte-overlay { align-items: center; justify-content: center; padding: var(--bos-space-md, 18px); }
+  .karte-sheet {
+    background: var(--bos-surface); width: 100%; max-width: 720px; height: min(680px, 86vh); overflow: hidden;
+    display: flex; flex-direction: column; border-radius: var(--bos-radius-lg); border: 1px solid var(--bos-border);
+    box-shadow: var(--bos-shadow-lg);
+  }
+  .karte-kopf { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); padding: var(--bos-space-lg, 22px) var(--bos-space-lg, 24px) var(--bos-space-sm, 16px); flex-shrink: 0; }
+  .karte-nav-btn {
+    background: var(--bos-surface-raised); border: 1px solid var(--bos-border); color: var(--bos-text);
+    width: 42px; height: 42px; min-width: 42px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; flex-shrink: 0;
+  }
+  .karte-nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+  .karte-titel { flex: 1; text-align: center; overflow: hidden; min-width: 0; }
+  .karte-name { font-family: var(--bos-font-display); font-size: var(--bos-font-xl, 1.4rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .karte-sub { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); font-family: monospace; margin-top: 4px; }
+  .karte-close { background: none; border: none; color: var(--bos-text-dim); font-size: 1.3rem; cursor: pointer; flex-shrink: 0; padding: var(--bos-space-2xs, 8px); }
+  .karte-tabs { display: flex; gap: var(--bos-space-2xs, 8px); padding: 0 var(--bos-space-lg, 24px) var(--bos-space-sm, 16px); overflow-x: auto; flex-shrink: 0; }
+  .karte-tabs::-webkit-scrollbar { display: none; }
+  .karte-tab-btn {
+    font-family: var(--bos-font-label); font-size: var(--bos-font-sm, .82rem); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: var(--bos-space-2xs, 10px) var(--bos-space-sm, 16px); border-radius: var(--bos-radius-sm); border: 1px solid var(--bos-border);
+    background: transparent; color: var(--bos-text-dim); white-space: nowrap; cursor: pointer; flex-shrink: 0;
+  }
+  .karte-tab-btn.aktiv { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  .karte-body { overflow-y: auto; padding: var(--bos-space-2xs, 8px) var(--bos-space-lg, 24px) var(--bos-space-lg, 28px); flex: 1; }
+
+  .detail-section { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: var(--bos-space-md, 18px) var(--bos-space-lg, 22px); padding: var(--bos-space-sm, 14px) 0; border-bottom: 1px solid var(--bos-border); }
+  .detail-section.full { grid-template-columns: 1fr; }
+  .detail-section:last-child { border-bottom: none; }
+  .detail-feld { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 6px); }
+  .detail-feld label { font-size: var(--bos-font-xs, .72rem); letter-spacing: .05em; text-transform: uppercase; color: var(--bos-amber); font-weight: 700; }
+  .detail-feld .readonly-wert { font-size: var(--bos-font-md, .95rem); color: var(--bos-text); padding: var(--bos-space-2xs, .6em) 0; }
+  .detail-feld input, .detail-feld select { min-height: var(--bos-tap-min, 44px); }
+  .checkbox-feld { display: flex !important; flex-direction: row !important; align-items: center; gap: var(--bos-space-sm, 12px); padding: var(--bos-space-2xs, 4px) 0; }
+  .checkbox-feld input[type="checkbox"] { width: 24px; height: 24px; }
+  .checkbox-feld .cb-label { font-size: var(--bos-font-md, .92rem); color: var(--bos-text); text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  .bereich-gruppe { margin-bottom: var(--bos-space-md, 20px); }
+  .bereich-gruppe + .bereich-gruppe { border-top: 1px solid var(--bos-border); padding-top: var(--bos-space-md, 18px); }
+  .bereich-gruppe h3 { font-size: var(--bos-font-xs, .72rem); text-transform: uppercase; letter-spacing: .06em; color: var(--bos-amber); margin: 0 0 var(--bos-space-2xs, 6px); }
+  .zugriff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--bos-space-md, 18px); }
+  @media (max-width: 480px) { .zugriff-grid { grid-template-columns: 1fr; } }
+  .zugriff-zeile { display: flex; align-items: center; gap: var(--bos-space-xs, 11px); padding: var(--bos-space-2xs, 7px) 0; cursor: pointer; min-width: 0; }
+  .zugriff-zeile input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; }
+  .zugriff-icon { width: 1.4em; text-align: center; flex-shrink: 0; }
+  .zugriff-name { font-size: var(--bos-font-sm, .88rem); min-width: 0; overflow-wrap: break-word; }
+
+  .bos-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: var(--bos-space-md, 20px);
+  }
+  .bos-modal { max-width: 320px; width: 100%; padding: var(--bos-space-lg, 22px); display: flex; flex-direction: column; gap: var(--bos-space-xs, 10px); }
+  .bos-modal .bos-btn-row { display: flex; gap: var(--bos-space-xs, 10px); margin-top: var(--bos-space-2xs, 6px); }
+  .bos-modal .bos-btn-row .bos-btn { flex: 1; }
+
+  .help-btn { width: auto; background: transparent; border: 1px solid var(--bos-border); color: var(--bos-amber); padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 11px); border-radius: var(--bos-radius-sm); font-size: var(--bos-font-md, 1rem); }
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 60; display: flex; align-items: flex-end; }
+  .sheet { background: var(--bos-surface); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: var(--bos-space-sm, 14px) var(--bos-space-md, 20px) var(--bos-space-lg, 24px); border-top: 1px solid var(--bos-border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--bos-border); border-radius: 2px; margin: 0 auto var(--bos-space-sm, 14px); }
+  .sheet h2 { font-family: var(--bos-font-display); font-size: var(--bos-font-lg, 1.15rem); margin: 0 0 var(--bos-space-sm, 14px); }
+  .sheet .sec { margin-bottom: var(--bos-space-sm, 16px); }
+  .sheet .sec h3 { font-size: var(--bos-font-md, .9rem); color: var(--bos-amber); margin: 0 0 var(--bos-space-3xs, 4px); }
+  .sheet .sec p { font-size: var(--bos-font-sm, .87rem); color: var(--bos-text); line-height: 1.5; margin: 0; }
+  /* Reiter „Namen“ (Schritt 3) */
+  .namen-kopf { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+  .namen-kopf .bos-input { flex:1; min-width:180px; }
+  .namen-tabelle-wrap { overflow-x:auto; border:1px solid var(--bos-border); border-radius:var(--bos-radius-sm, 8px); }
+  .namen-tabelle { width:100%; border-collapse:collapse; font-size:var(--bos-font-sm, .85rem); }
+  .namen-tabelle th, .namen-tabelle td { padding:6px 8px; border-bottom:1px solid var(--bos-border); text-align:left; vertical-align:middle; }
+  .namen-tabelle th { color:var(--bos-text-dim); font-weight:600; font-size:var(--bos-font-xs, .75rem); position:sticky; top:0; background:var(--bos-surface, #1c1a17); }
+  .namen-tabelle td.nr { font-family:var(--bos-mono, monospace); white-space:nowrap; }
+  .namen-tabelle input { width:100%; min-width:120px; }
+  .namen-tabelle tr.geaendert input { border-color:var(--bos-green); }
+  .namen-tabelle tr.inaktiv td { opacity:.6; }
+  .namen-tabelle tr.archiv td { opacity:.55; font-style:italic; }
+  .namen-tabelle tr.konto-fehlt td.konto { color:var(--bos-red); font-weight:600; }
+  .namen-tabelle .inaktiv-zeichen { font-size:.8em; margin-left:4px; }
+  .namen-tabelle .rufname-leeren { font-size:var(--bos-font-xs, .72rem); padding:2px 6px; margin-left:6px; }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'konten_verwaltung';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>   <!-- NEU seit 31.08.2026 -->
+<script src="../bos_access.js"></script>         <!-- NEU seit 31.08.2026 -->
+<script src="../bos_access_guard.js"></script>
+<!-- PIN-Schleuse entfernt 18.09.2026 (Kontenumstellung).
+     Sie war ein clientseitiger Vergleich gegen einen Wert aus der
+     öffentlich ausgelieferten bos_pin_config.js — und stand vor einer
+     Seite, deren schreibende Aktionen ohnehin das Admin-Passwort über
+     adminReauth() verlangen. Zwei Passwortabfragen hintereinander, von
+     denen die erste nichts aufhält. Der wirksame Schutz sind seitdem
+     der Rollen-Guard (bos_access_guard.js, Rolle admin) und die
+     Firestore-Regeln über istAdmin(). -->
+
+<div id="app">
+  <header>
+    <div class="bos-title">Konten &amp; Rollen</div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="bos-badge" id="fsStatus">Lädt …</span>
+      <button id="sperrenBtn" class="help-btn hidden" title="Admin-Sitzung beenden und Seite sperren">🔒 Sperren</button>
+      <button id="helpOpenBtn" class="help-btn" title="Hilfe">❓</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="leerlaufStreifen" class="hidden" role="alert" style="position:sticky; top:env(safe-area-inset-top, 0px); z-index:40; margin-bottom:12px; padding:10px 14px; border:1px solid var(--bos-amber); border-radius:var(--bos-radius-sm, 8px); background:var(--bos-surface, #1c1a17); color:var(--bos-amber); font-weight:600; font-size:.9rem;"></div>
+    <div id="gesperrtBox" class="bos-panel" style="max-width:520px; margin:24px auto; text-align:center; display:flex; flex-direction:column; gap:12px;">
+      <div class="bos-title" style="font-size:1.1rem;">Nur mit Admin-Passwort</div>
+      <p style="color:var(--bos-text-dim); font-size:.9rem; margin:0;">Die Kontenverwaltung zeigt erst nach der Admin-Anmeldung etwas an. Die Rolle Admin allein reicht nicht.</p>
+      <p id="gesperrtErr" class="status-err hidden" style="margin:0;"></p>
+      <button class="bos-btn bos-btn--amber" id="entsperrenBtn">Mit Admin-Passwort öffnen</button>
+    </div>
+    <div id="adminInhalt" class="hidden">
+    <div class="tab-row" style="display:flex; gap:8px; margin-bottom:16px;">
+      <button class="bos-btn bos-btn--amber tab-btn" data-tab="konten">Konten</button>
+      <button class="bos-btn tab-btn" data-tab="rollen">Rollen &amp; Rechte</button>
+      <button class="bos-btn tab-btn" data-tab="namen">Namen</button>
+    </div>
+
+    <div id="tabNamen" class="hidden">
+      <p style="color:var(--bos-text-dim); font-size:.85rem; margin:0 0 10px;">
+        Nummer und Name jeder Person. Neue Personen entstehen nur hier. Einsatzdaten (Schicht, Tage, Sperren) pflegst du im
+        <a href="../schichtplaner/personen_editor.html" style="color:var(--bos-amber);">Personen-Editor</a>.
+        ⏸ = inaktiv. Rot = verknüpft mit einem Konto, das es nicht gibt („lösen“).
+      </p>
+      <div class="namen-kopf">
+        <input type="text" id="neuPersonBeschreibung" class="bos-input" maxlength="30" placeholder="Neue Person: Beschreibung, z. B. Jörg">
+        <button class="bos-btn" id="neuPersonBtn">+ Neue Person</button>
+        <button class="bos-btn bos-btn--amber" id="namenSpeichernBtn">Namen speichern</button>
+      </div>
+      <p id="namenStatus" style="font-size:.82rem; color:var(--bos-text-dim); margin:0 0 8px;"></p>
+      <p id="namenErr" class="status-err hidden"></p>
+      <div class="namen-tabelle-wrap"><div id="namenListe"></div></div>
+    </div>
+
+    <div id="tabKonten">
+      <p id="kontenErr" class="status-err hidden" style="margin-bottom:10px;"></p>
+
+      <div class="neue-konten-karte" id="musterPanel">
+        <div class="nk-titel">Neue Konten vorbereiten</div>
+        <div class="nk-ablauf">1 Kennungen vorschlagen · 2 in der Firebase-Konsole anlegen · 3 hier bestätigen</div>
+        <div class="nk-felder">
+          <label class="nk-feld"><span>Bereich</span><select id="musterBereich" class="bos-input"></select></label>
+          <label class="nk-feld nk-anzahl"><span>Anzahl</span><input type="number" id="musterAnzahl" class="bos-input" min="1" max="20" value="1" inputmode="numeric"></label>
+        </div>
+        <button class="bos-btn bos-btn--amber nk-knopf" id="musterVorschlagBtn">Kennungen vorschlagen</button>
+        <div id="musterListe"></div>
+        <button class="bos-btn bos-btn--amber nk-knopf hidden" id="musterAnlegenBtn">Logins sind angelegt — Dokumente anlegen</button>
+        <p id="musterStatus" class="nk-status"></p>
+      </div>
+      <div id="sektionUnbestaetigt" class="sektion-unbestaetigt hidden">
+        <div class="sektion-kopf"><h2>Rohlinge</h2><span class="anzahl" id="anzahlUnbestaetigt"></span></div>
+        <p style="color:var(--bos-text-dim); font-size:.8rem; margin:0 0 8px;">Konten ohne Rolle. Beschriften: Konto antippen → Reiter „Konto“ → „Beschriften“.</p>
+        <div class="entry-list" id="listeUnbestaetigt"></div>
+      </div>
+      <div class="sektion-bestaetigt">
+        <div class="sektion-kopf"><h2>Bestätigt</h2><span class="anzahl" id="anzahlBestaetigt"></span></div>
+        <div class="entry-list" id="listeBestaetigt"></div>
+      </div>
+
+      <div class="save-row">
+        <span id="saveStatus"></span>
+        <button class="bos-btn bos-btn--amber" id="saveBtn">Änderungen speichern</button>
+      </div>
+    </div>
+
+    <div id="tabRollen" class="hidden">
+      <div class="rolle-neu-form">
+        <input type="text" id="neueRolleIcon" class="bos-input" maxlength="4" placeholder="🔧">
+        <input type="text" id="neueRolleName" class="bos-input" placeholder="Anzeigename">
+        <input type="text" id="neueRolleId" class="bos-input" placeholder="id_schluessel">
+        <button class="bos-btn bos-btn--amber" id="neueRolleBtn">+ Neue Rolle</button>
+      </div>
+      <p id="rollenErr" class="status-err hidden" style="margin-bottom:10px;"></p>
+
+      <div class="entry-list" id="listeRollen"></div>
+
+      <div class="save-row">
+        <span id="rollenSaveStatus"></span>
+        <button class="bos-btn bos-btn--amber" id="exportRollenBtn">Rollen &amp; Rechte exportieren</button>
+      </div>
+    </div>
+    </div><!-- /adminInhalt -->
+  </main>
+
+  <div id="adminAuthOverlay" class="bos-modal-overlay hidden">
+    <div class="bos-panel bos-modal">
+      <div class="bos-title" style="font-size:1.1rem;">Admin-Anmeldung</div>
+      <p id="adminAuthText" style="color:var(--bos-text-dim); font-size:.85rem; margin:0;">
+        Die Kontenverwaltung ist ein Admin-Werkzeug. Anmeldung mit dem Admin-Passwort.
+      </p>
+      <input type="password" id="adminPwInput" class="bos-input" placeholder="Admin-Passwort">
+      <p id="adminPwErr" class="status-err hidden"></p>
+      <div class="bos-btn-row">
+        <button class="bos-btn" id="adminPwCancel">Abbrechen</button>
+        <button class="bos-btn bos-btn--amber" id="adminPwConfirm">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="helpSheet" class="sheet-overlay hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="helpTitle"></h2>
+      <div id="helpContent"></div>
+      <button class="bos-btn" id="helpCloseBtn" style="width:100%;">Schließen</button>
+    </div>
+  </div>
+
+  <!-- Konto-Karte — einzige Bearbeitungsstelle für ein Konto, ersetzt die
+       frühere Zeile voller Zugriffs-Haken. Muster 1:1 aus produkt_config_editor.html
+       (SESSION_2026-09-04_PRODUKTKARTE_KONZEPT.md), siehe SESSION_2026-09-05_
+       KONTEN_ROLLEN_KARTE_KONZEPT.md. -->
+  <div id="kontoKarteOverlay" class="sheet-overlay karte-overlay hidden" onclick="if(event.target===this) schliesseKontoKarte()">
+    <div class="karte-sheet">
+      <div class="karte-kopf">
+        <button class="karte-nav-btn" id="kkZurueckBtn" onclick="kontoKarteNav(-1)" title="Vorheriges Konto">‹</button>
+        <div class="karte-titel">
+          <div class="karte-name" id="kkName">—</div>
+          <div class="karte-sub" id="kkSub">—</div>
+        </div>
+        <button class="karte-nav-btn" id="kkVorBtn" onclick="kontoKarteNav(1)" title="Nächstes Konto">›</button>
+        <button class="karte-close" onclick="schliesseKontoKarte()" title="Schließen">✕</button>
+      </div>
+      <div class="karte-tabs" id="kkTabs"></div>
+      <div class="karte-body" id="kkBody"></div>
+    </div>
+  </div>
+
+  <!-- Rollen-Karte — analog zur Konto-Karte, für eine einzelne Rolle. -->
+  <div id="rollenKarteOverlay" class="sheet-overlay karte-overlay hidden" onclick="if(event.target===this) schliesseRollenKarte()">
+    <div class="karte-sheet">
+      <div class="karte-kopf">
+        <button class="karte-nav-btn" id="rkZurueckBtn" onclick="rollenKarteNav(-1)" title="Vorherige Rolle">‹</button>
+        <div class="karte-titel">
+          <div class="karte-name" id="rkName">—</div>
+          <div class="karte-sub" id="rkSub">—</div>
+        </div>
+        <button class="karte-nav-btn" id="rkVorBtn" onclick="rollenKarteNav(1)" title="Nächste Rolle">›</button>
+        <button class="karte-close" onclick="schliesseRollenKarte()" title="Schließen">✕</button>
+      </div>
+      <div class="karte-tabs" id="rkTabs"></div>
+      <div class="karte-body" id="rkBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_accounts.js"></script>
+<script src="../bos_launcher_roles.js"></script>
+
+<script>
+// ==========================================================================
+// Start — ohne PIN-Schleuse (entfernt 18.09.2026, siehe Kommentar im HTML).
+// initApp() steht weiter unten; der Aufruf erfolgt am Dateiende, wenn alle
+// Funktionen definiert sind.
+// ==========================================================================
+
+// ==========================================================================
+// Hilfe
+// ==========================================================================
+var helpData = {
+  title: "Was ist das hier?",
+  sections: [
+    {
+      heading: "Wofür ist diese Seite?",
+      text: "Hier bereitest du neue Konten vor und weist Rollen zu. Die Anmeldung selbst (Kennung und Passwort) entsteht vorher in der Firebase-Konsole; eine Selbstregistrierung gibt es nicht mehr. Die Seite ist ein reines Admin-Werkzeug: sie zeigt erst nach dem Admin-Passwort etwas an, auch dem Alltagskonto mit Rolle Admin nicht."
+    },
+    {
+      heading: "Wie lege ich ein neues Konto an?",
+      text: "Oben „Neue Konten vorbereiten“: Bereich und Anzahl wählen, „Kennungen vorschlagen“. Die Seite nimmt die nächsten Nummern aus dem Kontenzähler — eine Kennung wird nie ein zweites Mal vergeben, auch keine gelöschte. Die Adressen legst du in der Firebase-Konsole mit einem Wegwerf-Passwort an und bestätigst hier. Danach steht der Rohling unter „Rohlinge“ und wird dort beschriftet. Sonderfälle außerhalb eines Musters (ein einzelnes Konto mit ganz eigener Kennung) laufen über die Firebase-Konsole: Login UND Dokument von Hand anlegen — und vorher prüfen, dass die Kennung nie vergeben war."
+    },
+    {
+      heading: "Wie funktioniert der Konten-Tab?",
+      text: "Oben abgesetzt, in Rot: Konten ohne Rolle — die neuesten zuerst. Darunter alphabetisch alle bestätigten Konten. Rolle lässt sich direkt in der Zeile umstellen, das setzt automatisch die Zugriffs-Haken auf den Rollen-Standard. Ein Tipp auf die Zeile selbst öffnet die Konto-Karte mit den einzelnen Zugriffs-Ausnahmen, gruppiert nach Bereich."
+    },
+    {
+      heading: "Warum das Admin-Passwort schon beim Öffnen?",
+      text: "Die Kontenliste zeigt, wer welche Karte hat. Das geht niemanden außer dem Admin etwas an. Deshalb darf jedes Konto nur sein eigenes Dokument lesen, die ganze Liste nur die gesonderte Admin-Anmeldung. Sie bleibt bestehen, solange die Seite offen ist, wird nie auf dem Gerät gespeichert und endet beim Verlassen der Seite, mit 🔒 Sperren oder von selbst nach 5 Minuten ohne Eingabe (eine Minute vorher erscheint oben ein Hinweis)."
+    },
+    {
+      heading: "Was, wenn ich jemanden zurückstufen will?",
+      text: "Rolle auf „— Grundkonto —” setzen und speichern. Die Person behält ihre Anmeldung, verliert aber jeden Zugriff über die allgemein offenen Werkzeuge hinaus, bis du erneut eine Rolle vergibst — und taucht danach wieder oben bei „Unbestätigt” auf."
+    },
+    {
+      heading: "Was macht der Tab „Rollen & Rechte”?",
+      text: "Eine Zeile pro Rolle. „+ Neue Rolle” legt eine neue an (Icon, Name, ID — die ID muss eindeutig sein und lässt sich danach nicht mehr ändern). Ein Tipp auf eine bestehende Rolle öffnet die Rollen-Karte: Stammdaten (Name/Icon) und die Rechte-Matrix dieser einen Rolle, ebenfalls nach Bereich gruppiert. Das legt fest, was eine Rolle grundsätzlich darf — Ausnahmen für einzelne Personen bleiben weiterhin im Konten-Tab."
+    },
+    {
+      heading: "Warum „Exportieren” statt „Speichern”?",
+      text: "Rollen und Rechte liegen als Dateien im Code, nicht in der Datenbank — du bist der einzige, der sie pflegt. „Exportieren” lädt zwei aktualisierte Dateien herunter (bos_launcher_roles.js und bos_permissions.js), die du im Repo ersetzt. Erst danach gilt die Änderung wirklich, auf allen Geräten."
+    },
+    {
+      heading: "Warum ist die ID einer Rolle nicht änderbar?",
+      text: "Die ID steckt in Konten, in der App-Registry und in der Rechte-Matrix. Würde sie sich nachträglich ändern, würden bestehende Zuweisungen ins Leere laufen. Deshalb wird sie nur bei der Neuanlage einmal festgelegt — Name und Icon lassen sich in der Karte jederzeit anpassen, die ID bleibt fest."
+    },
+    {
+      heading: "Was bedeutet die Gruppierung nach Bereich?",
+      text: "Reine Übersichtshilfe (Verwaltung, Produktion, Verbrauch, Vertrieb & Filiale, Allgemein) — hat keinen Einfluss auf die tatsächliche Berechtigung. Ein Satellit ohne zugeordneten Bereich landet sichtbar unter „Sonstiges”, statt zu verschwinden."
+    }
+  ]
+};
+function renderHelp() {
+  document.getElementById('helpTitle').textContent = helpData.title;
+  var html = '';
+  helpData.sections.forEach(function (s) {
+    html += '<div class="sec"><h3>' + s.heading + '</h3><p>' + s.text + '</p></div>';
+  });
+  document.getElementById('helpContent').innerHTML = html;
+}
+renderHelp();
+document.getElementById('helpOpenBtn').onclick = function () { document.getElementById('helpSheet').classList.remove('hidden'); };
+document.getElementById('helpCloseBtn').onclick = function () { document.getElementById('helpSheet').classList.add('hidden'); };
+document.getElementById('helpSheet').addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
+
+// ==========================================================================
+// Daten laden
+// ==========================================================================
+var alleKonten = [];
+var bearbeitung = {};   // { kontoId: { role, checks: { satellitId: bool } } }
+// NEU 12.09.2026, 15:32 -- Ulf: "würde diese Einstellung nicht sogar im
+// Konten & Rollen System Sinn machen?" Verknüpfung Konto <-> SchichtPlaner-
+// Person jetzt hier bedienbar (Tab "Konto"), schreibt weiterhin dieselbe
+// bosKontoId auf der Person (personen-Collection) wie schon bisher über
+// personen_editor.html -- keine zweite Datenquelle, nur ein zweiter,
+// bequemerer Bedienweg zum selben Feld. Siehe setzeVerknuepftePerson().
+var allePersonen = [];      // Rohdaten aus Firestore 'personen', für die Verknüpfung unten
+var personenLadefehler = null; // 26.09.2026: gesetzt, wenn nur die Personen nicht geladen werden konnten
+var alleNamen = {};         // Schritt 3: Firestore 'namen', { personId: {beschreibung, rufname} }
+var namenLadefehler = null;
+var namenEntwurf = {};      // getippte, noch nicht gespeicherte Beschreibungen
+var namenLeeren = {};       // vorgemerkt: Rufname leeren (wird mit „Namen speichern“ geschrieben)
+var verknuepfungLoesen = {}; // vorgemerkt: Verknüpfung ins Leere lösen (N-27), ebenso
+var namenGeaendert = false;
+
+function anzeigeNamePerson(id) {
+  // Schritt 8: nur noch die Beschreibung aus der Namensliste.
+  if (alleNamen[id] && alleNamen[id].beschreibung) return alleNamen[id].beschreibung;
+  return id + ' · kein Name hinterlegt';
+}
+var permissions = {};   // aus bos_permissions.js (window.BOS_PERMISSIONS)
+var gatedApps = [];     // ehemals Spalten der Matrix-Tabelle, jetzt Grundlage für die
+                         // gruppierten Zugriffe-/Rechte-Listen in den Karten
+var geaendert = false;
+
+// NEU 05.09.2026, siehe SESSION_2026-09-05_KONTEN_ROLLEN_KARTE_KONZEPT.md —
+// reine Anzeige-Gruppierung für die Karten (Konto-Karte Tab "Zugriffe",
+// Rollen-Karte Tab "Rechte"). Quelle: bereich-Feld in bos_app_registry.js.
+// 'sonstiges' fängt Satelliten ohne (noch) gesetztes Feld sichtbar auf,
+// statt sie verschwinden zu lassen — gleiches Prinzip wie ladeGatedApps().
+var BEREICHE = [
+  { id: 'verwaltung', label: 'Verwaltung' },
+  { id: 'produktion', label: 'Produktion' },
+  { id: 'verbrauch', label: 'Verbrauch' },
+  { id: 'vertrieb_filiale', label: 'Vertrieb & Filiale' },
+  { id: 'allgemein', label: 'Allgemein' },
+  { id: 'sonstiges', label: 'Sonstiges' }
+];
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+// Rendert die gruppierte Zugriffs-/Rechte-Liste für ein einzelnes Konto ODER
+// eine einzelne Rolle. `checksObj` ist das jeweilige { satellitId: bool } –
+// `handlerName` der Name der global definierten Callback-Funktion, die bei
+// jeder Änderung aufgerufen wird (toggleKontoZugriff / toggleRolleRecht).
+// Eine Mechanik, zwei Aufrufer, statt zwei separate Render-Funktionen.
+function bereichsGruppenHTML(checksObj, handlerName) {
+  return BEREICHE.map(function (b) {
+    var apps = gatedApps.filter(function (a) { return (a.bereich || 'sonstiges') === b.id; });
+    if (!apps.length) return '';
+    var zeilen = apps.map(function (a) {
+      var checked = !!checksObj[a.id];
+      return '<label class="zugriff-zeile">' +
+        '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="' + handlerName + '(\'' + a.id + '\', this.checked)">' +
+        '<span class="zugriff-icon">' + (a.icon || '') + '</span>' +
+        '<span class="zugriff-name">' + esc(a.name) + '</span>' +
+      '</label>';
+    }).join('');
+    return '<div class="bereich-gruppe"><h3>' + b.label + '</h3><div class="zugriff-grid">' + zeilen + '</div></div>';
+  }).join('');
+}
+
+function ladeGatedApps() {
+  /* 31.08.2026: Vereinigung aus zwei Quellen statt nur der Registry —
+     das war die konkrete Lücke, die zu konten_verwaltung.html führte
+     (Registry sagt roles:['admin'], bos_permissions.js hatte gar
+     keinen Eintrag → Seite war fail-open für jeden). Diese Funktion
+     ist jetzt die einzige Stelle, die "gilt als rollen-gesteuert"
+     entscheidet — sie deckt beide Quellen ab, damit ein Auseinander-
+     laufen zwischen Registry und bos_permissions.js hier sichtbar
+     wird statt zu verschwinden. Die eigentliche Zugriffsprüfung
+     (BOS_ACCESS.can()) liest weiterhin NUR bos_permissions.js — diese
+     Vereinigung ist reine Anzeige-/Vollständigkeits-Hilfe für die
+     Tabelle, keine zweite Durchsetzungs-Quelle. */
+  var satIds = {};
+  Object.keys(window.BOS_PERMISSIONS || {}).forEach(function (rolle) {
+    Object.keys(window.BOS_PERMISSIONS[rolle] || {}).forEach(function (id) { satIds[id] = true; });
+  });
+  (window.BOS_APPS || []).forEach(function (a) {
+    if (a.roles && a.roles.length) satIds[a.id] = true;
+  });
+  var registryById = {};
+  var registryOrder = [];
+  (window.BOS_APPS || []).forEach(function (a) { registryById[a.id] = a; registryOrder.push(a.id); });
+  var ids = Object.keys(satIds).sort(function (a, b) {
+    var ia = registryOrder.indexOf(a); if (ia === -1) ia = 999;
+    var ib = registryOrder.indexOf(b); if (ib === -1) ib = 999;
+    return ia - ib || a.localeCompare(b);
+  });
+  gatedApps = ids.map(function (id) {
+    return registryById[id] || { id: id, name: id + ' (nicht mehr in Registry)', icon: '⚠️' };
+  });
+}
+function ladePermissions() {
+  /* 31.08.2026: bos_permissions.json gibt's als Live-Quelle nicht mehr,
+     bos_permissions.js liefert window.BOS_PERMISSIONS synchron per <script>
+     (siehe Einbindung oben) — kein fetch() mehr nötig, bleibt aber als
+     Promise-Funktion stehen, damit Promise.all() unten unverändert bleibt. */
+  permissions = window.BOS_PERMISSIONS || {};
+  return Promise.resolve();
+}
+function standardChecks(role) {
+  var res = {};
+  gatedApps.forEach(function (a) {
+    res[a.id] = !!(role && permissions[role] && permissions[role][a.id]);
+  });
+  return res;
+}
+function angewandteChecks(role, overrides) {
+  var checks = standardChecks(role);
+  Object.keys(overrides || {}).forEach(function (k) {
+    if (checks.hasOwnProperty(k)) checks[k] = !!overrides[k];
+  });
+  return checks;
+}
+function initBearbeitung() {
+  bearbeitung = {};
+  alleKonten.forEach(function (k) {
+    bearbeitung[k.id] = {
+      role: k.role,
+      checks: angewandteChecks(k.role, k.overrides),
+      taskboardAbhaken: !!k.taskboardAbhaken, // NEU 05.09.2026, Taskboard-Feature
+      teigeckePflege: !!k.teigeckePflege,     // NEU 28.09.2026, Teigecke Stufe 1
+      teigeckeTeige: !!k.teigeckeTeige,       // NEU 29.09.2026, Teigecke Stufe 2
+      teigeckeRezepte: !!k.teigeckeRezepte    // NEU 29.09.2026, Teigecke Stufe 2
+    };
+  });
+}
+function markiereGeaendert() {
+  geaendert = true;
+  document.getElementById('saveStatus').textContent = 'Ungespeicherte Änderungen';
+  document.getElementById('saveStatus').className = '';
+}
+
+// ==========================================================================
+// Konten-Listen — Unbestätigt (kein role) optisch abgesetzt oben, sortiert
+// nach Registrierungsdatum (neueste zuerst), Bestätigt alphabetisch darunter.
+// Ersetzt die frühere Matrix-Tabelle, siehe SESSION_2026-09-05_KONTEN_
+// ROLLEN_KARTE_KONZEPT.md. Zugriffs-Haken leben nur noch in der Konto-Karte.
+// ==========================================================================
+function erstelltSekunden(konto) {
+  return (konto.erstelltAm && typeof konto.erstelltAm.seconds === 'number') ? konto.erstelltAm.seconds : 0;
+}
+function istUnbestaetigt(konto) { return !konto.role; }
+
+function sortierteKonten() {
+  var unbest = alleKonten.filter(istUnbestaetigt).sort(function (a, b) { return erstelltSekunden(b) - erstelltSekunden(a); });
+  var best = alleKonten.filter(function (k) { return !istUnbestaetigt(k); }).sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  return { unbest: unbest, best: best };
+}
+
+function rollenOptionsHTML(ausgewaehlt) {
+  var html = '<option value=""' + (!ausgewaehlt ? ' selected' : '') + '>— Grundkonto —</option>';
+  (window.BOS_ROLES || []).forEach(function (r) {
+    html += '<option value="' + r.id + '"' + (r.id === ausgewaehlt ? ' selected' : '') + '>' + (r.icon || '') + ' ' + esc(r.name) + '</option>';
+  });
+  return html;
+}
+function rollenIconFuer(roleId) {
+  var r = (window.BOS_ROLES || []).filter(function (x) { return x.id === roleId; })[0];
+  return r ? (r.icon || '❔') : '❔';
+}
+function roleName(roleId) {
+  var r = (window.BOS_ROLES || []).filter(function (x) { return x.id === roleId; })[0];
+  return r ? r.name : null;
+}
+
+// ==========================================================================
+// Schutz vor Selbstaussperrung — 26.09.2026 (Ulfs Frage "Kann ich mich
+// selbst aussperren?"). Zwei Konten sind geschützt:
+//   - das Admin-Konto (Kennung aus BOS_BV, nicht im Klartext hier) — Tresorschlüssel
+//   - das Konto, mit dem dieses Gerät gerade angemeldet ist (Alltag)
+// Löschen oder die Rolle admin wegnehmen hieße: beim nächsten Öffnen
+// sperrt der Zugriffs-Guard diese Seite, der Weg zurück ginge nur noch
+// über die Firebase-Konsole. Deshalb weder 🗑 noch Rollenwechsel für
+// diese beiden. Andere Admin-Konten bleiben normal bedienbar.
+// ==========================================================================
+function geschuetzteKonten() {
+  var liste = [];
+  try {
+    var adminMail = window.BOS_BV && typeof window.BOS_BV.adminKennung === 'function' ? window.BOS_BV.adminKennung() : null;
+    if (adminMail) liste.push(String(adminMail).split('@')[0].toLowerCase());
+  } catch (e) { /* ohne BOS_BV bleibt nur das angemeldete Konto */ }
+  var ich = firebase.auth().currentUser;
+  if (ich && ich.email) liste.push(String(ich.email).split('@')[0].toLowerCase());
+  return liste;
+}
+function istGeschuetzt(kontoId) { return geschuetzteKonten().indexOf(kontoId) !== -1; }
+
+function kontoRowHTML(konto) {
+  var b = bearbeitung[konto.id];
+  if (istGeschuetzt(konto.id)) {
+    return '<div class="entry-row" onclick="oeffneKontoKarte(\'' + konto.id + '\')">' +
+      '<span class="entry-icon">' + (b.role ? rollenIconFuer(b.role) : '❔') + '</span>' +
+      '<span class="entry-name">' + esc(konto.name || '(ohne Namen)') + ' <span class="entry-sub">· ' + esc(konto.id) + ' · geschützt' + hakenMarke(konto) + '</span></span>' +
+      '<span class="entry-sub" title="Eigenes Konto: nicht löschbar, Rolle nicht änderbar — sonst sperrst du dich aus dieser Seite aus.">🛡 ' + esc(roleName(b.role) || 'ohne Rolle') + '</span>' +
+    '</div>';
+  }
+  return '<div class="entry-row" onclick="oeffneKontoKarte(\'' + konto.id + '\')">' +
+    '<span class="entry-icon">' + (b.role ? rollenIconFuer(b.role) : '❔') + '</span>' +
+    '<span class="entry-name">' + esc(konto.name || '(ohne Namen)') + ' <span class="entry-sub">· ' + esc(konto.id) + hakenMarke(konto) + '</span></span>' +
+    '<select class="bos-input" onclick="event.stopPropagation()" onchange="setzeKontoRolle(\'' + konto.id + '\', this.value)">' + rollenOptionsHTML(b.role) + '</select>' +
+    '<button type="button" class="entry-del" title="Konto unwiderruflich löschen" onclick="event.stopPropagation(); loescheKontoKlick(\'' + konto.id + '\')">🗑</button>' +
+  '</div>';
+}
+
+function renderKontenListen() {
+  var sortiert = sortierteKonten();
+
+  var sektion = document.getElementById('sektionUnbestaetigt');
+  if (sortiert.unbest.length) {
+    sektion.classList.remove('hidden');
+    document.getElementById('anzahlUnbestaetigt').textContent = '[' + sortiert.unbest.length + ']';
+    document.getElementById('listeUnbestaetigt').innerHTML = sortiert.unbest.map(kontoRowHTML).join('');
+  } else {
+    sektion.classList.add('hidden');
+  }
+
+  document.getElementById('anzahlBestaetigt').textContent = '[' + sortiert.best.length + ']';
+  if (!alleKonten.length) {
+    document.getElementById('listeBestaetigt').innerHTML = '<p class="leer-hinweis">Noch keine Konten.</p>';
+  } else {
+    document.getElementById('listeBestaetigt').innerHTML = sortiert.best.length
+      ? sortiert.best.map(kontoRowHTML).join('')
+      : '<p class="leer-hinweis">Noch keine bestätigten Konten.</p>';
+  }
+}
+
+function setzeKontoRolle(kontoId, neu) {
+  neu = neu || null;
+  if (istGeschuetzt(kontoId)) {
+    alert('Dieses Konto ist geschützt (Admin-Konto oder das Konto, mit dem du gerade angemeldet bist). Die Rolle lässt sich hier nicht ändern — sonst sperrst du dich aus der Kontenverwaltung aus.');
+    renderKontenListen();
+    if (kontoKarteId === kontoId) renderKontoKarte();
+    return;
+  }
+  bearbeitung[kontoId].role = neu;
+  bearbeitung[kontoId].checks = standardChecks(neu);
+  markiereGeaendert();
+  renderKontenListen();
+  if (kontoKarteId === kontoId) renderKontoKarte();
+}
+function loescheKontoKlick(kontoId) {
+  if (istGeschuetzt(kontoId)) {
+    alert('Dieses Konto ist geschützt (Admin-Konto oder das Konto, mit dem du gerade angemeldet bist) und lässt sich hier nicht löschen.');
+    return;
+  }
+  var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
+  var name = (k && k.name) || '(ohne Namen)';
+  var verknuepft = allePersonen.filter(function (p) { return p.bosKontoId === kontoId; })[0];
+  var zusatz = verknuepft ? '\n\nDie Verknüpfung mit ' + anzeigeNamePerson(verknuepft.id) + ' wird dabei gelöst; die Person selbst bleibt.' : '';
+  if (!confirm('Konto von „' + name + '" (Kennung: ' + kontoId + ') wirklich unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.' + zusatz + '\n\nDen Login in der Firebase-Konsole bitte zusätzlich dort löschen.')) return;
+  oeffneAdminAuth({ typ: 'loeschen', kontoId: kontoId, name: name });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Konto-Karte — einzige Bearbeitungsstelle für ein Konto. Muster 1:1 aus
+// produkt_config_editor.html übernommen (SESSION_2026-09-04_PRODUKTKARTE_
+// KONZEPT.md): Vor/Zurück-Pfeile blättern durch die aktuell sichtbare
+// Liste (Unbestätigt+Bestätigt in Anzeige-Reihenfolge), Löschen bleibt
+// bewusst nur in der Liste (🗑), nicht in der Karte — gleiches Prinzip
+// wie beim Produkt.
+// ══════════════════════════════════════════════════════════════════════
+var kontoKarteId = null;
+var kontoKarteListe = [];
+var kontoKarteAktiverTab = 'stamm';
+
+function formatiertesDatum(konto) {
+  if (!konto.erstelltAm || typeof konto.erstelltAm.seconds !== 'number') return 'unbekannt';
+  var d = new Date(konto.erstelltAm.seconds * 1000);
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+var KONTO_KARTEN_TABS = [
+  {
+    id: 'stamm', label: 'Stammdaten',
+    render: function (k) {
+      var b = bearbeitung[k.id];
+      return (
+        '<div class="detail-section">' +
+          '<div class="detail-feld"><label>Name</label><div class="readonly-wert">' + esc(k.name || '—') + '</div></div>' +
+          (k.geburtsdatum ? '<div class="detail-feld"><label>Geburtsdatum (Altkonto)</label><div class="readonly-wert">' + esc(k.geburtsdatum) + '</div></div>' : '') +
+        '</div>' +
+        '<div class="detail-section full">' +
+          '<div class="detail-feld"><label>Rolle</label>' +
+          (istGeschuetzt(k.id)
+            ? '<div class="readonly-wert">🛡 ' + esc(roleName(b.role) || 'ohne Rolle') + ' — geschützt, hier nicht änderbar</div></div>'
+            : '<select onchange="setzeKontoRolle(\'' + k.id + '\', this.value)">' + rollenOptionsHTML(b.role) + '</select></div>') +
+        '</div>' +
+        '<div class="detail-section full">' +
+          '<label class="checkbox-feld"><input type="checkbox" ' + (b.taskboardAbhaken ? 'checked' : '') + ' onchange="toggleKontoAbhaken(this.checked)">' +
+          '<span class="cb-label">Darf Aufgaben im Taskboard-Popup als erledigt markieren</span></label>' +
+        '</div>' +
+        '<div class="detail-section full">' +
+          '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckePflege ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckePflege\', this.checked)">' +
+          '<span class="cb-label">🧺 Wagen &amp; Zutaten pflegen — Wagen beschriften, Zuhause der Zutaten, Gebinde, Schilder (nichts an den Teigen)</span></label>' +
+        '</div>' +
+        '<div class="detail-section full">' +
+          '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckeTeige ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckeTeige\', this.checked)">' +
+          '<span class="cb-label">🥣 Teige pflegen — Wasserregel, Wassertemperatur- und Hefe-Tabelle, Einwaagen, Kessel, Abwiegefolge</span></label>' +
+        '</div>' +
+        '<div class="detail-section full">' +
+          '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckeRezepte ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckeRezepte\', this.checked)">' +
+          '<span class="cb-label">📜 Rezepte pflegen — Zutatenliste je Teig, Vorstufe, Sauer/Hefe/Vorstufe je kg (Datenbank prüft alle drei Haken)</span></label>' +
+        '</div>'
+      );
+    }
+  },
+  {
+    id: 'zugriffe', label: 'Zugriffe',
+    render: function (k) {
+      return bereichsGruppenHTML(bearbeitung[k.id].checks, 'toggleKontoZugriff');
+    }
+  },
+  {
+    id: 'konto', label: 'Konto',
+    render: function (k) {
+      var verknuepftePerson = allePersonen.filter(function (p) { return p.bosKontoId === k.id; })[0] || null;
+      var personOptionenHTML = '<option value="">— keine Verknüpfung —</option>' + allePersonen
+        .slice()
+        .sort(function (a, b) { return anzeigeNamePerson(a.id).localeCompare(anzeigeNamePerson(b.id), 'de'); })
+        .map(function (p) {
+          return '<option value="' + p.id + '"' + (verknuepftePerson && p.id === verknuepftePerson.id ? ' selected' : '') + '>' + esc(anzeigeNamePerson(p.id)) + '</option>';
+        }).join('');
+      return (
+        '<div class="detail-section full"><div class="detail-feld"><label>Status</label><div class="readonly-wert">' +
+          (istUnbestaetigt(k) ? 'Unbestätigt — Grundkonto ohne Rolle' : 'Bestätigt') + '</div></div></div>' +
+        '<div class="detail-section full"><div class="detail-feld"><label>Registriert am</label><div class="readonly-wert">' + formatiertesDatum(k) + '</div></div></div>' +
+        '<div class="detail-section full">' +
+          '<div class="detail-feld"><label>Verknüpfte Person (SchichtPlaner)</label>' +
+          '<select onchange="setzeVerknuepftePerson(\'' + k.id + '\', this.value)">' + personOptionenHTML + '</select>' +
+          '<p style="color:var(--bos-text-faint); font-size:.76rem; margin-top:6px;">Verknüpft dieses Konto mit einer Person im SchichtPlaner (schreibt bosKontoId dort) — damit Wunschtag/Urlaub-Anfrage/Sonntag-Ablehnung die richtige Person automatisch vorschlagen können. Wirkt sofort, unabhängig vom Speichern-Knopf oben. Namen aus dem Reiter „Namen“.</p>' +
+          '<div id="verknuepfungStatus-' + k.id + '" style="font-size:.78rem; margin-top:6px;"></div>' +
+        '</div></div>' +
+        beschriftenHTML(k) +
+        freigabeHTML(k) +
+        zugangsblattHTML(k) +
+        '<p style="color:var(--bos-text-faint); font-size:.78rem; margin-top:10px;">Löschen geht weiterhin über das 🗑 in der Liste, nicht aus der Karte heraus.</p>'
+      );
+    }
+  }
+];
+
+function oeffneKontoKarte(kontoId) {
+  var sortiert = sortierteKonten();
+  kontoKarteListe = sortiert.unbest.concat(sortiert.best).map(function (k) { return k.id; });
+  if (kontoKarteListe.indexOf(kontoId) === -1) kontoKarteListe.push(kontoId);
+  kontoKarteId = kontoId;
+  kontoKarteAktiverTab = 'stamm';
+  renderKontoKarte();
+  document.getElementById('kontoKarteOverlay').classList.remove('hidden');
+}
+function kontoKarteNav(delta) {
+  var pos = kontoKarteListe.indexOf(kontoKarteId);
+  var neu = pos + delta;
+  if (neu < 0 || neu >= kontoKarteListe.length) return;
+  kontoKarteId = kontoKarteListe[neu];
+  renderKontoKarte();
+}
+function schliesseKontoKarte() {
+  document.getElementById('kontoKarteOverlay').classList.add('hidden');
+  kontoKarteId = null;
+}
+function waehleKontoKartenTab(id) {
+  kontoKarteAktiverTab = id;
+  renderKontoKarte();
+}
+function renderKontoKarte() {
+  var k = alleKonten.filter(function (x) { return x.id === kontoKarteId; })[0];
+  if (!k) { schliesseKontoKarte(); return; }
+  document.getElementById('kkName').textContent = k.name || '(ohne Namen)';
+  var b = bearbeitung[k.id];
+  document.getElementById('kkSub').textContent = istUnbestaetigt(k) ? 'Unbestätigt' : ((rollenIconFuer(b.role) || '') + ' ' + (roleName(b.role) || ''));
+
+  var pos = kontoKarteListe.indexOf(kontoKarteId);
+  document.getElementById('kkZurueckBtn').disabled = pos <= 0;
+  document.getElementById('kkVorBtn').disabled = pos === -1 || pos >= kontoKarteListe.length - 1;
+
+  document.getElementById('kkTabs').innerHTML = KONTO_KARTEN_TABS.map(function (t) {
+    return '<button class="karte-tab-btn' + (t.id === kontoKarteAktiverTab ? ' aktiv' : '') + '" onclick="waehleKontoKartenTab(\'' + t.id + '\')">' + t.label + '</button>';
+  }).join('');
+
+  var aktiv = KONTO_KARTEN_TABS.filter(function (t) { return t.id === kontoKarteAktiverTab; })[0] || KONTO_KARTEN_TABS[0];
+  document.getElementById('kkBody').innerHTML = aktiv.render(k);
+}
+function toggleKontoZugriff(appId, checked) {
+  if (!kontoKarteId) return;
+  bearbeitung[kontoKarteId].checks[appId] = checked;
+  markiereGeaendert();
+}
+function toggleKontoAbhaken(checked) {
+  if (!kontoKarteId) return;
+  bearbeitung[kontoKarteId].taskboardAbhaken = checked;
+  markiereGeaendert();
+}
+// NEU 28.09.2026, Teigecke Stufe 1 — gleiche Mechanik wie der Taskboard-Haken.
+// Seit 29.09.2026 für alle drei Teigecke-Haken (Feldname als Parameter).
+var TEIGECKE_HAKEN = ['teigeckePflege', 'teigeckeTeige', 'teigeckeRezepte'];
+function toggleKontoTeigecke(feld, checked) {
+  if (!kontoKarteId || TEIGECKE_HAKEN.indexOf(feld) === -1) return;
+  bearbeitung[kontoKarteId][feld] = checked;
+  markiereGeaendert();
+}
+
+// Verknüpft ein Konto mit einer SchichtPlaner-Person (schreibt bosKontoId
+// dort) -- Ulf, 12.09.2026: "würde diese Einstellung nicht sogar im
+// Konten & Rollen System Sinn machen?" Bewusst SOFORT geschrieben, nicht
+// über den Speichern-Knopf oben (der ist für Rolle/Zugriffe/Taskboard-
+// Recht gedacht, eine andere Firestore-Collection) -- eigener, kleiner
+// Schreibvorgang, damit nichts beim Verwerfen der übrigen Änderungen
+// versehentlich mit zurückgesetzt wird. EINE Person pro Konto: wird ein
+// Konto neu verknüpft, verliert eine zuvor verknüpfte andere Person ihre
+// Verknüpfung automatisch (sonst zwei Personen mit derselben
+// bosKontoId, uneindeutig für die automatische Vorauswahl anderswo).
+// ==========================================================================
+// Schritt 2 — Haken „freigeschaltet“, Art, Weggang (26.09.2026, §11)
+// --------------------------------------------------------------------------
+// freigeschaltet: Boolean im Konto-Dokument. Fehlt es, gilt es als false.
+// art: 'person' | 'ort' | 'system' — REINE SEITENINFORMATION (K-12): keine
+//   Regel liest sie; sie steuert nur, welche Voraussetzungen diese Seite
+//   vor dem Haken verlangt (NE-12).
+// Diese Seite setzt NICHTS voraus, was erst mit Schritt 2(c) kommt (NF-46):
+// sie liest/schreibt die Felder nur über die Admin-Sitzung und wertet
+// freigeschaltet nirgends für den eigenen Zugang aus.
+// ==========================================================================
+var ARTEN = { person: 'Person', ort: 'Ort (z. B. Tablet an der Wand)', system: 'System (Generalschlüssel)' };
+
+function istAdminKennung(kontoId) {
+  try {
+    var m = window.BOS_BV && typeof window.BOS_BV.adminKennung === 'function' ? window.BOS_BV.adminKennung() : null;
+    return !!m && String(m).split('@')[0].toLowerCase() === kontoId;
+  } catch (e) { return false; }
+}
+
+function hakenMarke(k) {
+  return k.freigeschaltet === true ? ' · ✓ freigeschaltet' : ' · 🔒 nicht freigeschaltet';
+}
+
+// Was fehlt, damit der Haken gesetzt werden darf? Leere Liste = alles da.
+// Nur die Seite prüft das (NE-12) — die Regel verlangt nur den Haken.
+function hakenFehlt(k) {
+  var fehlt = [];
+  if (!k.role) fehlt.push('Rolle');
+  var art = k.art || '';
+  if (!art) { fehlt.push('Art (Person, Ort oder System)'); return fehlt; }
+  if (art === 'system') {
+    if (!istAdminKennung(k.id)) fehlt.push('„System“ ist nur für den Generalschlüssel');
+  } else if (art === 'ort') {
+    if (!String(k.name || '').trim()) fehlt.push('Name des Orts (Notiz)');
+  } else if (art === 'person') {
+    var p = allePersonen.filter(function (x) { return x.bosKontoId === k.id; })[0];
+    if (!p) fehlt.push('verknüpfte Person');
+    else if (!(alleNamen[p.id] && String(alleNamen[p.id].beschreibung || '').trim())) fehlt.push('Beschreibung der Person ' + p.id + ' (Reiter „Namen“)');
+  }
+  return fehlt;
+}
+
+function freigabeHTML(k) {
+  var geschuetzt = istGeschuetzt(k.id);
+  var fehlt = hakenFehlt(k);
+  var an = k.freigeschaltet === true;
+  var artOptionen = '<option value="">— Art wählen —</option>' + Object.keys(ARTEN).map(function (a) {
+    return '<option value="' + a + '"' + (k.art === a ? ' selected' : '') + '>' + ARTEN[a] + '</option>';
+  }).join('');
+  var sperrgrund = '';
+  if (!an && fehlt.length) sperrgrund = 'Fehlt: ' + fehlt.join(', ') + '.';
+  if (an && geschuetzt) sperrgrund = '🛡 Geschützt — der Haken lässt sich hier nicht entfernen (Admin-Konto oder das Konto, mit dem dieses Gerät angemeldet ist).';
+  var person = allePersonen.filter(function (x) { return x.bosKontoId === k.id; })[0] || null;
+  return '<div class="detail-section full"><div class="detail-feld"><label>Freigabe (Schritt 2)</label>' +
+      '<select onchange="setzeKontoArt(\'' + k.id + '\', this.value)">' + artOptionen + '</select>' +
+      '<label style="display:flex; align-items:center; gap:8px; margin-top:8px;">' +
+        '<input type="checkbox" id="haken-' + k.id + '"' + (an ? ' checked' : '') +
+        ((an && geschuetzt) || (!an && fehlt.length) ? ' disabled' : '') +
+        ' onchange="setzeFreigeschaltet(\'' + k.id + '\', this.checked)"> Freigeschaltet</label>' +
+      (sperrgrund ? '<p style="color:var(--bos-text-faint); font-size:.76rem; margin-top:6px;">' + esc(sperrgrund) + '</p>' : '') +
+      (!geschuetzt ? '<button type="button" class="bos-btn" style="margin-top:10px;" onclick="weggangKlick(\'' + k.id + '\')">Weggang</button>' +
+        '<p style="color:var(--bos-text-faint); font-size:.76rem; margin-top:6px;">Weggang: Haken raus und Verknüpfung' + (person ? ' mit ' + esc(anzeigeNamePerson(person.id)) + ' (' + person.id + ')' : '') + ' lösen, in einem Zug (NE-24). Die Kennung wird nie wieder vergeben (NE-25).</p>' : '') +
+      '<div id="freigabeStatus-' + k.id + '" style="font-size:.78rem; margin-top:6px;"></div>' +
+    '</div></div>';
+}
+
+function zeigeFreigabeStatus(kontoId, text, fehler) {
+  var el = document.getElementById('freigabeStatus-' + kontoId);
+  if (el) { el.textContent = text; el.style.color = fehler ? 'var(--bos-red)' : ''; }
+  var st = document.getElementById('saveStatus');
+  if (st) { st.textContent = text; st.className = fehler ? 'status-err' : 'status-ok'; }
+}
+
+function freigabeFehler(f) { return ((f && f.code) ? f.code + ' — ' : '') + ((f && f.message) || String(f)); }
+
+function setzeKontoArt(kontoId, art) {
+  var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
+  if (!k) return;
+  if (art === 'system' && !istAdminKennung(kontoId)) {
+    alert('„System“ ist nur für den Generalschlüssel.'); renderKontoKarte(); return;
+  }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  adminDb.collection('bos_accounts').doc(kontoId).update({ art: art || null }).then(function () {
+    k.art = art || null;
+    zeigeFreigabeStatus(kontoId, '✓ Art gespeichert: ' + (ARTEN[art] || '—'));
+    renderKontoKarte(); renderKontenListen();
+  }).catch(function (f) {
+    console.error('[Konten & Rollen] Art speichern fehlgeschlagen:', f);
+    zeigeFreigabeStatus(kontoId, 'Art nicht gespeichert: ' + freigabeFehler(f), true);
+  });
+}
+
+function setzeFreigeschaltet(kontoId, wert) {
+  var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
+  if (!k) return;
+  if (!wert && istGeschuetzt(kontoId)) {
+    alert('Dieses Konto ist geschützt — den Haken zu entfernen würde dich aussperren.'); renderKontoKarte(); return;
+  }
+  if (wert) {
+    var fehlt = hakenFehlt(k);
+    if (fehlt.length) { alert('Noch nicht freischaltbar. Fehlt: ' + fehlt.join(', ') + '.'); renderKontoKarte(); return; }
+  }
+  if (!confirm((wert ? 'Konto freischalten' : 'Haken entfernen (Konto sperren)') + ': ' + (k.name || kontoId) + ' (Kennung: ' + kontoId + ')?' +
+      (wert ? '' : '\n\nOhne Haken darf dieses Konto nichts mehr außer sein eigenes Konto-Dokument lesen.'))) { renderKontoKarte(); return; }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  adminDb.collection('bos_accounts').doc(kontoId).update({ freigeschaltet: !!wert }).then(function () {
+    k.freigeschaltet = !!wert;
+    zeigeFreigabeStatus(kontoId, wert ? '✓ ' + kontoId + ' freigeschaltet' : '✓ ' + kontoId + ' gesperrt (Haken entfernt)');
+    renderKontoKarte(); renderKontenListen();
+  }).catch(function (f) {
+    console.error('[Konten & Rollen] Haken speichern fehlgeschlagen:', f);
+    zeigeFreigabeStatus(kontoId, 'Haken nicht gespeichert: ' + freigabeFehler(f), true);
+    renderKontoKarte();
+  });
+}
+
+// Knopf „Weggang“ (K-14, NE-24): Haken raus und Verknüpfung lösen in EINEM
+// Batch. Rolle, Notiz und Dokument bleiben (Archiv). Den Login kann die Seite
+// nicht löschen — das sagt sie danach.
+function weggangKlick(kontoId) {
+  var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
+  if (!k) return;
+  if (istGeschuetzt(kontoId)) { alert('Dieses Konto ist geschützt — kein Weggang möglich.'); return; }
+  var person = allePersonen.filter(function (x) { return x.bosKontoId === kontoId; })[0] || null;
+  if (!confirm('Weggang: ' + kontoId + (person ? ' · ' + anzeigeNamePerson(person.id) + ' (' + person.id + ')' : ' (keine Person verknüpft)') + '?\n\n' +
+      'Der Haken wird entfernt' + (person ? ' und die Verknüpfung gelöst' : '') + ' — in einem Zug. Rolle, Notiz und Dokument bleiben als Archiv. ' +
+      'Die Kennung wird nie wieder vergeben.')) return;
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var batch = adminDb.batch();
+  batch.update(adminDb.collection('bos_accounts').doc(kontoId), { freigeschaltet: false });
+  if (person) batch.update(adminDb.collection('personen').doc(person.id), { bosKontoId: null });
+  batch.commit().then(function () {
+    k.freigeschaltet = false;
+    if (person) person.bosKontoId = null;
+    zeigeFreigabeStatus(kontoId, 'Erledigt. Jetzt den Login „' + kontoId + '“ in der Firebase-Konsole löschen oder deaktivieren.');
+    renderKontoKarte(); renderKontenListen();
+  }).catch(function (f) {
+    console.error('[Konten & Rollen] Weggang fehlgeschlagen:', f);
+    zeigeFreigabeStatus(kontoId, 'Weggang nicht gespeichert — nichts geändert (ein Schreibvorgang): ' + freigabeFehler(f), true);
+  });
+}
+
+// ==========================================================================
+// Schritt 4 — Rohlinge, Nach Muster anlegen, Beschriften, Zugangsblatt
+// (27.09.2026, Konzept §12 mit NF-47, K-13, K-16; ohne QR, NE-26)
+// ==========================================================================
+var musterVorschlag = null;   // { bereich, zaehlerVorher, kennungen: [] }
+
+function istRohling(k) {
+  return !k.role && k.freigeschaltet !== true && !allePersonen.some(function (p) { return p.bosKontoId === k.id; });
+}
+function zweistellig(n) { return String(n).padStart(2, '0'); }
+function kontenZaehlerId(bereich) { return 'konten_nummern_' + bereich; }
+
+// Höchste Nummer des Musters <bereich>NN in der geladenen Liste.
+function hoechsteKennungImMuster(bereich) {
+  var re = new RegExp('^' + bereich + '(\\d+)$'), max = 0;
+  alleKonten.forEach(function (k) { var m = re.exec(k.id); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  return max;
+}
+
+function fuelleMusterBereiche() {
+  var sel = document.getElementById('musterBereich');
+  if (!sel) return;
+  sel.innerHTML = (window.BOS_ROLES || []).filter(function (r) { return /^[a-z0-9]+$/.test(r.id) && r.id !== 'admin'; })
+    .map(function (r) { return '<option value="' + r.id + '">' + (r.icon || '') + ' ' + esc(r.name) + ' (' + r.id + 'NN)</option>'; }).join('');
+}
+
+function musterStatus(text, fehler) {
+  var el = document.getElementById('musterStatus');
+  el.textContent = text; el.style.color = fehler ? 'var(--bos-red)' : '';
+}
+
+// K-16: Zähler lesen; fehlt er, Startwert vorschlagen und von Ulf bestätigen
+// lassen (die Seite sieht gelöschte Kennungen nicht).
+function leseOderStarteKontenZaehler(bereich) {
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var ref = adminDb.collection('einstellungen').doc(kontenZaehlerId(bereich));
+  return ref.get().then(function (d) {
+    if (d.exists && typeof d.data().hoechste === 'number') return d.data().hoechste;
+    var vorschlag = hoechsteKennungImMuster(bereich);
+    var antwort = prompt('Für „' + bereich + '“ gibt es noch keinen Kontenzähler.\n\n' +
+      'Höchste Nummer in der Liste: ' + vorschlag + '. Gab es schon einmal eine höhere Nummer, die inzwischen gelöscht ist? ' +
+      'Dann hier die höchste je vergebene eintragen — eine Kennung wird nie zweimal vergeben (NE-25).', String(vorschlag));
+    if (antwort === null) throw new Error('abgebrochen');
+    var start = parseInt(antwort, 10);
+    if (!(start >= vorschlag)) throw new Error('Startwert muss eine Zahl ≥ ' + vorschlag + ' sein.');
+    return ref.set({ hoechste: start }).then(function () { return start; });
+  });
+}
+
+document.getElementById('musterVorschlagBtn').addEventListener('click', function () {
+  var bereich = document.getElementById('musterBereich').value;
+  var anzahl = parseInt(document.getElementById('musterAnzahl').value, 10);
+  if (!bereich) { musterStatus('Bitte einen Bereich wählen.', true); return; }
+  if (!(anzahl >= 1 && anzahl <= 20)) { musterStatus('Anzahl 1 bis 20.', true); return; }
+  musterStatus('Lese Zähler …');
+  leseOderStarteKontenZaehler(bereich).then(function (hoechste) {
+    var kennungen = [];
+    for (var i = 1; i <= anzahl; i++) kennungen.push(bereich + zweistellig(hoechste + i));
+    musterVorschlag = { bereich: bereich, zaehlerVorher: hoechste, kennungen: kennungen };
+    document.getElementById('musterListe').innerHTML =
+      '<p style="font-size:.8rem; color:var(--bos-text-dim); margin:0 0 6px;">In der Firebase-Konsole je Adresse einen Login anlegen, mit einem <b>Wegwerf-Passwort</b> (nicht merken, nirgends notieren — das echte Passwort entsteht erst beim Zugangsblatt, NF-47).</p>' +
+      kennungen.map(function (k) {
+        var adr = k + '@baeckereios.intern';
+        return '<div style="display:flex; gap:8px; align-items:center; margin:3px 0;"><code>' + esc(adr) + '</code>' +
+          '<button class="bos-btn" style="padding:2px 8px; font-size:.75rem;" onclick="kopiere(\'' + adr + '\')">kopieren</button></div>';
+      }).join('');
+    document.getElementById('musterAnlegenBtn').classList.remove('hidden');
+    musterStatus('Zähler ' + bereich + ': ' + hoechste + '. Vorschlag: ' + kennungen.join(', ') + '.');
+  }).catch(function (f) {
+    if (f && f.message === 'abgebrochen') { musterStatus('Abgebrochen — nichts geändert.'); return; }
+    console.error('[Konten & Rollen] Kennungen vorschlagen fehlgeschlagen', f);
+    musterStatus('Nicht möglich: ' + freigabeFehler(f), true);
+  });
+});
+
+function kopiere(text) {
+  try { navigator.clipboard.writeText(text).then(function () { musterStatus('Kopiert: ' + text); }, function () { prompt('Zum Kopieren:', text); }); }
+  catch (e) { prompt('Zum Kopieren:', text); }
+}
+
+// Eine Transaktion: Zähler unverändert? Keine der Kennungen vergeben? Dann
+// alle Rohling-Dokumente und der Zähler in einem Zug (0 Regelzugriffe je
+// Dokument, Zähler lesen ≤ 2 — Konzept 12.1a).
+document.getElementById('musterAnlegenBtn').addEventListener('click', function () {
+  var v = musterVorschlag;
+  if (!v) return;
+  if (!confirm('Für ' + v.kennungen.join(', ') + ' die Dokumente anlegen?\n\nNur, wenn die Logins in der Konsole mit GENAU diesen Adressen angelegt sind.')) return;
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var zRef = adminDb.collection('einstellungen').doc(kontenZaehlerId(v.bereich));
+  var btn = this; btn.disabled = true;
+  adminDb.runTransaction(function (tx) {
+    return tx.get(zRef).then(function (z) {
+      var stand = (z.exists && typeof z.data().hoechste === 'number') ? z.data().hoechste : null;
+      if (stand !== v.zaehlerVorher) throw new Error('Der Kontenzähler hat sich seit dem Vorschlag geändert (' + stand + ' statt ' + v.zaehlerVorher + ') — nichts angelegt. Bitte neu vorschlagen.');
+      var refs = v.kennungen.map(function (k) { return adminDb.collection('bos_accounts').doc(k); });
+      return Promise.all(refs.map(function (r) { return tx.get(r); })).then(function (docs) {
+        docs.forEach(function (d, i) { if (d.exists) throw new Error('Die Kennung ' + v.kennungen[i] + ' gibt es schon — nichts angelegt.'); });
+        refs.forEach(function (r) {
+          tx.set(r, { name: '', role: null, overrides: {}, erstelltAm: firebase.firestore.FieldValue.serverTimestamp() });
+        });
+        tx.set(zRef, { hoechste: v.zaehlerVorher + v.kennungen.length });
+      });
+    });
+  }).then(function () {
+    var angelegt = v.kennungen.join(', ');
+    musterVorschlag = null;
+    document.getElementById('musterListe').innerHTML = '';
+    document.getElementById('musterAnlegenBtn').classList.add('hidden');
+    return ladeAllesUndRender().then(function () { musterStatus('✓ Rohlinge angelegt: ' + angelegt + '. Probe-Anmeldung mit dem Zugangsblatt zeigt, ob Login und Dokument zusammenpassen.'); });
+  }).catch(function (f) {
+    console.error('[Konten & Rollen] Rohlinge anlegen fehlgeschlagen', f);
+    musterStatus('Nicht angelegt: ' + freigabeFehler(f), true);
+  }).then(function () { btn.disabled = false; });
+});
+
+// ---- Beschriften (12.2): (a) vorhandene Person, (b) neue Person, (c) Ort ----
+function beschriftenHTML(k) {
+  if (!istRohling(k)) return '';
+  var vorschlagRolle = ((/^([a-z]+)\d+$/.exec(k.id) || [])[1]) || '';
+  var freiePersonen = allePersonen.filter(function (p) { return !p.bosKontoId && p.aktiv !== false; })
+    .sort(function (a, b) { return anzeigeNamePerson(a.id).localeCompare(anzeigeNamePerson(b.id), 'de'); });
+  return '<div class="detail-section full"><div class="detail-feld"><label>Beschriften (Rohling, Schritt 4)</label>' +
+    '<select id="bArt-' + k.id + '" onchange="beschriftenArtWechsel(\'' + k.id + '\')">' +
+      '<option value="a">vorhandene Person</option><option value="b">neue Person</option><option value="c">Ort (z. B. Tablet)</option></select>' +
+    '<select id="bPerson-' + k.id + '" style="margin-top:6px;"><option value="">— Person wählen —</option>' +
+      freiePersonen.map(function (p) { return '<option value="' + p.id + '">' + esc(anzeigeNamePerson(p.id)) + ' (' + p.id + ')</option>'; }).join('') + '</select>' +
+    '<input type="text" id="bText-' + k.id + '" class="bos-input hidden" maxlength="30" style="margin-top:6px;" placeholder="Beschreibung, z. B. Jörg">' +
+    '<select id="bRolle-' + k.id + '" style="margin-top:6px;">' + rollenOptionsHTML(vorschlagRolle) + '</select>' +
+    '<button type="button" class="bos-btn bos-btn--amber" style="margin-top:8px;" onclick="beschriftenKlick(\'' + k.id + '\')">Beschriften und freischalten</button>' +
+    '<div id="bStatus-' + k.id + '" style="font-size:.78rem; margin-top:6px;"></div>' +
+  '</div></div>';
+}
+function beschriftenArtWechsel(kontoId) {
+  var art = document.getElementById('bArt-' + kontoId).value;
+  document.getElementById('bPerson-' + kontoId).classList.toggle('hidden', art !== 'a');
+  var t = document.getElementById('bText-' + kontoId);
+  t.classList.toggle('hidden', art === 'a');
+  t.placeholder = art === 'c' ? 'Name des Orts, z. B. Wandtablet Rondo' : 'Beschreibung, z. B. Jörg';
+}
+function beschriftenStatus(kontoId, text, fehler) {
+  var el = document.getElementById('bStatus-' + kontoId);
+  if (el) { el.textContent = text; el.style.color = fehler ? 'var(--bos-red)' : ''; }
+  var st = document.getElementById('saveStatus'); if (st) { st.textContent = text; st.className = fehler ? 'status-err' : 'status-ok'; }
+}
+
+// Eine Transaktion je Weg. Haken im selben Zug (NE-12), die Seite prüft
+// vorher Rolle und Name. Keine Nachnamen-Sperre mehr (Schritt 8, 12.2).
+function beschriftenKlick(kontoId) {
+  var art = document.getElementById('bArt-' + kontoId).value;
+  var rolle = document.getElementById('bRolle-' + kontoId).value;
+  var text = String(document.getElementById('bText-' + kontoId).value || '').trim();
+  var personId = document.getElementById('bPerson-' + kontoId).value;
+  if (!rolle) { beschriftenStatus(kontoId, 'Bitte eine Rolle wählen — ohne Rolle kein Haken.', true); return; }
+  if (art === 'a' && !personId) { beschriftenStatus(kontoId, 'Bitte eine Person wählen.', true); return; }
+  if (art !== 'a' && !text) { beschriftenStatus(kontoId, art === 'c' ? 'Bitte den Namen des Orts eingeben.' : 'Bitte eine Beschreibung eingeben.', true); return; }
+  if (text.length > NAMEN_MAX) { beschriftenStatus(kontoId, 'Höchstens ' + NAMEN_MAX + ' Zeichen.', true); return; }
+  if (art === 'a' && !(alleNamen[personId] && String(alleNamen[personId].beschreibung || '').trim())) {
+    beschriftenStatus(kontoId, 'Die Person ' + personId + ' hat noch keine Beschreibung (Reiter „Namen“).', true); return;
+  }
+  if (art === 'b') {
+    var doppelB = namensDoppel(text, null, null);
+    if (doppelB.length && !confirm(doppelWarnung(doppelB.map(function (t) { return '„' + text + '“ = ' + t; })))) return;
+  }
+  var wer = art === 'a' ? anzeigeNamePerson(personId) + ' (' + personId + ')' : (art === 'b' ? 'neue Person „' + text + '“' : 'Ort „' + text + '“');
+  if (!confirm('Rohling ' + kontoId + ' beschriften: ' + wer + ', Rolle ' + (roleName(rolle) || rolle) + ', und freischalten?')) return;
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var kRef = adminDb.collection('bos_accounts').doc(kontoId);
+  var arbeit;
+  if (art === 'a') {
+    arbeit = adminDb.runTransaction(function (tx) {
+      var pRef = adminDb.collection('personen').doc(personId), nRef = adminDb.collection('namen').doc(personId);
+      return Promise.all([tx.get(kRef), tx.get(pRef), tx.get(nRef)]).then(function (d) {
+        if (!d[0].exists) throw new Error('Das Konto ' + kontoId + ' gibt es nicht.');
+        var kd = d[0].data();
+        if (kd.role || kd.freigeschaltet === true) throw new Error(kontoId + ' ist kein Rohling mehr (Rolle oder Haken gesetzt) — nichts geändert.');
+        if (!d[1].exists) throw new Error('Die Person ' + personId + ' gibt es nicht.');
+        if (d[1].data().bosKontoId) throw new Error(personId + ' ist schon mit ' + d[1].data().bosKontoId + ' verknüpft — nichts geändert.');
+        if (!d[2].exists || !String(d[2].data().beschreibung || '').trim()) throw new Error(personId + ' hat keine Beschreibung — nichts geändert.');
+        tx.update(pRef, { bosKontoId: kontoId });
+        tx.update(kRef, { role: rolle, art: 'person', freigeschaltet: true });
+        return personId;
+      });
+    });
+  } else if (art === 'b') {
+    var zaehlerRef = adminDb.collection('einstellungen').doc('personen_nummern');
+    var bekannt = hoechsteBekannteNummer();
+    arbeit = adminDb.runTransaction(function (tx) {
+      return Promise.all([tx.get(kRef), tx.get(zaehlerRef)]).then(function (d) {
+        if (!d[0].exists) throw new Error('Das Konto ' + kontoId + ' gibt es nicht.');
+        var kd = d[0].data();
+        if (kd.role || kd.freigeschaltet === true) throw new Error(kontoId + ' ist kein Rohling mehr — nichts geändert.');
+        var zaehler = (d[1].exists && typeof d[1].data().hoechste === 'number') ? d[1].data().hoechste : 0;
+        var n = Math.max(zaehler, bekannt) + 1, id = 'P' + zweistellig(n);
+        var pRef = adminDb.collection('personen').doc(id);
+        return tx.get(pRef).then(function (p) {
+          if (p.exists) throw new Error('Die Nummer ' + id + ' gibt es schon — nichts geändert.');
+          tx.set(pRef, { status: 'mitarbeiter', abteilung: 'baeckerei', teilbereich: null, stammschicht: null,
+            aktiv: true, einsatzfaehig: true, keinRotierenderFreierTag: false, maxSonntageProMonat: null,
+            bosKontoId: kontoId, arbeitstage: null, freieTagOptionen: null, gesperrteSchichten: null });
+          tx.set(adminDb.collection('namen').doc(id), { beschreibung: text, rufname: '' });
+          tx.set(zaehlerRef, { hoechste: n });
+          tx.update(kRef, { role: rolle, art: 'person', freigeschaltet: true });
+          return id;
+        });
+      });
+    });
+  } else {
+    arbeit = kRef.update({ name: text, role: rolle, art: 'ort', freigeschaltet: true }).then(function () { return null; });
+  }
+  arbeit.then(function (pid) {
+    return ladeAllesUndRender().then(function () {
+      oeffneKontoKarte(kontoId); waehleKontoKartenTab('konto');
+      beschriftenStatus(kontoId, '✓ ' + kontoId + ' beschriftet' + (pid ? ' (' + pid + ')' : ' (Ort)') + ' und freigeschaltet. Jetzt das Zugangsblatt drucken.');
+      var z = document.getElementById('zStatus-' + kontoId);
+      if (z) z.textContent = '✓ ' + kontoId + ' beschriftet' + (pid ? ' (' + pid + ')' : ' (Ort)') + ' und freigeschaltet. Jetzt das Zugangsblatt drucken.';
+    });
+  }).catch(function (f) {
+    console.error('[Konten & Rollen] Beschriften fehlgeschlagen', f);
+    beschriftenStatus(kontoId, 'Nicht beschriftet — nichts geändert: ' + freigabeFehler(f), true);
+  });
+}
+
+// ---- Zugangsblatt (12.4, NF-47): Passwort nur im Druckdialog ----
+var zugangsPasswort = null;   // lebt nur, solange der Dialog offen ist
+function zugangsblattHTML(k) {
+  if (k.freigeschaltet !== true || istRohling(k)) return '';
+  return '<div class="detail-section full"><div class="detail-feld"><label>Zugangsblatt</label>' +
+    '<button type="button" class="bos-btn" onclick="oeffneZugangsblatt(\'' + k.id + '\')">Zugangsblatt drucken …</button>' +
+    '<div id="zStatus-' + k.id + '" style="font-size:.78rem; margin-top:6px;"></div>' +
+  '</div></div>';
+}
+// 12 Zeichen, ohne verwechselbare (0/O, 1/l/I).
+function erzeugePasswort() {
+  var zeichen = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  var z = new Uint32Array(12); window.crypto.getRandomValues(z);
+  return Array.prototype.map.call(z, function (x) { return zeichen[x % zeichen.length]; }).join('');
+}
+function zugangsName(k) {
+  var p = allePersonen.filter(function (x) { return x.bosKontoId === k.id; })[0];
+  if (p) return anzeigeNamePerson(p.id);
+  return k.name || k.id;
+}
+function oeffneZugangsblatt(kontoId) {
+  var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
+  if (!k) return;
+  schliesseZugangsblatt();
+  zugangsPasswort = erzeugePasswort();
+  var d = document.createElement('div');
+  d.id = 'zugangsDialog';
+  d.setAttribute('style', 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;');
+  d.innerHTML = '<div class="bos-panel" style="max-width:440px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
+    '<div style="font-weight:700;">Zugangsblatt · ' + esc(zugangsName(k)) + ' · ' + esc(kontoId) + '</div>' +
+    '<p style="margin:0;font-size:.85rem;">1. In der Firebase-Konsole für <code>' + esc(kontoId) + '@baeckereios.intern</code> genau dieses Passwort setzen:</p>' +
+    '<div id="zugangsPw" style="font-family:monospace;font-size:1.6rem;letter-spacing:.08em;text-align:center;padding:8px;border:1px dashed var(--bos-amber);"></div>' +
+    '<button type="button" class="bos-btn" id="zugangsKopieren">kopieren</button>' +
+    '<p style="margin:0;font-size:.85rem;">2. Dann drucken. Das Passwort wird nirgends gespeichert und ist weg, sobald dieses Fenster zu ist.</p>' +
+    '<div style="display:flex;gap:8px;"><button type="button" class="bos-btn" id="zugangsAbbrechen" style="flex:1;">Schließen</button>' +
+    '<button type="button" class="bos-btn bos-btn--amber" id="zugangsDrucken" style="flex:1;">In der Konsole gesetzt — drucken</button></div></div>';
+  document.body.appendChild(d);
+  d.querySelector('#zugangsPw').textContent = zugangsPasswort;
+  d.querySelector('#zugangsKopieren').addEventListener('click', function () { kopiere(zugangsPasswort); });
+  d.querySelector('#zugangsAbbrechen').addEventListener('click', schliesseZugangsblatt);
+  d.querySelector('#zugangsDrucken').addEventListener('click', function () { druckeZugangsblatt(k); });
+}
+function zugangsblattDruckHTML(k, pw) {
+  var e = function (t) { return esc(String(t)); };
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Zugangsblatt</title>' +
+    '<style>@page{size:A4;margin:20mm}body{font-family:sans-serif;color:#000}h1{font-size:20pt;margin:0 0 12mm}' +
+    'table{border-collapse:collapse;font-size:14pt}td{padding:4mm 6mm 4mm 0;vertical-align:top}.pw{font-family:monospace;font-size:18pt;letter-spacing:.08em}' +
+    'ol{font-size:12pt;line-height:1.6;margin-top:10mm}.klein{font-size:10pt;color:#444;margin-top:12mm}</style></head><body>' +
+    '<h1>BäckereiOS · Zugang</h1><table>' +
+    '<tr><td>Name</td><td><b>' + e(zugangsName(k)) + '</b></td></tr>' +
+    '<tr><td>Kennung</td><td><b>' + e(k.id) + '</b></td></tr>' +
+    '<tr><td>Passwort</td><td class="pw">' + e(pw) + '</td></tr></table>' +
+    '<ol><li>Die Tür von BäckereiOS öffnen (Adresse: siehe Aushang).</li><li>Kennung und Passwort eingeben.</li>' +
+    '<li>Erscheint „Noch nicht freigeschaltet“: Ulf Bescheid geben.</li></ol>' +
+    '<p class="klein">Blatt nicht liegen lassen. Bei Verlust: Ulf setzt ein neues Passwort, das alte gilt dann nicht mehr.</p>' +
+    '<p class="klein">Probe-Anmeldung durchgeführt: ☐</p></body></html>';
+}
+function druckeZugangsblatt(k) {
+  if (!zugangsPasswort) return;
+  var f = document.createElement('iframe');
+  f.id = 'zugangsDruck';
+  f.setAttribute('style', 'position:fixed;width:0;height:0;border:0;visibility:hidden;');
+  document.body.appendChild(f);
+  var doc = f.contentWindow.document;
+  doc.open(); doc.write(zugangsblattDruckHTML(k, zugangsPasswort)); doc.close();
+  var fertig = function () { schliesseZugangsblatt(); var z = document.getElementById('zStatus-' + k.id); if (z) z.textContent = 'Gedruckt. Jetzt die Probe-Anmeldung mit dem Blatt an der Tür.'; };
+  try { f.contentWindow.focus(); f.contentWindow.print(); } catch (err) { console.error('[Konten & Rollen] Druck fehlgeschlagen', err); alert('Druck fehlgeschlagen: ' + err.message); }
+  setTimeout(fertig, 500);
+}
+// Passwort weg: Variable überschrieben, Dialog und Druckrahmen entfernt.
+function schliesseZugangsblatt() {
+  zugangsPasswort = null;
+  var d = document.getElementById('zugangsDialog'); if (d) d.remove();
+  var f = document.getElementById('zugangsDruck'); if (f) f.remove();
+}
+
+function setzeVerknuepftePerson(kontoId, neuePersonId) {
+  var statusEl = document.getElementById('verknuepfungStatus-' + kontoId);
+  var vorherigePerson = allePersonen.filter(function (p) { return p.bosKontoId === kontoId; })[0] || null;
+  if (statusEl) statusEl.textContent = 'Speichert …';
+
+  // 26.09.2026: EIN Schreibvorgang (batch) über die Admin-Sitzung statt
+  // zwei getrennter über window.db. Geht ein Teil schief, geht keiner —
+  // vorher konnte die Verknüpfung halb stehen bleiben, ohne dass es
+  // jemand merkt.
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var batch = adminDb.batch();
+  if (vorherigePerson && vorherigePerson.id !== neuePersonId) {
+    batch.update(adminDb.collection('personen').doc(vorherigePerson.id), { bosKontoId: null });
+  }
+  if (neuePersonId) {
+    batch.update(adminDb.collection('personen').doc(neuePersonId), { bosKontoId: kontoId });
+  }
+
+  batch.commit().then(function () {
+    allePersonen.forEach(function (p) {
+      if (vorherigePerson && p.id === vorherigePerson.id) p.bosKontoId = null;
+      if (neuePersonId && p.id === neuePersonId) p.bosKontoId = kontoId;
+    });
+    if (statusEl) statusEl.textContent = neuePersonId ? 'Verknüpft mit ' + anzeigeNamePerson(neuePersonId) + '.' : 'Verknüpfung entfernt.';
+  }).catch(function (fehler) {
+    console.error('[Konten & Rollen] Verknüpfung fehlgeschlagen:', fehler);
+    if (statusEl) statusEl.textContent = 'Fehlgeschlagen: ' + ((fehler && fehler.message) || String(fehler));
+  });
+}
+
+function ladeAllesUndRender() {
+  document.getElementById('fsStatus').textContent = 'Lädt …';
+  // Schritt 8: die lokale Namensdatei ist in Rente. Einmalig den alten
+  // Browserspeicher-Schlüssel räumen (dieselbe Zeile wie in bos_namen.js —
+  // die Kontenverwaltung lädt bos_namen.js nicht).
+  try {
+    if (window.localStorage && window.localStorage.getItem('bos_lokal_personen') !== null) {
+      window.localStorage.removeItem('bos_lokal_personen');
+      console.info('[Konten & Rollen] Schritt 8: alte lokale Namensdatei aus dem Browserspeicher entfernt (bos_lokal_personen).');
+    }
+  } catch (fehler) {
+    console.error('[Konten & Rollen] Browserspeicher nicht erreichbar — alte lokale Namensdatei nicht entfernt:', fehler);
+  }
+  // 26.09.2026: alles über die Admin-Sitzung. Personen getrennt und
+  // abgefangen — scheitert NUR das, bleiben die Konten bedienbar (der
+  // Reparaturweg darf nicht an einer zweiten Collection hängen).
+  personenLadefehler = null;
+  var altErr = document.getElementById('kontenErr');
+  if (altErr) { altErr.textContent = ''; altErr.classList.add('hidden'); }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var personenPromise = adminDb.collection('personen').get().catch(function (fehler) {
+    console.error('Konten-Verwaltung: Personen konnten nicht geladen werden', fehler);
+    personenLadefehler = fehler;
+    return null;
+  });
+  // Schritt 3: Namensliste, ebenfalls getrennt abgefangen.
+  namenLadefehler = null;
+  var namenPromise = adminDb.collection('namen').get().catch(function (fehler) {
+    console.error('Konten-Verwaltung: Namensliste konnte nicht geladen werden', fehler);
+    namenLadefehler = fehler;
+    return null;
+  });
+  return window.BOS_AUTH_READY.then(function () {
+    return Promise.all([window.BOS_ACCOUNTS.ladeAlleKonten(adminDb), ladePermissions(), personenPromise, namenPromise]);
+  }).then(function (ergebnisse) {
+    alleKonten = ergebnisse[0];
+    alleNamen = {};
+    if (ergebnisse[3]) ergebnisse[3].forEach(function (doc) { alleNamen[doc.id] = doc.data(); });
+    namenEntwurf = {};
+    namenLeeren = {};
+    verknuepfungLoesen = {};
+    namenGeaendert = false;
+    allePersonen = [];
+    if (ergebnisse[2]) ergebnisse[2].forEach(function (doc) { allePersonen.push(Object.assign({ id: doc.id }, doc.data())); });
+    var pErr = document.getElementById('kontenErr');
+    if (personenLadefehler && pErr) {
+      pErr.textContent = 'Personen konnten nicht geladen werden — Konten sind trotzdem bedienbar, die Verknüpfung mit Personen nicht: ' +
+        ((personenLadefehler.code ? personenLadefehler.code + ' — ' : '') + (personenLadefehler.message || String(personenLadefehler)));
+      pErr.classList.remove('hidden');
+    }
+    ladeGatedApps();
+    fuelleMusterBereiche();
+    initBearbeitung();
+    renderKontenListen();
+    renderNamen();
+    geaendert = false;
+    document.getElementById('saveStatus').textContent = '';
+    document.getElementById('fsStatus').textContent = alleKonten.length + ' Konten';
+    rollenDatenBereit = true;
+    versucheRollenInit();
+  }).catch(function (fehler) {
+    // KORREKTUR 18.09.2026: Grund sichtbar machen, nicht nur in der Konsole.
+    console.error('Konten-Verwaltung: Laden fehlgeschlagen', fehler);
+    document.getElementById('fsStatus').textContent = 'Fehler beim Laden';
+    var lErr = document.getElementById('kontenErr');
+    if (lErr) {
+      lErr.textContent = 'Laden fehlgeschlagen: ' + ((fehler && fehler.message) || String(fehler));
+      lErr.classList.remove('hidden');
+    }
+  });
+}
+
+function initApp() {
+  if (!window.BOS_AUTH_READY || !window.BOS_ACCOUNTS) {
+    document.getElementById('fsStatus').textContent = 'Firestore/Accounts-Modul fehlt';
+    zeigeGesperrt('bos_firebase_config.js oder bos_accounts.js ist nicht geladen — die Seite kann nicht arbeiten.');
+    return;
+  }
+  if (typeof window.BOS_ACCOUNTS.adminAngemeldet !== 'function') {
+    // Veraltete bos_accounts.js im Cache (§13.31) — sonst stünde gleich
+    // ein unverständlicher Fehler da.
+    document.getElementById('fsStatus').textContent = 'bos_accounts.js zu alt';
+    zeigeGesperrt('bos_accounts.js ist zu alt (adminAngemeldet fehlt). Hart neu laden oder die neue Datei hochladen.');
+    return;
+  }
+  zeigeGesperrt('');
+  oeffneAdminAuth({ typ: 'oeffnen' });
+}
+
+// ==========================================================================
+// Gesperrt / entsperrt — 26.09.2026. Ohne Admin-Sitzung ist NICHTS zu
+// sehen, auch keine alten Daten im Speicher der Seite.
+// ==========================================================================
+function zeigeGesperrt(fehlerText) {
+  entsperrt = false;
+  if (typeof schliesseZugangsblatt === 'function') schliesseZugangsblatt();
+  versteckeLeerlaufStreifen();
+  alleKonten = []; allePersonen = []; bearbeitung = {};
+  alleNamen = {}; namenEntwurf = {}; namenLeeren = {}; verknuepfungLoesen = {}; namenGeaendert = false;
+  var nl = document.getElementById('namenListe'); if (nl) nl.innerHTML = '';
+  document.getElementById('adminInhalt').classList.add('hidden');
+  document.getElementById('gesperrtBox').classList.remove('hidden');
+  document.getElementById('sperrenBtn').classList.add('hidden');
+  document.getElementById('listeUnbestaetigt').innerHTML = '';
+  document.getElementById('listeBestaetigt').innerHTML = '';
+  schliesseKontoKarte();
+  document.getElementById('fsStatus').textContent = 'Gesperrt';
+  var e = document.getElementById('gesperrtErr');
+  if (fehlerText) { e.textContent = fehlerText; e.classList.remove('hidden'); }
+  else { e.textContent = ''; e.classList.add('hidden'); }
+}
+function zeigeEntsperrt() {
+  document.getElementById('gesperrtBox').classList.add('hidden');
+  document.getElementById('adminInhalt').classList.remove('hidden');
+  document.getElementById('sperrenBtn').classList.remove('hidden');
+  letzteEingabe = Date.now();
+  entsperrt = true;
+}
+
+// ==========================================================================
+// Automatische Sperre nach Untätigkeit — 26.09.2026 (N-15, Ulf: 5 Minuten)
+// --------------------------------------------------------------------------
+// Zeitstempel statt eines langen setTimeout: Browser drosseln Timer in
+// Hintergrund-Tabs, ein Zeitstempel lügt nicht. Geprüft wird alle 5 s und
+// sofort, wenn die Seite wieder sichtbar wird.
+// ==========================================================================
+var LEERLAUF_MS = 5 * 60 * 1000;
+var VORWARNUNG_MS = 60 * 1000;
+var letzteEingabe = Date.now();
+var entsperrt = false;
+['pointerdown', 'keydown', 'input', 'wheel', 'touchstart', 'scroll'].forEach(function (typ) {
+  window.addEventListener(typ, function () { if (entsperrt) { letzteEingabe = Date.now(); versteckeLeerlaufStreifen(); } }, { passive: true, capture: true });
+});
+function versteckeLeerlaufStreifen() {
+  var st = document.getElementById('leerlaufStreifen');
+  if (st) st.classList.add('hidden');
+}
+function pruefeLeerlauf() {
+  if (!entsperrt) return;
+  var vergangen = Date.now() - letzteEingabe;
+  if (vergangen >= LEERLAUF_MS) { automatischSperren(); return; }
+  var st = document.getElementById('leerlaufStreifen');
+  if (vergangen >= LEERLAUF_MS - VORWARNUNG_MS) {
+    var rest = Math.max(0, Math.ceil((LEERLAUF_MS - vergangen) / 1000));
+    st.textContent = '⏳ Keine Eingabe seit ' + Math.floor(vergangen / 60000) + ' Minuten — die Kontenverwaltung sperrt sich in ' + rest +
+      ' s. Tippen zum Weiterarbeiten.' + ((geaendert || namenGeaendert) ? ' Ungespeicherte Änderungen gehen dabei verloren.' : '');
+    st.classList.remove('hidden');
+  } else {
+    st.classList.add('hidden');
+  }
+}
+function automatischSperren() {
+  var hatteAenderungen = geaendert || namenGeaendert;
+  geaendert = false; namenGeaendert = false;
+  versteckeLeerlaufStreifen();
+  window.BOS_ACCOUNTS.adminReauthEnde().catch(function (f) { console.error('Konten-Verwaltung: Abmelden fehlgeschlagen', f); });
+  zeigeGesperrt('Nach ' + Math.round(LEERLAUF_MS / 60000) + ' Minuten ohne Eingabe automatisch gesperrt.' +
+    (hatteAenderungen ? ' Ungespeicherte Änderungen wurden verworfen.' : ''));
+}
+setInterval(pruefeLeerlauf, 5000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) pruefeLeerlauf(); });
+document.getElementById('entsperrenBtn').addEventListener('click', function () {
+  oeffneAdminAuth({ typ: 'oeffnen' });
+});
+document.getElementById('sperrenBtn').addEventListener('click', function () {
+  if ((geaendert || namenGeaendert) && !confirm('Es gibt ungespeicherte Änderungen. Trotzdem sperren und verwerfen?')) return;
+  geaendert = false; namenGeaendert = false;
+  window.BOS_ACCOUNTS.adminReauthEnde().catch(function (f) { console.error('Konten-Verwaltung: Abmelden fehlgeschlagen', f); });
+  zeigeGesperrt('');
+});
+// Beim Verlassen der Seite abmelden. Mit Persistence NONE wäre die Sitzung
+// ohnehin weg — das hier ist nur die zweite Sicherung.
+window.addEventListener('pagehide', function () {
+  try { window.BOS_ACCOUNTS.adminReauthEnde(); } catch (e) { /* nichts zu tun */ }
+});
+// Kommt die Seite aus dem Browser-Zwischenspeicher zurück (Zurück-Taste),
+// stünden sonst die alten Daten wieder da — ohne Sitzung dahinter.
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) { zeigeGesperrt(''); oeffneAdminAuth({ typ: 'oeffnen' }); }
+});
+
+// ==========================================================================
+// Admin-Anmeldung — gemeinsam für Speichern und Löschen, einmalige
+// Anmeldung pro Aktion. pendingAdminAktion legt fest, was nach
+// erfolgreicher Anmeldung tatsächlich ausgeführt wird.
+// ==========================================================================
+var pendingAdminAktion = null; // { typ: 'speichern' } oder { typ: 'loeschen', kontoId, name }
+
+function oeffneAdminAuth(aktion) {
+  // 26.09.2026: steht die Admin-Sitzung schon (Seite ist entsperrt), wird
+  // die Aktion direkt ausgeführt — das Passwort kam beim Öffnen.
+  if (aktion.typ !== 'oeffnen' && window.BOS_ACCOUNTS.adminAngemeldet()) {
+    fuehreAdminAktionAus(aktion, null);
+    return;
+  }
+  document.getElementById('adminAuthText').textContent = (aktion.typ === 'oeffnen')
+    ? 'Die Kontenverwaltung ist ein Admin-Werkzeug. Anmeldung mit dem Admin-Passwort.'
+    : 'Die Admin-Sitzung ist abgelaufen. Bitte das Admin-Passwort erneut eingeben.';
+  pendingAdminAktion = aktion;
+  document.getElementById('adminPwInput').value = '';
+  document.getElementById('adminPwErr').classList.add('hidden');
+  document.getElementById('adminAuthOverlay').classList.remove('hidden');
+  document.getElementById('adminPwInput').focus();
+}
+document.getElementById('saveBtn').addEventListener('click', function () {
+  oeffneAdminAuth({ typ: 'speichern' });
+});
+document.getElementById('adminPwCancel').addEventListener('click', function () {
+  document.getElementById('adminAuthOverlay').classList.add('hidden');
+  pendingAdminAktion = null;
+});
+document.getElementById('adminPwInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('adminPwConfirm').click();
+});
+
+function tatsaechlichSpeichern() {
+  var aufgaben = [];
+  alleKonten.forEach(function (k) {
+    var b = bearbeitung[k.id];
+    if (b.role !== k.role) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeRolle(window.db, k.id, b.role));
+    }
+    var standard = standardChecks(b.role);
+    gatedApps.forEach(function (a) {
+      var will = !!b.checks[a.id];
+      var ist = !!standard[a.id];
+      var hatteOverride = k.overrides && Object.prototype.hasOwnProperty.call(k.overrides, a.id);
+      if (will !== ist) {
+        aufgaben.push(window.BOS_ACCOUNTS.setzeOverride(window.db, k.id, a.id, will));
+      } else if (hatteOverride) {
+        aufgaben.push(window.BOS_ACCOUNTS.setzeOverride(window.db, k.id, a.id, null));
+      }
+    });
+    // NEU 05.09.2026, Taskboard-Feature: läuft in derselben Sammelaktion
+    // mit, kein zweites adminReauth() nötig.
+    if (!!b.taskboardAbhaken !== !!k.taskboardAbhaken) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeTaskboardRecht(window.db, k.id, b.taskboardAbhaken));
+    }
+    // NEU 28.09.2026, Teigecke Stufe 1: selbe Sammelaktion
+    if (!!b.teigeckePflege !== !!k.teigeckePflege) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeTeigeckePflegeRecht(window.db, k.id, b.teigeckePflege));
+    }
+    // NEU 29.09.2026, Teigecke Stufe 2: zwei weitere Haken, selbe Sammelaktion
+    if (!!b.teigeckeTeige !== !!k.teigeckeTeige) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeTeigeckeTeigeRecht(window.db, k.id, b.teigeckeTeige));
+    }
+    if (!!b.teigeckeRezepte !== !!k.teigeckeRezepte) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeTeigeckeRezepteRecht(window.db, k.id, b.teigeckeRezepte));
+    }
+  });
+  return Promise.all(aufgaben);
+}
+
+document.getElementById('adminPwConfirm').addEventListener('click', function () {
+  var pw = document.getElementById('adminPwInput').value;
+  var errEl = document.getElementById('adminPwErr');
+  var btn = this;
+  if (!pw || !pendingAdminAktion) return;
+  btn.disabled = true;
+  var aktion = pendingAdminAktion;
+
+  window.BOS_ACCOUNTS.adminReauth(pw)
+    .then(function () {
+      document.getElementById('adminAuthOverlay').classList.add('hidden');
+      document.getElementById('adminPwInput').value = '';
+      btn.disabled = false;
+      pendingAdminAktion = null;
+      fuehreAdminAktionAus(aktion, null);
+    })
+    .catch(function (fehler) {
+      console.error('Konten-Verwaltung: Admin-Anmeldung fehlgeschlagen', fehler);
+      var code = (fehler && fehler.code) || '';
+      var klartext = (code === 'auth/invalid-credential' || code === 'auth/wrong-password')
+        ? 'Admin-Passwort stimmt nicht.'
+        : ((code ? code + ' — ' : '') + ((fehler && fehler.message) || String(fehler)));
+      errEl.textContent = klartext;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+    });
+});
+
+// Führt eine Admin-Aktion aus. Die Admin-Sitzung muss stehen (beim Öffnen
+// angemeldet). 26.09.2026: KEIN adminReauthEnde() mehr nach jeder Aktion —
+// die Sitzung endet mit 🔒 Sperren oder beim Verlassen der Seite.
+function fuehreAdminAktionAus(aktion) {
+  if (aktion.typ === 'oeffnen') {
+    zeigeEntsperrt();
+    return ladeAllesUndRender();
+  }
+  var statusEl = document.getElementById('saveStatus');
+  statusEl.textContent = 'Speichert …';
+  statusEl.className = '';
+  var arbeit;
+  if (aktion.typ === 'loeschen') {
+    // 26.09.2026: Konto löschen und eine damit verknüpfte Person im SELBEN
+    // Schreibvorgang lösen — sonst zeigt die Person auf ein Konto, das es
+    // nicht mehr gibt. Den Login in der Firebase-Konsole löscht Ulf wie
+    // bisher von Hand (ohne Konto-Dokument darf er ohnehin nichts).
+    var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+    var loeschBatch = adminDb.batch();
+    loeschBatch.delete(adminDb.collection('bos_accounts').doc(aktion.kontoId));
+    allePersonen.filter(function (p) { return p.bosKontoId === aktion.kontoId; }).forEach(function (p) {
+      loeschBatch.update(adminDb.collection('personen').doc(p.id), { bosKontoId: null });
+    });
+    arbeit = loeschBatch.commit();
+  } else {
+    arbeit = tatsaechlichSpeichern();
+  }
+  return arbeit.then(function () {
+    var meldung = '✓ Gespeichert';
+    if (aktion.typ === 'loeschen') {
+      meldung = '✓ Konto von „' + aktion.name + '" gelöscht';
+    }
+    geaendert = false;
+    // Meldung NACH dem Neuladen setzen: ladeAllesUndRender() leert den
+    // Status, vorher war das "✓ Gespeichert" dadurch sofort wieder weg.
+    return ladeAllesUndRender().then(function () {
+      statusEl.textContent = meldung;
+      statusEl.className = 'status-ok';
+    });
+  }).catch(function (fehler) {
+    console.error('Konten-Verwaltung: Aktion fehlgeschlagen', fehler);
+    statusEl.textContent = 'Nicht gespeichert: ' + ((fehler && fehler.code ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler)));
+    statusEl.className = 'status-err';
+  });
+}
+
+// ==========================================================================
+// „+ Konto anlegen“ (Kennung frei eintippen) ist ENTFERNT — NF-56, 27.09.2026.
+// Der Weg prüfte nur vorhandene Dokumente und hätte eine gelöschte Kennung
+// (z. B. test01) neu vergeben — gegen NE-25. Neue Konten entstehen nur noch
+// über „Neue Konten vorbereiten“ (Kontenzähler). Sonderfälle außerhalb eines
+// Musters: Login und Dokument von Hand in der Firebase-Konsole.
+// ==========================================================================
+
+// ==========================================================================
+// Reiter „Namen“ — Schritt 3 mit 3a (26.09.2026, NE-16 bis NE-19)
+// ==========================================================================
+var NAMEN_MAX = 30;
+
+// Nummer → Zahl für die Sortierung (P9 < P10 < P100). Fremde IDs ans Ende.
+function nummerZahl(id) {
+  var m = /^P(\d+)$/.exec(id);
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+}
+
+// N-27: zeigt die Verknüpfung einer Person auf ein Konto, das es nicht gibt?
+function kontoFehlt(person) {
+  if (!person || !person.bosKontoId) return false;
+  return !alleKonten.some(function (k) { return k.id === person.bosKontoId; });
+}
+
+// Alle Nummern: Personen plus Namenseinträge ohne Person (NE-18, Archiv).
+function namenZeilen() {
+  var personNachId = {};
+  allePersonen.forEach(function (p) { personNachId[p.id] = p; });
+  var ids = Object.keys(personNachId);
+  Object.keys(alleNamen).forEach(function (id) { if (!personNachId[id]) ids.push(id); });
+  ids.sort(function (a, b) { return (nummerZahl(a) - nummerZahl(b)) || a.localeCompare(b); });
+  return ids.map(function (id) {
+    var eintrag = alleNamen[id] || null;
+    var getippt = Object.prototype.hasOwnProperty.call(namenEntwurf, id);
+    var wert = getippt ? namenEntwurf[id] : (eintrag ? eintrag.beschreibung : '');
+    // Schritt 8: keine Vorschläge mehr (es gibt keine lokale Datei) —
+    // eine Zeile ohne Eintrag ist leer, gespeichert wird nur Getipptes.
+    return { id: id, person: personNachId[id] || null, eintrag: eintrag, wert: wert, getippt: getippt };
+  });
+}
+
+function renderNamen() {
+  var ziel = document.getElementById('namenListe');
+  if (!ziel) return;
+  var err = document.getElementById('namenErr');
+  // Ohne lesbare Namensliste wäre jede Eingabe ein „neuer“ Eintrag über
+  // womöglich vorhandene — deshalb dann nichts bedienbar, nur der Grund.
+  document.getElementById('namenSpeichernBtn').disabled = !!namenLadefehler;
+  document.getElementById('neuPersonBtn').disabled = !!namenLadefehler;
+  if (namenLadefehler) {
+    err.textContent = 'Namensliste konnte nicht geladen werden: ' + ((namenLadefehler.code ? namenLadefehler.code + ' — ' : '') + (namenLadefehler.message || String(namenLadefehler))) +
+      ' — ist der Regelblock „namen“ veröffentlicht? Speichern und „+ Neue Person“ sind gesperrt, die Konten bleiben bedienbar.';
+    err.classList.remove('hidden');
+  }
+  var zeilen = namenZeilen();
+  var ohne = 0;
+  var html = '<table class="namen-tabelle"><thead><tr><th>Nr.</th><th>Beschreibung</th><th>Rufname</th><th>Konto</th><th></th></tr></thead><tbody>';
+  var insLeere = 0;
+  zeilen.forEach(function (z) {
+    var klassen = [];
+    if (!z.eintrag) ohne++;
+    if (Object.prototype.hasOwnProperty.call(namenEntwurf, z.id)) klassen.push('geaendert');
+    if (z.person && !z.person.aktiv) klassen.push('inaktiv');
+    if (!z.person) klassen.push('archiv');
+    var ruf;
+    if (z.eintrag && z.eintrag.rufname && namenLeeren[z.id]) {
+      klassen.push('geaendert');
+      ruf = '<s>„' + esc(z.eintrag.rufname) + '“</s> wird geleert<button class="bos-btn rufname-leeren" onclick="rufnameLeerenKlick(\'' + z.id + '\')">zurück</button>';
+    } else if (z.eintrag && z.eintrag.rufname) {
+      ruf = '„' + esc(z.eintrag.rufname) + '“<button class="bos-btn rufname-leeren" onclick="rufnameLeerenKlick(\'' + z.id + '\')">leeren</button>';
+    } else {
+      ruf = '<span style="color:var(--bos-text-dim)">—</span>';
+    }
+    var status = !z.person ? 'Archiv (Person gelöscht)' : (z.person.aktiv ? '' : 'inaktiv');
+    var kontoZelle;
+    if (kontoFehlt(z.person)) {
+      insLeere++;
+      if (verknuepfungLoesen[z.id]) {
+        klassen.push('geaendert');
+        kontoZelle = '<td class="konto"><s>' + esc(z.person.bosKontoId) + '</s> wird gelöst' +
+          '<button class="bos-btn rufname-leeren" onclick="verknuepfungLoesenKlick(\'' + z.id + '\')">zurück</button></td>';
+      } else {
+        klassen.push('konto-fehlt');
+        kontoZelle = '<td class="konto" title="Dieses Konto gibt es nicht (mehr) — Verknüpfung von vor der Kontenumstellung">' + esc(z.person.bosKontoId) +
+          ' — gibt es nicht<button class="bos-btn rufname-leeren" onclick="verknuepfungLoesenKlick(\'' + z.id + '\')">lösen</button></td>';
+      }
+    } else {
+      kontoZelle = '<td class="konto">' + esc((z.person && z.person.bosKontoId) || '—') + '</td>';
+    }
+    var inaktivZeichen = (z.person && !z.person.aktiv) ? ' <span class="inaktiv-zeichen" title="inaktiv">⏸</span>' : '';
+    html += '<tr class="' + klassen.join(' ') + '">' +
+      '<td class="nr">' + esc(z.id) + inaktivZeichen + '</td>' +
+      '<td><input class="bos-input" data-namen-id="' + esc(z.id) + '" maxlength="' + NAMEN_MAX + '" value="' + esc(z.wert || '') + '" placeholder="' + (z.eintrag ? '' : 'Beschreibung eintragen') + '"></td>' +
+      '<td>' + ruf + '</td>' +
+      kontoZelle +
+      '<td style="font-size:.75rem; color:var(--bos-text-dim)">' + status + '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+  ziel.innerHTML = html;
+  ziel.querySelectorAll('input[data-namen-id]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      namenEntwurf[inp.dataset.namenId] = inp.value;
+      namenGeaendert = true;
+      var tr = inp.closest('tr'); tr.classList.add('geaendert');
+    });
+  });
+  document.getElementById('namenStatus').textContent = zeilen.length + ' Nummern · ' + (zeilen.length - ohne) + ' mit Namen · ' +
+    ohne + ' ohne' +
+    (insLeere ? ' · ' + insLeere + ' Verknüpfung(en) auf ein Konto, das es nicht gibt' : '');
+}
+
+// Was „Speichern“ schreiben würde. Wirft mit Klartext, wenn etwas ungültig ist.
+// N-41 (27.09.2026, Gegenrichtung zu K-19): Eine Beschreibung, die einem
+// Rufnamen oder einer Beschreibung einer ANDEREN Person gleicht (ohne
+// Groß/Klein und Randleerzeichen, wie K-8), ergäbe im Plan zwei gleiche
+// Namen (NE-6: angezeigt wird Rufname, sonst Beschreibung). WARNUNG mit
+// Rückfrage, keine Sperre — die Beschreibung ist Ulfs Sache.
+// weitere: { Nummer: neue Beschreibung } aus demselben Speichervorgang.
+function kleinName(t) { return String(t == null ? '' : t).trim().toLocaleLowerCase('de'); }
+function namensDoppel(wert, eigeneNr, weitere) {
+  var k = kleinName(wert), treffer = [];
+  if (!k) return treffer;
+  Object.keys(alleNamen).forEach(function (nr) {
+    if (nr === eigeneNr) return;
+    var e = alleNamen[nr] || {};
+    if (kleinName(e.rufname) === k) treffer.push('Rufname von ' + nr);
+    var besch = (weitere && Object.prototype.hasOwnProperty.call(weitere, nr)) ? weitere[nr] : e.beschreibung;
+    if (kleinName(besch) === k) treffer.push('Beschreibung von ' + nr);
+  });
+  Object.keys(weitere || {}).forEach(function (nr) {
+    if (nr === eigeneNr || alleNamen[nr]) return;          // bestehende oben schon geprüft
+    if (kleinName(weitere[nr]) === k) treffer.push('neue Beschreibung von ' + nr);
+  });
+  return treffer;
+}
+function doppelWarnung(liste) {
+  return 'Achtung — im Plan stünden zwei gleiche Namen (K-19):\n' +
+    liste.map(function (x) { return '• ' + x; }).join('\n') +
+    '\n\nTrotzdem speichern? (Abbrechen: etwas dazuschreiben.)';
+}
+
+function namenAenderungen() {
+  var aenderungenDaten = {};   // id → { beschreibung?, rufname? } für bestehende Einträge
+  var neu = [], aenderungen = [], leeren = [];
+  namenZeilen().forEach(function (z) {
+    var wert = String(z.wert || '').trim();
+    // Ohne Eintrag wird nur geschrieben, was getippt ist.
+    if (!z.eintrag && !z.getippt) return;
+    var neuWert = !z.eintrag ? !!wert : (wert !== z.eintrag.beschreibung);
+    if (neuWert) {
+      if (!wert) throw new Error(z.id + ': Die Beschreibung darf nicht leer werden — einen Namenseintrag gibt es nur mit Beschreibung.');
+      if (wert.length > NAMEN_MAX) throw new Error(z.id + ': Beschreibung länger als ' + NAMEN_MAX + ' Zeichen.');
+    }
+    if (!z.eintrag) {
+      if (wert) neu.push({ id: z.id, beschreibung: wert });
+      return;
+    }
+    var aenderung = {};
+    if (neuWert) aenderung.beschreibung = wert;
+    if (namenLeeren[z.id] && z.eintrag.rufname) aenderung.rufname = '';
+    if ('beschreibung' in aenderung) aenderungen.push({ id: z.id });
+    if ('rufname' in aenderung) leeren.push({ id: z.id });
+    if (Object.keys(aenderung).length) aenderungenDaten[z.id] = aenderung;
+  });
+  var loesen = Object.keys(verknuepfungLoesen).filter(function (id) {
+    var p = allePersonen.filter(function (x) { return x.id === id; })[0];
+    return p && kontoFehlt(p);
+  });
+  return { neu: neu, geaendert: aenderungen, leeren: leeren, daten: aenderungenDaten, loesen: loesen };
+}
+
+function zeigeNamenFehler(text) {
+  var e = document.getElementById('namenErr');
+  e.textContent = text; e.classList.remove('hidden');
+}
+function namenFehlertext(f) { return ((f && f.code) ? f.code + ' — ' : '') + ((f && f.message) || String(f)); }
+
+document.getElementById('namenSpeichernBtn').addEventListener('click', function () {
+  var e = document.getElementById('namenErr'); e.textContent = ''; e.classList.add('hidden');
+  var plan;
+  try { plan = namenAenderungen(); } catch (f) { zeigeNamenFehler(f.message); return; }
+  var anzahlUpdates = Object.keys(plan.daten).length;
+  if (!plan.neu.length && !anzahlUpdates && !plan.loesen.length) { document.getElementById('namenStatus').textContent = 'Nichts zu speichern.'; return; }
+  // N-41: neue und geänderte Beschreibungen gegen alle anderen Namen prüfen
+  // (auch untereinander im selben Speichervorgang).
+  var neueBeschr = {};
+  plan.neu.forEach(function (x) { neueBeschr[x.id] = x.beschreibung; });
+  Object.keys(plan.daten).forEach(function (id) { if ('beschreibung' in plan.daten[id]) neueBeschr[id] = plan.daten[id].beschreibung; });
+  var doppel = [];
+  Object.keys(neueBeschr).forEach(function (id) {
+    namensDoppel(neueBeschr[id], id, neueBeschr).forEach(function (t) { doppel.push(id + ' „' + neueBeschr[id].trim() + '“ = ' + t); });
+  });
+  if (doppel.length) {
+    document.getElementById('namenStatus').textContent = '⚠ Gleiche Namen: ' + doppel.join('; ');
+    if (!confirm(doppelWarnung(doppel))) return;
+  }
+  // NF-37: die Rückfrage nennt nur, was wirklich geschrieben wird.
+  var teile = [];
+  if (plan.neu.length) teile.push(plan.neu.length + ' neue Namenseinträge');
+  if (plan.geaendert.length) teile.push(plan.geaendert.length + ' geänderte Beschreibungen');
+  if (plan.leeren.length) teile.push(plan.leeren.length + ' geleerte Rufnamen');
+  if (plan.loesen.length) teile.push(plan.loesen.length + ' gelöste Verknüpfungen');
+  if (!confirm('Speichern: ' + teile.join(', ') + '?' +
+      (plan.neu.length || plan.geaendert.length ? '\n\nDie Beschreibungen sind danach für alle mit Konto lesbar.' : ''))) return;
+  if (!window.BOS_ACCOUNTS.adminAngemeldet()) { zeigeNamenFehler('Admin-Sitzung abgelaufen — bitte neu öffnen.'); return; }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var batch = adminDb.batch();
+  plan.neu.forEach(function (x) { batch.set(adminDb.collection('namen').doc(x.id), { beschreibung: x.beschreibung, rufname: '' }); });
+  Object.keys(plan.daten).forEach(function (id) { batch.update(adminDb.collection('namen').doc(id), plan.daten[id]); });
+  // N-27: Verknüpfung ins Leere lösen — Regel personen.update: istAdmin().
+  plan.loesen.forEach(function (id) { batch.update(adminDb.collection('personen').doc(id), { bosKontoId: null }); });
+  var btn = this; btn.disabled = true;
+  batch.commit().then(function () {
+    namenGeaendert = false;
+    return ladeAllesUndRender();
+  }).then(function () {
+    document.getElementById('namenStatus').textContent = '✓ ' + plan.neu.length + ' neu, ' + plan.geaendert.length + ' geändert, ' +
+      plan.leeren.length + ' Rufname(n) geleert, ' + plan.loesen.length + ' Verknüpfung(en) gelöst — ' + document.getElementById('namenStatus').textContent;
+  }).catch(function (f) {
+    console.error('Konten-Verwaltung: Namen speichern fehlgeschlagen', f);
+    zeigeNamenFehler('Nicht gespeichert — nichts davon (ein Schreibvorgang): ' + namenFehlertext(f));
+  }).then(function () { btn.disabled = false; });
+});
+
+// Rufname leeren (NE-6): nur VORMERKEN, geschrieben wird mit „Namen
+// speichern“ im selben Batch. Vorher schrieb der Knopf sofort und lud neu —
+// dabei gingen getippte, ungespeicherte Beschreibungen verloren.
+function rufnameLeerenKlick(id) {
+  var eintrag = alleNamen[id];
+  if (!eintrag || !eintrag.rufname) return;
+  if (namenLeeren[id]) { delete namenLeeren[id]; }
+  else { namenLeeren[id] = true; namenGeaendert = true; }
+  renderNamen();
+}
+
+// N-27: Verknüpfung auf ein nicht vorhandenes Konto lösen — nur VORMERKEN,
+// geschrieben mit „Namen speichern“. Neu verknüpfen gibt es hier nicht
+// (dafür: Reiter „Konten“, Konto-Karte).
+function verknuepfungLoesenKlick(id) {
+  if (verknuepfungLoesen[id]) { delete verknuepfungLoesen[id]; }
+  else { verknuepfungLoesen[id] = true; namenGeaendert = true; }
+  renderNamen();
+}
+
+// Höchste Nummer, die die Seite kennt (Personen UND Namenseinträge).
+function hoechsteBekannteNummer() {
+  var max = 0;
+  allePersonen.forEach(function (p) { var n = nummerZahl(p.id); if (n !== Number.MAX_SAFE_INTEGER && n > max) max = n; });
+  Object.keys(alleNamen).forEach(function (id) { var n = nummerZahl(id); if (n !== Number.MAX_SAFE_INTEGER && n > max) max = n; });
+  return max;
+}
+
+// Eine Transaktion: Zähler lesen, Nummer bestimmen, Existenz prüfen, dann
+// Person + Namenseintrag + Zähler in einem Zug. Die Web-SDK-Transaktion
+// liest nur Einzeldokumente — die höchste vorhandene Nummer kommt deshalb
+// aus der geladenen Liste; Zähler und Existenzprüfung fangen Abweichungen.
+function legeNeuePersonAn(beschreibung) {
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var zaehlerRef = adminDb.collection('einstellungen').doc('personen_nummern');
+  var bekannt = hoechsteBekannteNummer();
+  return adminDb.runTransaction(function (tx) {
+    return tx.get(zaehlerRef).then(function (z) {
+      var zaehler = (z.exists && typeof z.data().hoechste === 'number') ? z.data().hoechste : 0;
+      var n = Math.max(zaehler, bekannt) + 1;
+      var id = 'P' + String(n).padStart(2, '0');
+      var personRef = adminDb.collection('personen').doc(id);
+      return tx.get(personRef).then(function (p) {
+        if (p.exists) throw new Error('Die Nummer ' + id + ' gibt es schon — nichts geschrieben. Seite neu öffnen und noch einmal versuchen.');
+        // Standardwerte wie im Personen-Editor für eine neue Person.
+        tx.set(personRef, {
+          status: 'mitarbeiter', abteilung: 'baeckerei', teilbereich: null, stammschicht: null,
+          aktiv: true, einsatzfaehig: true, keinRotierenderFreierTag: false, maxSonntageProMonat: null,
+          bosKontoId: null, arbeitstage: null, freieTagOptionen: null, gesperrteSchichten: null
+        });
+        tx.set(adminDb.collection('namen').doc(id), { beschreibung: beschreibung, rufname: '' });
+        tx.set(zaehlerRef, { hoechste: n });
+        return id;
+      });
+    });
+  });
+}
+
+document.getElementById('neuPersonBtn').addEventListener('click', function () {
+  var e = document.getElementById('namenErr'); e.textContent = ''; e.classList.add('hidden');
+  var feld = document.getElementById('neuPersonBeschreibung');
+  var beschreibung = feld.value.trim();
+  if (!beschreibung) { zeigeNamenFehler('Bitte zuerst eine Beschreibung eingeben (z. B. „Jörg“) — eine Person gibt es nur mit Namenseintrag.'); return; }
+  if (beschreibung.length > NAMEN_MAX) { zeigeNamenFehler('Beschreibung länger als ' + NAMEN_MAX + ' Zeichen.'); return; }
+  var doppelNeu = namensDoppel(beschreibung, null, null);
+  if (doppelNeu.length && !confirm(doppelWarnung(doppelNeu.map(function (t) { return '„' + beschreibung + '“ = ' + t; })))) return;
+  if (namenGeaendert && !confirm('Es gibt ungespeicherte Namen. Die neue Person anlegen lädt die Liste neu — die ungespeicherten Namen gehen verloren. Trotzdem?')) return;
+  if (!confirm('Neue Person „' + beschreibung + '“ anlegen?\n\nSie bekommt die nächste freie Nummer — für immer. Einsatzdaten danach im Personen-Editor.')) return;
+  var btn = this; btn.disabled = true;
+  legeNeuePersonAn(beschreibung).then(function (id) {
+    feld.value = '';
+    namenGeaendert = false;
+    return ladeAllesUndRender().then(function () {
+      document.getElementById('namenStatus').textContent = '✓ ' + id + ' „' + beschreibung + '“ angelegt — Einsatzdaten im Personen-Editor ergänzen. ' + document.getElementById('namenStatus').textContent;
+    });
+  }).catch(function (f) {
+    console.error('Konten-Verwaltung: Neue Person fehlgeschlagen', f);
+    zeigeNamenFehler('Keine Person angelegt: ' + namenFehlertext(f));
+  }).then(function () { btn.disabled = false; });
+});
+
+// ==========================================================================
+// Tabs
+// ==========================================================================
+document.querySelectorAll('.tab-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('bos-btn--amber'); });
+    btn.classList.add('bos-btn--amber');
+    var tab = btn.dataset.tab;
+    var zeigeRollen = tab === 'rollen';
+    document.getElementById('tabKonten').classList.toggle('hidden', tab !== 'konten');
+    document.getElementById('tabRollen').classList.toggle('hidden', !zeigeRollen);
+    document.getElementById('tabNamen').classList.toggle('hidden', tab !== 'namen');
+    if (zeigeRollen) versucheRollenInit();
+    if (tab === 'namen') renderNamen();
+  });
+});
+
+// ==========================================================================
+// Rollen & Rechte — eigener Tab, eigene Arbeitskopien, eigenes Speichern
+// (= Export als Datei, kein Firestore — Ein-Schreiber-Dateien wie bisher)
+// ==========================================================================
+var rollenBearbeitung = [];   // Arbeitskopie von window.BOS_ROLES: [{id,name,icon}]
+var matrixBearbeitung = {};   // Arbeitskopie von window.BOS_PERMISSIONS
+var rollenInitialisiert = false;
+var rollenDatenBereit = false;
+var rollenGeaendert = false;
+
+function versucheRollenInit() {
+  if (rollenInitialisiert || !rollenDatenBereit) return;
+  initRollenTab();
+}
+
+function initRollenTab() {
+  rollenBearbeitung = (window.BOS_ROLES || []).map(function (r) {
+    return { id: r.id, name: r.name, icon: r.icon };
+  });
+  matrixBearbeitung = {};
+  Object.keys(window.BOS_PERMISSIONS || {}).forEach(function (rolle) {
+    matrixBearbeitung[rolle] = Object.assign({}, window.BOS_PERMISSIONS[rolle]);
+  });
+  rollenBearbeitung.forEach(function (r) {
+    if (!matrixBearbeitung[r.id]) matrixBearbeitung[r.id] = {};
+  });
+  /* 31.08.2026: Konkrete Lücke von oben (ladeGatedApps) hier als Ausgangswert
+     korrigiert — admin sollte konten_verwaltung immer dürfen, das fehlte
+     bisher komplett in bos_permissions.js. Wird erst mit dem nächsten
+     Export tatsächlich wirksam, nicht sofort live. */
+  if (matrixBearbeitung['admin'] && !('konten_verwaltung' in matrixBearbeitung['admin'])) {
+    matrixBearbeitung['admin']['konten_verwaltung'] = true;
+  }
+  rollenInitialisiert = true;
+  renderRollenListe();
+}
+
+function markiereRollenGeaendert() {
+  rollenGeaendert = true;
+  document.getElementById('rollenSaveStatus').textContent = 'Ungespeicherte Änderungen — noch nicht exportiert';
+  document.getElementById('rollenSaveStatus').className = '';
+}
+
+function rollenRowHTML(r) {
+  return '<div class="entry-row" onclick="oeffneRollenKarte(\'' + r.id + '\')">' +
+    '<span class="entry-icon">' + (r.icon || '❔') + '</span>' +
+    '<span class="entry-name">' + esc(r.name) + '<span class="entry-sub"> · ' + esc(r.id) + '</span></span>' +
+    '<button type="button" class="entry-del" title="Rolle löschen" onclick="event.stopPropagation(); loescheRolleKlick(\'' + r.id + '\')">🗑</button>' +
+  '</div>';
+}
+function renderRollenListe() {
+  var container = document.getElementById('listeRollen');
+  container.innerHTML = rollenBearbeitung.length
+    ? rollenBearbeitung.map(rollenRowHTML).join('')
+    : '<p class="leer-hinweis">Noch keine Rollen angelegt.</p>';
+}
+function loescheRolleKlick(rolleId) {
+  var r = rollenBearbeitung.filter(function (x) { return x.id === rolleId; })[0];
+  if (!r) return;
+  var betroffen = alleKonten.filter(function (k) { return k.role === r.id; }).length;
+  var warnung = 'Rolle „' + r.name + '" wirklich löschen?';
+  if (betroffen > 0) {
+    warnung += '\n\nAchtung: ' + betroffen + ' Konto(en) haben aktuell diese Rolle. Sie verschwindet aus der Auswahl, die Konten behalten die Rolle nur als Text in der Datenbank, bis du sie manuell umstellst.';
+  }
+  if (!confirm(warnung)) return;
+  rollenBearbeitung = rollenBearbeitung.filter(function (x) { return x.id !== rolleId; });
+  delete matrixBearbeitung[rolleId];
+  markiereRollenGeaendert();
+  renderRollenListe();
+}
+
+// Neuanlage bleibt bewusst die kleine Inline-Zeile (nicht die Karte): die
+// ID muss VOR dem Anlegen auf Eindeutigkeit geprüft werden, anders als
+// beim frei nachträglich editierbaren Produkt-legacyKey, der einfach
+// automatisch generiert wird. Nach erfolgreicher Anlage öffnet sich die
+// Karte automatisch auf dem Rechte-Tab — Konfigurieren ist der nächste
+// logische Schritt, analog zu neuesProdukt().
+document.getElementById('neueRolleBtn').addEventListener('click', function () {
+  var errEl = document.getElementById('rollenErr');
+  errEl.classList.add('hidden');
+  var icon = document.getElementById('neueRolleIcon').value.trim() || '❔';
+  var name = document.getElementById('neueRolleName').value.trim();
+  var idRoh = document.getElementById('neueRolleId').value.trim();
+  var id = idRoh.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (!name || !id) {
+    errEl.textContent = 'Name und ID werden beide gebraucht.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (rollenBearbeitung.some(function (r) { return r.id === id; })) {
+    errEl.textContent = 'ID „' + id + '" gibt es schon — Rollen-IDs müssen eindeutig sein.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  rollenBearbeitung.push({ id: id, name: name, icon: icon });
+  matrixBearbeitung[id] = {};
+  document.getElementById('neueRolleIcon').value = '';
+  document.getElementById('neueRolleName').value = '';
+  document.getElementById('neueRolleId').value = '';
+  markiereRollenGeaendert();
+  renderRollenListe();
+  oeffneRollenKarte(id, 'rechte');
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// Rollen-Karte — einzige Bearbeitungsstelle für eine bestehende Rolle.
+// Gleiches Muster wie die Konto-Karte oben, Tab "Rechte" nutzt dieselbe
+// bereichsGruppenHTML() — eine Mechanik, zwei Aufrufer.
+// ══════════════════════════════════════════════════════════════════════
+var rollenKarteId = null;
+var rollenKarteListe = [];
+var rollenKarteAktiverTab = 'stamm';
+
+var ROLLEN_KARTEN_TABS = [
+  {
+    id: 'stamm', label: 'Stammdaten',
+    render: function (r) {
+      return (
+        '<div class="detail-section">' +
+          '<div class="detail-feld"><label>Icon</label><input type="text" maxlength="4" value="' + esc(r.icon) + '" onchange="aendereRolle(\'' + r.id + '\',\'icon\',this.value)"></div>' +
+          '<div class="detail-feld"><label>Name</label><input type="text" value="' + esc(r.name) + '" oninput="document.getElementById(\'rkName\').textContent=this.value||\'Unbenannt\'" onchange="aendereRolle(\'' + r.id + '\',\'name\',this.value)"></div>' +
+        '</div>' +
+        '<div class="detail-section full"><div class="detail-feld"><label>ID</label><div class="readonly-wert">' + esc(r.id) + '</div></div></div>' +
+        '<p style="color:var(--bos-text-faint); font-size:.78rem;">ID ist fix, sobald die Rolle angelegt ist — verhindert kaputte Referenzen in Konten/Registry.</p>'
+      );
+    }
+  },
+  {
+    id: 'rechte', label: 'Rechte',
+    render: function (r) {
+      if (!matrixBearbeitung[r.id]) matrixBearbeitung[r.id] = {};
+      return bereichsGruppenHTML(matrixBearbeitung[r.id], 'toggleRolleRecht');
+    }
+  }
+];
+
+function oeffneRollenKarte(rolleId, tab) {
+  rollenKarteListe = rollenBearbeitung.map(function (r) { return r.id; });
+  if (rollenKarteListe.indexOf(rolleId) === -1) rollenKarteListe.push(rolleId);
+  rollenKarteId = rolleId;
+  rollenKarteAktiverTab = tab || 'stamm';
+  renderRollenKarte();
+  document.getElementById('rollenKarteOverlay').classList.remove('hidden');
+}
+function rollenKarteNav(delta) {
+  var pos = rollenKarteListe.indexOf(rollenKarteId);
+  var neu = pos + delta;
+  if (neu < 0 || neu >= rollenKarteListe.length) return;
+  rollenKarteId = rollenKarteListe[neu];
+  renderRollenKarte();
+}
+function schliesseRollenKarte() {
+  document.getElementById('rollenKarteOverlay').classList.add('hidden');
+  rollenKarteId = null;
+  renderRollenListe();
+}
+function waehleRollenKartenTab(id) {
+  rollenKarteAktiverTab = id;
+  renderRollenKarte();
+}
+function renderRollenKarte() {
+  var r = rollenBearbeitung.filter(function (x) { return x.id === rollenKarteId; })[0];
+  if (!r) { schliesseRollenKarte(); return; }
+  document.getElementById('rkName').textContent = r.name || 'Unbenannt';
+  document.getElementById('rkSub').textContent = r.id;
+
+  var pos = rollenKarteListe.indexOf(rollenKarteId);
+  document.getElementById('rkZurueckBtn').disabled = pos <= 0;
+  document.getElementById('rkVorBtn').disabled = pos === -1 || pos >= rollenKarteListe.length - 1;
+
+  document.getElementById('rkTabs').innerHTML = ROLLEN_KARTEN_TABS.map(function (t) {
+    return '<button class="karte-tab-btn' + (t.id === rollenKarteAktiverTab ? ' aktiv' : '') + '" onclick="waehleRollenKartenTab(\'' + t.id + '\')">' + t.label + '</button>';
+  }).join('');
+
+  var aktiv = ROLLEN_KARTEN_TABS.filter(function (t) { return t.id === rollenKarteAktiverTab; })[0] || ROLLEN_KARTEN_TABS[0];
+  document.getElementById('rkBody').innerHTML = aktiv.render(r);
+}
+function aendereRolle(rolleId, feld, wert) {
+  var r = rollenBearbeitung.filter(function (x) { return x.id === rolleId; })[0];
+  if (!r) return;
+  r[feld] = wert;
+  markiereRollenGeaendert();
+}
+function toggleRolleRecht(appId, checked) {
+  if (!rollenKarteId) return;
+  if (!matrixBearbeitung[rollenKarteId]) matrixBearbeitung[rollenKarteId] = {};
+  matrixBearbeitung[rollenKarteId][appId] = checked;
+  markiereRollenGeaendert();
+}
+
+// ==========================================================================
+// Export — Rollen & Rechte als Dateien, kein Firestore (Ein-Schreiber-Dateien,
+// wie bei produkt_config_sync.html: Export → manuell im Repo ersetzen)
+// ==========================================================================
+function escapeJsString(s) {
+  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+function ladeDatei(dateiname, inhalt) {
+  var blob = new Blob([inhalt], { type: 'text/javascript' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = dateiname;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+var ROLLEN_HEADER =
+"/* ================================================================\n" +
+"   BäckereiOS · Satellite — Rollen-Definition\n" +
+"   ================================================================\n" +
+"   Reiner Berechtigungs-Rahmen: welche Rollen gibt es, welche App-\n" +
+"   Kacheln sind für welche Rolle überhaupt erlaubt (siehe \"roles\"-\n" +
+"   Feld in bos_app_registry.js). Kein PIN mehr hier — der lebt jetzt\n" +
+"   pro Person in bos_launcher_profiles.js, weil Schutz eine Sache\n" +
+"   der einzelnen Person ist, nicht der Kategorie.\n" +
+"\n" +
+"   Diese Liste füllt außerdem das Rollen-Auswahlfeld, wenn sich\n" +
+"   jemand über die \"+\"-Kachel im Profil-Bildschirm selbst ein neues\n" +
+"   Profil anlegt.\n" +
+"\n" +
+"   Felder je Rolle:\n" +
+"     id    — eindeutiger Schlüssel, wird in bos_app_registry.js\n" +
+"             (\"roles\"-Array) und bos_launcher_profiles.js (\"role\")\n" +
+"             referenziert. NIE umbenennen.\n" +
+"     name  — Anzeigename, z.B. im Rollen-Auswahlfeld beim Profil-Anlegen\n" +
+"     icon  — Emoji, aktuell nur als Fallback verwendet\n" +
+"\n" +
+"   PFLEGE: Ab 31.08.2026 über konten_verwaltung.html, Tab \"Rollen &\n" +
+"   Rechte\" — nicht mehr von Hand editieren, sonst läuft diese Datei\n" +
+"   der Rechte-Matrix in bos_permissions.js auseinander.\n" +
+"   ================================================================ */\n";
+
+var PERMISSIONS_HEADER =
+"/* ================================================================\n" +
+"   BäckereiOS · Berechtigungen — Rolle × Satellit → Standard\n" +
+"   ================================================================\n" +
+"   Einzige Wahrheit für \"darf Rolle X auf Satellit Y zugreifen?\".\n" +
+"   Wird von bos_access.js gelesen (BOS_ACCESS.can()), genutzt von\n" +
+"   bos_access_guard.js (Satelliten-Zugriff) UND launcher.html\n" +
+"   (Kachel-Sichtbarkeit) — eine Mechanik, viele Aufrufer.\n" +
+"\n" +
+"   Reines JS, window.BOS_PERMISSIONS direkt gesetzt (kein JSON) —\n" +
+"   der Guard muss synchron per <script> laden können, vor dem Rendern.\n" +
+"\n" +
+"   Fehlt ein Satellit bei einer Rolle, gilt false — EXCEPT: taucht\n" +
+"   der Satellit in GAR KEINER Rolle hier auf (auch nicht bei admin),\n" +
+"   gilt das als \"noch nicht konfiguriert\" und BOS_ACCESS.can() fällt\n" +
+"   auf offen zurück (fail-open) — ein Konfigurationsfehler soll dich\n" +
+"   nicht selbst aussperren. Siehe bos_access.js für die genaue Logik.\n" +
+"\n" +
+"   PFLEGE: Ab 31.08.2026 über konten_verwaltung.html, Tab \"Rollen &\n" +
+"   Rechte\" — nicht mehr von Hand editieren. Diese Tabelle zeigt dort\n" +
+"   auch Satelliten an, die in der Registry ein roles-Feld tragen, aber\n" +
+"   hier noch fehlen (wie es konten_verwaltung selbst bis 31.08. war) —\n" +
+"   so bleibt Registry und Rechte-Matrix sichtbar im Gleichschritt.\n" +
+"\n" +
+"   Person-Overrides (kontoOverrides) laufen weiterhin separat über\n" +
+"   bos_accounts / die Freischaltungs-Tabelle und haben Vorrang.\n" +
+"\n" +
+"   EINBINDUNG (Reihenfolge in jedem Satelliten):\n" +
+"     <script>var BOS_APP_ID = '...';<\/script>\n" +
+"     <script src=\"bos_app_registry.js\"><\/script>\n" +
+"     <script src=\"bos_launcher_profiles.js\"><\/script>\n" +
+"     <script src=\"bos_permissions.js\"><\/script>\n" +
+"     <script src=\"bos_access.js\"><\/script>\n" +
+"     <script src=\"bos_access_guard.js\"><\/script>\n" +
+"     ... restlicher Seiteninhalt ...\n" +
+"   ================================================================ */\n";
+
+function exportiereRollenDatei() {
+  var stamp = new Date().toISOString().slice(0, 10);
+  var kommentar = "\n/* " + stamp + ": Exportiert über konten_verwaltung.html (Rollen & Rechte). */\n";
+  var zeilen = rollenBearbeitung.map(function (r) {
+    return "  { id: '" + r.id + "', name: '" + escapeJsString(r.name) + "', icon: '" + escapeJsString(r.icon) + "' }";
+  });
+  var inhalt = ROLLEN_HEADER + kommentar + "window.BOS_ROLES = [\n" + zeilen.join(',\n') + "\n];\n";
+  ladeDatei('bos_launcher_roles.js', inhalt);
+}
+
+function exportierePermissionsDatei() {
+  var stamp = new Date().toISOString().slice(0, 10);
+  var kommentar = "\n/* " + stamp + ": Exportiert über konten_verwaltung.html (Rollen & Rechte). */\n";
+  var bloecke = rollenBearbeitung.map(function (r) {
+    var perms = matrixBearbeitung[r.id] || {};
+    var trueKeys = Object.keys(perms).filter(function (k) { return !!perms[k]; });
+    if (!trueKeys.length) return '  "' + r.id + '": {}';
+    var inner = trueKeys.map(function (k) { return '    "' + k + '": true'; }).join(',\n');
+    return '  "' + r.id + '": {\n' + inner + '\n  }';
+  });
+  var inhalt = PERMISSIONS_HEADER + kommentar + "window.BOS_PERMISSIONS = {\n" + bloecke.join(',\n') + "\n};\n";
+  ladeDatei('bos_permissions.js', inhalt);
+}
+
+document.getElementById('exportRollenBtn').addEventListener('click', function () {
+  exportiereRollenDatei();
+  exportierePermissionsDatei();
+  rollenGeaendert = false;
+  document.getElementById('rollenSaveStatus').textContent = '✓ Beide Dateien heruntergeladen — im Repo ersetzen, dann neu laden';
+  document.getElementById('rollenSaveStatus').className = 'status-ok';
+});
+
+window.addEventListener('beforeunload', function (e) {
+  if (geaendert || rollenGeaendert || namenGeaendert) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ==========================================================================
+// Start — früher hinter der PIN-Schleuse, seit 18.09.2026 direkt.
+// Steht bewusst ganz am Dateiende: initApp() greift auf Funktionen und
+// Zustandsvariablen zu, die weiter oben definiert werden.
+// ==========================================================================
+initApp();
+</script>
+</body>
+</html>

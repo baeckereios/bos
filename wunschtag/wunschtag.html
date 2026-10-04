@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Wunschtag · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: wunschtag.html
+  ZWECK: Erster eigenständiger Satellit im SchichtPlaner-V2-Aufbau. Erfasst
+         einen unverbindlichen "Wunschtag" (freier Tag) — entweder für eine
+         der nächsten drei Kalenderwochen (mit Frist-Hinweis) oder für ein
+         beliebiges Datum weiter in der Zukunft (seit v0.4, Ulf: "in
+         mehreren Wochen Termin freihalten" ist der eigentliche Wert).
+         Keine Zusage, keine Berechnung — reine Willensäußerung, die später
+         vom Arbeitsplan Gestalter gelesen und von einer planenden Person
+         gewürdigt wird. Siehe Konzept-Doku
+         SESSION_2026-09-05_SCHICHTPLANER_V2_KONZEPT.md §11/§19.
+  DATENFLUSS: Standalone-Login (bos_accounts) → Formular (Woche+Tag ODER
+         freies Datum + optional "erhöhte Priorität" + optionale
+         Begründung) → EIN Dokument pro Absenden nach Firestore-Collection
+         "bos_events" (type: 'schichtplaner_wunschtag'). Seit dem
+         20.09.2026 ohne die frühere Anzahl-Anzeige: der einzige
+         verbliebene lesende Zugriff betrifft Tab 2 und filtert auf die
+         eigene Kennung. Grund siehe Kommentar im Code und Changelog.
+  SCHNITTSTELLEN: bos_accounts.js (Identität: name, kontoSchluessel),
+         bos_firebase_config.js, Firestore (bos_events, Mechanik-Schicht,
+         seit v0.4 auch lesend). FRIST_WOCHENTAG/FRIST_STUNDE unten =
+         vorläufige, hart codierte Einstellung (Donnerstag 12 Uhr der
+         Vorwoche) — gilt nur für die drei Nah-Wochen, nicht für "weiter in
+         der Zukunft" (dort ergibt eine Frist noch keinen Sinn). Soll
+         später in die echte Einstellungen-Kachel wandern (§17 der
+         Konzept-Doku), existiert dort aber noch nicht.
+  BEKANNTE OFFENE PUNKTE:
+    - "Änderungsanfrage" ist bewusst kein eigener Mechanismus: ein zweiter
+      Wunsch für denselben Tag ist einfach ein zweiter Eintrag (append-only).
+      Die planende Person sieht beim Bau des Arbeitsplan Gestalters alle
+      Einträge zu einer Woche/Person und entscheidet, welcher zählt.
+    - bosKontoId → SchichtPlaner-interne Person (echte Personen aus
+      positionen_pools.json/Personen-Editor) existiert noch nicht als
+      Verknüpfung. Name + Konto-ID werden mitgespeichert, Zuordnung ist
+      Aufgabe des nächsten Bausteins.
+    - bos_standalone_login.js liefert keine Rückmeldung/Event, wann ein
+      Login abgeschlossen ist — diese Seite pollt deshalb selbst auf das
+      Erscheinen eines aktiven Profils in localStorage (siehe warteAufProfil
+      unten). Sollte es dafür mal eine zentrale Lösung geben, kann das hier
+      vereinfacht werden.
+    - Frist ist absichtlich NICHT blockierend (nur Hinweistext) — passt zum
+      Systemprinzip "menschliches Urteilsvermögen statt Automatik" (siehe
+      BOS-Prinzipien). Aus demselben Grund bewusst KEINE Obergrenze für
+      Wünsche pro Tag (Ulfs Idee, 10.09.2026, verworfen): das Formular kann
+      nicht seriös beurteilen, ob mehrere Wünsche am selben Tag ein
+      Problem sind — das hängt von Positionen/Pools ab, die hier nicht
+      bekannt sind. Stattdessen nur eine reine Zahl ("X andere haben diesen
+      Tag auch gewählt"), ausdrücklich ohne Einschätzung/Ampel.
+
+  CHANGELOG
+    2026-09-27 · v0.16 · Fix (Namens-Fundament Schritt 7, NF-4; NF-26)
+      Wunschtag und Sonntags-Ablehnung schreiben KEIN Feld name mehr in
+      bos_events (vorher die Konto-Notiz aus dem Profil). Die Anzeige
+      ignoriert es seit Schritt 5 ohnehin; der Name kommt über personId
+      bzw. bosKontoId → Person aus der Namensliste. Alte Einreichungen
+      bleiben unverändert. NF-26: der Alttext „echtes Konto … (Vorname,
+      Geburtsdatum, PIN)“ ist raus (Tür, Kennung, Passwort). Sonst nichts.
+    2026-09-26 · v0.15 · Fix (N-12, Kontroll-Chat)
+      ladeEigenePerson(): bei mehr als einer verknüpften Person null statt
+      still der erste Treffer; die Nummern stehen im rotationHinweisBox mit
+      der Bitte, Ulf Bescheid zu geben. Einreichen bleibt möglich (hängt an
+      der Kennung). Der Hinweis erscheint auch ohne geladene Feiertagsregel.
+      Normalfall (genau eine Person) unverändert.
+    2026-09-24 · 09:10 · v0.14 · Text (E25, Ulf 24.09.)
+      Nicht einsatzfähiger Azubi und Inaktive haben keine festen
+      Arbeitstage -- sie werden schlicht nicht eingeteilt. Statt B lesen
+      sie: "Du wirst derzeit nicht in den Wochenplan eingeteilt. Dein
+      Wunsch kommt trotzdem an und wird von Hand entschieden."
+      Alle anderen außerhalb der Rotation behalten B.
+    2026-09-24 · 09:08 · v0.13 · Feature (E25, Teil A)
+      "Deine Woche" für Personen außerhalb der Rotation, deren arbeitstage
+      die Woche wirklich beschreiben (Ulf 24.09.: feste Arbeitstage, und
+      keinRotierenderFreierTag MIT gesetzten arbeitstage). Nicht für den
+      nicht einsatzfähigen Azubi, Inaktive oder keinRotierenderFreierTag
+      ohne arbeitstage -- dort nur B. Nur in Feiertagswochen (E17 wie
+      überall), gebaut aus arbeitstage, den Feiertagen Mo-Sa und dem
+      Sonntagsplan:
+      - Feiertag auf einem Arbeitstag, nicht eingeteilt: "Deine Woche:
+        Mo–Fr, außer Mi 30.09., Feiertag, frei."
+      - Feiertag auf einem Nicht-Arbeitstag: "... wie immer. Der Feiertag
+        am Sa 03.10. fällt auf deinen freien Tag."
+      - Laut Sonntagsplan eingeteilt, am Feiertag ODER am Sonntag der
+        Woche (Ulf 24.09.: auch der Sonntag): "Am Sa 03.10. bist du
+        eingeteilt." Mehrere: sinngemäß im Plural.
+      - Offener Feiertag auf einem Arbeitstag, Sonntagsplan fehlt: nicht
+        "frei" behaupten -- "außer Mi 30.09., Feiertag. Ob du dort
+        eingeteilt bist, steht erst mit dem Sonntagsplan fest."
+      "Laut aktuellem Sonntagsplan:" nur, wenn alle nötigen Dokumente da
+      sind. B bleibt daneben stehen.
+    2026-09-24 · 08:44 · v0.12 · Feature (E25, Teil B)
+      Personen AUSSERHALB der Rotation (Kriterium aus feiertagsregel.js,
+      rotationsStatus(), gleich nimmtGrundsaetzlichTeil() im Kern) bekamen
+      in Feiertagswochen den festen E22-Text "Er greift nur, wenn du am
+      Feiertag oder Sonntag eingeteilt bist" -- für sie falsch, bei ihnen
+      greift die Rotation in keiner Woche. Jetzt, nur wenn die eigene
+      Person bekannt ist UND außerhalb der Rotation steht:
+      - in JEDER Woche der Hinweis B ("Bei festen Arbeitstagen verteilt die
+        Planung freie Tage nicht automatisch. Dein Wunsch kommt trotzdem an
+        und wird von Hand entschieden."), eigener Kasten, sobald die Person
+        geladen ist;
+      - in Feiertagswochen KEIN Rotations-Hinweis mehr (weder persönlich
+        noch fest). Teil A ("Deine Woche") folgt nach Freigabe.
+      Rotierende Personen: unverändert E22, kein B. Unverknüpftes Konto:
+      fester Text wie bisher, kein B.
+    2026-09-24 · 08:14 · v0.11 · Feature (E22, O47)
+      Persönlicher Hinweis in Feiertagswochen, nur Hinweis, nichts wird
+      gesperrt. Liegt das gewählte Datum (oder die gewählte Woche) in
+      einer Feiertagswoche (E4/E5/E17 wie beim Stern) und sind die nötigen
+      Sonntagsplan-Dokumente gespeichert (offener Feiertag: Feiertag +
+      Sonntag, geschlossener: nur Sonntag), rechnet die Seite mit
+      BOS_FEIERTAGSREGEL.sollUndRest() (feiertagsregel.js -- dieselbe
+      Funktion wie Entwürfe, O40) und sagt "laut aktuellem Sonntagsplan":
+      Rest 0 -> der Feiertag ist dein freier Tag, ein Wunschtag greift
+      nicht; Rest >= 1 -> du bist eingeteilt, dein Wunschtag kann greifen;
+      Feiertag selbst gewählt -> "ohnehin frei" bzw. "am Feiertag
+      eingeteilt". Sonst (Plan fehlt, Konto nicht verknüpft, Person mit
+      höchstens 5 Arbeitstagen -- außerhalb der Rotation, O47/E11) ein
+      fester, allgemeiner Text; bei einem Lesefehler derselbe Text plus
+      err.message.
+      Die eigene Person NUR über personen.where('bosKontoId','==',kontoId),
+      wie mein_konto.html -- eine Abfrage über alle Personen scheitert für
+      Kollegen komplett (Regeln). Liest sonntagsplan: braucht die Regel
+      aus E24 (lesen mit Konto). Gelesenes wird je Woche zwischengespeichert,
+      weil der Hinweis bei jeder Eingabe neu bewertet wird (T-156).
+      Neu eingebunden: ../feiertagsregel.js (rein, ohne Abhängigkeiten).
+    2026-09-23 · 10:02 · v0.10 · Feature (E20, Feiertag-Sonntag-Regeln)
+      Nur Text, keine Rechnung. Liegt das gewählte Datum (oder, solange
+      noch kein Tag gewählt ist, die gewählte Woche) in einer
+      Feiertagswoche -- ein Feiertag Mo-Sa, offen ODER geschlossen (E4,
+      E5); ein Feiertag auf dem Sonntag zählt nicht (E17) --, heißt die
+      Checkbox "⭐ Genau dieser Tag ist mir wichtig", darunter ein Satz,
+      was der Stern in dieser Woche bewirkt. Sonst die bisherige
+      Beschriftung. Wechselt mit dem Datum (aktualisiereSternBeschriftung,
+      aufgerufen aus aktualisiereSubmitZustand). Braucht nur BOS_FEIERTAGE
+      aus bos_zeitkontext_referenz.js (war schon eingebunden, Z. 325),
+      keinen Status und keine Firestore-Abfrage. Fehlen die Daten, bleibt
+      die normale Beschriftung, ohne Fehler (E20: nur ein Hinweis, keine
+      Sperre). Hilfe um einen Absatz zum Stern ergänzt. Gespeichert wird
+      unverändert wichtig:true/false.
+    2026-09-20 · v0.9 · Umbau (Etappe 3.2)
+      Anzahl-Anzeige ersatzlos entfernt (Funktion, Markup, CSS,
+      Hilfetext-Abschnitt). Sie las ALLE Wünsche eines Datums, also
+      auch fremde Begründungen — mit der neuen Leseregel („nur die
+      eigene Einreichung, plus Planung") hätte die Abfrage die ganze
+      Seite scheitern lassen. Ulfs Entscheidung war aber inhaltlich,
+      nicht technisch: eine Zahl ohne Namen ist irreführend, und Namen
+      dazu sind ausdrücklich unerwünscht. Begründung ausführlich im
+      Code an der Stelle der früheren Funktion.
+      Hilfetext zur Begründung verschärft: „niemand sonst kann sie
+      lesen, auch nicht über Umwege" — der Satz stimmt seit dieser
+      Regel zum ersten Mal wirklich.
+    2026-09-10 · v0.1 · Feature
+      Erste Version. Wochen-/Tagesauswahl, Checkbox "Erhöhte Priorität",
+      optionale Begründung, Standalone-Login, Schreiben nach bos_events.
+    2026-09-10 · v0.2 · Fix
+      "Kein Konto"-Meldung war eine Sackgasse (Ulf: "der Wunschtag mag mich
+      nicht") -- ein bereits aktives, aber nicht kontoverknüpftes Launcher-
+      Profil auf dem Gerät wurde nie erneut zur Anmeldung aufgefordert.
+      Button "Neu anmelden" ergänzt: setzt nur activeProfileId zurück
+      (Profil bleibt erhalten, wird nicht gelöscht), Neuladen löst danach
+      automatisch Pfad 2 von bos_standalone_login.js aus (echte Login-Karte).
+    2026-09-10 · v0.3 · Feature
+      Schema um personId (vorerst immer null, siehe Baustellen) und quelle
+      ('selbst') erweitert — Entwürfe bekam denselben Tag eine manuelle
+      Eintragungsmöglichkeit (quelle: 'manuell', personId direkt gesetzt),
+      beide Schreibpfade jetzt im selben Schema.
+    2026-09-10 · v0.4 · Feature
+      Ulf: 3-Wochen-Grenze sollte weg, "Termin freihalten" macht den
+      Satelliten wertvoll. Neue Sektion "Weiter in der Zukunft" mit freiem
+      Datum, unbegrenzt. Dazu Ulfs Geistesblitz (Obergrenze/Wahrschein-
+      lichkeit) durchdacht: Obergrenze verworfen (siehe BEKANNTE OFFENE
+      PUNKTE), stattdessen eine reine, unbewertete Anzahl anderer Wünsche
+      für dasselbe Datum ergänzt — erster lesender Firestore-Zugriff
+      dieser Datei.
+    2026-09-12 · 09:50 · v0.5 · Fix
+      Ulf: solche Fehlermeldungen künftig überall zeigen, nicht nur die
+      echte Meldung statt "fehlgeschlagen" konsole-only -- auf Tablet/
+      Handy ist Remote-Debugging umständlich. Alle Fehlermeldungen dieser
+      Datei zeigen jetzt err.message direkt in der UI.
+    2026-09-12 · 15:06 · v0.6 · Feature
+      Zweiter Tab "Sonntage ablehnen" (Ulf: "warum einen neuen Satelliten
+      bauen, wenn Wunschtag schon das ganze Login-Gerüst mitbringt" --
+      zu Recht, ursprünglich sogar so vorgeschlagen). Liste kommender
+      Sonntage + offener Feiertage (bos_zeitkontext_referenz.js +
+      bos_zeitkontext.js, neu eingebunden), pro Tag ein "nicht arbeiten"-
+      Knopf mit optionaler Begründung, schreibt EIN Dokument pro Ablehnung
+      nach bos_events (type: 'sonntag_ablehnung') -- gleiches Schema-
+      Prinzip wie Wunschtag/Urlaub-Anfrage, bewusst eigener `type`, NICHT
+      mit Wunschtag vermischt ("hat ja nichts mit den freien Tagen zu
+      tun", Ulf). sonntagsplan.html liest und übernimmt diese Einträge
+      (siehe dortiger Changelog).
+    2026-09-16 · 22:05 · v0.7 · Fix (T-77)
+      bos_theme_sync.js eingebunden. Das data-theme="dark" am
+      <html>-Tag galt damit unabhaengig vom Launcher-Profil -- die Seite
+      lief IMMER dunkel, egal was der Nutzer eingestellt hatte. Genau das
+      Problem, das am 28.08.2026 fuer die Hub-Kacheln geloest wurde
+      (SESSION_2026-08-28_THEME_SYNC.md); dieser Satellit entstand am
+      12.09. und hat den Einbau nie bekommen. Gefunden durch Ulfs Frage
+      "ist Systemdesign denn ueberhaupt eingebunden?".
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat-SDK) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- Ergaenzt 16.09.2026 (T-77): bos_theme_sync.js liest das Theme des
+     aktiven Launcher-Profils und setzt data-theme auf DIESEM Dokument --
+     jede Seite laeuft in einem eigenen iframe-Fenster, ein data-theme des
+     Launchers gilt hier nicht automatisch. MUSS vor bos_design_tokens.css
+     stehen, sonst blitzt kurz das falsche Theme auf. Das data-theme="dark"
+     am <html>-Tag bleibt bewusst als Vorbelegung stehen: es gilt, bis das
+     Skript laeuft, und auch dann, wenn es (etwa bei einem stumm
+     fehlgeschlagenen Script-Load, siehe T-74) gar nicht laeuft. -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a);
+    --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg);
+    color:var(--text); font-family:var(--font-body); min-height:100vh;
+    padding-bottom:110px; -webkit-tap-highlight-color:transparent;
+  }
+
+  header{
+    padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px);
+    border-bottom:1px solid var(--border); background:var(--surface);
+    position:sticky; top:0; z-index:20;
+  }
+  .eyebrow{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.14em;
+    text-transform:uppercase; font-size: var(--bos-font-xs,.72rem);
+    color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px);
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{
+    font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.7rem);
+    margin: var(--bos-space-3xs,4px) 0 var(--bos-space-3xs,2px); letter-spacing:-.01em;
+  }
+  .zeit{font-family:var(--font-label); color:var(--dim); font-size: var(--bos-font-sm,.85rem); letter-spacing:.02em;}
+  .hilfe-btn{
+    position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--dim);
+    font-family:var(--font-label); font-weight:700; display:flex; align-items:center;
+    justify-content:center; cursor:pointer;
+  }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px) var(--bos-space-xs,8px); max-width:640px; margin:0 auto;}
+
+  .tab-leiste{ display:flex; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:19; }
+  .tab-btn{ flex:1; background:transparent; border:none; padding: var(--bos-space-sm,12px); font-family:var(--font-label); font-weight:700; letter-spacing:.02em; font-size: var(--bos-font-sm,.85rem); color:var(--dim); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab-btn.aktiv{color:var(--amber-bright); border-bottom-color:var(--amber);}
+
+  .ablehnen-zeile{ display:flex; align-items:center; justify-content:space-between; gap: var(--bos-space-sm,10px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .ablehnen-datum{font-weight:700;}
+  .ablehnen-typ{font-size: var(--bos-font-xs,.74rem); color:var(--dim); font-family:var(--font-label);}
+  .ablehnen-btn{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.76rem); background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong); border-radius:8px; padding: 8px 12px; cursor:pointer; flex-shrink:0; }
+  .ablehnen-btn.abgelehnt{background:var(--amber-glow); color:var(--amber-bright); border-color:var(--amber);}
+  .ablehnen-begruendung-feld{ margin-top: var(--bos-space-sm,10px); padding-top: var(--bos-space-sm,10px); border-top:1px solid var(--border); display:none; }
+  .ablehnen-begruendung-feld.offen{display:block;}
+  .ablehnen-begruendung-feld textarea{width:100%; margin-bottom: var(--bos-space-xs,8px);}
+  .ablehnen-begruendung-feld .btn-bestaetigen{ width:100%; padding: 10px; font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.03em; font-size: var(--bos-font-sm,.82rem); background:var(--amber); color:#1a1208; border:none; border-radius:8px; cursor:pointer; }
+
+  .feiertag-hinweis{margin: 0 0 var(--bos-space-sm,10px); padding: 10px 12px; border-radius: 8px;
+    border:1px solid var(--amber); background: var(--amber-glow); font-size: var(--bos-font-sm,.85rem); line-height:1.5;}
+  .feiertag-hinweis .quelle{display:block; font-size: var(--bos-font-xs,.75rem); opacity:.8; margin-bottom:2px;}
+  .intro{
+    font-size: var(--bos-font-md,.95rem); color:var(--dim); line-height:1.5;
+    margin: 0 0 var(--bos-space-lg,22px); padding: var(--bos-space-sm,14px);
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  }
+  .intro b{color:var(--text);}
+
+  .abschnitt-titel{
+    font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-sm,.82rem);
+    letter-spacing:.1em; text-transform:uppercase; color:var(--dim);
+    margin: 0 0 var(--bos-space-xs,10px) var(--bos-space-3xs,4px);
+  }
+
+  /* ===== Wochenauswahl ===== */
+  .wochen-liste{display:flex; flex-direction:column; gap: var(--bos-space-xs,8px); margin-bottom: var(--bos-space-lg,22px);}
+  .wochen-karte{
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding: var(--bos-space-sm,14px); font-family:var(--font-body); color:var(--text);
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .wochen-karte:hover{border-color:var(--border-strong);}
+  .wochen-karte.gewaehlt{border-color:var(--amber); background:var(--amber-glow);}
+  .wochen-karte .wk-zeitraum{font-weight:700; font-size: var(--bos-font-md,.98rem);}
+  .wochen-karte .wk-frist{
+    font-family:var(--font-label); font-size: var(--bos-font-xs,.74rem); color:var(--dim);
+    margin-top: var(--bos-space-3xs,4px); letter-spacing:.02em;
+  }
+  .wochen-karte.gewaehlt .wk-frist{color:var(--amber-bright);}
+  .wochen-karte .wk-frist.abgelaufen{color:var(--danger);}
+
+  /* ===== Tagesraster ===== */
+  .tage-grid{display:grid; grid-template-columns:repeat(7,1fr); gap: var(--bos-space-2xs,6px); margin-bottom: var(--bos-space-md,18px);}
+  .tag-btn{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding: var(--bos-space-xs,8px) 2px; border-radius:10px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text); font-family:var(--font-label); cursor:pointer;
+  }
+  .tag-btn .tag-name{font-size: var(--bos-font-xs,.7rem); color:var(--dim); text-transform:uppercase; letter-spacing:.04em;}
+  .tag-btn .tag-datum{font-size: var(--bos-font-md,.92rem); font-weight:700;}
+  .tag-btn.gewaehlt{border-color:var(--amber); background:var(--amber-glow); color:var(--amber-bright);}
+  .tag-btn.gewaehlt .tag-name{color:var(--amber-bright);}
+
+  .feld{margin-bottom: var(--bos-space-lg,22px);}
+  .checkbox-row{display:flex; align-items:center; gap: var(--bos-space-xs,10px); cursor:pointer; margin-bottom: var(--bos-space-2xs,6px);}
+  .checkbox-row input[type="checkbox"]{width:20px; height:20px; accent-color:var(--amber); flex-shrink:0;}
+  .checkbox-row span{font-size: var(--bos-font-md,.95rem); font-weight:600;}
+  .feld-hinweis{font-size: var(--bos-font-xs,.78rem); color:var(--dim); line-height:1.5; margin: var(--bos-space-2xs,6px) 0 0;}
+  textarea.bos-input{resize:vertical; min-height:70px; font-family:var(--font-body);}
+
+  .frist-hinweis-block{
+    font-size: var(--bos-font-sm,.85rem); color:var(--danger); background:rgba(214,88,74,.12);
+    border:1px solid rgba(214,88,74,.3); border-radius:var(--radius); padding: var(--bos-space-sm,12px);
+    margin-bottom: var(--bos-space-md,18px); line-height:1.5;
+  }
+
+  .fern-block{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,14px); margin-bottom: var(--bos-space-lg,22px);}
+  .fern-hinweis{font-size: var(--bos-font-sm,.85rem); color:var(--dim); margin: 0 0 var(--bos-space-sm,10px); line-height:1.5;}
+
+  .warte-box{text-align:center; padding: var(--bos-space-xl,50px) var(--bos-space-md,20px); color:var(--dim); font-size: var(--bos-font-md,.95rem);}
+  .warte-box.fehler{color:var(--danger);}
+
+  /* ===== Sticky Submit ===== */
+  .submit-bar{
+    position:fixed; left:0; right:0; bottom:0;
+    padding: var(--bos-space-sm,12px) var(--bos-space-sm,14px) calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, var(--bg) 60%, transparent); z-index:30;
+  }
+  .submit-btn{
+    width:100%; max-width:640px; margin:0 auto; display:block;
+    font-family:var(--font-label); font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+    font-size: var(--bos-font-md,1rem); color:#1b1305;
+    background:linear-gradient(180deg, var(--amber-bright), var(--amber));
+    border:none; border-radius:var(--radius); padding: var(--bos-space-sm,16px); cursor:pointer;
+    box-shadow:0 4px 18px var(--amber-glow);
+  }
+  .submit-btn:disabled{background:var(--surface-2); color:var(--dim-2); box-shadow:none; cursor:not-allowed;}
+  .submit-hint{text-align:center; font-family:var(--font-label); font-size: var(--bos-font-xs,.74rem); color:var(--dim); margin-top: var(--bos-space-xs,8px); letter-spacing:.02em;}
+
+  /* ===== Hilfe-Sheet ===== */
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen{display:flex;}
+  .sheet{
+    background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0;
+    padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom));
+    width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto;
+  }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet h3{font-family:var(--font-label); font-size: var(--bos-font-sm,.85rem); text-transform:uppercase; letter-spacing:.04em; color:var(--amber-bright); margin: var(--bos-space-md,16px) 0 var(--bos-space-2xs,4px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{
+    margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+    font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    font-size: var(--bos-font-sm,.82rem); cursor:pointer;
+  }
+
+  /* ===== Erfolgsansicht ===== */
+  .erfolg{text-align:center; padding: var(--bos-space-xl,60px) var(--bos-space-lg,24px);}
+  .erfolg .glyph{
+    width:64px; height:64px; border-radius:50%; background:var(--amber-glow); border:2px solid var(--amber);
+    display:flex; align-items:center; justify-content:center; font-size: var(--bos-font-2xl,1.8rem);
+    margin: 0 auto var(--bos-space-md,18px);
+  }
+  .erfolg h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.4rem); margin: 0 0 var(--bos-space-xs,8px);}
+  .erfolg p{color:var(--dim); font-size: var(--bos-font-md,.92rem); margin: 0 0 var(--bos-space-lg,24px);}
+  .neu-btn{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    font-size: var(--bos-font-sm,.85rem); color:var(--bg); background:var(--amber);
+    border:none; border-radius:8px; padding: var(--bos-space-sm,12px) var(--bos-space-lg,22px); cursor:pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<!-- Standalone-Login-Kette (Reihenfolge bindend, siehe bos_standalone_login.js Kopf-Kommentar) -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../feiertagsregel.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'wunschtag';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Wunschtag</h1>
+  <div class="zeit" id="zeitText">—</div>
+</header>
+
+<div class="tab-leiste">
+  <button type="button" class="tab-btn aktiv" id="tab1Btn" data-tab="1">Wunschtag</button>
+  <button type="button" class="tab-btn" id="tab2Btn" data-tab="2">Sonntage ablehnen</button>
+</div>
+
+<main id="main">
+  <div class="warte-box" id="warteBox">Einen Moment …</div>
+</main>
+
+<main id="mainTab2" style="display:none;">
+  <div class="warte-box" id="tab2WarteBox">Einen Moment …</div>
+</main>
+
+<div class="submit-bar" id="submitBar" style="display:none;">
+  <button class="submit-btn" id="submitBtn" disabled>Wunsch absenden</button>
+  <div class="submit-hint" id="submitHint">Wähle zuerst eine Woche und einen Tag.</div>
+</div>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Was ist ein Wunschtag?</h2>
+    <p>Ein Wunschtag ist <b style="color:var(--text)">unverbindlich</b>. Er ist keine Krankmeldung, kein Urlaubsantrag und keine Zusage — er fließt nur als Hinweis in die Planung ein.</p>
+    <h3>Wie funktioniert die Frist?</h3>
+    <p>Für jede der drei nächsten Wochen gibt es eine Frist (Donnerstag, 12 Uhr, der Vorwoche). Danach wird die Woche geplant. Ein Wunsch nach Ablauf der Frist kommt trotzdem an — sag im Zweifel zusätzlich persönlich Bescheid.</p>
+    <h3>Weiter in der Zukunft?</h3>
+    <p>Kein Fenster, kein Limit — ein Tag in einigen Monaten lässt sich genauso eintragen wie einer nächste Woche. Keine Frist-Anzeige dafür, weil noch nicht geplant wird.</p>
+    <h3>Was, wenn sich mein Wunsch ändert?</h3>
+    <p>Einfach nochmal absenden. Der neue Eintrag zeigt der planenden Person, dass sich etwas geändert hat.</p>
+    <h3>Was passiert mit der Begründung?</h3>
+    <p>Sie ist freiwillig — du musst dich nicht rechtfertigen. Sie ist nur für die Person sichtbar, die den Plan erstellt — niemand sonst kann sie lesen, auch nicht über Umwege. Sie steht nicht auf dem für alle Kollegen offenen Plan. Bitte keine Gesundheits- oder Diagnosedaten eintragen.</p>
+    <h3>Und der zweite Tab "Sonntage ablehnen"?</h3>
+    <p>Getrennt von Wunschtag — hier sagst du, an welchem konkreten Sonntag oder offenen Feiertag du nicht arbeiten möchtest. Auch das ist unverbindlich, keine Zusage.</p>
+    <h3>Was bedeutet "Erhöhte Priorität"?</h3>
+    <p>Ein zusätzliches Signal für besondere Anlässe. Der Grund wird dabei nicht abgefragt — bei Bedarf persönlich.</p>
+    <p>Der Stern ⭐: Markiere einen Wunsch als wichtig, wenn du genau diesen Tag brauchst. In einer Woche mit Feiertag bekommen manche Kollegen zwei oder mehr freie Tage. Das System legt sie dann möglichst zusammen. Ohne Stern kann das deinen Wunschtag verdrängen, mit Stern hat der Wunschtag Vorrang.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  /* ==== Frist-Einstellung (vorläufig, siehe Modul-Kopf) ==== */
+  var FRIST_WOCHENTAG_OFFSET = 3;  // Montag + 3 Tage = Donnerstag
+  var FRIST_STUNDE = 12;
+
+  var WOCHENTAGE = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  var MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+  function formatDatum(d) {
+    return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.';
+  }
+  function formatDatumKurz(d) {
+    return String(d.getDate()).padStart(2,'0') + '.' + MONATE[d.getMonth()];
+  }
+  function isoDatum(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function montagDerWoche(datum) {
+    var d = new Date(datum);
+    d.setHours(0,0,0,0);
+    var tag = d.getDay(); // 0=So..6=Sa
+    var diff = (tag === 0 ? -6 : 1 - tag);
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  /* Die nächsten drei Kalenderwochen ab kommender Woche, je mit Frist
+     (Donnerstag 12 Uhr der Vorwoche). Frist ist Hinweis, kein Blocker. */
+  function berechneWochen() {
+    var heute = new Date();
+    var montagAktuell = montagDerWoche(heute);
+    var wochen = [];
+    for (var i = 1; i <= 3; i++) {
+      var montagZiel = new Date(montagAktuell);
+      montagZiel.setDate(montagZiel.getDate() + i * 7);
+      var montagVorwoche = new Date(montagZiel);
+      montagVorwoche.setDate(montagVorwoche.getDate() - 7);
+      var frist = new Date(montagVorwoche);
+      frist.setDate(frist.getDate() + FRIST_WOCHENTAG_OFFSET);
+      frist.setHours(FRIST_STUNDE, 0, 0, 0);
+      var tage = [];
+      for (var t = 0; t < 7; t++) {
+        var tagDatum = new Date(montagZiel);
+        tagDatum.setDate(tagDatum.getDate() + t);
+        tage.push(tagDatum);
+      }
+      wochen.push({
+        montag: montagZiel,
+        tage: tage,
+        frist: frist,
+        fristAbgelaufen: heute > frist
+      });
+    }
+    return wochen;
+  }
+
+  var WOCHEN = berechneWochen();
+  var gewaehlteWoche = null;   // Index in WOCHEN
+  var fernDatum = null;        // Date, wenn "Weiter in der Zukunft" genutzt wird (statt WOCHEN)
+
+  function fernMinDatum() {
+    // Erster Tag NACH der letzten Nah-Woche, damit sich beide Wege nicht überlappen.
+    var letzte = WOCHEN[WOCHEN.length - 1];
+    var d = new Date(letzte.tage[6]);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+  var gewaehlterTag = null;    // Date
+  var authBereit = false;      // erst senden, wenn BOS_AUTH_READY erfüllt ist (gleiche Vorsicht wie froster_inventur.html)
+
+  (window.BOS_AUTH_READY || Promise.resolve()).then(function () {
+    authBereit = true;
+    aktualisiereSubmitZustand();
+  }).catch(function (err) {
+    console.error('[Wunschtag] Auth-Fehler:', err);
+  });
+
+  /* ==== Kopfzeile ==== */
+  function renderZeit() {
+    var jetzt = new Date();
+    var tage = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    document.getElementById('zeitText').textContent =
+      tage[jetzt.getDay()] + '. ' + formatDatum(jetzt) + String(jetzt.getFullYear()).slice(2) +
+      ' · ' + String(jetzt.getHours()).padStart(2,'0') + ':' + String(jetzt.getMinutes()).padStart(2,'0') + ' Uhr';
+  }
+  renderZeit();
+  setInterval(renderZeit, 30000);
+
+  // E20 (23.09.2026): Texte der Stern-Checkbox, VOR renderFormular()
+  // definiert, weil das Formular sie beim ersten Rendern braucht.
+  var STERN_TEXT_NORMAL = {
+    label: 'Erhöhte Priorität',
+    hinweis: 'Für besondere Anlässe. Der Grund wird hier nicht abgefragt — bei Bedarf persönlich.'
+  };
+  var STERN_TEXT_FEIERTAGSWOCHE = {
+    label: '⭐ Genau dieser Tag ist mir wichtig',
+    hinweis: 'In dieser Woche ist ein Feiertag. Wer mehrere freie Tage bekommt, bekommt sie möglichst am Stück. Mit Stern hat dein Wunschtag Vorrang.'
+  };
+
+  /* ==== Formular rendern ==== */
+  function renderFormular() {
+    var html = '';
+    html += '<div class="intro">Dein Wunsch ist <b>unverbindlich</b> und keine Zusage. Eine Begründung ist freiwillig — du musst dich nicht rechtfertigen.</div>';
+
+    html += '<div class="abschnitt-titel">Woche</div>';
+    html += '<div class="wochen-liste" id="wochenListe">';
+    WOCHEN.forEach(function (w, i) {
+      var erster = w.tage[0], letzter = w.tage[6];
+      html += '<button type="button" class="wochen-karte" data-woche="' + i + '">' +
+        '<div class="wk-zeitraum">' + formatDatum(erster) + ' – ' + formatDatumKurz(letzter) + '</div>' +
+        '<div class="wk-frist' + (w.fristAbgelaufen ? ' abgelaufen' : '') + '">' +
+        (w.fristAbgelaufen ? 'Frist abgelaufen (Do. ' + formatDatumKurz(w.frist) + ', 12 Uhr)' : 'Frist: Do. ' + formatDatumKurz(w.frist) + ', 12 Uhr') +
+        '</div></button>';
+    });
+    html += '</div>';
+
+    html += '<div id="tagAbschnitt" style="display:none;">';
+    html += '<div class="abschnitt-titel">Tag</div>';
+    html += '<div id="fristHinweisBox"></div>';
+    html += '<div class="tage-grid" id="tageGrid"></div>';
+    html += '</div>';
+
+    html += '<div class="abschnitt-titel">Weiter in der Zukunft</div>';
+    html += '<div class="fern-block">' +
+      '<p class="fern-hinweis">Für einen Tag, den du dir schon jetzt freihalten möchtest, auch wenn er noch weit weg ist.</p>' +
+      '<input type="date" class="bos-input" id="fernDatumInput" min="' + isoDatum(fernMinDatum()) + '">' +
+      '</div>';
+
+    html += '<div id="rotationHinweisBox"></div>'; // E25 B (24.09.2026)
+    html += '<div id="feiertagHinweisBox"></div>'; // E22 (24.09.2026)
+
+    html += '<div class="feld">' +
+      '<label class="checkbox-row"><input type="checkbox" id="wichtigCheckbox"><span id="wichtigLabel">' + STERN_TEXT_NORMAL.label + '</span></label>' +
+      '<p class="feld-hinweis" id="wichtigHinweis">' + STERN_TEXT_NORMAL.hinweis + '</p>' +
+      '</div>';
+
+    html += '<div class="feld">' +
+      '<label class="bos-label" for="begruendung">Begründung (freiwillig)</label>' +
+      '<textarea id="begruendung" class="bos-input" rows="3" placeholder="Nur falls du möchtest …"></textarea>' +
+      '<p class="feld-hinweis">Nur für die planende Person sichtbar, nicht im veröffentlichten Plan. Bitte keine Gesundheits- oder Diagnosedaten eintragen.</p>' +
+      '</div>';
+
+    document.getElementById('main').innerHTML = html;
+
+    document.querySelectorAll('.wochen-karte').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        gewaehlteWoche = parseInt(btn.dataset.woche, 10);
+        gewaehlterTag = null;
+        fernDatum = null;
+        document.getElementById('fernDatumInput').value = '';
+        document.querySelectorAll('.wochen-karte').forEach(function (b) { b.classList.remove('gewaehlt'); });
+        btn.classList.add('gewaehlt');
+        renderTage();
+        aktualisiereSubmitZustand();
+      });
+    });
+
+    document.getElementById('fernDatumInput').addEventListener('change', function (e) {
+      if (!e.target.value) { fernDatum = null; aktualisiereSubmitZustand(); return; }
+      fernDatum = new Date(e.target.value + 'T00:00:00');
+      gewaehlteWoche = null; gewaehlterTag = null;
+      document.querySelectorAll('.wochen-karte').forEach(function (b) { b.classList.remove('gewaehlt'); });
+      document.getElementById('tagAbschnitt').style.display = 'none';
+      aktualisiereSubmitZustand();
+    });
+
+    document.getElementById('wichtigCheckbox').addEventListener('change', aktualisiereSubmitZustand);
+    document.getElementById('begruendung').addEventListener('input', aktualisiereSubmitZustand);
+
+    document.getElementById('submitBar').style.display = 'block';
+  }
+
+  function renderTage() {
+    var w = WOCHEN[gewaehlteWoche];
+    var abschnitt = document.getElementById('tagAbschnitt');
+    abschnitt.style.display = 'block';
+
+    var hinweisBox = document.getElementById('fristHinweisBox');
+    hinweisBox.innerHTML = w.fristAbgelaufen
+      ? '<div class="frist-hinweis-block">Die Frist für diese Woche ist bereits abgelaufen. Trag deinen Wunsch trotzdem ein — am besten zusätzlich persönlich Bescheid sagen.</div>'
+      : '';
+
+    var html = '';
+    w.tage.forEach(function (tagDatum, i) {
+      html += '<button type="button" class="tag-btn" data-tag="' + i + '">' +
+        '<span class="tag-name">' + WOCHENTAGE[i] + '</span>' +
+        '<span class="tag-datum">' + tagDatum.getDate() + '</span>' +
+        '</button>';
+    });
+    document.getElementById('tageGrid').innerHTML = html;
+
+    document.querySelectorAll('.tag-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = parseInt(btn.dataset.tag, 10);
+        gewaehlterTag = w.tage[idx];
+        document.querySelectorAll('.tag-btn').forEach(function (b) { b.classList.remove('gewaehlt'); });
+        btn.classList.add('gewaehlt');
+        try {
+          aktualisiereSubmitZustand();
+        } catch (fehler) {
+          var h = document.getElementById('submitHint');
+          if (h) {
+            h.textContent = 'Fehler beim Freigeben des Knopfes: ' +
+                            ((fehler && fehler.message) || String(fehler));
+            h.style.color = '#e0776a';
+          }
+          throw fehler;
+        }
+      });
+    });
+  }
+
+  /* Gewählter Tag aus der Wochenauswahl ODER ein Datum weiter in der
+     Zukunft — was gerade gesetzt ist. Stand bis zum 20.09.2026 unter der
+     Überschrift der Anzahl-Anzeige und wurde beim Ausbau versehentlich
+     mitentfernt; ohne sie blieb der Absende-Knopf gesperrt, weil
+     aktualisiereSubmitZustand() abbrach. Gehört inhaltlich nicht dorthin,
+     steht deshalb jetzt für sich. */
+  function aktuellesDatum() { return gewaehlterTag || fernDatum; }
+
+  /* Die Anzahl-Anzeige ist am 20.09.2026 ersatzlos entfallen.
+     Ulfs Begründung, damit sie nicht wieder aufgemacht wird: eine Zahl
+     ohne Namen ist nicht nur weniger hilfreich, sie ist irreführend.
+     "Drei haben schon frei" bedeutet am Ofen etwas anderes als in der
+     Konditorei; wer die Besetzung nicht kennt, zieht falsche Schlüsse
+     und nimmt sich womöglich einen Tag zurück, der problemlos gegangen
+     wäre. Die naheliegende Verbesserung — Namen dazu — ist ausdrücklich
+     unerwünscht: dann sieht jeder, wer wann freihaben will, und aus
+     einem Wunsch wird eine öffentliche Liste.
+
+     Nebeneffekt, der den Ausschlag gab: die Abfrage las ALLE Wünsche
+     eines Datums, also auch fremde Begründungen. Die Leseregel seit
+     Etappe 3.2 erlaubt nur noch die eigene Einreichung (plus Planung),
+     und Firestore lehnt eine Abfrage ganz ab, sobald ein Treffer nicht
+     passt. Mit dem Ausbau verschwindet das Problem, statt gelöst zu
+     werden.
+
+     Die Frage dahinter bleibt offen: wer einreicht, weiß nicht, ob der
+     Wunsch aussichtsreich ist. Die Antwort darauf ist keine Zahl beim
+     Einreichen, sondern eine Rückmeldung danach — siehe Baustellen. */
+
+  /* ==== Sichtbare Fehleranzeige (20.09.2026) ====
+     Ein JavaScript-Fehler brach die Seite bisher stumm ab: der Tag wurde
+     markiert, der Absende-Knopf blieb gesperrt, und auf dem Bildschirm
+     stand weiter der Starttext. Remote-Debugging auf dem Tablet ist
+     unpraktisch — also meldet die Seite es selbst. Bleibt dauerhaft
+     drin; das ist billiger als die nächste Stunde Ratespiel. */
+  window.addEventListener('error', function (e) {
+    var hint = document.getElementById('submitHint');
+    if (!hint) return;
+    hint.textContent = 'Fehler: ' + (e.message || 'unbekannt') +
+      ' (' + ((e.filename || '').split('/').pop()) + ':' + (e.lineno || '?') + ')';
+    hint.style.color = '#e0776a';
+  });
+
+  window.addEventListener('unhandledrejection', function (e) {
+    var hint = document.getElementById('submitHint');
+    if (!hint) return;
+    var r = e.reason;
+    hint.textContent = 'Fehler (unbehandelt): ' + ((r && r.message) || String(r));
+    hint.style.color = '#e0776a';
+  });
+
+  /* ==== Stern-Beschriftung (E20, 23.09.2026) ====
+     Nur Text. In einer Feiertagswoche bekommen manche Kollegen zwei oder
+     mehr freie Tage, und das System legt sie möglichst zusammen ("am
+     Stück", Gewicht 30). Ein Wunsch ohne Stern (10) kann dem unterliegen,
+     mit Stern (50) hat er Vorrang (E19). Die Beschriftung sagt das dort,
+     wo der Stern gesetzt wird -- so, dass sie auch für jemanden stimmt,
+     der nur einen freien Tag hat. */
+  // Feiertagswoche = Mo-So-Woche des Datums mit einem Feiertag Mo-Sa,
+  // offen oder geschlossen (E4, E5); ein Sonntags-Feiertag zählt nicht
+  // (E17). Ohne Feiertagsdaten: false (normale Beschriftung, E20).
+  function istFeiertagswoche(datum) {
+    if (!datum || !window.BOS_FEIERTAGE || !Array.isArray(window.BOS_FEIERTAGE.feiertage)) return false;
+    var montag = new Date(datum.getFullYear(), datum.getMonth(), datum.getDate());
+    montag.setDate(montag.getDate() - ((montag.getDay() + 6) % 7));
+    var samstag = new Date(montag); samstag.setDate(samstag.getDate() + 5);
+    var von = isoDatum(montag), bis = isoDatum(samstag);
+    return window.BOS_FEIERTAGE.feiertage.some(function (f) { return f && f.datum >= von && f.datum <= bis; });
+  }
+
+  function aktualisiereSternBeschriftung() {
+    var label = document.getElementById('wichtigLabel');
+    var hinweis = document.getElementById('wichtigHinweis');
+    if (!label || !hinweis) return;
+    // Solange noch kein Tag gewählt ist, zählt die gewählte Woche.
+    var datum = aktuellesDatum() || (gewaehlteWoche !== null && WOCHEN[gewaehlteWoche] ? WOCHEN[gewaehlteWoche].tage[0] : null);
+    var text = istFeiertagswoche(datum) ? STERN_TEXT_FEIERTAGSWOCHE : STERN_TEXT_NORMAL;
+    if (label.textContent !== text.label) label.textContent = text.label;
+    if (hinweis.textContent !== text.hinweis) hinweis.textContent = text.hinweis;
+  }
+
+  /* ==== Persönlicher Feiertags-Hinweis (E22, 24.09.2026) ==== */
+  var eigenesKontoId = null;          // gesetzt in warteAufProfil()
+  var eigenePersonPromise = null;     // einmal pro Seitenaufruf
+  var feiertagsLageCache = {};        // montagIso -> Promise der Lage
+  var feiertagHinweisZaehler = 0;     // gegen verspätete Antworten
+
+  var FEIERTAG_TEXT = {
+    frei: 'Der Feiertag ist diese Woche dein freier Tag. Ein Wunschtag greift deshalb nicht.',
+    kannGreifen: 'Du bist am Feiertag oder Sonntag eingeteilt. Dein Wunschtag kann greifen.',
+    feiertagFrei: 'Am Feiertag hast du ohnehin frei.',
+    feiertagEingeteilt: 'Du bist am Feiertag eingeteilt.'
+  };
+  var WT_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  function tagDatumText(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    return WT_KURZ[d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.';
+  }
+  function festerFeiertagText(feiertage) {
+    var tage = feiertage.map(function (f) { return tagDatumText(f.datum); });
+    var liste = tage.length > 1 ? tage.slice(0, -1).join(', ') + ' und ' + tage[tage.length - 1] : tage[0];
+    return 'In dieser Woche ' + (tage.length > 1 ? 'sind ' + liste + ' Feiertage' : 'ist ' + liste + ' Feiertag') +
+      '. Wer am Feiertag frei hat, hat damit seinen freien Tag dieser Woche, ein Wunschtag greift dann nicht. ' +
+      'Er greift nur, wenn du am Feiertag oder Sonntag eingeteilt bist.';
+  }
+
+  // Eigene Person NUR gefiltert (wie mein_konto.html); null = nicht verknüpft.
+  // 26.09.2026 (N-12): bei MEHR als einem Treffer ebenfalls null — vorher
+  // still der erste. Die Nummern stehen dann in mehrfachVerknuepft, und
+  // aktualisiereRotationHinweis() zeigt sie. Einreichen bleibt möglich:
+  // die Einreichung hängt an der Kennung, nicht an der Person.
+  var mehrfachVerknuepft = null;      // null oder ['P07', 'P12']
+  function ladeEigenePerson() {
+    if (eigenePersonPromise) return eigenePersonPromise;
+    if (!eigenesKontoId || !window.db) return Promise.resolve(null);
+    eigenePersonPromise = window.db.collection('personen').where('bosKontoId', '==', eigenesKontoId).get().then(function (snap) {
+      if (snap.size > 1) {
+        mehrfachVerknuepft = snap.docs.map(function (d) { return d.id; }).sort(function (a, b) {
+          return (parseInt(a.slice(1), 10) || 0) - (parseInt(b.slice(1), 10) || 0) || a.localeCompare(b);
+        });
+        console.error('[Wunschtag] Mehrere Personen mit Konto ' + eigenesKontoId + ' verknüpft:', mehrfachVerknuepft);
+        return null;
+      }
+      mehrfachVerknuepft = null;
+      var person = null;
+      snap.forEach(function (doc) { if (!person) person = Object.assign({ id: doc.id }, doc.data()); });
+      return person;
+    });
+    eigenePersonPromise.catch(function () { eigenePersonPromise = null; }); // nächster Versuch darf neu lesen
+    return eigenePersonPromise;
+  }
+
+  // Feiertage Mo-Sa der Woche (E17), ihr Status und die nötigen
+  // Sonntagsplan-Dokumente (Tabelle 4.1). Je Woche einmal gelesen.
+  function ladeFeiertagsLage(montag) {
+    var key = isoDatum(montag);
+    if (feiertagsLageCache[key]) return feiertagsLageCache[key];
+    var samstag = new Date(montag); samstag.setDate(samstag.getDate() + 5);
+    var sonntag = new Date(montag); sonntag.setDate(sonntag.getDate() + 6);
+    var von = key, bis = isoDatum(samstag), sonntagIso = isoDatum(sonntag);
+    var feiertage = window.BOS_FEIERTAGE.feiertage.filter(function (f) { return f.datum >= von && f.datum <= bis; });
+    var p = Promise.all(feiertage.map(function (f) { return window.BOS_ZEITKONTEXT.status(window.db, f.datum); })).then(function (stati) {
+      var liste = feiertage.map(function (f, i) { return { datum: f.datum, name: f.name, offen: !!(stati[i] && stati[i].offen) }; });
+      var noetig = liste.filter(function (f) { return f.offen; }).map(function (f) { return f.datum; }).concat([sonntagIso]);
+      return Promise.all(noetig.map(function (d) { return window.db.collection('sonntagsplan').doc(d).get(); })).then(function (docs) {
+        var plaene = {}, fehlt = false;
+        docs.forEach(function (doc, i) { if (doc.exists) plaene[noetig[i]] = doc.data(); else fehlt = true; });
+        return { feiertage: liste, sonntag: sonntagIso, plaene: plaene, fehlt: fehlt };
+      });
+    });
+    feiertagsLageCache[key] = p;
+    p.catch(function () { delete feiertagsLageCache[key]; });
+    return p;
+  }
+
+  function eingeteilt(doc) {
+    var z = (doc && doc.zuweisungen) || {};
+    return Object.keys(z).map(function (k) { return z[k]; }).filter(Boolean);
+  }
+
+  /**
+   * Reine Entscheidung, welcher Text erscheint (für die Testsuite
+   * herauslösbar). person: eigenes Personen-Dokument oder null; lage:
+   * Ergebnis von ladeFeiertagsLage(); gewaehltIso: gewählter Tag oder
+   * null (nur Woche). Liefert { persoenlich, text }.
+   */
+  function feiertagHinweisText(person, lage, gewaehltIso) {
+    var fest = festerFeiertagText(lage.feiertage);
+    // E25 (24.09.2026): Person bekannt und außerhalb der Rotation -> kein
+    // Rotations-Hinweis (der feste Text wäre für sie falsch). Hinweis B
+    // steht für sie im eigenen Kasten; Teil A folgt.
+    if (person && window.BOS_FEIERTAGSREGEL.ausserhalbDerRotation(person)) {
+      return hatWochenmuster(person) ? deineWocheText(person, lage) : { persoenlich: false, text: null };
+    }
+    // Fester Text: Plan fehlt oder Konto nicht verknüpft.
+    if (!person || lage.fehlt) {
+      return { persoenlich: false, text: fest };
+    }
+    var eingabe = {
+      feiertage: lage.feiertage.map(function (f) { return { datum: f.datum, offen: f.offen, eingeteilt: f.offen ? eingeteilt(lage.plaene[f.datum]) : [] }; }),
+      sonntagEingeteilt: eingeteilt(lage.plaene[lage.sonntag])
+    };
+    var r = window.BOS_FEIERTAGSREGEL.sollUndRest(person.id, eingabe);
+    var istFeiertag = gewaehltIso && lage.feiertage.some(function (f) { return f.datum === gewaehltIso; });
+    var text;
+    if (istFeiertag) text = r.arbeitetFeiertag.indexOf(gewaehltIso) !== -1 ? FEIERTAG_TEXT.feiertagEingeteilt : FEIERTAG_TEXT.feiertagFrei;
+    else text = r.rest >= 1 ? FEIERTAG_TEXT.kannGreifen : FEIERTAG_TEXT.frei;
+    return { persoenlich: true, text: text };
+  }
+
+  function zeigeFeiertagHinweis(box, inhalt) {
+    box.innerHTML = inhalt ? '<div class="feiertag-hinweis">' + inhalt + '</div>' : '';
+  }
+
+  function aktualisiereFeiertagHinweis() {
+    var box = document.getElementById('feiertagHinweisBox');
+    if (!box) return;
+    var datum = aktuellesDatum() || (gewaehlteWoche !== null && WOCHEN[gewaehlteWoche] ? WOCHEN[gewaehlteWoche].tage[0] : null);
+    if (!istFeiertagswoche(datum) || !window.BOS_FEIERTAGSREGEL || !window.BOS_ZEITKONTEXT || !window.db) {
+      zeigeFeiertagHinweis(box, ''); return; // normale Woche oder Daten fehlen: kein Hinweis, kein Fehler
+    }
+    var montag = new Date(datum.getFullYear(), datum.getMonth(), datum.getDate());
+    montag.setDate(montag.getDate() - ((montag.getDay() + 6) % 7));
+    var gewaehltIso = aktuellesDatum() ? isoDatum(aktuellesDatum()) : null;
+    var meinZaehler = ++feiertagHinweisZaehler;
+    var lagePromise = ladeFeiertagsLage(montag);
+    Promise.all([lagePromise, ladeEigenePerson()]).then(function (erg) {
+      if (meinZaehler !== feiertagHinweisZaehler) return; // inzwischen anderes Datum
+      var h = feiertagHinweisText(erg[1], erg[0], gewaehltIso);
+      if (h.text === null) { zeigeFeiertagHinweis(box, ''); return; } // E25
+      zeigeFeiertagHinweis(box, (h.persoenlich ? '<span class="quelle">Laut aktuellem Sonntagsplan:</span>' : '') + escHtmlWt(h.text));
+    }).catch(function (err) {
+      if (meinZaehler !== feiertagHinweisZaehler) return;
+      console.error('[Wunschtag] Feiertags-Hinweis:', err);
+      // Fester Text braucht nur die Feiertagsliste -- die ist lokal da.
+      lagePromise.catch(function () {}).then(function () {
+        var samstag = new Date(montag); samstag.setDate(samstag.getDate() + 5);
+        var von = isoDatum(montag), bis = isoDatum(samstag);
+        var feiertage = window.BOS_FEIERTAGE.feiertage.filter(function (f) { return f.datum >= von && f.datum <= bis; });
+        zeigeFeiertagHinweis(box, escHtmlWt(festerFeiertagText(feiertage)) +
+          '<br><span class="quelle">Persönlicher Stand nicht lesbar: ' + escHtmlWt((err && err.message) || String(err)) + '</span>');
+      });
+    });
+  }
+
+  /* ==== E25 A: "Deine Woche" (24.09.2026) ==== */
+  var WT_KEYS = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
+  var WT_NAME = { mo: 'Mo', di: 'Di', mi: 'Mi', do: 'Do', fr: 'Fr', sa: 'Sa', so: 'So' };
+
+  // Beschreiben die arbeitstage die Woche wirklich? (Antwort 24.09.: nur bei
+  // festen Arbeitstagen und bei keinRotierenderFreierTag mit gesetzten
+  // arbeitstage -- nicht beim nicht einsatzfähigen Azubi, nicht bei Inaktiven.)
+  function hatWochenmuster(person) {
+    var grund = window.BOS_FEIERTAGSREGEL.rotationsStatus(person).grund;
+    if (!Array.isArray(person.arbeitstage) || !person.arbeitstage.length) return false;
+    return grund === 'festeArbeitstage' || grund === 'keinRotierenderFreierTag';
+  }
+
+  // ['mo','di','mi','do','fr'] -> 'Mo–Fr'; ['mo','mi','fr'] -> 'Mo, Mi, Fr'
+  function wochenMusterText(arbeitstage) {
+    var idx = WT_KEYS.map(function (k, i) { return arbeitstage.indexOf(k) !== -1 ? i : -1; }).filter(function (i) { return i >= 0; });
+    var teile = [], start = null, vorher = null;
+    idx.concat([null]).forEach(function (i) {
+      if (start === null) { start = i; vorher = i; return; }
+      if (i !== null && i === vorher + 1) { vorher = i; return; }
+      var laenge = vorher - start + 1;
+      if (laenge >= 3) teile.push(WT_NAME[WT_KEYS[start]] + '–' + WT_NAME[WT_KEYS[vorher]]);
+      else for (var j = start; j <= vorher; j++) teile.push(WT_NAME[WT_KEYS[j]]);
+      start = i; vorher = i;
+    });
+    return teile.join(', ');
+  }
+
+  function aufzaehlung(liste) {
+    return liste.length > 1 ? liste.slice(0, -1).join(', ') + ' und ' + liste[liste.length - 1] : liste[0];
+  }
+
+  function wochentagKey(iso) { return WT_KEYS[(new Date(iso + 'T00:00:00').getDay() + 6) % 7]; }
+
+  function deineWocheText(person, lage) {
+    var tage = person.arbeitstage;
+    var frei = [], unbekannt = [], aufFreiemTag = [], eingeteilt = [];
+    var planFehlt = false;
+    lage.feiertage.forEach(function (f) {
+      var aufArbeitstag = tage.indexOf(wochentagKey(f.datum)) !== -1;
+      var plan = lage.plaene[f.datum];
+      var bekannt = !f.offen || !!plan;              // geschlossen: niemand arbeitet (E5)
+      if (f.offen && !plan) planFehlt = true;
+      var istEingeteilt = f.offen && plan && (function (z) { return Object.keys(z).some(function (k) { return z[k] === person.id; }); })(plan.zuweisungen || {});
+      if (istEingeteilt) eingeteilt.push(f.datum);
+      else if (!aufArbeitstag) aufFreiemTag.push(f.datum);
+      else if (bekannt) frei.push(f.datum);
+      else unbekannt.push(f.datum);
+    });
+    var sonntagsPlan = lage.plaene[lage.sonntag];
+    if (!sonntagsPlan) planFehlt = true;
+    else if (Object.keys(sonntagsPlan.zuweisungen || {}).some(function (k) { return sonntagsPlan.zuweisungen[k] === person.id; })) eingeteilt.push(lage.sonntag);
+
+    var saetze = [];
+    var ausnahmen = frei.concat(unbekannt).sort();
+    if (ausnahmen.length) {
+      saetze.push('Deine Woche: ' + wochenMusterText(tage) + ', außer ' + aufzaehlung(ausnahmen.map(tagDatumText)) +
+        (ausnahmen.length > 1 ? ', Feiertage' : ', Feiertag') + (unbekannt.length ? '.' : ', frei.'));
+    } else {
+      saetze.push('Deine Woche: ' + wochenMusterText(tage) + ' wie immer.');
+    }
+    if (unbekannt.length) {
+      saetze.push('Ob du ' + (unbekannt.length > 1 ? 'dort' : 'am ' + tagDatumText(unbekannt[0])) + ' eingeteilt bist, steht erst mit dem Sonntagsplan fest.');
+    }
+    if (aufFreiemTag.length) {
+      saetze.push(aufFreiemTag.length > 1
+        ? 'Die Feiertage am ' + aufzaehlung(aufFreiemTag.map(tagDatumText)) + ' fallen auf deine freien Tage.'
+        : 'Der Feiertag am ' + tagDatumText(aufFreiemTag[0]) + ' fällt auf deinen freien Tag.');
+    }
+    if (eingeteilt.length) {
+      saetze.push('Am ' + aufzaehlung(eingeteilt.sort().map(tagDatumText)) + ' bist du eingeteilt.');
+    }
+    return { persoenlich: !planFehlt, text: saetze.join(' ') };
+  }
+
+  /* ==== E25 B: Hinweis für Personen außerhalb der Rotation ==== */
+  var ROTATION_TEXT_B = 'Bei festen Arbeitstagen verteilt die Planung freie Tage nicht automatisch. Dein Wunsch kommt trotzdem an und wird von Hand entschieden.';
+  // Ulf 24.09.: für den nicht einsatzfähigen Azubi und Inaktive (keine
+  // festen Arbeitstage, sie werden nicht eingeteilt).
+  var ROTATION_TEXT_NICHT_EINGETEILT = 'Du wirst derzeit nicht in den Wochenplan eingeteilt. Dein Wunsch kommt trotzdem an und wird von Hand entschieden.';
+  function aktualisiereRotationHinweis() {
+    var box = document.getElementById('rotationHinweisBox');
+    // 26.09.2026: die Feiertagsregel ist nur für den Rotations-Text nötig,
+    // nicht für den Hinweis auf doppelte Verknüpfung — deshalb hier nur
+    // Box und Kennung als Voraussetzung, die Regel wird unten geprüft.
+    if (!box || !eigenesKontoId) { if (box) box.innerHTML = ''; return; }
+    ladeEigenePerson().then(function (person) {
+      var b = document.getElementById('rotationHinweisBox'); // Formular kann neu gerendert sein
+      if (!b) return;
+      if (mehrfachVerknuepft) {
+        b.innerHTML = '<div class="feiertag-hinweis">' + escHtmlWt('Mit deinem Konto sind mehrere Personen verknüpft (' +
+          mehrfachVerknuepft.join(', ') + ') — bitte Ulf Bescheid geben, bis dahin fehlen hier die persönlichen Hinweise. Einreichen geht trotzdem.') + '</div>';
+        return;
+      }
+      if (!window.BOS_FEIERTAGSREGEL) { b.innerHTML = ''; return; }
+      var st = person ? window.BOS_FEIERTAGSREGEL.rotationsStatus(person) : { ausserhalb: false };
+      var text = !st.ausserhalb ? '' :
+        (st.grund === 'azubiNichtEinsatzfaehig' || st.grund === 'inaktiv') ? ROTATION_TEXT_NICHT_EINGETEILT : ROTATION_TEXT_B;
+      b.innerHTML = text ? '<div class="feiertag-hinweis">' + escHtmlWt(text) + '</div>' : '';
+    }).catch(function (err) {
+      console.error('[Wunschtag] Eigene Person nicht lesbar:', err);
+      var b = document.getElementById('rotationHinweisBox');
+      if (b) b.innerHTML = '<div class="feld-hinweis">Eigene Angaben nicht lesbar: ' + escHtmlWt((err && err.message) || String(err)) + '</div>';
+    });
+  }
+
+  function escHtmlWt(t) { return String(t).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+
+  /* ==== Submit-Zustand ==== */
+  function aktualisiereSubmitZustand() {
+    aktualisiereSternBeschriftung(); // E20: vor jedem frühen Rücksprung
+    aktualisiereFeiertagHinweis();   // E22: ebenso
+    aktualisiereRotationHinweis();   // E25 B: unabhängig vom Datum
+    var btn = document.getElementById('submitBtn');
+    var hint = document.getElementById('submitHint');
+    if (!aktuellesDatum()) {
+      btn.disabled = true; hint.textContent = 'Wähle eine Woche+Tag oder ein Datum weiter in der Zukunft.'; return;
+    }
+    if (!authBereit) {
+      btn.disabled = true; hint.textContent = 'Verbinde …'; return;
+    }
+    btn.disabled = false;
+    hint.textContent = 'Begründung ist freiwillig.';
+  }
+
+  /* ==== Absenden ==== */
+  function sendeWunsch(profil, kontoId) {
+    var btn = document.getElementById('submitBtn');
+    var datum = aktuellesDatum();
+    if (!datum) return;
+    btn.disabled = true;
+    btn.textContent = 'Wird gesendet …';
+
+    var dokument = {
+      type: 'schichtplaner_wunschtag',
+      bosKontoId: kontoId,
+      personId: null, // noch keine Verknüpfung bosKontoId -> interne Person, siehe Baustellen oben
+      // v0.16 (Schritt 7, NF-4): KEIN Feld name mehr — der Name kommt beim
+      // Anzeigen aus der Namensliste (bos_namen.js), über das Konto.
+      kalenderwoche: isoDatum(montagDerWoche(datum)),
+      datum: isoDatum(datum),
+      wichtig: !!document.getElementById('wichtigCheckbox').checked,
+      begruendung: document.getElementById('begruendung').value.trim(),
+      quelle: 'selbst',
+      eingereichtAm: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    window.db.collection('bos_events').add(dokument).then(function () {
+      zeigeErfolg();
+    }).catch(function (err) {
+      console.error('[Wunschtag] Sende-Fehler:', err);
+      btn.disabled = false;
+      btn.textContent = 'Wunsch absenden';
+      document.getElementById('submitHint').textContent = 'Senden fehlgeschlagen: ' + ((err && err.message) || String(err));
+    });
+  }
+
+  function zeigeErfolg() {
+    document.getElementById('submitBar').style.display = 'none';
+    document.getElementById('main').innerHTML =
+      '<div class="erfolg">' +
+      '<div class="glyph">✓</div>' +
+      '<h2>Wunsch gespeichert</h2>' +
+      '<p>Dein Wunschtag ist angekommen — unverbindlich, wie besprochen.</p>' +
+      '<button class="neu-btn" id="neuBtn">Weiteren Wunsch abgeben</button>' +
+      '</div>';
+    document.getElementById('neuBtn').addEventListener('click', function () {
+      gewaehlteWoche = null; gewaehlterTag = null; fernDatum = null;
+      WOCHEN = berechneWochen();
+      renderFormular();
+      aktualisiereSubmitZustand();
+    });
+  }
+
+  /* ==== Profil abwarten (siehe Modul-Kopf: kein Event von bos_standalone_login.js) ==== */
+  function leseAktivesProfil() {
+    var raw;
+    try { raw = localStorage.getItem('bos_launcher_state_v2'); } catch (e) { return null; }
+    if (!raw) return null;
+    var state;
+    try { state = JSON.parse(raw); } catch (e) { return null; }
+    if (!state || !state.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(state.localProfiles || []);
+    return alle.find(function (p) { return p.id === state.activeProfileId; }) || null;
+  }
+  function hatZugriff(profil) {
+    if (!window.BOS_ACCESS) return true;
+    return window.BOS_ACCESS.can(window.BOS_APP_ID, profil.role, profil.kontoOverrides);
+  }
+  function ermittleKontoId(profil) {
+    if (profil.kontoSchluessel) return profil.kontoSchluessel;
+    if (profil.id && profil.id.indexOf('konto_') === 0) return profil.id.slice(6);
+    return null;
+  }
+
+  function warteAufProfil() {
+    var profil = leseAktivesProfil();
+    if (!profil) { setTimeout(warteAufProfil, 250); return; }
+    if (!hatZugriff(profil)) return; // bos_standalone_login.js zeigt bereits "Kein Zugriff"
+    var kontoId = ermittleKontoId(profil);
+    if (!kontoId) {
+      document.getElementById('main').innerHTML =
+        '<div class="warte-box fehler">Auf diesem Gerät ist kein Konto angemeldet — bitte an der Tür mit deiner Kennung und deinem Passwort anmelden.' +
+        '<br><br><button type="button" class="bos-btn bos-btn--amber" id="neuAnmeldenBtn">Neu anmelden</button></div>';
+      document.getElementById('neuAnmeldenBtn').addEventListener('click', function () {
+        if (!confirm('Setzt die Anmeldung auf diesem Gerät zurück — danach meldest du dich an der Tür mit Kennung und Passwort an. Fortfahren?')) return;
+        // Deaktiviert NUR das aktive Profil auf diesem Gerät (löscht es nicht) --
+        // beim Neuladen greift bos_standalone_login.js dann automatisch Pfad 2
+        // (Login-Karte: Vorname/Geburtsdatum/PIN), statt weiter das bestehende,
+        // nicht kontoverknüpfte Profil stillschweigend zu übernehmen.
+        try {
+          var raw = localStorage.getItem('bos_launcher_state_v2');
+          var state = raw ? JSON.parse(raw) : null;
+          if (state) { state.activeProfileId = null; localStorage.setItem('bos_launcher_state_v2', JSON.stringify(state)); }
+        } catch (e) { /* nichts zu tun -- Reload versucht es trotzdem */ }
+        location.reload();
+      });
+      return;
+    }
+    eigenesKontoId = kontoId; // E22: für die gefilterte Personen-Abfrage
+    renderFormular();
+    aktualisiereSubmitZustand();
+    document.getElementById('submitBtn').addEventListener('click', function () { sendeWunsch(profil, kontoId); });
+    initialisiereTab2(profil, kontoId);
+  }
+  warteAufProfil();
+
+  /* ==== Tabs ==== */
+  function wechsleTab(nr) {
+    document.getElementById('main').style.display = nr === 1 ? 'block' : 'none';
+    document.getElementById('mainTab2').style.display = nr === 2 ? 'block' : 'none';
+    document.getElementById('submitBar').style.display = nr === 1 ? 'block' : 'none';
+    document.getElementById('tab1Btn').classList.toggle('aktiv', nr === 1);
+    document.getElementById('tab2Btn').classList.toggle('aktiv', nr === 2);
+  }
+  document.getElementById('tab1Btn').addEventListener('click', function () { wechsleTab(1); });
+  document.getElementById('tab2Btn').addEventListener('click', function () { wechsleTab(2); });
+
+  /* ==== Tab 2: Sonntage ablehnen ====
+     Eigener Bereich, bewusst NICHT mit Wunschtag vermischt ("hat ja
+     nichts mit den freien Tagen zu tun", Ulf, 12.09.2026) — eigener
+     Firestore-`type`, eigene Liste, eigener Absende-Weg (pro Zeile
+     direkt, kein gemeinsamer Sammel-Submit wie bei Tab 1). */
+  var TAGE_LABEL_ABLEHNEN = ['So','Mo','Di','Mi','Do','Fr','Sa']; // eigenes Array (andere Reihenfolge als WOCHENTAGE oben), da getDay() direkt 0=So liefert
+
+  function isoDatumTab2(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function formatDatumTab2(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    return TAGE_LABEL_ABLEHNEN[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + '. ' + MONATE[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function ermittleKommendeSonntageUndFeiertage() {
+    var heute = new Date(); heute.setHours(0, 0, 0, 0);
+    var ergebnisse = [];
+    var d = new Date(heute);
+    while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+    for (var i = 0; i < 8; i++) {
+      ergebnisse.push({ datum: isoDatumTab2(d), typ: 'sonntag', name: 'Sonntag' });
+      d.setDate(d.getDate() + 7);
+    }
+    var promises = [];
+    if (window.BOS_FEIERTAGE && window.BOS_ZEITKONTEXT && window.db) {
+      var heuteIso = isoDatumTab2(heute);
+      var grenzeIso = isoDatumTab2(new Date(Date.now() + 90 * 86400000));
+      window.BOS_FEIERTAGE.feiertage.filter(function (f) { return f.datum >= heuteIso && f.datum <= grenzeIso; }).forEach(function (f) {
+        promises.push(window.BOS_ZEITKONTEXT.status(window.db, f.datum).then(function (st) {
+          if (st.offen) ergebnisse.push({ datum: f.datum, typ: 'feiertag', name: f.name });
+        }));
+      });
+    }
+    return Promise.all(promises).then(function () {
+      ergebnisse.sort(function (a, b) { return a.datum.localeCompare(b.datum); });
+      return ergebnisse;
+    });
+  }
+
+  function initialisiereTab2(profil, kontoId) {
+    var box = document.getElementById('mainTab2');
+    box.innerHTML = '<div class="warte-box">Einen Moment …</div>';
+
+    Promise.all([
+      ermittleKommendeSonntageUndFeiertage(),
+      window.db.collection('bos_events').where('type', '==', 'sonntag_ablehnung').where('bosKontoId', '==', kontoId).get()
+    ]).then(function (ergebnisse) {
+      var tage = ergebnisse[0];
+      var bereitsAbgelehnt = {};
+      ergebnisse[1].forEach(function (doc) { bereitsAbgelehnt[doc.data().datum] = true; });
+
+      if (!tage.length) { box.innerHTML = '<div class="warte-box">Keine anstehenden Sonntage oder offenen Feiertage bekannt.</div>'; return; }
+
+      box.innerHTML = tage.map(function (t, i) {
+        var istAbgelehnt = !!bereitsAbgelehnt[t.datum];
+        return '<div class="ablehnen-zeile-wrap" data-index="' + i + '">' +
+          '<div class="ablehnen-zeile">' +
+          '<div><div class="ablehnen-datum">' + formatDatumTab2(t.datum) + '</div>' +
+          (t.typ === 'feiertag' ? '<div class="ablehnen-typ">' + escHtml(t.name) + ' (Feiertag)</div>' : '') + '</div>' +
+          '<button type="button" class="ablehnen-btn' + (istAbgelehnt ? ' abgelehnt' : '') + '" data-index="' + i + '"' + (istAbgelehnt ? ' disabled' : '') + '>' + (istAbgelehnt ? '✓ Abgelehnt' : 'Nicht arbeiten') + '</button>' +
+          '</div>' +
+          '<div class="ablehnen-begruendung-feld" id="begruendungFeld' + i + '">' +
+          '<textarea class="bos-input" id="begruendungText' + i + '" rows="2" placeholder="Grund (freiwillig) …"></textarea>' +
+          '<button type="button" class="btn-bestaetigen" data-index="' + i + '">Bestätigen</button>' +
+          '</div></div>';
+      }).join('');
+
+      box.querySelectorAll('.ablehnen-btn:not([disabled])').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.getElementById('begruendungFeld' + btn.dataset.index).classList.add('offen');
+        });
+      });
+      box.querySelectorAll('.btn-bestaetigen').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var i = Number(btn.dataset.index);
+          var t = tage[i];
+          btn.disabled = true; btn.textContent = 'Sendet …';
+          window.db.collection('bos_events').add({
+            type: 'sonntag_ablehnung',
+            bosKontoId: kontoId,
+            personId: null,
+            // v0.16 (Schritt 7, NF-4): kein Feld name mehr.
+            datum: t.datum,
+            begruendung: document.getElementById('begruendungText' + i).value.trim(),
+            quelle: 'selbst',
+            eingereichtAm: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            initialisiereTab2(profil, kontoId);
+          }).catch(function (err) {
+            console.error('[Wunschtag/Ablehnung] Senden fehlgeschlagen:', err);
+            btn.disabled = false; btn.textContent = 'Bestätigen';
+            alert('Senden fehlgeschlagen: ' + ((err && err.message) || String(err)));
+          });
+        });
+      });
+    }).catch(function (err) {
+      console.error('[Wunschtag/Ablehnung] Laden fehlgeschlagen:', err);
+      box.innerHTML = '<div class="warte-box fehler">Laden fehlgeschlagen: ' + escHtml((err && err.message) || String(err)) + '</div>';
+    });
+  }
+
+  /* ==== Hilfe-Sheet ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () {
+    document.getElementById('hilfeOverlay').classList.add('offen');
+  });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () {
+    document.getElementById('hilfeOverlay').classList.remove('offen');
+  });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('offen');
+  });
+
+})();
+</script>
+</body>
+</html>

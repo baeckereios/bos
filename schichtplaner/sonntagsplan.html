@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Sonntagsplan · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: sonntagsplan.html
+  ZWECK: Zehnte Hub-Kachel — der erste echte Rechen-Motor-Baustein.
+         Besetzt Sonntag-Positionen für einen kompletten KALENDERMONAT auf
+         einen Blick: Positionen als Zeilen, jeder Sonntag/offene Feiertag
+         des Monats als Spalte (Ulf, 12.09.2026 — Monat statt Einzeltag,
+         weil die Monats-Obergrenze ohnehin nur im Monatskontext Sinn
+         ergibt). Diese Datei ist NUR NOCH für UI/Rendern/Firestore-
+         Schreiben zuständig — die eigentliche Berechnung (inkl. aller
+         "bewussten Eingabe-Anpassungen") lebt seit 12.09.2026 in
+         `sonntagsplan_berechnung.js` (Ulf: "Berechnungen langsam in
+         einer eigenen Datei"). Nutzt rechenmodul.js weiterhin DIREKT und
+         UNVERÄNDERT, nur eben über den Umweg dieser Berechnungsdatei.
+  DATENFLUSS: bos_access_guard.js (roles: admin, produktionsleitung) →
+         Monatsauswahl → Firestore personen/positionen/abwesenheiten/
+         einstellungen (roh geladen, bleiben hier) →
+         window.BOS_SONNTAGSPLAN_BERECHNUNG.ermittleTageImMonat() +
+         .berechneMonat() (siehe sonntagsplan_berechnung.js für die volle
+         Berechnungslogik) → Anzeige als Tabelle mit manueller
+         Übersteuerung je Zelle + Konflikt-Erkennung → Speichern (ein
+         Firestore-Dokument pro Tag in 'sonntagsplan') → Drucken.
+  SCHNITTSTELLEN: sonntagsplan_berechnung.js (die eigentliche Berechnung,
+         siehe DORTIGER Kopf für "Zwei" -> jetzt "Vier bewusste Eingabe-
+         Anpassungen" im Detail — rechenmodul.js bleibt dabei UNVERÄNDERT),
+         personen, positionen, abwesenheiten, einstellungen,
+         bos_zeitkontext(_referenz).js, bos_namen.js, bos_druck.js.
+
+  WARUM berechneTagAlleSchichten() STATT NUR DER 'sonntag'-SCHICHT (12.09.,
+  Ulf: "Ofen und Brötchenstraße fehlen, weil es exakt die gleiche
+  Besetzung wäre wie an jedem anderen Tag"): manche Sonntagspositionen
+  (Teigmacher-Zusatzslot, Frosterposten, Schlawinerposten) sind eigene
+  schicht:'sonntag'-Positionen. Andere (Ofen, Brötchenstraße) laufen an
+  jedem Tag inkl. Sonntag mit derselben Besetzung wie unter der Woche —
+  dafür reicht es, bei der BESTEHENDEN frueh-Position in
+  positionen_editor.html "So" als aktiven Tag mit anzuhaken, KEINE
+  Dopplung nötig. Damit diese automatisch mit auftauchen, rechnet dieses
+  Modul jetzt alle drei Schichten (nacht/frueh/sonntag) für jeden Tag und
+  kombiniert die Ergebnisse — nacht bleibt an einem Sonntag normalerweise
+  einfach leer, kostet aber nichts.
+
+  VIER BEWUSSTE EINGABE-ANPASSUNGEN — leben jetzt vollständig in
+  sonntagsplan_berechnung.js (siehe DORTIGER Kopf für die ausführliche
+  Begründung jeder einzelnen: Feiertag-Wochentag nur zu Sonntag-
+  Positionen, Monats-Obergrenze mit allgemeinem Standard-Fallback,
+  Pool-Rotation nach Monats-Zählung, Nicht-zwei-Sonntage-hintereinander
+  monatsübergreifend). rechenmodul.js bleibt dabei UNVERÄNDERT, Prinzip
+  "keine stillen Architektur-Änderungen" gilt weiterhin.
+
+  BEKANNTE OFFENE PUNKTE:
+    - Ereignisse aus `abwesenheiten` werden 1:1 übernommen (gleiche
+      Feldnamen, siehe dortige Doku) — keine weitere Übersetzung nötig.
+    - Keine Wunschtag-Berücksichtigung — Wunschtag betrifft die Mo-Sa-
+      Rotation (freie_tage_verteilung.js), nicht die Sonntagsbesetzung.
+    - "Diesen Sonntag nicht arbeiten"-Ablehnung: JETZT gebaut (12.09.
+      nachmittags) — Melder in wunschtag.html (Tab 2), Übernahme-Fenster
+      hier unter der Tabelle, fünfte Eingabe-Anpassung in
+      sonntagsplan_berechnung.js.
+    - `sonntagsplan`-Collection weiterhin ein Dokument pro TAG (nicht pro
+      Monat) — Speichern schreibt beim Monats-Speichern entsprechend
+      mehrere Dokumente auf einmal.
+    - `bos_events`-Dokumente vom Typ `sonntag_ablehnung` werden bei
+      Übernahme mit `uebernommenAm`/`uebernommenFuerPersonId` versehen —
+      bewusste, dokumentierte Ausnahme vom Append-only-Prinzip (wie schon
+      bei Urlaub-Anfrage -> Abwesenheiten).
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Auswahl (Sonntage + offene Feiertage), Berechnung
+      über rechenmodul.js, manuelle Übersteuerung, Speichern, Drucken.
+    2026-09-12 · 09:50 · v0.2 · Fix
+      Ulf: solche Fehlermeldungen künftig überall zeigen, nicht nur die
+      echte Meldung statt "fehlgeschlagen" konsole-only -- auf Tablet/
+      Handy ist Remote-Debugging umständlich. Alle Fehlermeldungen dieser
+      Datei zeigen jetzt err.message direkt in der UI.
+    2026-09-12 · v0.3 · Feature
+      Kompletter Umbau: Einzeltag-Auswahl + Liste ersetzt durch
+      Kalendermonat-Auswahl + Tabelle (Positionen als Zeilen, Tage als
+      Spalten) -- Ulf: "es muss ja immer ein Kalendermonat sein... so
+      dass es eine übersichtliche Seite ist". Ruft jetzt
+      berechneTagAlleSchichten() statt nur berechneTag(..., 'sonntag',
+      ...), damit Positionen mit gleichbleibender Besetzung über die
+      Woche hinweg (Ofen, Brötchenstraße) automatisch mit auftauchen,
+      sobald "So" bei ihnen als aktiver Tag gesetzt ist -- keine
+      Dopplung als eigene sonntag-Position mehr nötig. Monats-Obergrenze
+      läuft jetzt als laufende Zählung über den ganzen Monat.
+    2026-09-12 · 13:25 · v0.4 · Fix
+      Ulf, echter Testlauf: "immer die gleichen Personen" -- rechenmodul.js
+      wählt streng nach Pool-Rang, keine Rotation eingebaut. Dritte
+      bewusste Eingabe-Anpassung: Pool jeder Position wird vor jedem
+      Tages-Aufruf nach laufender Monats-Zählung aufsteigend sortiert
+      (wer seltener dran war, rutscht nach vorne), expliziter Index-
+      Tiebreaker statt Sort-Stabilität. Nur hier, nicht in Entwürfe.
+    2026-09-12 · 13:34 · v0.5 · Feature
+      Ulf: (1) nicht zwei Sonntage hintereinander, auch monatsübergreifend
+      -- vierte Eingabe-Anpassung, Sonntag-zu-Sonntag, prüft bei Bedarf
+      einen Tag aus dem Vormonat. (2) allgemeine (nicht personenspezifische)
+      Standard-Obergrenze -- liest jetzt einstellungen/sonntag_standard
+      als Fallback, wenn maxSonntageProMonat bei einer Person leer ist.
+      "Feld leer" bedeutet seitdem "Standard verwenden", nicht mehr
+      "keine Grenze" (siehe auch personen_editor.html-Changelog).
+    2026-09-12 · 13:46 · v0.6 · Feature
+      Ulf entdeckte eine Person mehrfach am selben Sonntag (selbst von
+      Hand so eingetragen, keine Berechnungs-Lücke) und wünschte sich
+      trotzdem eine Warnung dafür. Konflikt-Erkennung ergänzt: erkennt
+      pro Tag, wenn eine Person mehreren Positionen zugewiesen ist
+      (Berechnung ODER manuelle Änderung), hebt die betroffenen Zellen
+      hervor und zeigt eine Warnliste über der Tabelle.
+    2026-09-12 · 13:51 · v0.7 · Refactor
+      Ulf: "Berechnungen langsam in einer eigenen Datei". Komplette
+      Berechnungslogik (ermittleTageImMonat, ladeBaselineFuerMonat,
+      verschobenesDatum, berechneMonat inkl. aller vier bewussten
+      Eingabe-Anpassungen) nach sonntagsplan_berechnung.js ausgelagert.
+      berechneMonat() bekommt personenListe/positionenListe/
+      abwesenheitenListe/sonntagStandardObergrenze jetzt als explizite
+      Parameter statt aus Closure-Variablen -- macht die Funktion klarer
+      nachvollziehbar. Diese Datei bleibt für UI/Rendern/Firestore-
+      Schreiben zuständig. pruefeMotorAbhaengigkeiten() prüft jetzt auch
+      auf das Vorhandensein der neuen Datei. Namenskollision gegen die
+      volle Kombination (rechenmodul.js + sonntagsplan_berechnung.js +
+      diese Datei) geprüft.
+    2026-09-12 · 15:06 · v0.8 · Fix
+      Ulf: "ladeGrunddaten is not defined". Beim Auslagern der Berechnung
+      (v0.7) wurde ladeGrunddaten() versehentlich mit ausgeschnitten,
+      obwohl sie in dieser Datei hätte bleiben sollen (lädt Firestore-
+      Rohdaten für die UI, keine reine Berechnung). Wiederhergestellt.
+    2026-09-12 · 15:11 · v0.9 · Feature
+      Fenster "Offene Sonntag-Ablehnungen" unter der Tabelle (Gegenstück
+      zu Tab 2 in wunschtag.html). Zeigt noch nicht übernommene
+      Ablehnungen des gewählten Monats, "Übernehmen" mit Personen-
+      Zuordnung (bosKontoId -> Person weiterhin nicht automatisch
+      auflösbar, gleiches Muster wie Urlaub-Anfrage -> Abwesenheiten).
+      Übernommene Ablehnungen fließen ab sofort als fünfte Eingabe-
+      Anpassung in berechneMonat() ein (siehe sonntagsplan_berechnung.js).
+    2026-09-12 · 15:22 · v1.0 · Feature
+      Ulf: "die Kette müssen wir noch eingeben" (Personen-Editor hat das
+      bosKontoId-Feld längst, nur genutzt hat es hier noch niemand).
+      renderAblehnungen() erkennt jetzt automatisch, wenn das
+      eingereichte Konto mit einer Person verknüpft ist, wählt sie im
+      Dropdown vor (sichtbarer Hinweis, weiterhin bestätigungspflichtig
+      -- keine automatische Übernahme ohne Blick von Ulf). Gleiche
+      Ergänzung auch in abwesenheiten_editor.html (siehe dortiger
+      Changelog).
+    2026-09-24 · 09:15 · v1.1 · Fix (O56)
+      Beim Speichern werden gespeicherte Tage des Monats, die nicht mehr
+      zum Plan gehören (z. B. ein Feiertag, der inzwischen geschlossen
+      ist), GELÖSCHT -- nach einer Rückfrage, die die Daten nennt.
+      Abbrechen speichert gar nichts (sonst bliebe der Monat halb alt,
+      halb neu). Gelöscht wird im selben Batch wie gespeichert. Ein
+      Wochenplan, der auf einem gelöschten Tag beruht, fällt danach an
+      beiden Türen durch (Entwürfe: "nicht mehr gespeichert",
+      offizieller_plan.html: "fehlt" bzw. Statuswechsel). Dazu rechnet
+      sonntagsplan_berechnung.js v0.6 die Monatszählung nur noch aus
+      Tagen, die zum Plan gehören.
+      Nebenbei (O55): Die Vorbelegung einer verknüpften Person beim
+      Übernehmen einer Ablehnung gibt es seit v1.0. Randfall behoben: ist
+      die verknüpfte Person inaktiv, steht sie nicht in der Auswahl -- der
+      Hinweis sagt das jetzt, statt "vorausgewählt" zu behaupten.
+    2026-09-26 · Schritt 5 (Namens-Fundament, K-7) · Umbau
+      Namen kommen aus bos_namen.js (Namensliste in Firestore, NE-6):
+      Rufname > Beschreibung > lokale Datei als Kürzel („M. · lokal“, nur
+      bis Schritt 8) > „P07 · kein Name hinterlegt“ — nie leer, nie
+      undefined. anzeigeName() ist nur noch ein Einzeiler auf
+      BOS_NAMEN.anzeige(); Auswahllisten zeigen „Rufname (Beschreibung)“
+      (NE-7, BOS_NAMEN.auswahl). Die Namensliste lädt einmal zusammen mit
+      den Personen (personenUndNamen()); ist sie nicht lesbar, steht der
+      Grund sichtbar oben. Die lokale Datei bleibt bis Schritt 8 Rückfall.
+      Ablehnungen zeigen den Namen der Person (über personId, sonst über das
+      verknüpfte Konto) statt des gespeicherten (§10.3). Der Hinweis
+      „keine lokale Namensdatei“ erscheint nur noch, wenn die Namensliste
+      nicht lesbar ist.
+    2026-09-26 · Schritt 8 (Namens-Fundament) · Rückbau
+      Die lokale Namensdatei ist in Rente: keine Einbindung von
+      bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei.
+      Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
+      Beschreibung > „P07 · kein Name hinterlegt“).
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="../rechenmodul.js"></script>
+<script src="../sonntagsplan_berechnung.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px) var(--bos-space-xl,40px); max-width:640px; margin:0 auto;}
+  .abschnitt-titel{ font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-sm,.82rem); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin: var(--bos-space-lg,22px) 0 var(--bos-space-xs,10px) var(--bos-space-3xs,4px); }
+  .abschnitt-titel:first-child{margin-top:0;}
+
+  select.bos-input{cursor:pointer;}
+  .tag-typ-badge{ display:inline-block; font-size: var(--bos-font-2xs,.66rem); font-family:var(--font-label); font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:2px 7px; border-radius:6px; background:var(--surface-2); color:var(--dim); margin-left: var(--bos-space-2xs,6px); }
+  .tag-typ-badge.feiertag{background:rgba(224,151,58,.2); color:var(--amber-bright);}
+
+  .zusammenfassung{ display:flex; gap: var(--bos-space-md,16px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,14px); margin-bottom: var(--bos-space-md,16px); flex-wrap:wrap; }
+  .zusammenfassung .stat{flex:1; min-width:100px;}
+  .zusammenfassung .stat .zahl{font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-xl,1.4rem);}
+  .zusammenfassung .stat .zahl.luecken{color:var(--danger);}
+  .zusammenfassung .stat .label{font-family:var(--font-label); font-size: var(--bos-font-xs,.72rem); color:var(--dim); text-transform:uppercase; letter-spacing:.03em;}
+
+  .pos-zeile{ display:flex; align-items:center; gap: var(--bos-space-sm,10px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .pos-zeile.luecke{border-color:rgba(214,88,74,.5); background:rgba(214,88,74,.06);}
+  .pos-name{font-weight:700; min-width:110px; flex-shrink:0;}
+  .pos-auswahl{flex:1;}
+  .pruefung-hinweis{ font-size: var(--bos-font-xs,.76rem); color:var(--amber-bright); background:var(--amber-glow); border-radius:8px; padding: var(--bos-space-sm,10px); margin: var(--bos-space-2xs,6px) 0 var(--bos-space-md,14px); }
+
+  .tabelle-wrap{overflow-x:auto; margin: var(--bos-space-sm,10px) 0; border:1px solid var(--border); border-radius:8px; -webkit-overflow-scrolling:touch;}
+  .sonntag-tabelle{border-collapse:collapse; width:100%; font-size: var(--bos-font-sm,.85rem);}
+  .sonntag-tabelle th, .sonntag-tabelle td{border:1px solid var(--border); padding: 6px 8px; text-align:left; white-space:nowrap;}
+  .sonntag-tabelle th{font-family:var(--font-label); font-weight:700; color:var(--dim); background:var(--surface-2); font-size: var(--bos-font-xs,.76rem);}
+  .sonntag-tabelle td.st-pos, .sonntag-tabelle th.st-pos{position:sticky; left:0; background:var(--surface); z-index:1; font-weight:700;}
+  .sonntag-tabelle th.st-pos{background:var(--surface-2); z-index:2;}
+  .sonntag-tabelle td.st-na{color:var(--dim-2); text-align:center;}
+  .sonntag-tabelle select.st-auswahl{width:100%; min-width:130px;}
+  .sonntag-tabelle td.luecke select{border-color:var(--danger);}
+  .sonntag-tabelle td.konflikt select{border-color:var(--amber-bright); background:rgba(224,151,58,.12);}
+  .konflikt-warnung{ font-size: var(--bos-font-sm,.85rem); color:var(--amber-bright); background:var(--amber-glow); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-sm,10px); line-height:1.6; }
+
+  .ablehnung-karte{ background:var(--surface); border:1px solid rgba(224,151,58,.4); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .ablehnung-kopf{display:flex; align-items:center; justify-content:space-between; gap: var(--bos-space-sm,10px); flex-wrap:wrap;}
+  .ablehnung-name{font-weight:700;}
+  .ablehnung-datum{font-size: var(--bos-font-sm,.85rem); color:var(--dim); font-family:var(--font-label);}
+  .ablehnung-begruendung{font-size: var(--bos-font-sm,.82rem); color:var(--dim); margin-top:4px;}
+  .btn-ablehnung-uebernehmen{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.76rem); background:var(--amber); color:#1a1208; border:none; border-radius:8px; padding: 8px 12px; cursor:pointer; flex-shrink:0; }
+  .ablehnung-personwahl{ display:none; margin-top: var(--bos-space-sm,10px); padding-top: var(--bos-space-sm,10px); border-top:1px solid var(--border); gap: var(--bos-space-xs,8px); }
+  .ablehnung-personwahl.offen{display:flex; flex-wrap:wrap;}
+  .ablehnung-personwahl select{flex:1; min-width:160px;}
+  .ablehnung-erkannt{ width:100%; font-size: var(--bos-font-xs,.76rem); color:var(--good); margin-bottom: var(--bos-space-2xs,4px); }
+
+  @media (min-width: 900px){ main{max-width:1100px;} }
+
+  .aktion-block{ display:flex; gap: var(--bos-space-xs,8px); margin-top: var(--bos-space-lg,20px); }
+  .btn{ font-family:var(--font-label); font-weight:800; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-sm,.88rem); border:none; border-radius:var(--radius); padding: var(--bos-space-sm,14px); cursor:pointer; flex:1; }
+  .btn-speichern{background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#1b1305;}
+  .btn-drucken{background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong);}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  .lade-hinweis, .leer-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen-sheet{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_sonntagsplan';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Sonntagsplan</h1>
+</header>
+
+<main>
+  <div class="abschnitt-titel">Kalendermonat</div>
+  <select class="bos-input" id="monatSelect"><option value="">Lade …</option></select>
+
+  <div id="lokalHinweis" class="lade-hinweis" style="display:none;"></div>
+
+  <div class="abschnitt-titel">Besetzung</div>
+  <div class="zusammenfassung" id="zusammenfassung" style="display:none;">
+    <div class="stat"><div class="zahl" id="statBesetzt">–</div><div class="label">Besetzt</div></div>
+    <div class="stat"><div class="zahl luecken" id="statLuecken">–</div><div class="label">Lücken</div></div>
+  </div>
+  <div id="konfliktBox"></div>
+  <div id="tabelleBox"><div class="lade-hinweis">Wähle zuerst einen Monat.</div></div>
+
+  <div class="aktion-block" id="aktionBlock" style="display:none;">
+    <button type="button" class="btn btn-drucken" id="druckenBtn">Drucken</button>
+    <button type="button" class="btn btn-speichern" id="speichernBtn">Speichern</button>
+  </div>
+
+  <div class="abschnitt-titel">Offene Sonntag-Ablehnungen (dieser Monat)</div>
+  <div id="ablehnungenBox"><div class="lade-hinweis">–</div></div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert Sonntagsplan?</h2>
+    <p>Zeigt einen ganzen Kalendermonat: links die Positionen, oben jeder Sonntag + jeder offene (bearbeitete) Feiertag dieses Monats als Spalte.</p>
+    <p>Positionen mit gleichbleibender Besetzung über die Woche (z. B. Ofen, Brötchenstraße) tauchen automatisch mit auf — dafür reicht "So" als aktiver Tag bei der bestehenden Position im Positionen-Editor, keine eigene Sonntag-Position nötig.</p>
+    <p>Der Vorschlag kommt aus derselben Kaskaden-Logik wie später der große Motor (rechenmodul.js) — jede Zelle lässt sich danach von Hand ändern.</p>
+    <p>Personen, die ihre eingestellte Monats-Obergrenze für Sonntage/Feiertage schon erreicht haben, werden beim Vorschlag automatisch übersprungen — die Zählung läuft über den ganzen Monat, auch innerhalb dieser einen Berechnung.</p>
+    <p>"Speichern" merkt sich alle Tage des Monats einzeln (für künftige Monats-Zählungen), "Drucken" erzeugt eine Übersicht zum Aushängen.</p>
+    <p>Unter der Tabelle: offene Sonntag-Ablehnungen aus Wunschtag (Tab 2). "Übernehmen" braucht die passende Person — die Zuordnung ist noch nicht automatisch. Übernommene Ablehnungen schließen die Person für genau diesen Tag aus, ab dem nächsten Berechnen.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var TAGE_LABEL = ['So','Mo','Di','Mi','Do','Fr','Sa']; // eigener Name, kollidiert bewusst NICHT mit rechenmodul.js' WOCHENTAGE (lowercase, andere Reihenfolge/Zweck)
+  var MONATE_LABEL = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+  var personenListe = [];
+  var positionenListe = [];
+  var abwesenheitenListe = [];
+  var monatOptionen = [];   // [{ jahr, monat, label }]
+  var gewaehlterMonat = null;
+  var berechneteTage = [];  // [{ tag:{datum,typ,name,wochentag}, zuweisungen, aktivePositionen, luecken }]
+  var alleZeilenPositionen = []; // Vereinigung aller aktivePositionen über den Monat, für die Tabellenzeilen
+  var sonntagStandardObergrenze = null; // aus einstellungen.html, Fallback für Personen ohne eigenen Wert
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  // Zeigt die echte Fehlermeldung an, nicht nur "fehlgeschlagen" -- auf
+  // Tablet/Handy ist Remote-Debugging umständlich, das hier hilft sofort
+  // weiter (Ulf, 12.09.2026, siehe SCHICHTPLANER_V2_BAUSTELLEN.md).
+  function fehlertext(err) { return escHtml((err && err.message) || String(err)); }
+  function formatDatumKurz(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.';
+  }
+
+  // Schritt 5 (Namens-Fundament, 26.09.2026): EINE Namensfunktion für alle
+  // Planungsseiten — bos_namen.js (Rufname > Beschreibung > lokal als
+  // Kürzel > "P07 · kein Name hinterlegt"). Die frühere eigene Kopie, die
+  // Vor- und Nachname aus der lokalen Datei zusammensetzte, ist entfernt.
+  function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
+  // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
+  function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
+  // Personen UND Namensliste zusammen laden; liefert wie vorher den
+  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  function personenUndNamen() {
+    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
+      .then(function (r) { return r[0]; });
+  }
+
+
+  /* ==== Firestore-Grunddaten (personen/positionen/abwesenheiten +
+     allgemeine Sonntags-Standard-Obergrenze) -- bleibt bewusst hier,
+     keine reine Berechnung, sondern UI-nahes Laden von Rohdaten für die
+     Anzeige und für die Übergabe an sonntagsplan_berechnung.js. Beim
+     Auslagern der Berechnungslogik aus Versehen mitgelöscht (Ulf,
+     12.09.2026, "ladeGrunddaten is not defined") -- hier wiederhergestellt. ==== */
+  function ladeGrunddaten() {
+    return Promise.all([
+      personenUndNamen(),
+      window.db.collection('positionen').get(),
+      window.db.collection('abwesenheiten').get(),
+      window.db.collection('einstellungen').doc('sonntag_standard').get()
+    ]).then(function (ergebnisse) {
+      personenListe = [];
+      ergebnisse[0].forEach(function (doc) { personenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+      positionenListe = [];
+      ergebnisse[1].forEach(function (doc) { positionenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+      abwesenheitenListe = [];
+      ergebnisse[2].forEach(function (doc) { abwesenheitenListe.push(doc.data()); });
+      sonntagStandardObergrenze = (ergebnisse[3].exists && ergebnisse[3].data().obergrenze != null) ? ergebnisse[3].data().obergrenze : null;
+    });
+  }
+
+  /* ==== Monatsauswahl ==== */
+  function ermittleMonatOptionen() {
+    var heute = new Date();
+    var optionen = [];
+    for (var i = 0; i < 6; i++) {
+      var d = new Date(heute.getFullYear(), heute.getMonth() + i, 1);
+      optionen.push({ jahr: d.getFullYear(), monat: d.getMonth(), label: MONATE_LABEL[d.getMonth()] + ' ' + d.getFullYear() });
+    }
+    return optionen;
+  }
+
+  function renderMonatSelect() {
+    var sel = document.getElementById('monatSelect');
+    sel.innerHTML = monatOptionen.map(function (m, i) {
+      return '<option value="' + i + '">' + m.label + '</option>';
+    }).join('');
+  }
+
+  // ermittleTageImMonat(), ladeBaselineFuerMonat(), verschobenesDatum(),
+  // berechneMonat() jetzt in sonntagsplan_berechnung.js (Ulf, 12.09.2026:
+  // "Berechnungen in einer eigenen Datei") -- aufgerufen als
+  // window.BOS_SONNTAGSPLAN_BERECHNUNG.<name>(), siehe ladeUndBerechne() unten.
+
+  /* ==== Rendern ==== */
+  function renderTabelle() {
+    var box = document.getElementById('tabelleBox');
+    if (!berechneteTage.length) {
+      box.innerHTML = '<div class="leer-hinweis">Keine Sonntage oder offenen Feiertage in diesem Monat.</div>';
+      document.getElementById('zusammenfassung').style.display = 'none';
+      document.getElementById('aktionBlock').style.display = 'none';
+      document.getElementById('konfliktBox').innerHTML = '';
+      return;
+    }
+
+    // Zeilen: Vereinigung aller in diesem Monat je aktiven Positionen.
+    var posMap = {};
+    berechneteTage.forEach(function (bt) { bt.aktivePositionen.forEach(function (p) { posMap[p.id] = p; }); });
+    alleZeilenPositionen = Object.keys(posMap).map(function (id) { return posMap[id]; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+
+    var besetztGesamt = 0, lueckenGesamt = 0;
+    berechneteTage.forEach(function (bt) { besetztGesamt += Object.keys(bt.zuweisungen).length; lueckenGesamt += bt.luecken.length; });
+    document.getElementById('statBesetzt').textContent = besetztGesamt + ' / ' + (besetztGesamt + lueckenGesamt);
+    document.getElementById('statLuecken').textContent = lueckenGesamt;
+    document.getElementById('zusammenfassung').style.display = 'flex';
+    document.getElementById('aktionBlock').style.display = 'flex';
+
+    if (!alleZeilenPositionen.length) {
+      box.innerHTML = '<div class="leer-hinweis">Keine Sonntag-relevanten Positionen aktiv (weder eigene Sonntag-Positionen noch "So" bei einer bestehenden Position angehakt).</div>';
+      document.getElementById('konfliktBox').innerHTML = '';
+      return;
+    }
+
+    var aktivePersonenSortiert = personenListe.filter(function (p) { return p.aktiv !== false; })
+      .sort(function (a, b) { return anzeigeName(a.id).localeCompare(anzeigeName(b.id), 'de'); });
+
+    // Konflikt-Erkennung (Ulf, 12.09.2026): dieselbe Person mehrfach am
+    // selben Tag eingetragen -- egal ob aus der Berechnung oder
+    // nachträglich von Hand so geändert, niemand kann zwei Positionen
+    // gleichzeitig besetzen.
+    var konflikteProTag = berechneteTage.map(function (bt) {
+      var vorkommen = {};
+      Object.keys(bt.zuweisungen).forEach(function (posId) {
+        var pid = bt.zuweisungen[posId];
+        vorkommen[pid] = vorkommen[pid] || [];
+        vorkommen[pid].push(posId);
+      });
+      var konflikte = {};
+      Object.keys(vorkommen).forEach(function (pid) { if (vorkommen[pid].length > 1) konflikte[pid] = vorkommen[pid]; });
+      return konflikte;
+    });
+
+    var warnZeilen = [];
+    berechneteTage.forEach(function (bt, tagIdx) {
+      Object.keys(konflikteProTag[tagIdx]).forEach(function (pid) {
+        var posNamen = konflikteProTag[tagIdx][pid].map(function (posId) {
+          var pos = alleZeilenPositionen.find(function (p) { return p.id === posId; });
+          return escHtml(pos ? pos.name : posId);
+        });
+        warnZeilen.push('<b>' + escHtml(anzeigeName(pid)) + '</b> am ' + formatDatumKurz(bt.tag.datum) + ': ' + posNamen.join(', '));
+      });
+    });
+    document.getElementById('konfliktBox').innerHTML = warnZeilen.length
+      ? '<div class="konflikt-warnung">⚠️ Doppelt eingetragen — niemand kann zwei Positionen gleichzeitig besetzen:<br>' + warnZeilen.join('<br>') + '</div>'
+      : '';
+
+    var kopf = '<tr><th class="st-pos">Position</th>' + berechneteTage.map(function (bt) {
+      return '<th>' + formatDatumKurz(bt.tag.datum) + (bt.tag.typ === 'feiertag' ? '<br>' + escHtml(bt.tag.name) : '') + '</th>';
+    }).join('') + '</tr>';
+
+    var zeilen = alleZeilenPositionen.map(function (pos) {
+      var zellen = berechneteTage.map(function (bt, tagIdx) {
+        var istAktiv = bt.aktivePositionen.some(function (p) { return p.id === pos.id; });
+        if (!istAktiv) return '<td class="st-na">–</td>';
+        var zugewiesen = bt.zuweisungen[pos.id] || '';
+        var istLuecke = !zugewiesen;
+        var istKonflikt = zugewiesen && konflikteProTag[tagIdx][zugewiesen];
+        var optionen = '<option value="">— offen —</option>' + aktivePersonenSortiert.map(function (p) {
+          return '<option value="' + p.id + '"' + (p.id === zugewiesen ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
+        }).join('');
+        return '<td' + (istLuecke ? ' class="luecke"' : istKonflikt ? ' class="konflikt"' : '') + '><select class="bos-input st-auswahl' + (istKonflikt ? ' st-konflikt' : '') + '" data-tag="' + tagIdx + '" data-position="' + pos.id + '">' + optionen + '</select></td>';
+      }).join('');
+      return '<tr><td class="st-pos">' + escHtml(pos.name) + '</td>' + zellen + '</tr>';
+    }).join('');
+
+    box.innerHTML = '<div class="tabelle-wrap"><table class="sonntag-tabelle"><thead>' + kopf + '</thead><tbody>' + zeilen + '</tbody></table></div>';
+
+    box.querySelectorAll('[data-position]').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var tagIdx = Number(sel.dataset.tag);
+        var bt = berechneteTage[tagIdx];
+        if (sel.value) bt.zuweisungen[sel.dataset.position] = sel.value;
+        else delete bt.zuweisungen[sel.dataset.position];
+        renderTabelle();
+      });
+    });
+  }
+
+  // Prüft rechenmodul.js auf einmal, statt später mit kryptischer
+  // Meldung mittendrin zu scheitern (gleiches Muster wie in
+  // entwuerfe.html, Ulf, 12.09.2026).
+  function pruefeMotorAbhaengigkeiten() {
+    var erwartet = ['berechneTagAlleSchichten', 'hatBindendeSperre', 'aktivePositionenFuerTag', 'istEinsetzbar'];
+    var fehlend = erwartet.filter(function (name) { return typeof window[name] !== 'function'; });
+    // sonntagsplan_berechnung.js separat prüfen (eigene Datei seit
+    // 12.09.2026) -- anderer Fehlertyp (Objekt/Namespace, keine einzelne
+    // globale Funktion), deshalb eigene Prüfung statt in der Liste oben.
+    if (!window.BOS_SONNTAGSPLAN_BERECHNUNG || typeof window.BOS_SONNTAGSPLAN_BERECHNUNG.berechneMonat !== 'function') {
+      fehlend.push('sonntagsplan_berechnung.js');
+    }
+    return fehlend;
+  }
+
+  function millisSonntagsplan(ts) { return (ts && typeof ts.toMillis === 'function') ? ts.toMillis() : 0; }
+
+  /* ==== Sonntag-Ablehnungen (aus wunschtag.html, Tab 2) ==== */
+  function ladeAblehnungenFuerMonat(jahr, monat) {
+    var monatStart = jahr + '-' + String(monat + 1).padStart(2, '0') + '-01';
+    var monatEndeDatum = new Date(jahr, monat + 1, 0);
+    var monatEnde = monatEndeDatum.getFullYear() + '-' + String(monatEndeDatum.getMonth() + 1).padStart(2, '0') + '-' + String(monatEndeDatum.getDate()).padStart(2, '0');
+    return window.db.collection('bos_events').where('type', '==', 'sonntag_ablehnung').get().then(function (snap) {
+      var alle = [];
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        if (d.datum >= monatStart && d.datum <= monatEnde) alle.push(Object.assign({ id: doc.id }, d));
+      });
+      return alle;
+    });
+  }
+
+  function baueAbgelehnteProDatum(uebernommeneAblehnungen) {
+    var karte = {};
+    uebernommeneAblehnungen.forEach(function (a) {
+      karte[a.datum] = karte[a.datum] || {};
+      karte[a.datum][a.uebernommenFuerPersonId] = true;
+    });
+    return karte;
+  }
+
+  function renderAblehnungen(offeneAblehnungen) {
+    var box = document.getElementById('ablehnungenBox');
+    if (!offeneAblehnungen.length) { box.innerHTML = '<div class="leer-hinweis">Keine offenen Ablehnungen diesen Monat.</div>'; return; }
+
+    var aktivePersonenSortiert = personenListe.filter(function (p) { return p.aktiv !== false; })
+      .sort(function (a, b) { return anzeigeName(a.id).localeCompare(anzeigeName(b.id), 'de'); });
+
+    offeneAblehnungen.sort(function (a, b) { return millisSonntagsplan(b.eingereichtAm) - millisSonntagsplan(a.eingereichtAm); });
+
+    box.innerHTML = offeneAblehnungen.map(function (a) {
+      // Automatische Vorauswahl über bosKontoId, falls die Person im
+      // Personen-Editor verknüpft ist (Ulf, 12.09.2026: "die Kette
+      // müssen wir noch eingeben") -- ersetzt NICHT die manuelle Prüfung,
+      // nur eine Vorauswahl, die man bestätigt oder ändert.
+      var erkanntePerson = a.bosKontoId ? personenListe.find(function (p) { return p.bosKontoId && p.bosKontoId === a.bosKontoId; }) : null;
+      var optionen = '<option value="">— Person wählen —</option>' + aktivePersonenSortiert.map(function (p) {
+        return '<option value="' + p.id + '"' + (erkanntePerson && p.id === erkanntePerson.id ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
+      }).join('');
+      return '<div class="ablehnung-karte" data-id="' + a.id + '">' +
+        '<div class="ablehnung-kopf">' +
+        '<div><span class="ablehnung-name">' + escHtml(window.BOS_NAMEN.anzeigeEinreichung(a, personenListe)) + '</span>' +
+        '<div class="ablehnung-datum">' + formatDatumKurz(a.datum) + '</div></div>' +
+        '<button type="button" class="btn-ablehnung-uebernehmen" data-toggle="' + a.id + '">Übernehmen</button>' +
+        '</div>' +
+        (a.begruendung ? '<div class="ablehnung-begruendung">' + escHtml(a.begruendung) + '</div>' : '') +
+        '<div class="ablehnung-personwahl" id="personwahl-' + a.id + '">' +
+        // O55 (24.09.2026): eine verknüpfte, aber INAKTIVE Person steht nicht
+        // in der Auswahl -- der Hinweis behauptete trotzdem "vorausgewählt".
+        (erkanntePerson ? '<div class="ablehnung-erkannt">Konto verknüpft mit ' + escHtml(anzeigeName(erkanntePerson.id)) +
+          (erkanntePerson.aktiv === false ? ' — die Person ist inaktiv und steht nicht in der Auswahl, bitte prüfen.' : ' — vorausgewählt, bitte prüfen.') + '</div>' : '') +
+        '<select class="bos-input" id="personwahl-select-' + a.id + '">' + optionen + '</select>' +
+        '<button type="button" class="btn-ablehnung-uebernehmen" data-bestaetigen="' + a.id + '" data-datum="' + a.datum + '">Bestätigen</button>' +
+        '</div></div>';
+    }).join('');
+
+    box.querySelectorAll('[data-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.getElementById('personwahl-' + btn.dataset.toggle).classList.toggle('offen');
+      });
+    });
+    box.querySelectorAll('[data-bestaetigen]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var ablehnungId = btn.dataset.bestaetigen;
+        var personId = document.getElementById('personwahl-select-' + ablehnungId).value;
+        if (!personId) { alert('Bitte eine Person wählen.'); return; }
+        btn.disabled = true; btn.textContent = 'Übernimmt …';
+        window.db.collection('bos_events').doc(ablehnungId).update({
+          uebernommenAm: firebase.firestore.FieldValue.serverTimestamp(),
+          uebernommenFuerPersonId: personId
+        }).then(function () {
+          ladeUndBerechne(); // lädt Ablehnungen + Tabelle neu, Ausschluss greift ab jetzt
+        }).catch(function (err) {
+          console.error('[Sonntagsplan] Ablehnung übernehmen fehlgeschlagen:', err);
+          btn.disabled = false; btn.textContent = 'Bestätigen';
+          alert('Übernehmen fehlgeschlagen: ' + fehlertext(err));
+        });
+      });
+    });
+  }
+
+  function ladeUndBerechne() {
+    var idx = document.getElementById('monatSelect').value;
+    if (idx === '') return;
+    gewaehlterMonat = monatOptionen[idx];
+
+    var fehlendeFunktionen = pruefeMotorAbhaengigkeiten();
+    if (fehlendeFunktionen.length) {
+      document.getElementById('tabelleBox').innerHTML = '<div class="leer-hinweis">rechenmodul.js nicht geladen oder falsch abgelegt (fehlt: ' + escHtml(fehlendeFunktionen.join(', ')) + ') — bitte prüfen, ob die Datei im Root-Ordner liegt.</div>';
+      return;
+    }
+
+    document.getElementById('tabelleBox').innerHTML = '<div class="lade-hinweis">Berechne …</div>';
+    document.getElementById('ablehnungenBox').innerHTML = '<div class="lade-hinweis">Lade …</div>';
+    // Schritt 5: der Hinweis galt der lokalen Datei; die Namen kommen jetzt
+    // aus der Namensliste. Er erscheint nur noch, wenn DIE nicht lesbar ist.
+    var namenStatus = window.BOS_NAMEN.status();
+    document.getElementById('lokalHinweis').style.display = namenStatus.fehler ? 'block' : 'none';
+    if (namenStatus.fehler) window.BOS_NAMEN.fehlerZeigen(document.getElementById('lokalHinweis'));
+
+    Promise.all([
+      window.BOS_SONNTAGSPLAN_BERECHNUNG.ermittleTageImMonat(gewaehlterMonat.jahr, gewaehlterMonat.monat),
+      ladeAblehnungenFuerMonat(gewaehlterMonat.jahr, gewaehlterMonat.monat)
+    ]).then(function (ergebnisse) {
+      var tage = ergebnisse[0];
+      var alleAblehnungen = ergebnisse[1];
+      var offene = alleAblehnungen.filter(function (a) { return !a.uebernommenAm; });
+      var uebernommene = alleAblehnungen.filter(function (a) { return a.uebernommenAm && a.uebernommenFuerPersonId; });
+      renderAblehnungen(offene);
+      var abgelehnteProDatum = baueAbgelehnteProDatum(uebernommene);
+      return window.BOS_SONNTAGSPLAN_BERECHNUNG.berechneMonat(tage, personenListe, positionenListe, abwesenheitenListe, sonntagStandardObergrenze, abgelehnteProDatum);
+    }).then(function (ergebnisse) {
+      berechneteTage = ergebnisse;
+      renderTabelle();
+    }).catch(function (err) {
+      console.error('[Sonntagsplan] Berechnung fehlgeschlagen:', err);
+      document.getElementById('tabelleBox').innerHTML = '<div class="leer-hinweis">Berechnung fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+
+  document.getElementById('monatSelect').addEventListener('change', ladeUndBerechne);
+
+  /* ==== Speichern: ein Firestore-Dokument pro Tag, wie bisher ==== */
+  document.getElementById('speichernBtn').addEventListener('click', function () {
+    if (!berechneteTage.length) return;
+    var btn = document.getElementById('speichernBtn');
+    btn.disabled = true; btn.textContent = 'Speichert …';
+    // O56 (24.09.2026): liegengebliebene Tage des Monats finden und nach
+    // Rückfrage mitlöschen.
+    var planDaten = berechneteTage.map(function (bt) { return bt.tag.datum; });
+    var monatPrefix = gewaehlterMonat.jahr + '-' + String(gewaehlterMonat.monat + 1).padStart(2, '0');
+    window.BOS_SONNTAGSPLAN_BERECHNUNG.veralteteTageImMonat(monatPrefix, planDaten).then(function (veraltet) {
+      if (veraltet.length && !window.confirm(
+        'Diese gespeicherten Tage gehören nicht mehr zum Plan (z. B. ein Feiertag, der inzwischen geschlossen ist) und werden gelöscht: ' +
+        veraltet.map(formatDatumKurz).join(', ') +
+        '\n\nEin Wochenplan, der auf einem dieser Tage beruht, lässt sich danach nicht mehr vorschlagen oder annehmen und muss neu generiert werden. Fortfahren?')) {
+        btn.disabled = false; btn.textContent = 'Speichern';
+        alert('Nicht gespeichert.');
+        return;
+      }
+      speichereMonat(veraltet);
+    }).catch(function (err) {
+      console.error('[Sonntagsplan] Prüfung vor dem Speichern fehlgeschlagen:', err);
+      btn.disabled = false; btn.textContent = 'Speichern';
+      alert('Speichern abgebrochen — gespeicherte Tage konnten nicht geprüft werden: ' + fehlertext(err));
+    });
+
+    function speichereMonat(veraltet) {
+    var batch = window.db.batch();
+    veraltet.forEach(function (datum) { batch.delete(window.db.collection('sonntagsplan').doc(datum)); });
+    berechneteTage.forEach(function (bt) {
+      var ref = window.db.collection('sonntagsplan').doc(bt.tag.datum);
+      batch.set(ref, {
+        typ: bt.tag.typ,
+        name: bt.tag.name,
+        zuweisungen: bt.zuweisungen,
+        luecken: bt.luecken,
+        gespeichertAm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    batch.commit().then(function () {
+      btn.disabled = false; btn.textContent = 'Speichern';
+      alert(berechneteTage.length + ' Tag(e) gespeichert.' + (veraltet.length ? ' ' + veraltet.length + ' nicht mehr geplante(r) Tag(e) gelöscht.' : ''));
+    }).catch(function (err) {
+      console.error('[Sonntagsplan] Speichern fehlgeschlagen:', err);
+      btn.disabled = false; btn.textContent = 'Speichern';
+      alert('Speichern fehlgeschlagen: ' + fehlertext(err));
+    });
+    } // speichereMonat
+  });
+
+  /* ==== Drucken ==== */
+  document.getElementById('druckenBtn').addEventListener('click', function () {
+    if (!berechneteTage.length || !window.BOS_DRUCK || !window.BOS_DRUCK) return;
+    if (!alleZeilenPositionen.length) return;
+    var kopf = '<tr><th style="border:1px solid #ccc; padding:1.5mm 2mm; background:#f0f0f0;">Position</th>' + berechneteTage.map(function (bt) {
+      return '<th style="border:1px solid #ccc; padding:1.5mm 2mm; background:#f0f0f0;">' + formatDatumKurz(bt.tag.datum) + (bt.tag.typ === 'feiertag' ? '<br>' + escHtml(bt.tag.name) : '') + '</th>';
+    }).join('') + '</tr>';
+    var zeilen = alleZeilenPositionen.map(function (pos) {
+      var zellen = berechneteTage.map(function (bt) {
+        var istAktiv = bt.aktivePositionen.some(function (p) { return p.id === pos.id; });
+        if (!istAktiv) return '<td style="border:1px solid #ccc; padding:1.5mm 2mm; color:#bbb; text-align:center;">–</td>';
+        var pid = bt.zuweisungen[pos.id];
+        return '<td style="border:1px solid #ccc; padding:1.5mm 2mm;">' + (pid ? escHtml(anzeigeName(pid)) : '<span style="color:#c33;">— offen —</span>') + '</td>';
+      }).join('');
+      return '<tr><td style="border:1px solid #ccc; padding:1.5mm 2mm; font-weight:700;">' + escHtml(pos.name) + '</td>' + zellen + '</tr>';
+    }).join('');
+    var inhalt = '<table style="width:100%; border-collapse:collapse; font-size:9pt;">' + kopf + zeilen + '</table>';
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: inhalt,
+      appName: 'Sonntagsplan',
+      titel: gewaehlterMonat ? gewaehlterMonat.label : '',
+      mitKopf: true,
+      farbig: true,
+      ausrichtung: 'landscape'
+    });
+  });
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen-sheet'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen-sheet'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen-sheet'); });
+
+  /* ==== Start ==== */
+  (window.BOS_AUTH_READY || Promise.resolve()).then(function () {
+    monatOptionen = ermittleMonatOptionen();
+    return ladeGrunddaten();
+  }).then(function () {
+    renderMonatSelect();
+    if (monatOptionen.length) ladeUndBerechne();
+  }).catch(function (err) {
+    console.error('[Sonntagsplan] Start fehlgeschlagen:', err);
+    document.getElementById('tabelleBox').innerHTML = '<div class="leer-hinweis">Laden fehlgeschlagen: ' + fehlertext(err) + '</div>';
+  });
+
+
+})();
+</script>
+</body>
+</html>

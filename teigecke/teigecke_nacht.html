@@ -1,0 +1,2557 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
+  Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  CHANGELOG
+    2026-10-03 · 04:42 · v0.9 · Umbau (Orte ziehen aus, Etappe 1)
+      ANWEISUNG_2026-10-02_TEIGECKE_ORTE_HUB.md (KC 03.10., 03:42), Bauplan
+      SESSION_2026-10-03_TEIGECKE_ORTE_HUB_BAU.md. Der Reiter „Orte“, die
+      Pflege von Orten und Zutaten und der Schilderdruck sind auf die neue
+      Seite teigecke_orte.html gezogen (Hub „Teigecke“). Hier entfernt:
+      renderOrte, ortKarteHTML, oeffneOrt, oeffneZutat, druckeSchilder,
+      die Ort-/Zutat-Zweige in speichereEdit/archiviereEdit/
+      stelleWiederHer, FELDER/HAKEN_FUER für teigecke_orte und
+      teigecke_zutaten, bos_druck.js. Die Einsammelliste liest Orte und
+      Zutaten weiter und nennt die Kennung; mit Haken „Wagen & Zutaten“
+      steht dort der Link „Orte pflegen“. „Startdaten einlesen“ steht
+      jetzt im Reiter „Teige“ und liest nur noch Teige und Teigwerte;
+      neue Zutaten in der Datei → Hinweis, sie erst unter „Orte“
+      einzulesen. „✎ Pflegen“ erscheint nur noch mit Haken Teige oder
+      Rezepte. REGEL_DATEI nennt die neue Regeldatei (Fassung der Seite
+      unverändert teigecke-2026-10-02; die neue Datei erfüllt sie).
+      Rechnung, Nachtdaten, Vorbereitungen, Vorrat, Schritte, Wasserregel,
+      Temperatur-Tabelle: unverändert. Das Schreib-Gerüst bleibt bis
+      Etappe 2 in dieser Datei (KC); dieselbe Mechanik liegt für die
+      Orte-Seite in teigecke_seite.js — Fehler an beiden Stellen beheben.
+    2026-10-02 · 10:30 · v0.8 · Feature
+      Vorstufen-Schritte: Ist die gewählte Stufe rechnerisch zu wenig für
+      die Prognose, wird sie rötlich markiert (Schalter und Zeile, Farbe
+      wie „Einwaage fehlt“) mit „n × (reicht nur für X von Y Broten)“.
+      Wahl bleibt erlaubt, keine Rückfrage; Vorbelegung (aufgerundet) und
+      vorstufeWahl unverändert. Hilfetext „Vorbereitungen“ ergänzt.
+      Anweisung ANWEISUNG_2026-10-02_TEIGECKE_ROETLICH.md (KC 10:13).
+    2026-10-02 · 09:34 · v0.7 · Feature + Fix (Meldung)
+      Vorstufen-Schritte: unter „Zusammen: … = … kg“ je Behälter eine Zeile
+      mit seinen Mengen („graue Wanne 1: 9 kg … + 27 L …“), nummeriert,
+      Name aus dem Rezept (L.behaelterZeilen). „Keine Berechtigung“ nennt
+      jetzt alle drei Gründe: Haken/Rolle fehlt · Generalschlüssel 👑 ·
+      Regeln älter als die Seite („Regelstand in der Firebase-Konsole
+      prüfen“). Neu: Regelstand-Probe beim Laden (ein Lesen auf
+      bos_regelstand/teigecke-2026-10-02, RK §13); passt die Regel nicht,
+      steht oben ein roter Hinweis mit der einzusetzenden Regeldatei, und
+      die Berechtigungs-Meldung nennt Grund (3) zuerst. Fehlt nur der
+      Haken (Prüfung vor dem Senden), bleibt die kurze Meldung.
+    2026-10-02 · 08:54 · v0.6 · Feature (Vorrat, Rumpf-Teige, Vorstufen-Schritte)
+      ANWEISUNG_2026-09-30_TEIGECKE_VORRAT.md mit Anhang 1–3 (KC/Ulf 02.10.).
+      Vorrats-Teige (ausTeig + frosterZustaendigkeit) stehen nur in Liste
+      und Diashow, wenn sie unter „Vorrat heute“ angehakt sind; Haken je
+      Backtag in teigecke_naechte.vorratHaken, Entfernen mit Zahlen fragt
+      nach und löscht sie. Karte im Vorrat-Modus: Teiglinge in Blechen/
+      Dielen oder Stück (Umschalter), gespeichert in Stück unter
+      teigecke_naechte.vorrat; Prognose ohne Vorrats-Teige. Backzettel-
+      Karte: Hinweis „Stück, nicht Bleche“. mitSauer fehlt = „Sauer
+      unbekannt“ (roter Hinweis, nicht eingerechnet); Rezept-Formular mit
+      ja/nein/unbekannt. Vorstufen in festen Schritten: zwei Nachbarn,
+      vorbelegt aufgerundet, Wahl je Nacht in teigecke_naechte.vorstufeWahl
+      (Dokument von morgen), Aufschlüsselung mit Behältern. Rezept-
+      Formular: Schritt als Text („3 kg … + 9 L …“), Schritte je Behälter,
+      Behältername; vorgemerkte WinBack-Felder bleiben beim Speichern
+      erhalten. Hilfetext um Vorrat und Schritte ergänzt.
+    2026-10-02 · 07:03 · v0.5 · Fix (gefährliche Anzeige) + Feature
+      Liste zeigte „213,2 kg (2×)“ — lesbar als zweimal 213,2 kg, gemeint
+      waren 2 Kessel à 106,6 kg; wörtlich genommen die doppelte Menge.
+      Jetzt überall vorn die Zahl je Kessel/Charge, Gesamt nur klein:
+      Liste „in WinBack“ und WinBack-Kachel „2 × 106,6 kg“ + „213,2 kg
+      gesamt“; Schüttwasser-Kachel und Hefe ebenso je Kessel; Sauer-Kachel
+      „2 × 52,5 kg“; Rechenweg ohne „×“ neben Gesamtmengen; Prognose zeigt
+      die Teigmenge ohne „×“. Helfer L.mengeJeKessel (Logik v0.4).
+      Fund beim Prüfen: eine Fehlermeldung in der Karte blieb stehen und
+      erschien beim nächsten Öffnen über einem anderen Teig — jetzt geleert.
+      Einwaage hinter jedem Brot in der Liste („· Einwaage … g“, fehlt
+      = rot), in der Karte unter dem Brotnamen deutlicher. Kopf: „… gilt
+      der nächste Backtag“. Anpassen: Hefe „für den ganzen Teig“.
+    2026-10-02 · 06:21 · v0.4 · Design
+      Feinschliff nach Ulfs Blick aufs Tablet („grob, ohne Feinschliff“):
+      Reiter wie Browser-Tabs (aktiver Tab aus demselben Stoff wie die
+      Seite, Zahl der Teige am Reiter), Kopf und Reiter kleben oben
+      zusammen. Karte als schwebendes Fenster nach dem Muster der
+      Produkt-Karte (zentriert, feste Höhe, Kopf und Reiter fest, Inhalt
+      scrollt, Tipp daneben schließt). Ergebnis als zwei Kacheln
+      (Schüttwasser | In WinBack), Rechenweg klein darunter; Sauer
+      ebenso (Ansetzen | Anstellgut). Teig-Liste als eine Fläche mit
+      Trennlinien, Status „○“ für noch leer. Hinweis „Brote ohne Teig“
+      eingeklappt (Zustand bleibt beim Live-Update), WinBack-Hinweis nur
+      noch in der Karte, Außentemperatur als eine Zeile mit Umschalter.
+      Keine Änderung an Daten, Rechnung oder Rechten.
+    2026-09-29 · 19:45 · v0.3 · Feature
+      Stufe 2 + Umbau Stufe 1 (Bauplan SESSION_2026-09-29_TEIGECKE_STUFE2_BAU.md,
+      Freigabe KC mit drei Auflagen, Konzept TEIGECKEN_FUEHRUNG_KONZEPT 11:30).
+      Vier Reiter: Teige (Startseite, Liste mit Status), Vorbereitungen (Sauer
+      zuerst, dann Prognose für morgen, dann Vorstufen), Einsammeln, Orte.
+      Karte je Teig als Diashow (Zahlen / Anpassen), Eingabetaste springt
+      weiter. Rechnung: D = Brote × Einwaage + Kesselrest, Wasserabzug r,
+      WinBack-Eingabe T = D + r, Kessel gleichmäßig; Hefe auf T (Auflage 1);
+      Sauer und Vorstufen für morgen auf D; Reicht-Prüfung heute auf T.
+      Außentemperatur Havelse über Open-Meteo (umschaltbar auf von Hand).
+      Teige hängen jetzt an den Broten (produkt_config.json, Feld ausTeig);
+      das Feld „produkte“ am Teig entfällt, Teig-Kennung = Dokument-ID.
+      Drei Haken statt einem: 🧺 Wagen & Zutaten, 🥣 Teige, 📜 Rezepte.
+      Nachtdaten ohne Haken, feldgenau (teigecke_naechte), Anpassungen „nur
+      heute“ als EIN Dokument teigecke_nacht_anpassungen/aktuell mit backtag
+      (Auflage 2). Offline Schicht 1: Verbindungsleiste, Produktspiegel,
+      Pflege ohne Netz gesperrt (Schicht 2 nur Merkposten, Auflage 3).
+      Startdaten Version 2. Speichern prüft vorab Haken, Netz und
+      ausstehende Übertragungen und nennt den Grund.
+    2026-09-29 · 09:18 · v0.2 · Feature
+      Konfliktmeldung. Die Regel prüft seit heute den Inhalt der Sicherung:
+      „vorher“ muss dem Serverstand gleichen (Anlegen: null). Speichert
+      jemand auf veraltetem Stand, lehnt die Datenbank ab (permission-
+      denied). Die Seite liest das Dokument dann frisch; hat es sich seit
+      dem Laden geändert, meldet sie „Inzwischen von ‹Kennung› geändert,
+      neu geladen, bitte erneut speichern.“ und öffnet den Eintrag mit dem
+      frischen Stand. Sonst bleibt es bei der Berechtigungsmeldung. Gilt
+      für Bearbeiten, Archivieren und Wiederherstellen (Einlesen legt nur
+      an). Siehe SESSION_2026-09-28_TEIGECKEN_STUFE1_BAU.md, RK §10.
+    2026-09-28 · 10:33 · v0.1 · Feature
+      Erstfassung. Orte (Wagen), Zutatenstamm, Teig → Zutaten (nur Namen,
+      keine Mengen), Einsammelliste in zwei Blöcken (heute Nacht / für
+      morgen vorbereiten), Teig- und Orts-Ansicht, Wagenschilder über
+      bos_druck.js, Startdaten per Datei (liegt außerhalb des Repos).
+      Schreiben nur mit Haken „Teigecke pflegen“; jede Änderung als ein
+      Batch aus Sicherung + Dokument (Regel prüft die Kopplung, RK §10).
+      Kein Löschen, nur Archivieren. Knopf „nicht gefunden“ sichtbar als
+      „in Planung“. Siehe SESSION_2026-09-28_TEIGECKEN_STUFE1_BAU.md.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Teigecke Nacht</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root {
+    --tk-tap: max(56px, var(--bos-tap-min, 44px));  /* Mehlstaub, Teighände: lieber groß */
+  }
+  [hidden] { display: none !important; }
+  body { min-height: 100vh; padding-bottom: 80px; }
+
+  header {
+    background: var(--bos-bg);
+    padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px);
+    display: flex; align-items: center; gap: var(--bos-space-sm, 14px); flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: var(--bos-font-xl, 1.3rem); }
+  .kopf-titel { flex: 1 1 auto; min-width: 180px; }
+  .backtag { font-family: var(--bos-font-label); font-size: var(--bos-font-md, .95rem); color: var(--bos-amber-bright); letter-spacing: .02em; }
+  .backtag small { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .72rem); }
+  .kopf-knoepfe { display: flex; gap: var(--bos-space-2xs, 6px); align-items: center; }
+  .rund-btn { min-width: var(--tk-tap); min-height: var(--tk-tap); font-size: 1.2rem; }
+  .pflege-btn[aria-pressed="true"] { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+
+  #fehlerLeiste {
+    margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0;
+    border: 1px solid var(--bos-red); border-radius: var(--bos-radius-sm);
+    background: var(--bos-surface);   /* Rückfall für ältere WebViews ohne color-mix() */
+    background: color-mix(in srgb, var(--bos-red) 12%, var(--bos-surface));
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px);
+    font-size: var(--bos-font-sm, .82rem); line-height: 1.5;
+  }
+  #fehlerLeiste ul { margin: 4px 0 0; padding-left: 18px; }
+  #fehlerLeiste li { word-break: break-word; }
+  .fehler-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+
+
+  main { padding: var(--bos-space-md, 18px); max-width: 860px; margin: 0 auto; }
+  .status { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); padding: var(--bos-space-sm, 14px) 0; }
+
+  .hinweis {
+    border-left: 4px solid var(--bos-amber); background: var(--bos-surface);
+    border-radius: var(--bos-radius-sm); padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px);
+    margin-bottom: var(--bos-space-xs, 9px); font-size: var(--bos-font-sm, .82rem); line-height: 1.5;
+  }
+  .hinweis.rot { border-left-color: var(--bos-red); }
+  .hinweis.blau { border-left-color: var(--bos-blue); }
+  .hinweis.baustelle { border-left-color: var(--bos-text-faint); color: var(--bos-text-dim); }
+
+  section.block { margin-top: var(--bos-space-lg, 22px); }
+  .block-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: var(--bos-space-xs, 9px); }
+  .block-kopf h2 { margin: 0; font-size: var(--bos-font-lg, 1.15rem); }
+  .block-kopf .klein { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs, 6px); margin-bottom: var(--bos-space-sm, 14px); }
+  .chip {
+    min-height: 44px; padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--bos-border-strong); background: var(--bos-surface-raised); color: var(--bos-text-dim);
+    font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-sm, .82rem); cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--bos-amber-glow); border-color: var(--bos-amber); color: var(--bos-text); }
+  .chip:disabled { opacity: .45; cursor: not-allowed; }
+  .chip.warn { border-color: var(--bos-red); }
+  .link-btn { background: none; border: none; color: var(--bos-amber-bright); font-family: var(--bos-font-label); font-weight: 700; cursor: pointer; padding: 8px 4px; min-height: 44px; }
+
+  .ort-gruppe { margin-bottom: var(--bos-space-sm, 14px); }
+  .ort-kopf { display: flex; align-items: baseline; gap: var(--bos-space-xs, 9px); margin: var(--bos-space-xs, 9px) 0 4px; }
+  .ort-kennung { font-family: var(--bos-font-display); font-weight: 900; font-size: var(--bos-font-2xl, 1.6rem); color: var(--bos-amber-bright); }
+  .ort-name { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); }
+  .ort-kopf.ohne .ort-kennung { color: var(--bos-text-faint); font-size: var(--bos-font-lg, 1.15rem); }
+  .ort-kopf.unbekannt .ort-kennung { color: var(--bos-red); font-size: var(--bos-font-lg, 1.15rem); }
+
+  .zeile {
+    display: flex; align-items: stretch; gap: var(--bos-space-2xs, 6px);
+    margin-bottom: var(--bos-space-2xs, 6px);
+  }
+  .zeile-haupt {
+    flex: 1 1 auto; min-height: var(--tk-tap); text-align: left;
+    display: flex; flex-direction: column; justify-content: center;
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-sm);
+    color: var(--bos-text); padding: 8px 14px; cursor: pointer; font-family: var(--bos-font-body);
+  }
+  .zeile-haupt .z-name { font-size: var(--bos-font-md, .95rem); font-weight: 600; }
+  .zeile-haupt .z-fuer { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); margin-top: 2px; }
+  .zeile-haupt[aria-pressed="true"] { opacity: .45; }
+  .zeile-haupt[aria-pressed="true"] .z-name::before { content: '✓ '; color: var(--bos-green); }
+  .geplant {
+    flex: 0 0 auto; min-height: var(--tk-tap); padding: 6px 10px; max-width: 120px;
+    border: 1px dashed var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+    background: transparent; color: var(--bos-text-faint); font-family: var(--bos-font-label);
+    font-size: var(--bos-font-2xs, .62rem); line-height: 1.2; cursor: help;
+  }
+
+  .karte { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px); margin-bottom: var(--bos-space-sm, 14px); }
+  .karte.archiviert { opacity: .6; border-style: dashed; }
+  .karte-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .karte-kopf h3 { margin: 0; font-size: var(--bos-font-lg, 1.15rem); }
+  .karte-unter { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); margin-top: 4px; line-height: 1.45; }
+  .karte-knoepfe { display: flex; gap: var(--bos-space-2xs, 6px); flex-wrap: wrap; }
+  .karte-knoepfe .bos-btn { min-height: 44px; }
+  .liste { margin: var(--bos-space-xs, 9px) 0 0; padding: 0; list-style: none; }
+  .liste li { padding: 7px 0; border-top: 1px solid var(--bos-border); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .liste li:first-child { border-top: none; }
+  .wo { font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-amber-bright); white-space: nowrap; }
+  .wo.leer { color: var(--bos-text-faint); font-weight: 600; }
+  .unterkopf { font-family: var(--bos-font-label); text-transform: uppercase; letter-spacing: .06em; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); margin-top: var(--bos-space-sm, 14px); }
+  .badge { display: inline-block; font-family: var(--bos-font-label); font-size: var(--bos-font-2xs, .62rem); letter-spacing: .05em; text-transform: uppercase; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 1px 8px; color: var(--bos-text-dim); vertical-align: middle; }
+  .badge.rot { border-color: var(--bos-red); color: var(--bos-red); }
+  .zutat-tap { background: none; border: none; color: inherit; font: inherit; text-align: left; padding: 0; cursor: pointer; min-height: 36px; }
+  .pflege-leiste { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs, 6px); margin: var(--bos-space-sm, 14px) 0; }
+  .pflege-leiste .bos-btn { min-height: var(--tk-tap); }
+
+  /* Bottom-Sheets (Hilfe, Bearbeiten, Startdaten) */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet {
+    background: var(--bos-surface); width: 100%; max-width: 720px; max-height: 92vh; overflow-y: auto;
+    border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; padding: var(--bos-space-md, 18px) var(--bos-space-md, 18px) var(--bos-space-xl, 32px);
+    box-shadow: var(--bos-shadow-lg);
+  }
+  .sheet h2 { margin: 0 0 var(--bos-space-sm, 14px); font-size: var(--bos-font-xl, 1.3rem); }
+  .sheet .sec h3 { margin: var(--bos-space-sm, 14px) 0 4px; font-size: var(--bos-font-md, .95rem); color: var(--bos-amber-bright); }
+  .sheet .sec p { margin: 0; line-height: 1.55; color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); }
+  .feld { margin-bottom: var(--bos-space-sm, 14px); }
+  .feld > label { display: block; margin-bottom: 4px; }
+  .feld .bos-input { min-height: 48px; }
+  .feld-zeile { display: flex; gap: var(--bos-space-2xs, 6px); }
+  .feld-hilfe { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); margin-top: 3px; line-height: 1.4; }
+  .sheet-knoepfe { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs, 6px); margin-top: var(--bos-space-md, 18px); }
+  .sheet-knoepfe .bos-btn { min-height: var(--tk-tap); flex: 1 1 140px; }
+  .sheet-fehler { color: var(--bos-red); font-size: var(--bos-font-sm, .82rem); margin-top: var(--bos-space-xs, 9px); line-height: 1.5; word-break: break-word; }
+  .sheet-info { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); margin-top: var(--bos-space-xs, 9px); line-height: 1.5; }
+  .bos-btn.gefahr { border-color: var(--bos-red); color: var(--bos-red); }
+  .import-liste { font-size: var(--bos-font-sm, .82rem); line-height: 1.5; max-height: 220px; overflow-y: auto; padding-left: 18px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 60;
+    background: var(--bos-surface-raised); border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+    padding: 10px 16px; max-width: 90vw; font-size: var(--bos-font-sm, .82rem); box-shadow: var(--bos-shadow-md);
+  }
+
+  /* ---- Stufe 2 (29.09.2026) ---- */
+  .klein { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); line-height: 1.4; }
+  .hinweis.gruen { border-left-color: var(--bos-green); }
+  .hinweis.gross { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; color: var(--bos-text); }
+  #verbindungLeiste {
+    margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0;
+    border: 1px solid var(--bos-blue); border-radius: var(--bos-radius-sm); background: var(--bos-surface);
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); font-size: var(--bos-font-sm, .82rem); line-height: 1.5;
+  }
+
+
+  .zahl-block { display: flex; flex-direction: column; gap: var(--bos-space-xs, 9px); margin: var(--bos-space-sm, 14px) 0; }
+  .zahl-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); }
+  .zz-name { flex: 1 1 auto; font-size: var(--bos-font-lg, 1.15rem); font-weight: 600; display: flex; flex-direction: column; }
+  .zz-name small { font-size: var(--bos-font-xs, .72rem); font-weight: 400; color: var(--bos-text-faint); }
+  .zahl-eingabe {
+    flex: 0 0 auto; width: 130px; min-height: 64px; text-align: center;
+    font-family: var(--bos-font-label); font-weight: 800; font-size: 2rem;
+    background: var(--bos-surface-raised); color: var(--bos-text);
+    border: 2px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+  }
+  .zahl-eingabe:focus { outline: none; border-color: var(--bos-amber); box-shadow: 0 0 0 3px var(--bos-amber-glow); }
+  .karte-weiter { display: flex; justify-content: flex-end; margin-bottom: var(--bos-space-sm, 14px); }
+  .karte-weiter .bos-btn { min-height: var(--tk-tap); min-width: 160px; font-size: var(--bos-font-lg, 1.15rem); }
+  .info-liste { list-style: none; margin: 0 0 var(--bos-space-sm, 14px); padding: 0; }
+  .info-liste > li { padding: 8px 0; border-top: 1px solid var(--bos-border); font-size: var(--bos-font-md, .95rem); line-height: 1.5; }
+  .info-liste > li:first-child { border-top: none; }
+  .info-liste > li.rot { color: var(--bos-red); }
+  .info-liste > li.wasser { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; }
+  .info-liste > li.ergebnis { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; color: var(--bos-amber-bright); }
+  .info-liste > li.ergebnis.rot { color: var(--bos-red); }
+  .info-liste details summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; gap: 6px; }
+  .info-liste details summary { list-style: none; }
+  .info-liste details summary::-webkit-details-marker { display: none; }
+  .info-liste details summary::before { content: '▸'; color: var(--bos-text-faint); width: 1em; }
+  .info-liste details[open] summary::before { content: '▾'; }
+  .info-liste details .liste { margin-top: 2px; }
+  .abw { display: inline-block; font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .72rem); font-weight: 700; color: var(--bos-amber-bright); border: 1px dashed var(--bos-amber); border-radius: 999px; padding: 0 8px; vertical-align: middle; }
+
+  /* Reiter „Anpassen“: oben nur heute (Mond), darunter die dauerhafte Regel */
+  .nacht-block { border: 1px dashed var(--bos-blue); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px); margin-top: var(--bos-space-sm, 14px); }
+  .nacht-titel { font-weight: 700; margin-bottom: var(--bos-space-xs, 9px); color: var(--bos-blue); }
+  .regel-block { border: 1px solid var(--bos-amber); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px); margin-top: var(--bos-space-md, 18px); }
+  .regel-titel { font-weight: 700; margin-bottom: var(--bos-space-xs, 9px); color: var(--bos-amber-bright); }
+  .anp-zeile { margin-bottom: var(--bos-space-sm, 14px); }
+  .anp-zeile > label { display: block; margin-bottom: 4px; }
+  .anp-zeile .feld-zeile { align-items: center; flex-wrap: wrap; }
+  .anp-zeile .bos-input { min-height: 48px; max-width: 160px; }
+  .tabelle-kopf, .tabelle-zeile { display: grid; grid-template-columns: 1fr 1fr 1fr 48px; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .tabelle-kopf { font-size: var(--bos-font-2xs, .62rem); text-transform: uppercase; letter-spacing: .05em; color: var(--bos-text-faint); font-family: var(--bos-font-label); }
+  .tabelle-zeile .bos-input { min-height: 44px; max-width: none; width: 100%; }
+
+  /* Abwiegefolge, Sauer, Import */
+  .folge-zeile { display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); padding: 6px 0; border-top: 1px solid var(--bos-border); }
+  .folge-zeile .bos-btn { min-width: 52px; min-height: 52px; font-size: 1.1rem; }
+  .fz-nr { width: 2.2em; text-align: right; font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-text-faint); }
+  .fz-name { flex: 1 1 auto; font-weight: 600; }
+  .sauer-eintrag { align-items: center; flex-wrap: wrap; margin-top: var(--bos-space-xs, 9px); }
+  .sauer-eintrag .bos-input { max-width: 120px; min-height: 48px; }
+  .einwaage-tabelle { width: 100%; border-collapse: collapse; font-size: var(--bos-font-sm, .82rem); }
+  .einwaage-tabelle td { padding: 4px 6px; border-top: 1px solid var(--bos-border); }
+  .einwaage-tabelle td:last-child { text-align: right; white-space: nowrap; }
+  .einwaage-tabelle td.rot { color: var(--bos-red); font-weight: 700; }
+
+  /* ---- Feinschliff 02.10.2026 (Ulf: „grob, ohne Feinschliff“) ----
+     Kopf und Reiter kleben zusammen oben; Reiter wie Browser-Tabs (der
+     aktive Tab ist aus demselben Stoff wie die Seite darunter); Karte als
+     schwebendes Fenster wie die Produkt-Karte im Produkt-Config-Editor. */
+  .kopfbereich { position: sticky; top: 0; z-index: 20; background: var(--bos-bg); }
+  .rund-btn { min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 1.15rem; }
+  .pflege-btn { min-height: 48px; }
+
+  nav.reiter {
+    display: flex; align-items: flex-end; gap: 4px;
+    padding: 6px var(--bos-space-md, 18px) 0;
+    background: var(--bos-bg-soft); border-bottom: 1px solid var(--bos-border-strong);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  nav.reiter::-webkit-scrollbar { display: none; }
+  nav.reiter button {
+    flex: 1 1 0; min-width: 0; min-height: 50px; margin-bottom: -1px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 0 14px; border: 1px solid transparent; border-bottom: none;
+    border-radius: 12px 12px 0 0; background: transparent; color: var(--bos-text-dim);
+    font-family: var(--bos-font-label); font-weight: 600; font-size: 1.02rem; letter-spacing: .01em;
+    text-transform: none; white-space: nowrap; cursor: pointer; position: relative;
+    transition: background var(--bos-transition-fast, .12s), color var(--bos-transition-fast, .12s);
+  }
+  nav.reiter button:hover { background: var(--bos-amber-glow-soft); color: var(--bos-text); }
+  nav.reiter button[aria-selected="true"] {
+    background: var(--bos-bg); color: var(--bos-text); border-color: var(--bos-border-strong);
+    box-shadow: inset 0 3px 0 var(--bos-amber);
+  }
+  nav.reiter button:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: -4px; }
+  .reiter-zahl {
+    min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; font-size: .78rem; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--bos-amber-glow-soft); color: var(--bos-amber-bright);
+  }
+  .reiter-zahl:empty { display: none; }
+  @media (max-width: 520px) { nav.reiter { padding: 6px 8px 0; gap: 2px; } nav.reiter button { padding: 0 6px; font-size: .9rem; } }
+
+  /* Teig-Liste: EINE Fläche mit Trennlinien statt einzelner Kacheln */
+  .teig-liste { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); overflow: hidden; }
+  .liste-kopf, .liste-zeile { display: grid; grid-template-columns: 28px 1fr 64px 136px; gap: 10px; align-items: center; }
+  .liste-kopf { padding: 0 16px 6px; font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .liste-kopf span:nth-child(3), .liste-kopf span:nth-child(4) { text-align: right; }
+  .liste-zeile-rahmen { display: flex; align-items: stretch; border-top: 1px solid var(--bos-border); }
+  .liste-zeile-rahmen:first-child { border-top: none; }
+  .liste-zeile-rahmen > .bos-btn { min-width: 56px; border: none; border-left: 1px solid var(--bos-border); border-radius: 0; background: transparent; }
+  .liste-zeile {
+    flex: 1 1 auto; min-height: 62px; text-align: left; cursor: pointer;
+    background: transparent; border: none; color: var(--bos-text); padding: 8px 16px; font-family: var(--bos-font-body);
+  }
+  .liste-zeile:hover, .liste-zeile:focus-visible { background: var(--bos-amber-glow-soft); outline: none; }
+  .lz-status { font-size: 1.1rem; font-weight: 700; text-align: center; color: var(--bos-text-faint); }
+  .lz-status.ok { color: var(--bos-green); } .lz-status.warn { color: var(--bos-red); } .lz-status.teil { color: var(--bos-amber-bright); }
+  .lz-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .lz-name b { font-weight: 600; font-size: var(--bos-font-md, .95rem); }
+  .lz-name small { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .72rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lz-zahl { text-align: right; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-lg, 1.15rem); font-variant-numeric: tabular-nums; }
+  .lz-menge { text-align: right; font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-amber-bright); font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) { .liste-kopf, .liste-zeile { grid-template-columns: 22px 1fr 40px 104px; gap: 6px; } .liste-zeile { padding: 8px 10px; } }
+
+  /* Hinweise, die jede Nacht gleich sind, eingeklappt */
+  details.hinweis > summary { cursor: pointer; list-style: none; font-weight: 600; min-height: 28px; display: flex; align-items: center; gap: 6px; }
+  details.hinweis > summary::-webkit-details-marker { display: none; }
+  details.hinweis > summary::after { content: '▸'; margin-left: auto; color: var(--bos-text-faint); transition: transform var(--bos-transition-fast, .12s); }
+  details.hinweis[open] > summary::after { transform: rotate(90deg); }
+  details.hinweis > div { margin-top: 6px; }
+
+  /* Außentemperatur: eine ruhige Zeile mit Umschalter */
+  .temp-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: var(--bos-space-sm, 14px) 0; }
+  .temp-titel { font-family: var(--bos-font-label); font-weight: 600; color: var(--bos-text-dim); }
+  .temp-wert { font-size: var(--bos-font-md, .95rem); }
+  .temp-wert strong { font-family: var(--bos-font-label); font-size: 1.25rem; }
+  .temp-eingabe { max-width: 96px; min-height: 44px; display: inline-block; }
+  .umschalter { display: inline-flex; border: 1px solid var(--bos-border-strong); border-radius: 999px; overflow: hidden; margin-left: auto; }
+  .umschalter button {
+    min-height: 40px; padding: 0 16px; border: none; background: transparent; color: var(--bos-text-dim);
+    font-family: var(--bos-font-label); font-weight: 600; font-size: .9rem; cursor: pointer;
+  }
+  .umschalter button + button { border-left: 1px solid var(--bos-border-strong); }
+  .umschalter button[aria-pressed="true"] { background: var(--bos-amber); color: #1a1208; }
+
+  /* Karte je Teig: schwebendes Fenster (Muster Produkt-Karte, 04.09.2026) */
+  .karte-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(0,0,0,.55); }
+  .karte-rahmen {
+    width: 100%; max-width: 760px; height: min(780px, 90vh); overflow: hidden;
+    display: flex; flex-direction: column;
+    background: var(--bos-surface); border: 1px solid var(--bos-border-strong); border-radius: 18px;
+    box-shadow: 0 20px 56px rgba(0,0,0,.45);
+  }
+  .karte-kopfzeile { display: flex; align-items: center; gap: 12px; padding: 18px 22px 12px; flex-shrink: 0; }
+  .karte-kopfzeile .rund-btn { background: var(--bos-surface); border: 1px solid var(--bos-border-strong); color: var(--bos-text); }
+  .karte-kopfzeile .rund-btn:disabled { opacity: .3; }
+  .karte-zu { background: none; border: none; color: var(--bos-text-dim); font-size: 1.5rem; width: 48px; height: 48px; cursor: pointer; flex-shrink: 0; }
+  .karte-titelblock { flex: 1 1 auto; min-width: 0; text-align: center; }
+  .karte-titel { font-family: var(--bos-font-display); font-weight: 900; font-size: 1.6rem; color: var(--bos-text); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .karte-untertitel { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-faint); margin-top: 3px; }
+  .karte-reiterleiste { display: flex; gap: 4px; padding: 0 22px; border-bottom: 1px solid var(--bos-border-strong); flex-shrink: 0; }
+  .karte-reiterleiste button {
+    min-height: 46px; padding: 0 22px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: none;
+    border-radius: 10px 10px 0 0; background: transparent; color: var(--bos-text-dim); cursor: pointer;
+    font-family: var(--bos-font-label); font-weight: 600; font-size: 1rem;
+  }
+  .karte-reiterleiste button[aria-selected="true"] { background: var(--bos-surface); color: var(--bos-text); border-color: var(--bos-border-strong); box-shadow: inset 0 3px 0 var(--bos-amber); }
+  .karte-inhalt { flex: 1 1 auto; overflow-y: auto; padding: 4px 22px 28px; }
+  .karte-inhalt #karteMeldung:empty { display: none; }
+  @media (max-width: 560px) {
+    .karte-overlay { padding: 8px; }
+    .karte-rahmen { height: 94vh; border-radius: 14px; }
+    .karte-kopfzeile { padding: 12px 12px 8px; gap: 6px; }
+    .karte-titel { font-size: 1.3rem; }
+    .karte-reiterleiste { padding: 0 12px; }
+    .karte-inhalt { padding: 4px 14px 22px; }
+  }
+
+  /* Ergebnis der Karte: zwei Kacheln (Feinschliff 02.10.2026) */
+  .ergebnis-kacheln { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin: 4px 0 var(--bos-space-sm, 14px); }
+  .kachel { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: var(--bos-radius-md); border: 1px solid var(--bos-border-strong); background: var(--bos-bg-soft); min-width: 0; }
+  .kachel.winback { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .k-label { font-family: var(--bos-font-label); font-weight: 600; font-size: .9rem; color: var(--bos-text-dim); }
+  .k-wert { font-family: var(--bos-font-label); font-weight: 800; font-size: 2.1rem; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--bos-text); }
+  .kachel.winback .k-wert { color: var(--bos-amber-bright); }
+  .k-wert.klein-wert { font-size: 1.15rem; font-weight: 600; color: var(--bos-text-dim); }
+  .k-unter { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .ergebnis-kacheln.sauer { grid-template-columns: 1.4fr 1fr; }
+  .ergebnis-kacheln.vorlaeufig .kachel { border-style: dashed; }
+  .info-liste > li.rechenweg { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-faint); }
+  @media (max-width: 480px) { .ergebnis-kacheln { grid-template-columns: 1fr; } .k-wert { font-size: 1.8rem; } }
+
+  /* Sicherheitsregel 02.10.2026: Zahl je Kessel vorn, Gesamt klein darunter */
+  .lz-menge { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .lz-haupt { white-space: nowrap; }
+  .lz-gesamt { font-family: var(--bos-font-body); font-weight: 400; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); white-space: nowrap; }
+  .lz-name small { white-space: normal; overflow: visible; line-height: 1.5; }
+  .lz-brot { display: inline-block; margin-right: 14px; white-space: nowrap; }
+  .lz-brot .rot, .zz-einwaage.rot { color: var(--bos-red); font-weight: 700; }
+  .zz-einwaage { font-size: var(--bos-font-md, .95rem); font-weight: 600; color: var(--bos-text-dim); margin-top: 2px; }
+
+  /* Vorrat (Konzept Punkt 53) und Vorstufen-Schritte (§5.1a), 02.10.2026 */
+  .vorrat-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 var(--bos-space-sm, 14px); }
+  .vorrat-titel { font-family: var(--bos-font-label); font-weight: 600; color: var(--bos-text-dim); margin-right: 4px; }
+  .vorrat-haken {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 10px; cursor: pointer;
+    border: 1px solid var(--bos-border-strong); border-radius: 999px; background: var(--bos-surface); color: var(--bos-text);
+    font-family: var(--bos-font-body); font-size: var(--bos-font-md, .95rem);
+  }
+  .vorrat-haken[aria-pressed="true"] { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .vh-kasten { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--bos-border-strong); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: var(--bos-amber-bright); }
+  .vorrat-haken[aria-pressed="true"] .vh-kasten { border-color: var(--bos-amber); }
+  .vorrat-marke { font-family: var(--bos-font-label); font-size: .72rem; font-weight: 700; color: var(--bos-blue); border: 1px solid var(--bos-blue); border-radius: 999px; padding: 0 7px; vertical-align: middle; }
+  .vorrat-hinweis { border-left-color: var(--bos-blue); }
+  .vorrat-zeile { flex-wrap: wrap; }
+  .einheit-schalter { margin-left: 0; }
+  .einheit-schalter button { min-height: 48px; }
+  .zz-umrechnung { font-size: var(--bos-font-sm, .82rem); color: var(--bos-amber-bright); font-weight: 600; margin-top: 2px; }
+  .stueck-hinweis { margin: 4px 0 -4px; }
+  .vorstufen-liste li.mit-schritten { flex-wrap: wrap; }
+  .schritt-wahl { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .schritt-wahl .umschalter { margin-left: 0; align-self: flex-start; }
+  .schritt-wahl .umschalter button { min-height: 48px; padding: 0 18px; }
+  .schritt-wahl .umschalter small { font-weight: 400; opacity: .85; }
+  .schritt-aufschluesselung { font-weight: 600; }
+  .sauer-schalter { margin-left: 0; }
+
+  /* Je Behälter eine Zeile; Regelstand-Hinweis (02.10.2026) */
+  .behaelter-liste { list-style: none; margin: 2px 0 0; padding: 0; }
+  .behaelter-liste li { display: block; padding: 6px 0; border-top: 1px dashed var(--bos-border); font-size: var(--bos-font-md, .95rem); }
+  .behaelter-liste li:first-child { border-top: none; }
+  #regelLeiste { margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0; font-weight: 600; }
+
+  /* Kleinere Stufe rechnerisch zu wenig: rötlich wie „Einwaage fehlt“ (02.10.2026) */
+  .vorstufen-liste li.zu-wenig { border-left: 3px solid var(--bos-red); padding-left: 10px; }
+  .vorstufen-liste li.zu-wenig .schritt-aufschluesselung, .vorstufen-liste li.zu-wenig .behaelter-liste li b { color: var(--bos-red); }
+  .schritt-wahl .umschalter button.zu-wenig[aria-pressed="true"] { background: var(--bos-red); color: #fff; }
+  .schritt-wahl .umschalter button.zu-wenig small { opacity: 1; font-weight: 700; }
+</style>
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge nach Checkliste §2a und
+     bos_standalone_login.js-Kopf. Direkt aufrufbar (Lesezeichen/QR/NFC am
+     Gerät in der Teigecke). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'teigecke_nacht';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="teigecke_logik.js"></script>
+
+<div class="kopfbereich">
+<header>
+    <div class="kopf-titel">
+      <h1 class="bos-title" data-i18n="titel">Teigecke Nacht</h1>
+      <div class="backtag" id="backtagZeile">…</div>
+    </div>
+    <div class="kopf-knoepfe">
+      <button type="button" class="bos-btn pflege-btn" id="pflegeBtn" aria-pressed="false" hidden data-i18n="pflegen">✎ Pflegen</button>
+      <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+    </div>
+  </header>
+  <nav class="reiter" role="tablist" aria-label="Bereiche">
+    <button type="button" role="tab" data-tab="teige" aria-selected="true"><span data-i18n="reiter_teige">Teige</span><span class="reiter-zahl" id="reiterZahlTeige"></span></button>
+    <button type="button" role="tab" data-tab="vorbereitungen" aria-selected="false"><span data-i18n="reiter_vorbereitungen">Vorbereitungen</span></button>
+    <button type="button" role="tab" data-tab="einsammeln" aria-selected="false"><span data-i18n="reiter_einsammeln">Einsammeln</span></button>
+  </nav>
+</div>
+
+<div id="verbindungLeiste" role="status" hidden></div>
+<div id="regelLeiste" class="hinweis rot" role="alert" hidden></div>
+
+<div id="fehlerLeiste" role="alert" hidden>
+  <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+
+
+<main>
+  <div id="ladeStatus" class="status" data-i18n="lade">Lade Daten …</div>
+  <div id="ansichtTeige"></div>
+  <div id="ansichtVorbereitungen" hidden></div>
+  <div id="ansichtEinsammeln" hidden></div>
+</main>
+
+<div id="karteSheet" class="karte-overlay" hidden>
+  <div class="karte-rahmen" role="dialog" aria-modal="true" aria-labelledby="karteTitel">
+    <div class="karte-kopfzeile">
+      <button type="button" class="bos-btn rund-btn" id="karteZurueckBtn" data-aktion="karte-zurueck" aria-label="voriger Teig">‹</button>
+      <div class="karte-titelblock"><div id="karteTitel" class="karte-titel"></div><div id="karteUntertitel" class="karte-untertitel"></div></div>
+      <button type="button" class="bos-btn rund-btn" id="karteVorBtn" data-aktion="karte-vor" aria-label="nächster Teig">›</button>
+      <button type="button" class="karte-zu" data-aktion="karte-zu" aria-label="schließen">✕</button>
+    </div>
+    <div id="karteReiter" class="karte-reiterleiste" role="tablist"></div>
+    <div class="karte-inhalt">
+      <div id="karteMeldung" class="sheet-fehler" role="alert"></div>
+      <div id="karteBody"></div>
+    </div>
+  </div>
+</div>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="editSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="editTitel"></h2>
+    <div id="editInhalt"></div>
+    <div id="editFehler" class="sheet-fehler" role="alert"></div>
+    <div id="editInfo" class="sheet-info"></div>
+    <div class="sheet-knoepfe" id="editKnoepfe"></div>
+  </div>
+</div>
+
+<input type="file" id="importDatei" accept=".json,application/json" hidden>
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Teigecke Nacht — Seitenlogik (Stufe 2). Reine Rechenlogik liegt in
+   teigecke_logik.js (BOS_TEIGECKE_LOGIK, mit node testbar).
+   KEINE Daten im Code: keine Zutaten-, Teig-, Mengen- oder Rezeptwerte
+   (Repo ist öffentlich, Grundsatz „Schutzbedarf“). Startdaten kommen aus
+   einer Datei außerhalb des Repos (Knopf „Startdaten einlesen“).
+   Die einzigen Zahlen hier sind Ulfs Betriebsvorgaben (Kessel 190 kg,
+   Umschaltzeit 12 Uhr) und der feste Wetter-Standort Havelse.
+   ================================================================== */
+
+const L = window.BOS_TEIGECKE_LOGIK;
+const COL = {
+  orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', teigwerte: 'teigecke_teigwerte',
+  einstellungen: 'teigecke_einstellungen', sicherungen: 'teigecke_sicherungen',
+  naechte: 'teigecke_naechte', anpassungen: 'teigecke_nacht_anpassungen'
+};
+/* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§11).
+   Orte und Zutaten schreibt seit 03.10.2026 nur noch teigecke_orte.html.
+   test_teigecke.js vergleicht beides automatisch. */
+const FELDER = {
+  teigecke_teige: ['name', 'istSauerteig', 'mitSauer', 'ohneSchuettwasser', 'hinweisOben', 'zutaten', 'vorstufe',
+    'vorstufeZutaten', 'vorstufeHinweis', 'beiBedarf', 'sauerJeKg', 'hefeJeKg', 'vorstufeJeKg', 'anstellgutAnteil',
+    'rezeptBasisKg', 'sort', 'geloescht',
+    'vorstufeSchritt', 'vorstufeSchritteJeBehaelter', 'vorstufeBehaelter',
+    'winbackFeld', 'winbackName', 'vorstufeWinbackFeld', 'vorstufeWinbackName'],
+  teigecke_teigwerte: ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter', 'tabelle', 'einwaage',
+    'kesselMaxKg', 'kesselrestKg'],
+  teigecke_einstellungen: ['abwiegefolge', 'kesselMaxVorgabeKg', 'sauerKesselMaxKg', 'sauerStufeKg', 'sauerHalbStufeKg',
+    'sauerSchwelleKg']
+};
+const NACHT_FELDER = ['brote', 'kesselrest', 'temperatur', 'prognose', 'sauerAnsatz', 'rezeptStand',
+  'vorrat', 'vorratHaken', 'vorstufeWahl'];
+const ANPASSUNG_FELDER = ['backtag', 'teige'];
+/* Welcher Haken darf welche Collection schreiben (drei Schlüssel, Konzept §6.1a). */
+const HAKEN_FUER = {
+  teigecke_teige: 'rezepte',
+  teigecke_teigwerte: 'teige', teigecke_einstellungen: 'teige'
+};
+const SCHREIB_ZEITLIMIT_MS = 20000;
+const LOKAL_KEY = 'bos_teigecke_nacht_lokal';
+const PRODUKTE_SPIEGEL_KEY = 'bos_teigecke_produkte_spiegel';
+const WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const WT_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const WT_REIHE = [1, 2, 3, 4, 5, 6, 0];
+const VORSTUFEN_VORSCHLAG = ['Quellstück', 'Brühstück', 'Kochstück'];
+/* Fester Standort Backstube Havelse (Garbsen), keine Standortfreigabe (Ulf). */
+const WETTER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=52.42&longitude=9.59&current=temperature_2m&timezone=Europe%2FBerlin';
+const WETTER_INTERVALL_MS = 30 * 60 * 1000;
+const WETTER_ZEITLIMIT_MS = 10000;
+const KESSEL_VORGABE_KG = 190;   // Ulf, 29.09.2026
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  titel: 'Teigecke Nacht', pflegen: '✎ Pflegen', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
+  reiter_einsammeln: 'Einsammeln', reiter_teige: 'Teige', reiter_orte: 'Orte', lade: 'Lade Daten …', schliessen: 'Schließen',
+  backtag: 'Backtag: {tag} · ab 12:00 Uhr gilt der nächste Backtag',
+  heute_titel: 'Für heute Nacht', heute_klein: 'Hauptteige · nach Ort sortiert',
+  morgen_titel: 'Für morgen vorbereiten', morgen_klein: 'Vorstufen der Teige für {tag}',
+  morgen_annahme: '🚧 Annahme, noch von Ulf zu bestätigen: Alle Vorstufen (Quellstück & Co.) werden in der Vornacht angesetzt.',
+  teige_waehlen: 'Welche Teige? (antippen zum Ändern)', auswahl_manuell: 'Auswahl von Hand geändert', auswahl_zurueck: 'zurück zur Vorauswahl',
+  keine_teige: 'Noch keine Teige angelegt.', keine_auswahl: 'Kein Teig ausgewählt.', nichts_zu_sammeln: 'Für die ausgewählten Teige ist nichts einzusammeln (keine Zutaten hinterlegt).',
+  ohne_zuhause: '🚧 Noch ohne Zuhause', unbekannte_zutat: '⚠ Unbekannte Zutat', unbekannte_zutat_text: 'Zutat fehlt im Stamm (archiviert oder gelöscht) — Teig prüfen',
+  fuer: 'für {liste}',
+  nicht_gefunden: '🚧 „nicht gefunden“ — in Planung',
+  nicht_gefunden_info: 'In Planung: „nicht gefunden“ soll später eine Aufgabe im Taskboard anlegen (pro Nacht und Zutat eine, mit Zähler). Bisher darf nur die Produktionsleitung Aufgaben anlegen — das wird noch geklärt.',
+  hinweis_geschlossen: 'Laut Zeitkontext ist {tag} geschlossen{grund}. Die Vorauswahl der Teige zeigt trotzdem die üblichen Sorten — bitte prüfen.',
+  hinweis_ohne_teig_kurz: '🚧 {n} Brote am {tag} noch ohne Teig',
+  hinweis_produkte_fehlen: '⚠ produkt_config.json ließ sich nicht laden — ohne Produktliste gibt es keine Vorauswahl der Teige. Teige von Hand antippen.',
+  noch_ohne: 'noch ohne Zuhause', unbekannt: 'unbekannt',
+  orte_leer: 'Noch keine Orte angelegt. Die Kennungen vergibt Ulf, sobald die Wagen beschriftet sind.',
+  ort_art_wagen: 'Wagen', ort_art_ort: 'anderer Ort', ort_leer: 'noch keine Zutaten', ohne_zuhause_karte: 'Zutaten ohne Zuhause',
+  schild: '🖨 Schild', alle_schilder: '🖨 Alle Schilder drucken', keine_schilder: 'Kein Ort zum Drucken vorhanden.',
+  neu_ort: '＋ Ort', neu_zutat: '＋ Zutat', startdaten: '📂 Startdaten einlesen',
+  archiv_zeigen: 'Archiv zeigen', archiv_verbergen: 'Archiv verbergen', archiv_leer: 'Nichts archiviert.',
+  wiederherstellen: '↩ Wiederherstellen', bearbeiten: '✎', speichern: 'Speichern', abbrechen: 'Abbrechen', archivieren: 'Archivieren',
+  gespeichert: '✓ Gespeichert', archiviert: '✓ Archiviert', wiederhergestellt: '✓ Wiederhergestellt',
+  e_titel_ort_neu: 'Neuer Ort', e_titel_ort: 'Ort bearbeiten', e_titel_zutat_neu: 'Neue Zutat', e_titel_zutat: 'Zutat bearbeiten',
+  f_kennung: 'Kennung (so wie auf dem Wagen)', f_kennung_hilfe: 'Kurz, z. B. zwei bis vier Zeichen. Steht groß auf dem Schild.',
+  f_name: 'Name', f_art: 'Art', f_beschreibung: 'Beschreibung (optional)', f_sort: 'Reihenfolge im Gang (optional)', f_sort_hilfe: 'Kleinere Zahl = weiter vorne in der Einsammelliste. Leer = hinten, nach Kennung sortiert.',
+  f_zuhause: 'Zuhause', f_zuhause_ohne: '— noch ohne Zuhause —', f_gebinde: 'Gebinde (optional)', f_gebinde_hilfe: 'Größe des Sacks/Eimers, z. B. 25 und kg. Nur zur Anzeige; wird später für den Verbrauch in Gebinden gebraucht.',
+  f_einheit_leer: '—',
+  v_pflicht: '„{feld}“ fehlt.', v_zu_lang: '„{feld}“ ist zu lang (höchstens {max} Zeichen).',
+  v_kennung_doppelt: 'Die Kennung „{wert}“ hat schon ein anderer Ort.', v_name_doppelt: '„{wert}“ gibt es schon.',
+  v_sort: 'Reihenfolge muss eine Zahl sein.', v_gebinde: 'Gebindegröße muss eine Zahl über 0 sein.',
+  v_vorstufe_ohne_name: 'Vorstufen-Zutaten ausgewählt, aber kein Name der Vorstufe.',
+  sperre_ort: 'Archivieren geht nicht: an diesem Ort liegen noch {liste}. Erst ein anderes Zuhause geben.',
+  sperre_zutat: 'Archivieren geht nicht: die Zutat steht noch in {liste}. Erst dort herausnehmen.',
+  import_titel: 'Startdaten einlesen', import_json: 'Die Datei ist kein gültiges JSON: {msg}',
+  import_fehler_titel: 'Fehler — so wird nichts übernommen:', import_hinweise_titel: 'Hinweise:', import_nichts: 'Nichts Neues in der Datei.',
+  import_los: 'Übernehmen ({n} Einträge)', import_laeuft: 'Schreibe {i} von {n} …', import_fertig: '✓ Übernommen: {n} Einträge, jeder mit eigener Sicherung.',
+  import_abbruch: 'Abgebrochen bei Eintrag {i} von {n}. Alles davor ist gespeichert. Erneutes Einlesen überspringt Vorhandenes.',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).', err_zeit: 'Keine Antwort vom Server nach {s} s — vermutlich kein Netz. Die Änderung kann noch nachträglich ankommen: später neu laden und nachsehen.',
+  konflikt: 'Inzwischen von {wer} geändert, neu geladen, bitte erneut speichern.',
+  err_gegenlesen: 'Gegenlesen nach abgelehntem Speichern',
+  err_laden: 'Laden „{was}“', err_speichern: 'Speichern', err_drucken: 'Drucken', err_konto: 'Konto lesen (Pflege-Recht)', err_zeitkontext: 'Zeitkontext lesen', err_unbehandelt: 'Unerwarteter Fehler',
+  kein_konto: 'Keine Anmeldung erkannt — Pflege nicht möglich. Anzeigen geht trotzdem.',
+  backtag_gewechselt: 'Es ist 12 Uhr durch — Backtag gewechselt, Vorauswahl neu gesetzt.',
+  /* ---- neu 29.09.2026, Stufe 2 ---- */
+  reiter_vorbereitungen: 'Vorbereitungen', reiter_zahlen: 'Zahlen', reiter_anpassen: 'Anpassen',
+  teige_titel: 'Teige für {tag}', keine_teige_heute: 'Für diesen Backtag ist kein Teig dran (kein Brot mit Teig im Backprogramm).',
+  keine_teige_morgen: 'Für morgen ist kein Teig dran.', keine_teige_tag: 'An diesem Wochentag ist kein Teig dran.',
+  spalte_teig: 'Teig', spalte_anzahl: 'Anzahl', spalte_winback: 'in WinBack', spalte_teigmenge: 'Teigmenge',
+  status_fertig: 'fertig: alle Zahlen stehen', status_null: 'Heute nicht (alle Brote 0).', status_einwaage: 'Einwaage fehlt', status_teilweise: 'noch nicht alle Brote eingetragen', status_leer: 'noch nichts eingetragen',
+  heute_nicht: 'heute nicht', einwaage_fehlt_kurz: 'Einwaage fehlt', einwaage_fehlt_lang: 'Einwaage fehlt bei: {liste} — ohne sie rechnet BOS keine Teigmenge.',
+  einwaage_klein: 'Einwaage {g} g', einwaage_heute: '(heute)', einwaage_titel: 'Einwaage je Brot',
+  winback_hinweis: 'In WinBack die kg-Menge eingeben, nicht Stück.',
+  vorrat_heute: 'Vorrat heute:', vorrat_marke: 'Vorrat', vorrat_bleche: 'Bleche', vorrat_dielen: 'Dielen', vorrat_stueck: 'Stück',
+  vorrat_einheit: 'Eingabe in', vorrat_umrechnung: '{n} {wort} = {stk} Stück',
+  vorrat_hilfe: 'Auf Vorrat für den Froster. Nicht die Backzettel-Zahl eintragen, sondern die Teiglinge, die heute produziert werden.',
+  vorrat_entfernen_titel: 'Vorrat abhaken?', vorrat_entfernen_text: 'Bei „{teig}“ sind schon Teiglinge eingetragen ({liste}). Wenn du den Haken entfernst, werden sie gelöscht.',
+  vorrat_entfernen_ja: 'Haken entfernen und Zahlen löschen',
+  stueck_nicht_bleche: 'Anzahl in Stück eintippen, nicht die Spalte Bleche.',
+  sauer_unbekannt: 'Sauer unbekannt: {liste} — ob diese Teige Sauer brauchen, steht noch nicht im Rezept. Sie sind NICHT eingerechnet. Im Rezept „Sauer ja/nein“ setzen.',
+  sauer_vorrat: 'Vorrat mit Sauer: {liste} — die Menge für morgen ist unbekannt und nicht eingerechnet.',
+  vorstufe_vorrat: 'Vorrat mit Vorstufe: {liste} — die Menge für morgen ist unbekannt und nicht eingerechnet.',
+  vorstufe_bedarf: 'Bedarf {kg} für {stk} Brote', vorstufe_schritte: 'Anzahl Schritte', vorstufe_option: '{n} ×', vorstufe_reicht: '(reicht für {stk} Brote)', vorstufe_reicht_nur: '(reicht nur für {stk} von {von} Broten)',
+  vorstufe_gesamt: 'Zusammen: {teile} = {kg}', vorstufe_behaelter_vorgabe: 'Behälter',
+  f_mit_sauer_frage: 'Sauerteig im Teig?', f_sauer_ja: 'ja', f_sauer_nein: 'nein', f_sauer_unbekannt: 'unbekannt',
+  f_sauer_hilfe: '„unbekannt“ heißt: noch nicht aus dem Rezept übernommen. Der Sauer-Block zeigt diese Teige dann rot und rechnet sie nicht mit.',
+  f_vorstufe_schritt: 'Vorstufe in festen Schritten (ein Schritt)', f_vorstufe_schritt_beispiel: 'z. B. 3 kg Schrot + 9 L Wasser',
+  f_vorstufe_schritt_hilfe: 'Leer = genaue kg. Mit Schritt zeigt „Vorbereitungen“ die zwei passenden Anzahlen zur Wahl. Mengen in kg oder L, mit + verbunden.',
+  f_schritte_je_behaelter: 'Schritte je Behälter höchstens', f_behaelter: 'Behälter (Name)',
+  v_schritt: 'Vorstufen-Schritt nicht lesbar bei „{teil}“ — so schreiben: 3 kg Schrot + 9 L Wasser.', v_schritt_ohne_vorstufe: 'Ein Vorstufen-Schritt braucht den Namen der Vorstufe.',
+  v_schritte_je_behaelter: 'Schritte je Behälter: eine ganze Zahl ab 1.',
+  k_eine_charge: 'eine Charge', k_anstellgut: 'Anstellgut zurückhalten', k_anstellgut_unter: 'vom heutigen Sauer, für den neuen Ansatz',
+  k_wasser: 'Schüttwasser weniger', k_kein_schuettwasser: 'kein Schüttwasser', k_winback_je: 'In WinBack eingeben, je Kessel',
+  k_winback: 'In WinBack eingeben', k_winback_vorlaeufig: 'In WinBack (vorläufig)', k_kg_nicht_stueck: 'als kg, nicht Stück',
+  weiter: 'Weiter ›', letzter_teig: 'Das war der letzte Teig.', karte_prognose: 'Prognose für {tag}',
+  wasser_weniger: '{l} weniger Wasser', heute_statt: 'heute, sonst {statt}', heute_angepasst: 'heute angepasst',
+  keine_wasserregel: '(noch keine Wasserregel)', ohne_schuettwasser: 'Kein Schüttwasser in diesem Teig — kein Wasserabzug.',
+  wassertemp: 'Wassertemperatur: {c} °C', wassertemp_keine_tabelle: 'Wassertemperatur: noch keine Tabelle.', wassertemp_ohne_aussen: 'Wassertemperatur: Außentemperatur fehlt.',
+  tabelle_rand: '(Randwert — außerhalb der Tabelle)',
+  hefe: 'Hefe: {kg}', hefe_ohne_tabelle: '(laut Rezept, noch keine Tabelle)', hefe_tabelle: '(Tabelle: {delta})', hefe_kein_rezeptwert: 'Hefe: noch kein Rezeptwert.',
+  kesselrest: 'Kesselrest/Zusatzteig: {kg}', noch_keine_zahlen: 'Noch keine Zahlen eingetragen.', noch_nicht_alle: 'Vorläufig, noch nicht alle Brote eingetragen:',
+  rechnung: 'Aus den Broten {summe}, + Kesselrest/Zusatzteig {rest}', rechnung_vorrat: 'Aus den Teiglingen {summe}, + Kesselrest/Zusatzteig {rest}', in_winback: '{kg} in WinBack',
+  in_winback_kessel: '{gesamt} gesamt, auf {n} Kessel verteilt: je Kessel {je} in WinBack',
+  teigmenge_d: 'Teigmenge:', sauer_dafuer: 'Sauer dafür:', vorstufe_gestern: 'Wurde in der Vornacht angesetzt.',
+  nur_heute: '🌙 Gilt nur für heute Nacht — ab 12 Uhr gelten wieder die normalen Werte.',
+  anp_wasser: 'Wasserabzug heute (L)', anp_wasser_hilfe: 'Leer = laut Regel. Der Wert steht grau im Feld.', anp_wassertemp: 'Wassertemperatur heute',
+  anp_hefe: 'Hefe heute, für den ganzen Teig (kg)', anp_kesselrest: 'Kesselrest/Zusatzteig heute', anp_einwaage: 'Einwaage heute: {name}', normalwert: '↺ Normalwert',
+  temp_label: 'Außentemperatur', temp_auto: 'automatisch', temp_manuell: 'von Hand', temp_stand: 'Stand {zeit}, Havelse',
+  temp_alt: 'Wetterdienst gerade nicht erreichbar', temp_holt: 'wird geholt …', temp_fehlt: 'keine Temperatur — von Hand eintragen',
+  err_wetter: 'Wetterdienst', wetter_zeitlimit: 'Keine Antwort vom Wetterdienst nach {s} s.',
+  regel_titel: '🥣 Regel (dauerhaft)', regel_wasser: 'Wasserregel', regel_bei: 'Bei', regel_brote: 'Broten', regel_liter: 'L weniger Wasser',
+  regel_bisher: '{brote} × {name}: bisher {l} weniger laut Regel.', regel_gepflegt: 'Gepflegt: bei {brote} Broten {l} weniger.',
+  regel_wasser_hilfe: 'War der Teig zu weich oder zu fest, trag ein, was beim nächsten Mal richtig wäre. BOS rechnet das selbst auf jede Menge um.',
+  regel_tabelle: 'Wassertemperatur und Hefe nach Außentemperatur', regel_tabelle_hilfe: 'Je Zeile: Außen °C → Wasser °C und Hefe ±g bei 100 Broten (wie in der Umfrage). Dazwischen rechnet BOS anteilig.',
+  tab_aussen: 'außen °C', tab_wasser: 'Wasser °C', tab_hefe: 'Hefe ±g', tab_plus: '＋ Zeile', tab_minus: 'Zeile löschen',
+  regel_einwaagen: 'Einwaage je Brot (Stammwert)', regel_kessel: 'Kessel höchstens', regel_kesselrest: 'Kesselrest/Zusatzteig (Vorgabe)',
+  regel_speichern: 'Regel speichern', zuletzt: 'zuletzt geändert am {datum} von {wer}', warte_uebertragung: 'Die letzte Änderung wird noch übertragen — bitte kurz warten.',
+  v_anzahl: 'Bitte eine ganze Zahl ab 0 eingeben.', v_zahl: 'Bitte eine Zahl eingeben.', v_einwaage: 'Einwaage für „{name}“ muss über 0 g liegen.',
+  v_tabelle: 'Jede Tabellenzeile braucht eine Außentemperatur.', v_kessel: 'Kessel-Höchstmenge muss über 0 kg liegen.', v_kesselrest: 'Kesselrest darf nicht negativ sein.',
+  v_wasserregel: 'Wasserregel: Anzahl Brote über 0 und Liter ab 0 eintragen.', v_wasserregel_einwaage: 'Wasserregel lässt sich nicht umrechnen: Es fehlt eine Einwaage oder eine Brotzahl.',
+  v_teig_kennung: 'Die Kennung darf nur a–z, 0–9 und _ enthalten (2–40 Zeichen).', v_teig_kennung_doppelt: 'Die Kennung „{wert}“ gibt es schon (auch archivierte zählen).',
+  v_zahl_feld: '„{feld}“ muss eine Zahl über 0 sein.', v_anstellgut: 'Anstellgut-Anteil muss unter 1 liegen (z. B. 0,09).', v_zwei_sauerteige: 'Es gibt schon einen Sauerteig: „{name}“.',
+  sperre_teig: 'Archivieren geht nicht: Diese Brote zeigen in der Produkt-Config noch auf den Teig: {liste}.',
+  hinweis_unbekannter_teig: '⚠ Diese Brote zeigen auf einen Teig, den es nicht (mehr) gibt: {liste}',
+  offline_stand: '📴 Ohne Verbindung — Stand von {zeit}. Eingaben werden gespeichert und übertragen, sobald das Netz wieder da ist.',
+  ausstehend: '⏳ Änderungen werden übertragen …', produkte_spiegel: 'Produktliste vom Gerät (Stand {zeit})',
+  offline_pflege: 'Ohne Verbindung wird nichts dauerhaft geändert (nur Nachtwerte).',
+  folge_knopf: '↕ Abwiegefolge', folge_titel: 'Abwiegefolge je Wochentag', folge_hilfe: 'Reihenfolge, in der die Teige am {tag} abgewogen werden.',
+  folge_hoch: 'nach oben', folge_runter: 'nach unten', folge_von_tag: 'Reihenfolge von einem anderen Tag übernehmen', folge_uebernehmen: 'übernehmen',
+  neu_teig: '＋ Teig', alle_teige_an: 'alle Teige zeigen', alle_teige_aus: 'nur Teige von heute', andere_teige: 'Teige, die heute nicht dran sind',
+  e_titel_teig_neu: 'Neuer Teig', e_titel_teig: 'Rezept bearbeiten',
+  f_teig_kennung: 'Feste Kennung', f_teig_kennung_auto: 'wird aus dem Namen gebildet', f_teig_kennung_hilfe: 'Bleibt für immer (die Brote zeigen darauf). Leer lassen = aus dem Namen.',
+  f_teig_kennung_fest: 'Nicht änderbar — die Brote in der Produkt-Config zeigen darauf.', f_brote: 'Brote aus diesem Teig', f_brote_hilfe: 'Wird in der Produkt-Config gepflegt (Feld „Aus Teig“), nicht hier. Neu zugeordnete Brote erscheinen erst, wenn die exportierte produkt_config.json im Repo liegt.',
+  f_mit_sauer: 'mit eigenem Sauer', f_ohne_schuettwasser: 'ohne Schüttwasser', f_ist_sauerteig: 'ist der Sauerteig',
+  f_hinweis_oben: 'Hinweis ganz oben (optional)', f_hinweis_oben_hilfe: 'Erscheint in der Karte ganz oben, z. B. „Zuerst Schaumsauer ansetzen“.',
+  f_zutaten: 'Handverwogene Zutaten (Hauptteig)', f_vorstufe: 'Vorstufe (optional)', f_vorstufe_hilfe: 'Name der Vorstufe, z. B. Quellstück. Leer lassen, wenn es keine gibt.',
+  f_vorstufe_zutaten: 'Zutaten der Vorstufe', f_vorstufe_hinweis: 'Hinweis zur Vorstufe (optional)', f_bei_bedarf: 'Nur bei Bedarf',
+  f_bei_bedarf_hilfe: 'Hat ein Zuhause, gehört aber nicht jede Nacht in die Einsammelliste (z. B. nur zum Auffrischen).',
+  f_keine_zutaten: 'Noch keine Zutaten im Stamm — erst unter „Orte“ Zutaten anlegen.',
+  f_werte_je_kg: 'Werte je kg Teig (stehen nicht im Repo; lesen darf jedes Konto, ändern nur der Rezept-Haken)', f_sauer_je_kg: 'Sauer je kg Teig (kg)', f_hefe_je_kg: 'Hefe je kg Teig (kg)',
+  f_vorstufe_je_kg: 'Vorstufe je kg Teig (kg)', f_rezeptbasis: 'Rezeptbasis (kg)', f_rezeptbasis_hilfe: 'Teigmenge des WinBack-Rezepts, meist für 100 Brote. Damit rechnet BOS die Hefe-Tabelle um.',
+  f_anstellgut: 'Anstellgut-Anteil (nur Sauerteig)', f_anstellgut_hilfe: 'Anteil Anstellgut je kg Sauer, z. B. 0,09.', f_sort_teig: 'Reihenfolge (optional)',
+  teig_keine_produkte: 'noch kein Brot zugeordnet', teig_zutaten: 'Handverwogene Zutaten', teig_vorstufe: 'Vorstufe: {name}',
+  sauer_titel: 'Sauer ansetzen', sauer_klein: 'für die Teige von {tag}', sauer_kein_rezept: '🚧 Noch kein Sauerteig-Rezept mit Anstellgut-Anteil eingetragen.',
+  sauer_ohne_wert: 'Ohne Sauer-Wert (zählt nicht mit): {liste}', sauer_prognose_offen: 'Erst die Prognose für morgen fertig eintippen: {liste}',
+  sauer_bedarf: 'Sauer für die Teige von morgen:', sauer_mindest: 'Mindestmenge (mit {prozent} % Anstellgut für übermorgen):', sauer_ansatz: 'Ansetzen',
+  sauer_angesetzt: 'Angesetzt', sauer_bestaetigen: '✓ So angesetzt',
+  sauer_eingetragen: 'Eingetragen. Das gilt morgen für die Prüfung „Reicht der Sauer?“.', sauer_vorschlag_gilt: 'Noch nichts eingetragen — dann gilt der Vorschlag.',
+  reicht_titel: 'Reicht der Sauer von gestern?', reicht_gestern_fehlt: 'Gestern wurde kein Ansatz eingetragen und keine Prognose für heute — keine Prüfung möglich.',
+  reicht_heute_offen: 'Erst alle Brotzahlen von heute eintragen: {liste}', reicht_ansatz_fehlt: 'Der neue Ansatz steht noch nicht fest.',
+  reicht_ja: '✓ Reicht.', reicht_nein: '⚠ Reicht NICHT — es fehlen {fehlt} Anstellgut.',
+  reicht_zahlen: 'Ansatz gestern {gestern} ({quelle}), davon für die Teige heute {heute}, bleiben {rest}, gebraucht als Anstellgut {noetig}.',
+  reicht_quelle_eingetragen: 'eingetragen', reicht_quelle_vorschlag: 'Vorschlag aus der Prognose',
+  prognose_titel: 'Prognose für {tag}', prognose_klein: 'vom Büro-Zettel eintippen', prognose_fehlt: 'Prognose fehlt', kein_rezeptwert: 'kein Rezeptwert',
+  vorstufen_titel: 'Vorstufen ansetzen', vorstufen_klein: 'für {tag}', vorstufen_keine: 'Morgen braucht kein Teig eine Vorstufe.', vorstufe_menge: '{stk} Stk = {kg}',
+  haken_wagen: '🧺 Wagen & Zutaten', haken_teige: '🥣 Teige', haken_rezepte: '📜 Rezepte',
+  import_haken_fehlen: 'Für diese Datei fehlen dir die Haken: {liste}. Es wird nichts geschrieben.',
+  import_einwaagen_titel: 'Einwaagen bitte prüfen (noch nicht bestätigt):',
+  import_zusammenfassung: 'Neu: {teige} Teige, {werte}× Teigwerte (Einwaagen). Schon vorhanden (wird übersprungen): {vorhanden}.',
+  import_zutaten_erst: 'Die Datei enthält {n} Zutat(en), die es noch nicht gibt. Zutaten liest seit dem 03.10. die Seite „Orte“ ein (Hub „Teigecke“ → Orte → „Zutaten einlesen“, Haken 🧺). Danach diese Datei hier noch einmal einlesen.',
+  import_orte_nicht: 'Die Datei enthält {n} Ort(e). Orte werden nicht mehr eingelesen, sondern auf der Seite „Orte“ von Hand angelegt.',
+  orte_pflegen: 'Orte pflegen ›',
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Drei mögliche Gründe: (1) Dir fehlt der passende Haken (🧺 Wagen & Zutaten, 🥣 Teige, 📜 Rezepte) bzw. für die Nachtwerte die Rolle Backstube/Produktionsleitung. (2) Du bist mit dem Generalschlüssel 👑 angemeldet — der schreibt in der Teigecke nie. (3) Die Regeln sind älter als diese Seite (die Seite schickt Felder, die die alte Regel nicht kennt) — Regelstand in der Firebase-Konsole prüfen.',
+  err_perm_regel_alt: 'Wahrscheinlich Grund (3): Beim Laden passte der Regelstand nicht zur Seite. ',
+  err_haken_fehlt: 'Dafür fehlt dir der passende Haken in der Kontenverwaltung (🧺 Wagen & Zutaten, 🥣 Teige oder 📜 Rezepte).',
+  regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Speichern kann deshalb abgelehnt werden. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.'
+};
+function t(schluessel, werte) {
+  let text = I18N_DE[schluessel] || schluessel;
+  Object.keys(werte || {}).forEach(function (k) { text = text.split('{' + k + '}').join(String(werte[k])); });
+  return text;
+}
+function wendeI18nAn() {
+  document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
+}
+const esc = L.esc;
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, haken: { wagen: false, teige: false, rezepte: false },
+  pflegeModus: false, tab: 'teige', zeigeArchiv: false, zeigeAlleTeige: false,
+  orte: [], zutaten: [], teige: [], teigwerte: {}, einstellungen: {}, naechte: {}, anpassung: null,
+  produkte: [], produkteOk: false, produkteAusSpiegel: null,
+  backtag: null, backtagMorgen: null, backtagGestern: null, zeitkontext: null, geladen: false,
+  verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
+  wetter: { laeuft: false, fehler: null },
+  karte: null,
+  regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
+  aufgeklappt: {},  // eingeklappte Hinweise, nur für die Sitzung
+  vorratEinheit: {} // je Vorrats-Brot: Eingabe in 'bleche' oder 'stueck' (nur dieses Gerät)
+};
+const abos = { stamm: [], naechte: [] };
+
+/* ---------- Fehler sichtbar (Checkliste §7a) ---------- */
+function erklaerung(err) {
+  const c = (err && err.code) || '';
+  if (c === 'permission-denied') return (S.regelstand === 'alt' ? t('err_perm_regel_alt') : '') + t('err_perm');
+  if (c === 'unavailable') return t('err_netz');
+  if (c === 'zeitlimit') return t('err_zeit', { s: SCHREIB_ZEITLIMIT_MS / 1000 });
+  return '';
+}
+function fehlerText(kontext, err) {
+  const roh = (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err));
+  return kontext + ': ' + [erklaerung(err), roh].filter(Boolean).join(' · ');
+}
+function zeigeFehler(kontext, err) {
+  console.error('[Teigecke] ' + kontext, err);
+  const liste = document.getElementById('fehlerListe');
+  const li = document.createElement('li');
+  li.textContent = fehlerText(kontext, err);
+  liste.insertBefore(li, liste.firstChild);
+  while (liste.children.length > 6) liste.removeChild(liste.lastChild);
+  document.getElementById('fehlerLeiste').hidden = false;
+}
+window.addEventListener('error', function (e) {
+  zeigeFehler(t('err_unbehandelt'), { message: (e.message || 'unbekannt') + ' (' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?') + ')' });
+});
+window.addEventListener('unhandledrejection', function (e) {
+  zeigeFehler(t('err_unbehandelt'), e.reason || { message: 'unbekannt' });
+});
+document.getElementById('fehlerZuBtn').addEventListener('click', function () {
+  document.getElementById('fehlerLeiste').hidden = true;
+  document.getElementById('fehlerListe').innerHTML = '';
+});
+
+let toastTimer = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.hidden = true; }, 4200);
+}
+
+/* ---------- Lokaler Zustand je Backtag (Auswahl, Abhaken) ----------
+   Nur auf diesem Gerät, nichts davon geht in die Datenbank. */
+function leseLokal() {
+  try { const r = localStorage.getItem(LOKAL_KEY); const o = r ? JSON.parse(r) : {}; return (o && typeof o === 'object') ? o : {}; }
+  catch (e) { return {}; }
+}
+function schreibeLokal(o) {
+  try {
+    const tage = Object.keys(o).sort();
+    while (tage.length > 4) delete o[tage.shift()];   // nur die letzten Tage behalten
+    localStorage.setItem(LOKAL_KEY, JSON.stringify(o));
+  } catch (e) { console.warn('[Teigecke] lokales Speichern nicht möglich', e); }
+}
+function lokalTag(datum) {
+  const o = leseLokal();
+  const k = L.datumStr(datum);
+  return (o[k] && typeof o[k] === 'object') ? o[k] : {};
+}
+function setzeLokalTag(datum, teil) {
+  const o = leseLokal();
+  const k = L.datumStr(datum);
+  o[k] = Object.assign({}, o[k] || {}, teil);
+  schreibeLokal(o);
+}
+
+/* Auswahl: null = automatische Vorauswahl über backTage, Liste = von Hand */
+function auswahl(datum) {
+  const lokal = lokalTag(datum);
+  if (Array.isArray(lokal.auswahl)) return { ids: lokal.auswahl, manuell: true };
+  return { ids: S.produkteOk ? L.vorauswahl(S.teige, S.produkte, datum.getDay(), vorratHaken(L.datumStr(datum))) : [], manuell: false };
+}
+
+/* ---------- Datum/Backtag ---------- */
+function tagText(d) { return WOCHENTAGE[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.'; }
+function heuteStr() { return L.datumStr(S.backtag); }
+function morgenStr() { return L.datumStr(S.backtagMorgen); }
+function gesternStr() { return L.datumStr(S.backtagGestern); }
+function setzeBacktag() {
+  S.backtag = L.backtag(new Date());
+  S.backtagMorgen = L.naechsterTag(S.backtag);
+  S.backtagGestern = new Date(S.backtag.getFullYear(), S.backtag.getMonth(), S.backtag.getDate() - 1);
+  document.getElementById('backtagZeile').textContent = t('backtag', { tag: tagText(S.backtag) });
+}
+
+/* ---------- Zahlen ---------- */
+function fmt(x, stellen) {
+  if (!L.istZahl(x)) return '–';
+  return x.toFixed(stellen).replace('.', ',');
+}
+function fmtKg(x) { return fmt(x, 1) + ' kg'; }
+function fmtL(x) { return fmt(x, 1) + ' L'; }
+function fmtHefe(x) { return fmt(x, 2) + ' kg'; }
+function fmtG(x) { return L.istZahl(x) ? Math.round(x) + ' g' : '–'; }
+function zahlText(x) { return L.istZahl(x) ? String(x).replace('.', ',') : ''; }
+/* '' → null (Feld geleert), sonst Zahl oder NaN (ungültig). Komma erlaubt. */
+function parseZahl(text) {
+  const s = String(text == null ? '' : text).trim().replace(',', '.');
+  if (s === '') return null;
+  const n = Number(s);
+  return isFinite(n) ? n : NaN;
+}
+
+/* ---------- Kurzwege ---------- */
+const tm = function () { return L.nachId(S.teige); };
+const zm = function () { return L.nachId(S.zutaten); };
+const om = function () { return L.nachId(S.orte); };
+const pm = function () { return L.produktMap(S.produkte); };
+function produktName(k) { const p = pm()[k]; return p ? p.name : k; }
+function aktiveTeigeSortiert() { return L.aktiv(S.teige).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); }); }
+function online() { return navigator.onLine !== false && !Object.keys(S.verbindung.ausCache).some(function (k) { return S.verbindung.ausCache[k]; }); }
+function hatHaken() { return S.haken.teige || S.haken.rezepte; }   /* Wagen-Haken: Seite „Orte“ */
+function pflegtRezepte() { return S.pflegeModus && S.haken.rezepte && online(); }
+function pflegtTeige() { return S.pflegeModus && S.haken.teige && online(); }
+function einstZahl(feld, vorgabe) { const v = S.einstellungen && S.einstellungen[feld]; return L.istZahl(v) ? v : vorgabe; }
+function folgeFuer(wd) { const f = S.einstellungen && S.einstellungen.abwiegefolge; return (f && Array.isArray(f[String(wd)])) ? f[String(wd)] : null; }
+function sauerteig() { return L.aktiv(S.teige).filter(function (x) { return x.istSauerteig; })[0] || null; }
+
+/* ---------- Laden: Produkte (Datei), Konto, Zeitkontext ---------- */
+async function ladeProdukte() {
+  try {
+    const res = await fetch('../produkt_config.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' beim Laden von produkt_config.json');
+    const liste = await res.json();
+    if (!Array.isArray(liste)) throw new Error('produkt_config.json ist keine Liste');
+    S.produkte = liste; S.produkteOk = true; S.produkteAusSpiegel = null;
+    try { localStorage.setItem(PRODUKTE_SPIEGEL_KEY, JSON.stringify({ zeit: Date.now(), liste: liste })); } catch (e) { /* voll/gesperrt: egal */ }
+  } catch (err) {
+    zeigeFehler(t('err_laden', { was: 'produkt_config.json' }), err);
+    /* Offline-Schicht 1: öffentliche Produktliste vom letzten erfolgreichen Laden. */
+    try {
+      const sp = JSON.parse(localStorage.getItem(PRODUKTE_SPIEGEL_KEY) || 'null');
+      if (sp && Array.isArray(sp.liste)) { S.produkte = sp.liste; S.produkteOk = true; S.produkteAusSpiegel = new Date(sp.zeit); return; }
+    } catch (e) { /* kein Spiegel */ }
+    S.produkte = []; S.produkteOk = false;
+  }
+}
+async function ladeKonto() {
+  S.haken = { wagen: false, teige: false, rezepte: false };
+  if (!S.kennung) return;
+  try {
+    const konto = await window.BOS_ACCOUNTS.ladeKonto(window.db, S.kennung);
+    S.haken = {
+      wagen: !!(konto && konto.teigeckePflege === true),
+      teige: !!(konto && konto.teigeckeTeige === true),
+      rezepte: !!(konto && konto.teigeckeRezepte === true)
+    };
+  } catch (err) { zeigeFehler(t('err_konto'), err); }
+}
+async function ladeZeitkontext() {
+  S.zeitkontext = null;
+  if (!window.BOS_ZEITKONTEXT) return;
+  try { S.zeitkontext = await window.BOS_ZEITKONTEXT.status(window.db, heuteStr()); }
+  catch (err) { zeigeFehler(t('err_zeitkontext'), err); }
+}
+
+/* ---------- Live-Daten (onSnapshot) ----------
+   Alles wird abonniert: Zwei Geräte sehen sofort, was das andere schreibt,
+   und ohne Netz bleibt der letzte Stand auf dem Bildschirm (Schicht 1). */
+function merkeVerbindung(schluessel, meta) {
+  S.verbindung.ausCache[schluessel] = !!meta.fromCache;
+  S.verbindung.ausstehend[schluessel] = !!meta.hasPendingWrites;
+  if (!meta.fromCache) S.verbindung.letzteServerZeit = new Date();
+}
+function mitId(snap) { const a = []; snap.forEach(function (d) { a.push(Object.assign({ id: d.id }, d.data())); }); return a; }
+function aboCollection(name, verarbeite) {
+  return window.db.collection(COL[name]).onSnapshot({ includeMetadataChanges: true }, function (snap) {
+    merkeVerbindung(name, snap.metadata);
+    verarbeite(mitId(snap));
+    planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: COL[name] }), err); });
+}
+function aboDokument(col, id, schluessel, verarbeite) {
+  return window.db.collection(col).doc(id).onSnapshot({ includeMetadataChanges: true }, function (snap) {
+    merkeVerbindung(schluessel, snap.metadata);
+    verarbeite(snap.exists ? Object.assign({ id: snap.id }, snap.data()) : null);
+    planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: col + '/' + id }), err); });
+}
+function abonniereStamm() {
+  abos.stamm.forEach(function (ab) { ab(); });
+  abos.stamm = [
+    aboCollection('orte', function (a) { S.orte = a; }),
+    aboCollection('zutaten', function (a) { S.zutaten = a; }),
+    aboCollection('teige', function (a) { S.teige = a; }),
+    aboCollection('teigwerte', function (a) { S.teigwerte = L.nachId(a); }),
+    aboDokument(COL.einstellungen, 'allgemein', 'einstellungen', function (d) { S.einstellungen = d || {}; }),
+    aboDokument(COL.anpassungen, 'aktuell', 'anpassungen', function (d) { S.anpassung = d; })
+  ];
+}
+function abonniereNaechte() {
+  abos.naechte.forEach(function (ab) { ab(); });
+  S.naechte = {};
+  abos.naechte = [gesternStr(), heuteStr(), morgenStr()].map(function (tag) {
+    return aboDokument(COL.naechte, tag, 'nacht_' + tag, function (d) { S.naechte[tag] = d; });
+  });
+}
+
+async function start() {
+  wendeI18nAn();
+  renderHilfe();
+  setzeBacktag();
+  if (!window.db || !window.BOS_AUTH_READY) {
+    zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt'));
+    return;
+  }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; }
+  catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); return; }
+  S.kennung = (nutzer && nutzer.email) ? nutzer.email.split('@')[0] : null;
+  if (!S.kennung) toast(t('kein_konto'));
+  await Promise.all([ladeProdukte(), ladeKonto(), ladeZeitkontext()]);
+  abonniereStamm();
+  abonniereNaechte();
+  S.geladen = true;
+  document.getElementById('ladeStatus').hidden = true;
+  document.getElementById('pflegeBtn').hidden = !hatHaken();
+  render();
+  holeWetter();
+  if (S.kennung) pruefeRegelstand();
+  setInterval(pruefeBacktagWechsel, 60000);
+  setInterval(holeWetter, WETTER_INTERVALL_MS);
+}
+async function pruefeBacktagWechsel() {
+  const neu = L.backtag(new Date());
+  if (S.backtag && L.datumStr(neu) !== L.datumStr(S.backtag)) {
+    setzeBacktag();
+    abonniereNaechte();       // neuer Backtag = neues, leeres Nacht-Dokument
+    await ladeZeitkontext();
+    schliesseKarte();
+    render();
+    toast(t('backtag_gewechselt'));
+    holeWetter();
+  }
+}
+window.addEventListener('online', function () { planeRender(); holeWetter(); });
+window.addEventListener('offline', planeRender);
+
+/* ---------- Schreiben: Nachtdaten (ohne Haken, feldgenau) ----------
+   Merge auf Feldpfade: zwei Geräte, die verschiedene Felder schreiben,
+   verlieren nichts. Gleiches Feld gleichzeitig: spätere Eingabe gewinnt
+   (RK §11). Nicht blockierend: ohne Netz puffert Firestore, die Leiste
+   oben zeigt „wird übertragen“. */
+/* Regelstand-Probe (02.10.2026, RK §13): Die Regeln geben ein Lesen auf
+   bos_regelstand/{fassung} nur für die Fassungen frei, die sie erfüllen.
+   Das Dokument existiert nicht; ein erlaubtes get liefert „gibt es nicht“,
+   eine ältere Regel lehnt ab (kein passender match-Block). Ein Lesevorgang,
+   kein Schreiben, keine Daten. Nur „permission-denied“ vom SERVER zählt als
+   „alt“; ohne Netz oder bei anderen Fehlern bleibt es still (unbekannt). */
+const REGEL_FASSUNG = 'teigecke-2026-10-02';
+const REGEL_DATEI = 'firestore_regeln_2026-10-04_nfc_sammelblatt.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
+async function pruefeRegelstand() {
+  try {
+    await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' });
+    S.regelstand = 'passt';
+  } catch (err) {
+    S.regelstand = err && err.code === 'permission-denied' ? 'alt' : 'unbekannt';
+    if (S.regelstand === 'unbekannt') console.warn('[Teigecke] Regelstand nicht prüfbar:', err && err.message);
+  }
+  const el = document.getElementById('regelLeiste');
+  el.textContent = t('regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
+  el.hidden = S.regelstand !== 'alt';
+}
+function FV() { return firebase.firestore.FieldValue; }
+function verschachtelt(pfad, wert) {
+  let innen = wert;
+  for (let i = pfad.length - 1; i >= 0; i--) { const o = {}; o[pfad[i]] = innen; innen = o; }
+  return innen;
+}
+function schreibeNacht(tag, daten) {
+  const voll = Object.assign({}, daten, { geaendertVon: S.kennung, geaendertAm: FV().serverTimestamp() });
+  return window.db.collection(COL.naechte).doc(tag).set(voll, { merge: true })
+    .catch(function (err) { zeigeFehler(t('err_speichern'), err); });
+}
+/* Anpassungen „nur heute Nacht“: EIN Dokument mit Feld backtag (Auflage KC).
+   Passt der Backtag nicht, wird es beim ersten Schreiben ganz ersetzt —
+   die Anpassung von gestern ist dann weg und nirgends mehr gespeichert. */
+function schreibeAnpassung(kennung, pfad, wert) {
+  const heute = heuteStr();
+  const aktuell = !!(S.anpassung && S.anpassung.backtag === heute);
+  if (wert === null && !aktuell) return Promise.resolve();
+  const teil = {}; teil[kennung] = verschachtelt(pfad, wert === null ? FV().delete() : wert);
+  const daten = { teige: teil, geaendertVon: S.kennung, geaendertAm: FV().serverTimestamp() };
+  const ref = window.db.collection(COL.anpassungen).doc('aktuell');
+  let p;
+  if (aktuell) p = ref.set(daten, { merge: true });
+  else { daten.backtag = heute; p = ref.set(daten); }
+  return p.catch(function (err) { zeigeFehler(t('err_speichern'), err); });
+}
+
+/* ---------- Temperatur (Konzept §4.1) ---------- */
+function temperaturHeute() {
+  const n = S.naechte[heuteStr()];
+  const tmp = (n && n.temperatur) || {};
+  return { modus: tmp.modus === 'manuell' ? 'manuell' : 'auto', wertC: L.istZahl(tmp.wertC) ? tmp.wertC : null, zeit: tmp.zeit || '', quelle: tmp.quelle || '' };
+}
+async function holeWetter() {
+  if (!S.geladen || S.wetter.laeuft || temperaturHeute().modus !== 'auto') return;
+  S.wetter.laeuft = true;
+  const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+  const timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, WETTER_ZEITLIMIT_MS);
+  try {
+    const res = await fetch(WETTER_URL, { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' vom Wetterdienst');
+    const j = await res.json();
+    const w = j && j.current && j.current.temperature_2m;
+    if (!L.istZahl(w)) throw new Error('Der Wetterdienst lieferte keine Temperatur.');
+    S.wetter.fehler = null;
+    if (temperaturHeute().modus === 'auto') {
+      schreibeNacht(heuteStr(), { temperatur: { modus: 'auto', wertC: w, quelle: 'automatisch', zeit: String((j.current && j.current.time) || '') } });
+    }
+  } catch (err) {
+    const e = (err && err.name === 'AbortError') ? { message: t('wetter_zeitlimit', { s: WETTER_ZEITLIMIT_MS / 1000 }) } : err;
+    S.wetter.fehler = e;
+    zeigeFehler(t('err_wetter'), e);
+  } finally {
+    clearTimeout(timer);
+    S.wetter.laeuft = false;
+    planeRender();
+  }
+}
+function uhrzeitAus(zeit) { const m = /T(\d{2}:\d{2})/.exec(zeit || ''); return m ? m[1] : (zeit || ''); }
+function temperaturHTML() {
+  const tmp = temperaturHeute();
+  const knopf = function (modus) {
+    return '<button type="button" data-aktion="temp-modus" data-modus="' + modus + '" aria-pressed="' + (tmp.modus === modus) + '">' + esc(t(modus === 'auto' ? 'temp_auto' : 'temp_manuell')) + '</button>';
+  };
+  let wert;
+  if (tmp.modus === 'manuell') {
+    wert = '<input class="bos-input temp-eingabe" id="tempManuell" inputmode="decimal" value="' + esc(zahlText(tmp.wertC)) + '" aria-label="' + esc(t('temp_label')) + '"> °C';
+  } else if (L.istZahl(tmp.wertC)) {
+    wert = '<strong>' + fmt(tmp.wertC, 1) + ' °C</strong> <span class="klein">' + esc(t('temp_stand', { zeit: uhrzeitAus(tmp.zeit) })) + '</span>' +
+      (S.wetter.fehler ? ' <span class="badge rot">' + esc(t('temp_alt')) + '</span>' : '');
+  } else {
+    wert = S.wetter.laeuft ? esc(t('temp_holt')) : '<span class="badge rot">' + esc(t('temp_fehlt')) + '</span>';
+  }
+  return '<div class="temp-leiste"><span class="temp-titel">' + esc(t('temp_label')) + '</span><div class="temp-wert">' + wert + '</div>' +
+    '<div class="umschalter" role="group" aria-label="' + esc(t('temp_label')) + '">' + knopf('auto') + knopf('manuell') + '</div></div>';
+}
+
+/* ---------- Ein Teig in einer Nacht (Anzeige + Rechnung) ---------- */
+function teigRechnung(teig, rolle) {
+  const datum = rolle === 'prognose' ? S.backtagMorgen : S.backtag;
+  const tag = L.datumStr(datum);
+  const nacht = S.naechte[tag] || {};
+  const vorrat = rolle === 'heute' && istVorrat(teig);
+  const zahlen = (rolle === 'prognose' ? nacht.prognose : vorrat ? nacht.vorrat : nacht.brote) || {};
+  const tw = S.teigwerte[teig.id] || {};
+  const stamm = tw.einwaage || {};
+  const anp = rolle === 'heute' ? (L.anpassungHeute(S.anpassung, tag)[teig.id] || {}) : {};
+  const anpE = anp.einwaage || {};
+  /* Vorrat: alle Brote des Teigs (nicht an den Backtag gebunden). */
+  const produkte = L.produkteDesTeigs(teig.id, S.produkte, vorrat ? undefined : datum.getDay());
+  const posten = produkte.map(function (p) {
+    const lk = p.legacyKey;
+    const abw = L.istZahl(anpE[lk]);
+    return { lk: lk, name: p.name, anzahl: L.istZahl(zahlen[lk]) ? zahlen[lk] : undefined,
+      einwaageG: abw ? anpE[lk] : stamm[lk], stammG: stamm[lk], abw: abw };
+  });
+  const kesselrestStamm = L.istZahl(tw.kesselrestKg) ? tw.kesselrestKg : 0;
+  const kesselrestNacht = (rolle === 'heute' && nacht.kesselrest && L.istZahl(nacht.kesselrest[teig.id])) ? nacht.kesselrest[teig.id] : null;
+  const aussen = rolle === 'heute' ? temperaturHeute().wertC : null;
+  const hefeT = L.interpoliere(tw.tabelle, aussen, 'hefeDeltaG');
+  const wasserT = L.interpoliere(tw.tabelle, aussen, 'wasserC');
+  const calc = L.rechneTeig({
+    posten: posten,
+    kesselrestKg: kesselrestNacht !== null ? kesselrestNacht : kesselrestStamm,
+    literJeKg: tw.wasserLiterJeKg,
+    wasserL: L.istZahl(anp.wasserL) ? anp.wasserL : null,
+    ohneSchuettwasser: !!teig.ohneSchuettwasser,
+    kesselMaxKg: L.istZahl(tw.kesselMaxKg) ? tw.kesselMaxKg : einstZahl('kesselMaxVorgabeKg', KESSEL_VORGABE_KG),
+    hefeJeKg: teig.hefeJeKg, hefeDeltaG: hefeT.wert, rezeptBasisKg: teig.rezeptBasisKg,
+    hefeKg: L.istZahl(anp.hefeKg) ? anp.hefeKg : null
+  });
+  return { teig: teig, rolle: rolle, tag: tag, vorrat: vorrat, produkte: produkte, posten: posten, tw: tw, anp: anp, kesselrestStamm: kesselrestStamm,
+    kesselrestNacht: kesselrestNacht, aussen: aussen, hefeT: hefeT, wasserT: wasserT, calc: calc };
+}
+function istFertig(calc) { return calc.status === 'fertig' || calc.status === 'null'; }
+
+/* ---------- Rendern ---------- */
+let renderGeplant = false, renderAufgeschoben = false;
+function planeRender() {
+  if (renderGeplant) return;
+  renderGeplant = true;
+  requestAnimationFrame(function () { renderGeplant = false; render(); });
+}
+function fokusIn(el) {
+  const a = document.activeElement;
+  return !!(a && el && el.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
+}
+document.addEventListener('focusout', function () {
+  setTimeout(function () { if (renderAufgeschoben) { renderAufgeschoben = false; render(); } }, 0);
+});
+function renderVerbindung() {
+  const el = document.getElementById('verbindungLeiste');
+  const ausstehend = Object.keys(S.verbindung.ausstehend).filter(function (k) { return S.verbindung.ausstehend[k]; }).length;
+  const teile = [];
+  if (!online()) {
+    const z = S.verbindung.letzteServerZeit;
+    teile.push(t('offline_stand', { zeit: z ? String(z.getHours()).padStart(2, '0') + ':' + String(z.getMinutes()).padStart(2, '0') : '?' }));
+  }
+  if (ausstehend) teile.push(t('ausstehend'));
+  if (S.produkteAusSpiegel) teile.push(t('produkte_spiegel', { zeit: S.produkteAusSpiegel.toLocaleString('de-DE') }));
+  el.hidden = !teile.length;
+  el.textContent = teile.join(' · ');
+}
+function render() {
+  if (!S.geladen) return;
+  renderVerbindung();
+  document.querySelectorAll('nav.reiter [data-tab]').forEach(function (knopf) {
+    knopf.setAttribute('aria-selected', knopf.getAttribute('data-tab') === S.tab ? 'true' : 'false');
+  });
+  document.getElementById('pflegeBtn').setAttribute('aria-pressed', S.pflegeModus ? 'true' : 'false');
+  document.getElementById('reiterZahlTeige').textContent = String(teigeFuer('heute').length || '');
+  const ansichten = { teige: 'ansichtTeige', vorbereitungen: 'ansichtVorbereitungen', einsammeln: 'ansichtEinsammeln' };
+  Object.keys(ansichten).forEach(function (k) { document.getElementById(ansichten[k]).hidden = S.tab !== k; });
+  if (fokusIn(document.querySelector('main'))) renderAufgeschoben = true;
+  else {
+    if (S.tab === 'teige') renderTeige();
+    if (S.tab === 'vorbereitungen') renderVorbereitungen();
+    if (S.tab === 'einsammeln') renderEinsammeln();
+  }
+  if (S.karte) renderKarte(false);
+}
+
+function hinweiseHTML() {
+  const h = [];
+  if (S.zeitkontext && S.zeitkontext.offen === false) {
+    h.push('<div class="hinweis blau">' + esc(t('hinweis_geschlossen', { tag: tagText(S.backtag), grund: S.zeitkontext.grund ? ' (' + S.zeitkontext.grund + ')' : '' })) + '</div>');
+  }
+  if (!S.produkteOk) h.push('<div class="hinweis rot">' + esc(t('hinweis_produkte_fehlen')) + '</div>');
+  if (S.produkteOk) {
+    const unb = L.unbekannterTeig(S.produkte, S.teige);
+    if (unb.length) h.push('<div class="hinweis rot">' + esc(t('hinweis_unbekannter_teig', { liste: unb.map(function (p) { return p.name + ' → ' + p.ausTeig; }).join(', ') })) + '</div>');
+    const ohne = L.ohneTeig(S.produkte, S.teige, S.backtag.getDay());
+    if (ohne.length) h.push('<details class="hinweis baustelle" data-merken="ohneTeig"' + (S.aufgeklappt.ohneTeig ? ' open' : '') + '><summary>' + esc(t('hinweis_ohne_teig_kurz', { n: ohne.length, tag: WOCHENTAGE[S.backtag.getDay()] })) + '</summary><div>' +
+      esc(ohne.map(function (p) { return p.name; }).join(', ')) + '</div></details>');
+  }
+  return h.join('');
+}
+
+/* ---------- Liste der Teige (Startseite, auch für die Prognose) ---------- */
+function statusSymbol(calc) {
+  if (calc.status === 'fertig') return '<span class="lz-status ok" title="' + esc(t('status_fertig')) + '">✓</span>';
+  if (calc.status === 'null') return '<span class="lz-status neutral" title="' + esc(t('status_null')) + '">–</span>';
+  if (calc.status === 'einwaageFehlt') return '<span class="lz-status warn" title="' + esc(t('status_einwaage')) + '">⚠</span>';
+  if (calc.status === 'teilweise') return '<span class="lz-status teil" title="' + esc(t('status_teilweise')) + '">…</span>';
+  return '<span class="lz-status leer" title="' + esc(t('status_leer')) + '">○</span>';
+}
+/* Vorrats-Teige (Konzept Punkt 53): nur, wenn für den Backtag angehakt.
+   Die Prognose für morgen nimmt sie nie (nicht an den Backzettel gebunden). */
+function vorratHaken(tag) {
+  const h = (S.naechte[tag] || {}).vorratHaken || {}, m = {};
+  Object.keys(h).forEach(function (k) { if (h[k] === true) m[k] = true; });
+  return m;
+}
+function istVorrat(teig) { return L.istVorratsTeig(teig.id, S.produkte); }
+function teigeFuer(rolle) {
+  const datum = rolle === 'prognose' ? S.backtagMorgen : S.backtag;
+  return L.teigeDesTages(S.teige, S.produkte, datum.getDay(), folgeFuer(datum.getDay()), rolle === 'prognose' ? {} : vorratHaken(heuteStr()));
+}
+function vorratZeileHTML() {
+  const vt = L.vorratsTeige(S.teige, S.produkte);
+  if (!vt.length) return '';
+  const h = vorratHaken(heuteStr());
+  return '<div class="vorrat-leiste"><span class="vorrat-titel">' + esc(t('vorrat_heute')) + '</span>' + vt.map(function (x) {
+    return '<button type="button" class="vorrat-haken" data-aktion="vorrat-haken" data-id="' + esc(x.id) + '" aria-pressed="' + (h[x.id] === true) + '">' +
+      '<span class="vh-kasten" aria-hidden="true">' + (h[x.id] === true ? '✓' : '') + '</span>' + esc(x.name) + '</button>';
+  }).join('') + '</div>';
+}
+/* Haken setzen/entfernen. Stehen schon Teiglinge drin, erst nachfragen;
+   beim Entfernen werden sie mit gelöscht (sonst stünde Vorrat in der Historie,
+   der nie gemacht wurde). */
+function vorratUmschalten(id, bestaetigt) {
+  const tag = heuteStr(), an = vorratHaken(tag)[id] === true;
+  const daten = { vorratHaken: {} };
+  if (!an) { daten.vorratHaken[id] = true; schreibeNacht(tag, daten); return; }
+  const zahlen = (S.naechte[tag] || {}).vorrat || {};
+  const mitZahl = L.produkteDesTeigs(id, S.produkte).filter(function (p) { return L.istZahl(zahlen[p.legacyKey]); });
+  if (mitZahl.length && !bestaetigt) {
+    editZustand = { typ: 'vorratFrage', id: id };
+    oeffneEdit(t('vorrat_entfernen_titel'), '<p>' + esc(t('vorrat_entfernen_text', { teig: (tm()[id] || {}).name || id,
+      liste: mitZahl.map(function (p) { return p.name + ' ' + zahlen[p.legacyKey] + ' Stk'; }).join(', ') })) + '</p>',
+      [{ aktion: 'vorrat-entfernen', text: t('vorrat_entfernen_ja'), klasse: 'gefahr' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+    return;
+  }
+  daten.vorratHaken[id] = FV().delete();
+  if (mitZahl.length) { daten.vorrat = {}; mitZahl.forEach(function (p) { daten.vorrat[p.legacyKey] = FV().delete(); }); }
+  schreibeNacht(tag, daten);
+}
+function listeHTML(rolle) {
+  const teige = teigeFuer(rolle);
+  if (!teige.length) return '<p class="status">' + esc(t(rolle === 'prognose' ? 'keine_teige_morgen' : 'keine_teige_heute')) + '</p>';
+  const kopf = '<div class="liste-kopf"><span></span><span>' + esc(t('spalte_teig')) + '</span><span>' + esc(t('spalte_anzahl')) + '</span><span>' +
+    esc(t(rolle === 'prognose' ? 'spalte_teigmenge' : 'spalte_winback')) + '</span></div>';
+  return kopf + '<div class="teig-liste">' + teige.map(function (teig) {
+    const r = teigRechnung(teig, rolle);
+    const c = r.calc;
+    let menge = '';
+    if (c.status === 'einwaageFehlt') menge = '<span class="badge rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>';
+    else if (c.status === 'null') menge = esc(t('heute_nicht'));
+    /* Sicherheitsregel 02.10.2026: In „in WinBack“ steht nur die Zahl, die
+       eingegeben wird — bei Kesseln je Kessel („2 × 106,6 kg“); die
+       Gesamtmenge klein darunter, nie als führende Zahl neben einem „×“.
+       Die Prognose zeigt die Teigmenge D (keine WinBack-Eingabe, kein „×“). */
+    else if (rolle === 'prognose' && L.istZahl(c.D)) menge = '<span class="lz-haupt">' + fmtKg(c.D) + '</span>';
+    else if (rolle !== 'prognose' && L.istZahl(c.T)) {
+      const m = L.mengeJeKessel(c.T, c.kessel, 'kg', 1);
+      menge = '<span class="lz-haupt">' + esc(m.haupt) + '</span>' + (m.gesamt ? '<span class="lz-gesamt">' + esc(m.gesamt) + '</span>' : '');
+    }
+    /* Einwaage hinter jedem Brot (Ulf, 02.10.); Produktname wie auf dem Backzettel. */
+    const brote = r.posten.map(function (p) {
+      return '<span class="lz-brot">' + esc(p.name) + ' · ' + (L.istZahl(p.einwaageG)
+        ? esc(t('einwaage_klein', { g: Math.round(p.einwaageG) })) + (p.abw ? ' ' + esc(t('einwaage_heute')) : '')
+        : '<span class="rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>') + '</span>';
+    }).join('');
+    return '<div class="liste-zeile-rahmen"><button type="button" class="liste-zeile" data-aktion="karte-oeffnen" data-rolle="' + rolle + '" data-id="' + esc(teig.id) + '">' +
+      statusSymbol(c) +
+      '<span class="lz-name"><b>' + esc(teig.name) + (r.vorrat ? ' <span class="vorrat-marke">' + esc(t('vorrat_marke')) + '</span>' : '') + '</b><small>' + brote + '</small></span>' +
+      '<span class="lz-zahl">' + (c.status === 'leer' ? '' : esc(String(c.anzahl))) + '</span>' +
+      '<span class="lz-menge">' + menge + '</span></button>' +
+      (pflegtRezepte() ? '<button type="button" class="bos-btn" data-aktion="bearbeiten-teig" data-id="' + esc(teig.id) + '" aria-label="' + esc(t('e_titel_teig')) + '">✎</button>' : '') +
+      '</div>';
+  }).join('') + '</div>';
+}
+
+function renderTeige() {
+  const el = document.getElementById('ansichtTeige');
+  let html = hinweiseHTML() + temperaturHTML() + vorratZeileHTML();
+  if (S.pflegeModus && hatHaken()) {
+    html += '<div class="pflege-leiste">';
+    if (pflegtTeige()) html += '<button type="button" class="bos-btn" data-aktion="folge-oeffnen">' + esc(t('folge_knopf')) + '</button>';
+    if (pflegtRezepte()) html += '<button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-teig">' + esc(t('neu_teig')) + '</button>' +
+      '<button type="button" class="link-btn" data-aktion="alle-teige">' + esc(t(S.zeigeAlleTeige ? 'alle_teige_aus' : 'alle_teige_an')) + '</button>';
+    /* Startdaten (seit 03.10.2026 hier, vorher im Reiter „Orte“): nur noch Teige und Teigwerte. */
+    if (online()) html += '<button type="button" class="bos-btn" data-aktion="startdaten">' + esc(t('startdaten')) + '</button>';
+    if (!online()) html += '<span class="klein">' + esc(t('offline_pflege')) + '</span>';
+    html += '</div>';
+  }
+  html += '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('teige_titel', { tag: tagText(S.backtag) })) + '</h2></div>' + listeHTML('heute') + '</section>';
+  if (pflegtRezepte() && S.zeigeAlleTeige) {
+    const heute = teigeFuer('heute').map(function (x) { return x.id; });
+    const rest = aktiveTeigeSortiert().filter(function (x) { return heute.indexOf(x.id) === -1; });
+    html += '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('andere_teige')) + '</h2></div>' +
+      (rest.length ? rest.map(function (x) { return teigKarteHTML(x, false); }).join('') : '<p class="status">–</p>') + '</section>';
+  }
+  if (pflegtRezepte()) html += archivHTML('teige');
+  el.innerHTML = html;
+}
+/* Kurzkarte eines Teigs für „andere Teige“ und Archiv (Rezept-Haken). */
+function teigKarteHTML(teig, archiv) {
+  const brote = L.produkteDesTeigs(teig.id, S.produkte).map(function (p) { return p.name; }).join(', ');
+  const knopf = archiv
+    ? '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="teige" data-id="' + esc(teig.id) + '">' + esc(t('wiederherstellen')) + '</button>'
+    : '<button type="button" class="bos-btn" data-aktion="bearbeiten-teig" data-id="' + esc(teig.id) + '">✎</button>';
+  return '<div class="karte' + (archiv ? ' archiviert' : '') + '"><div class="karte-kopf"><div><h3>' + esc(teig.name) + ' <span class="badge">' + esc(teig.id) + '</span></h3>' +
+    '<div class="karte-unter">' + esc(brote || t('teig_keine_produkte')) + '</div></div><div class="karte-knoepfe">' + knopf + '</div></div></div>';
+}
+
+/* ---------- Vorbereitungen: Sauer, Prognose, Vorstufen ---------- */
+function prognoseStand() {
+  const teige = teigeFuer('prognose');
+  const rechnungen = teige.map(function (x) { return teigRechnung(x, 'prognose'); });
+  const offen = rechnungen.filter(function (r) { return !istFertig(r.calc); });
+  return { rechnungen: rechnungen, offen: offen };
+}
+function sauerBedarfAus(rechnungen, feld) {
+  return rechnungen.reduce(function (s, r) {
+    const teig = r.teig;
+    if (!teig.mitSauer || !L.istZahl(teig.sauerJeKg) || !L.istZahl(r.calc[feld])) return s;
+    return s + teig.sauerJeKg * r.calc[feld];
+  }, 0);
+}
+function sauerHTML() {
+  const st = sauerteig();
+  const a = st && st.anstellgutAnteil;
+  const einst = { stufeKg: einstZahl('sauerStufeKg', L.SAUER_VORGABE.stufeKg), halbStufeKg: einstZahl('sauerHalbStufeKg', L.SAUER_VORGABE.halbStufeKg),
+    schwelleKg: einstZahl('sauerSchwelleKg', L.SAUER_VORGABE.schwelleKg), chargeMaxKg: einstZahl('sauerKesselMaxKg', L.SAUER_VORGABE.chargeMaxKg) };
+  let html = '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('sauer_titel')) + '</h2><span class="klein">' + esc(t('sauer_klein', { tag: tagText(S.backtagMorgen) })) + '</span></div>';
+  if (!L.istZahl(a)) return html + '<div class="hinweis baustelle">' + esc(t('sauer_kein_rezept')) + '</div></section>';
+  const pg = prognoseStand();
+  const ohneWert = pg.rechnungen.filter(function (r) { return r.teig.mitSauer && !L.istZahl(r.teig.sauerJeKg); }).map(function (r) { return r.teig.name; });
+  if (ohneWert.length) html += '<div class="hinweis baustelle">' + esc(t('sauer_ohne_wert', { liste: ohneWert.join(', ') })) + '</div>';
+  /* mitSauer fehlt = unbekannt (Anweisung Vorrat §5 A): sichtbar, nicht still weglassen. */
+  const unbekannt = pg.rechnungen.filter(function (r) { return typeof r.teig.mitSauer !== 'boolean' && !r.teig.istSauerteig; }).map(function (r) { return r.teig.name; });
+  if (unbekannt.length) html += '<div class="hinweis rot">' + esc(t('sauer_unbekannt', { liste: unbekannt.join(', ') })) + '</div>';
+  const vorratMitSauer = L.vorratsTeige(S.teige, S.produkte).filter(function (x) { return x.mitSauer === true; }).map(function (x) { return x.name; });
+  if (vorratMitSauer.length) html += '<div class="hinweis">' + esc(t('sauer_vorrat', { liste: vorratMitSauer.join(', ') })) + '</div>';
+  let vorschlag = null;
+  if (pg.offen.length) {
+    html += '<div class="hinweis">' + esc(t('sauer_prognose_offen', { liste: pg.offen.map(function (r) { return r.teig.name; }).join(', ') })) + '</div>';
+  } else {
+    const bedarf = sauerBedarfAus(pg.rechnungen, 'D');
+    vorschlag = L.sauerAnsatz(bedarf, a, einst);
+    if (vorschlag) {
+      /* Feinschliff 02.10.: Ergebnis als Kacheln wie in der Teig-Karte. */
+      html += '<div class="ergebnis-kacheln sauer">' +
+        '<div class="kachel winback"><span class="k-label">' + esc(t('sauer_ansatz')) + '</span><span class="k-wert">' + esc(L.mengeJeKessel(vorschlag.ansatzKg, vorschlag.chargen, 'kg', 1).haupt) + '</span>' +
+          '<span class="k-unter">' + esc(L.mengeJeKessel(vorschlag.ansatzKg, vorschlag.chargen, 'kg', 1).gesamt || t('k_eine_charge')) + '</span></div>' +
+        '<div class="kachel"><span class="k-label">' + esc(t('k_anstellgut')) + '</span><span class="k-wert">' + fmtKg(vorschlag.anstellgutKg) + '</span>' +
+          '<span class="k-unter">' + esc(t('k_anstellgut_unter')) + '</span></div></div>' +
+        '<ul class="info-liste">' +
+        '<li>' + esc(t('sauer_bedarf')) + ' <strong>' + fmtKg(vorschlag.bedarfKg) + '</strong></li>' +
+        '<li>' + esc(t('sauer_mindest', { prozent: fmt(a * 100, 1) })) + ' <strong>' + fmtKg(vorschlag.mindestKg) + '</strong></li></ul>';
+    }
+  }
+  const eingetragen = (S.naechte[heuteStr()] || {}).sauerAnsatz;
+  const wert = eingetragen && L.istZahl(eingetragen.kg) ? eingetragen.kg : (vorschlag ? vorschlag.ansatzKg : null);
+  if (wert !== null) {
+    html += '<div class="feld-zeile sauer-eintrag"><label class="bos-label" for="sauerAngesetzt">' + esc(t('sauer_angesetzt')) + '</label>' +
+      '<input class="bos-input" id="sauerAngesetzt" inputmode="decimal" value="' + esc(zahlText(wert)) + '"> kg ' +
+      '<button type="button" class="bos-btn bos-btn--amber" data-aktion="sauer-bestaetigen">' + esc(t('sauer_bestaetigen')) + '</button></div>' +
+      '<div class="klein">' + esc(eingetragen && L.istZahl(eingetragen.kg) ? t('sauer_eingetragen') : t('sauer_vorschlag_gilt')) + '</div>';
+  }
+  html += reichtHTML(a, einst, wert);
+  return html + '</section>';
+}
+/* Reicht-Prüfung für heute: gestriger Ansatz − Sauer der heutigen Teige (auf T)
+   ≥ Anstellgut für den neuen Ansatz. Nur ein Hinweis, kein Vorschlag (Punkt 34). */
+function reichtHTML(a, einst, ansatzHeute) {
+  const gestern = (S.naechte[gesternStr()] || {}).sauerAnsatz;
+  let ansatzGestern = gestern && L.istZahl(gestern.kg) ? gestern.kg : null, quelle = 'eingetragen';
+  if (ansatzGestern === null) {
+    /* „Der Vorschlag gilt“ (Frage 9): aus der Prognose, die gestern für heute eingetippt wurde. */
+    const prog = (S.naechte[heuteStr()] || {}).prognose;
+    if (prog && Object.keys(prog).length) {
+      const rechnungen = teigeFuer('heute').map(function (x) {
+        const r = teigRechnung(x, 'heute');
+        const posten = r.posten.map(function (p) { return Object.assign({}, p, { anzahl: L.istZahl(prog[p.lk]) ? prog[p.lk] : undefined, einwaageG: p.stammG }); });
+        return { teig: x, calc: L.rechneTeig({ posten: posten, kesselrestKg: r.kesselrestStamm, ohneSchuettwasser: true }) };
+      });
+      if (rechnungen.every(function (r) { return istFertig(r.calc); })) {
+        const v = L.sauerAnsatz(sauerBedarfAus(rechnungen, 'D'), a, einst);
+        if (v) { ansatzGestern = v.ansatzKg; quelle = 'vorschlag'; }
+      }
+    }
+  }
+  let html = '<div class="unterkopf">' + esc(t('reicht_titel')) + '</div>';
+  if (ansatzGestern === null) return html + '<div class="hinweis baustelle">' + esc(t('reicht_gestern_fehlt')) + '</div>';
+  const heute = teigeFuer('heute').map(function (x) { return teigRechnung(x, 'heute'); });
+  const offen = heute.filter(function (r) { return !istFertig(r.calc); });
+  if (offen.length) return html + '<div class="hinweis">' + esc(t('reicht_heute_offen', { liste: offen.map(function (r) { return r.teig.name; }).join(', ') })) + '</div>';
+  if (!L.istZahl(ansatzHeute)) return html + '<div class="hinweis">' + esc(t('reicht_ansatz_fehlt')) + '</div>';
+  const pr = L.reichtPruefung(ansatzGestern, sauerBedarfAus(heute, 'T'), a * ansatzHeute);
+  const zahlen = t('reicht_zahlen', { gestern: fmtKg(ansatzGestern), quelle: t(quelle === 'vorschlag' ? 'reicht_quelle_vorschlag' : 'reicht_quelle_eingetragen'),
+    heute: fmtKg(ansatzGestern - pr.restKg), rest: fmtKg(pr.restKg), noetig: fmtKg(a * ansatzHeute) });
+  return html + '<div class="hinweis ' + (pr.reicht ? 'gruen' : 'rot') + '">' + esc((pr.reicht ? t('reicht_ja') : t('reicht_nein', { fehlt: fmtKg(pr.fehltKg) })) + ' ' + zahlen) + '</div>';
+}
+function vorstufenHTML() {
+  const pg = prognoseStand();
+  const mit = pg.rechnungen.filter(function (r) { return r.teig.vorstufe; });
+  const vorratMit = L.vorratsTeige(S.teige, S.produkte).filter(function (x) { return x.vorstufe; }).map(function (x) { return x.name; });
+  let html = '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('vorstufen_titel')) + '</h2><span class="klein">' + esc(t('vorstufen_klein', { tag: tagText(S.backtagMorgen) })) + '</span></div>';
+  if (vorratMit.length) html += '<div class="hinweis">' + esc(t('vorstufe_vorrat', { liste: vorratMit.join(', ') })) + '</div>';
+  if (!mit.length) return html + '<p class="status">' + esc(t('vorstufen_keine')) + '</p></section>';
+  const wahlen = (S.naechte[morgenStr()] || {}).vorstufeWahl || {};
+  return html + '<ul class="liste vorstufen-liste">' + mit.map(function (r) {
+    const x = r.teig;
+    let menge = '', schritte = '', zuWenig = false;
+    if (!istFertig(r.calc)) menge = '<span class="klein">' + esc(t('prognose_fehlt')) + '</span>';
+    else if (!L.istZahl(x.vorstufeJeKg)) menge = '<span class="klein">' + esc(t('kein_rezeptwert')) + '</span>';
+    else {
+      const bedarf = x.vorstufeJeKg * r.calc.D;
+      const v = L.istSchritt(x.vorstufeSchritt) ? L.vorstufeSchritte(bedarf, x.vorstufeSchritt, x.vorstufeSchritteJeBehaelter, r.calc.anzahl) : null;
+      if (!v) menge = '<strong>' + esc(t('vorstufe_menge', { stk: r.calc.anzahl, kg: fmtKg(bedarf) })) + '</strong>';
+      else {
+        /* Feste Schritte (Konzept §5.1a): zwei Nachbarn, vorbelegt aufgerundet, Wahl je Nacht. */
+        const gewaehlt = v.optionen.filter(function (o) { return o.n === wahlen[x.id]; })[0] || v.optionen.filter(function (o) { return o.n === v.vorschlag; })[0];
+        menge = '<span class="klein">' + esc(t('vorstufe_bedarf', { kg: fmtKg(bedarf), stk: r.calc.anzahl })) + '</span>';
+        /* Kleinere Stufe bleibt wählbar (Erfahrung des Teigmachers), wird aber
+           rötlich, wenn sie rechnerisch nicht für die Prognose reicht (KC 02.10.).
+           Folgt der aktuellen Prognose, weil sie bei jedem Zeichnen neu rechnet. */
+        zuWenig = gewaehlt.zuWenig;
+        schritte = '<div class="schritt-wahl"><div class="umschalter" role="group" aria-label="' + esc(t('vorstufe_schritte')) + '">' + v.optionen.map(function (o) {
+          const rot = o === gewaehlt && o.zuWenig;
+          return '<button type="button" data-aktion="vorstufe-wahl" data-id="' + esc(x.id) + '" data-n="' + o.n + '" aria-pressed="' + (o === gewaehlt) + '"' + (rot ? ' class="zu-wenig"' : '') + '>' +
+            esc(t('vorstufe_option', { n: o.n })) + (L.istZahl(o.reichtBrote) ? ' <small>' + esc(rot && L.istZahl(o.broteBedarf)
+              ? t('vorstufe_reicht_nur', { stk: o.reichtBrote, von: o.broteBedarf }) : t('vorstufe_reicht', { stk: o.reichtBrote })) + '</small>' : '') + '</button>';
+        }).join('') + '</div>' +
+        '<div class="schritt-aufschluesselung">' + esc(t('vorstufe_gesamt', { teile: L.schrittText(x.vorstufeSchritt, gewaehlt.n), kg: fmtKg(gewaehlt.kg) })) + '</div>' +
+        /* Je Behälter eine Zeile (Ulf, 02.10.): „graue Wanne 1: 9 kg … + 27 L …“ */
+        '<ul class="behaelter-liste">' + L.behaelterZeilen(x.vorstufeSchritt, gewaehlt.behaelter, x.vorstufeBehaelter || t('vorstufe_behaelter_vorgabe')).map(function (b) {
+          return '<li><b>' + esc(b.name) + ':</b> ' + esc(b.text) + ' <span class="klein">(' + esc(fmtKg(b.kg)) + ')</span></li>';
+        }).join('') + '</ul></div>';
+      }
+    }
+    return '<li class="' + (schritte ? 'mit-schritten' : '') + (zuWenig ? ' zu-wenig' : '') + '"><span>' + esc(x.vorstufe + ' ' + x.name) + (x.vorstufeHinweis ? '<br><small>' + esc(x.vorstufeHinweis) + '</small>' : '') + '</span>' + menge + schritte + '</li>';
+  }).join('') + '</ul></section>';
+}
+function renderVorbereitungen() {
+  const el = document.getElementById('ansichtVorbereitungen');
+  el.innerHTML = hinweiseHTML() + sauerHTML() +
+    '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('prognose_titel', { tag: tagText(S.backtagMorgen) })) + '</h2><span class="klein">' + esc(t('prognose_klein')) + '</span></div>' +
+    listeHTML('prognose') + '</section>' + vorstufenHTML();
+}
+
+/* ---------- Karte je Teig (Diashow) ---------- */
+function oeffneKarte(rolle, id) {
+  const liste = teigeFuer(rolle).map(function (x) { return x.id; });
+  const index = liste.indexOf(id);
+  if (index === -1) return;
+  S.karte = { rolle: rolle, liste: liste, index: index, reiter: 'zahlen', gerendert: '', entwurf: null };
+  document.getElementById('karteMeldung').textContent = '';   // keine alte Meldung eines anderen Teigs (Fund 02.10.)
+  document.getElementById('karteSheet').hidden = false;
+  renderKarte(true);
+  fokusErstesFeld();
+}
+function schliesseKarte() {
+  S.karte = null;
+  document.getElementById('karteSheet').hidden = true;
+  planeRender();
+}
+function karteNav(richtung) {
+  const k = S.karte;
+  if (!k) return false;
+  const neu = k.index + richtung;
+  if (neu < 0 || neu >= k.liste.length) return false;
+  k.index = neu; k.reiter = 'zahlen'; k.entwurf = null;
+  document.getElementById('karteMeldung').textContent = '';
+  renderKarte(true);
+  return true;
+}
+function fokusErstesFeld() {
+  const f = document.querySelector('#karteBody .zahl-eingabe');
+  if (f) { f.focus(); if (f.select) f.select(); }
+}
+function renderKarte(voll) {
+  const k = S.karte;
+  if (!k) return;
+  const teig = tm()[k.liste[k.index]];
+  if (!teig || teig.geloescht) { schliesseKarte(); return; }
+  const r = teigRechnung(teig, k.rolle);
+  const schluessel = teig.id + '|' + k.reiter + '|' + k.rolle;
+  const sheet = document.getElementById('karteSheet');
+  if (!voll && k.gerendert === schluessel) {
+    if (k.reiter === 'zahlen') {
+      const info = document.getElementById('karteInfo');
+      if (info) info.innerHTML = karteInfoHTML(r);
+      document.querySelectorAll('#karteBody .zahl-eingabe').forEach(function (inp) {
+        if (inp === document.activeElement) return;
+        const p = r.posten.filter(function (x) { return x.lk === inp.getAttribute('data-lk'); })[0];
+        inp.value = p && L.istZahl(p.anzahl) ? String(p.anzahl) : '';
+        inp.setAttribute('data-geschrieben', inp.value);
+      });
+      return;
+    }
+    if (fokusIn(sheet)) return;
+  }
+  k.gerendert = schluessel;
+  document.getElementById('karteTitel').textContent = teig.name;
+  document.getElementById('karteUntertitel').textContent = (k.rolle === 'prognose' ? t('karte_prognose', { tag: tagText(S.backtagMorgen) }) : tagText(S.backtag)) + ' · ' + (k.index + 1) + '/' + k.liste.length;
+  document.getElementById('karteZurueckBtn').disabled = k.index <= 0;
+  document.getElementById('karteVorBtn').disabled = k.index >= k.liste.length - 1;
+  const reiter = k.rolle === 'heute' ? [['zahlen', t('reiter_zahlen')], ['anpassen', t('reiter_anpassen')]] : [['zahlen', t('reiter_zahlen')]];
+  document.getElementById('karteReiter').innerHTML = reiter.map(function (x) {
+    return '<button type="button" role="tab" data-aktion="karte-reiter" data-reiter="' + x[0] + '" aria-selected="' + (k.reiter === x[0]) + '">' + esc(x[1]) + '</button>';
+  }).join('');
+  document.getElementById('karteBody').innerHTML = k.reiter === 'anpassen' ? anpassenHTML(r) : zahlenHTML(r);
+}
+function vorratFeldHTML(r, p) {
+  const prod = pm()[p.lk] || {};
+  const spb = L.istZahl(prod.stueckProBlech) && prod.stueckProBlech > 1 ? prod.stueckProBlech : null;
+  const wort = String(prod.einheit || '').indexOf('Dielen') !== -1 ? t('vorrat_dielen') : t('vorrat_bleche');
+  let einh = spb ? (S.vorratEinheit[p.lk] || 'bleche') : 'stueck';
+  if (einh === 'bleche' && L.istZahl(p.anzahl) && p.anzahl % spb !== 0) einh = 'stueck';
+  const wertText = L.istZahl(p.anzahl) ? String(einh === 'bleche' ? p.anzahl / spb : p.anzahl) : '';
+  const umrechnung = L.istZahl(p.anzahl) && spb ? t('vorrat_umrechnung', { n: zahlText(p.anzahl / spb), wort: wort, stk: p.anzahl }) : '';
+  return '<div class="zahl-zeile vorrat-zeile"><span class="zz-name">' + esc(p.name) +
+      (L.istZahl(p.einwaageG) ? '<span class="zz-einwaage">' + esc(t('einwaage_klein', { g: Math.round(p.einwaageG) })) + (p.abw ? ' ' + esc(t('einwaage_heute')) : '') + '</span>'
+        : '<span class="zz-einwaage rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>') +
+      (umrechnung ? '<span class="zz-umrechnung">' + esc(umrechnung) + '</span>' : '') + '</span>' +
+    (spb ? '<span class="umschalter einheit-schalter" role="group" aria-label="' + esc(t('vorrat_einheit')) + '">' +
+      '<button type="button" data-aktion="vorrat-einheit" data-lk="' + esc(p.lk) + '" data-einheit="bleche" aria-pressed="' + (einh === 'bleche') + '">' + esc(wort) + '</button>' +
+      '<button type="button" data-aktion="vorrat-einheit" data-lk="' + esc(p.lk) + '" data-einheit="stueck" aria-pressed="' + (einh === 'stueck') + '">' + esc(t('vorrat_stueck')) + '</button></span>' : '') +
+    '<input class="zahl-eingabe" data-lk="' + esc(p.lk) + '" data-teig="' + esc(r.teig.id) + '" data-rolle="vorrat" data-einheit="' + einh + '" data-spb="' + (spb || 1) +
+      '" data-geschrieben="' + esc(wertText) + '" inputmode="numeric" enterkeyhint="next" autocomplete="off" value="' + esc(wertText) + '" aria-label="' + esc(p.name) + '"></div>';
+}
+function zahlenHTML(r) {
+  let html = '';
+  if (r.rolle === 'heute' && r.teig.hinweisOben) html += '<div class="hinweis rot gross">' + esc(r.teig.hinweisOben) + '</div>';
+  if (r.vorrat) {
+    html += '<div class="hinweis vorrat-hinweis">' + esc(t('vorrat_hilfe')) + '</div>' +
+      '<div class="zahl-block">' + r.posten.map(function (p) { return vorratFeldHTML(r, p); }).join('') + '</div>' +
+      '<div class="karte-weiter"><button type="button" class="bos-btn bos-btn--amber" data-aktion="karte-weiter">' + esc(t('weiter')) + '</button></div>' +
+      '<div id="karteInfo">' + karteInfoHTML(r) + '</div>';
+    return html;
+  }
+  html += '<div class="klein stueck-hinweis">' + esc(t('stueck_nicht_bleche')) + '</div>';
+  html += '<div class="zahl-block">' + r.posten.map(function (p) {
+    return '<label class="zahl-zeile"><span class="zz-name">' + esc(p.name) + (L.istZahl(p.einwaageG)
+        ? '<span class="zz-einwaage">' + esc(t('einwaage_klein', { g: Math.round(p.einwaageG) })) + (p.abw ? ' ' + esc(t('einwaage_heute')) : '') + '</span>'
+        : '<span class="zz-einwaage rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>') + '</span>' +
+      '<input class="zahl-eingabe" data-lk="' + esc(p.lk) + '" data-teig="' + esc(r.teig.id) + '" data-rolle="' + esc(r.rolle) + '" data-geschrieben="' + esc(L.istZahl(p.anzahl) ? String(p.anzahl) : '') + '" inputmode="numeric" enterkeyhint="next" autocomplete="off" value="' + esc(L.istZahl(p.anzahl) ? String(p.anzahl) : '') + '"></label>';
+  }).join('') + '</div>' +
+  '<div class="karte-weiter"><button type="button" class="bos-btn bos-btn--amber" data-aktion="karte-weiter">' + esc(t('weiter')) + '</button></div>' +
+  '<div id="karteInfo">' + karteInfoHTML(r) + '</div>';
+  return html;
+}
+function karteInfoHTML(r) {
+  const c = r.calc, x = r.teig, anp = r.anp;
+  const zeilen = [];
+  if (r.rolle === 'prognose') {
+    if (c.status === 'einwaageFehlt') zeilen.push('<li class="rot">' + esc(t('einwaage_fehlt_lang', { liste: c.fehlendeEinwaage.map(produktName).join(', ') })) + '</li>');
+    else if (istFertig(c) || c.status === 'teilweise') {
+      zeilen.push('<li>' + esc(t('teigmenge_d')) + ' <strong>' + fmtKg(c.D) + '</strong></li>');
+      if (x.mitSauer && L.istZahl(x.sauerJeKg)) zeilen.push('<li>' + esc(t('sauer_dafuer')) + ' <strong>' + fmtKg(x.sauerJeKg * c.D) + '</strong></li>');
+      if (x.vorstufe && L.istZahl(x.vorstufeJeKg)) zeilen.push('<li>' + esc(x.vorstufe) + ': <strong>' + fmtKg(x.vorstufeJeKg * c.D) + '</strong></li>');
+    }
+    return '<ul class="info-liste">' + zeilen.join('') + '</ul>';
+  }
+  const abw = function (text) { return ' <span class="abw">' + esc(text) + '</span>'; };
+  /* Feinschliff 02.10.: Steht das Ergebnis fest, kommen Wasser und WinBack-
+     Menge als zwei große Kacheln nach oben (Wasser links = zuerst, Konzept
+     §4.3); die Liste darunter trägt nur noch die Einzelheiten. */
+  const mitKacheln = (c.status === 'fertig' || c.status === 'teilweise') && L.istZahl(c.T);
+  /* 1. Wasser zuerst — muss vor der WinBack-Eingabe feststehen (Konzept §4.3). */
+  if (mitKacheln) { /* steht in der Kachel */ }
+  else if (x.ohneSchuettwasser) zeilen.push('<li>' + esc(t('ohne_schuettwasser')) + '</li>');
+  else if (L.istZahl(c.r)) {
+    let w = '<li class="wasser">' + esc(t('wasser_weniger', { l: fmtL(c.r) }));
+    if (L.istZahl(anp.wasserL)) w += abw(t('heute_statt', { statt: L.istZahl(c.rRegel) ? fmtL(c.rRegel) : '0 L' }));
+    else if (!L.istZahl(r.tw.wasserLiterJeKg)) w += ' <span class="klein">' + esc(t('keine_wasserregel')) + '</span>';
+    zeilen.push(w + '</li>');
+  } else if (!L.istZahl(r.tw.wasserLiterJeKg)) zeilen.push('<li class="klein">' + esc(t('keine_wasserregel')) + '</li>');
+  /* 2. Wassertemperatur */
+  if (!x.ohneSchuettwasser) {
+    if (L.istZahl(anp.wasserC)) zeilen.push('<li>' + esc(t('wassertemp', { c: Math.round(anp.wasserC) })) + abw(t('heute_angepasst')) + '</li>');
+    else if (r.wasserT.leer) zeilen.push('<li class="klein">' + esc(t('wassertemp_keine_tabelle')) + '</li>');
+    else if (r.wasserT.ohneTemperatur) zeilen.push('<li class="klein">' + esc(t('wassertemp_ohne_aussen')) + '</li>');
+    else zeilen.push('<li>' + esc(t('wassertemp', { c: Math.round(r.wasserT.wert) })) + (r.wasserT.rand ? ' <span class="klein">' + esc(t('tabelle_rand')) + '</span>' : '') + '</li>');
+  }
+  /* 3. Hefe (auf T, wie WinBack) */
+  if (L.istZahl(c.hefeKg)) {
+    const hm = L.mengeJeKessel(c.hefeKg, c.kessel, 'kg', 2);
+    let h = '<li>' + esc(t('hefe', { kg: hm.haupt })) + (hm.gesamt ? ' <span class="klein">(' + esc(hm.gesamt) + ')</span>' : '');
+    if (L.istZahl(anp.hefeKg)) h += abw(t('heute_statt', { statt: L.istZahl(c.hefeRezeptKg) ? fmtHefe(c.hefeRezeptKg + (c.hefeDeltaKg || 0)) : '–' }));
+    else if (r.hefeT.leer) h += ' <span class="klein">' + esc(t('hefe_ohne_tabelle')) + '</span>';
+    else if (L.istZahl(c.hefeDeltaKg) && c.hefeDeltaKg !== 0) h += ' <span class="klein">' + esc(t('hefe_tabelle', { delta: (c.hefeDeltaKg > 0 ? '+' : '') + fmt(c.hefeDeltaKg * 1000, 0) + ' g' })) + '</span>';
+    zeilen.push(h + '</li>');
+  } else if (!L.istZahl(x.hefeJeKg)) zeilen.push('<li class="klein">' + esc(t('hefe_kein_rezeptwert')) + '</li>');
+  /* 4. Einwaage (ausklappbar), 5. Kesselrest */
+  const einwaageAbw = r.posten.some(function (p) { return p.abw; });
+  zeilen.push('<li><details' + (einwaageAbw || c.status === 'einwaageFehlt' ? ' open' : '') + '><summary>' + esc(t('einwaage_titel')) + (einwaageAbw ? abw(t('heute_angepasst')) : '') + '</summary><ul class="liste">' +
+    r.posten.map(function (p) {
+      return '<li><span>' + esc(p.name) + '</span><span>' + (L.istZahl(p.einwaageG) ? fmtG(p.einwaageG) : '<span class="badge rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>') +
+        (p.abw ? abw(t('heute_statt', { statt: fmtG(p.stammG) })) : '') + '</span></li>';
+    }).join('') + '</ul></details></li>');
+  const kr = r.kesselrestNacht !== null ? r.kesselrestNacht : r.kesselrestStamm;
+  zeilen.push('<li>' + esc(t('kesselrest', { kg: fmtKg(kr) })) + (r.kesselrestNacht !== null ? abw(t('heute_statt', { statt: fmtKg(r.kesselrestStamm) })) : '') + '</li>');
+  /* 6. Ergebnis */
+  let erg;
+  if (c.status === 'leer') erg = t('noch_keine_zahlen');
+  else if (c.status === 'null') erg = t('status_null');
+  else if (c.status === 'einwaageFehlt') erg = t('einwaage_fehlt_lang', { liste: c.fehlendeEinwaage.map(produktName).join(', ') });
+  else {
+    erg = t(r.vorrat ? 'rechnung_vorrat' : 'rechnung', { summe: fmtKg(c.summeKg), rest: fmtKg(kr) }) + (x.ohneSchuettwasser || !c.r ? '' : ', ' + t('wasser_weniger', { l: fmtL(c.r) })) + ' → ' +
+      (c.kessel > 1 ? t('in_winback_kessel', { gesamt: fmtKg(c.T), n: c.kessel, je: fmtKg(c.jeKesselKg) }) : t('in_winback', { kg: fmtKg(c.T) }));
+    if (c.status === 'teilweise') erg = t('noch_nicht_alle') + ' ' + erg;
+  }
+  zeilen.push('<li class="' + (mitKacheln ? 'rechenweg' : 'ergebnis') + (c.status === 'einwaageFehlt' ? ' rot' : '') + '">' + esc(erg) + '</li>');
+  let kacheln = '';
+  if (mitKacheln) {
+    let wasser;
+    if (x.ohneSchuettwasser) wasser = '<span class="k-wert klein-wert">' + esc(t('k_kein_schuettwasser')) + '</span>';
+    else {
+      const wm = L.mengeJeKessel(c.r || 0, c.r ? c.kessel : 1, 'L', 1);
+      wasser = '<span class="k-wert">' + esc(wm.haupt) + '</span>' + (wm.gesamt ? '<span class="k-unter">' + esc(wm.gesamt) + '</span>' : '');
+      if (L.istZahl(anp.wasserL)) wasser += '<span class="k-unter">' + abw(t('heute_statt', { statt: L.istZahl(c.rRegel) ? fmtL(c.rRegel) : '0 L' })) + '</span>';
+      else if (!L.istZahl(r.tw.wasserLiterJeKg)) wasser += '<span class="k-unter">' + esc(t('keine_wasserregel')) + '</span>';
+    }
+    const km = L.mengeJeKessel(c.T, c.kessel, 'kg', 1);
+    kacheln = '<div class="ergebnis-kacheln' + (c.status === 'teilweise' ? ' vorlaeufig' : '') + '">' +
+      '<div class="kachel"><span class="k-label">' + esc(t('k_wasser')) + '</span>' + wasser + '</div>' +
+      '<div class="kachel winback"><span class="k-label">' + esc(t(c.status === 'teilweise' ? 'k_winback_vorlaeufig' : (c.kessel > 1 ? 'k_winback_je' : 'k_winback'))) + '</span><span class="k-wert">' + esc(km.haupt) + '</span>' +
+        '<span class="k-unter">' + esc(km.gesamt ? km.gesamt + ' · ' + t('k_kg_nicht_stueck') : t('k_kg_nicht_stueck')) + '</span></div></div>';
+  }
+  let html = kacheln + '<ul class="info-liste">' + zeilen.join('') + '</ul>' + (mitKacheln ? '' : '<div class="hinweis">' + esc(t('winback_hinweis')) + '</div>');
+  if (x.zutaten && x.zutaten.length) html += '<div class="unterkopf">' + esc(t('teig_zutaten')) + '</div>' + zutatenListeHTML(x.zutaten);
+  if (x.vorstufe) html += '<div class="unterkopf">' + esc(t('teig_vorstufe', { name: x.vorstufe })) + '</div><div class="klein">' + esc(t('vorstufe_gestern')) + '</div>';
+  return html;
+}
+/* Reiter „Anpassen“: oben „nur heute Nacht“ für jeden, darunter die dauerhafte
+   Regel nur mit Teig-Haken (ohne Haken ausgeblendet, nicht gesperrt). */
+function anpassenHTML(r) {
+  const x = r.teig, anp = r.anp, c = r.calc;
+  const feld = function (label, anpFeld, wertJetzt, einheit, extra) {
+    const gesetzt = L.istZahl(anpFeld === 'kesselrest' ? r.kesselrestNacht : (anpFeld.indexOf('einwaage:') === 0 ? (anp.einwaage || {})[anpFeld.slice(9)] : anp[anpFeld]));
+    return '<div class="anp-zeile"><label class="bos-label">' + esc(label) + '</label><div class="feld-zeile">' +
+      '<input class="bos-input" data-anp="' + esc(anpFeld) + '" inputmode="decimal" placeholder="' + esc(zahlText(wertJetzt)) + '" value="' + (gesetzt ? esc(zahlText(anpFeld === 'kesselrest' ? r.kesselrestNacht : (anpFeld.indexOf('einwaage:') === 0 ? anp.einwaage[anpFeld.slice(9)] : anp[anpFeld]))) : '') + '"> ' + esc(einheit) +
+      (gesetzt ? ' <button type="button" class="bos-btn" data-aktion="anp-zurueck" data-anp="' + esc(anpFeld) + '">' + esc(t('normalwert')) + '</button>' : '') +
+      '</div>' + (extra ? '<div class="feld-hilfe">' + esc(extra) + '</div>' : '') + '</div>';
+  };
+  let html = '<div class="nacht-block"><div class="nacht-titel">' + esc(t('nur_heute')) + '</div>';
+  if (!x.ohneSchuettwasser) {
+    html += feld(t('anp_wasser'), 'wasserL', L.istZahl(c.rRegel) ? Math.round(c.rRegel * 10) / 10 : null, 'L', t('anp_wasser_hilfe'));
+    html += feld(t('anp_wassertemp'), 'wasserC', r.wasserT && L.istZahl(r.wasserT.wert) ? Math.round(r.wasserT.wert) : null, '°C');
+  }
+  html += feld(t('anp_hefe'), 'hefeKg', L.istZahl(c.hefeRezeptKg) ? Math.round((c.hefeRezeptKg + (c.hefeDeltaKg || 0)) * 100) / 100 : null, 'kg');
+  html += feld(t('anp_kesselrest'), 'kesselrest', r.kesselrestStamm, 'kg');
+  r.posten.forEach(function (p) { html += feld(t('anp_einwaage', { name: p.name }), 'einwaage:' + p.lk, p.stammG, 'g'); });
+  html += temperaturHTML() + '</div>';
+  if (S.haken.teige) html += regelHTML(r);
+  return html;
+}
+function regelEntwurf(r) {
+  const tw = r.tw;
+  const brote = r.calc.anzahl > 0 ? r.calc.anzahl : (L.istZahl(tw.wasserRefBrote) ? tw.wasserRefBrote : null);
+  const literBisher = (L.istZahl(tw.wasserLiterJeKg) && L.istZahl(r.calc.D) && r.calc.anzahl > 0) ? Math.round(tw.wasserLiterJeKg * r.calc.D * 10) / 10
+    : (L.istZahl(tw.wasserRefLiter) ? tw.wasserRefLiter : null);
+  return {
+    refBrote: brote, refLiter: literBisher, wasserGeaendert: false,
+    tabelle: (tw.tabelle || []).map(function (z) { return { aussenC: z.aussenC, wasserC: z.wasserC, hefeDeltaG: z.hefeDeltaG }; }),
+    einwaage: Object.assign({}, tw.einwaage || {}),
+    kesselMaxKg: L.istZahl(tw.kesselMaxKg) ? tw.kesselMaxKg : null,
+    kesselrestKg: L.istZahl(tw.kesselrestKg) ? tw.kesselrestKg : null
+  };
+}
+function regelHTML(r) {
+  const k = S.karte;
+  if (!k.entwurf) k.entwurf = regelEntwurf(r);
+  const e = k.entwurf, tw = r.tw, x = r.teig;
+  const eing = function (feld, wert, extra) { return '<input class="bos-input" data-entwurf="' + feld + '"' + (extra || '') + ' inputmode="decimal" value="' + esc(zahlText(wert)) + '">'; };
+  let html = '<div class="regel-block"><div class="regel-titel">' + esc(t('regel_titel')) + '</div>';
+  if (!online()) html += '<div class="klein">' + esc(t('offline_pflege')) + '</div>';
+  if (!x.ohneSchuettwasser) {
+    const bisher = (L.istZahl(tw.wasserLiterJeKg) && L.istZahl(r.calc.D) && r.calc.anzahl > 0)
+      ? t('regel_bisher', { brote: r.calc.anzahl, name: x.name, l: fmtL(tw.wasserLiterJeKg * r.calc.D) })
+      : (L.istZahl(tw.wasserRefBrote) ? t('regel_gepflegt', { brote: tw.wasserRefBrote, l: fmtL(tw.wasserRefLiter) }) : t('keine_wasserregel'));
+    html += '<div class="anp-zeile"><label class="bos-label">' + esc(t('regel_wasser')) + '</label><div class="klein">' + esc(bisher) + '</div>' +
+      '<div class="feld-zeile">' + esc(t('regel_bei')) + ' ' + eing('refBrote', e.refBrote, ' style="max-width:90px"') + ' ' + esc(t('regel_brote')) + ' ' +
+      eing('refLiter', e.refLiter, ' style="max-width:90px"') + ' ' + esc(t('regel_liter')) + '</div><div class="feld-hilfe">' + esc(t('regel_wasser_hilfe')) + '</div></div>';
+  }
+  html += '<div class="anp-zeile"><label class="bos-label">' + esc(t('regel_tabelle')) + '</label><div class="feld-hilfe">' + esc(t('regel_tabelle_hilfe')) + '</div>' +
+    '<div class="tabelle-kopf"><span>' + esc(t('tab_aussen')) + '</span><span>' + esc(t('tab_wasser')) + '</span><span>' + esc(t('tab_hefe')) + '</span><span></span></div>' +
+    e.tabelle.map(function (z, i) {
+      return '<div class="tabelle-zeile">' + eing('tabelle', z.aussenC, ' data-zeile="' + i + '" data-spalte="aussenC"') + eing('tabelle', z.wasserC, ' data-zeile="' + i + '" data-spalte="wasserC"') +
+        eing('tabelle', z.hefeDeltaG, ' data-zeile="' + i + '" data-spalte="hefeDeltaG"') + '<button type="button" class="bos-btn" data-aktion="tab-minus" data-zeile="' + i + '" aria-label="' + esc(t('tab_minus')) + '">−</button></div>';
+    }).join('') + '<button type="button" class="bos-btn" data-aktion="tab-plus">' + esc(t('tab_plus')) + '</button></div>';
+  html += '<div class="anp-zeile"><label class="bos-label">' + esc(t('regel_einwaagen')) + '</label>' + r.produkte.map(function (p) {
+    return '<div class="feld-zeile"><span class="fz-name">' + esc(p.name) + '</span>' + eing('einwaage', e.einwaage[p.legacyKey], ' data-lk="' + esc(p.legacyKey) + '" style="max-width:110px"') + ' g</div>';
+  }).join('') + '</div>';
+  html += '<div class="anp-zeile"><div class="feld-zeile"><span class="fz-name">' + esc(t('regel_kessel')) + '</span>' + eing('kesselMaxKg', e.kesselMaxKg, ' style="max-width:110px" placeholder="' + einstZahl('kesselMaxVorgabeKg', KESSEL_VORGABE_KG) + '"') + ' kg</div>' +
+    '<div class="feld-zeile"><span class="fz-name">' + esc(t('regel_kesselrest')) + '</span>' + eing('kesselrestKg', e.kesselrestKg, ' style="max-width:110px" placeholder="0"') + ' kg</div></div>';
+  html += '<div class="sheet-knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="regel-speichern"' + (online() ? '' : ' disabled') + '>' + esc(t('regel_speichern')) + '</button></div>';
+  if (tw.geaendertAm && tw.geaendertAm.toDate) {
+    const d = tw.geaendertAm.toDate();
+    html += '<div class="klein">' + esc(t('zuletzt', { datum: d.toLocaleDateString('de-DE'), wer: tw.geaendertVon || '?' })) + '</div>';
+  }
+  return html + '</div>';
+}
+async function speichereRegel() {
+  const k = S.karte;
+  if (!k || !k.entwurf) return;
+  const teig = tm()[k.liste[k.index]];
+  const r = teigRechnung(teig, 'heute');
+  const e = k.entwurf, tw = r.tw, meldung = document.getElementById('karteMeldung');
+  meldung.textContent = '';
+  if (!S.haken.teige) { meldung.textContent = t('err_perm'); return; }
+  if (!online()) { meldung.textContent = t('offline_pflege'); return; }
+  if (S.verbindung.ausstehend.teigwerte) { meldung.textContent = t('warte_uebertragung'); return; }
+  const daten = {};
+  const einwaage = {};
+  let fehler = '';
+  Object.keys(e.einwaage).forEach(function (lk) {
+    const g = e.einwaage[lk];
+    if (g === null || g === undefined || g === '') return;
+    if (!(L.istZahl(g) && g > 0)) fehler = t('v_einwaage', { name: produktName(lk) }); else einwaage[lk] = g;
+  });
+  if (Object.keys(einwaage).length) daten.einwaage = einwaage;
+  const tabelle = [];
+  e.tabelle.forEach(function (z) {
+    if (!L.istZahl(z.aussenC)) { if (L.istZahl(z.wasserC) || L.istZahl(z.hefeDeltaG)) fehler = t('v_tabelle'); return; }
+    const zeile = { aussenC: z.aussenC };
+    if (L.istZahl(z.wasserC)) zeile.wasserC = z.wasserC;
+    if (L.istZahl(z.hefeDeltaG)) zeile.hefeDeltaG = z.hefeDeltaG;
+    tabelle.push(zeile);
+  });
+  if (tabelle.length) daten.tabelle = tabelle.sort(function (a, b) { return a.aussenC - b.aussenC; });
+  if (L.istZahl(e.kesselMaxKg)) { if (e.kesselMaxKg > 0) daten.kesselMaxKg = e.kesselMaxKg; else fehler = t('v_kessel'); }
+  if (L.istZahl(e.kesselrestKg)) { if (e.kesselrestKg >= 0) daten.kesselrestKg = e.kesselrestKg; else fehler = t('v_kesselrest'); }
+  /* Wasserregel: nur neu umrechnen, wenn sie geändert wurde — sonst bliebe
+     sie nicht exakt dieselbe, weil sich die Brotmischung der Nacht ändert. */
+  ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter'].forEach(function (f) { if (L.istZahl(tw[f])) daten[f] = tw[f]; });
+  if (e.wasserGeaendert && !teig.ohneSchuettwasser) {
+    if (!(L.istZahl(e.refBrote) && e.refBrote > 0) || !(L.istZahl(e.refLiter) && e.refLiter >= 0)) fehler = t('v_wasserregel');
+    else {
+      let refKg = null;
+      if (r.calc.anzahl > 0 && L.istZahl(r.calc.D) && r.calc.D > 0) refKg = r.calc.D * e.refBrote / r.calc.anzahl;
+      else {
+        const erste = r.produkte.map(function (p) { return einwaage[p.legacyKey]; }).filter(L.istZahl)[0];
+        if (L.istZahl(erste)) refKg = e.refBrote * erste / 1000;
+      }
+      if (!L.istZahl(refKg)) fehler = t('v_wasserregel_einwaage');
+      else {
+        daten.wasserLiterJeKg = L.wasserRegelLiterJeKg(e.refLiter, refKg);
+        daten.wasserRefBrote = e.refBrote; daten.wasserRefKg = refKg; daten.wasserRefLiter = e.refLiter;
+      }
+    }
+  }
+  if (fehler) { meldung.textContent = fehler; return; }
+  const vorher = S.teigwerte[teig.id] || null;
+  try {
+    await schreibe(COL.teigwerte, teig.id, daten, vorher ? 'aendern' : 'anlegen', vorher);
+    k.entwurf = null;
+    toast(t('gespeichert'));
+    renderKarte(true);
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(COL.teigwerte, teig.id, vorher);
+      if (konflikt) { k.entwurf = null; renderKarte(true); document.getElementById('karteMeldung').textContent = konflikt; return; }
+    }
+    meldung.textContent = fehlerText(t('err_speichern'), err);
+    zeigeFehler(t('err_speichern'), err);
+  }
+}
+
+/* Eingaben in der Karte: Zahl → sofort in die Nacht schreiben. */
+/* Teig und Rolle kommen aus dem Feld selbst: Enter springt schon zum nächsten
+   Teig, bevor ein spätes „change“ des alten Feldes eintrifft. data-geschrieben
+   verhindert, dass derselbe Wert zweimal geschrieben wird (Enter + change). */
+function commitZahl(inp) {
+  const rolle = inp.getAttribute('data-rolle');
+  const teig = tm()[inp.getAttribute('data-teig')];
+  if (!teig) return;
+  if (inp.value.trim() === (inp.getAttribute('data-geschrieben') || '')) return;
+  const lk = inp.getAttribute('data-lk');
+  const n = parseZahl(inp.value);
+  if (n !== null && (!(n >= 0) || Math.floor(n) !== n)) { toast(t('v_anzahl')); inp.value = inp.getAttribute('data-geschrieben') || ''; return; }
+  inp.setAttribute('data-geschrieben', inp.value.trim());
+  if (rolle === 'vorrat') {
+    /* Teiglinge: gespeichert wird immer in Stück (Bleche/Dielen × stueckProBlech). */
+    const stk = n === null ? null : L.teiglingeStueck(n, inp.getAttribute('data-einheit'), Number(inp.getAttribute('data-spb')));
+    const dv = { vorrat: {}, rezeptStand: {} };
+    dv.vorrat[lk] = stk === null ? FV().delete() : stk;
+    dv.rezeptStand[teig.id] = teig.sicherungId || '';
+    schreibeNacht(heuteStr(), dv);
+    return;
+  }
+  const feld = rolle === 'prognose' ? 'prognose' : 'brote';
+  const tag = rolle === 'prognose' ? morgenStr() : heuteStr();
+  const daten = {}; daten[feld] = {}; daten[feld][lk] = n === null ? FV().delete() : n;
+  if (rolle === 'heute') { daten.rezeptStand = {}; daten.rezeptStand[teig.id] = teig.sicherungId || ''; }
+  schreibeNacht(tag, daten);
+}
+function commitAnpassung(inp) {
+  const k = S.karte;
+  if (!k) return;
+  const teig = tm()[k.liste[k.index]];
+  const feld = inp.getAttribute('data-anp');
+  const n = parseZahl(inp.value);
+  if (n !== null && !(n >= 0)) { toast(t('v_zahl')); return; }
+  if (feld === 'kesselrest') {
+    const d = { kesselrest: {} }; d.kesselrest[teig.id] = n === null ? FV().delete() : n;
+    schreibeNacht(heuteStr(), d);
+  } else if (feld.indexOf('einwaage:') === 0) schreibeAnpassung(teig.id, ['einwaage', feld.slice(9)], n);
+  else schreibeAnpassung(teig.id, [feld], n);
+}
+function entwurfEingabe(inp) {
+  const k = S.karte;
+  if (!k || !k.entwurf) return;
+  const e = k.entwurf, feld = inp.getAttribute('data-entwurf');
+  const n = parseZahl(inp.value);
+  const wert = (n === null || isNaN(n)) ? null : n;
+  if (feld === 'tabelle') e.tabelle[Number(inp.getAttribute('data-zeile'))][inp.getAttribute('data-spalte')] = wert;
+  else if (feld === 'einwaage') e.einwaage[inp.getAttribute('data-lk')] = wert;
+  else { e[feld] = wert; if (feld === 'refBrote' || feld === 'refLiter') e.wasserGeaendert = true; }
+}
+
+function wo(zutatId) {
+  const z = zm()[zutatId];
+  if (!z || z.geloescht) return '<span class="wo leer">' + esc(t('unbekannt')) + '</span>';
+  const o = z.ortId ? om()[z.ortId] : null;
+  if (!o || o.geloescht) return '<span class="wo leer">' + esc(t('noch_ohne')) + '</span>';
+  return '<span class="wo">→ ' + esc(o.kennung) + '</span>';
+}
+function zutatName(zid) { const z = zm()[zid]; return z ? z.name : zid; }
+function zutatenListeHTML(ids) {
+  if (!ids || !ids.length) return '';
+  return '<ul class="liste">' + ids.map(function (zid) { return '<li><span>' + esc(zutatName(zid)) + '</span>' + wo(zid) + '</li>'; }).join('') + '</ul>';
+}
+
+function teigChipsHTML(datum, rolle) {
+  const teige = aktiveTeigeSortiert();
+  if (!teige.length) return '<p class="status">' + esc(t('keine_teige')) + '</p>';
+  const a = auswahl(datum);
+  const chips = teige.map(function (teig) {
+    const an = a.ids.indexOf(teig.id) !== -1;
+    return '<button type="button" class="chip" aria-pressed="' + an + '" data-aktion="teig-waehlen" data-rolle="' + rolle + '" data-id="' + esc(teig.id) + '">' + esc(teig.name) + '</button>';
+  }).join('');
+  const kopf = '<div class="bos-label">' + esc(t('teige_waehlen')) + (a.manuell ? ' · ' + esc(t('auswahl_manuell')) + ' <button type="button" class="link-btn" data-aktion="auswahl-zurueck" data-rolle="' + rolle + '">' + esc(t('auswahl_zurueck')) + '</button>' : '') + '</div>';
+  return kopf + '<div class="chips">' + chips + '</div>';
+}
+
+function sammelHTML(datum, rolle, feld) {
+  const a = auswahl(datum);
+  if (!a.ids.length) return '<p class="status">' + esc(t('keine_auswahl')) + '</p>';
+  const gruppen = L.einsammelliste(a.ids, S.teige, S.zutaten, S.orte, feld);
+  if (!gruppen.length) return '<p class="status">' + esc(t('nichts_zu_sammeln')) + '</p>';
+  const haken = lokalTag(datum)['haken_' + rolle] || {};
+  return gruppen.map(function (g) {
+    let kopf;
+    if (g.art === 'ort') kopf = '<div class="ort-kopf"><span class="ort-kennung">' + esc(g.ort.kennung) + '</span><span class="ort-name">' + esc(g.ort.name) + '</span></div>';
+    else if (g.art === 'ohne') kopf = '<div class="ort-kopf ohne"><span class="ort-kennung">' + esc(t('ohne_zuhause')) + '</span></div>';
+    else kopf = '<div class="ort-kopf unbekannt"><span class="ort-kennung">' + esc(t('unbekannte_zutat')) + '</span><span class="ort-name">' + esc(t('unbekannte_zutat_text')) + '</span></div>';
+    const zeilen = g.eintraege.map(function (e) {
+      const name = e.zutat ? e.zutat.name : e.zutatId;
+      const an = !!haken[e.zutatId];
+      return '<div class="zeile">' +
+        '<button type="button" class="zeile-haupt" aria-pressed="' + an + '" data-aktion="abhaken" data-rolle="' + rolle + '" data-id="' + esc(e.zutatId) + '">' +
+          '<span class="z-name">' + esc(name) + '</span><span class="z-fuer">' + esc(t('fuer', { liste: e.teige.join(', ') })) + '</span></button>' +
+        '<button type="button" class="geplant" aria-disabled="true" data-aktion="nicht-gefunden">' + esc(t('nicht_gefunden')) + '</button>' +
+      '</div>';
+    }).join('');
+    return '<div class="ort-gruppe">' + kopf + zeilen + '</div>';
+  }).join('');
+}
+
+function renderEinsammeln() {
+  const el = document.getElementById('ansichtEinsammeln');
+  el.innerHTML =
+    hinweiseHTML() +
+    '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('heute_titel')) + '</h2><span class="klein">' + esc(t('heute_klein')) + '</span></div>' +
+      teigChipsHTML(S.backtag, 'heute') + sammelHTML(S.backtag, 'heute', 'zutaten') + '</section>' +
+    '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('morgen_titel')) + '</h2><span class="klein">' + esc(t('morgen_klein', { tag: tagText(S.backtagMorgen) })) + '</span></div>' +
+      '<div class="hinweis baustelle">' + esc(t('morgen_annahme')) + '</div>' +
+      teigChipsHTML(S.backtagMorgen, 'morgen') + sammelHTML(S.backtagMorgen, 'morgen', 'vorstufeZutaten') + '</section>' +
+    /* Orte und Zutaten pflegt die Seite „Orte“ (03.10.2026); Link nur mit Haken. */
+    (S.haken.wagen ? '<div class="pflege-leiste"><a class="link-btn" href="teigecke_orte.html">' + esc(t('orte_pflegen')) + '</a></div>' : '');
+}
+
+function archivHTML(name) {
+  const arch = (S[name] || []).filter(function (x) { return x.geloescht; });
+  let html = '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-umschalten">' + esc(t(S.zeigeArchiv ? 'archiv_verbergen' : 'archiv_zeigen')) + ' (' + esc(COL[name]) + ': ' + arch.length + ')</button></div>';
+  if (!S.zeigeArchiv) return html;
+  if (!arch.length) return html + '<p class="status">' + esc(t('archiv_leer')) + '</p>';
+  return html + arch.map(function (x) {
+    if (name === 'teige') return teigKarteHTML(x, true);
+    return '<div class="karte archiviert"><div class="karte-kopf"><div><h3>' + esc(x.name) + '</h3></div><div class="karte-knoepfe">' +
+      '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="zutaten" data-id="' + esc(x.id) + '">' + esc(t('wiederherstellen')) + '</button></div></div></div>';
+  }).join('');
+}
+
+/* ---------- Schreiben: Sicherung + Dokument in EINEM Batch ----------
+   Die Regel (RK §10) verlangt: sicherungId zeigt auf eine Sicherung, die
+   in genau diesem Batch neu entsteht und auf genau dieses Dokument zeigt.
+   Eine Mechanik für jeden Schreibweg dieser Seite (Pflege, Archiv,
+   Startdaten) — ein künftiger Aufrufer (Produkt-Karte) muss denselben
+   Weg gehen, sonst lehnt die Regel ab. */
+function nurErlaubteFelder(col, daten) {
+  const d = {};
+  FELDER[col].forEach(function (k) { if (daten[k] !== undefined) d[k] = daten[k]; });
+  return d;
+}
+function ohneId(dok) { if (!dok) return null; const k = Object.assign({}, dok); delete k.id; return k; }
+function mitZeitlimit(promise) {
+  let timer;
+  const zeit = new Promise(function (_, reject) {
+    timer = setTimeout(function () { const e = new Error('Zeitlimit ' + (SCHREIB_ZEITLIMIT_MS / 1000) + ' s überschritten'); e.code = 'zeitlimit'; reject(e); }, SCHREIB_ZEITLIMIT_MS);
+  });
+  return Promise.race([promise, zeit]).finally(function () { clearTimeout(timer); });
+}
+/* Vorab (29.09.2026): Haken passend zur Collection, Verbindung da, nichts
+   mehr ausstehend. Sonst eine verständliche Meldung statt einer späten
+   Ablehnung durch die Regel oder eines Schreibvorgangs, der offline hängt. */
+function schreibSperre(col, ohneWarten) {
+  const haken = HAKEN_FUER[col];
+  if (!haken || !S.haken[haken]) return { code: 'haken-fehlt', text: t('err_haken_fehlt') };
+  if (!online()) return { code: 'offline', text: t('offline_pflege') };
+  const name = Object.keys(COL).filter(function (k) { return COL[k] === col; })[0];
+  if (!ohneWarten && name && S.verbindung.ausstehend[name]) return { code: 'ausstehend', text: t('warte_uebertragung') };
+  return null;
+}
+/* ohneWarten: nur das Einlesen, das Eintrag für Eintrag schreibt und jeden
+   Schritt selbst abwartet — dort wäre „wird noch übertragen“ ein Fehlalarm
+   (die Bestätigung des vorigen Eintrags kann kurz nach dem commit kommen). */
+async function schreibe(col, id, daten, aktion, vorher, ohneWarten) {
+  const sperre = schreibSperre(col, ohneWarten);
+  if (sperre) { const e = new Error(sperre.text); e.code = sperre.code; throw e; }
+  const db = window.db;
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+  const sichRef = db.collection(COL.sicherungen).doc();
+  const zielRef = id ? db.collection(col).doc(id) : db.collection(col).doc();
+  const batch = db.batch();
+  batch.set(sichRef, { collection: col, dokId: zielRef.id, aktion: aktion, vorher: ohneId(vorher), konto: S.kennung, ts: ts });
+  batch.set(zielRef, Object.assign(nurErlaubteFelder(col, daten), { sicherungId: sichRef.id, geaendertVon: S.kennung, geaendertAm: ts }));
+  await mitZeitlimit(batch.commit());
+  return zielRef.id;
+}
+
+/* ---------- Bearbeiten-Sheet ---------- */
+let editZustand = null;   // { typ, id, auswahl: { feld: Set } }
+function oeffneEdit(titel, inhaltHTML, knoepfe) {
+  document.getElementById('editTitel').textContent = titel;
+  document.getElementById('editInhalt').innerHTML = inhaltHTML;
+  document.getElementById('editFehler').textContent = '';
+  document.getElementById('editInfo').textContent = '';
+  document.getElementById('editKnoepfe').innerHTML = knoepfe.map(function (k) {
+    return '<button type="button" class="bos-btn ' + (k.klasse || '') + '" data-aktion="' + k.aktion + '">' + esc(k.text) + '</button>';
+  }).join('');
+  document.getElementById('editSheet').hidden = false;
+}
+function schliesseEdit() { document.getElementById('editSheet').hidden = true; editZustand = null; }
+function editFehler(text) { document.getElementById('editFehler').textContent = text; }
+function wert(id) { const el = document.getElementById(id); return el ? String(el.value).trim() : ''; }
+function feldHTML(label, inner, hilfe) {
+  return '<div class="feld"><label class="bos-label">' + esc(label) + '</label>' + inner + (hilfe ? '<div class="feld-hilfe">' + esc(hilfe) + '</div>' : '') + '</div>';
+}
+function eingabe(id, wertText, extra) {
+  return '<input class="bos-input" id="' + id + '" value="' + esc(wertText == null ? '' : wertText) + '" ' + (extra || '') + '>';
+}
+function chipAuswahlHTML(feld, eintraege) {
+  if (!eintraege.length) return '<p class="feld-hilfe">' + esc(t('f_keine_zutaten')) + '</p>';
+  return '<div class="chips">' + eintraege.map(function (e) {
+    return '<button type="button" class="chip' + (e.warn ? ' warn' : '') + '" data-aktion="chip" data-feld="' + feld + '" data-id="' + esc(e.id) + '" aria-pressed="' + (!!e.an) + '"' + (e.gesperrt ? ' disabled' : '') + '>' + esc(e.text) + '</button>';
+  }).join('') + '</div>';
+}
+
+/* ---------- Rezept eines Teigs (Rezept-Haken) ---------- */
+function oeffneTeig(id) {
+  const x = id ? tm()[id] : { name: '', zutaten: [], vorstufe: '', vorstufeZutaten: [], beiBedarf: [] };
+  editZustand = {
+    typ: 'teig', id: id || null, istSauerteig: !!x.istSauerteig, ohneSchuettwasser: !!x.ohneSchuettwasser,
+    mitSauer: typeof x.mitSauer === 'boolean' ? x.mitSauer : null,   // null = unbekannt (02.10.2026)
+    auswahl: { zutaten: new Set(x.zutaten || []), vorstufeZutaten: new Set(x.vorstufeZutaten || []), beiBedarf: new Set(x.beiBedarf || []) }
+  };
+  renderTeigForm(x);
+}
+function renderTeigForm(x) {
+  const z = editZustand;
+  const zutaten = L.aktiv(S.zutaten).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  const zeintraege = function (feld) {
+    const liste = zutaten.map(function (y) { return { id: y.id, text: y.name, an: z.auswahl[feld].has(y.id) }; });
+    z.auswahl[feld].forEach(function (zid) { if (!zm()[zid] || zm()[zid].geloescht) liste.push({ id: zid, text: t('unbekannt') + ' (' + zid + ')', an: true, warn: true }); });
+    return liste;
+  };
+  const schalter = function (feld, label) { return '<button type="button" class="chip" data-aktion="teig-schalter" data-feld="' + feld + '" aria-pressed="' + z[feld] + '">' + esc(label) + '</button>'; };
+  const zahl = function (id, label, wert, hilfe) { return feldHTML(label, eingabe(id, zahlText(wert), 'inputmode="decimal"'), hilfe); };
+  const vorschlaege = '<datalist id="vorstufenListe">' + VORSTUFEN_VORSCHLAG.map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>';
+  const brote = z.id ? L.produkteDesTeigs(z.id, S.produkte).map(function (p) { return p.name; }).join(', ') : '';
+  oeffneEdit(t(z.id ? 'e_titel_teig' : 'e_titel_teig_neu'),
+    feldHTML(t('f_name'), eingabe('fName', x.name, 'maxlength="60"')) +
+    (z.id ? feldHTML(t('f_teig_kennung'), '<div class="klein">' + esc(z.id) + '</div>', t('f_teig_kennung_fest'))
+          : feldHTML(t('f_teig_kennung'), eingabe('fTeigKennung', '', 'maxlength="40" placeholder="' + esc(t('f_teig_kennung_auto')) + '"'), t('f_teig_kennung_hilfe'))) +
+    (z.id ? feldHTML(t('f_brote'), '<div class="klein">' + esc(brote || t('teig_keine_produkte')) + '</div>', t('f_brote_hilfe')) : '') +
+    feldHTML(t('f_mit_sauer_frage'), '<div class="umschalter sauer-schalter" role="group">' + [[true, 'f_sauer_ja'], [false, 'f_sauer_nein'], [null, 'f_sauer_unbekannt']].map(function (o) {
+      return '<button type="button" data-aktion="teig-sauer" data-wert="' + String(o[0]) + '" aria-pressed="' + (z.mitSauer === o[0]) + '">' + esc(t(o[1])) + '</button>';
+    }).join('') + '</div>', t('f_sauer_hilfe')) +
+    '<div class="chips">' + schalter('ohneSchuettwasser', t('f_ohne_schuettwasser')) + schalter('istSauerteig', t('f_ist_sauerteig')) + '</div>' +
+    feldHTML(t('f_hinweis_oben'), eingabe('fHinweisOben', x.hinweisOben, 'maxlength="200"'), t('f_hinweis_oben_hilfe')) +
+    feldHTML(t('f_zutaten'), chipAuswahlHTML('zutaten', zeintraege('zutaten'))) +
+    feldHTML(t('f_vorstufe'), eingabe('fVorstufe', x.vorstufe, 'maxlength="40" list="vorstufenListe"') + vorschlaege, t('f_vorstufe_hilfe')) +
+    feldHTML(t('f_vorstufe_zutaten'), chipAuswahlHTML('vorstufeZutaten', zeintraege('vorstufeZutaten'))) +
+    feldHTML(t('f_vorstufe_hinweis'), eingabe('fVorstufeHinweis', x.vorstufeHinweis, 'maxlength="120"')) +
+    feldHTML(t('f_vorstufe_schritt'), eingabe('fVorstufeSchritt', L.istSchritt(x.vorstufeSchritt) ? L.schrittText(x.vorstufeSchritt) : '', 'maxlength="160" placeholder="' + esc(t('f_vorstufe_schritt_beispiel')) + '"'), t('f_vorstufe_schritt_hilfe')) +
+    '<div class="feld-zeile">' + feldHTML(t('f_schritte_je_behaelter'), eingabe('fSchritteJeBehaelter', zahlText(x.vorstufeSchritteJeBehaelter), 'inputmode="numeric"')) +
+      feldHTML(t('f_behaelter'), eingabe('fBehaelter', x.vorstufeBehaelter || '', 'maxlength="40" placeholder="' + esc(t('vorstufe_behaelter_vorgabe')) + '"')) + '</div>' +
+    feldHTML(t('f_bei_bedarf'), chipAuswahlHTML('beiBedarf', zeintraege('beiBedarf')), t('f_bei_bedarf_hilfe')) +
+    '<div class="unterkopf">' + esc(t('f_werte_je_kg')) + '</div>' +
+    zahl('fSauerJeKg', t('f_sauer_je_kg'), x.sauerJeKg) + zahl('fHefeJeKg', t('f_hefe_je_kg'), x.hefeJeKg) +
+    zahl('fVorstufeJeKg', t('f_vorstufe_je_kg'), x.vorstufeJeKg) + zahl('fRezeptBasis', t('f_rezeptbasis'), x.rezeptBasisKg, t('f_rezeptbasis_hilfe')) +
+    zahl('fAnstellgut', t('f_anstellgut'), x.anstellgutAnteil, t('f_anstellgut_hilfe')) + zahl('fSort', t('f_sort_teig'), x.sort),
+    [{ aktion: 'speichern', text: t('speichern'), klasse: 'bos-btn--amber' }].concat(z.id ? [{ aktion: 'archivieren', text: t('archivieren'), klasse: 'gefahr' }] : []).concat([{ aktion: 'abbrechen', text: t('abbrechen') }]));
+}
+
+function pruefeText(feldLabel, text, max) {
+  if (!text) return t('v_pflicht', { feld: feldLabel });
+  if (text.length > max) return t('v_zu_lang', { feld: feldLabel, max: max });
+  return '';
+}
+async function speichereEdit() {
+  const z = editZustand;
+  if (!z) return;
+  let col, id = z.id, daten, fehler = '';
+  if (z.typ !== 'teig') return;   /* Orte und Zutaten: teigecke_orte.html */
+  {
+    col = COL.teige;
+    const name = wert('fName'), vorstufe = wert('fVorstufe');
+    fehler = pruefeText(t('f_name'), name, 60);
+    if (!fehler && L.namensKonflikt(S.teige, name, z.id)) fehler = t('v_name_doppelt', { wert: name });
+    if (!id && !fehler) {
+      id = wert('fTeigKennung') || L.kennungAus(name);
+      if (!L.KENNUNG_MUSTER.test(id)) fehler = t('v_teig_kennung');
+      else if (S.teige.some(function (x) { return x.id === id; })) fehler = t('v_teig_kennung_doppelt', { wert: id });
+    }
+    if (!fehler && z.auswahl.vorstufeZutaten.size && !vorstufe) fehler = t('v_vorstufe_ohne_name');
+    daten = {
+      name: name, istSauerteig: !!z.istSauerteig, ohneSchuettwasser: !!z.ohneSchuettwasser,
+      hinweisOben: wert('fHinweisOben'), zutaten: Array.from(z.auswahl.zutaten), vorstufe: vorstufe,
+      vorstufeZutaten: vorstufe ? Array.from(z.auswahl.vorstufeZutaten) : [], vorstufeHinweis: wert('fVorstufeHinweis'),
+      beiBedarf: Array.from(z.auswahl.beiBedarf), geloescht: false
+    };
+    /* [Eingabefeld, Datenfeld, Label-Schlüssel] */
+    [['fSauerJeKg', 'sauerJeKg', 'f_sauer_je_kg'], ['fHefeJeKg', 'hefeJeKg', 'f_hefe_je_kg'], ['fVorstufeJeKg', 'vorstufeJeKg', 'f_vorstufe_je_kg'],
+     ['fRezeptBasis', 'rezeptBasisKg', 'f_rezeptbasis'], ['fAnstellgut', 'anstellgutAnteil', 'f_anstellgut'], ['fSort', 'sort', 'f_sort_teig']].forEach(function (p) {
+      const n = parseZahl(wert(p[0]));
+      if (n === null) return;
+      if (p[1] === 'sort') { if (!L.istZahl(n)) fehler = fehler || t('v_sort'); else daten.sort = n; return; }
+      if (!L.istZahl(n) || !(n > 0)) { fehler = fehler || t('v_zahl_feld', { feld: t(p[2]) }); return; }
+      if (p[1] === 'anstellgutAnteil' && n >= 1) { fehler = fehler || t('v_anstellgut'); return; }
+      daten[p[1]] = n;
+    });
+    /* Sauer: ja/nein gespeichert, „unbekannt“ = Feld fehlt (Regel erlaubt das seit 02.10.2026). */
+    if (typeof z.mitSauer === 'boolean') daten.mitSauer = z.mitSauer;
+    else if (daten.istSauerteig) daten.mitSauer = false;
+    /* Vorstufe in festen Schritten (Konzept §5.1a). */
+    const ps = L.parseSchritt(wert('fVorstufeSchritt'));
+    if (ps.fehler) fehler = fehler || t('v_schritt', { teil: ps.fehler });
+    else if (ps.schritt) {
+      if (!vorstufe) fehler = fehler || t('v_schritt_ohne_vorstufe');
+      daten.vorstufeSchritt = ps.schritt;
+    }
+    const jb = parseZahl(wert('fSchritteJeBehaelter'));
+    if (jb !== null) { if (!(L.istZahl(jb) && jb >= 1 && Math.floor(jb) === jb)) fehler = fehler || t('v_schritte_je_behaelter'); else daten.vorstufeSchritteJeBehaelter = jb; }
+    if (wert('fBehaelter')) daten.vorstufeBehaelter = wert('fBehaelter');
+    /* Felder ohne Eingabe im Formular (WinBack-Felder, Punkt 56) bleiben erhalten. */
+    const alt = z.id ? (tm()[z.id] || {}) : {};
+    ['winbackFeld', 'winbackName', 'vorstufeWinbackFeld', 'vorstufeWinbackName'].forEach(function (f) { if (typeof alt[f] === 'string') daten[f] = alt[f]; });
+    const andere = sauerteig();
+    if (!fehler && daten.istSauerteig && andere && andere.id !== id) fehler = t('v_zwei_sauerteige', { name: andere.name });
+  }
+  if (fehler) { editFehler(fehler); return; }
+  const vorher = z.id ? (tm()[z.id] || null) : null;
+  await fuehreSchreibenAus(col, id, daten, z.id ? 'aendern' : 'anlegen', vorher, t('gespeichert'));
+}
+
+/* ---------- Konflikt statt Rätsel (29.09.2026) ----------
+   Seit die Regel „vorher“ gegen den Serverstand prüft, heißt
+   permission-denied entweder „Haken fehlt“ oder „jemand war schneller“.
+   Frisch vom Server lesen und unterscheiden. Liefert den Meldungstext
+   oder null (dann gilt die normale Berechtigungsmeldung). */
+async function konfliktText(col, id, vorher) {
+  if (!id || !vorher) return null;
+  let frisch = null;
+  try {
+    const snap = await window.db.collection(col).doc(id).get({ source: 'server' });
+    frisch = snap.exists ? snap.data() : null;
+  } catch (err) {
+    zeigeFehler(t('err_gegenlesen'), err);
+    return null;
+  }
+  if (!L.istVeraltet(vorher, frisch)) return null;
+  uebernimmFrisch(col, id, frisch);
+  return t('konflikt', { wer: (frisch && frisch.geaendertVon) || '?' });
+}
+/* Frischen Serverstand sofort in S übernehmen — das Formular öffnet damit,
+   auch wenn der Live-Abruf (onSnapshot) noch nicht nachgezogen hat. */
+function uebernimmFrisch(col, id, frisch) {
+  const dok = frisch ? Object.assign({ id: id }, frisch) : null;
+  if (col === COL.einstellungen) { S.einstellungen = dok || {}; return; }
+  if (col === COL.teigwerte) { if (dok) S.teigwerte[id] = dok; else delete S.teigwerte[id]; return; }
+  const name = Object.keys(COL).filter(function (k) { return COL[k] === col; })[0];
+  if (!name || !Array.isArray(S[name])) return;
+  S[name] = S[name].filter(function (x) { return x.id !== id; }).concat(dok ? [dok] : []);
+}
+/* Die Daten kommen live (onSnapshot); „neu laden“ heißt hier nur neu zeichnen. */
+async function neuLaden() { render(); }
+function oeffneNachCol(col, id) {
+  if (col === COL.teige) oeffneTeig(id);
+  else if (col === COL.einstellungen) oeffneFolge();
+}
+
+async function fuehreSchreibenAus(col, id, daten, aktion, vorher, erfolgText) {
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  document.getElementById('editInfo').textContent = '…';
+  try {
+    await schreibe(col, id, daten, aktion, vorher);
+    schliesseEdit();
+    toast(erfolgText);
+    await neuLaden();
+  } catch (err) {
+    document.getElementById('editInfo').textContent = '';
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(col, id, vorher);
+      if (konflikt) {
+        console.error('[Teigecke] Speichern abgelehnt: veralteter Stand', err);
+        await neuLaden();
+        oeffneNachCol(col, id);      // Formular mit dem frischen Stand
+        editFehler(konflikt);
+        return;
+      }
+    }
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(t('err_speichern'), err);
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
+}
+async function archiviereEdit() {
+  const z = editZustand;
+  if (!z || !z.id) return;
+  if (z.typ !== 'teig') return;
+  {
+    const brote = L.produkteDesTeigs(z.id, S.produkte);
+    if (brote.length) { editFehler(t('sperre_teig', { liste: brote.map(function (p) { return p.name; }).join(', ') })); return; }
+    const teig = tm()[z.id];
+    await fuehreSchreibenAus(COL.teige, z.id, Object.assign({}, teig, { geloescht: true }), 'archivieren', teig, t('archiviert'));
+  }
+}
+async function stelleWiederHer(name, id) {
+  const dok = L.nachId(S[name])[id];
+  if (!dok) return;
+  if (!S.haken[HAKEN_FUER[COL[name]]]) { zeigeFehler(t('wiederherstellen'), { message: t('err_perm') }); return; }
+  let fehler = '';
+  if (L.namensKonflikt(S[name], dok.name, id)) fehler = t('v_name_doppelt', { wert: dok.name });
+  if (!fehler && name === 'teige' && dok.istSauerteig && sauerteig()) fehler = t('v_zwei_sauerteige', { name: sauerteig().name });
+  if (fehler) { zeigeFehler(t('wiederherstellen'), { message: fehler }); return; }
+  try {
+    await schreibe(COL[name], id, Object.assign({}, dok, { geloescht: false }), 'wiederherstellen', dok);
+    toast(t('wiederhergestellt'));
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(COL[name], id, dok);
+      if (konflikt) { console.error('[Teigecke] Wiederherstellen abgelehnt: veralteter Stand', err); zeigeFehler(t('wiederherstellen'), { message: konflikt }); return; }
+    }
+    zeigeFehler(t('err_speichern'), err);
+  }
+}
+
+/* ---------- Abwiegefolge je Wochentag (Teig-Haken) ---------- */
+let folgeZustand = null;   // { tag, listen: { '1': [...] } }
+function teigIdsAm(wd) { return L.teigeDesTages(S.teige, S.produkte, wd, null).map(function (x) { return x.id; }); }
+function folgeListe(wd) {
+  const key = String(wd);
+  if (!folgeZustand.listen[key]) {
+    const ids = teigIdsAm(wd);
+    folgeZustand.listen[key] = L.sortiereNachFolge(ids.map(function (id) { return tm()[id]; }), folgeFuer(wd)).map(function (x) { return x.id; });
+  }
+  return folgeZustand.listen[key];
+}
+function oeffneFolge() {
+  folgeZustand = { tag: S.backtag.getDay(), listen: {} };
+  renderFolge();
+}
+function renderFolge() {
+  const wd = folgeZustand.tag;
+  const liste = folgeListe(wd);
+  const tage = '<div class="chips">' + WT_REIHE.map(function (d) {
+    return '<button type="button" class="chip" data-aktion="folge-tag" data-tag="' + d + '" aria-pressed="' + (d === wd) + '">' + WT_KURZ[d] + '</button>';
+  }).join('') + '</div>';
+  const zeilen = liste.length ? liste.map(function (id, i) {
+    const x = tm()[id];
+    return '<div class="folge-zeile"><span class="fz-nr">' + (i + 1) + '.</span><span class="fz-name">' + esc(x ? x.name : id) + '</span>' +
+      '<button type="button" class="bos-btn" data-aktion="folge-hoch" data-index="' + i + '"' + (i === 0 ? ' disabled' : '') + ' aria-label="' + esc(t('folge_hoch')) + '">▲</button>' +
+      '<button type="button" class="bos-btn" data-aktion="folge-runter" data-index="' + i + '"' + (i === liste.length - 1 ? ' disabled' : '') + ' aria-label="' + esc(t('folge_runter')) + '">▼</button></div>';
+  }).join('') : '<p class="status">' + esc(t('keine_teige_tag')) + '</p>';
+  const quelle = '<div class="feld-zeile"><select class="bos-input" id="folgeQuelle">' + WT_REIHE.filter(function (d) { return d !== wd; }).map(function (d) {
+    return '<option value="' + d + '">' + WOCHENTAGE[d] + '</option>';
+  }).join('') + '</select><button type="button" class="bos-btn" data-aktion="folge-uebernehmen">' + esc(t('folge_uebernehmen')) + '</button></div>';
+  oeffneEdit(t('folge_titel'), tage + '<div class="klein">' + esc(t('folge_hilfe', { tag: WOCHENTAGE[wd] })) + '</div>' + zeilen +
+    '<div class="unterkopf">' + esc(t('folge_von_tag')) + '</div>' + quelle,
+    [{ aktion: 'folge-speichern', text: t('speichern'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+async function speichereFolge() {
+  if (!S.haken.teige) { editFehler(t('err_perm')); return; }
+  const vorher = (S.einstellungen && S.einstellungen.id) ? S.einstellungen : null;
+  const folge = Object.assign({}, (vorher && vorher.abwiegefolge) || {});
+  Object.keys(folgeZustand.listen).forEach(function (k) { folge[k] = folgeZustand.listen[k].slice(); });
+  const daten = Object.assign({}, vorher || {}, { abwiegefolge: folge });
+  await fuehreSchreibenAus(COL.einstellungen, 'allgemein', daten, vorher ? 'aendern' : 'anlegen', vorher, t('gespeichert'));
+}
+
+/* ---------- Startdaten Version 2 (Datei außerhalb des Repos) ---------- */
+let importZustand = null;
+function starteImport() { const i = document.getElementById('importDatei'); i.value = ''; i.click(); }
+document.getElementById('importDatei').addEventListener('change', function (e) {
+  const datei = e.target.files && e.target.files[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onerror = function () { zeigeFehler(t('import_titel'), leser.error || new Error('Datei nicht lesbar')); };
+  leser.onload = function () {
+    let json;
+    try { json = JSON.parse(leser.result); }
+    catch (err) { oeffneEdit(t('import_titel'), '<p class="sheet-fehler">' + esc(t('import_json', { msg: err.message })) + '</p>', [{ aktion: 'abbrechen', text: t('schliessen') }]); return; }
+    const ergebnis = L.importPlan(json, { orte: S.orte, zutaten: S.zutaten, teige: S.teige }, S.produkte);
+    const plan = ergebnis.plan;
+    const neu = function (liste) { return liste.filter(function (x) { return x.aktion === 'neu'; }); };
+    const teigwerte = neu(plan.teige).filter(function (x) { return L.teigwerteDokument(x.daten) && !S.teigwerte[x.daten.kennung]; });
+    const anzahl = neu(plan.teige).length + teigwerte.length;
+    const vorhanden = plan.teige.length - neu(plan.teige).length;
+    /* Orte und Zutaten liest diese Seite nicht mehr ein (03.10.2026). Neue Zutaten
+       in der Datei: erst auf „Orte“ einlesen, sonst fehlen sie den Teigen. */
+    if (neu(plan.zutaten).length) ergebnis.fehler.push(t('import_zutaten_erst', { n: neu(plan.zutaten).length }));
+    if (neu(plan.orte).length) ergebnis.hinweise.push(t('import_orte_nicht', { n: neu(plan.orte).length }));
+    /* Jeder Teil braucht seinen Haken — fehlt einer, wird gar nichts geschrieben. */
+    const fehlend = [];
+    if (neu(plan.teige).length && !S.haken.rezepte) fehlend.push(t('haken_rezepte'));
+    if (teigwerte.length && !S.haken.teige) fehlend.push(t('haken_teige'));
+    if (fehlend.length) ergebnis.fehler.push(t('import_haken_fehlen', { liste: fehlend.join(', ') }));
+    importZustand = { plan: plan, anzahl: anzahl };
+    let html = '<p class="sheet-info">' + esc(t('import_zusammenfassung', { teige: neu(plan.teige).length, werte: teigwerte.length, vorhanden: vorhanden })) + '</p>';
+    if (ergebnis.fehler.length) html += '<p class="sheet-fehler">' + esc(t('import_fehler_titel')) + '</p><ul class="import-liste">' + ergebnis.fehler.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    if (ergebnis.einwaagen.length) {
+      html += '<p class="sheet-info"><strong>' + esc(t('import_einwaagen_titel')) + '</strong></p><table class="einwaage-tabelle">' + ergebnis.einwaagen.map(function (e) {
+        return '<tr><td>' + esc(e.teig) + '</td><td>' + esc(e.produkt) + '</td><td class="' + (e.gramm === null ? 'rot' : '') + '">' + (e.gramm === null ? esc(t('einwaage_fehlt_kurz')) : e.gramm + ' g') + '</td></tr>';
+      }).join('') + '</table>';
+    }
+    if (ergebnis.hinweise.length) html += '<p class="sheet-info">' + esc(t('import_hinweise_titel')) + '</p><ul class="import-liste">' + ergebnis.hinweise.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    const knoepfe = [];
+    if (!ergebnis.fehler.length && anzahl > 0) knoepfe.push({ aktion: 'import-los', text: t('import_los', { n: anzahl }), klasse: 'bos-btn--amber' });
+    else if (!ergebnis.fehler.length) html += '<p class="sheet-info">' + esc(t('import_nichts')) + '</p>';
+    knoepfe.push({ aktion: 'abbrechen', text: t('abbrechen') });
+    oeffneEdit(t('import_titel'), html, knoepfe);
+  };
+  leser.readAsText(datei);
+});
+async function fuehreImportAus() {
+  if (!importZustand) return;
+  const plan = importZustand.plan, n = importZustand.anzahl;
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  const info = document.getElementById('editInfo');
+  const zutatId = {};
+  L.aktiv(S.zutaten).forEach(function (z) { zutatId[L.norm(z.name)] = z.id; });
+  let i = 0;
+  const schritt = function () { i++; info.textContent = t('import_laeuft', { i: i, n: n }); };
+  try {
+    /* Eins nach dem anderen, jedes mit eigener Sicherung: bleibt unter der
+       Zugriffsgrenze der Regel und ist bei Abbruch wiederholbar. */
+    for (const e of plan.teige) { if (e.aktion !== 'neu') continue; schritt();
+      await schreibe(COL.teige, e.daten.kennung, L.teigDokument(e.daten, zutatId), 'anlegen', null, true); }
+    for (const e of plan.teige) {
+      const w = e.aktion === 'neu' ? L.teigwerteDokument(e.daten) : null;
+      if (!w || S.teigwerte[e.daten.kennung]) continue;
+      schritt();
+      await schreibe(COL.teigwerte, e.daten.kennung, w, 'anlegen', null, true);
+    }
+    info.textContent = t('import_fertig', { n: n });
+    importZustand = null;
+    document.getElementById('editKnoepfe').innerHTML = '<button type="button" class="bos-btn" data-aktion="abbrechen">' + esc(t('schliessen')) + '</button>';
+  } catch (err) {
+    info.textContent = t('import_abbruch', { i: i, n: n });
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(t('import_titel'), err);
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-aktion],[data-tab]');
+  if (!el || el.disabled) return;
+  if (el.hasAttribute('data-tab') && !el.hasAttribute('data-aktion')) { S.tab = el.getAttribute('data-tab'); render(); return; }
+  const a = el.getAttribute('data-aktion'), id = el.getAttribute('data-id'), rolle = el.getAttribute('data-rolle');
+  const datum = rolle === 'morgen' ? S.backtagMorgen : S.backtag;
+  switch (a) {
+    /* Einsammeln (wie Stufe 1) */
+    case 'teig-waehlen': {
+      const ids = auswahl(datum).ids.slice();
+      const i = ids.indexOf(id);
+      if (i === -1) ids.push(id); else ids.splice(i, 1);
+      setzeLokalTag(datum, { auswahl: ids });
+      render(); break;
+    }
+    case 'auswahl-zurueck': setzeLokalTag(datum, { auswahl: null }); render(); break;
+    case 'abhaken': {
+      const feld = 'haken_' + rolle;
+      const h = Object.assign({}, lokalTag(datum)[feld] || {});
+      if (h[id]) delete h[id]; else h[id] = true;
+      const teil = {}; teil[feld] = h;
+      setzeLokalTag(datum, teil);
+      el.setAttribute('aria-pressed', h[id] ? 'true' : 'false');
+      break;
+    }
+    case 'nicht-gefunden': toast(t('nicht_gefunden_info')); break;
+    /* Teige, Karte */
+    case 'karte-oeffnen': oeffneKarte(rolle, id); break;
+    case 'karte-zu': schliesseKarte(); break;
+    case 'karte-zurueck': karteNav(-1); fokusErstesFeld(); break;
+    case 'karte-vor': karteNav(1); fokusErstesFeld(); break;
+    case 'karte-weiter': if (karteNav(1)) fokusErstesFeld(); else { schliesseKarte(); toast(t('letzter_teig')); } break;
+    case 'karte-reiter': if (S.karte) { S.karte.reiter = el.getAttribute('data-reiter'); renderKarte(true); } break;
+    case 'anp-zurueck': {
+      const k = S.karte; if (!k) break;
+      const teig = tm()[k.liste[k.index]], feld = el.getAttribute('data-anp');
+      if (feld === 'kesselrest') { const d = { kesselrest: {} }; d.kesselrest[teig.id] = FV().delete(); schreibeNacht(heuteStr(), d); }
+      else if (feld.indexOf('einwaage:') === 0) schreibeAnpassung(teig.id, ['einwaage', feld.slice(9)], null);
+      else schreibeAnpassung(teig.id, [feld], null);
+      break;
+    }
+    case 'tab-plus': if (S.karte && S.karte.entwurf) { S.karte.entwurf.tabelle.push({ aussenC: null, wasserC: null, hefeDeltaG: null }); renderKarte(true); } break;
+    case 'tab-minus': if (S.karte && S.karte.entwurf) { S.karte.entwurf.tabelle.splice(Number(el.getAttribute('data-zeile')), 1); renderKarte(true); } break;
+    case 'regel-speichern': speichereRegel(); break;
+    case 'temp-modus': {
+      const modus = el.getAttribute('data-modus'), tmp = temperaturHeute();
+      if (modus === tmp.modus) break;
+      const jetzt = new Date();
+      schreibeNacht(heuteStr(), { temperatur: { modus: modus === 'manuell' ? 'manuell' : 'auto', wertC: modus === 'manuell' ? tmp.wertC : null,
+        quelle: modus === 'manuell' ? 'manuell' : 'automatisch', zeit: String(jetzt.getHours()).padStart(2, '0') + ':' + String(jetzt.getMinutes()).padStart(2, '0') } })
+        .then(function () { if (modus === 'auto') holeWetter(); });
+      break;
+    }
+    case 'sauer-bestaetigen': {
+      const n = parseZahl(wert('sauerAngesetzt'));
+      if (!L.istZahl(n) || n < 0) { toast(t('v_zahl')); break; }
+      const st = sauerteig();
+      schreibeNacht(heuteStr(), { sauerAnsatz: { kg: n, anstellgutAnteil: st ? st.anstellgutAnteil || null : null } });
+      toast(t('gespeichert'));
+      break;
+    }
+    /* Pflege */
+    case 'alle-teige': S.zeigeAlleTeige = !S.zeigeAlleTeige; render(); break;
+    case 'folge-oeffnen': oeffneFolge(); break;
+    case 'folge-tag': folgeZustand.tag = Number(el.getAttribute('data-tag')); renderFolge(); break;
+    case 'folge-hoch': case 'folge-runter': {
+      const key = String(folgeZustand.tag);
+      folgeZustand.listen[key] = L.verschiebe(folgeListe(folgeZustand.tag), Number(el.getAttribute('data-index')), a === 'folge-hoch' ? -1 : 1);
+      renderFolge(); break;
+    }
+    case 'folge-uebernehmen': {
+      const quelle = Number(wert('folgeQuelle'));
+      folgeZustand.listen[String(folgeZustand.tag)] = L.folgeUebernehmen(folgeListe(quelle), teigIdsAm(folgeZustand.tag));
+      renderFolge(); break;
+    }
+    case 'folge-speichern': speichereFolge(); break;
+    case 'neu-teig': oeffneTeig(null); break;
+    case 'bearbeiten-teig': oeffneTeig(id); break;
+    case 'vorrat-haken': vorratUmschalten(id, false); break;
+    case 'vorrat-entfernen': if (editZustand && editZustand.typ === 'vorratFrage') { const vid = editZustand.id; schliesseEdit(); vorratUmschalten(vid, true); } break;
+    case 'vorrat-einheit': {
+      const offen = document.activeElement && document.activeElement.classList.contains('zahl-eingabe') ? document.activeElement : null;
+      if (offen) commitZahl(offen);
+      S.vorratEinheit[el.getAttribute('data-lk')] = el.getAttribute('data-einheit'); renderKarte(true); break;
+    }
+    case 'vorstufe-wahl': { const dw = { vorstufeWahl: {} }; dw.vorstufeWahl[id] = Number(el.getAttribute('data-n')); schreibeNacht(morgenStr(), dw); break; }
+    case 'teig-sauer': if (editZustand) {
+      const w = el.getAttribute('data-wert'); editZustand.mitSauer = w === 'true' ? true : w === 'false' ? false : null;
+      el.parentNode.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b === el)); });
+    } break;
+    case 'teig-schalter': if (editZustand) { const f = el.getAttribute('data-feld'); editZustand[f] = !editZustand[f]; el.setAttribute('aria-pressed', editZustand[f] ? 'true' : 'false'); } break;
+    case 'chip': {
+      if (!editZustand || !editZustand.auswahl) break;
+      const menge = editZustand.auswahl[el.getAttribute('data-feld')];
+      if (menge.has(id)) menge.delete(id); else menge.add(id);
+      el.setAttribute('aria-pressed', menge.has(id) ? 'true' : 'false');
+      break;
+    }
+    case 'speichern': speichereEdit(); break;
+    case 'archivieren': archiviereEdit(); break;
+    case 'abbrechen': schliesseEdit(); break;
+    case 'wiederherstellen': stelleWiederHer(el.getAttribute('data-col'), id); break;
+    case 'archiv-umschalten': S.zeigeArchiv = !S.zeigeArchiv; render(); break;
+    case 'startdaten': starteImport(); break;
+    case 'import-los': fuehreImportAus(); break;
+  }
+});
+document.addEventListener('change', function (e) {
+  const el = e.target;
+  if (el.classList && el.classList.contains('zahl-eingabe')) commitZahl(el);
+  else if (el.hasAttribute && el.hasAttribute('data-anp')) commitAnpassung(el);
+  else if (el.id === 'tempManuell') {
+    const n = parseZahl(el.value);
+    if (n !== null && !L.istZahl(n)) { toast(t('v_zahl')); return; }
+    const jetzt = new Date();
+    schreibeNacht(heuteStr(), { temperatur: { modus: 'manuell', wertC: n, quelle: 'manuell', zeit: String(jetzt.getHours()).padStart(2, '0') + ':' + String(jetzt.getMinutes()).padStart(2, '0') } });
+  }
+});
+document.addEventListener('toggle', function (e) {
+  const k = e.target && e.target.getAttribute && e.target.getAttribute('data-merken');
+  if (k) S.aufgeklappt[k] = e.target.open;
+}, true);
+document.addEventListener('input', function (e) {
+  if (e.target.hasAttribute && e.target.hasAttribute('data-entwurf')) entwurfEingabe(e.target);
+});
+/* Eingabetaste in der Karte: nächstes Zahlenfeld, nach dem letzten der nächste Teig. */
+document.getElementById('karteSheet').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' || !e.target.classList.contains('zahl-eingabe')) return;
+  e.preventDefault();
+  const felder = Array.prototype.slice.call(document.querySelectorAll('#karteBody .zahl-eingabe'));
+  const i = felder.indexOf(e.target);
+  commitZahl(e.target);
+  if (i >= 0 && i < felder.length - 1) { felder[i + 1].focus(); felder[i + 1].select(); }
+  else if (karteNav(1)) fokusErstesFeld();
+  else { e.target.blur(); toast(t('letzter_teig')); }
+});
+document.getElementById('pflegeBtn').addEventListener('click', function () {
+  if (!hatHaken()) return;
+  S.pflegeModus = !S.pflegeModus;
+  render();
+});
+document.getElementById('editSheet').addEventListener('click', function (e) { if (e.target === this) schliesseEdit(); });
+document.getElementById('karteSheet').addEventListener('click', function (e) { if (e.target === this) schliesseKarte(); });
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in der Modul-Doku) ---------- */
+const helpData = {
+  title: 'Teigecke Nacht — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'In die Teigecke gehen, Brotzahlen eingeben, loslegen. Die Seite sagt dir je Teig, welche Menge du in WinBack eingibst, wie viel Wasser du weglässt, welche Wassertemperatur und wie viel Hefe passen — und welche Zutaten du brauchst und in welchem Wagen sie stehen. Die einzelnen Mengen zeigt dir weiter WinBack beim Abwiegen. BOS ist der Vermittler, nicht der Rezeptcomputer.' },
+    { heading: 'Welcher Tag wird angezeigt?', text: 'Oben steht der Backtag: der Tag, FÜR den gebacken wird. In der Nacht zum Mittwoch ist das Mittwoch. Ab 12 Uhr mittags springt die Seite auf den nächsten Backtag um. Alles, was du „nur für heute Nacht“ geändert hast, ist dann wieder weg, und es gelten die normalen Werte.' },
+    { heading: 'Reiter „Teige“: die Liste', text: 'Du siehst die Teige des Backtags in der Reihenfolge, in der sie abgewogen werden. Unter dem Namen stehen die Brote des Teigs, jeweils mit ihrer Einwaage; fehlt eine, steht dort rot „Einwaage fehlt“. Rechts stehen die Anzahl und die Zahl für WinBack. Passt der Teig nicht in einen Kessel, steht dort die Menge je Kessel, zum Beispiel „2 × 106,6 kg“: zweimal 106,6 kg eingeben, nicht die Gesamtmenge. Die steht nur klein darunter („213,2 kg gesamt“). Tippst du einen Teig an, öffnet sich seine Karte. Ein grüner Haken heißt: alle Zahlen stehen. Ein Strich heißt: heute nicht (alle Brote 0) — damit sieht man den Unterschied zu „vergessen“. Ein Warnzeichen heißt: bei einem Brot fehlt die Einwaage, dann rechnet BOS bewusst keine Menge.' },
+    { heading: 'Die Karte eines Teigs', text: 'Oben tippst du die Brotzahlen ein, eine Zahl je Brot. Mit der Eingabetaste oder „Weiter“ springst du ins nächste Feld und nach dem letzten zum nächsten Teig — wie eine Diashow. Die Pfeile ‹ › blättern ebenfalls; das ✕ oder ein Tipp neben das Fenster bringt dich zurück zur Liste. Unter den Zahlen stehen zwei große Kästen: links, wie viel Schüttwasser du weglässt, rechts, wie viel kg du in WinBack eingibst. Ist es mehr als in einen Kessel passt, teilt BOS gleichmäßig auf: Dann zeigen beide Kästen und die Hefe die Menge je Kessel („2 × …“), die Gesamtmenge steht nur klein darunter. Darunter stehen Wassertemperatur, Hefe, Einwaage und Kesselrest und klein der Rechenweg. Darunter stehen die Zutaten des Teigs mit ihrem Wagen. Tippt ein Kollege auf einem anderen Gerät, siehst du seine Zahlen sofort.' },
+    { heading: 'Warum mehr kg in WinBack als Teig?', text: 'Wer Wasser weglässt, bekommt sonst weniger Teig, und es reicht nicht für alle Brote. Deshalb rechnet BOS die Liter, die du weglässt, auf die Menge drauf: „2 L weniger Wasser → 122 kg statt 120 kg eingeben“. WinBack verteilt dann alle Zutaten auf diese Menge, du lässt die Liter weg, und übrig bleibt genau der Teig, den du brauchst. Auch die Hefe rechnet BOS auf diese Menge, damit sie zu WinBack passt. Wichtig: In WinBack immer die kg-Menge eingeben, nicht Stück.' },
+    { heading: 'Reiter „Anpassen“: nur für heute Nacht', text: 'Merkst du am Kessel, dass heute etwas anders ist, darfst du für diese Nacht alles anpassen: Wasserabzug, Wassertemperatur, Hefe, Kesselrest, Einwaage und die Außentemperatur. Das gilt nur bis 12 Uhr mittags und ändert keine Regel. Angepasste Werte sind in der Karte markiert („heute, sonst …“). Mit „↺ Normalwert“ nimmst du eine Anpassung zurück.' },
+    { heading: 'Vorrat heute (Baguette, L\'amourette, Zwiebelstangen)', text: 'Diese Teige werden auf Vorrat für den Froster gemacht, nicht nach Backzettel. Sie stehen deshalb nicht von selbst in der Liste. Oben unter „Vorrat heute“ hakst du an, was du heute machst; dann erscheint der Teig in der Liste und in der Diashow, auf allen Geräten. Seine Karte fragt nicht nach der Backzettel-Zahl, sondern nach den Teiglingen, die heute produziert werden: in Blechen bzw. Dielen oder in Stück (Umschalter am Feld). BOS rechnet in Stück um und zeigt beides („4 Bleche = 24 Stück“). Am nächsten Backtag ist nichts mehr angehakt. Nimmst du einen Haken weg, obwohl schon Teiglinge drinstehen, fragt BOS vorher nach und löscht sie dann.' },
+    { heading: 'Die Außentemperatur', text: 'Automatisch holt BOS die aktuelle Temperatur für Havelse vom Wetterdienst. Mit dem Umschalter „von Hand“ trägst du sie selbst ein. Jede Nacht steht der Umschalter wieder auf automatisch. Ist der Wetterdienst nicht erreichbar, steht das oben in Rot — dann bitte von Hand eintragen. Aus der Außentemperatur ergeben sich Wassertemperatur und Hefe, sobald für den Teig eine Tabelle gepflegt ist. Solange es keine gibt, steht dort „noch keine Tabelle“ und die Hefe laut Rezept.' },
+    { heading: 'Die Regel (dauerhaft)', text: 'Wer den Haken „Teige pflegen“ hat, sieht im Reiter „Anpassen“ unten die dauerhafte Regel: Wasserregel, Tabelle, Einwaagen, Kessel. Die Wasserregel pflegst du an der echten Menge: Die Karte zeigt zum Beispiel „83 Korbbrote: bisher 1,4 L weniger“. War der Teig zu weich, trägst du ein „bei 83 Broten 2 L“ — BOS rechnet das selbst auf jede andere Menge um. Wer den Haken nicht hat, sieht diesen Teil nicht; für die Nacht anpassen darf trotzdem jeder.' },
+    { heading: 'Reiter „Vorbereitungen“', text: 'Hier geht es um den nächsten Backtag. Oben steht der Sauer: wie viel du ansetzt, in wie vielen Chargen, und wie viel Anstellgut du vom heutigen Sauer zurückhältst. BOS rundet auf 30-kg-Schritte und nimmt einen 15-kg-Schritt, wenn der 30er deutlich zu viel wäre. Darunter tippst du die Prognose vom Büro-Zettel ein — mit derselben Liste und denselben Karten wie bei den Teigen. Daraus rechnet BOS den Sauer und die Vorstufen (Quellstück und Co.) für morgen. Mit „So angesetzt“ hältst du fest, was du wirklich angesetzt hast; sonst gilt der Vorschlag. Bei Vorstufen in festen Schritten ist auch die kleinere Stufe bewusst wählbar (Erfahrung zählt); reicht sie rechnerisch nicht für die Prognose, wird sie rot gezeigt („reicht nur für … von … Broten“).' },
+    { heading: 'Sauer unbekannt und Vorstufen in Schritten', text: 'Steht bei einem Teig noch nicht im Rezept, ob er Sauer braucht (z. B. die neuen Teige ohne Rezept), zeigt der Sauer-Block ihn rot als „Sauer unbekannt“ und rechnet ihn NICHT mit. Wer den Rezept-Haken hat, setzt im Rezept „Sauerteig im Teig?“ auf ja oder nein. Vorstufen, die in festen Portionen angesetzt werden (z. B. 3 kg Schrot + 9 L Wasser), zeigen statt der genauen kg zwei Möglichkeiten zur Wahl, etwa „5 ×“ oder „6 ×“, jeweils mit „reicht für … Brote“. Vorgewählt ist die größere. Darunter steht, was genau hineinkommt und wie es auf die Behälter verteilt wird. Die Wahl gilt für diese Nacht und wird mit der Prognose gespeichert.' },
+    { heading: 'Reicht der Sauer von gestern?', text: 'Sobald alle Brotzahlen von heute stehen, prüft BOS: Bleibt nach den Teigen von heute genug Sauer als Anstellgut für den neuen Ansatz übrig? Wenn nicht, steht dort ein roter Hinweis mit den Zahlen, bevor der Sauer verteilt ist. Was dann zu tun ist, entscheidest du.' },
+    { heading: 'Reiter „Einsammeln“', text: '„Einsammeln“ zeigt, was du für die Teige heute Nacht und für die Vorstufen von morgen einsammeln musst, sortiert nach Ort; vor jeder Gruppe steht die Kennung des Orts (z. B. B01), wie sie auf dem Schild steht. Abhaken gilt nur auf diesem Gerät. Orte, Zutaten und Schilder pflegst du nicht mehr hier, sondern auf der Seite „Orte“ (im Launcher unter „Teigecke“); mit dem Haken „Wagen & Zutaten“ steht unten ein Link dorthin.' },
+    { heading: 'Wer darf was ändern?', text: 'Anzeigen und die Zahlen der Nacht eintragen darf jeder Teigmacher. Dauerhaft ändern hängt an drei Haken in der Kontenverwaltung: „Wagen & Zutaten pflegen“ (Orte, Zuhause der Zutaten, Gebinde, Schilder — auf der Seite „Orte“), „Teige pflegen“ (Wasserregel, Tabelle, Einwaagen, Kessel, Abwiegefolge) und „Rezepte pflegen“ (Zutatenliste, Vorstufe, Werte je kg — faktisch nur Ulf). Wer den Haken Teige oder Rezepte hat, sieht hier oben „✎ Pflegen“. Die Datenbank prüft jeden Haken selbst.' },
+    { heading: 'Wird etwas überschrieben?', text: 'Dauerhafte Änderungen bekommen vorher eine Sicherung der alten Fassung, in einem Schritt. Hat jemand anderes denselben Eintrag inzwischen geändert, lehnt die Datenbank ab, und die Seite sagt „Inzwischen von … geändert, neu geladen, bitte erneut speichern“. Die Brotzahlen der Nacht speichert BOS Feld für Feld: Tippen zwei Geräte verschiedene Brote ein, geht nichts verloren. Tippen beide dasselbe Brot, gilt die spätere Eingabe — beide sehen sie sofort.' },
+    { heading: 'Ohne Netz', text: 'Fällt das Netz weg, bleibt alles auf dem Bildschirm, und oben steht „Ohne Verbindung — Stand von …“. Brotzahlen und Anpassungen kannst du weiter eintragen, sie werden übertragen, sobald das Netz wieder da ist. Dauerhafte Änderungen gehen ohne Netz nicht. Wichtig: Die Seite ohne Netz nicht neu laden — dann kann sie sich nicht öffnen.' },
+    { heading: 'Startdaten einlesen', text: 'Für den Anfang gibt es eine Datei mit Zutaten, Teigen und Rezeptwerten. Sie liegt bewusst NICHT im öffentlichen Programmordner, sondern nur bei Ulf. Unter „Teige“ → „✎ Pflegen“ → „Startdaten einlesen“ wählst du sie aus; hier werden die Teige und ihre Werte übernommen. Neue Zutaten aus derselben Datei liest vorher die Seite „Orte“ ein. Die Seite zeigt vorher, was neu ist, und die Einwaagen groß zum Prüfen. Fehlende Einwaagen stehen dort als „fehlt“; die trägst du später in der Karte nach. Was es schon gibt, wird übersprungen.' },
+    { heading: 'Neue Brote und Zuordnung zum Teig', text: 'Aus welchem Teig ein Brot gemacht wird, steht in der Produkt-Config („Aus Teig“) und wird dort gepflegt. Neue Brote und neue Zuordnungen erscheinen hier erst, wenn die neue Produktliste im Programmordner liegt — nur in die Datenbank übernommen reicht nicht.' },
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ hat drei mögliche Gründe: Dir fehlt der passende Haken (bzw. für die Nachtwerte die Rolle), du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt in der Teigecke nie), oder die Regeln in der Firebase-Konsole sind älter als die Seite. Für den dritten Fall prüft die Seite beim Laden still den Regelstand; passt er nicht, steht oben ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Keine Verbindung“ heißt: WLAN weg. Bitte den Text vom roten Kasten abfotografieren und Ulf schicken.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.title;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.sections.map(function (s) {
+    return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>';
+  }).join('');
+}
+document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = false; });
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

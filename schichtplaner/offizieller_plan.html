@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Offizieller Plan · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: offizieller_plan.html
+  ZWECK: Neunte(?) Hub-Kachel — zweites, bewusstes Freigabe-Gate für einen
+         in Entwürfe (Tab 2) vorgeschlagenen Plan. Konzept siehe
+         SESSION_2026-09-12_KONTO_KRANKMELDER_KONZEPT.md §1. Ulf: "so
+         kann man nicht leichtfertig mal eben irgendwo klicken" — der
+         "Annehmen"-Knopf in Entwürfe heißt deshalb bewusst "Für
+         offiziellen Plan vorschlagen" (klingt nicht mehr endgültig),
+         und wird erst HIER, nach Kontextwechsel und zweitem Blick,
+         mit einem eigenen Knopf "Offiziell annehmen" wirklich verbindlich.
+  FÜR WEN: registriert für admin, backstube, konditorei, produktionsleitung
+         (siehe bos_app_registry.js — von Anfang an so geplant: "das ist
+         DER für Kollegen veröffentlichte Plan"). Intern aber
+         UNTERSCHIEDLICHE Ansicht je Rolle, da bos_access_guard.js nur
+         ALLE-ODER-NICHTS gatet:
+           - admin/produktionsleitung: sehen "Zur Freigabe" (vorgeschlagene
+             Pläne, mit "Offiziell annehmen"-Knopf) UND "Offizielle Pläne".
+           - backstube/konditorei: sehen NUR "Offizielle Pläne", rein
+             lesend — kein Zugriff auf unbestätigte Vorschläge.
+         Rolle wird genau wie in bos_access_guard.js aus
+         localStorage('bos_launcher_state_v2') gelesen (keine öffentliche
+         API dafür, deshalb hier dieselbe kleine Logik dupliziert statt
+         einer neuen gemeinsamen Abhängigkeit für nur einen Verbraucher).
+  DATENFLUSS: bos_access_guard.js (alle vier Rollen) → aktuelle Rolle aus
+         localStorage → Firestore 'plaene' (Dokument-ID = Montag-ISO-
+         Datum, siehe entwuerfe.html) + personen/positionen/abwesenheiten
+         (LIVE, nicht aus dem Plan eingefroren) + bos_namen.js +
+         einstellungen/dienstplan_reihenfolge (fürs Tabellen-Layout,
+         identisch zu Entwürfe) → Tabelle je Plan, "Offiziell annehmen"
+         schreibt status:'offiziell' + offiziellAm zurück → Drucken
+         (bos_druck.js). Zusätzlich (15.09.2026, siehe Changelog):
+         baueAusgleichskontoKontext() lädt für die Konto-Verbuchung die
+         beiden angrenzenden 'sonntagsplan'-Dokumente, 'bos_events'
+         (type:'schichtplaner_wunschtag', kalenderwoche == plan.montag)
+         und für Feiertage INNERHALB der Woche den Offen-Status via
+         bos_zeitkontext.js.
+  SCHNITTSTELLEN: Firestore-Dokument plaene/<Montag-ISO>:
+         { status: 'vorgeschlagen'|'offiziell', montag, ereignisse,
+           fruehschichtEreignisse, luecken, wunschtageErfuellt,
+           tage: [{datumISO, nacht:{zuweisungen,luecken},
+           frueh:{...}, sonntag:{...}, ueberzaehlig, lehrschicht}],
+           vorgeschlagenAm, offiziellAm }
+         — bewusst SCHLANK (Positions-/Personen-IDs, keine vollen
+         Objekte) — Namen/Farben werden hier live aus personen/
+         positionen aufgelöst, bleiben dadurch auch bei späteren
+         Änderungen korrekt, nicht eingefroren auf den Stand von damals.
+         Geschrieben von entwuerfe.html (vorschlagenFuerOffiziellenPlan),
+         hier gelesen UND (nur bei Annahme) das status-Feld aktualisiert.
+  BEKANNTE OFFENE PUNKTE:
+    - Kein Bearbeiten eines vorgeschlagenen Plans hier — wer etwas ändern
+      will, muss zurück zu Entwürfe und neu vorschlagen (bewusst: zwei
+      Gates sollen nicht durch eine dritte Bearbeitungsstelle unterlaufen
+      werden).
+    - "Offizielle Pläne"-Liste ohne Limit/Paginierung — bei sehr vielen
+      Wochen könnte das irgendwann unübersichtlich werden.
+    - Wunschtag nachträglich: die Kandidatenliste fragt bos_events nur
+      mit einem Einzelfeld-Query ab (type=='schichtplaner_wunschtag',
+      kein Composite-Index nötig) und filtert Woche/uebernommenAm/
+      bereits-erfüllt clientseitig -- bei sehr vielen offenen Wünschen
+      langfristig ggf. ineffizient, aktuell unkritisch.
+    - Wunschtag nachträglich schreibt KEIN plan.wunschtageErfuellt hoch
+      (das Feld ist laut ausgleichskonto_berechnung.js ohnehin nur eine
+      gewichtete Anzeige-Zahl aus der Plan-Generierung, wird von dort
+      nicht gelesen) -- die "X Wünsche erfüllt"-Kachel in diesem Bereich
+      hier zählt einen per Nachtrag angenommenen Wunsch also NICHT mit.
+      Bewusst nicht angefasst, eigenständige Anzeige-Baustelle, keine
+      Auswirkung auf die Konto-Buchung selbst.
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Zwei Bereiche (Zur Freigabe / Offizielle Pläne),
+      rollenabhängige Sichtbarkeit, Tabelle wie in Entwürfe, Drucken.
+    2026-09-12 · 22:33 · v0.2 · Feature
+      Baustein 2 (Ausgleichskonto) angeschlossen: "Offiziell annehmen"
+      ruft jetzt zusätzlich ausgleichskonto_berechnung.js auf und
+      schreibt die Punkt-Deltas per Batch (FieldValue.increment) in eine
+      neue Collection 'konten/<personId>'. Idempotent über
+      kontoVerarbeitetAm auf dem Plan-Dokument -- verhindert
+      Doppelbuchung bei doppeltem Klick/Netz-Retry.
+    2026-09-13 · 00:46 · v0.3 · Fix
+      Ulf: Urlaub/Krankheit/Sonstiges sollten in der Tabelle sichtbar
+      sein, nicht als nicht unterscheidbare leere Zelle. abwesenheiten
+      jetzt LIVE geladen (gleiche "nicht einfrieren"-Philosophie wie
+      Namen/Positionen), eigene Zellen-Beschriftung analog zu
+      entwuerfe.html.
+    2026-09-15 · 07:23 · v0.4 · Fix
+      FUND: ausgleichskonto_berechnung.js existierte bisher nur in der
+      Doku, nicht als echte Datei -- "Offiziell annehmen" lief seit
+      12.09. bei Schritt 2 (Konto-Verbuchung) immer in einen TypeError,
+      sichtbar als "Fehlgeschlagen: ..." (Plan wurde davon unabhängig
+      trotzdem offiziell, Schritt 1 lief durch). Datei jetzt echt gebaut
+      -- reine Funktion, kein eigener Firestore-Zugriff, siehe deren
+      Kopf. Aufruf deshalb um baueAusgleichskontoKontext() erweitert:
+      lädt vor verarbeiteWoche() die beiden angrenzenden Sonntage
+      (sonntagsplan), Wunschtag-Events der Woche (bos_events) und
+      Feiertag-Offen-Status (bos_zeitkontext.js -- neu eingebunden,
+      erster echter Verwender dieser Datei im Projekt). System lief zum
+      Fundzeitpunkt noch nicht produktiv, keine rückwirkende
+      Nachverarbeitung nötig (Ulf bestätigt).
+    2026-09-15 · 07:46 · v0.5 · Feature
+      Live im ersten echten Testlauf aufgetreten: "Offiziell annehmen"
+      lief auf einen fehlenden Firestore-Composite-Index für den neuen
+      bos_events-Query (Schritt 1 lief trotzdem durch, Plan war
+      offiziell, Konto-Verbuchung fehlte). Genau der in v0.4
+      beschriebene Fall, für den es noch keinen Nachtrag gab -- jetzt
+      nachgeholt: Konto-Logik aus offiziellAnnehmen() in eigene,
+      idempotente Funktion verarbeiteKontoFuerPlan() gezogen, dazu ein
+      "Konto nachbuchen"-Knopf in Offizielle Pläne, sichtbar nur für
+      istVerwalter UND nur, wenn kontoVerarbeitetAm auf dem Plan fehlt.
+      Kein manueller Firestore-Eingriff mehr nötig, wenn Schritt 2
+      künftig fehlschlägt.
+    2026-09-15 · 07:59 · v0.6 · Fix
+      Live im zweiten Testlauf gefunden (wunschtagScore blieb bei allen
+      Personen 0, obwohl die Kachel "1 Wünsche erfüllt" zeigte): der
+      bos_events-Query in baueAusgleichskontoKontext() hatte zwei falsche
+      Annahmen aus dem ursprünglichen Konzept-Chat übernommen, jetzt
+      gegen den echten Code von entwuerfe.html/WUNSCHTAG_DOKU.md
+      korrigiert. (1) type-Wert ist 'schichtplaner_wunschtag', nicht
+      'wunschtag'. (2) Das Scoping-Feld ist 'kalenderwoche' (vom
+      Absender gewählte Zielwoche), nicht ein datum-Bereich -- ersetzt.
+      ausgleichskonto_berechnung.js entsprechend mitgezogen (siehe
+      dortiger Changelog): nur Einträge MIT personId zählen, exakt wie
+      im Generierungs-Motor (entwuerfe.html: "Motor kennt nur personId",
+      dokumentierte "Wunschtag-personId-Lücke" -- selbst eingereichte
+      Wünsche ohne aufgelöste personId zählen bewusst nicht mit, hier
+      wie dort).
+    2026-09-15 · 08:35 · v0.7 · Feature
+      baueAusgleichskontoKontext() lädt jetzt zusätzlich
+      einstellungen/ausgleichskonto_werte und reicht es als
+      kontext.werte durch (Ulf: Punkte-Werte sollen über Firestore
+      einstellbar sein, nicht als Datei -- "zu kompliziert mit den zig
+      verschiedenen Wegen"). Editor: zweiter Tab in bankkonto.html.
+      Existiert das Dokument nicht, bleibt kontext.werte undefined --
+      ausgleichskonto_berechnung.js fällt selbst auf STANDARD_WERTE
+      zurück, siehe dortiger Changelog.
+    2026-09-15 · 08:53 · v0.8 · Feature
+      baueAusgleichskontoKontext() reicht jetzt zusätzlich die bereits
+      geladene personenListe durch (kein neuer Firestore-Zugriff) --
+      ermöglicht ausgleichskonto_berechnung.js die bosKontoId->personId-
+      Auflösung für self-eingereichte Wunschtage (Wunschtag-personId-
+      Lücke, siehe dortiger Changelog v0.4). Ändert heute noch nichts
+      Sichtbares, System ohne echte bosKontoId-Verknüpfungen (Ulf:
+      "alles noch im Test").
+    2026-09-15 · 10:25 · v0.9 · Fix
+      T-02 aus dem Kompendium-Code-Abgleich: verarbeiteKontoFuerPlan()
+      war Read-then-Write, keine Transaktion -- zwei gleichzeitige
+      Läufe hätten beide den kontoVerarbeitetAm-Check passieren und
+      doppelt buchen können (FieldValue.increment ist nicht idempotent).
+      Finaler Check-und-Schreib-Schritt jetzt in runTransaction(): liest
+      planRef frisch, prüft kontoVerarbeitetAm erneut, schreibt nur dann.
+      Der äußere Vorab-Check bleibt als günstiger Ausstieg bestehen,
+      ist aber nicht mehr die Korrektheitsgarantie -- baueAusgleichs
+      kontoKontext() bleibt bewusst außerhalb der Transaktion (mehrere
+      eigene Reads, bos_zeitkontext.js kennt keine Transaktion).
+    2026-09-15 · 10:26 · v0.10 · Feature
+      T-07 aus dem Kompendium-Code-Abgleich: neues Feld wochenGezaehlt
+      im Transaktions-Write (d.wochenGezaehltDelta aus
+      ausgleichskonto_berechnung.js, siehe dortiger Changelog) --
+      reiner Kontext-Zähler für bankkonto.html, keine Änderung an der
+      Saldo-Logik selbst.
+    2026-09-15 · 10:27 · v0.11 · Fix
+      Diesen Changelog-Block selbst chronologisch sortiert -- war beim
+      wiederholten Editieren heute durcheinandergeraten (v0.7/v0.9/v0.8/
+      v0.6 in dieser Reihenfolge im Text statt v0.6/v0.7/v0.8/v0.9).
+      Inhaltlich nichts geändert, nur die Reihenfolge.
+    2026-09-15 · 11:24 · v0.12 · Feature
+      Neuer Bereich "Wunschtag nachträglich" (Baustein aus
+      STARTER_WENNS_KLAPPT_WUNSCHTAG.md, siehe
+      SESSION_2026-09-15_WUNSCHTAG_NACHTRAG.md für die volle Doku).
+      Für einen "wäre schön, wenn's noch klappt"-Wunschtag NACH
+      Fristablauf, dessen Woche schon offiziell ist: listet offene
+      bos_events-Wünsche (type:'schichtplaner_wunschtag') ohne
+      uebernommenAm, deren Woche bereits offiziell ist und die noch
+      nicht organisch erfüllt sind. Pro Wunsch zwei Strategien
+      (minimal/neu) über krankmelder_berechnung.js/rechenmodul.js
+      WIEDERVERWENDET, UNVERÄNDERT -- beide sind durch
+      rechenmodul.js selbst strukturell auf reinen Positionstausch
+      INNERHALB der Schicht begrenzt (versucheTauschTief() läuft in
+      berechneTag() immer mit Wechsel-Budget 0), kein Cross-Schicht-
+      Vorschlag wird hier angezeigt/verwendet. NIE ein Lücken-
+      Kompromiss (kein Verzicht, keine manuelle Nachbesetzung wie im
+      Krankmelder) -- bei einer Lücke in beiden Strategien: ehrlich
+      "geht nicht", niedrigste Priorität der drei Wunschtag-Stufen
+      (Ulf, 15.09.2026). WICHTIG: ereignisseFuerAufruf enthält jetzt
+      zusätzlich plan.ereignisse (nicht nur abwesenheitenListe wie
+      im Original-Krankmelder) -- sonst wäre für rechenmodul.js jeder
+      an dem Tag schon regulär freie Kollege (Rotation oder bereits
+      honorierter Wunschtag) ganz normal einsetzbar gewesen, könnte
+      also den fremden freien Tag "klauen", ohne dass es auffällt.
+      Bei Annahme: (1) betroffener Tag in plaene/<Montag>.tage[]
+      ersetzt + neues {grund:'freierTag', bindend:true}-Ereignis
+      angehängt (einzig dieser grund-Wert wird von
+      ausgleichskonto_berechnung.js für die Score-Vergabe erkannt,
+      hart verglichen -- ein eigener grund-Wert für "Nachtrag" hätte
+      still gar keinen Score gebracht). (2) Ausgleichskonto-Delta ALS
+      DIFFERENZ verarbeiteWoche(vorher) vs. verarbeiteWoche(nachher)
+      gebildet, NICHT als roher Delta-Output eines einzelnen Aufrufs
+      -- letzteres hätte den/die bereits gebuchten regulären freien
+      Tag/Tage derselben Person und Woche beim Schreiben ein zweites
+      Mal mitgezählt (Fund beim Bauen, nicht im Konzept-Chat
+      aufgefallen). Differenzbildung erfasst außerdem korrekt den
+      seltenen Rand-Fall, dass der neue Tag eine bestehende
+      Feiertag-Kombi eines Nachbartags rückwirkend freischaltet.
+      kontoVerarbeitetAm auf dem Plan bleibt unberührt -- eigener
+      Schutz über uebernommenAm auf dem bos_events-Wunsch, in
+      derselben Transaktion wie das konten/-Increment.
+    2026-09-15 · 11:35 · v0.13 · Fix
+      Ulf: "normal gewährte [freie Tage] sind egal... sonst würde
+      unser Prinzip gar nicht funktionieren" -- v0.12 hatte
+      PAUSCHAL jeden an dem Tag freien Kollegen tabu gesetzt (jede
+      Art frei, nicht nur Wunschtag). Praktisch hätte das die
+      Tausch-Tiefensuche fast immer ins Leere laufen lassen, da an
+      den meisten Tagen ein Teil der Belegschaft schlicht wegen der
+      normalen Rotation frei ist -- kein "frei" übrig, den man
+      ziehen könnte. Jetzt: nur ERFÜLLTE Wunschtage sind tabu
+      (baueEreignisseFuerNachtrag() bekommt einen wunschtagIndex,
+      exakt dieselbe Quelle wie die Score-Vergabe --
+      baueWunschtagIndex() aus ausgleichskonto_berechnung.js, jetzt
+      auch dafür verwendet statt nur fürs Scoring). berechneNachtrag()
+      dafür auf async umgestellt (lädt zuerst
+      baueAusgleichskontoKontext()). NEU außerdem, aus derselben
+      Überlegung: verdrängte Personen (hatten frei, werden von der
+      gewählten Strategie doch eingeteilt) werden jetzt VOR der
+      Entscheidung pro Strategie angezeigt ("zieht: Name") --
+      "Mensch entscheidet, nicht Automatik" gilt auch hier. Beim
+      Veröffentlichen wird ihr altes freierTag-Ereignis für genau
+      diesen Tag entfernt (sonst Widerspruch: frei laut ereignisse,
+      aber eingeteilt laut tage[]) -- ihr bereits gebuchter Score
+      bleibt unangetastet (keine rückwirkende Korrektur, gleiche
+      Haltung wie Krankmelders Verzicht-Mechanik). OFFENE FRAGE AN
+      ULF, noch nicht entschieden: verdient eine verdrängte Person
+      eine Gutschrift (analog freieTageSchuld bei Krankmelder-
+      Verzicht), oder ist "normal gewährt, also egal" wörtlich
+      gemeint -- keine Kompensation? Siehe Chat.
+    2026-09-15 · 11:42 · v0.14 · Fix
+      Ulf, zur offenen Frage aus v0.13: "nein keine Gutschrift" --
+      der freie Tag war zufällig zugewiesen, kein eigener Wunsch.
+      Entschieden, kein Code für Kompensation. Dabei ein FUND: das
+      trägt nur, WENN die betroffene Woche noch nicht begonnen hat
+      (anders als beim Krankmelder, der akut/heute wirkt) -- genau
+      das war in der Kandidatenliste bisher NICHT geprüft, wäre auch
+      für schon laufende oder vergangene offizielle Wochen
+      angesprungen. Jetzt in ladeNachtragKandidaten() ergänzt:
+      plan.montag muss ECHT in der Zukunft liegen (heuteAlsISO() aus
+      rechenmodul.js, jetzt auch dafür mitgenutzt, nicht nur für die
+      Berechnung selbst). Ohne diese Garantie wäre "kein
+      Kurzfristig-Einschnitt" für die verdrängte Person nicht mehr
+      gegeben gewesen -- die "keine Gutschrift"-Entscheidung hängt
+      also direkt an dieser Korrektur.
+    2026-09-16 · 10:14 · v0.13 · Feature (T-71, T-73, T-10)
+      Schreibt das Buchungsprotokoll (plan.kontoBuchung) in derselben
+      Transaktion wie die Kontostände -- Grundlage für die Rücknahme im
+      Krankmelder. Bucht zusätzlich freieTageSchuld (Verzichte aus
+      Entwürfe und den Abbau einer eingelösten Schuld) und lädt die
+      aktuellen Schuldstände in den Kontext. Der Wunschtag-Nachtrag
+      ergänzt das Protokoll um den nachgetragenen Tag.
+    2026-09-16 · 21:47 · v0.14 · Umbau (T-75)
+      baueTabelle() ruft jetzt schichtplan_tabelle.js auf, die
+      Farb-Helfer sind dorthin gewandert. Sie standen zeichengleich auch
+      in entwuerfe.html. Ausgabe unverändert (Vergleichstest beider
+      Fassungen). Was hier bleibt, ist baueZellen() -- der liest ein
+      gespeichertes Plan-Dokument und unterscheidet sich echt von der
+      Varianten-Fassung in Entwürfe.
+    2026-09-23 · 09:37 · v0.15 · Feature (Etappe D, Feiertag-Sonntag-Regeln)
+      SCHICHTPLANER_V2_FEIERTAG_SONNTAG_REGELN.md, §5 Schritt 11 (K3): die
+      zweite, unabhängige Tür. "Offiziell annehmen" prüft in einer
+      Feiertagswoche (mindestens ein Feiertag Mo-Sa, offen oder
+      geschlossen; E17: ein Sonntags-Feiertag zählt nicht) selbst:
+      (a) trägt der Plan den Vermerk plan.feiertagsregel (Entwürfe
+      v0.56)? Fehlt er, stammt der Plan aus einer alten Entwürfe-Fassung
+      (etwa einem zwischengespeicherten Tablet) -> abgelehnt.
+      (b) Liegen die nötigen sonntagsplan-Dokumente vor (Tabelle 4.1:
+      offen -> Feiertag + Sonntag, geschlossen -> nur Sonntag)?
+      (c) Stimmen Feiertage/Status und gespeichertAm der Dokumente noch
+      mit dem Vermerk überein? Sonst ruht der Plan auf einer
+      Grundlage, die es so nicht mehr gibt -> abgelehnt, neu generieren.
+      Der Grund steht in der UI. Normale Wochen: unverändert annehmbar,
+      auch alte Pläne ohne Vermerk. Fehlen die Feiertagsdaten auf der
+      Seite ganz, wird abgelehnt statt blind angenommen.
+      Dazu globale Fehleranzeige (window error / unhandledrejection).
+    2026-09-23 · 09:59 · v0.16 · Fix (O31 des Kontroll-Chats)
+      (1) Die Tür lehnt eine Woche hinter dem letzten Feiertag der
+      Referenzdaten ab ("Feiertagsdaten reichen nur bis ..."), statt sie
+      als normale Woche durchzulassen.
+      (2) baueAusgleichskontoKontext() -- gemeinsam für Annehmen, "Konto
+      nachbuchen" und den Wunschtag-Nachtrag -- nimmt die Feiertagsliste
+      aus dem Vermerk im Plan (plan.feiertagsregel.feiertage), wenn er da
+      ist: die Liste, unter der der Plan entstanden ist, nicht neu aus
+      einer zweiten Quelle gerechnet (deckt O29 für neue Pläne). Ohne
+      Vermerk (normale Wochen, alte Pläne) bleibt der bisherige Weg über
+      BOS_IST_BESONDERER_TAG und BOS_ZEITKONTEXT, aber er hält jetzt an,
+      statt still "keine Feiertage" zu liefern: wenn eine der beiden
+      fehlt oder die Woche hinter den Referenzdaten liegt.
+      Gewählt statt "Tür auch vor Konto nachbuchen": Nachbuchen betrifft
+      Pläne, die schon offiziell sind; eine Tür dort könnte einen bereits
+      angenommenen Plan nicht mehr sinnvoll ablehnen, nur seine Buchung
+      verhindern. Die Liste aus dem Vermerk bucht ihn dagegen genau so,
+      wie er entstanden ist.
+    2026-09-23 · 10:42 · v0.17 · Schutz (O39, bis zur Klärung)
+      Wunschtag-Nachtrag in Feiertagswochen ausgeschaltet: Hat ein
+      offizieller Plan den Vermerk plan.feiertagsregel, bietet der
+      Nachtrag für diese Woche keine Kandidaten an und sagt stattdessen
+      je Wunsch, warum. Hintergrund: der Nachtrag verschiebt einen freien
+      Tag nach den alten Regeln (ein Tag je Person); mit Zählregel E9,
+      Sonntag-Plus und "am Stück" ist ungeklärt, was er dort tun darf.
+      Normale Wochen: unverändert.
+    2026-09-26 · Schritt 5 (Namens-Fundament, K-7) · Umbau
+      Namen kommen aus bos_namen.js (Namensliste in Firestore, NE-6):
+      Rufname > Beschreibung > lokale Datei als Kürzel („M. · lokal“, nur
+      bis Schritt 8) > „P07 · kein Name hinterlegt“ — nie leer, nie
+      undefined. anzeigeName() ist nur noch ein Einzeiler auf
+      BOS_NAMEN.anzeige(); Auswahllisten zeigen „Rufname (Beschreibung)“
+      (NE-7, BOS_NAMEN.auswahl). Die Namensliste lädt einmal zusammen mit
+      den Personen (personenUndNamen()); ist sie nicht lesbar, steht der
+      Grund sichtbar oben. Die lokale Datei bleibt bis Schritt 8 Rückfall.
+      Nachtrag-Listen zeigen immer den aktuellen Namen der Person, nicht
+      mehr den in der Einreichung gespeicherten (w.name, §10.3). Plan und
+      Druck bekommen BOS_NAMEN.anzeige über anzeigeName (Aushang: Rufname,
+      NE-6).
+    2026-09-26 · Schritt 8 (Namens-Fundament) · Rückbau
+      Die lokale Namensdatei ist in Rente: keine Einbindung von
+      bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei.
+      Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
+      Beschreibung > „P07 · kein Name hinterlegt“).
+-->
+
+<script>
+  // Ergänzt 23.09.2026 (v0.15): jeder unbehandelte Fehler mit
+  // err.message sichtbar, nicht nur in der Konsole.
+  (function () {
+    function zeige(text) {
+      if (!document.body) { setTimeout(function () { zeige(text); }, 50); return; }
+      var box = document.getElementById('globalerFehlerBanner');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'globalerFehlerBanner';
+        box.setAttribute('role', 'alert');
+        box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#5a1d1d;color:#fff;padding:10px 12px;border-radius:8px;font:14px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.4);';
+        box.addEventListener('click', function () { box.remove(); });
+        document.body.appendChild(box);
+      }
+      var zeile = document.createElement('div');
+      zeile.textContent = '⚠ ' + text + ' (antippen zum Schließen)';
+      box.appendChild(zeile);
+    }
+    window.addEventListener('error', function (ev) {
+      console.error('[Offizieller Plan] Unbehandelter Fehler:', ev.error || ev.message);
+      zeige('Fehler: ' + ((ev.error && ev.error.message) || ev.message || 'unbekannt'));
+    });
+    window.addEventListener('unhandledrejection', function (ev) {
+      var r = ev.reason;
+      console.error('[Offizieller Plan] Unbehandelte Promise-Ablehnung:', r);
+      zeige('Fehler: ' + ((r && r.message) || String(r)));
+    });
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../ausgleichskonto_berechnung.js"></script>
+<script src="../schichtplan_tabelle.js"></script>
+  <script src="../rechenmodul.js"></script>
+<script src="../krankmelder_berechnung.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:900px; margin:0 auto;}
+  .abschnitt-titel{ font-family:var(--font-label); font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size: var(--bos-font-xs,.74rem); color:var(--dim); margin: var(--bos-space-lg,22px) 0 var(--bos-space-xs,8px); }
+  .abschnitt-titel:first-child{margin-top:0;}
+  .hinweis-top{font-size: var(--bos-font-sm,.85rem); color:var(--dim); line-height:1.5; margin: 0 0 var(--bos-space-md,16px); padding: var(--bos-space-sm,12px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);}
+  .lade-hinweis, .leer-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+
+  .plan-karte{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-md,16px); margin-bottom: var(--bos-space-md,16px); }
+  .plan-karte.vorgeschlagen{border-color:var(--amber);}
+  .plan-kopf{display:flex; align-items:center; justify-content:space-between; gap: var(--bos-space-sm,10px); flex-wrap:wrap; margin-bottom: var(--bos-space-sm,10px);}
+  .plan-titel{font-family:var(--font-display); font-weight:800; font-size: var(--bos-font-lg,1.05rem);}
+  .plan-meta{font-size: var(--bos-font-xs,.76rem); color:var(--dim);}
+  .plan-stats{display:flex; gap: var(--bos-space-md,16px); margin-bottom: var(--bos-space-sm,10px);}
+  .plan-stats .stat{font-size: var(--bos-font-sm,.85rem); color:var(--dim);}
+  .plan-stats .stat b{color:var(--text); font-size: var(--bos-font-md,.95rem);}
+  .plan-stats .stat.luecken b{color:var(--danger);}
+  .plan-aktionen{display:flex; gap: var(--bos-space-xs,8px); margin-top: var(--bos-space-md,14px);}
+  .btn{ flex:1; padding: var(--bos-space-sm,12px); border-radius:var(--radius); border:none; font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.03em; font-size: var(--bos-font-sm,.85rem); cursor:pointer; text-align:center; }
+  .btn-annehmen{background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#1b1305; box-shadow:0 4px 18px var(--amber-glow);}
+  .btn-annehmen:disabled{opacity:.6; cursor:wait;}
+  .btn-drucken{background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong);}
+  .annehmen-status{font-size: var(--bos-font-xs,.76rem); color:var(--dim); text-align:center; margin-top: var(--bos-space-2xs,6px);}
+
+  .nachtrag-karte{background:var(--surface); border:1px solid var(--amber); border-radius:var(--radius); padding: var(--bos-space-md,16px); margin-bottom: var(--bos-space-md,16px);}
+  .nachtrag-kopf{font-family:var(--font-display); font-weight:800; font-size: var(--bos-font-lg,1.05rem); margin-bottom: 2px;}
+  .nachtrag-meta{font-size: var(--bos-font-xs,.78rem); color:var(--dim); margin-bottom: var(--bos-space-sm,10px);}
+  .strategie-wahl{display:flex; gap: var(--bos-space-xs,8px); margin: var(--bos-space-sm,10px) 0;}
+  .strategie-btn{flex:1; padding: var(--bos-space-sm,10px); border-radius:var(--radius); border:1px solid var(--border-strong); background:var(--surface-2); color:var(--text); font-family:var(--font-label); font-weight:700; font-size: var(--bos-font-xs,.78rem); cursor:pointer; text-align:center;}
+  .strategie-btn .luecken-zahl{display:block; font-family:var(--font-display); font-size: var(--bos-font-lg,1.15rem); margin-top:2px;}
+  .strategie-btn.geht{border-color:var(--good); color:var(--good);}
+  .strategie-btn.geht .luecken-zahl{color:var(--good);}
+  .strategie-btn.gewaehlt{border-color:var(--amber); background:var(--amber-glow); color:var(--amber-bright);}
+  .strategie-btn.gewaehlt.geht{border-color:var(--good); background:rgba(76,175,125,0.16); color:var(--good);}
+  .strategie-btn:disabled{opacity:.4; cursor:not-allowed;}
+  .verdraengt-zeile{display:block; font-family:var(--font-body); font-weight:400; text-transform:none; letter-spacing:normal; font-size: var(--bos-font-2xs,.68rem); color:var(--amber-bright); margin-top:3px;}
+  .nachtrag-hinweis{font-size: var(--bos-font-sm,.85rem); color:var(--dim); line-height:1.5; margin: var(--bos-space-sm,10px) 0;}
+  .nachtrag-hinweis.rot{color:var(--danger);}
+  .btn-nachtrag-berechnen{width:100%; background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong);}
+  .btn-nachtrag-annehmen{width:100%; margin-top: var(--bos-space-xs,8px); background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#1b1305;}
+  .btn-nachtrag-annehmen:disabled{opacity:.5; cursor:not-allowed;}
+
+  .tabelle-wrap{overflow-x:auto; margin: var(--bos-space-sm,10px) 0; border:1px solid var(--border); border-radius:8px; -webkit-overflow-scrolling:touch;}
+  .dienstplan-tabelle{border-collapse:collapse; width:100%; font-size: var(--bos-font-xs,.78rem);}
+  .dienstplan-tabelle th, .dienstplan-tabelle td{border:1px solid var(--border); padding: 5px 7px; text-align:left; white-space:nowrap;}
+  .dienstplan-tabelle th{font-family:var(--font-label); font-weight:700; color:var(--dim); background:var(--surface-2); font-size: var(--bos-font-2xs,.68rem);}
+  .dienstplan-tabelle td.sp-name, .dienstplan-tabelle th.sp-name{position:sticky; left:0; background:var(--surface); z-index:1; font-weight:700;}
+  .dienstplan-tabelle th.sp-name{background:var(--surface-2); z-index:2;}
+  .dienstplan-tabelle tr.sp-gruppe td{background:var(--surface-2); font-family:var(--font-label); font-weight:700; color:var(--amber-bright); text-transform:uppercase; font-size: var(--bos-font-2xs,.68rem); letter-spacing:.04em;}
+  .dienstplan-tabelle tr.sp-leerzeile td{border:none; padding:3px;}
+  .dienstplan-tabelle td.zelle-frei{color:var(--dim); font-style:italic;}
+  .dienstplan-tabelle td.zelle-anwesend{color:var(--dim); font-style:italic;}
+  .dienstplan-tabelle td.zelle-lehrschicht{color:var(--amber-bright); font-size: var(--bos-font-2xs,.66rem);}
+  .dienstplan-tabelle td.zelle-fruehschichteinsatz{color:var(--amber-bright); font-weight:700; font-size: var(--bos-font-2xs,.66rem);}
+  .dienstplan-tabelle td.zelle-abwesend{color:var(--danger); font-size: var(--bos-font-2xs,.68rem);}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen-sheet{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  @media (min-width: 900px){ main{max-width:900px;} }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_offizieller_plan';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Offizieller Plan</h1>
+</header>
+
+<main>
+  <div class="abschnitt-titel" id="freigabeTitel" style="display:none;">Zur Freigabe</div>
+  <div id="freigabeBox" style="display:none;"></div>
+
+  <div class="abschnitt-titel" id="nachtragTitel" style="display:none;">Wunschtag nachträglich</div>
+  <div id="nachtragBox" style="display:none;"></div>
+
+  <div class="abschnitt-titel">Offizielle Pläne</div>
+  <div id="offiziellBox"><div class="lade-hinweis">Lade …</div></div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert der offizielle Plan?</h2>
+    <p>Zweite, bewusste Freigabe-Stufe. In Entwürfe wird eine Variante zunächst nur "für den offiziellen Plan vorgeschlagen" — verbindlich wird sie erst, wenn sie hier, nach nochmaligem Blick, mit "Offiziell annehmen" bestätigt wird.</p>
+    <p>Absicht dahinter: niemand soll leichtfertig irgendwo klicken und einen Plan live setzen. Ein Kontextwechsel und ein zweiter, bewusster Blick sind dazwischen.</p>
+    <p>Einmal offiziell, lässt sich ein Plan hier nicht mehr bearbeiten — Änderungen laufen wieder über Entwürfe und ein neues Vorschlagen.</p>
+    <p>Beim Annehmen wird im Hintergrund auch das Ausgleichskonto fortgeschrieben. Schlägt das ausnahmsweise fehl, bleibt der Plan trotzdem offiziell — unten in „Offizielle Pläne" erscheint dann ein „Konto nachbuchen"-Knopf, bis die Verbuchung nachgeholt wurde.</p>
+    <p>„Wunschtag nachträglich": für einen Wunsch, der erst nach Fristablauf kam, wenn die Woche schon offiziell ist. Niedrigste Priorität der drei Wunschtag-Stufen — geht es ohne Lücke und ohne Schichtwechsel, super; sonst bleibt es ehrlich bei einer Absage, kein Kompromiss.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var TAGE_LABEL = ['Mo','Di','Mi','Do','Fr','Sa'];
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function fehlertext(err) { return escHtml((err && err.message) || String(err)); }
+  function isoDatum(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function formatDatumKurz(d) { return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.'; }
+
+  // Gleiche kleine Logik wie in bos_access_guard.js, hier dupliziert --
+  // dort ist sie lokal in einer IIFE gekapselt, keine öffentliche API für
+  // "welche Rolle ist gerade aktiv". Für nur diesen einen Verbraucher
+  // keine neue gemeinsame Datei anlegen.
+  function aktuelleRolle() {
+    var raw;
+    try { raw = localStorage.getItem('bos_launcher_state_v2'); } catch (e) { return null; }
+    if (!raw) return null;
+    var state;
+    try { state = JSON.parse(raw); } catch (e) { return null; }
+    if (!state || !state.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(state.localProfiles || []);
+    var profil = alle.find(function (p) { return p.id === state.activeProfileId; });
+    return profil ? profil.role : null;
+  }
+  var istVerwalter = ['admin', 'produktionsleitung'].indexOf(aktuelleRolle()) !== -1;
+
+  var personenListe = [];
+  var positionenListe = [];
+  var abwesenheitenListe = [];
+  var dienstplanReihenfolge = null;
+
+  // Schritt 5 (Namens-Fundament, 26.09.2026): EINE Namensfunktion für alle
+  // Planungsseiten — bos_namen.js (Rufname > Beschreibung > lokal als
+  // Kürzel > "P07 · kein Name hinterlegt"). Die frühere eigene Kopie, die
+  // Vor- und Nachname aus der lokalen Datei zusammensetzte, ist entfernt.
+  function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
+  // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
+  function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
+  // Personen UND Namensliste zusammen laden; liefert wie vorher den
+  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  function personenUndNamen() {
+    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
+      .then(function (r) { return r[0]; });
+  }
+
+  // Ausgelagert 16.09.2026 (T-75): hellOderDunkel/hexZuRgba/farbStil
+  // standen zeichengleich auch in entwuerfe.html. Sie liegen jetzt in
+  // schichtplan_tabelle.js, hier nur noch als lokale Namen.
+  var farbStil = window.BOS_SCHICHTPLAN_TABELLE.farbStil;
+
+  // Baut dieselben Zellen-Inhalte wie entwuerfe.html, aber aus der
+  // SCHLANKEN gespeicherten Form (IDs statt voller Objekte) -- Namen/
+  // Farben werden hier aus den frisch geladenen personen/positionen
+  // aufgelöst, nicht aus dem eingefrorenen Plan selbst.
+  function baueZellen(plan) {
+    var zellen = {};
+    function setZelle(personId, datumISO, text, cls) {
+      zellen[personId] = zellen[personId] || {};
+      zellen[personId][datumISO] = { text: text, cls: cls || '' };
+    }
+    plan.tage.forEach(function (tag) {
+      ['nacht', 'frueh'].forEach(function (schicht) {
+        var erg = tag[schicht] || {};
+        Object.keys(erg.zuweisungen || {}).forEach(function (posId) {
+          var personId = erg.zuweisungen[posId];
+          var pos = positionenListe.find(function (p) { return p.id === posId; });
+          setZelle(personId, tag.datumISO, pos ? pos.name : posId, '');
+          if (pos && pos.farbe) { zellen[personId][tag.datumISO].farbe = pos.farbe; }
+        });
+      });
+      (tag.ueberzaehlig || []).forEach(function (personId) { setZelle(personId, tag.datumISO, 'Anwesend', 'zelle-anwesend'); });
+      (tag.lehrschicht || []).forEach(function (eintrag) {
+        var pos = positionenListe.find(function (p) { return p.id === eintrag.positionId; });
+        setZelle(eintrag.personId, tag.datumISO, 'Lehrschicht: ' + (pos ? pos.name : eintrag.positionId), 'zelle-lehrschicht');
+      });
+    });
+    (plan.ereignisse || []).forEach(function (e) { setZelle(e.personId, e.von, 'Frei', 'zelle-frei'); });
+    // Urlaub/Krankheit/Sonstiges -- live aus Firestore, NICHT aus dem
+    // Plan eingefroren (gleiche Philosophie wie Namen/Positionen: bleibt
+    // korrekt, auch wenn sich ein Abwesenheiten-Eintrag später ändert).
+    // Ulf, 13.09.2026: "war mir vorhin nicht sicher, ob er den Urlaub
+    // übernommen hat -- hat er, aber ohne Anzeige, einfach nur leer".
+    var ART_LABEL = { urlaub: 'Urlaub', krankheit: 'Krankheit', sonstiges: 'Sonstiges' };
+    abwesenheitenListe.forEach(function (e) {
+      var d = new Date(e.von + 'T00:00:00');
+      while (isoDatum(d) <= e.bis) { setZelle(e.personId, isoDatum(d), ART_LABEL[e.grund] || e.grund, 'zelle-abwesend'); d.setDate(d.getDate() + 1); }
+    });
+    (plan.fruehschichtEreignisse || []).forEach(function (e) {
+      var d = new Date(e.von + 'T00:00:00');
+      while (isoDatum(d) <= e.bis) { setZelle(e.personId, isoDatum(d), 'Frühschicht-Einsatz', 'zelle-fruehschichteinsatz'); d.setDate(d.getDate() + 1); }
+    });
+    return zellen;
+  }
+
+  function baueTabelle(plan, modus) {
+    // Ausgelagert 16.09.2026 (T-75): die Tabelle selbst baut jetzt
+    // schichtplan_tabelle.js -- dieselbe Funktion, die auch Entwürfe
+    // benutzt. Was hier bleibt, ist der Aufbau der Zell-DATEN
+    // (baueZellen), denn der liest ein gespeichertes Plan-Dokument und
+    // unterscheidet sich echt von der Varianten-Fassung in Entwürfe.
+    return window.BOS_SCHICHTPLAN_TABELLE.baueDienstplanTabelle(plan.tage, baueZellen(plan), {
+      modus: modus,
+      personenListe: personenListe,
+      reihenfolge: dienstplanReihenfolge,
+      anzeigeName: anzeigeName
+    });
+  }
+
+  function formatWoche(montagIso) {
+    var d = new Date(montagIso + 'T00:00:00');
+    var ende = new Date(d); ende.setDate(ende.getDate() + 5);
+    return formatDatumKurz(d) + ' – ' + formatDatumKurz(ende) + '.' + String(ende.getFullYear());
+  }
+
+  function druckePlan(plan) {
+    if (!window.BOS_DRUCK) return;
+    var extraCss = '.dp-tabelle{width:100%; border-collapse:collapse; font-size:9pt;} .dp-tabelle th, .dp-tabelle td{border:1px solid #ccc; padding:1.5mm 2mm; text-align:left;} .dp-tabelle th{background:#f0f0f0;} .dp-gruppe td{background:#e8dcc8; font-weight:700;} .dp-frei{color:#999; font-style:italic;} .zelle-anwesend{color:#999; font-style:italic;} .zelle-lehrschicht{color:#a06b1e; font-size:7pt;} .zelle-fruehschichteinsatz{color:#a06b1e; font-weight:700; font-size:7pt;} .zelle-abwesend{color:#c33; font-size:7pt;} .sp-leerzeile td{border:none; padding:1mm;}';
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: '<p>' + plan.luecken + ' Lücken, ' + plan.wunschtageErfuellt + ' Wünsche erfüllt.</p>' + baueTabelle(plan, 'druck').replace('tabelle-wrap', 'dp-wrap').replace('dienstplan-tabelle', 'dp-tabelle').replace(/sp-gruppe/g, 'dp-gruppe').replace(/sp-name/g, 'dp-name').replace(/zelle-frei/g, 'dp-frei'),
+      appName: 'Offizieller Plan',
+      titel: 'Woche ab ' + formatWoche(plan.montag),
+      mitKopf: true,
+      farbig: true,
+      ausrichtung: 'landscape',
+      extraCSS: extraCss
+    });
+  }
+
+  // Sammelt die externen Daten, die ausgleichskonto_berechnung.js als
+  // reine Funktion braucht (kein eigener Firestore-Zugriff dort, siehe
+  // deren Kopf): die beiden angrenzenden Sonntage, Wunschtag-Events der
+  // Woche, und Offen-Status für Feiertage INNERHALB der Woche.
+  function baueAusgleichskontoKontext(plan) {
+    var samstagDatum = new Date(plan.montag + 'T00:00:00'); samstagDatum.setDate(samstagDatum.getDate() + 5);
+    var samstagIso = isoDatum(samstagDatum);
+    var sonntagDavorDatum = new Date(plan.montag + 'T00:00:00'); sonntagDavorDatum.setDate(sonntagDavorDatum.getDate() - 1);
+    var sonntagDavorIso = isoDatum(sonntagDavorDatum);
+    var sonntagDanachDatum = new Date(samstagIso + 'T00:00:00'); sonntagDanachDatum.setDate(sonntagDanachDatum.getDate() + 1);
+    var sonntagDanachIso = isoDatum(sonntagDanachDatum);
+
+    // O31 (23.09.2026, v0.16): Feiertagsliste bevorzugt aus dem Vermerk
+    // (die Liste, unter der der Plan entstanden ist). Ohne Vermerk der
+    // bisherige Weg -- aber anhalten statt still "keine Feiertage".
+    var vermerkFeiertage = (plan.feiertagsregel && Array.isArray(plan.feiertagsregel.feiertage)) ? plan.feiertagsregel.feiertage : null;
+    var feiertagDatumsListe = [];
+    if (!vermerkFeiertage) {
+      if (!window.BOS_IST_BESONDERER_TAG || !window.BOS_ZEITKONTEXT) {
+        return Promise.reject(new Error('Feiertagsdaten nicht geladen (bos_zeitkontext_referenz.js / bos_zeitkontext.js) -- ohne sie würde das Konto Feiertage übersehen. Seite neu laden.'));
+      }
+      var letzterFeiertag = letzterReferenzFeiertag();
+      if (!letzterFeiertag || plan.montag > letzterFeiertag) {
+        return Promise.reject(new Error('Feiertagsdaten reichen nur bis ' + (letzterFeiertag || '(keine Einträge)') + ' -- Konto für diese Woche nicht sicher berechenbar. Referenzdaten erweitern.'));
+      }
+      plan.tage.forEach(function (t) {
+        var info = window.BOS_IST_BESONDERER_TAG(t.datumISO);
+        if (info && info.typ === 'feiertag') feiertagDatumsListe.push(t.datumISO);
+      });
+    }
+
+    return Promise.all([
+      window.db.collection('sonntagsplan').doc(sonntagDavorIso).get(),
+      window.db.collection('sonntagsplan').doc(sonntagDanachIso).get(),
+      window.db.collection('bos_events')
+        .where('type', '==', 'schichtplaner_wunschtag')
+        .where('kalenderwoche', '==', plan.montag)
+        .get(),
+      vermerkFeiertage
+        ? Promise.resolve(vermerkFeiertage.map(function (f) { return { datumISO: f.datum, offen: !!f.offen }; }))
+        : Promise.all(feiertagDatumsListe.map(function (datumISO) {
+          return window.BOS_ZEITKONTEXT.status(window.db, datumISO).then(function (status) {
+            return { datumISO: datumISO, offen: status.offen };
+          });
+        })),
+      // Werte-Konfiguration (15.09.2026) -- Editor: bankkonto.html, Tab
+      // "Punkte-Werte". Existiert das Dokument nicht, bleibt kontext.werte
+      // undefined -- ausgleichskonto_berechnung.js fällt dann selbst auf
+      // STANDARD_WERTE zurück, kein Sonderfall hier nötig.
+      window.db.collection('einstellungen').doc('ausgleichskonto_werte').get(),
+      // Ergänzt 16.09.2026 (T-10): aktuelle Schuldstände, damit
+      // verarbeiteWoche() eine eingelöste Schuld wieder abbauen kann.
+      window.db.collection('konten').get()
+    ]).then(function (ergebnisse) {
+      var wunschtagEvents = [];
+      ergebnisse[2].forEach(function (doc) { wunschtagEvents.push(doc.data()); });
+      var feiertageOffenProDatum = {};
+      ergebnisse[3].forEach(function (eintrag) { feiertageOffenProDatum[eintrag.datumISO] = eintrag.offen; });
+      return {
+        sonntagDavor: ergebnisse[0].exists ? ergebnisse[0].data() : null,
+        sonntagDanach: ergebnisse[1].exists ? ergebnisse[1].data() : null,
+        wunschtagEvents: wunschtagEvents,
+        feiertageOffenProDatum: feiertageOffenProDatum,
+        werte: ergebnisse[4].exists ? ergebnisse[4].data() : undefined,
+        // Für die bosKontoId->personId-Auflösung bei self-eingereichten
+        // Wunschtagen (15.09.2026) -- kein Zusatz-Zugriff nötig,
+        // personenListe ist beim Seitenstart bereits geladen (siehe
+        // oben, Zeile ~278/618).
+        personenListe: personenListe,
+        // T-10: personId -> offene freieTageSchuld.
+        schuldProPerson: (function () {
+          var m = {};
+          ergebnisse[5].forEach(function (doc) { m[doc.id] = (doc.data() || {}).freieTageSchuld || 0; });
+          return m;
+        })()
+      };
+    });
+  }
+
+  // Bucht das Ausgleichskonto für einen bereits offiziellen Plan --
+  // idempotent über kontoVerarbeitetAm (Grundlage für den "Konto
+  // nachbuchen"-Knopf unten, falls dieser Schritt beim ersten
+  // "Offiziell annehmen" fehlschlug). Gemeinsam genutzt von
+  // offiziellAnnehmen() und kontoNachbuchen().
+  //
+  // ZWEISTUFIG (15.09.2026, T-02): der äußere planRef.get()-Check ist
+  // nur ein günstiger Vorab-Ausstieg, KEINE Korrektheitsgarantie mehr --
+  // baueAusgleichskontoKontext() macht mehrere eigene Firestore-Reads
+  // (sonntagsplan, bos_events, bos_zeitkontext je Feiertag), die sich
+  // nicht sinnvoll in eine einzige Transaktion ziehen lassen (bos_
+  // zeitkontext.js liest selbst, kennt keine Transaktion). Die echte
+  // Absicherung ist die innere runTransaction(): sie liest planRef
+  // FRISCH, prüft kontoVerarbeitetAm ERNEUT und schreibt nur dann --
+  // zwei gleichzeitige Läufe (Doppelklick, "Annehmen" + "Nachbuchen"
+  // parallel, zwei Geräte) können jetzt nicht mehr beide durchkommen,
+  // weil Firestore die zweite Transaktion bei einem Konflikt automatisch
+  // erneut versucht, und der zweite Versuch dann das frisch gesetzte
+  // kontoVerarbeitetAm sieht und abbricht.
+  function verarbeiteKontoFuerPlan(montagIso) {
+    var planRef = window.db.collection('plaene').doc(montagIso);
+    return planRef.get().then(function (doc) {
+      var plan = doc.data();
+      if (plan.kontoVerarbeitetAm) return null; // günstiger Vorab-Ausstieg, siehe oben
+      return baueAusgleichskontoKontext(plan).then(function (kontext) {
+        return window.BOS_AUSGLEICHSKONTO_BERECHNUNG.verarbeiteWoche(plan, kontext);
+      }).then(function (deltas) {
+        return window.db.runTransaction(function (transaction) {
+          return transaction.get(planRef).then(function (frischerDoc) {
+            var frischerPlan = frischerDoc.data();
+            if (frischerPlan.kontoVerarbeitetAm) return false; // inzwischen von woanders erledigt
+            Object.keys(deltas).forEach(function (personId) {
+              var d = deltas[personId];
+              transaction.set(window.db.collection('konten').doc(personId), {
+                saldo: firebase.firestore.FieldValue.increment(d.saldoDelta),
+                samstagKombi: firebase.firestore.FieldValue.increment(d.samstagKombiDelta),
+                montagKombi: firebase.firestore.FieldValue.increment(d.montagKombiDelta),
+                wunschtagScore: firebase.firestore.FieldValue.increment(d.wunschtagScoreDelta),
+                wochenGezaehlt: firebase.firestore.FieldValue.increment(d.wochenGezaehltDelta),
+                // Ergänzt 16.09.2026 (T-10/T-73): Verzichte aus Entwürfe
+                // und der Abbau einer eingelösten Schuld.
+                freieTageSchuld: firebase.firestore.FieldValue.increment(d.freieTageSchuldDelta || 0),
+                aktualisiertAm: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            });
+            // T-71: protokollieren, was pro Person und Tag gebucht wurde.
+            // Der Krankmelder nimmt später exakt diese Beträge zurück,
+            // statt sie neu zu berechnen -- keine Drift, wenn jemand
+            // zwischendurch die Punkte-Werte verstellt, und nebenbei der
+            // Verlauf, der bisher fehlte (T-31).
+            var kontoBuchung = {};
+            Object.keys(deltas).forEach(function (personId) {
+              if (deltas[personId].buchungen && Object.keys(deltas[personId].buchungen).length) {
+                kontoBuchung[personId] = deltas[personId].buchungen;
+              }
+            });
+            transaction.set(planRef, { kontoVerarbeitetAm: firebase.firestore.FieldValue.serverTimestamp(), kontoBuchung: kontoBuchung }, { merge: true });
+            return true;
+          });
+        });
+      });
+    });
+  }
+
+  /**
+   * Zweite Tür (23.09.2026, v0.15, §5 Schritt 11). Löst mit null auf,
+   * wenn der Plan angenommen werden darf, sonst mit dem Grund (Text).
+   * Siehe Changelog v0.15 für die drei Prüfungen.
+   */
+  function letzterReferenzFeiertag() {
+    if (!window.BOS_FEIERTAGE || !window.BOS_FEIERTAGE.feiertage) return '';
+    return window.BOS_FEIERTAGE.feiertage.reduce(function (m, f) { return f.datum > m ? f.datum : m; }, '');
+  }
+
+  function pruefeFeiertagsTuer(plan) {
+    if (!window.BOS_FEIERTAGE || !window.BOS_ZEITKONTEXT) {
+      return Promise.resolve('Feiertagsdaten nicht geladen (bos_zeitkontext_referenz.js / bos_zeitkontext.js) -- ob eine Feiertagswoche vorliegt, lässt sich nicht prüfen. Seite neu laden.');
+    }
+    var montag = new Date(plan.montag + 'T00:00:00');
+    var samstag = new Date(montag); samstag.setDate(samstag.getDate() + 5);
+    var sonntag = new Date(montag); sonntag.setDate(sonntag.getDate() + 6);
+    var montagIso = isoDatum(montag), samstagIso = isoDatum(samstag), sonntagIso = isoDatum(sonntag);
+    // O31 (23.09.2026, v0.16): hinter dem Ende der Referenzdaten nicht
+    // "normale Woche" annehmen.
+    var letzterFeiertag = letzterReferenzFeiertag();
+    if (!letzterFeiertag || montagIso > letzterFeiertag) {
+      return Promise.resolve('Feiertagsdaten reichen nur bis ' + (letzterFeiertag || '(keine Einträge)') + ' -- ob diese Woche einen Feiertag hat, lässt sich nicht prüfen. Referenzdaten (bos_zeitkontext_referenz.js) erweitern.');
+    }
+    var relevant = window.BOS_FEIERTAGE.feiertage.filter(function (f) { return f.datum >= montagIso && f.datum <= samstagIso; });
+    if (!relevant.length) return Promise.resolve(null); // normale Woche: unverändert
+    var vermerk = plan.feiertagsregel;
+    if (!vermerk) {
+      return Promise.resolve('Feiertagswoche, aber der Plan trägt keinen Vermerk der Feiertagsregel -- er stammt aus einer alten Entwürfe-Fassung. In Entwürfe neu laden (hart) und neu generieren.');
+    }
+    return Promise.all(relevant.map(function (f) { return window.BOS_ZEITKONTEXT.status(window.db, f.datum); })).then(function (stati) {
+      var feiertage = relevant.map(function (f, i) { return { datum: f.datum, offen: !!(stati[i] && stati[i].offen) }; });
+      var jetzt = feiertage.map(function (f) { return f.datum + ':' + f.offen; }).join(',');
+      var damals = (vermerk.feiertage || []).map(function (f) { return f.datum + ':' + !!f.offen; }).join(',');
+      if (jetzt !== damals) return 'Die Feiertage der Woche oder ihr Status (offen/geschlossen) haben sich seit dem Vorschlag geändert. Bitte neu generieren.';
+      var noetig = feiertage.filter(function (f) { return f.offen; }).map(function (f) { return f.datum; }).concat([sonntagIso]);
+      return Promise.all(noetig.map(function (d) { return window.db.collection('sonntagsplan').doc(d).get(); })).then(function (docs) {
+        var probleme = [];
+        var gespeichert = vermerk.sonntagsplanGespeichertAm || {};
+        docs.forEach(function (doc, i) {
+          var d = noetig[i];
+          if (!doc.exists) { probleme.push('Sonntagsplan ' + d + ' fehlt'); return; }
+          var daten = doc.data() || {};
+          var ms = (daten.gespeichertAm && typeof daten.gespeichertAm.toMillis === 'function') ? daten.gespeichertAm.toMillis() : null;
+          if (!(d in gespeichert)) probleme.push('Sonntagsplan ' + d + ' war beim Generieren nicht Grundlage');
+          else if (ms !== gespeichert[d]) probleme.push('Sonntagsplan ' + d + ' wurde nach dem Generieren neu gespeichert');
+        });
+        return probleme.length ? 'Feiertagswoche: ' + probleme.join(', ') + '. Bitte in Entwürfe neu generieren.' : null;
+      });
+    });
+  }
+
+  function offiziellAnnehmen(montagIso) {
+    var statusEl = document.getElementById('annehmenStatus-' + montagIso);
+    var btn = document.getElementById('annehmenBtn-' + montagIso);
+    if (btn) { btn.disabled = true; btn.textContent = 'Übernimmt …'; }
+    var planRef = window.db.collection('plaene').doc(montagIso);
+    // 23.09.2026 (v0.15): zweite Tür vor dem Annehmen, siehe
+    // pruefeFeiertagsTuer(). Abgelehnt wird mit Grund in der UI.
+    planRef.get().then(function (doc) {
+      if (!doc.exists) throw new Error('Plan ' + montagIso + ' nicht gefunden.');
+      return pruefeFeiertagsTuer(Object.assign({ montag: montagIso }, doc.data()));
+    }).then(function (grund) {
+      if (grund) throw new Error('Nicht angenommen: ' + grund);
+      return planRef.update({
+        status: 'offiziell',
+        offiziellAm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }).then(function () {
+      // Ausgleichskonto fortschreiben -- Baustein 2 (Konzept-Doku §2).
+      // Schlägt DIESER Teil fehl, bleibt der Plan trotzdem offiziell --
+      // taucht dann unten in "Offizielle Pläne" mit "Konto nachbuchen"
+      // auf (15.09.2026, siehe dortiger Changelog), kein manueller
+      // Firestore-Eingriff mehr nötig.
+      return verarbeiteKontoFuerPlan(montagIso);
+    }).then(function () {
+      ladeUndRender();
+    }).catch(function (err) {
+      console.error('[Offizieller Plan] Annehmen fehlgeschlagen:', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Offiziell annehmen'; }
+      if (statusEl) statusEl.textContent = 'Fehlgeschlagen: ' + fehlertext(err);
+    });
+  }
+
+  function kontoNachbuchen(montagIso) {
+    var statusEl = document.getElementById('nachbuchenStatus-' + montagIso);
+    var btn = document.getElementById('nachbuchenBtn-' + montagIso);
+    if (btn) { btn.disabled = true; btn.textContent = 'Bucht nach …'; }
+    verarbeiteKontoFuerPlan(montagIso).then(function () {
+      ladeUndRender();
+    }).catch(function (err) {
+      console.error('[Offizieller Plan] Konto-Nachbuchung fehlgeschlagen:', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Konto nachbuchen'; }
+      if (statusEl) statusEl.textContent = 'Fehlgeschlagen: ' + fehlertext(err);
+    });
+  }
+
+  // ============================================================
+  // Wunschtag nachträglich -- Baustein aus
+  // STARTER_WENNS_KLAPPT_WUNSCHTAG.md, siehe SESSION_2026-09-15_
+  // WUNSCHTAG_NACHTRAG.md für die volle Doku. Reine Wiederverwendung
+  // von krankmelder_berechnung.js/rechenmodul.js für die Tages-
+  // Korrektur, kein eigener Rechenkern, beide UNVERÄNDERT. Niedrigste
+  // der drei Wunschtag-Prioritätsstufen (Ulf, 15.09.2026): kein
+  // Lücken-Kompromiss, kein Schichtwechsel -- geht's sauber, super,
+  // sonst ehrlich abgelehnt.
+  //
+  // BEKANNTE EINSCHRÄNKUNG: hält zwei Kandidaten derselben Woche
+  // gleichzeitig "berechnet" offen und nimmt beide nacheinander OHNE
+  // Neuladen dazwischen an, überschreibt die zweite Annahme die
+  // Tages-Zuweisung der ersten wieder (beide bauen tage[] aus
+  // demselben, beim Laden eingefrorenen k.plan). Nach jeder
+  // erfolgreichen Annahme wird deshalb neu geladen -- bei
+  // sequenzieller Nutzung (annehmen, warten, nächstes annehmen) kein
+  // Problem, nur bei echt gleichzeitiger Bearbeitung zweier
+  // Kandidaten derselben Woche. Für ein internes Einzel-Admin-Tool
+  // bewusst nicht mit einer eigenen Transaktion über tage[]
+  // abgesichert -- gleiche Abwägung wie in krankmelder.html.
+  // ============================================================
+
+  var nachtragKandidaten = []; // [{ id (bos_events-Doc-ID), personId, name, datum, montagIso, plan, planTag }]
+  var nachtragFeiertagswoche = []; // O39 (v0.17): Wünsche, die nur wegen der Feiertagswoche nicht angeboten werden
+  var nachtragZustand = {}; // kandidatId -> { ergebnisse:{minimal,neu}, gewaehlt }
+
+  function baueEreignisseFuerNachtrag(plan, wuenschendePersonId, datumISO, wunschtagIndex) {
+    // KORRIGIERT 15.09.2026 (Ulf): nur ERFÜLLTE Wunschtage sind tabu --
+    // normale, per Rotation gewährte freie Tage sind "egal" und dürfen
+    // für den Tausch verwendet werden. "Sonst würde unser Prinzip gar
+    // nicht funktionieren": an den meisten Tagen ist ein Teil der
+    // Belegschaft schlicht wegen der normalen Mo-Sa-Rotation frei --
+    // wären die pauschal alle tabu, bliebe der Tausch-Tiefensuche fast
+    // nie jemand "frei" übrig, den man ziehen könnte, und dieses
+    // Feature könnte praktisch nie greifen. wunschtagIndex kommt aus
+    // derselben Quelle wie die Score-Vergabe (baueWunschtagIndex() aus
+    // ausgleichskonto_berechnung.js) -- "erfüllter Wunschtag" ist damit
+    // überall im System exakt derselbe Begriff.
+    var geschuetzteEreignisse = (plan.ereignisse || []).filter(function (e) {
+      return e.grund === 'freierTag' && wunschtagIndex[e.personId + '|' + e.von];
+    });
+    var sperrEreignis = { personId: wuenschendePersonId, von: datumISO, bis: datumISO, grund: 'freierTag', bindend: true, begruendung: null };
+    return abwesenheitenListe.concat(geschuetzteEreignisse).concat([sperrEreignis]);
+  }
+
+  // Personen, die an diesem Tag laut Plan eigentlich frei hätten (JEDE
+  // Art frei, nicht nur Wunschtag -- hier geht's um die Anzeige, nicht
+  // um die Tabu-Prüfung oben) und in diesem Berechnungs-Ergebnis
+  // trotzdem einer Position zugewiesen wurden -- zieht sie aus ihrem
+  // freien Tag. Für die Sichtbarkeit vor der Entscheidung (Ulf sieht,
+  // wen es trifft) UND zum Bereinigen von plan.ereignisse beim
+  // Veröffentlichen (sonst stünde die Person dort weiterhin als "frei",
+  // obwohl sie laut tage[] arbeitet).
+  function ermittleVerdraengtePersonen(plan, wuenschendePersonId, datumISO, ergebnis) {
+    var freiIds = (plan.ereignisse || [])
+      .filter(function (e) { return e.grund === 'freierTag' && e.personId !== wuenschendePersonId && e.von <= datumISO && datumISO <= e.bis; })
+      .map(function (e) { return e.personId; });
+    var zugewiesenIds = {};
+    ['nacht', 'frueh', 'sonntag'].forEach(function (schicht) {
+      var z = (ergebnis[schicht] || {}).zuweisungen || {};
+      Object.keys(z).forEach(function (posId) { zugewiesenIds[z[posId]] = true; });
+    });
+    return freiIds.filter(function (pid) { return zugewiesenIds[pid]; });
+  }
+
+  function ladeNachtragKandidaten() {
+    if (!istVerwalter) return Promise.resolve();
+    return window.db.collection('bos_events').where('type', '==', 'schichtplaner_wunschtag').get().then(function (snap) {
+      var alleWuensche = [];
+      snap.forEach(function (doc) { alleWuensche.push(Object.assign({ id: doc.id }, doc.data())); });
+      var bosKontoIdIndex = window.BOS_AUSGLEICHSKONTO_BERECHNUNG.baueBosKontoIdIndex(personenListe);
+      return window.db.collection('plaene').get().then(function (planSnap) {
+        var offizielleProMontag = {};
+        planSnap.forEach(function (doc) {
+          var p = Object.assign({ montag: doc.id }, doc.data());
+          if (p.status === 'offiziell') offizielleProMontag[p.montag] = p;
+        });
+        nachtragKandidaten = [];
+        nachtragFeiertagswoche = [];
+        var heute = heuteAlsISO();
+        alleWuensche.forEach(function (w) {
+          if (w.uebernommenAm) return; // schon angenommen
+          var plan = offizielleProMontag[w.kalenderwoche];
+          if (!plan) return; // Woche noch nicht offiziell (oder nicht mehr vorhanden)
+          if (plan.montag <= heute) return; // Woche hat schon begonnen oder liegt in der Vergangenheit --
+            // ANDERS ALS BEIM KRANKMELDER (der akut/heute wirkt) ist dieses
+            // Feature bewusst nur für noch nicht begonnene Wochen gedacht
+            // (Ulf, 15.09.2026) -- nur DAS macht "keine Gutschrift für
+            // verdrängte Personen" vertretbar: der freie Tag war zufällig
+            // zugewiesen, nicht gewünscht, UND die verdrängte Person hat
+            // echten Vorlauf, keine kurzfristige Überraschung.
+          var personId = w.personId || (w.bosKontoId && bosKontoIdIndex[w.bosKontoId]) || null;
+          if (!personId) return; // ungelöste bosKontoId, siehe ausgleichskonto_berechnung.js-Kopf
+          // O39 (23.09.2026, v0.17): Feiertagswoche -> nicht anbieten, aber
+          // sichtbar sagen, warum (siehe Changelog).
+          if (plan.feiertagsregel) {
+            nachtragFeiertagswoche.push({ personId: personId, name: anzeigeName(personId), datum: w.datum, montagIso: plan.montag });
+            return;
+          }
+          var planTag = (plan.tage || []).find(function (t) { return t.datumISO === w.datum; });
+          if (!planTag) return; // z.B. Sonntag -- außerhalb von plan.tage, deckt dieses Feature nicht ab
+          var bereitsFrei = (plan.ereignisse || []).some(function (e) { return e.personId === personId && e.grund === 'freierTag' && e.von <= w.datum && w.datum <= e.bis; });
+          if (bereitsFrei) return; // schon organisch erfüllt -- nichts zu tun
+          nachtragKandidaten.push({ id: w.id, personId: personId, name: anzeigeName(personId), datum: w.datum, montagIso: plan.montag, plan: plan, planTag: planTag });
+        });
+        nachtragKandidaten.sort(function (a, b) { return a.datum.localeCompare(b.datum); });
+      });
+    }).catch(function (err) {
+      console.error('[Offizieller Plan] Wunschtag-Nachtrag-Kandidaten laden fehlgeschlagen:', err);
+      var box = document.getElementById('nachtragBox');
+      if (box) box.innerHTML = '<div class="leer-hinweis">Laden fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+
+  function renderNachtrag() {
+    var titel = document.getElementById('nachtragTitel');
+    var box = document.getElementById('nachtragBox');
+    if (!istVerwalter) { titel.style.display = 'none'; box.style.display = 'none'; return; }
+    titel.style.display = 'block'; box.style.display = 'block';
+    // O39 (v0.17): Feiertagswochen ausdrücklich nennen statt still auslassen.
+    var feiertagsHinweis = nachtragFeiertagswoche.length
+      ? '<div class="nachtrag-hinweis">Nicht angeboten, weil die Woche eine Feiertagswoche ist — dort ist der Nachtrag ausgeschaltet, bis geklärt ist, wie er mit mehreren freien Tagen und „am Stück“ umgeht: ' +
+        nachtragFeiertagswoche.map(function (k) {
+          var d = new Date(k.datum + 'T00:00:00');
+          return escHtml(anzeigeName(k.personId)) + ' (' + TAGE_LABEL[(d.getDay() + 6) % 7] + ' ' + escHtml(formatDatumKurz(d)) + ')';
+        }).join(', ') + '. Bei Bedarf in Entwürfe von Hand lösen.</div>'
+      : '';
+    if (!nachtragKandidaten.length) { box.innerHTML = feiertagsHinweis + '<div class="leer-hinweis">Keine offenen "wäre schön, wenn\'s noch klappt"-Wünsche.</div>'; return; }
+    box.innerHTML = feiertagsHinweis + nachtragKandidaten.map(function (k) {
+      var d = new Date(k.datum + 'T00:00:00');
+      return '<div class="nachtrag-karte">' +
+        '<div class="nachtrag-kopf">' + escHtml(anzeigeName(k.personId)) + '</div>' +
+        '<div class="nachtrag-meta">' + TAGE_LABEL[(d.getDay() + 6) % 7] + ' ' + escHtml(formatDatumKurz(d)) + ' — Woche ab ' + escHtml(formatWoche(k.montagIso)) + '</div>' +
+        '<button type="button" class="btn btn-nachtrag-berechnen" id="nachtragBerechnenBtn-' + k.id + '" data-nachtrag-berechnen="' + k.id + '">Berechnen</button>' +
+        '<div id="nachtragErgebnis-' + k.id + '"></div>' +
+        '</div>';
+    }).join('');
+    box.querySelectorAll('[data-nachtrag-berechnen]').forEach(function (btn) {
+      btn.addEventListener('click', function () { berechneNachtrag(btn.dataset.nachtragBerechnen); });
+    });
+  }
+
+  function berechneNachtrag(kandidatId) {
+    var k = nachtragKandidaten.find(function (x) { return x.id === kandidatId; });
+    if (!k) return;
+    var btn = document.getElementById('nachtragBerechnenBtn-' + kandidatId);
+    if (btn) { btn.disabled = true; btn.textContent = 'Berechnet …'; }
+    baueAusgleichskontoKontext(k.plan).then(function (kontext) {
+      var bosKontoIdIndex = window.BOS_AUSGLEICHSKONTO_BERECHNUNG.baueBosKontoIdIndex(personenListe);
+      var wunschtagIndex = window.BOS_AUSGLEICHSKONTO_BERECHNUNG.baueWunschtagIndex(kontext.wunschtagEvents, bosKontoIdIndex);
+      var ereignisseFuerAufruf = baueEreignisseFuerNachtrag(k.plan, k.personId, k.datum, wunschtagIndex);
+      var ergMinimal = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(k.planTag, k.personId, personenListe, positionenListe, ereignisseFuerAufruf, 'minimal');
+      var ergNeu = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(k.planTag, k.personId, personenListe, positionenListe, ereignisseFuerAufruf, 'neu');
+      nachtragZustand[kandidatId] = { ergebnisse: { minimal: ergMinimal, neu: ergNeu }, gewaehlt: null };
+      if (btn) { btn.disabled = false; btn.textContent = 'Neu berechnen'; }
+      renderNachtragErgebnis(kandidatId);
+    }).catch(function (err) {
+      console.error('[Offizieller Plan] Wunschtag-Nachtrag Berechnen fehlgeschlagen:', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Berechnen'; }
+      var box = document.getElementById('nachtragErgebnis-' + kandidatId);
+      if (box) box.innerHTML = '<div class="nachtrag-hinweis rot">Berechnung fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+
+  function waehleNachtragStrategie(kandidatId, strategie) {
+    var zustand = nachtragZustand[kandidatId];
+    if (!zustand) return;
+    var luecken = window.BOS_KRANKMELDER_BERECHNUNG.zaehleLuecken(zustand.ergebnisse[strategie]);
+    if (luecken > 0) return; // nie ein Kompromiss, siehe Kopf oben
+    zustand.gewaehlt = strategie;
+    renderNachtragErgebnis(kandidatId);
+  }
+
+  function renderNachtragErgebnis(kandidatId) {
+    var k = nachtragKandidaten.find(function (x) { return x.id === kandidatId; });
+    var zustand = nachtragZustand[kandidatId];
+    var box = document.getElementById('nachtragErgebnis-' + kandidatId);
+    if (!k || !zustand || !box) return;
+
+    var lueckenJeStrategie = {
+      minimal: window.BOS_KRANKMELDER_BERECHNUNG.zaehleLuecken(zustand.ergebnisse.minimal),
+      neu: window.BOS_KRANKMELDER_BERECHNUNG.zaehleLuecken(zustand.ergebnisse.neu)
+    };
+    var verdraengteJeStrategie = {
+      minimal: ermittleVerdraengtePersonen(k.plan, k.personId, k.datum, zustand.ergebnisse.minimal),
+      neu: ermittleVerdraengtePersonen(k.plan, k.personId, k.datum, zustand.ergebnisse.neu)
+    };
+    var strategieHtml = ['minimal', 'neu'].map(function (s) {
+      var luecken = lueckenJeStrategie[s];
+      var label = s === 'minimal' ? 'Minimal verändert' : 'Neu sortiert';
+      var gehtKlasse = luecken === 0 ? ' geht' : '';
+      var gewaehltKlasse = zustand.gewaehlt === s ? ' gewaehlt' : '';
+      var verdraengtHtml = (luecken === 0 && verdraengteJeStrategie[s].length)
+        ? '<span class="verdraengt-zeile">zieht: ' + escHtml(verdraengteJeStrategie[s].map(anzeigeName).join(', ')) + '</span>' : '';
+      return '<button type="button" class="strategie-btn' + gehtKlasse + gewaehltKlasse + '"' + (luecken > 0 ? ' disabled' : '') + ' data-strategie="' + s + '">' + label + '<span class="luecken-zahl">' + luecken + ' Lücken</span>' + verdraengtHtml + '</button>';
+    }).join('');
+
+    var beideHabenLuecken = lueckenJeStrategie.minimal > 0 && lueckenJeStrategie.neu > 0;
+
+    var html = '<div class="strategie-wahl">' + strategieHtml + '</div>';
+    if (beideHabenLuecken) {
+      html += '<div class="nachtrag-hinweis rot">Geht sauber nicht — weder minimal noch neu sortiert bleibt die Schicht ohne Lücke. Ehrlich abgelehnt, kein Kompromiss.</div>';
+    } else {
+      html += '<div class="nachtrag-hinweis">Strategie wählen, dann annehmen.</div>' +
+        '<button type="button" class="btn btn-nachtrag-annehmen" id="nachtragAnnehmenBtn-' + kandidatId + '"' + (!zustand.gewaehlt ? ' disabled' : '') + '>Annehmen</button>' +
+        '<div class="nachtrag-hinweis" id="nachtragAnnehmenStatus-' + kandidatId + '"></div>';
+    }
+    box.innerHTML = html;
+
+    box.querySelectorAll('[data-strategie]').forEach(function (btn) {
+      btn.addEventListener('click', function () { waehleNachtragStrategie(kandidatId, btn.dataset.strategie); });
+    });
+    var annehmenBtn = document.getElementById('nachtragAnnehmenBtn-' + kandidatId);
+    if (annehmenBtn) annehmenBtn.addEventListener('click', function () { veroeffentlicheNachtrag(kandidatId); });
+  }
+
+  function baueNeuerTagAusErgebnis(datumISO, ergebnis) {
+    var neuerTag = { datumISO: datumISO };
+    ['nacht', 'frueh', 'sonntag'].forEach(function (schicht) {
+      var erg = ergebnis[schicht] || {};
+      neuerTag[schicht] = { zuweisungen: erg.zuweisungen || {}, luecken: erg.luecken || [] };
+    });
+    neuerTag.ueberzaehlig = ergebnis.ueberzaehlig || [];
+    neuerTag.lehrschicht = ergebnis.lehrschicht || [];
+    return neuerTag;
+  }
+
+  function veroeffentlicheNachtrag(kandidatId) {
+    var k = nachtragKandidaten.find(function (x) { return x.id === kandidatId; });
+    var zustand = nachtragZustand[kandidatId];
+    if (!k || !zustand || !zustand.gewaehlt) return;
+    var btn = document.getElementById('nachtragAnnehmenBtn-' + kandidatId);
+    var statusEl = document.getElementById('nachtragAnnehmenStatus-' + kandidatId);
+    if (btn) { btn.disabled = true; btn.textContent = 'Übernimmt …'; }
+
+    var planRef = window.db.collection('plaene').doc(k.montagIso);
+    var wunschRef = window.db.collection('bos_events').doc(k.id);
+
+    // Schritt 1: betroffenen Tag ersetzen + neues freierTag-Ereignis
+    // anhängen -- einzig dieser grund-Wert wird von
+    // ausgleichskonto_berechnung.js für die Score-Vergabe erkannt.
+    // Verdrängte Personen (siehe ermittleVerdraengtePersonen): deren
+    // ALTES freierTag-Ereignis für GENAU diesen Tag muss raus, sonst
+    // stünden sie in plan.ereignisse weiter als "frei", obwohl sie laut
+    // tage[] jetzt arbeiten (Anzeige-Widerspruch + falsche Basis für
+    // jede künftige Konto-Verarbeitung). Nur der EXAKTE Ein-Tag-Fall
+    // (von===bis===k.datum) wird entfernt -- ein hypothetisches
+    // mehrtägiges freierTag-Ereignis (in der Praxis bislang nicht
+    // gesehen) würde unangetastet bleiben, siehe Doku.
+    var neuerTag = baueNeuerTagAusErgebnis(k.datum, zustand.ergebnisse[zustand.gewaehlt]);
+    var neueTage = k.plan.tage.map(function (t) { return t.datumISO === k.datum ? neuerTag : t; });
+    var verdraengte = ermittleVerdraengtePersonen(k.plan, k.personId, k.datum, zustand.ergebnisse[zustand.gewaehlt]);
+    var bereinigteEreignisse = (k.plan.ereignisse || []).filter(function (e) {
+      if (e.grund !== 'freierTag') return true;
+      if (e.von !== k.datum || e.bis !== k.datum) return true; // kein exakter Ein-Tag-Treffer -- unangetastet
+      return verdraengte.indexOf(e.personId) === -1;
+    });
+    var sperrEreignis = { personId: k.personId, von: k.datum, bis: k.datum, grund: 'freierTag', bindend: true, begruendung: null };
+    var neueEreignisse = bereinigteEreignisse.concat([sperrEreignis]);
+    var aktualisierterPlan = Object.assign({}, k.plan, { tage: neueTage, ereignisse: neueEreignisse });
+
+    planRef.set({ tage: neueTage, ereignisse: neueEreignisse, wunschtagNachtragAm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }).then(function () {
+      // Schritt 2: Konto-Differenz bilden -- NICHT den rohen Delta-
+      // Output eines einzelnen verarbeiteWoche()-Aufrufs schreiben,
+      // sonst würde der/die bereits gebuchte reguläre freie Tag/Tage
+      // derselben Person diese Woche ein zweites Mal mitgezählt.
+      // Stattdessen vorher/nachher, nur die Differenz schreiben --
+      // erfasst nebenbei korrekt auch den seltenen Fall, dass der neue
+      // Tag eine Feiertag-Kombi eines Nachbartags rückwirkend
+      // freischaltet.
+      return baueAusgleichskontoKontext(k.plan).then(function (kontext) {
+        return Promise.all([
+          window.BOS_AUSGLEICHSKONTO_BERECHNUNG.verarbeiteWoche(k.plan, kontext),
+          window.BOS_AUSGLEICHSKONTO_BERECHNUNG.verarbeiteWoche(aktualisierterPlan, kontext)
+        ]);
+      });
+    }).then(function (ergebnisse) {
+      var leer = { saldoDelta: 0, samstagKombiDelta: 0, montagKombiDelta: 0, wunschtagScoreDelta: 0, wochenGezaehltDelta: 0, freieTageSchuldDelta: 0 };
+      var vorher = (ergebnisse[0] && ergebnisse[0][k.personId]) || leer;
+      var nachher = (ergebnisse[1] && ergebnisse[1][k.personId]) || leer;
+      var differenz = {
+        saldoDelta: nachher.saldoDelta - vorher.saldoDelta,
+        samstagKombiDelta: nachher.samstagKombiDelta - vorher.samstagKombiDelta,
+        montagKombiDelta: nachher.montagKombiDelta - vorher.montagKombiDelta,
+        wunschtagScoreDelta: nachher.wunschtagScoreDelta - vorher.wunschtagScoreDelta,
+        wochenGezaehltDelta: nachher.wochenGezaehltDelta - vorher.wochenGezaehltDelta,
+        freieTageSchuldDelta: (nachher.freieTageSchuldDelta || 0) - (vorher.freieTageSchuldDelta || 0)
+      };
+      // Schritt 3: Transaktion -- uebernommenAm auf dem Wunsch schützt
+      // vor Doppelbuchung (Doppelklick, zwei Geräte), analog
+      // kontoVerarbeitetAm bei verarbeiteKontoFuerPlan().
+      return window.db.runTransaction(function (transaction) {
+        return transaction.get(wunschRef).then(function (frischerWunschDoc) {
+          var frischerWunsch = frischerWunschDoc.data();
+          if (frischerWunsch && frischerWunsch.uebernommenAm) return false; // inzwischen von woanders erledigt
+          transaction.set(window.db.collection('konten').doc(k.personId), {
+            saldo: firebase.firestore.FieldValue.increment(differenz.saldoDelta),
+            samstagKombi: firebase.firestore.FieldValue.increment(differenz.samstagKombiDelta),
+            montagKombi: firebase.firestore.FieldValue.increment(differenz.montagKombiDelta),
+            wunschtagScore: firebase.firestore.FieldValue.increment(differenz.wunschtagScoreDelta),
+            wochenGezaehlt: firebase.firestore.FieldValue.increment(differenz.wochenGezaehltDelta),
+            freieTageSchuld: firebase.firestore.FieldValue.increment(differenz.freieTageSchuldDelta),
+            aktualisiertAm: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+          // Ergänzt 16.09.2026 (T-71): auch der nachgetragene Tag muss im
+          // Buchungsprotokoll landen -- sonst könnte ausgerechnet er später
+          // hergegeben werden, ohne dass der Krankmelder weiß, was er
+          // zurückzunehmen hat.
+          if (nachher.buchungen && nachher.buchungen[k.datum]) {
+            var nachtragBuchung = {};
+            nachtragBuchung['kontoBuchung.' + k.personId + '.' + k.datum] = nachher.buchungen[k.datum];
+            transaction.update(window.db.collection('plaene').doc(k.montagIso), nachtragBuchung);
+          }
+          transaction.set(wunschRef, { uebernommenAm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          return true;
+        });
+      });
+    }).then(function () {
+      return ladeNachtragKandidaten().then(function () { renderNachtrag(); ladeUndRender(); });
+    }).catch(function (err) {
+      console.error('[Offizieller Plan] Wunschtag-Nachtrag Übernehmen fehlgeschlagen:', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Annehmen'; }
+      if (statusEl) statusEl.textContent = 'Fehlgeschlagen: ' + fehlertext(err);
+    });
+  }
+
+  function renderFreigabe(plaene) {
+    var titel = document.getElementById('freigabeTitel');
+    var box = document.getElementById('freigabeBox');
+    if (!istVerwalter) { titel.style.display = 'none'; box.style.display = 'none'; return; }
+    titel.style.display = 'block'; box.style.display = 'block';
+    var vorgeschlagen = plaene.filter(function (p) { return p.status === 'vorgeschlagen'; })
+      .sort(function (a, b) { return a.montag.localeCompare(b.montag); });
+    if (!vorgeschlagen.length) { box.innerHTML = '<div class="leer-hinweis">Nichts zur Freigabe.</div>'; return; }
+    box.innerHTML = vorgeschlagen.map(function (plan) {
+      return '<div class="plan-karte vorgeschlagen">' +
+        '<div class="plan-kopf"><span class="plan-titel">Woche ab ' + escHtml(formatWoche(plan.montag)) + '</span></div>' +
+        '<div class="plan-stats"><div class="stat luecken"><b>' + plan.luecken + '</b> Lücken</div><div class="stat"><b>' + plan.wunschtageErfuellt + '</b> Wünsche erfüllt</div></div>' +
+        baueTabelle(plan, 'bildschirm') +
+        '<div class="plan-aktionen"><button type="button" class="btn btn-annehmen" id="annehmenBtn-' + plan.montag + '" data-annehmen="' + plan.montag + '">Offiziell annehmen</button></div>' +
+        '<div class="annehmen-status" id="annehmenStatus-' + plan.montag + '"></div>' +
+        '</div>';
+    }).join('');
+    box.querySelectorAll('[data-annehmen]').forEach(function (btn) {
+      btn.addEventListener('click', function () { offiziellAnnehmen(btn.dataset.annehmen); });
+    });
+  }
+
+  function renderOffiziell(plaene) {
+    var box = document.getElementById('offiziellBox');
+    var offiziell = plaene.filter(function (p) { return p.status === 'offiziell'; })
+      .sort(function (a, b) { return b.montag.localeCompare(a.montag); }); // neueste zuerst
+    if (!offiziell.length) { box.innerHTML = '<div class="leer-hinweis">Noch kein offizieller Plan.</div>'; return; }
+    box.innerHTML = offiziell.map(function (plan) {
+      // Nachbuchen-Knopf nur für Verwalter UND nur, wenn die Konto-
+      // Verbuchung bei "Offiziell annehmen" fehlgeschlagen ist (kein
+      // kontoVerarbeitetAm) -- backstube/konditorei bleiben rein
+      // lesend, siehe Datei-Kopf "FÜR WEN".
+      var kontoOffen = istVerwalter && !plan.kontoVerarbeitetAm;
+      return '<div class="plan-karte">' +
+        '<div class="plan-kopf"><span class="plan-titel">Woche ab ' + escHtml(formatWoche(plan.montag)) + '</span></div>' +
+        '<div class="plan-stats"><div class="stat luecken"><b>' + plan.luecken + '</b> Lücken</div><div class="stat"><b>' + plan.wunschtageErfuellt + '</b> Wünsche erfüllt</div></div>' +
+        (kontoOffen ? '<div class="hinweis-top">Konto-Verbuchung für diese Woche steht noch aus.</div>' : '') +
+        baueTabelle(plan, 'bildschirm') +
+        '<div class="plan-aktionen">' +
+          (kontoOffen ? '<button type="button" class="btn btn-annehmen" id="nachbuchenBtn-' + plan.montag + '" data-nachbuchen="' + plan.montag + '">Konto nachbuchen</button>' : '') +
+          '<button type="button" class="btn btn-drucken" data-druck="' + plan.montag + '">Drucken</button>' +
+        '</div>' +
+        (kontoOffen ? '<div class="annehmen-status" id="nachbuchenStatus-' + plan.montag + '"></div>' : '') +
+        '</div>';
+    }).join('');
+    box.querySelectorAll('[data-druck]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var plan = offiziell.filter(function (p) { return p.montag === btn.dataset.druck; })[0];
+        if (plan) druckePlan(plan);
+      });
+    });
+    box.querySelectorAll('[data-nachbuchen]').forEach(function (btn) {
+      btn.addEventListener('click', function () { kontoNachbuchen(btn.dataset.nachbuchen); });
+    });
+  }
+
+  function ladeUndRender() {
+    document.getElementById('offiziellBox').innerHTML = '<div class="lade-hinweis">Lade …</div>';
+    window.db.collection('plaene').get().then(function (snap) {
+      var plaene = [];
+      snap.forEach(function (doc) { plaene.push(Object.assign({ montag: doc.id }, doc.data())); });
+      renderFreigabe(plaene);
+      renderOffiziell(plaene);
+    }).catch(function (err) {
+      console.error('[Offizieller Plan] Laden fehlgeschlagen:', err);
+      document.getElementById('offiziellBox').innerHTML = '<div class="leer-hinweis">Laden fehlgeschlagen: ' + fehlertext(err) + '</div>';
+    });
+  }
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen-sheet'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen-sheet'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen-sheet'); });
+
+  /* ==== Start ==== */
+  (window.BOS_AUTH_READY || Promise.resolve()).then(function () {
+    return Promise.all([
+      personenUndNamen(),
+      window.db.collection('positionen').get(),
+      window.db.collection('abwesenheiten').get(),
+      window.db.collection('einstellungen').doc('dienstplan_reihenfolge').get()
+    ]);
+  }).then(function (ergebnisse) {
+    personenListe = [];
+    ergebnisse[0].forEach(function (doc) { personenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+    positionenListe = [];
+    ergebnisse[1].forEach(function (doc) { positionenListe.push(Object.assign({ id: doc.id }, doc.data())); });
+    abwesenheitenListe = [];
+    ergebnisse[2].forEach(function (doc) { abwesenheitenListe.push(doc.data()); });
+    if (ergebnisse[3].exists) dienstplanReihenfolge = ergebnisse[3].data();
+    ladeUndRender();
+    ladeNachtragKandidaten().then(renderNachtrag);
+  }).catch(function (err) {
+    console.error('[Offizieller Plan] Start fehlgeschlagen:', err);
+    document.getElementById('offiziellBox').innerHTML = '<div class="leer-hinweis">Laden fehlgeschlagen: ' + fehlertext(err) + '</div>';
+  });
+
+})();
+</script>
+</body>
+</html>

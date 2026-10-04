@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Krankheit / Ausfall / Urlaub · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: abwesenheiten_editor.html
+  ZWECK: Kombiniertes Werkzeug für Krankheit, Urlaub und sonstigen Ausfall
+         — Zeiträume, in denen eine Person nicht einsetzbar ist. Bewusst
+         NUR vom Vorgesetzten bedient (Ulf, 12.09.2026): keine Selbst-
+         Einreichung durch Kollegen wie bei Wunschtag. Die zwischenzeitlich
+         erwogene Idee eines eigenen Urlaub-Anfrage-Satelliten ist damit
+         vom Tisch — Urlaub ist hier einfach eine von drei "Arten" eines
+         eingetragenen Zeitraums, kein separater Antrags-Workflow.
+  DATENFLUSS: bos_access_guard.js (roles: admin, produktionsleitung) →
+         Firestore-Collection 'personen' (lesend, für die Auswahl) +
+         bos_namen.js (dieselbe lokale Datei wie Personen-/
+         Positionen-Editor, für die Namensanzeige) → Firestore-Collection
+         'abwesenheiten' (lesend UND schreibend — anlegen, bearbeiten,
+         löschen). Mutable, kein Append-only — Einträge werden bei Bedarf
+         korrigiert, nicht nur ergänzt.
+  SCHNITTSTELLEN: Feld-Namen bewusst so gewählt, dass sie direkt dem
+         Verfügbarkeits-Ereignis-Format aus rechenmodul.js entsprechen
+         (personId, von, bis, grund, bindend, begruendung) — der künftige
+         Rechen-Motor kann diese Collection direkt (oder über einen
+         dünnen Adapter, analog zur Wunschtag-Übersetzung) als Teil seiner
+         `ereignisse` lesen. `grund` hier eingeschränkt auf
+         'urlaub'|'krankheit'|'sonstiges' (die für dieses Werkzeug
+         relevante Teilmenge — 'feiertag' etc. kommen von anderswo).
+         `bindend` immer true — was der Vorgesetzte einträgt, gilt als
+         bestätigt, kein Anfrage-Status. Seit v0.3 zusätzlich lesend (und
+         für EIN Feld schreibend) auf bos_events (type: 'urlaub_anfrage')
+         aus urlaub_anfrage.html — siehe "Offene Urlaubsanfragen" unten.
+         bos_druck.js für die Urlaubsbestätigung.
+  BEKANNTE OFFENE PUNKTE:
+    - Keine Prüfung auf überlappende Zeiträume für dieselbe Person.
+    - Keine PIN-Zusatzsperre, nur roles:['admin','produktionsleitung'] —
+      gleiche Begründung wie bei den anderen SchichtPlaner-Editoren (§0).
+    - Wird vom Rechen-Motor noch nicht gelesen — der ist selbst noch nicht
+      gebaut.
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Liste, Anlegen/Bearbeiten/Löschen von Zeiträumen,
+      Namensauflösung über bos_lokal_daten.js.
+    2026-09-12 · v0.2 · Fix
+      Noch vor dem ersten echten Testlauf gefunden (gleicher Fehler wie in
+      personen_editor.html, siehe dort): der lokale-Namen-Ladeaufruf lief
+      ungeschützt ganz am Anfang des Skripts, vor jeder addEventListener-
+      Registrierung — hätte bei einem Fehler dort ebenfalls jeden Button
+      lahmgelegt. In try/catch gepackt.
+    2026-09-12 · v0.3 · Feature
+      Verknüpfung mit dem neuen Satelliten urlaub_anfrage.html: Sektion
+      "Offene Urlaubsanfragen" (liest bos_events, type: 'urlaub_anfrage'),
+      "Übernehmen" befüllt das bestehende Formular vor (Person muss
+      manuell gewählt werden — bosKontoId→Person weiterhin ungelöst,
+      siehe wunschtag.html). Erfolgreich übernommene Anfragen bekommen
+      EINE bewusste Ausnahme vom Append-only-Prinzip (uebernommenAm-Feld),
+      damit sie nicht dauerhaft als offen erscheinen. Dazu: Bestätigung
+      drucken (bos_druck.js) pro Urlaubs-Eintrag in der Liste.
+    2026-09-12 · 09:50 · v0.4 · Fix
+      Ulf: solche Fehlermeldungen künftig überall zeigen, nicht nur die
+      echte Meldung statt "fehlgeschlagen" konsole-only -- auf Tablet/
+      Handy ist Remote-Debugging umständlich. Alle Fehlermeldungen dieser
+      Datei zeigen jetzt err.message direkt in der UI.
+    2026-09-12 · 15:22 · v0.5 · Feature
+      Ulf: "die Kette müssen wir noch eingeben". oeffneFormularAusAnfrage()
+      erkennt jetzt automatisch, wenn das eingereichte Konto mit einer
+      Person verknüpft ist (bosKontoId), wählt sie im Personen-Dropdown
+      vor (sichtbarer Hinweis, weiterhin bestätigungspflichtig). Gleiche
+      Ergänzung auch in sonntagsplan.html (siehe dortiger Changelog).
+    2026-09-17 · 04:55 · v0.6 · Fix
+      Erster echter Code-Abgleich dieser Datei gegen ihre Doku (T-53,
+      Kompendium §5.4). Zwei davon mit Datenwirkung:
+      (A-1) Die Maske konnte STUMM hängenbleiben. Der Start lautete
+        ladePersonen().then(ladeListe) -- innerhalb eines then()-Callbacks,
+        dessen Ergebnis nicht zurückgegeben wurde, und ladePersonen()
+        selbst hatte kein .catch. Scheiterte der Lesezugriff auf 'personen'
+        (Rechte, Regeln, offline), war die Ablehnung unbehandelt: ladeListe
+        lief nie, das Personen-Dropdown blieb auf "Lade Personen …", die
+        Liste der Zeiträume auf "Lade …" -- und es erschien KEINE Meldung.
+        Das äussere .catch hing an der falschen Kette und griff nicht. Jetzt
+        hat jeder der drei Ladewege sein eigenes .catch mit sichtbarer
+        Meldung, und der Personen-Ladefehler schreibt zusätzlich in das
+        Dropdown selbst, damit man nicht auf eine Auswahl wartet, die nie
+        kommt.
+      (A-2) Doppelte Abwesenheiten beim Übernehmen einer Urlaubsanfrage.
+        Dort ist bearbeiteteId null, die Referenz war deshalb
+        collection('abwesenheiten').doc() -- bei JEDEM Klick eine neue
+        Zufalls-ID. Der Speicherweg ist zweistufig (1. Abwesenheit
+        schreiben, 2. uebernommenAm auf dem Antrag setzen). Scheiterte
+        Schritt 2, meldete derselbe catch "Speichern fehlgeschlagen",
+        obwohl Schritt 1 erfolgreich war -- und der naheliegende zweite
+        Klick legte einen ZWEITEN Eintrag an. Da es bewusst keine
+        Überlappungsprüfung gibt (§5.4), wäre das niemandem aufgefallen,
+        und der Rechen-Motor hätte denselben Urlaub doppelt gesehen. Jetzt:
+        die Doc-Referenz wird pro Formular-Vorgang EINMAL erzeugt und
+        festgehalten, ein zweiter Versuch schreibt in dasselbe Dokument;
+        und Schritt 2 hat eine eigene, zutreffende Meldung, die sagt, dass
+        der Zeitraum gespeichert ist und nur der Antrag noch als offen
+        stehen bleibt.
+      (B-7) "Drucken aktuell nicht möglich." sagte nicht, woran es liegt.
+      (C-3) formatKurz() ergab bei fehlendem Datum "NaN.NaN.NaN" (möglich
+        bei einer unvollständigen Anfrage aus bos_events).
+      (C-4) Das "vergangen"-Ausgrauen nutzte new Date().toISOString() --
+        also UTC. In der Nachtschicht, zwischen 00:00 und 02:00 Ortszeit,
+        war "heute" damit der Vortag und ein gestern beendeter Zeitraum
+        wurde nicht ausgegraut. Jetzt lokales Datum.
+      Ausserdem liefert fehlertext() jetzt Klartext; das Escaping passiert
+      dort, wo der Text in innerHTML landet -- vorher standen in den
+      alert()-Meldungen "&quot;" und "&amp;" statt der echten Zeichen.
+      Nicht geändert: die fehlende Überlappungsprüfung (bewusste
+      Entscheidung, §5.4) und das feste data-theme="dark" -- die
+      Theme-Anbindung war hier von Anfang an vorhanden (anders als T-77).
+    2026-09-17 · 05:01 · v0.7 · Korrektur (Gegen-Check)
+      C-4 war in dieser Datei nur zur Hälfte angekommen. Das
+      "vergangen"-Ausgrauen lief seit v0.6 über heuteLokalIso(), das
+      Ausstellungsdatum der gedruckten Urlaubsbestätigung aber weiter über
+      toISOString(). Eine zwischen 00:00 und 02:00 Ortszeit gedruckte
+      Bestätigung trug damit das Datum von gestern -- auf einem Papier,
+      das eine Kollegin in die Hand bekommt. Jetzt beide über denselben
+      Helfer; die nicht mehr gebrauchte Variable `heute` ist entfallen.
+    2026-09-26 · Schritt 5 (Namens-Fundament, K-7) · Umbau
+      Namen kommen aus bos_namen.js (Namensliste in Firestore, NE-6):
+      Rufname > Beschreibung > lokale Datei als Kürzel („M. · lokal“, nur
+      bis Schritt 8) > „P07 · kein Name hinterlegt“ — nie leer, nie
+      undefined. anzeigeName() ist nur noch ein Einzeiler auf
+      BOS_NAMEN.anzeige(); Auswahllisten zeigen „Rufname (Beschreibung)“
+      (NE-7, BOS_NAMEN.auswahl). Die Namensliste lädt einmal zusammen mit
+      den Personen (personenUndNamen()); ist sie nicht lesbar, steht der
+      Grund sichtbar oben. Die lokale Datei bleibt bis Schritt 8 Rückfall.
+      Anfragen zeigen den Namen der Person (über personId, sonst über das
+      verknüpfte Konto) statt des in der Anfrage gespeicherten (§10.3).
+    2026-09-26 · Schritt 8 (Namens-Fundament) · Rückbau
+      Die lokale Namensdatei ist in Rente: keine Einbindung von
+      bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei und kein Abschnitt „Lokale Namens-Datei“ mit „Datei laden“.
+      Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
+      Beschreibung > „P07 · kein Name hinterlegt“).
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:720px; margin:0 auto;}
+  .abschnitt-titel{ font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-sm,.82rem); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin: var(--bos-space-lg,22px) 0 var(--bos-space-xs,10px) var(--bos-space-3xs,4px); }
+  .abschnitt-titel:first-child{margin-top:0;}
+
+  .btn-klein{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.76rem); background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong); border-radius:8px; padding: 8px 12px; cursor:pointer; }
+  .btn-klein.amber{background:var(--amber); color:#1a1208; border-color:var(--amber);}
+
+  .ab-karte{ display:flex; align-items:flex-start; gap: var(--bos-space-sm,10px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .ab-karte.vergangen{opacity:.55;}
+  .ab-art{ font-size: var(--bos-font-xs,.7rem); font-family:var(--font-label); font-weight:800; text-transform:uppercase; letter-spacing:.03em; border-radius:6px; padding:3px 8px; flex-shrink:0; margin-top:2px; }
+  .ab-art.urlaub{background:rgba(76,175,125,.15); color:var(--good);}
+  .ab-art.krankheit{background:rgba(214,88,74,.15); color:var(--danger);}
+  .ab-art.sonstiges{background:var(--surface-2); color:var(--dim);}
+  .ab-info{flex:1; min-width:0;}
+  .ab-name{font-weight:700;}
+  .ab-zeitraum{font-size: var(--bos-font-sm,.85rem); color:var(--dim); font-family:var(--font-label);}
+  .ab-begruendung{font-size: var(--bos-font-sm,.82rem); color:var(--dim); margin-top:4px;}
+  .ab-aktionen{display:flex; gap: var(--bos-space-2xs,4px); flex-shrink:0;}
+
+  .anfrage-karte{ background:var(--surface); border:1px solid rgba(224,151,58,.4); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .anfrage-kopf{display:flex; align-items:center; justify-content:space-between; gap: var(--bos-space-sm,10px); flex-wrap:wrap;}
+  .anfrage-name{font-weight:700;}
+  .anfrage-zeitraum{font-size: var(--bos-font-sm,.85rem); color:var(--dim); font-family:var(--font-label);}
+  .anfrage-begruendung{font-size: var(--bos-font-sm,.82rem); color:var(--dim); margin-top:4px;}
+  .anfrage-eingereicht{font-size: var(--bos-font-xs,.72rem); color:var(--dim-2); margin-top:2px;}
+  .btn-uebernehmen{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.76rem); background:var(--amber); color:#1a1208; border:none; border-radius:8px; padding: 8px 12px; cursor:pointer; flex-shrink:0; }
+  .uebernahme-hinweis-box{ background:var(--amber-glow); border:1px solid var(--amber); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-sm,12px); font-size: var(--bos-font-sm,.85rem); }
+  .icon-btn{ background:transparent; border:none; color:var(--dim); font-size:1rem; padding: 2px 6px; cursor:pointer; }
+  .icon-btn:hover{ color:var(--danger); }
+
+  .leer-hinweis, .lade-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+
+  .formular{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-md,16px); display:none; }
+  .formular.offen{display:block;}
+  .feld{margin-bottom: var(--bos-space-sm,14px);}
+  .feld label{display:block; margin-bottom: var(--bos-space-2xs,6px);}
+  .zwei-spalten{display:grid; grid-template-columns:1fr 1fr; gap: var(--bos-space-sm,10px);}
+  .formular-aktionen{display:flex; gap: var(--bos-space-xs,8px); margin-top: var(--bos-space-md,16px);}
+  .formular-aktionen .btn-klein{flex:1; text-align:center; padding: var(--bos-space-sm,12px);}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:720px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_abwesenheiten';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Krankheit / Ausfall / Urlaub</h1>
+</header>
+
+<main>
+  <div class="abschnitt-titel">Offene Urlaubsanfragen</div>
+  <div id="anfragenListe"><div class="lade-hinweis">Lade …</div></div>
+
+  <div class="abschnitt-titel">Eingetragene Zeiträume</div>
+  <div id="liste"><div class="lade-hinweis">Lade …</div></div>
+  <button type="button" class="btn-klein amber" id="neuBtn" style="margin-top:10px; width:100%; padding:12px;">+ Zeitraum eintragen</button>
+
+  <div class="abschnitt-titel">Eintragen / Bearbeiten</div>
+  <div id="uebernahmeHinweis"></div>
+  <div class="formular" id="formular">
+    <div class="feld">
+      <label class="bos-label" for="fPerson">Person</label>
+      <select class="bos-input" id="fPerson"><option value="">Lade Personen …</option></select>
+    </div>
+    <div class="feld">
+      <label class="bos-label" for="fArt">Art</label>
+      <select class="bos-input" id="fArt">
+        <option value="urlaub">Urlaub</option>
+        <option value="krankheit">Krankheit</option>
+        <option value="sonstiges">Sonstiger Ausfall</option>
+      </select>
+    </div>
+    <div class="feld zwei-spalten">
+      <div>
+        <label class="bos-label" for="fVon">Von</label>
+        <input type="date" class="bos-input" id="fVon">
+      </div>
+      <div>
+        <label class="bos-label" for="fBis">Bis</label>
+        <input type="date" class="bos-input" id="fBis">
+      </div>
+    </div>
+    <div class="feld">
+      <label class="bos-label" for="fBegruendung">Begründung (optional)</label>
+      <textarea class="bos-input" id="fBegruendung" rows="2"></textarea>
+    </div>
+    <div class="formular-aktionen">
+      <button type="button" class="btn-klein" id="abbrechenBtn">Abbrechen</button>
+      <button type="button" class="btn-klein amber" id="speichernBtn">Speichern</button>
+    </div>
+  </div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert dieses Werkzeug?</h2>
+    <p>Nur du trägst hier ein — keine Selbst-Einreichung durch Kollegen. Ein Eintrag ist ein Zeitraum (von–bis), in dem eine Person nicht einsetzbar ist, mit einer Art: Urlaub, Krankheit oder sonstiger Ausfall.</p>
+    <p>Namen kommen aus derselben lokalen Datei wie im Personen- und Positionen-Editor — ohne sie zeigt die Liste nur IDs.</p>
+    <p>Einträge lassen sich jederzeit bearbeiten oder löschen, z. B. bei einer verlängerten Krankschreibung oder einem Tippfehler.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var ART_LABEL = { urlaub: 'Urlaub', krankheit: 'Krankheit', sonstiges: 'Sonstiges' };
+  var personenListe = [];
+  var alleEintraege = [];
+  var bearbeiteteId = null;
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  // Zeigt die echte Fehlermeldung an, nicht nur "fehlgeschlagen" -- auf
+  // Tablet/Handy ist Remote-Debugging umständlich, das hier hilft sofort
+  // weiter (Ulf, 12.09.2026, siehe SCHICHTPLANER_V2_BAUSTELLEN.md).
+  // Liefert KLARTEXT. Vorher lief hier escHtml() mit drin, wodurch in den
+  // alert()-Meldungen "&quot;" statt " stand. Escaping passiert jetzt dort,
+  // wo der Text in innerHTML landet.
+  function fehlertext(err) { return (err && err.message) || String(err); }
+  // Schritt 5 (Namens-Fundament, 26.09.2026): EINE Namensfunktion für alle
+  // Planungsseiten — bos_namen.js (Rufname > Beschreibung > lokal als
+  // Kürzel > "P07 · kein Name hinterlegt"). Die frühere eigene Kopie, die
+  // Vor- und Nachname aus der lokalen Datei zusammensetzte, ist entfernt.
+  function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
+  // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
+  function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
+  // Personen UND Namensliste zusammen laden; liefert wie vorher den
+  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  function personenUndNamen() {
+    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
+      .then(function (r) { return r[0]; });
+  }
+  function formatKurz(iso) {
+    // Fehlendes/kaputtes Datum ergab vorher "NaN.NaN.NaN" (C-3) -- möglich
+    // bei einer unvollständigen Anfrage aus bos_events.
+    if (!iso) return '— kein Datum —';
+    var d = new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return '— ungültiges Datum (' + iso + ') —';
+    return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+  }
+  // LOKALES Datum, nicht toISOString() -- das rechnet nach UTC um. Diese
+  // Maske wird in der Nachtschicht bedient; zwischen 00:00 und 02:00
+  // Ortszeit lieferte die UTC-Fassung den VORTAG (C-4).
+  function heuteLokalIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* ==== Personen für den Picker ==== */
+  // Gibt eine Promise zurück, die NICHT ablehnt: der Fehler wird hier
+  // behandelt und sichtbar gemacht. Vorher konnte eine Ablehnung dieser
+  // Kette unbehandelt verschwinden, weil der Aufrufer das Ergebnis nicht
+  // zurückgab -- Folge war eine Maske, die ewig "Lade …" anzeigte und
+  // nichts meldete (A-1, 17.09.2026).
+  function ladePersonen() {
+    return personenUndNamen().then(function (snap) {
+      personenListe = [];
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        if (d.aktiv !== false) personenListe.push(Object.assign({ id: doc.id }, d));
+      });
+      personenListe.sort(function (a, b) { return anzeigeName(a.id).localeCompare(anzeigeName(b.id), 'de'); });
+      var sel = document.getElementById('fPerson');
+      var aktuell = sel.value;
+      sel.innerHTML = '<option value="">— Person wählen —</option>' +
+        personenListe.map(function (p) { return '<option value="' + p.id + '">' + escHtml(auswahlName(p.id)) + '</option>'; }).join('');
+      if (aktuell) sel.value = aktuell;
+    }).catch(function (err) {
+      console.error('[Abwesenheiten] Personen-Lesefehler:', err);
+      // Die Meldung gehört in das Dropdown selbst -- sonst wartet man auf
+      // eine Auswahl, die nie kommt.
+      var sel = document.getElementById('fPerson');
+      sel.innerHTML = '<option value="">— Personen konnten nicht geladen werden —</option>';
+      document.getElementById('uebernahmeHinweis').innerHTML =
+        '<div class="uebernahme-hinweis-box">Die Personenliste konnte nicht geladen werden: ' +
+        escHtml(fehlertext(err)) + '<br>Ohne sie lässt sich kein Zeitraum eintragen.</div>';
+    });
+  }
+
+  /* ==== Liste laden/rendern ==== */
+  function ladeListe() {
+    var box = document.getElementById('liste');
+    box.innerHTML = '<div class="lade-hinweis">Lade …</div>';
+    window.db.collection('abwesenheiten').get().then(function (snap) {
+      alleEintraege = [];
+      snap.forEach(function (doc) { alleEintraege.push(Object.assign({ id: doc.id }, doc.data())); });
+      alleEintraege.sort(function (a, b) { return (b.von || '').localeCompare(a.von || ''); });
+      renderListe();
+    }).catch(function (err) {
+      console.error('[Abwesenheiten] Lesefehler:', err);
+      box.innerHTML = '<div class="lade-hinweis">Laden fehlgeschlagen: ' + escHtml(fehlertext(err)) + '</div>';
+    });
+  }
+
+  /* ==== Offene Urlaubsanfragen (aus urlaub_anfrage.html) ==== */
+  function millis(ts) { return (ts && typeof ts.toMillis === 'function') ? ts.toMillis() : 0; }
+
+  function ladeUrlaubsanfragen() {
+    var box = document.getElementById('anfragenListe');
+    box.innerHTML = '<div class="lade-hinweis">Lade …</div>';
+    window.db.collection('bos_events').where('type', '==', 'urlaub_anfrage').get().then(function (snap) {
+      var alle = [];
+      snap.forEach(function (doc) { alle.push(Object.assign({ id: doc.id }, doc.data())); });
+      // Nur offene (nicht übernommene) anzeigen -- übernommenAm ist die
+      // bewusste, einzige Ausnahme vom Append-only-Prinzip hier, siehe
+      // Kommentar beim Speichern-Handler.
+      var offen = alle.filter(function (a) { return !a.uebernommenAm; });
+      offen.sort(function (a, b) { return millis(b.eingereichtAm) - millis(a.eingereichtAm); });
+      renderAnfragenListe(offen);
+    }).catch(function (err) {
+      console.error('[Abwesenheiten] Anfragen-Lesefehler:', err);
+      box.innerHTML = '<div class="lade-hinweis">Laden fehlgeschlagen: ' + escHtml(fehlertext(err)) + '</div>';
+    });
+  }
+
+  function renderAnfragenListe(anfragen) {
+    var box = document.getElementById('anfragenListe');
+    if (!anfragen.length) { box.innerHTML = '<div class="leer-hinweis">Keine offenen Anfragen.</div>'; return; }
+    box.innerHTML = anfragen.map(function (a) {
+      var eingereicht = millis(a.eingereichtAm) ? new Date(millis(a.eingereichtAm)).toLocaleDateString('de-DE') : '';
+      return '<div class="anfrage-karte" data-id="' + a.id + '">' +
+        '<div class="anfrage-kopf">' +
+        '<div><span class="anfrage-name">' + escHtml(window.BOS_NAMEN.anzeigeEinreichung(a, personenListe)) + '</span>' +
+        '<div class="anfrage-zeitraum">' + formatKurz(a.von) + ' – ' + formatKurz(a.bis) + '</div></div>' +
+        '<button type="button" class="btn-uebernehmen" data-uebernehmen="' + a.id + '">Übernehmen</button>' +
+        '</div>' +
+        (a.begruendung ? '<div class="anfrage-begruendung">' + escHtml(a.begruendung) + '</div>' : '') +
+        (eingereicht ? '<div class="anfrage-eingereicht">Eingereicht ' + eingereicht + '</div>' : '') +
+        '</div>';
+    }).join('');
+    box.querySelectorAll('[data-uebernehmen]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        oeffneFormularAusAnfrage(anfragen.find(function (a) { return a.id === btn.dataset.uebernehmen; }));
+      });
+    });
+  }
+
+  function renderListe() {
+    var box = document.getElementById('liste');
+    if (!alleEintraege.length) { box.innerHTML = '<div class="leer-hinweis">Noch keine Einträge.</div>'; return; }
+    var heuteIso = heuteLokalIso();
+    box.innerHTML = alleEintraege.map(function (e) {
+      var vergangen = e.bis && e.bis < heuteIso;
+      var druckBtn = e.grund === 'urlaub' ? '<button type="button" class="icon-btn" data-drucken="' + e.id + '" title="Bestätigung drucken">🖨</button>' : '';
+      return '<div class="ab-karte' + (vergangen ? ' vergangen' : '') + '">' +
+        '<span class="ab-art ' + e.grund + '">' + (ART_LABEL[e.grund] || e.grund) + '</span>' +
+        '<div class="ab-info">' +
+        '<div class="ab-name">' + escHtml(anzeigeName(e.personId)) + '</div>' +
+        '<div class="ab-zeitraum">' + formatKurz(e.von) + ' – ' + formatKurz(e.bis) + '</div>' +
+        (e.begruendung ? '<div class="ab-begruendung">' + escHtml(e.begruendung) + '</div>' : '') +
+        '</div>' +
+        '<div class="ab-aktionen">' +
+        druckBtn +
+        '<button type="button" class="icon-btn" data-edit="' + e.id + '" title="Bearbeiten">✎</button>' +
+        '<button type="button" class="icon-btn" data-loeschen="' + e.id + '" title="Löschen">×</button>' +
+        '</div></div>';
+    }).join('');
+    box.querySelectorAll('[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () { oeffneFormular(alleEintraege.find(function (e) { return e.id === btn.dataset.edit; })); });
+    });
+    box.querySelectorAll('[data-loeschen]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('Diesen Eintrag wirklich löschen?')) return;
+        window.db.collection('abwesenheiten').doc(btn.dataset.loeschen).delete().then(function () {
+          alleEintraege = alleEintraege.filter(function (e) { return e.id !== btn.dataset.loeschen; });
+          renderListe();
+        }).catch(function (err) { console.error('[Abwesenheiten] Löschfehler:', err); alert('Löschen fehlgeschlagen: ' + fehlertext(err)); });
+      });
+    });
+    box.querySelectorAll('[data-drucken]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        druckeBestaetigung(alleEintraege.find(function (e) { return e.id === btn.dataset.drucken; }));
+      });
+    });
+  }
+
+  /* ==== Bestätigung drucken ==== */
+  function druckeBestaetigung(eintrag) {
+    if (!eintrag) { alert('Drucken nicht möglich: der Eintrag ist in der geladenen Liste nicht mehr zu finden. Seite neu laden.'); return; }
+    if (!window.BOS_DRUCK) { alert('Drucken nicht möglich: bos_druck.js ist nicht geladen (fehlt im Root-Ordner oder falscher Pfad).'); return; }
+    // Ausstellungsdatum über heuteLokalIso(), nicht über toISOString() --
+    // diese Stelle war beim C-4-Durchgang übersehen worden (gefunden im
+    // Gegen-Check, 17.09.2026). Eine zwischen 00:00 und 02:00 gedruckte
+    // Bestätigung trug sonst das Datum von gestern, und zwar auf einem
+    // Papier, das eine Kollegin in die Hand bekommt.
+    var inhalt =
+      '<p>Hiermit wird bestätigt, dass</p>' +
+      '<p style="font-size:16pt; font-weight:700; margin:6mm 0;">' + escHtml(anzeigeName(eintrag.personId)) + '</p>' +
+      '<p>im Zeitraum vom <b>' + formatKurz(eintrag.von) + '</b> bis <b>' + formatKurz(eintrag.bis) + '</b> Urlaub hat.</p>' +
+      (eintrag.begruendung ? '<p style="color:#666;">Notiz: ' + escHtml(eintrag.begruendung) + '</p>' : '') +
+      '<p style="margin-top:14mm;">Ausgestellt am ' + formatKurz(heuteLokalIso()) + '</p>' +
+      '<p style="margin-top:14mm; border-top:1px solid #999; width:70mm; padding-top:2mm;">Unterschrift Vorgesetzte/r</p>';
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: inhalt,
+      appName: 'Krankheit / Ausfall / Urlaub',
+      titel: 'Urlaubsbestätigung',
+      mitKopf: true,
+      farbig: true
+    });
+  }
+
+  /* ==== Formular ==== */
+  var uebernehmeAnfrageId = null; // gesetzt, wenn das Formular aus einer Urlaubsanfrage vorbefüllt wurde
+  // Die Doc-ID für einen NEUEN Eintrag wird pro Formular-Vorgang genau
+  // einmal erzeugt und hier festgehalten. Vorher entstand bei jedem Klick
+  // auf Speichern eine neue Zufalls-ID -- ein zweiter Versuch nach einer
+  // Fehlermeldung legte deshalb einen ZWEITEN Eintrag an, statt den ersten
+  // zu überschreiben (A-2, 17.09.2026). Zusammen mit der bewusst fehlenden
+  // Überlappungsprüfung (§5.4) wäre das unbemerkt geblieben.
+  var neueEintragId = null;
+
+  function formularZuruecksetzen() {
+    uebernehmeAnfrageId = null;
+    neueEintragId = null;
+    document.getElementById('uebernahmeHinweis').innerHTML = '';
+  }
+
+  function oeffneFormular(eintrag) {
+    uebernehmeAnfrageId = null;
+    neueEintragId = null;
+    document.getElementById('uebernahmeHinweis').innerHTML = '';
+    bearbeiteteId = eintrag ? eintrag.id : null;
+    document.getElementById('fPerson').value = eintrag ? eintrag.personId : '';
+    document.getElementById('fArt').value = eintrag ? eintrag.grund : 'urlaub';
+    document.getElementById('fVon').value = eintrag ? eintrag.von : '';
+    document.getElementById('fBis').value = eintrag ? eintrag.bis : '';
+    document.getElementById('fBegruendung').value = eintrag ? (eintrag.begruendung || '') : '';
+    document.getElementById('formular').classList.add('offen');
+    document.getElementById('formular').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function oeffneFormularAusAnfrage(anfrage) {
+    bearbeiteteId = null;
+    neueEintragId = null;
+    uebernehmeAnfrageId = anfrage.id;
+    // Automatische Vorauswahl über bosKontoId, falls die Person im
+    // Personen-Editor verknüpft ist (Ulf, 12.09.2026: "die Kette müssen
+    // wir noch eingeben") -- ersetzt NICHT die manuelle Prüfung, nur
+    // eine Vorauswahl, die man bestätigt oder ändert.
+    var erkanntePerson = anfrage.bosKontoId ? personenListe.find(function (p) { return p.bosKontoId && p.bosKontoId === anfrage.bosKontoId; }) : null;
+    document.getElementById('fPerson').value = erkanntePerson ? erkanntePerson.id : '';
+    document.getElementById('fArt').value = 'urlaub';
+    document.getElementById('fVon').value = anfrage.von;
+    document.getElementById('fBis').value = anfrage.bis;
+    document.getElementById('fBegruendung').value = anfrage.begruendung || '';
+    document.getElementById('uebernahmeHinweis').innerHTML = erkanntePerson
+      ? '<div class="uebernahme-hinweis-box">Aus Antrag von <b>' + escHtml(window.BOS_NAMEN.anzeigeEinreichung(anfrage, personenListe)) + '</b> übernommen — Konto verknüpft mit <b>' + escHtml(anzeigeName(erkanntePerson.id)) + '</b>, oben vorausgewählt. Bitte prüfen.</div>'
+      : '<div class="uebernahme-hinweis-box">Aus Antrag von <b>' + escHtml(window.BOS_NAMEN.anzeigeEinreichung(anfrage, personenListe)) + '</b> übernommen — bitte oben die passende Person auswählen, kein verknüpftes Konto gefunden.</div>';
+    document.getElementById('formular').classList.add('offen');
+    document.getElementById('formular').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  document.getElementById('neuBtn').addEventListener('click', function () { oeffneFormular(null); });
+  document.getElementById('abbrechenBtn').addEventListener('click', function () {
+    document.getElementById('formular').classList.remove('offen');
+    formularZuruecksetzen();
+  });
+
+  document.getElementById('speichernBtn').addEventListener('click', function () {
+    var personId = document.getElementById('fPerson').value;
+    var von = document.getElementById('fVon').value;
+    var bis = document.getElementById('fBis').value;
+    if (!personId) { alert('Bitte eine Person wählen.'); return; }
+    if (!von || !bis) { alert('Bitte Von- und Bis-Datum angeben.'); return; }
+    if (bis < von) { alert('„Bis" liegt vor „Von" — bitte prüfen.'); return; }
+
+    var daten = {
+      personId: personId,
+      grund: document.getElementById('fArt').value,
+      von: von,
+      bis: bis,
+      bindend: true,
+      begruendung: document.getElementById('fBegruendung').value.trim(),
+      bearbeitetAm: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    var btn = document.getElementById('speichernBtn');
+    btn.disabled = true; btn.textContent = 'Speichert …';
+
+    // ID einmal festlegen und behalten -- ein zweiter Speicherversuch nach
+    // einer Fehlermeldung schreibt damit in DASSELBE Dokument statt ein
+    // zweites anzulegen (A-2).
+    if (!bearbeiteteId && !neueEintragId) neueEintragId = window.db.collection('abwesenheiten').doc().id;
+    var eintragId = bearbeiteteId || neueEintragId;
+    var ref = window.db.collection('abwesenheiten').doc(eintragId);
+    if (!bearbeiteteId) daten.erstelltAm = firebase.firestore.FieldValue.serverTimestamp();
+
+    ref.set(daten, { merge: true }).then(function () {
+      // Schritt 1 ist durch. Schritt 2 ist die bewusste, dokumentierte
+      // Ausnahme vom Append-only-Prinzip bei Urlaubsanfragen: NUR dieses
+      // eine Feld, NUR damit eine übernommene Anfrage nicht dauerhaft als
+      // "offen" stehen bleibt.
+      // Eigener catch: ein Fehlschlag HIER darf nicht als "Speichern
+      // fehlgeschlagen" gemeldet werden -- der Zeitraum steht dann bereits
+      // in Firestore, und wer daraufhin erneut speichert, hat sonst zwei
+      // Einträge (A-2).
+      if (!uebernehmeAnfrageId) return null;
+      return window.db.collection('bos_events').doc(uebernehmeAnfrageId)
+        .update({ uebernommenAm: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function () { return null; })
+        .catch(function (err) {
+          console.error('[Abwesenheiten] Antrag konnte nicht als übernommen markiert werden:', err);
+          return err;
+        });
+    }).then(function (antragsFehler) {
+      btn.disabled = false; btn.textContent = 'Speichern';
+      document.getElementById('formular').classList.remove('offen');
+      formularZuruecksetzen();
+      bearbeiteteId = null;
+      ladeListe();
+      ladeUrlaubsanfragen();
+      if (antragsFehler) {
+        alert('Der Zeitraum IST gespeichert (' + eintragId + ').\n\n' +
+              'Nur der Urlaubsantrag konnte nicht als übernommen markiert werden: ' + fehlertext(antragsFehler) + '\n\n' +
+              'Folge: der Antrag steht weiter unter "Offene Urlaubsanfragen". Nicht noch einmal speichern — ' +
+              'der Zeitraum wäre sonst doppelt eingetragen. Den Antrag später erneut übernehmen oder stehen lassen.');
+      }
+    }).catch(function (err) {
+      console.error('[Abwesenheiten] Schreibfehler:', err);
+      btn.disabled = false; btn.textContent = 'Speichern';
+      alert('Speichern fehlgeschlagen — der Zeitraum wurde NICHT gespeichert: ' + fehlertext(err) + '\n\n' +
+            'Erneutes Speichern legt keinen zweiten Eintrag an.');
+    });
+  });
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen'); });
+
+  /* ==== Start ==== */
+  // ladePersonen() lehnt nicht mehr ab (eigenes .catch), und das Ergebnis
+  // wird zurückgegeben statt fallengelassen -- vorher konnte eine Ablehnung
+  // hier unbehandelt verschwinden und die Maske hing stumm (A-1).
+  function starte() {
+    return ladePersonen().then(ladeListe).then(ladeUrlaubsanfragen).catch(function (err) {
+      console.error('[Abwesenheiten] Start fehlgeschlagen:', err);
+      document.getElementById('liste').innerHTML =
+        '<div class="lade-hinweis">Die Maske konnte nicht geladen werden: ' + escHtml(fehlertext(err)) + '</div>';
+    });
+  }
+  (window.BOS_AUTH_READY || Promise.resolve()).then(starte, function (err) {
+    console.error('[Abwesenheiten] Anmeldung nicht bestätigt, Laden wird trotzdem versucht:', err);
+    return starte();
+  });
+
+})();
+</script>
+</body>
+</html>

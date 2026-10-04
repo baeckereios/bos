@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
+  CHANGELOG
+    2026-09-29 · 19:45 · v-ausTeig-1 · Feature
+      Neues Feld „Aus Teig“ (ausTeig) im Reiter Backinformationen: Auswahl
+      aus den Teigen der Teigecke. Die Liste liest der Editor mit seiner
+      normalen Anmeldung aus Firestore teigecke_teige (Leseregel hatKonto(),
+      keine Regeländerung). Klappt das Lesen nicht, bleibt der bisherige
+      Wert stehen und die echte Fehlermeldung steht am Feld — kein Freitext,
+      damit kein Tippfehler zur Kennung wird. Siehe
+      SESSION_2026-09-29_TEIGECKE_STUFE2_BAU.md.
+    2026-09-28 · 10:33 · v-schluessel-1 · Fix
+      Doppelte Produkt-Schlüssel (legacyKey) bei Neuanlage. neuesProdukt()
+      vergab bisher slugify('neues_produkt_' + (daten.length + 1)); nach
+      einem Löschen ergab das denselben Schlüssel zweimal (Funktionsprobe
+      Kontroll-Chat: zweimal neues_produkt_88_stueck), und der Sync hat das
+      zweite Produkt still über das erste geschrieben.
+      Jetzt: „+ Produkt“ fragt zuerst den Namen, der Schlüssel entsteht aus
+      dem Namen (slugify, Endung _stueck wie alle bestehenden Schlüssel).
+      Existiert er schon — in der Liste ODER als in dieser Sitzung
+      gelöschter Schlüssel —, kommt ein Zähler vor die Endung
+      (name_2_stueck, name_3_stueck …). Abbrechen oder leerer Name legt
+      nichts an. Zusätzlich: Warnleiste unter der Werkzeugleiste, sobald die
+      geladene bzw. bearbeitete Liste doppelte Schlüssel enthält (nennt sie
+      beim Namen), auch beim Herunterladen noch einmal in der Statuszeile.
+      Siehe SESSION_2026-09-28_TEIGECKEN_STUFE1_BAU.md, Teil B.
+    (davor) kein Datei-Changelog — Geschichte in PRODUKT_CONFIG_EDITOR_DOKU.md
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Produkt-Config Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+
+<!-- Zentrale BOS-Design-Tokens — existiert bereits im Repo-Root, war hier
+     bisher nur nie eingebunden. Siehe SESSION_2026-08-28_DESIGN_TOKENS_
+     KONSOLIDIERUNG.md. -->
+<!-- Theme-Sync: liest das Profil-Theme aus dem Launcher-State, MUSS vor
+     bos_design_tokens.css stehen (siehe bos_theme_sync.js, Kopf-Kommentar) -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --amber: var(--bos-amber, #c07a10);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --red: var(--bos-red, #d6584a);
+    --green: var(--bos-green, #4caf7d);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --font: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+  }
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family:'Barlow', sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:60px; }
+
+  header {
+    background:var(--surface); padding:14px 18px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20;
+  }
+  header h1 { font-family:'Fraunces', serif; font-size:1.1rem; }
+  header .meta { font-size:.72rem; color:var(--dim); text-align:right; }
+
+  .toolbar {
+    background:var(--surface); border-bottom:1px solid var(--border);
+    padding:10px 14px; display:flex; flex-wrap:wrap; gap:7px; align-items:center;
+    position:sticky; top:53px; z-index:19;
+  }
+  .btn {
+    font-family:var(--font); font-size:.72rem; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; border:none; border-radius:7px; padding:8px 12px; cursor:pointer;
+  }
+  .btn-amber { background:var(--amber); color:#1a1710; }
+  .btn-green { background:var(--green); color:#132018; }
+  .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+  .toolbar .sep { width:1px; height:24px; background:var(--border); }
+  #suchfeld {
+    font-family:var(--font); font-size:.75rem; background:var(--surface); color:var(--text);
+    border:1px solid var(--border); border-radius:6px; padding:7px 9px; width:180px;
+  }
+  #statusBar { font-size:.72rem; color:var(--dim); margin-left:auto; }
+  #statusBar.ok { color:var(--green); }
+  #statusBar.err { color:var(--red); }
+
+  #uploadZone {
+    margin:26px auto; max-width:480px; border:2px dashed var(--border); border-radius:12px;
+    padding:34px; text-align:center; color:var(--dim); font-size:.85rem; cursor:pointer;
+  }
+  #uploadZone:hover, #uploadZone.drag { border-color:var(--amber); color:var(--text); }
+  #uploadZone .icon { font-size:2.2rem; margin-bottom:10px; }
+  #fileInput { display:none; }
+
+  #tabellen { padding:0 0 30px; }
+
+  .prod-tabelle { width:100%; border-collapse:collapse; }
+  .prod-tabelle thead th {
+    background:var(--surface); color:var(--dim); font-size:.62rem; letter-spacing:.05em;
+    text-transform:uppercase; padding:6px 6px; text-align:left; border-bottom:1px solid var(--border);
+  }
+  .prod-tabelle tbody tr { border-bottom:1px solid var(--border); }
+  .prod-tabelle tbody tr.fehlt-fz { background:rgba(224,101,95,.08); }
+  .prod-tabelle td { padding:8px 6px; vertical-align:middle; font-size:.78rem; }
+  .legacy-readonly { font-size:.65rem; color:var(--dim); font-family:monospace; }
+
+  .col-artnr{width:70px;} .col-name{width:200px;}
+  .col-spb{width:60px;} .col-einheit{width:90px;} .col-legacy{width:150px;}
+  .col-fz{width:110px;} .col-hinweis{min-width:100px;} .col-del{width:32px;text-align:center;}
+
+  .prod-tabelle tbody tr.klickbar { cursor:pointer; }
+  .prod-tabelle tbody tr.klickbar:hover td { background:rgba(255,255,255,.03); }
+  .prod-tabelle tbody tr.klickbar td { color:var(--text); }
+
+  .detail-section { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:18px 24px; padding:16px 0; border-bottom:1px solid var(--border); }
+  .detail-section.full { grid-template-columns:1fr; }
+  .detail-section.two { grid-template-columns:1fr 1fr; }
+  .detail-section:last-child { border-bottom:none; }
+  .detail-feld { display:flex; flex-direction:column; gap:6px; }
+  .detail-feld label { font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--amber); font-weight:700; }
+  .detail-feld select, .detail-feld input {
+    background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text);
+    padding:12px 14px; font-size:.95rem; font-family:'Barlow',sans-serif; width:100%; min-height:var(--bos-tap-min,44px);
+  }
+  .backtage-buttons { display:flex; gap:8px; flex-wrap:wrap; }
+  .bt-btn {
+    font-family:var(--font); font-size:.8rem; font-weight:700; padding:10px 16px; border-radius:7px;
+    cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--dim);
+  }
+  .bt-btn.aktiv { background:var(--amber); border-color:var(--amber); color:#1a1710; }
+
+  .btn-del {
+    background:none; border:1px solid var(--border); color:var(--dim); font-size:.75rem;
+    width:24px; height:24px; border-radius:5px; cursor:pointer;
+  }
+  .btn-del:hover { background:var(--red); border-color:var(--red); color:#1a1710; }
+
+  /* ── Kategorie-Tab-Leiste (ersetzt die frühere Akkordeon-Liste, siehe
+       SESSION_2026-09-04_PRODUKTKARTE_KONZEPT.md) ── */
+  .tab-leiste {
+    display:flex; gap:6px; overflow-x:auto; padding:10px 14px;
+    background:var(--surface); border-bottom:1px solid var(--border);
+    position:sticky; top:100px; z-index:18; -webkit-overflow-scrolling:touch;
+  }
+  .tab-leiste::-webkit-scrollbar { display:none; }
+  .tab-btn {
+    font-family:var(--font); font-size:var(--bos-font-xs,.72rem); font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; padding:var(--bos-space-2xs,7px) var(--bos-space-sm,13px); border-radius:8px;
+    border:1px solid var(--border); background:transparent; color:var(--dim);
+    white-space:nowrap; cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:5px;
+  }
+  .tab-btn .anzahl { color:var(--amber); font-size:.68rem; }
+  .tab-btn.aktiv { border-color:var(--amber); color:var(--text); box-shadow:inset 0 -3px 0 var(--amber); }
+
+  /* ── Produkt-Karte: Klick auf eine Zeile öffnet dies statt der früheren
+       Inline-Detail-Zeile. Eine Bearbeitungsstelle statt zwei.
+       Bewusst zentriertes Pop-up statt Bottom-Sheet (Ulf, 04.09.2026):
+       am unteren Bildschirmrand kollidierte es mit der Tastatur beim
+       Tippen in ein Feld, außerdem rein optisch nicht gewünscht. Das
+       Hilfe-Sheet (#helpSheet) bleibt bewusst unverändert als Bottom-Sheet
+       — dort tippt man nicht, also keine Tastatur-Kollision, und es ist
+       ein etabliertes, an anderer Stelle wiederverwendetes Muster. ── */
+  #karteOverlay { align-items:center; justify-content:center; padding:18px; }
+  .karte-sheet {
+    background:var(--surface); width:100%; max-width:760px; height:min(720px,84vh); overflow:hidden;
+    display:flex; flex-direction:column; border-radius:18px; border:1px solid var(--border);
+    box-shadow:0 20px 56px rgba(0,0,0,.6);
+  }
+  .karte-kopf { display:flex; align-items:center; gap:14px; padding:22px 26px 16px; flex-shrink:0; }
+  .karte-nav-btn {
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    width:44px; height:44px; min-width:44px; border-radius:50%; font-size:1.4rem; cursor:pointer; flex-shrink:0;
+  }
+  .karte-nav-btn:disabled { opacity:.3; cursor:not-allowed; }
+  .karte-titel { flex:1; text-align:center; overflow:hidden; min-width:0; }
+  .karte-name { font-family:'Fraunces',serif; font-size:1.55rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .karte-key { font-size:.72rem; color:var(--dim); font-family:monospace; margin-top:4px; }
+  .karte-close { background:none; border:none; color:var(--dim); font-size:1.4rem; cursor:pointer; flex-shrink:0; padding:8px; }
+  .karte-tabs { display:flex; gap:8px; padding:0 26px 18px; overflow-x:auto; flex-shrink:0; }
+  .karte-tabs::-webkit-scrollbar { display:none; }
+  .karte-tab-btn {
+    font-family:var(--font); font-size:.85rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    padding:11px 20px; border-radius:9px; border:1px solid var(--border); background:transparent;
+    color:var(--dim); white-space:nowrap; cursor:pointer; flex-shrink:0;
+  }
+  .karte-tab-btn.aktiv { background:var(--amber); border-color:var(--amber); color:#1a1710; }
+  .karte-body { overflow-y:auto; padding:8px 26px 34px; flex:1; }
+  .karte-legacy { padding:16px 0 0; font-size:.74rem; color:var(--dim); font-family:monospace; }
+
+  #saveBanner {
+    display:none; position:fixed; bottom:16px; right:16px; left:16px; max-width:480px; margin:0 auto;
+    background:var(--green); color:#132018; padding:12px 18px; border-radius:10px; font-size:.8rem;
+    font-weight:700; box-shadow:0 4px 20px rgba(0,0,0,.5); cursor:pointer; text-align:center;
+  }
+  #leerZustand { text-align:center; padding:50px 20px; color:var(--dim); font-size:.85rem; }
+
+  .help-btn {
+    width:auto; background:transparent; border:1px solid var(--border);
+    color:var(--amber); padding:6px 11px; border-radius:8px; font-size:1rem; cursor:pointer;
+  }
+  .feld-hilfe-btn {
+    background:none; border:none; color:var(--amber); font-size:.72rem; cursor:pointer;
+    padding:0 0 0 4px; vertical-align:middle; opacity:.85;
+  }
+  .feld-hilfe-btn:hover { opacity:1; }
+  .detail-feld label { display:flex; align-items:center; gap:2px; }
+  .checkbox-feld { display:flex; align-items:center; gap:12px; flex-direction:row !important; padding:4px 0; }
+  .checkbox-feld input[type=checkbox] { width:24px; height:24px; accent-color:var(--amber); cursor:pointer; margin:0; flex-shrink:0; }
+  .checkbox-feld .cb-label { font-size:.92rem; color:var(--text); text-transform:none; letter-spacing:0; font-weight:400; }
+  .sheet-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:50; display:flex; align-items:flex-end; }
+  /* Hilfe-Sheet kann auch AUS der Produkt-Karte heraus geöffnet werden (❓-Buttons pro
+     Feld) — muss deshalb immer über der Karte liegen, sonst landet es optisch dahinter
+     und wirkt durch den Karten-Overlay-Hintergrund ausgegraut. Bug, 04.09.2026 behoben. */
+  #helpSheet { z-index:70; }
+  .sheet { background:var(--surface); width:100%; max-height:85vh; overflow-y:auto; border-radius:18px 18px 0 0; padding:14px 20px 24px; border-top:1px solid var(--border); }
+  .sheet-handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 14px; }
+  .sheet h2 { font-family:'Fraunces', serif; font-size:1.15rem; margin:0 0 14px; }
+  .sheet .sec { margin-bottom:16px; }
+  .sheet .sec h3 { font-size:.9rem; color:var(--amber); margin:0 0 4px; }
+  .sheet .sec p { font-size:.87rem; color:var(--text); line-height:1.5; margin:0; }
+  .sheet button.secondary { background:transparent; border:1px solid var(--amber); color:var(--amber); margin-top:6px; padding:10px 16px; border-radius:8px; }
+  .hidden { display:none !important; }
+  .readonly-wert { font-size:.85rem; color:var(--text-dim); padding:6px 0; } /* NEU 29.09.2026, Feld „Aus Teig“ */
+  /* NEU 28.09.2026: Warnleiste doppelte Schlüssel (Teil B) */
+  #doppelWarnung {
+    margin:10px 14px 0; padding:10px 12px; border-radius:8px;
+    border:1px solid var(--red); background:rgba(214,88,74,0.12);
+    color:var(--text); font-size:.8rem; line-height:1.45;
+  }
+  #doppelWarnung code { color:var(--red); font-weight:700; }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'produkt_config_editor';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <h1>Produkt-Config · Editor</h1>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div class="meta">
+      <div>BäckereiOS V2 · nur Datei-Export, kein Firestore-Schreiben</div>
+      <div id="quelleName">keine Daten geladen</div>
+    </div>
+    <button id="helpOpenBtn" class="help-btn" title="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="helpSheet" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="helpTitle"></h2>
+    <div id="helpContent"></div>
+    <button id="helpCloseBtn" class="secondary">Schließen</button>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-outline" onclick="ladeVonServer()">↻ Datei laden</button>
+  <button class="btn btn-outline" onclick="ladeVonFirestore()">☁ Firestore laden</button>
+  <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📂 Upload</button>
+  <input type="file" id="fileInput" accept=".json">
+  <div class="sep"></div>
+  <input type="text" id="suchfeld" placeholder="Suchen (alle Kategorien)…" oninput="render()">
+  <div class="sep"></div>
+  <button class="btn btn-amber" onclick="neuesProdukt()">＋ Produkt</button>
+  <div class="sep"></div>
+  <button class="btn btn-outline" onclick="downloadJSON()">⬇ Datei</button>
+  <span id="statusBar">—</span>
+</div>
+
+<!-- NEU 28.09.2026 (Teil B): sichtbare Warnung bei doppelten Schlüsseln -->
+<div id="doppelWarnung" class="hidden" role="alert"></div>
+
+<div id="uploadZone" onclick="document.getElementById('fileInput').click()">
+  <div class="icon">📋</div>
+  <p><strong>produkt_config.json</strong></p>
+  <p>Lädt automatisch von <code>../produkt_config.json</code> — falls das scheitert:
+     Datei hierher ziehen/klicken, oder „Firestore laden" versuchen.</p>
+</div>
+
+<div id="tabLeiste" class="tab-leiste"></div>
+<div id="tabellen"></div>
+
+<div id="karteOverlay" class="sheet-overlay hidden" onclick="if(event.target===this) schliesseKarte()">
+  <div class="karte-sheet">
+    <div class="karte-kopf">
+      <button class="karte-nav-btn" id="karteZurueckBtn" onclick="karteNav(-1)" title="Vorheriges Produkt">‹</button>
+      <div class="karte-titel">
+        <div class="karte-name" id="karteName">—</div>
+        <div class="karte-key" id="karteKeyLabel">—</div>
+      </div>
+      <button class="karte-nav-btn" id="karteVorBtn" onclick="karteNav(1)" title="Nächstes Produkt">›</button>
+      <button class="karte-close" onclick="schliesseKarte()" title="Schließen">✕</button>
+    </div>
+    <div class="karte-tabs" id="karteTabs"></div>
+    <div class="karte-body" id="karteBody"></div>
+  </div>
+</div>
+
+<datalist id="einheitVorschlaege">
+  <option value="stueck">
+  <option value="bleche">
+  <option value="Lochblech">
+  <option value="rote Diele">
+  <option value="blaue Diele">
+  <option value="Kuchenblech">
+  <option value="Schlawinerblech">
+</datalist>
+
+<div id="saveBanner" onclick="downloadJSON()">⬇ Ungespeicherte Änderungen — Datei jetzt herunterladen</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+
+<script>
+var COLLECTION = 'produkte'; // Annahme, siehe SESSION_2026-08-27_PRODUKT_CONFIG_ZWITTER.md
+var KATEGORIEN = ['Brötchen','Brot','Konditorei','Fettgebäck','Snack','Schlawiner'];
+var KAT_FARBEN = { 'Brötchen':'#c9932e','Brot':'#8b5a2b','Konditorei':'#6c3483','Fettgebäck':'#1a6b8a','Snack':'#4caf7d','Schlawiner':'#a8452e' };
+var daten = [];
+var geaendert = false;
+var FELD_GLOSSAR = null; // aus produkt_config_felder.json, siehe ladeFeldGlossar()
+// NEU 28.09.2026 (Teil B): Schlüssel, die in DIESER Sitzung gelöscht wurden.
+// Sie gelten bei der Neuvergabe weiter als belegt — sonst bekäme ein neues
+// Produkt den Schlüssel eines eben gelöschten, und der Sync würde das alte
+// Firestore-Dokument (samt der Verbrauchs-/Froster-Historie unter diesem
+// Schlüssel) mit dem neuen Produkt überschreiben. Wird bei jedem Laden
+// geleert. Sitzungsübergreifend schützt das nicht — siehe Session-Doku.
+var geloeschteSchluessel = {};
+
+// ── Übersicht: Tab-Zustand (ersetzt das frühere eingeklappt-Akkordeon) ──
+var aktiveKat = KATEGORIEN[0];
+
+// ── Produkt-Karte: Zustand (siehe SESSION_2026-09-04_PRODUKTKARTE_KONZEPT.md) ──
+// Eine Bearbeitungsstelle statt zwei: die Tabelle ist reine Übersicht (Klick öffnet
+// die Karte), die frühere Zahnrad-Inline-Zeile gibt es nicht mehr.
+var karteIdx = null;       // Index in `daten` des gerade offenen Produkts
+var karteListe = [];       // Indizes der aktuell sichtbaren (gefilterten) Produkte, für Vor/Zurück
+var karteAktiverTab = 'stamm';
+
+// ── Feld-Glossar laden (siehe SESSION_2026-08-28_PRODUKT_CONFIG_FELD_GLOSSAR.md) ──
+// Liefert pro Feld eine Erklärung fürs ❓-Symbol. Graceful Degradation: Schlägt das
+// Laden fehl, funktioniert der Editor trotzdem — die ❓-Buttons zeigen dann nur
+// einen Hinweis, dass keine Beschreibung verfügbar ist, statt abzustürzen.
+async function ladeFeldGlossar() {
+  try {
+    var res = await fetch('../produkt_config_felder.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var json = await res.json();
+    FELD_GLOSSAR = json.felder || null;
+  } catch (err) {
+    console.warn('Feld-Glossar konnte nicht geladen werden, ❓-Buttons zeigen Fallback:', err);
+    FELD_GLOSSAR = null;
+  }
+}
+
+// Kleiner ❓-Button-Baustein für Feld-Labels, siehe zeigeFeldHilfe()
+function fhBtn(feldName) {
+  return '<button type="button" class="feld-hilfe-btn" onclick="zeigeFeldHilfe(\'' + feldName + '\')" title="Was bedeutet dieses Feld?">❓</button>';
+}
+
+// Zeigt die Erklärung eines einzelnen Felds im selben Bottom-Sheet, das auch
+// für die allgemeine Seiten-Hilfe genutzt wird (eine Mechanik, zwei Aufrufer).
+function zeigeFeldHilfe(feldName) {
+  var eintrag = FELD_GLOSSAR ? FELD_GLOSSAR[feldName] : null;
+  document.getElementById('helpTitle').textContent = eintrag ? eintrag.bezeichnung : feldName;
+  var html = '';
+  if (!eintrag) {
+    html += '<div class="sec"><p>Für dieses Feld liegt aktuell keine Beschreibung vor — entweder ist das Glossar (produkt_config_felder.json) nicht erreichbar, oder das Feld ist dort noch nicht eingetragen.</p></div>';
+  } else {
+    html += '<div class="sec"><p>' + esc(eintrag.beschreibung || '') + '</p></div>';
+    if (eintrag.werte) {
+      html += '<div class="sec"><h3>Mögliche Werte</h3><p>' + eintrag.werte.map(esc).join(', ') + '</p></div>';
+    }
+    if (eintrag.beispiel !== undefined) {
+      html += '<div class="sec"><h3>Beispiel</h3><p>' + esc(String(eintrag.beispiel)) + '</p></div>';
+    }
+    if (eintrag.genutztVon) {
+      html += '<div class="sec"><h3>Wird genutzt von</h3><p>' + eintrag.genutztVon.map(esc).join(', ') + '</p></div>';
+    }
+  }
+  document.getElementById('helpContent').innerHTML = html;
+  document.getElementById('helpSheet').classList.remove('hidden');
+}
+
+function status(msg, typ) {
+  var el = document.getElementById('statusBar');
+  el.textContent = msg;
+  el.className = typ || '';
+}
+function markiereGeaendert() {
+  geaendert = true;
+  document.getElementById('saveBanner').style.display = 'block';
+  status(daten.length + ' Produkte · ungespeicherte Änderungen', 'err');
+}
+
+// ── Laden: Datei (Auto-Fetch) ────────────────────────────────
+async function ladeVonServer() {
+  try {
+    status('Lade Datei …');
+    var res = await fetch('../produkt_config.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    daten = await res.json();
+    geloeschteSchluessel = {};
+    document.getElementById('quelleName').textContent = 'produkt_config.json (Datei)';
+    geaendert = false;
+    document.getElementById('saveBanner').style.display = 'none';
+    render();
+    status('✓ ' + daten.length + ' Produkte aus Datei', 'ok');
+  } catch (err) {
+    status('⚠ ' + err.message + ' — Upload oder Firestore versuchen', 'err');
+  }
+}
+
+// ── Laden: Firestore ──────────────────────────────────────────
+async function ladeVonFirestore() {
+  try {
+    status('Lade aus Firestore …');
+    await window.BOS_AUTH_READY;
+    var snap = await db.collection(COLLECTION).get();
+    var arr = [];
+    snap.forEach(function (doc) { arr.push(doc.data()); });
+    arr.sort(function (a, b) { return (a.legacyKey || '').localeCompare(b.legacyKey || ''); });
+    daten = arr;
+    geloeschteSchluessel = {};
+    document.getElementById('quelleName').textContent = 'Firestore (' + COLLECTION + ')';
+    geaendert = false;
+    document.getElementById('saveBanner').style.display = 'none';
+    render();
+    status('✓ ' + daten.length + ' Produkte aus Firestore', 'ok');
+  } catch (err) {
+    status('⚠ ' + err.message, 'err');
+  }
+}
+
+// ── Laden: manueller Upload ──────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', function (e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      daten = JSON.parse(ev.target.result);
+      geloeschteSchluessel = {};
+      document.getElementById('quelleName').textContent = file.name + ' (Upload)';
+      geaendert = false;
+      document.getElementById('saveBanner').style.display = 'none';
+      render();
+      status('✓ ' + daten.length + ' Produkte geladen', 'ok');
+    } catch (err) {
+      status('⚠ JSON-Fehler: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+});
+var zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', function () { zone.classList.remove('drag'); });
+zone.addEventListener('drop', function (e) {
+  e.preventDefault(); zone.classList.remove('drag');
+  var file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('fileInput').files = e.dataTransfer.files;
+    document.getElementById('fileInput').dispatchEvent(new Event('change'));
+  }
+});
+
+// ── Speichern: Datei ──────────────────────────────────────────
+function downloadJSON() {
+  var json = JSON.stringify(daten, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'produkt_config.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  geaendert = false;
+  document.getElementById('saveBanner').style.display = 'none';
+  status('✓ ' + daten.length + ' Produkte als Datei gespeichert — jetzt im Root ersetzen', 'ok');
+  // NEU 28.09.2026 (Teil B): Doppelte Schlüssel nicht still mit herausgeben.
+  // Kein Abbruch (die Datei soll zum Reparieren herunterladbar bleiben),
+  // aber die Statuszeile sagt es — der Sync lehnt so eine Datei ohnehin ab.
+  var doppelt = doppelteSchluessel(daten);
+  if (doppelt.length) {
+    status('⚠ Datei gespeichert, enthält aber doppelte Schlüssel: ' + doppelt.join(', ') + ' — der Sync nimmt sie so nicht an', 'err');
+  }
+}
+
+// Bewusst KEIN Schreibpfad nach Firestore hier. Änderungen landen nur in der
+// heruntergeladenen Datei. Übernahme nach Firestore läuft ausschließlich über
+// produkt_config_sync.html (Import mit Vorschau/Diff) — ein einziges,
+// bewusstes Nadelöhr statt zweier Schreibwege.
+
+// ── Gemeinsame Optionslisten (früher pro Tabellenzeile neu gebaut, jetzt
+//    einmal auf Modulebene, weil die Karte immer nur EIN Produkt zeigt) ──
+var STATIONEN = ['Brötchenstraße','Nachtschicht','Frühschicht','Rondo','Konditorei','Versand'];
+var BT_LABELS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+var BT_IDX = [1,2,3,4,5,6,0];
+
+// ── Ermittelt die aktuell sichtbare Produktliste ─────────────────────────
+// Suche schlägt die Kategorie-Tabs: sobald gesucht wird, gilt die Suche
+// über ALLE Kategorien hinweg (sonst wirkt "keine Treffer" beim Tippen
+// verwirrend, wenn man gerade im falschen Tab steht).
+function sichtbareIndizes() {
+  var suche = document.getElementById('suchfeld').value.toLowerCase();
+  var indizes = [];
+  daten.forEach(function (p, i) {
+    if (suche) {
+      if (((p.name||'') + (p.artNr||'') + (p.legacyKey||'')).toLowerCase().indexOf(suche) !== -1) indizes.push(i);
+    } else if (p.kategorie === aktiveKat) {
+      indizes.push(i);
+    }
+  });
+  return indizes;
+}
+
+// ── Render: Tab-Leiste + reine Übersichtstabelle ─────────────────────────
+function render() {
+  zeigeDoppelWarnung(); // NEU 28.09.2026 (Teil B)
+  if (!daten.length) {
+    document.getElementById('uploadZone').style.display = 'block';
+    document.getElementById('tabellen').innerHTML = '';
+    document.getElementById('tabLeiste').innerHTML = '';
+    return;
+  }
+  document.getElementById('uploadZone').style.display = 'none';
+
+  renderTabLeiste();
+
+  var suche = document.getElementById('suchfeld').value;
+  var indizes = sichtbareIndizes();
+  var container = document.getElementById('tabellen');
+
+  if (!indizes.length) {
+    container.innerHTML = '<div id="leerZustand">' + (suche ? 'Keine Treffer für „' + esc(suche) + '"' : 'Keine Produkte in dieser Kategorie') + '</div>';
+  } else {
+    var zeilen = indizes.map(function (idx) {
+      var p = daten[idx];
+      var farbe = KAT_FARBEN[p.kategorie] || '#555';
+      return (
+        '<tr class="klickbar' + (!p.frosterZustaendigkeit ? ' fehlt-fz' : '') + '" style="border-left:4px solid ' + farbe + '" onclick="oeffneKarte(' + idx + ')">' +
+          '<td class="col-artnr">' + esc(p.artNr || '—') + '</td>' +
+          '<td class="col-name">' + esc(p.name || '—') + '</td>' +
+          '<td class="col-spb">' + (p.stueckProBlech || '—') + '</td>' +
+          '<td class="col-einheit">' + esc(p.einheit || '—') + '</td>' +
+          '<td class="col-legacy"><span class="legacy-readonly">' + (p.legacyKey || '—') + '</span></td>' +
+          '<td class="col-fz">' + esc(p.frosterZustaendigkeit || '— offen —') + '</td>' +
+          '<td class="col-hinweis" style="color:var(--amber)">' + esc(p.hinweis || '—') + '</td>' +
+          '<td class="col-del"><button class="btn-del" onclick="event.stopPropagation(); loescheProdukt(' + idx + ')" title="Löschen">✕</button></td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    container.innerHTML =
+      '<table class="prod-tabelle">' +
+        '<thead><tr>' +
+          '<th class="col-artnr">ArtNr</th><th class="col-name">Bezeichnung</th>' +
+          '<th class="col-spb">Stk/Blech</th>' +
+          '<th class="col-einheit">Einheit <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'einheit\')" title="Was bedeutet das?">❓</button></th>' +
+          '<th class="col-legacy">legacyKey</th>' +
+          '<th class="col-fz">Froster-Zust. <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'frosterZustaendigkeit\')" title="Was bedeutet das?">❓</button></th>' +
+          '<th class="col-hinweis">Hinweis</th><th class="col-del">✕</th>' +
+        '</tr></thead>' +
+        '<tbody>' + zeilen + '</tbody>' +
+      '</table>';
+  }
+
+  var offen = daten.filter(function (p) { return !p.frosterZustaendigkeit; }).length;
+  status(daten.length + ' Produkte' + (offen ? ' · ' + offen + ' ohne Froster-Zuständigkeit' : '') + (geaendert ? ' · ungespeicherte Änderungen' : ''), geaendert ? 'err' : (offen ? '' : 'ok'));
+}
+
+// ── Kategorie-Tab-Leiste ──────────────────────────────────────────────
+// Ersetzt die frühere Akkordeon-Liste: die bewährte Kategorie-Sortierung
+// bleibt (Ulf, 04.09.2026 — "warum was Neues erfinden"), nur horizontal
+// als Tabs statt gestapelt, immer nur eine Kategorie offen.
+function renderTabLeiste() {
+  var suche = document.getElementById('suchfeld').value;
+  var html = KATEGORIEN.map(function (kat) {
+    var anzahl = daten.filter(function (p) { return p.kategorie === kat; }).length;
+    if (!anzahl) return '';
+    var aktiv = (!suche && kat === aktiveKat) ? ' aktiv' : '';
+    return '<button class="tab-btn' + aktiv + '" style="border-bottom-color:' + (KAT_FARBEN[kat]||'#555') + '" onclick="waehleTab(\'' + kat + '\')">' +
+      kat + ' <span class="anzahl">[' + anzahl + ']</span></button>';
+  }).join('');
+  document.getElementById('tabLeiste').innerHTML = html;
+}
+
+function waehleTab(kat) {
+  aktiveKat = kat;
+  document.getElementById('suchfeld').value = '';
+  render();
+}
+
+function toggleBackTag(idx, jsIdx, btn) {
+  var p = daten[idx];
+  var tags = Array.isArray(p.backTage) ? p.backTage.slice() : [];
+  var pos = tags.indexOf(jsIdx);
+  if (pos !== -1) { tags.splice(pos, 1); btn.classList.remove('aktiv'); }
+  else { tags.push(jsIdx); btn.classList.add('aktiv'); }
+  tags.sort(function (a, b) { return a - b; });
+  aendere(idx, 'backTage', tags);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Produkt-Karte — einzige Bearbeitungsstelle (siehe Kopf-Kommentar bei
+// den karteIdx/karteListe-Variablen weiter oben). Drei Tabs heute,
+// bewusst erweiterbar für später (Teig, Ofen, ...) — neuer Tab in
+// KARTEN_TABS ist dann kein Redesign, nur ein neuer Eintrag.
+// ══════════════════════════════════════════════════════════════════════
+
+function kfText(feld, label, wert, id) {
+  return '<div class="detail-feld"><label>' + label + ' ' + fhBtn(feld) + '</label>' +
+    '<input type="text"' + (id ? ' id="' + id + '"' : '') + ' value="' + esc(wert || '') + '" placeholder="—" onchange="aendere(karteIdx,\'' + feld + '\',this.value||null)"></div>';
+}
+function kfNumber(feld, label, wert, step) {
+  return '<div class="detail-feld"><label>' + label + ' ' + fhBtn(feld) + '</label>' +
+    '<input type="number"' + (step ? ' step="' + step + '"' : '') + ' value="' + (wert ?? '') + '" placeholder="—" ' +
+    'onchange="aendere(karteIdx,\'' + feld + '\',this.value?' + (step ? 'parseFloat(this.value)' : 'parseInt(this.value)') + ':null)"></div>';
+}
+function kfSelect(feld, label, wert, optionen, leerLabel) {
+  var opts = (leerLabel ? '<option value="">' + leerLabel + '</option>' : '') +
+    optionen.map(function (o) { return '<option' + (o === wert ? ' selected' : '') + '>' + o + '</option>'; }).join('');
+  return '<div class="detail-feld"><label>' + label + ' ' + fhBtn(feld) + '</label>' +
+    '<select onchange="aendere(karteIdx,\'' + feld + '\',this.value)">' + opts + '</select></div>';
+}
+// NEU 29.09.2026 (Teigecke Stufe 2): Auswahl „Aus Teig“. TEIG_LISTE:
+// null = lädt noch, Array = geladen, { fehler } = Lesen fehlgeschlagen.
+var TEIG_LISTE = null;
+async function ladeTeigListe() {
+  try {
+    await window.BOS_AUTH_READY;
+    var snap = await db.collection('teigecke_teige').get();
+    var liste = [];
+    snap.forEach(function (d) { var x = d.data(); if (!x.geloescht) liste.push({ id: d.id, name: x.name || d.id }); });
+    liste.sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+    TEIG_LISTE = liste;
+  } catch (err) {
+    console.error('[Produkt-Config] Teigliste laden:', err);
+    TEIG_LISTE = { fehler: (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)) };
+  }
+  if (karteIdx !== null && karteAktiverTab === 'back' && !document.getElementById('karteOverlay').classList.contains('hidden')) renderKarte();
+}
+function kfTeig(wert) {
+  var kopf = '<div class="detail-feld"><label>Aus Teig ' + fhBtn('ausTeig') + '</label>';
+  if (TEIG_LISTE === null) return kopf + '<div class="readonly-wert">Teige werden geladen … (bisher: ' + esc(wert || 'keiner') + ')</div></div>';
+  if (!Array.isArray(TEIG_LISTE)) {
+    return kopf + '<div class="readonly-wert">' + esc(wert || 'keiner') + ' — unverändert</div>' +
+      '<div style="color:var(--red);font-size:.75rem;margin-top:4px">⚠ Teigliste nicht lesbar: ' + esc(TEIG_LISTE.fehler) + '</div></div>';
+  }
+  var bekannt = TEIG_LISTE.some(function (t) { return t.id === wert; });
+  var opts = '<option value="">— kein Teig —</option>' +
+    (wert && !bekannt ? '<option value="' + esc(wert) + '" selected>⚠ ' + esc(wert) + ' (Teig nicht gefunden)</option>' : '') +
+    TEIG_LISTE.map(function (t) { return '<option value="' + esc(t.id) + '"' + (t.id === wert ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('');
+  return kopf + '<select onchange="aendereAusTeig(karteIdx,this.value)">' + opts + '</select>' +
+    (TEIG_LISTE.length ? '' : '<div style="font-size:.75rem;margin-top:4px;color:var(--text-dim)">Noch keine Teige in der Teigecke angelegt.</div>') + '</div>';
+}
+function aendereAusTeig(idx, wert) {
+  if (wert) daten[idx].ausTeig = wert; else delete daten[idx].ausTeig;
+  markiereGeaendert();
+}
+
+function kfCheckbox(feld, label, wert) {
+  return '<div class="detail-feld checkbox-feld">' +
+    '<input type="checkbox" id="kf_' + feld + '" ' + (wert === true ? 'checked' : '') +
+      ' onchange="aendere(karteIdx,\'' + feld + '\',this.checked)">' +
+    '<label for="kf_' + feld + '" class="cb-label">' + label + ' ' + fhBtn(feld) + '</label>' +
+  '</div>';
+}
+
+var KARTEN_TABS = [
+  {
+    id: 'stamm', label: 'Stammdaten',
+    render: function (p) {
+      return (
+        '<div class="detail-section two">' +
+          '<div class="detail-feld"><label>Name ' + fhBtn('name') + '</label>' +
+            '<input type="text" id="kfName" value="' + esc(p.name || '') + '" ' +
+            'oninput="document.getElementById(\'karteName\').textContent=this.value||\'Unbenannt\'" ' +
+            'onchange="aendere(karteIdx,\'name\',this.value)"></div>' +
+          kfText('artNr', 'ArtNr', p.artNr) +
+        '</div>' +
+        '<div class="detail-section two">' +
+          kfSelect('kategorie', 'Kategorie', p.kategorie, KATEGORIEN) +
+          kfSelect('station', 'Station', p.station, STATIONEN, '— Station wählen —') +
+        '</div>' +
+        '<div class="detail-section two">' +
+          kfNumber('stueckProBlech', 'Stück/Blech', p.stueckProBlech) +
+          '<div class="detail-feld"><label>Einheit ' + fhBtn('einheit') + '</label>' +
+            '<input type="text" list="einheitVorschlaege" value="' + esc(p.einheit || '') + '" placeholder="stueck" onchange="aendere(karteIdx,\'einheit\',this.value||null)"></div>' +
+        '</div>' +
+        '<div class="detail-section full">' + kfText('hinweis', 'Hinweis', p.hinweis) + '</div>' +
+        '<div class="karte-legacy">legacyKey: ' + (p.legacyKey || '—') + ' — niemals änderbar</div>'
+      );
+    }
+  },
+  {
+    id: 'back', label: 'Backinformationen',
+    render: function (p) {
+      var backTage = p.backTage || [];
+      var btHTML = BT_IDX.map(function (jsIdx, i) {
+        var aktiv = backTage.indexOf(jsIdx) !== -1 ? ' aktiv' : '';
+        return '<button class="bt-btn' + aktiv + '" onclick="toggleBackTag(karteIdx,' + jsIdx + ',this)">' + BT_LABELS[i] + '</button>';
+      }).join('');
+      return (
+        '<div class="detail-section full"><div class="detail-feld"><label>BackTage ' + fhBtn('backTage') + '</label><div class="backtage-buttons">' + btHTML + '</div></div></div>' +
+        '<div class="detail-section full">' + kfNumber('produktionsSchritt', 'Produktionsschritt (Bleche)', p.produktionsSchritt) + '</div>' +
+        '<div class="detail-section full">' + kfTeig(p.ausTeig) + '</div>'
+      );
+    }
+  },
+  {
+    id: 'einst', label: 'Einstellungen',
+    render: function (p) {
+      return (
+        '<div class="detail-section full">' + kfSelect('frosterZustaendigkeit', 'Froster-Zuständigkeit', p.frosterZustaendigkeit, ['nein','baecker','konditoren','sonstige'], '— offen —') + '</div>' +
+        '<div class="detail-section full">' + kfCheckbox('manuelleErfassung', 'Für manuelle Verbrauchserfassung freigeben', p.manuelleErfassung) + '</div>' +
+        '<div class="detail-section full">' + kfCheckbox('schnellrechnerRelevant', 'Schnellrechner relevant', p.schnellrechnerRelevant) + '</div>' +
+        '<div class="detail-section full">' + kfCheckbox('nfcSeite', 'Auf Produktionsplaner anzeigen', p.nfcSeite) + '</div>'
+      );
+    }
+  }
+];
+
+function oeffneKarte(idx) {
+  karteListe = sichtbareIndizes();
+  if (karteListe.indexOf(idx) === -1) karteListe.push(idx); // Fallback, z.B. direkt nach Neuanlage
+  karteIdx = idx;
+  renderKarte();
+  document.getElementById('karteOverlay').classList.remove('hidden');
+}
+
+function karteNav(delta) {
+  var pos = karteListe.indexOf(karteIdx);
+  var neu = pos + delta;
+  if (neu < 0 || neu >= karteListe.length) return;
+  karteIdx = karteListe[neu];
+  renderKarte();
+}
+
+function schliesseKarte() {
+  document.getElementById('karteOverlay').classList.add('hidden');
+  render();
+}
+
+function waehleKartenTab(id) {
+  karteAktiverTab = id;
+  renderKarte();
+}
+
+function renderKarte() {
+  var p = daten[karteIdx];
+  if (!p) return;
+  document.getElementById('karteName').textContent = p.name || 'Unbenannt';
+  document.getElementById('karteKeyLabel').textContent = p.legacyKey || '—';
+
+  var pos = karteListe.indexOf(karteIdx);
+  document.getElementById('karteZurueckBtn').disabled = pos <= 0;
+  document.getElementById('karteVorBtn').disabled = pos === -1 || pos >= karteListe.length - 1;
+
+  document.getElementById('karteTabs').innerHTML = KARTEN_TABS.map(function (t) {
+    return '<button class="karte-tab-btn' + (t.id === karteAktiverTab ? ' aktiv' : '') + '" onclick="waehleKartenTab(\'' + t.id + '\')">' + t.label + '</button>';
+  }).join('');
+
+  var aktivesTab = KARTEN_TABS.filter(function (t) { return t.id === karteAktiverTab; })[0] || KARTEN_TABS[0];
+  document.getElementById('karteBody').innerHTML = aktivesTab.render(p);
+}
+
+function aendere(idx, feld, wert) {
+  daten[idx][feld] = wert;
+  markiereGeaendert();
+}
+
+function slugify(name) {
+  return (name || 'produkt').toLowerCase()
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') + '_stueck';
+}
+
+// ── Schlüssel-Vergabe (NEU 28.09.2026, Teil B) ──────────────────────────
+// Der legacyKey bleibt für immer (Dokument-ID in Firestore, Schlüssel in der
+// Verbrauchs- und Froster-Historie). Deshalb entsteht er aus dem Namen, den
+// Ulf beim Anlegen eintippt — nicht aus einer Laufnummer, die sich nach
+// einem Löschen wiederholt.
+function doppelteSchluessel(liste) {
+  var gesehen = {}, doppelt = {};
+  (liste || []).forEach(function (p) {
+    var k = p && p.legacyKey;
+    if (!k) return;
+    if (gesehen[k]) doppelt[k] = true;
+    gesehen[k] = true;
+  });
+  return Object.keys(doppelt).sort();
+}
+
+function eindeutigerSchluessel(name) {
+  var belegt = {};
+  daten.forEach(function (p) { if (p && p.legacyKey) belegt[p.legacyKey] = true; });
+  Object.keys(geloeschteSchluessel).forEach(function (k) { belegt[k] = true; });
+  var basis = slugify(name);                       // z. B. zwiebelbrot_500g_stueck
+  if (!belegt[basis]) return basis;
+  var stamm = basis.replace(/_stueck$/, '');       // Zähler VOR die gemeinsame Endung
+  for (var n = 2; n < 1000; n++) {
+    var kandidat = stamm + '_' + n + '_stueck';
+    if (!belegt[kandidat]) return kandidat;
+  }
+  throw new Error('Kein freier Schlüssel für „' + name + '“ gefunden (über 1000 Varianten belegt).');
+}
+
+function zeigeDoppelWarnung() {
+  var el = document.getElementById('doppelWarnung');
+  var doppelt = doppelteSchluessel(daten);
+  if (!doppelt.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.innerHTML = '⚠ <strong>Doppelte Produkt-Schlüssel in dieser Liste:</strong> ' +
+    doppelt.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join(', ') +
+    '<br>Zwei Produkte mit demselben Schlüssel würden sich in der Datenbank gegenseitig überschreiben. ' +
+    'Eins davon löschen oder die Datei vor der Übernahme reparieren — der Sync lehnt sie so ab.';
+  el.classList.remove('hidden');
+}
+
+function neuesProdukt() {
+  var kat = aktiveKat || 'Brötchen';
+  var name = prompt('Name des neuen Produkts?\n\nAus dem Namen entsteht der Produkt-Schlüssel. Der bleibt für immer — der Name selbst lässt sich später jederzeit ändern.', '');
+  if (name === null) return;                       // abgebrochen
+  name = String(name).trim();
+  if (!name) { status('⚠ Kein Name eingegeben — kein Produkt angelegt', 'err'); return; }
+  var schluessel;
+  try {
+    schluessel = eindeutigerSchluessel(name);
+  } catch (err) {
+    console.error(err);
+    status('⚠ ' + err.message, 'err');
+    return;
+  }
+  var neu = {
+    legacyKey: schluessel,
+    name: name,
+    kategorie: kat,
+    artNr: null,
+    station: null,
+    stueckProBlech: null,
+    produktionsSchritt: null,
+    einheit: 'stueck',
+    backTage: [],
+    hinweis: null,
+    frosterZustaendigkeit: '',
+    manuelleErfassung: false,
+    schnellrechnerRelevant: false,
+    nfcSeite: false
+  };
+  daten.push(neu);
+  markiereGeaendert();
+  aktiveKat = kat;
+  document.getElementById('suchfeld').value = '';
+  karteAktiverTab = 'stamm';
+  oeffneKarte(daten.length - 1);
+  if (schluessel !== slugify(name)) {
+    status('Neu: „' + name + '“ — Schlüssel ' + schluessel + ' (der naheliegende war schon vergeben)', '');
+  }
+}
+
+function loescheProdukt(idx) {
+  var p = daten[idx];
+  if (!confirm('„' + p.name + '" wirklich löschen?')) return;
+  if (p.legacyKey) geloeschteSchluessel[p.legacyKey] = true; // NEU 28.09.2026 (Teil B)
+  daten.splice(idx, 1);
+  markiereGeaendert();
+  render();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+window.addEventListener('beforeunload', function (e) {
+  if (geaendert) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ==========================================================================
+// Hilfe (Standard-Muster: einfaches helpData-Objekt + Bottom-Sheet, Fundament §5.2/§5.2.1)
+// ==========================================================================
+var helpData = {
+  title: "Was ist das hier?",
+  sections: [
+    {
+      heading: "Wofür ist diese Seite?",
+      text: "Zum Bearbeiten der Produktliste — Namen, Kategorien, Backprogramm, Station, Froster-Zuständigkeit und mehr. Die Tabelle ist eine reine Übersicht zum Durchschauen; zum Bearbeiten auf ein Produkt tippen, dann öffnet sich die Produkt-Karte."
+    },
+    {
+      heading: "Wie navigiere ich durch die Produkte?",
+      text: "Die Kategorie-Tabs oben (Brötchen, Brot, ...) zeigen immer nur eine Kategorie gleichzeitig — antippen wechselt die Ansicht. Das Suchfeld sucht dagegen über alle Kategorien hinweg. Ein Tipp auf eine Zeile öffnet die Produkt-Karte mit mehreren Tabs (Stammdaten, Backinformationen, Einstellungen — künftig kommen weitere dazu). Oben in der Karte blättern die ‹/›-Pfeile zum vorherigen/nächsten Produkt der gerade sichtbaren Liste, ohne die Karte zu schließen."
+    },
+    {
+      heading: "Woher kommen die Daten?",
+      text: "Automatisch von der aktuellen produkt_config.json-Datei. Klappt das nicht, kannst du stattdessen aus der Datenbank (Firestore) laden oder eine Datei von Hand hochladen."
+    },
+    {
+      heading: "Was passiert mit meinen Änderungen?",
+      text: "Erstmal bleibt alles nur in diesem Browser-Fenster. Erst wenn du auf 'Datei' tippst, entsteht eine neue produkt_config.json mit deinen Änderungen. Diese Seite schreibt nie direkt in die Datenbank — das passiert bewusst an anderer Stelle (Produkt-Config Sync), damit vor jeder echten Änderung noch eine Kontrolle dazwischen liegt."
+    },
+    {
+      heading: "Was mache ich mit der heruntergeladenen Datei?",
+      text: "Entweder ersetzt du damit die alte produkt_config.json direkt im System, oder du lädst sie im Sync-Tool hoch, damit die Änderungen auch in der Datenbank ankommen."
+    },
+    {
+      heading: "Wichtig zu wissen",
+      text: "Der Produkt-Schlüssel (legacyKey) lässt sich nirgends ändern — der muss immer gleich bleiben, damit alte Daten nicht durcheinanderkommen (steht unten im Stammdaten-Tab der Karte, nur zur Anzeige). Beim Anlegen mit „＋ Produkt“ fragt die Seite deshalb zuerst nach dem Namen: aus ihm entsteht der Schlüssel. Gibt es den Schlüssel schon, hängt die Seite eine Zahl an (…_2_stueck) und sagt das in der Statuszeile. Den Namen selbst kannst du danach jederzeit ändern, den Schlüssel nicht. Enthält eine geladene Liste zwei Produkte mit demselben Schlüssel, erscheint unter der Werkzeugleiste eine rote Warnung mit den betroffenen Schlüsseln. Löschen geht weiterhin über das ✕ in der Übersichtstabelle, nicht aus der Karte heraus — entfernt das Produkt nur aus der Liste in diesem Fenster; endgültig wird das erst durch den Download und die anschließende Übernahme."
+    },
+    {
+      heading: "Was ist der Unterschied zwischen „Station\u201c und „Froster-Zuständigkeit\u201c?",
+      text: "Das sind zwei getrennte Felder, die leicht verwechselt werden können. „Station\u201c (Stammdaten-Tab der Karte) beschreibt, an welcher Arbeitsstation bzw. Schicht ein Produkt grundsätzlich produziert wird (z. B. Frühschicht, Nachtschicht, Brötchenstraße). „Froster-Zuständigkeit\u201c (Einstellungen-Tab der Karte, in der Übersicht als eigene Spalte sichtbar) legt dagegen fest, ob ein Produkt überhaupt für die Froster-Vorbereitung relevant ist und wenn ja, welche Berufsgruppe dafür verantwortlich ist — das entspricht dem, was früher schlicht „für Froster-Inventur relevant\u201c hieß, nur um die zuständige Gruppe erweitert. Ein Produkt kann also eine Station haben, ohne froster-relevant zu sein, und umgekehrt. Bei jedem einzelnen Feld hilft der kleine ❓-Button daneben mit einer eigenen, genaueren Erklärung."
+    },
+    {
+      heading: "Was ist der Unterschied zwischen „Station\u201c und „Auf Produktionsplaner anzeigen\u201c?",
+      text: "„Station\u201c legt fest, wo ein Produkt grundsätzlich dazugehört. „Auf Produktionsplaner anzeigen\u201c (nfcSeite, Einstellungen-Tab der Karte) ist ein zusätzlicher, bewusst getrennter Schalter: nicht jedes Produkt einer Station soll auch in der wöchentlichen Planung auftauchen — z. B. Ware, die tagesaktuell produziert wird und keine Wochenplanung braucht. Ein Produkt kann also eine Station haben, ohne hier angehakt zu sein."
+    },
+    {
+      heading: "Was bedeutet „Aus Teig“?",
+      text: "Im Reiter Backinformationen wählst du, aus welchem Teig ein Brot gemacht wird (z. B. kleine und große Korbbrote und Zwiebelbrote aus dem Korbbrot-Teig). Die Auswahl kommt aus den Teigen der Teigecke. Ein Brot gehört zu höchstens einem Teig. Die Teigecke rechnet daraus nachts die Teigmenge. Wichtig: Die Teigecke liest die Zuordnung aus der Datei — eine Änderung wirkt erst, wenn die heruntergeladene produkt_config.json im System liegt. Lässt sich die Teigliste nicht laden, bleibt der bisherige Wert stehen und am Feld steht die Fehlermeldung."
+    }
+  ]
+};
+
+function renderHelp() {
+  document.getElementById('helpTitle').textContent = helpData.title;
+  var html = '';
+  helpData.sections.forEach(function (s) {
+    html += '<div class="sec"><h3>' + s.heading + '</h3><p>' + s.text + '</p></div>';
+  });
+  document.getElementById('helpContent').innerHTML = html;
+}
+renderHelp();
+
+document.getElementById('helpOpenBtn').onclick = function () {
+  document.getElementById('helpSheet').classList.remove('hidden');
+};
+document.getElementById('helpCloseBtn').onclick = function () {
+  document.getElementById('helpSheet').classList.add('hidden');
+};
+document.getElementById('helpSheet').addEventListener('click', function (e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
+// Auto-Laden beim Start
+ladeFeldGlossar();
+ladeTeigListe();   // NEU 29.09.2026, Auswahl „Aus Teig“
+ladeVonServer().catch(function () {});
+</script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Feiertage · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: feiertage.html
+  ZWECK: Achte Hub-Kachel. Zeigt kommende Feiertage (NICHT Schulferien —
+         bewusst nach typ:'feiertag' gefiltert, siehe
+         bos_zeitkontext_referenz.js) mit ihrem aktuellen offen/
+         geschlossen-Status und lässt ihn umschalten — für den Fall
+         "Feiertag, an dem trotzdem gearbeitet wird" (Ulf, 12.09.2026).
+         KEINE neue Datenwelt: baut vollständig auf dem bereits
+         bestehenden bos_zeitkontext.js auf (Firestore > lokal > Referenz-
+         Datei-Standard). Was hier gesetzt wird, gilt automatisch auch für
+         Hamster (zeitkontext_editor.html) und umgekehrt — eine
+         Konfiguration für alles, wie von Ulf gewünscht.
+  DATENFLUSS: bos_access_guard.js (roles: admin, produktionsleitung) →
+         bos_zeitkontext_referenz.js liefert die Liste bekannter Feiertage
+         (BOS_FEIERTAGE.feiertage) → für jeden BOS_ZEITKONTEXT.status(db,
+         datum) (Firestore-Override falls vorhanden, sonst Referenz-
+         Standard: offen:false) → Umschalten liest den kompletten
+         aktuellen Stand (inkl. hamsterStufe!) und schreibt ihn über
+         BOS_ZEITKONTEXT.setzeFirestore() mit nur offen geändert zurück —
+         WICHTIG: niemals blind nur {offen} schreiben, setzeFirestore
+         überschreibt das ganze Dokument (kein Merge), ein unvollständiger
+         Aufruf würde eine evtl. gesetzte hamsterStufe stillschweigend auf
+         0 zurücksetzen.
+  SCHNITTSTELLEN: bos_zeitkontext_referenz.js, bos_zeitkontext.js,
+         bos_firebase_config.js. Schreibt NUR offen (+ erhält grund und
+         hamsterStufe), setzt nie eigene Felder.
+  BEKANNTE OFFENE PUNKTE:
+    - Zeitraum kommender Feiertage hart auf die nächsten 120 Tage
+      begrenzt — reicht für die Praxis, könnte bei Bedarf erweitert werden
+      (Referenzdatei hat Daten bis Ende 2028).
+    - Keine eigene Anzeige/Bearbeitung von hamsterStufe — bewusst, das ist
+      Hamsters eigener Bereich (zeitkontext_editor.html), diese Kachel
+      rührt den Wert nur lesend zum Erhalten an.
+    - Entwürfe (Tab 1) nutzt diese Quelle noch NICHT — hat weiterhin eine
+      rein lokale, nicht verzahnte Feiertag-Markierung. Umstellung ist ein
+      eigener, noch nicht begonnener Schritt.
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Liste kommender Feiertage, Status-Anzeige, Umschalten
+      offen/geschlossen mit hamsterStufe-Erhalt.
+    2026-09-12 · v0.2 · Feature
+      Ulf: "Wir sind Bäcker, Feiertage sind eher offen als zu." Statt den
+      geteilten Standard in bos_zeitkontext.js zu ändern (nutzt auch
+      Hamster/Verbrauchs-Durchschnitt, Risiko unklarer Nebenwirkungen dort)
+      Sammel-Knopf ergänzt: setzt alle noch unbestätigten Feiertage
+      (Quelle "datei", offen:false) auf einmal auf offen — bereits von
+      Hand gesetzte Einträge bleiben unangetastet.
+    2026-09-12 · 09:50 · v0.3 · Fix
+      Ulf: solche Fehlermeldungen künftig überall zeigen, nicht nur die
+      echte Meldung statt "fehlgeschlagen" konsole-only -- auf Tablet/
+      Handy ist Remote-Debugging umständlich. Alle Fehlermeldungen dieser
+      Datei zeigen jetzt err.message direkt in der UI.
+    2026-09-17 · 04:40 · v0.4 · Fix
+      Erster echter Code-Abgleich dieser Datei gegen ihre Doku (T-53,
+      Kompendium §5.6). Fünf Punkte:
+      (B-2) Der Zweig "setzeFirestore lieferte etwas Falsches" meldete
+        wörtlich "Umschalten fehlgeschlagen -- erneut versuchen." -- also
+        genau der begründungslose Satz, den Ulfs Fehlermeldungs-Regel
+        ausschliesst. An dieser Stelle GIBT es keine err.message, weil
+        setzeFirestore() einen Wert zurückgibt statt zu werfen. Die
+        Meldung sagt jetzt, was sie weiss (Firestore hat abgelehnt,
+        wahrscheinlich Rechte/Regeln), und nennt den zurückgegebenen Wert.
+        bos_zeitkontext.js selbst bleibt unangetastet -- die Datei wird
+        auch von Hamster genutzt, eine Änderung dort ist eine eigene
+        Entscheidung (siehe T-84).
+      (B-6) Der Sammel-Knopf prüfte die Rückgabewerte von setzeFirestore
+        gar nicht: lieferte sie für einzelne Feiertage false, meldete der
+        Knopf trotzdem Erfolg. Jetzt wird pro Feiertag ausgewertet und die
+        Zahl der nicht gesetzten Tage genannt.
+      (B-9) Fehlte bos_zeitkontext_referenz.js komplett (T-74: ein
+        fehlgeschlagener Script-Load ist unsichtbar), meldete die Kachel
+        "Keine Feiertage in den nächsten 120 Tagen bekannt" -- ruhig,
+        plausibel und falsch. Die drei Fälle (Referenzdatei fehlt /
+        Referenzdaten ausgelaufen, T-58 / wirklich keine in 120 Tagen)
+        werden jetzt unterschieden. Dasselbe für db und BOS_ZEITKONTEXT:
+        die Meldung nennt, welches Stück fehlt.
+      (C-4) Das Datumsfenster wurde über new Date().toISOString() gebildet
+        -- das ist UTC. In der Nachtschicht, zwischen 00:00 und 02:00
+        Ortszeit, war "heute" damit der Vortag, ein bereits vergangener
+        Feiertag stand noch in der Liste. Jetzt lokales Datum.
+      (C-5) §5.6 verspricht Read-before-Write. Das Einzel-Umschalten tat
+        das auch, der Sammel-Knopf aber schrieb mit den Stati vom
+        Render-Zeitpunkt -- eine zwischenzeitlich von Hamster gesetzte
+        hamsterStufe wäre verlorengegangen. Der Sammel-Knopf liest jetzt
+        jeden Eintrag unmittelbar vor dem Schreiben neu.
+      Nicht geändert: die (korrekte, nur umständliche) Paarung von
+      unbestaetigt<->stati, und das feste data-theme="dark" -- die
+      Theme-Anbindung war hier von Anfang an vorhanden (anders als bei den
+      drei Satelliten aus T-77).
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e); --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218); --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18)); --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a); --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1); --dim: var(--bos-text-dim, #ab9c8a); --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a); --good: var(--bos-green, #4caf7d); --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif); --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+
+  header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
+  .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.6rem); margin: var(--bos-space-3xs,4px) 0; letter-spacing:-.01em; }
+  .hilfe-btn{ position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); color:var(--dim); font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px); max-width:640px; margin:0 auto;}
+  .hinweis-top{font-size: var(--bos-font-sm,.85rem); color:var(--dim); line-height:1.5; margin: 0 0 var(--bos-space-lg,20px); padding: var(--bos-space-sm,12px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);}
+
+  .feiertag-karte{ display:flex; align-items:center; gap: var(--bos-space-sm,12px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .feiertag-karte.geschlossen{border-left:3px solid var(--dim-2);}
+  .feiertag-karte.offen{border-left:3px solid var(--good);}
+  .feiertag-datum{ font-family:var(--font-label); font-weight:800; color:var(--amber-bright); font-size: var(--bos-font-sm,.85rem); min-width:64px; }
+  .feiertag-info{flex:1; min-width:0;}
+  .feiertag-name{font-weight:700;}
+  .feiertag-status{font-size: var(--bos-font-xs,.76rem); color:var(--dim);}
+  .feiertag-status.offen{color:var(--good);}
+  .feiertag-quelle{font-size: var(--bos-font-2xs,.66rem); color:var(--dim-2); margin-top:2px;}
+  .toggle-btn{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.74rem); border-radius:8px; padding: 8px 12px; cursor:pointer; flex-shrink:0; border:1px solid var(--border-strong); background:var(--surface-2); color:var(--text); }
+  .toggle-btn:disabled{opacity:.5; cursor:wait;}
+  .btn-klein{ font-family:var(--font-label); font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size: var(--bos-font-xs,.76rem); background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong); border-radius:8px; padding: 8px 12px; cursor:pointer; }
+  .btn-klein.amber{background:var(--amber); color:#1a1208; border-color:var(--amber);}
+  .btn-klein:disabled{opacity:.5; cursor:wait;}
+
+  .lade-hinweis, .leer-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen-sheet{display:flex;}
+  .sheet{ background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0; padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom)); width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto; }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{ margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm,.82rem); cursor:pointer; }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<script>var BOS_APP_ID = 'schichtplaner_feiertage';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Feiertage</h1>
+</header>
+
+<main>
+  <div class="hinweis-top">Zeigt die nächsten Feiertage (Niedersachsen) mit ihrem aktuellen Status. Systemweiter Standard ist „geschlossen" — bei einer Bäckerei meist umgekehrt (Ulf, 12.09.2026). Statt jeden einzeln umzuschalten: unten der Sammel-Knopf.</div>
+  <button type="button" class="btn-klein amber" id="alleOffenBtn" style="width:100%; padding:12px; margin-bottom: var(--bos-space-md,16px); display:none;">Noch unbestätigte Feiertage als offen setzen</button>
+  <div id="liste"><div class="lade-hinweis">Lade …</div></div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert diese Kachel?</h2>
+    <p>Zeigt kommende Feiertage aus dem hinterlegten Kalender (Niedersachsen). Standardmäßig gilt jeder Feiertag als geschlossen — genau wie beim bisherigen System.</p>
+    <p>Wird an einem Feiertag trotzdem gearbeitet, einfach auf "Geschlossen" tippen, um auf "Offen" umzuschalten. Das gilt dann überall im System — auch für Hamster (Zeitkontext & Hamster), nicht nur hier.</p>
+    <p>Der systemweite Standard ist "geschlossen" — bei einer Bäckerei meist genau umgekehrt. Der Sammel-Knopf oben setzt alle noch unbestätigten Feiertage auf einmal auf "offen", ohne den geteilten Standard selbst zu verändern (der wird auch von Hamster genutzt). Bereits von Hand gesetzte Einträge bleiben dabei unangetastet.</p>
+    <p>Schulferien werden hier bewusst nicht angezeigt — die betreffen die Personalplanung nicht direkt, nur echte Feiertage.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var TAGE_VORAUS = 120;
+  var WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  // Zeigt die echte Fehlermeldung an, nicht nur "fehlgeschlagen" -- auf
+  // Tablet/Handy ist Remote-Debugging umständlich, das hier hilft sofort
+  // weiter (Ulf, 12.09.2026, siehe SCHICHTPLANER_V2_BAUSTELLEN.md).
+  // Liefert KLARTEXT. Vorher lief hier escHtml() mit drin, wodurch in den
+  // alert()-Meldungen "&quot;" statt " stand. Escaping passiert jetzt dort,
+  // wo der Text in innerHTML landet.
+  function fehlertext(err) { return (err && err.message) || String(err); }
+  function formatKurz(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    return WOCHENTAGE[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + '. ' + MONATE[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  // LOKALES Datum, nicht toISOString() -- das rechnet nach UTC um. Diese
+  // Kachel wird in der Nachtschicht bedient; zwischen 00:00 und 02:00
+  // Ortszeit lieferte die UTC-Fassung den VORTAG, wodurch ein bereits
+  // vergangener Feiertag noch in der Liste stand (C-4, 17.09.2026).
+  function lokalIso(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function ermittleKommendeFeiertage() {
+    if (!window.BOS_FEIERTAGE) return [];
+    var heuteIso = lokalIso(new Date());
+    var grenzeIso = lokalIso(new Date(Date.now() + TAGE_VORAUS * 86400000));
+    return window.BOS_FEIERTAGE.feiertage
+      .filter(function (f) { return f.datum >= heuteIso && f.datum <= grenzeIso; })
+      .sort(function (a, b) { return a.datum.localeCompare(b.datum); });
+  }
+
+  // Unterscheidet die drei Fälle, die vorher alle "keine Feiertage bekannt"
+  // ergaben (B-9): Referenzdatei gar nicht geladen (T-74), Referenzdaten
+  // ausgelaufen (T-58), oder wirklich keiner im Fenster.
+  function leerGrundText() {
+    if (!window.BOS_FEIERTAGE) {
+      return 'Die Feiertags-Referenzdatei ist nicht geladen (bos_zeitkontext_referenz.js) — ' +
+             'die Liste ist deshalb leer, NICHT weil keine Feiertage anstehen. ' +
+             'Seite neu laden; bleibt es dabei, fehlt die Datei oder der Pfad stimmt nicht.';
+    }
+    var liste = window.BOS_FEIERTAGE.feiertage || [];
+    var letztes = liste.length ? liste[liste.length - 1].datum : null;
+    var heuteIso = lokalIso(new Date());
+    if (letztes && letztes < heuteIso) {
+      return 'Die Referenzdatei führt Feiertage nur bis ' + letztes + ' — dieser Zeitraum ist abgelaufen. ' +
+             'bos_zeitkontext_referenz.js muss nachgepflegt werden (Kompendium T-58).';
+    }
+    return 'Keine Feiertage in den nächsten ' + TAGE_VORAUS + ' Tagen.';
+  }
+
+  function leseAktivenProfilNamen() {
+    try {
+      var state = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+      var id = state && state.activeProfileId;
+      if (!id) return 'SchichtPlaner';
+      var alle = (window.BOS_PROFILES || []).concat((state && state.localProfiles) || []);
+      var p = alle.find(function (x) { return x.id === id; });
+      return (p && p.name) || 'SchichtPlaner';
+    } catch (e) { return 'SchichtPlaner'; }
+  }
+
+  function ladeUndRenderListe() {
+    var box = document.getElementById('liste');
+    var feiertage = ermittleKommendeFeiertage();
+    if (!feiertage.length) { box.innerHTML = '<div class="leer-hinweis">' + escHtml(leerGrundText()) + '</div>'; document.getElementById('alleOffenBtn').style.display = 'none'; return; }
+    if (!window.db || !window.BOS_ZEITKONTEXT) {
+      // Nennt, WAS fehlt -- vorher stand hier nur "Zeitkontext nicht
+      // verfügbar", was beide sehr verschiedenen Ursachen verdeckte.
+      var fehlt = [];
+      if (!window.db) fehlt.push('die Firestore-Verbindung (bos_firebase_config.js)');
+      if (!window.BOS_ZEITKONTEXT) fehlt.push('bos_zeitkontext.js');
+      box.innerHTML = '<div class="leer-hinweis">Status kann nicht gelesen werden — es fehlt: ' + escHtml(fehlt.join(' und ')) + '.</div>';
+      document.getElementById('alleOffenBtn').style.display = 'none';
+      return;
+    }
+
+    box.innerHTML = '<div class="lade-hinweis">Lade Status …</div>';
+
+    Promise.all(feiertage.map(function (f) { return window.BOS_ZEITKONTEXT.status(window.db, f.datum); }))
+      .then(function (stati) {
+        var unbestaetigt = feiertage.filter(function (f, i) { return stati[i].quelle === 'datei' && !stati[i].offen; });
+        var sammelBtn = document.getElementById('alleOffenBtn');
+        sammelBtn.style.display = unbestaetigt.length ? 'block' : 'none';
+        sammelBtn.textContent = 'Noch unbestätigte Feiertage als offen setzen (' + unbestaetigt.length + ')';
+        // Bewusst OHNE die hier gelesenen Stati: setzeAlleUnbestaetigtenOffen()
+        // liest jeden Eintrag unmittelbar vor dem Schreiben neu (C-5). Sonst
+        // schriebe der Knopf mit dem Stand vom Seitenaufbau zurück und
+        // überschriebe eine zwischenzeitlich gesetzte hamsterStufe.
+        sammelBtn.onclick = function () { setzeAlleUnbestaetigtenOffen(unbestaetigt); };
+
+        box.innerHTML = feiertage.map(function (f, i) {
+          var st = stati[i];
+          return '<div class="feiertag-karte ' + (st.offen ? 'offen' : 'geschlossen') + '" data-datum="' + f.datum + '">' +
+            '<div class="feiertag-datum">' + f.datum.slice(8, 10) + '.' + f.datum.slice(5, 7) + '.</div>' +
+            '<div class="feiertag-info">' +
+            '<div class="feiertag-name">' + escHtml(f.name) + '</div>' +
+            '<div class="feiertag-status ' + (st.offen ? 'offen' : '') + '">' + (st.offen ? 'Offen — es wird gearbeitet' : 'Geschlossen') + '</div>' +
+            '<div class="feiertag-quelle">Quelle: ' + (st.quelle === 'firestore' ? 'von Hand gesetzt' : st.quelle === 'lokal' ? 'lokal überschrieben' : 'Standard, unbestätigt') + (st.hamsterStufe ? ' · Hamster-Stufe ' + st.hamsterStufe : '') + '</div>' +
+            '</div>' +
+            '<button type="button" class="toggle-btn" data-toggle="' + f.datum + '" data-name="' + escHtml(f.name) + '">' + (st.offen ? 'Auf geschlossen' : 'Auf offen') + '</button>' +
+            '</div>';
+        }).join('');
+
+        box.querySelectorAll('[data-toggle]').forEach(function (btn) {
+          btn.addEventListener('click', function () { schalteUm(btn.dataset.toggle, btn.dataset.name, btn); });
+        });
+      })
+      .catch(function (err) {
+        console.error('[Feiertage] Status-Abfrage fehlgeschlagen:', err);
+        box.innerHTML = '<div class="leer-hinweis">Laden fehlgeschlagen: ' + escHtml(fehlertext(err)) + '</div>';
+      });
+  }
+
+  function setzeAlleUnbestaetigtenOffen(feiertageListe) {
+    if (!feiertageListe.length) return;
+    if (!confirm(feiertageListe.length + ' Feiertag(e) auf "offen" setzen — bestehende, bereits von Hand gesetzte Einträge bleiben unangetastet. Fortfahren?')) return;
+    var btn = document.getElementById('alleOffenBtn');
+    btn.disabled = true; btn.textContent = 'Setze …';
+
+    // Pro Feiertag: erst den VOLLEN aktuellen Stand lesen (Read-before-Write
+    // wie beim Einzel-Umschalten, C-5), dann schreiben, dann das Ergebnis
+    // auswerten. Ein einzelner Fehlschlag darf die übrigen nicht abbrechen,
+    // deshalb wird pro Eintrag gefangen und am Ende zusammengefasst (B-6).
+    var ergebnisse = feiertageListe.map(function (f) {
+      return window.BOS_ZEITKONTEXT.status(window.db, f.datum).then(function (aktuell) {
+        return window.BOS_ZEITKONTEXT.setzeFirestore(window.db, f.datum, {
+          offen: true,
+          grund: aktuell.grund || f.name,
+          hamsterStufe: aktuell.hamsterStufe
+        }, leseAktivenProfilNamen());
+      }).then(function (erfolg) {
+        return (erfolg === false)
+          ? { datum: f.datum, name: f.name, grund: 'Firestore hat den Schreibvorgang abgelehnt (setzeFirestore lieferte false) — vermutlich Rechte oder Sicherheitsregeln.' }
+          : null;
+      }).catch(function (err) {
+        console.error('[Feiertage] Sammel-Setzen, Eintrag ' + f.datum + ':', err);
+        return { datum: f.datum, name: f.name, grund: (err && err.message) || String(err) };
+      });
+    });
+
+    Promise.all(ergebnisse).then(function (liste) {
+      var fehler = liste.filter(function (x) { return x; });
+      btn.disabled = false;
+      if (fehler.length) {
+        alert(fehler.length + ' von ' + feiertageListe.length + ' Feiertag(en) konnten NICHT gesetzt werden:\n\n' +
+          fehler.map(function (x) { return '• ' + x.datum + ' (' + x.name + '): ' + x.grund; }).join('\n') +
+          '\n\nDie übrigen wurden gesetzt.');
+      }
+      ladeUndRenderListe();
+    });
+  }
+
+  function schalteUm(datum, name, btn) {
+    btn.disabled = true;
+    var urspruenglicherText = btn.textContent;
+    btn.textContent = '…';
+    // Erst den VOLLEN aktuellen Stand lesen (inkl. hamsterStufe!) --
+    // setzeFirestore überschreibt das ganze Dokument, kein Merge. Ein
+    // Aufruf mit nur {offen} würde eine evtl. gesetzte Hamster-Stufe
+    // stillschweigend auf 0 zurücksetzen.
+    window.BOS_ZEITKONTEXT.status(window.db, datum).then(function (aktuell) {
+      return window.BOS_ZEITKONTEXT.setzeFirestore(window.db, datum, {
+        offen: !aktuell.offen,
+        grund: aktuell.grund || name,
+        hamsterStufe: aktuell.hamsterStufe
+      }, leseAktivenProfilNamen());
+    }).then(function (erfolg) {
+      // Hier gibt es KEIN err-Objekt: setzeFirestore() wirft in diesem Fall
+      // nicht, sondern liefert einen Wert zurück. Statt des begründungslosen
+      // "erneut versuchen" (B-2) sagt die Meldung, was tatsächlich bekannt
+      // ist -- inklusive des zurückgegebenen Werts, damit am Gerät ablesbar
+      // ist, was passiert ist. Sauberer wäre, dass bos_zeitkontext.js den
+      // Grund mitliefert; das ist eine Änderung an einer geteilten Datei
+      // (auch Hamster nutzt sie) und steht als eigener Punkt offen (T-84).
+      if (erfolg === false || erfolg === undefined || erfolg === null) {
+        alert('Umschalten nicht ausgeführt.\n\nFirestore hat den Schreibvorgang abgelehnt — ' +
+              'setzeFirestore() lieferte "' + String(erfolg) + '" statt eines Erfolgs. ' +
+              'Häufigste Ursache: fehlende Schreibrechte bzw. Sicherheitsregeln für den Zeitkontext, ' +
+              'oder keine Verbindung.\n\nDatum: ' + datum);
+        btn.disabled = false; btn.textContent = urspruenglicherText; return;
+      }
+      ladeUndRenderListe();
+    }).catch(function (err) {
+      console.error('[Feiertage] Umschalten fehlgeschlagen:', err);
+      alert('Umschalten fehlgeschlagen: ' + fehlertext(err));
+      btn.disabled = false; btn.textContent = urspruenglicherText;
+    });
+  }
+
+  /* ==== Hilfe ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.add('offen-sheet'); });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () { document.getElementById('hilfeOverlay').classList.remove('offen-sheet'); });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('offen-sheet'); });
+
+  /* ==== Start ==== */
+  (window.BOS_AUTH_READY || Promise.resolve()).then(ladeUndRenderListe).catch(ladeUndRenderListe);
+
+})();
+</script>
+</body>
+</html>

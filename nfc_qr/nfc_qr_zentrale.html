@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: nfc_qr/nfc_qr_zentrale.html — NFC-/QR-Zentrale (Stufe 2)
+  Doku:  nfc_qr/NFC_QR_ZENTRALE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Logik: nfc_qr/nfc_qr_logik.js (ohne Browser testbar), ../bos_qr.js (Adresse, QR, Sperre)
+  Test:  node test_nfc_qr.js [--regeln=<Regeldatei>] (im Projekt-Wurzelordner)
+
+  WAS DIE SEITE IST: Liste aller Ziele aus bos_app_registry.js. Je Ziel:
+  Adresse ansehen und kopieren, NFC-Chip beschreiben, Einzelschild (A4 quer)
+  drucken. Dazu Chip prüfen/auslesen und kopieren. Seit Stufe 2: Sammelblatt
+  (ein Standort, mehrere Ziele, A4 hoch), gespeichert in der Sammlung
+  nfc_sammelblaetter (Regel RK §15: lesen und schreiben nur Generalschlüssel).
+
+  DATENBANK DARF AUSFALLEN: Liste, Adresse, Einzelschild und Chips laufen
+  weiter, wenn Firebase nicht lädt, nicht antwortet oder ablehnt. Nur der
+  Bereich „Sammelblätter“ zeigt dann den Grund. Bitte so lassen: kein
+  Datenbank-Aufruf außerhalb des Sammelblatt-Teils.
+
+  DIE SPERRE: Drucken und Chip beschreiben gehen nur, wenn die Seite über
+  https und nicht lokal läuft (BOS_QR.darfAusgeben). Die Prüfung sitzt IN
+  den Aktionen (druckeSchild, schreibeChip), nicht nur am Knopf. Es gibt
+  keinen Schalter, keinen Parameter und keinen Speicherwert, der sie aufhebt.
+  Bitte keinen einbauen.
+
+  NFC: Web NFC (NDEFReader) arbeitet nur im Hauptfenster, nie eingebettet.
+  Der Launcher öffnet Apps eingebettet; dann zeigt die Seite statt der
+  Chip-Knöpfe „In eigenem Fenster öffnen“. Kein Schreibschutz für Chips
+  (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
+
+  CHANGELOG
+    2026-10-04 · 11:58 · v1.2 · Fix (drei Korrekturen, KC 04.10., Kompendium §P10)
+      Sammelblatt drucken nur im gespeicherten Stand: Sperre in
+      druckeSammelblatt(), Meldung „erst speichern, dann drucken“.
+      „Blatt entfernen“ schreibt den zuletzt gespeicherten Stand plus
+      geloescht, nicht den Stand aus dem Editor.
+      Gruppe vom Papier genommen (Ulf, 11:57; Logik v1.2): am Bildschirm
+      bleibt sie.
+    2026-10-04 · 11:02 · v1.1 · Feature (Stufe 2) + Fix
+      ANWEISUNG_2026-10-04_NFC_QR_ZENTRALE_STUFE2.md (KC, 10:55).
+      Sammelblatt: zusammenstellen, speichern (nfc_sammelblaetter),
+      „Ziel gibt es nicht mehr“, Druck A4 hoch. Firebase eingebunden,
+      Regelstand-Probe (Fassung nfc-qr-2026-10-04).
+      Fix L1: Gruppe über dem Namen (Schild, Chip prüfen, Sammelblatt).
+      Fix L2: Chip kopieren nur, wenn das Ziel wählbar ist.
+      Fix L3: Text auf einem Chip wird unverändert angezeigt (Logik).
+    2026-10-03 · 14:47 · v1.0 · Feature
+      Erstfassung, Stufe 1. ANWEISUNG_2026-10-03_NFC_QR_ZENTRALE_STUFE1.md
+      (KC, 11:51), Konzept 2026-10-03_NFC_QR_ZENTRALE.md (11:38).
+      Vorlagen (gelesen, nicht kopiert, altes Design gilt nicht mehr):
+      AdminTools/nfc_zentrale.html, druckzentrale_modul_schild.js.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · NFC &amp; QR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bos-bg, #16120e); color: var(--bos-text, #f3ece1);
+    font-family: var(--bos-font-body, sans-serif); font-size: var(--bos-font-md, .95rem); line-height: 1.45; }
+  .seite { max-width: 860px; margin: 0 auto; padding: var(--bos-space-md, 18px); padding-bottom: 90px; }
+  header.kopf { display: flex; justify-content: space-between; align-items: center; gap: var(--bos-space-sm, 14px); margin-bottom: var(--bos-space-md, 18px); }
+  .kopf h1 { margin: 0; }
+  .kopf .unter { color: var(--bos-text-dim, #ab9c8a); font-family: var(--bos-font-label, sans-serif); text-transform: uppercase; letter-spacing: .08em; font-size: var(--bos-font-xs, .72rem); }
+  .rund-btn { width: var(--bos-tap-min, 44px); height: var(--bos-tap-min, 44px); padding: 0; border-radius: 50%; }
+  h2.abschnitt { font-family: var(--bos-font-label, sans-serif); text-transform: uppercase; letter-spacing: .08em;
+    font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim, #ab9c8a); margin: var(--bos-space-lg, 22px) 0 var(--bos-space-xs, 9px); }
+  .karte { background: var(--bos-surface, #221b14); border: 1px solid var(--bos-border, rgba(255,255,255,.08));
+    border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px); margin-bottom: var(--bos-space-xs, 9px); }
+  .hinweis { border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px); margin-bottom: var(--bos-space-sm, 14px);
+    border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); background: var(--bos-surface-raised, #2b2218); }
+  .hinweis.sperre { border-color: var(--bos-amber, #c07a10); background: var(--bos-amber-glow-soft, rgba(192,122,16,.16)); }
+  .hinweis.rot { border-color: var(--bos-red, #d6584a); }
+  .hinweis b { display: block; margin-bottom: 4px; }
+  .klein { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim, #ab9c8a); }
+  .adresse { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--bos-font-sm, .82rem); word-break: break-all;
+    color: var(--bos-text-dim, #ab9c8a); user-select: all; -webkit-user-select: all; }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: var(--bos-space-xs, 9px); margin-top: var(--bos-space-xs, 9px); align-items: center; }
+  .bos-btn { min-height: var(--bos-tap-min, 44px); }
+  .bos-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .ziel-kopf { display: flex; gap: var(--bos-space-sm, 14px); align-items: flex-start; }
+  .ziel-icon { font-size: 1.6rem; line-height: 1.2; flex: 0 0 auto; width: 2rem; text-align: center; }
+  .ziel-name { font-weight: 700; font-size: var(--bos-font-lg, 1.15rem); }
+  .marke { display: inline-block; font-family: var(--bos-font-label, sans-serif); font-weight: 600; font-size: var(--bos-font-xs, .72rem);
+    text-transform: uppercase; letter-spacing: .06em; padding: 1px 8px; border-radius: 99px; margin-left: 6px; vertical-align: middle;
+    border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); color: var(--bos-text-dim, #ab9c8a); }
+  .karte.aus { opacity: .55; }
+  .karte.aus .ziel-name { font-weight: 600; font-size: var(--bos-font-md, .95rem); }
+  .ergebnis { margin-top: var(--bos-space-sm, 14px); padding-top: var(--bos-space-sm, 14px); border-top: 1px solid var(--bos-border, rgba(255,255,255,.08)); }
+  .ergebnis .urteil { font-weight: 700; margin: 6px 0; }
+  .urteil.gut { color: var(--bos-green, #4caf7d); } .urteil.warn { color: var(--bos-amber-bright, #e0973a); } .urteil.schlecht { color: var(--bos-red, #d6584a); }
+  #fehlerLeiste { border: 1px solid var(--bos-red, #d6584a); border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px);
+    margin-bottom: var(--bos-space-sm, 14px); background: var(--bos-surface, #221b14); }
+  #fehlerLeiste .fehler-kopf { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--bos-red, #d6584a); }
+  #fehlerLeiste ul { margin: 8px 0 0; padding-left: 1.1rem; word-break: break-word; }
+  .link-btn { background: none; border: none; color: var(--bos-amber-bright, #e0973a); font: inherit; cursor: pointer; text-decoration: underline; padding: 6px; }
+  .sheet-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 640px; max-height: 88vh; overflow: auto; background: var(--bos-surface-raised, #2b2218);
+    border-radius: var(--bos-radius-lg, 22px) var(--bos-radius-lg, 22px) 0 0; padding: var(--bos-space-lg, 22px); box-shadow: var(--bos-shadow-lg, 0 20px 56px rgba(0,0,0,.6)); }
+  .sheet h2 { margin: 0 0 var(--bos-space-sm, 14px); font-family: var(--bos-font-display, serif); }
+  .sheet h3 { margin: var(--bos-space-md, 18px) 0 4px; font-size: var(--bos-font-md, .95rem); }
+  .sheet p { margin: 0 0 8px; }
+  .sheet-knoepfe { display: flex; flex-wrap: wrap; gap: var(--bos-space-xs, 9px); justify-content: flex-end; margin-top: var(--bos-space-md, 18px); }
+  .sheet-fehler { color: var(--bos-red, #d6584a); font-weight: 600; word-break: break-word; }
+  .wahl { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 var(--bos-space-sm, 14px); }
+  .wahl label { display: flex; gap: 10px; align-items: center; min-height: var(--bos-tap-min, 44px); padding: 4px 10px;
+    border: 1px solid var(--bos-border, rgba(255,255,255,.08)); border-radius: var(--bos-radius-sm, 6px); cursor: pointer; }
+  .feld-label { display: block; font-family: var(--bos-font-label, sans-serif); text-transform: uppercase; letter-spacing: .06em;
+    font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim, #ab9c8a); margin-bottom: 4px; }
+  .bos-input { width: 100%; }
+  .blatt-zeile { display: flex; align-items: center; gap: var(--bos-space-xs, 9px); padding: 6px 0; border-bottom: 1px solid var(--bos-border, rgba(255,255,255,.08)); flex-wrap: wrap; }
+  .blatt-zeile .inhalt { flex: 1; min-width: 9rem; }
+  .blatt-zeile.ueber .inhalt { font-family: var(--bos-font-label, sans-serif); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .blatt-zeile.tot .inhalt { color: var(--bos-red, #d6584a); }
+  .klein-btn { min-width: var(--bos-tap-min, 44px); padding-left: 10px; padding-right: 10px; }
+  .gefahr { border-color: var(--bos-red, #d6584a); color: var(--bos-red, #d6584a); }
+  .blatt-meldung { color: var(--bos-red, #d6584a); font-weight: 600; margin: 8px 0; word-break: break-word; }
+  .zusatz-reihe { display: flex; gap: var(--bos-space-xs, 9px); margin-top: var(--bos-space-xs, 9px); flex-wrap: wrap; align-items: center; }
+  .zusatz-reihe .bos-input { flex: 1; min-width: 10rem; width: auto; }
+  .marke.offen { border-color: var(--bos-amber, #c07a10); color: var(--bos-amber-bright, #e0973a); }
+  .warte { font-size: 2.6rem; text-align: center; margin: 10px 0; animation: puls 1.2s infinite; }
+  @keyframes puls { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  /* pointer-events: none — sonst fängt eine lange Meldung fünf Sekunden lang die Tipper auf die Knöpfe darunter ab (Fund im Ablauftest, 04.10.2026) */
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 950; max-width: 92vw; pointer-events: none;
+    background: var(--bos-surface-raised, #2b2218); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18));
+    border-radius: var(--bos-radius-md, 14px); padding: 10px 16px; box-shadow: var(--bos-shadow-md, 0 10px 28px rgba(0,0,0,.5)); }
+</style>
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge nach Checkliste §2a und
+     bos_standalone_login.js-Kopf (seit Stufe 2 mit Firebase, der normale
+     Weg). Direkt aufrufbar, weil Chips nur im eigenen Fenster gehen. -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'nfc_qr_zentrale';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="../bos_qr.js"></script>
+<script src="../qrcode.min.js"></script>
+<script src="nfc_qr_logik.js"></script>
+
+<div class="seite">
+  <header class="kopf">
+    <div>
+      <h1 class="bos-title" data-i18n="titel">NFC &amp; QR</h1>
+      <div class="unter" data-i18n="untertitel">Zentrale für Schilder und Chips</div>
+    </div>
+    <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+  </header>
+
+  <div id="fehlerLeiste" role="alert" hidden>
+    <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+      <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+    <ul id="fehlerListe"></ul>
+  </div>
+
+  <div id="sperrHinweis" class="hinweis sperre" role="status" hidden></div>
+
+  <h2 class="abschnitt" data-i18n="abschnitt_chip">Chip prüfen</h2>
+  <div class="karte" id="chipBereich"></div>
+
+  <h2 class="abschnitt" data-i18n="abschnitt_blaetter">Sammelblätter</h2>
+  <div id="regelLeiste" class="hinweis rot" role="alert" hidden></div>
+  <div class="karte" id="blattBereich"></div>
+
+  <h2 class="abschnitt" data-i18n="abschnitt_ziele">Ziele</h2>
+  <div id="zielBereich"></div>
+
+  <h2 class="abschnitt" data-i18n="abschnitt_planung">Weitere Druckvorlagen</h2>
+  <div class="karte">
+    <div class="knoepfe" style="margin-top:0">
+      <button type="button" class="bos-btn" disabled data-i18n="planung_kaertchen">🚧 Maschinen-Kärtchen · in Planung</button>
+    </div>
+    <div class="klein" style="margin-top:8px" data-i18n="planung_text">Kommt in der nächsten Baustufe: kleine Kärtchen für Maschinen, zum Ausschneiden.</div>
+  </div>
+</div>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="schildSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="schildTitel"></h2>
+    <div class="adresse" id="schildAdresse"></div>
+    <span class="feld-label" style="margin-top:14px" data-i18n="schild_was">Was soll aufs Schild?</span>
+    <div class="wahl" id="schildWahl">
+      <label><input type="radio" name="variante" value="beides" checked> <span data-i18n="variante_beides">QR-Code und Chip-Feld</span></label>
+      <label><input type="radio" name="variante" value="qr"> <span data-i18n="variante_qr">nur QR-Code</span></label>
+      <label><input type="radio" name="variante" value="chip"> <span data-i18n="variante_chip">nur Chip-Feld</span></label>
+    </div>
+    <label class="feld-label" for="schildSpruch" data-i18n="schild_spruch">Spruch (darf leer sein)</label>
+    <input class="bos-input" id="schildSpruch" maxlength="70" autocomplete="off">
+    <div class="klein" style="margin-top:8px" data-i18n="schild_hinweis">DIN A4 quer. Im Druckdialog auf „Querformat“ achten. Das Chip-Feld zeigt nur, wo der Chip hinkommt: Den Chip beschreibst du getrennt mit „Chip beschreiben“ und klebst ihn dann auf.</div>
+    <div id="schildFehler" class="sheet-fehler" role="alert"></div>
+    <div class="sheet-knoepfe">
+      <button type="button" class="bos-btn" id="schildZuBtn" data-i18n="abbrechen">Abbrechen</button>
+      <button type="button" class="bos-btn bos-btn--amber" id="schildDruckBtn" data-i18n="schild_drucken">🖨 Drucken</button>
+    </div>
+  </div>
+</div>
+
+<div id="chipSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="chipSheetTitel"></h2>
+    <div class="warte" aria-hidden="true">📡</div>
+    <p id="chipSheetText"></p>
+    <div class="adresse" id="chipSheetAdresse"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="chipAbbrechenBtn" data-i18n="abbrechen">Abbrechen</button></div>
+  </div>
+</div>
+
+<div id="frageSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="frageTitel"></h2>
+    <p id="frageText"></p>
+    <div class="sheet-knoepfe" id="frageKnoepfe"></div>
+  </div>
+</div>
+
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   NFC-/QR-Zentrale — Seite. Reine Logik: nfc_qr_logik.js und ../bos_qr.js.
+   KEINE Adressen im Code: alles kommt aus bos_app_registry.js und aus
+   dem Speicherort von bos_qr.js.
+   ================================================================== */
+const L = window.BOS_NFC_QR_LOGIK;
+const Q = window.BOS_QR;
+const NFC_ZEITLIMIT_MS = 30000;   /* wie im alten Programm */
+/* Regelstand-Probe (RK §13/§15): die Seite liest bos_regelstand/<Fassung>.
+   Lehnt die Datenbank ab, ist die eingesetzte Regel älter als diese Seite.
+   REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft). */
+const REGEL_FASSUNG = 'nfc-qr-2026-10-04';
+const REGEL_DATEI = 'firestore_regeln_2026-10-04_nfc_sammelblatt.rules';
+const DB_ZEITLIMIT_MS = 10000;
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  titel: 'NFC & QR',
+  untertitel: 'Zentrale für Schilder und Chips',
+  fehler_titel: '⚠ Fehler',
+  ausblenden: 'ausblenden',
+  schliessen: 'Schließen',
+  abbrechen: 'Abbrechen',
+  abschnitt_chip: 'Chip prüfen',
+  abschnitt_ziele: 'Ziele',
+  abschnitt_planung: 'Weitere Druckvorlagen',
+  planung_kaertchen: '🚧 Maschinen-Kärtchen · in Planung',
+  planung_text: 'Kommt in der nächsten Baustufe: kleine Kärtchen für Maschinen, zum Ausschneiden.',
+  err_laden: 'Die Seite konnte nicht starten',
+  err_kopieren: 'Adresse konnte nicht kopiert werden. Sie steht in der Zeile: lange drücken, markieren, kopieren',
+  err_drucken: 'Schild konnte nicht gedruckt werden',
+  err_chip_schreiben: 'Chip wurde nicht beschrieben',
+  err_chip_lesen: 'Chip wurde nicht gelesen',
+  err_unerwartet: 'Unerwarteter Fehler',
+  sperre_titel: 'Erst wenn BOS online ist',
+  sperre_text: 'Diese Seite läuft gerade nicht unter der echten Online-Adresse von BäckereiOS. Ein jetzt gedrucktes Schild oder ein jetzt beschriebener Chip würde vom Handy aus nirgendwohin führen. Deshalb sind „Schild“ und „Chip beschreiben“ gesperrt. Adressen ansehen und kopieren geht.',
+  sperre_adresse: 'Adresse dieser Seite:',
+  gesperrt_kurz: 'erst wenn BOS online ist',
+  gesperrt_toast: 'Gesperrt: erst wenn BOS online ist.',
+  eingebettet_titel: 'Chips gehen nur im eigenen Fenster',
+  eingebettet_text: 'Diese Seite läuft gerade eingebettet (im Launcher). Der Browser erlaubt NFC nur in einem eigenen Fenster. Liste, Adressen und Schilder gehen hier weiter.',
+  eigenes_fenster: 'In eigenem Fenster öffnen',
+  kein_nfc_titel: 'Dieses Gerät kann hier keine Chips lesen oder beschreiben',
+  kein_nfc_text: 'Chips beschreibst und prüfst du am Handy in Chrome (Android, NFC eingeschaltet). Adressen ansehen, kopieren und Schilder drucken geht auch hier.',
+  chip_text: 'Chip hinhalten und sehen, wohin er führt und ob es das Ziel noch gibt.',
+  chip_pruefen: '📡 Chip prüfen',
+  chip_lesen_titel: 'Chip prüfen',
+  chip_lesen_text: 'Jetzt den Chip an die Rückseite des Handys halten …',
+  chip_schreiben_titel: 'Chip beschreiben: {name}',
+  chip_schreiben_text: 'Jetzt den Chip an die Rückseite des Handys halten und ruhig halten, bis die Bestätigung kommt. Was vorher auf dem Chip stand, wird überschrieben.',
+  chip_geschrieben: '✓ Chip beschrieben: {name}. Am besten gleich mit „Chip prüfen“ gegenlesen.',
+  chip_gelesen: 'Auf dem Chip steht:',
+  chip_leer: 'Auf dem Chip steht keine Adresse (leer oder anderer Inhalt).',
+  chip_ziel: '✓ Führt zu „{name}“ in diesem BOS.',
+  chip_zusatz: 'Zusatz in der Adresse: {zusatz}',
+  chip_nicht_direkt: 'Achtung: „{name}“ ist nicht (mehr) für den Direktaufruf freigegeben. Wer scannt, landet womöglich vor einer Sperre.',
+  chip_ziel_fehlt: '⚠ Führt in dieses BOS, aber das Ziel gibt es nicht (mehr): {pfad}',
+  chip_fremd: '✗ Führt nicht in dieses BOS.',
+  chip_fremd_lokal: 'Diese Seite läuft gerade lokal. Verglichen wird mit der lokalen Adresse. Ein Chip mit der echten Online-Adresse gilt hier deshalb als fremd.',
+  chip_kopieren: '📡 Auf einen anderen Chip kopieren',
+  chip_kopieren_nur_ziel: 'Kopieren geht nur für Chips, die zu einem wählbaren Ziel in diesem BOS führen.',
+  nfc_abgebrochen: 'Abgebrochen.',
+  nfc_zeit: 'Kein Chip erkannt (30 Sekunden gewartet). Chip mittig an die Rückseite des Handys halten und noch einmal versuchen.',
+  nfc_keine_erlaubnis: 'Keine Erlaubnis: Der Browser darf NFC für diese Seite nicht benutzen. In der Abfrage „Zulassen“ wählen, oder in Chrome über das Schloss neben der Adresse die Berechtigung „NFC“ erlauben.',
+  nfc_aus: 'NFC ist am Handy ausgeschaltet oder gerade belegt. In den Einstellungen des Handys NFC einschalten und noch einmal versuchen.',
+  nfc_kein_geraet: 'Dieses Gerät hat kein NFC, oder der Browser kann es nicht benutzen. Chips gehen am Handy in Chrome (Android).',
+  nfc_chip_nicht_lesbar: 'Chip nicht lesbar. Chip ruhig und mittig an die Rückseite des Handys halten. Bleibt es dabei: Der Chip ist defekt oder kein passender Typ.',
+  nfc_chip_nicht_beschreibbar: 'Chip nicht beschreibbar. Entweder zu früh weggezogen, schreibgeschützt oder kein passender Typ. Ruhig halten und noch einmal versuchen, sonst einen anderen Chip nehmen.',
+  nfc_unbekannt: 'NFC hat einen Fehler gemeldet.',
+  ziel_bos_text: 'Die Startseite mit allen Kacheln. Das Schild für die Backstubentür oder den Pausenraum.',
+  marke_offen: 'ohne Anmeldung',
+  adresse_kopieren: 'Adresse kopieren',
+  adresse_kopiert: 'Adresse kopiert.',
+  chip_beschreiben: '📡 Chip beschreiben',
+  schild: '🖨 Schild',
+  grund_nicht_direkt: 'Diese Seite ist nicht für den Direktaufruf gebaut. Sie bekommt deshalb keinen Code und keinen Chip.',
+  keine_ziele: 'In der Registry steht kein Ziel mit Adresse.',
+  schild_titel: 'Schild: {name}',
+  schild_was: 'Was soll aufs Schild?',
+  variante_beides: 'QR-Code und Chip-Feld',
+  variante_qr: 'nur QR-Code',
+  variante_chip: 'nur Chip-Feld',
+  schild_spruch: 'Spruch (darf leer sein)',
+  schild_hinweis: 'DIN A4 quer. Im Druckdialog auf „Querformat“ achten. Das Chip-Feld zeigt nur, wo der Chip hinkommt: Den Chip beschreibst du getrennt mit „Chip beschreiben“ und klebst ihn dann auf.',
+  schild_drucken: '🖨 Drucken',
+  hilfe_titel: 'Hilfe: NFC & QR',
+  abschnitt_blaetter: 'Sammelblätter',
+  blatt_lade: 'Lade gespeicherte Blätter …',
+  blatt_keine: 'Noch kein Blatt gespeichert.',
+  blatt_neu: '＋ Neues Blatt',
+  blatt_oeffnen: 'Öffnen',
+  blatt_drucken: '🖨 Drucken',
+  blatt_zeilen_zahl: '{ziele} Ziele, {ueber} Überschriften',
+  blatt_tote_uebersicht: '⚠ {n} Ziel(e) gibt es nicht mehr. Blatt öffnen und die Zeile ersetzen oder entfernen. Bis dahin kein Druck.',
+  blatt_zurueck: '‹ Alle Blätter',
+  blatt_ungespeichert: '● ungespeicherte Änderungen',
+  blatt_gespeichert_stand: '✓ gespeichert',
+  blatt_standort: 'Standort (steht groß auf dem Blatt)',
+  blatt_standort_platz: 'z. B. Backstubentür',
+  blatt_ausstattung: 'Was soll je Zeile drauf?',
+  blatt_zeilen: 'Zeilen in dieser Reihenfolge',
+  blatt_zeilen_leer: 'Noch keine Zeile. Unten ein Ziel hinzufügen.',
+  blatt_ziel_dazu: 'Ziel hinzufügen',
+  blatt_ziel_wahl: 'Ziel wählen …',
+  blatt_ueber_dazu: 'Überschrift hinzufügen',
+  blatt_ueber_platz: 'Überschrift, z. B. Froster',
+  blatt_zaehler: '{ziele} von {maxZiele} Zielen · {ueber} von {maxUeber} Überschriften',
+  blatt_hoch: 'nach oben',
+  blatt_runter: 'nach unten',
+  blatt_zeile_weg: 'Zeile entfernen',
+  blatt_speichern: 'Speichern',
+  blatt_entfernen: 'Blatt entfernen',
+  blatt_gespeichert: 'Blatt gespeichert.',
+  blatt_entfernt: 'Blatt entfernt.',
+  blatt_tot_fehlt: 'Ziel gibt es nicht mehr („{id}“ steht nicht mehr in der Liste der Programme). Zeile entfernen oder durch ein anderes Ziel ersetzen.',
+  blatt_tot_nicht_waehlbar: '„{name}“ ist nicht mehr für den Direktaufruf freigegeben. Zeile entfernen oder durch ein anderes Ziel ersetzen.',
+  blatt_zeile_kaputt: 'Diese Zeile ist nicht lesbar. Bitte entfernen.',
+  blatt_druck_tot: 'Kein Druck: {n} Ziel(e) auf diesem Blatt gibt es nicht mehr. Erst die rot markierten Zeilen ersetzen oder entfernen. Ein Blatt mit totem Code soll nicht entstehen.',
+  blatt_druck_leer: 'Kein Druck: Auf dem Blatt steht noch kein Ziel.',
+  blatt_druck_ungespeichert: 'Erst speichern, dann drucken. Dieses Blatt hat ungespeicherte Änderungen; gedruckt wird nur, was auch gespeichert ist.',
+  f_standort_leer: 'Der Standort fehlt.',
+  f_standort_lang: 'Der Standort ist zu lang (höchstens 40 Zeichen).',
+  f_ausstattung: 'Die Ausstattung fehlt.',
+  f_zeilen: 'Die Zeilen sind nicht lesbar.',
+  f_max_ziele: 'Mehr als 7 Ziele passen nicht auf ein Blatt (der Code soll mindestens 3 cm breit bleiben). Für weitere Ziele ein zweites Blatt anlegen.',
+  f_max_ueberschriften: 'Mehr als 2 Überschriften passen nicht auf ein Blatt.',
+  f_max_zeilen: 'Zu viele Zeilen für ein Blatt.',
+  f_zeile_form: 'Eine Zeile ist nicht lesbar oder eine Überschrift ist leer oder zu lang (höchstens 40 Zeichen).',
+  f_doppelt: 'Dieses Ziel steht schon auf dem Blatt.',
+  f_ueber_leer: 'Erst den Text der Überschrift eintippen.',
+  f_ziel_wahl: 'Erst ein Ziel aus der Liste wählen.',
+  frage_zeile_titel: 'Zeile entfernen?',
+  frage_zeile_text: '„{name}“ von diesem Blatt nehmen?',
+  frage_blatt_titel: 'Blatt entfernen?',
+  frage_blatt_text: '„{name}“ verschwindet aus der Liste. Es wird nicht endgültig gelöscht, in der Datenbank bleibt es als entfernt markiert.',
+  frage_verlassen_titel: 'Ungespeicherte Änderungen',
+  frage_verlassen_text: 'Dieses Blatt hat Änderungen, die noch nicht gespeichert sind.',
+  frage_verwerfen: 'Änderungen verwerfen',
+  frage_bleiben: 'Im Blatt bleiben',
+  frage_ja_entfernen: 'Ja, entfernen',
+  frage_nein: 'Nein, behalten',
+  db_regel_alt: 'Regeln passen nicht zu dieser Seite: Die Datenbank kennt die Fassung „{fassung}“ nicht. Gespeicherte Blätter gehen erst, wenn in der Firebase-Konsole die Regeldatei „{datei}“ eingesetzt ist. Liste, Adressen, Einzelschild und Chips gehen weiter.',
+  db_kein_admin: 'Gespeicherte Blätter gehören nur dem Systempflege-Konto. Du bist als „{kennung}“ angemeldet, dieses Konto darf sie weder lesen noch speichern. Liste, Adressen, Einzelschild und Chips gehen hier weiter.',
+  db_kein_netz: 'Die Datenbank ist gerade nicht erreichbar (kein Netz oder keine Antwort). Gespeicherte Blätter gehen im Moment nicht. Liste, Adressen, Einzelschild und Chips gehen weiter.',
+  db_nicht_geladen: 'Die Datenbank wurde nicht geladen (kein Netz beim Öffnen der Seite?). Gespeicherte Blätter gehen im Moment nicht. Liste, Adressen, Einzelschild und Chips gehen weiter.',
+  db_fehler: 'Die Datenbank hat einen Fehler gemeldet. Gespeicherte Blätter gehen im Moment nicht. Liste, Adressen, Einzelschild und Chips gehen weiter.',
+  db_meldung: 'Meldung der Datenbank:',
+  db_nochmal: 'Nochmal versuchen',
+  err_blatt_speichern: 'Blatt wurde NICHT gespeichert',
+  sp_kein_recht: 'Keine Berechtigung: Speichern darf nur das Systempflege-Konto, oder die eingesetzte Regel ist älter als diese Seite.',
+  sp_kein_netz: 'Keine Verbindung zur Datenbank. Das Blatt bleibt hier offen, später noch einmal speichern.',
+  sp_zeit: 'Die Datenbank hat nicht geantwortet (10 Sekunden gewartet). Ob gespeichert wurde, ist unklar: Seite neu laden und nachsehen.',
+  sp_konflikt: 'Dieses Blatt wurde inzwischen woanders geändert. Es wurde NICHT überschrieben. Zurück zu „Alle Blätter“, das Blatt neu öffnen und die Änderung dort noch einmal machen.',
+  sp_form: 'Das Blatt kann so nicht gespeichert werden:'
+};
+function t(key, werte) {
+  let s = Object.prototype.hasOwnProperty.call(I18N_DE, key) ? I18N_DE[key] : key;
+  if (werte) Object.keys(werte).forEach(function (k) { s = s.split('{' + k + '}').join(String(werte[k])); });
+  return s;
+}
+function wendeI18nAn() {
+  document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* ---------- Fehler gehören auf den Bildschirm (Checkliste §7a) ---------- */
+function fehlerText(titel, err) {
+  const m = err && (err.message || err.name) ? (err.message || err.name) : String(err);
+  return titel + ' — ' + m;
+}
+function zeigeFehler(titel, err) {
+  console.error('[NFC & QR] ' + titel, err);
+  const li = document.createElement('li');
+  li.textContent = fehlerText(titel, err);
+  const liste = document.getElementById('fehlerListe');
+  liste.insertBefore(li, liste.firstChild);
+  while (liste.children.length > 6) liste.removeChild(liste.lastChild);
+  document.getElementById('fehlerLeiste').hidden = false;
+}
+window.onerror = function (meldung, quelle, zeile) {
+  zeigeFehler(t('err_unerwartet'), new Error(meldung + (quelle ? ' (' + String(quelle).replace(/^.*\//, '') + ':' + zeile + ')' : '')));
+};
+window.addEventListener('unhandledrejection', function (e) {
+  zeigeFehler(t('err_unerwartet'), e.reason || new Error('unbekannt'));
+});
+let toastUhr = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastUhr);
+  toastUhr = setTimeout(function () { el.hidden = true; }, 5000);
+}
+
+/* ---------- Zustand ---------- */
+const S = { chip: null, nfcAbbruch: null, nfcLaeuft: false, schildZielId: null,
+  kennung: null, db: { zustand: 'lade', meldung: '', blaetter: [] }, blatt: null, blattSauber: null, blattMeldung: '', speichert: false };
+
+function apps() { return window.BOS_APPS || []; }
+function eingebettet() { try { return window.self !== window.top; } catch (e) { return true; } }
+function nfcDa() { return 'NDEFReader' in window; }
+/* DIE Sperre. Reine Frage an bos_qr.js, nur die eigene Adresse zählt. */
+function darf() { return !!Q && Q.darfAusgeben(window.location.href); }
+function adresseFuer(ziel) { return Q.adresse(ziel.url); }
+function standHeute() {
+  const h = new Date();   /* lokal rechnen, nie toISOString() */
+  return String(h.getDate()).padStart(2, '0') + '.' + String(h.getMonth() + 1).padStart(2, '0') + '.' + h.getFullYear();
+}
+
+/* ---------- Anzeige ---------- */
+function renderSperre() {
+  const el = document.getElementById('sperrHinweis');
+  if (darf()) { el.hidden = true; return; }
+  el.innerHTML = '<b>' + esc(t('sperre_titel')) + '</b>' + esc(t('sperre_text')) +
+    '<div class="klein" style="margin-top:8px">' + esc(t('sperre_adresse')) + ' <span class="adresse">' + esc(Q.wurzel()) + '</span></div>';
+  el.hidden = false;
+}
+function chipErgebnisHTML(e) {
+  if (!e) return '';
+  let html = '<div class="ergebnis" id="chipErgebnis">';
+  if (e.art === 'leer') {
+    html += '<div class="urteil warn">' + esc(t('chip_leer')) + '</div>';
+  } else {
+    html += '<div class="klein">' + esc(t('chip_gelesen')) + '</div><div class="adresse">' + esc(e.adresse) + '</div>';
+    if (e.art === 'ziel') {
+      html += '<div class="urteil gut">' + esc(t('chip_ziel', { name: L.anzeigeName(e.ziel) })) + '</div>';
+      if (e.zusatz) html += '<div class="klein">' + esc(t('chip_zusatz', { zusatz: e.zusatz })) + '</div>';
+      if (!e.direkt) html += '<div class="urteil warn">' + esc(t('chip_nicht_direkt', { name: L.anzeigeName(e.ziel) })) + '</div>';
+    } else if (e.art === 'ziel_fehlt') {
+      html += '<div class="urteil warn">' + esc(t('chip_ziel_fehlt', { pfad: e.pfad })) + '</div>';
+    } else {
+      html += '<div class="urteil schlecht">' + esc(t('chip_fremd')) + '</div>';
+      if (!darf()) html += '<div class="klein">' + esc(t('chip_fremd_lokal')) + '</div>';
+    }
+    html += '<div class="knoepfe">';
+    if (e.art === 'ziel' && e.direkt) {   /* L2: kopieren nur, wenn das Ziel wählbar ist */
+      html += '<button type="button" class="bos-btn" data-aktion="chip-kopieren"' + (darf() ? '' : ' disabled') + '>' + esc(t('chip_kopieren')) + '</button>';
+      if (!darf()) html += '<span class="klein">' + esc(t('gesperrt_kurz')) + '</span>';
+    } else {
+      html += '<span class="klein">' + esc(t('chip_kopieren_nur_ziel')) + '</span>';
+    }
+    html += '</div>';
+  }
+  return html + '</div>';
+}
+function renderChip() {
+  const el = document.getElementById('chipBereich');
+  let html;
+  if (eingebettet()) {
+    html = '<b>' + esc(t('eingebettet_titel')) + '</b><div class="klein">' + esc(t('eingebettet_text')) + '</div>' +
+      '<div class="knoepfe"><a class="bos-btn bos-btn--amber" id="eigenesFenster" target="_blank" rel="noopener" href="' + esc(window.location.href) + '">' + esc(t('eigenes_fenster')) + '</a></div>';
+  } else if (!nfcDa()) {
+    html = '<b>' + esc(t('kein_nfc_titel')) + '</b><div class="klein" id="keinNfc">' + esc(t('kein_nfc_text')) + '</div>';
+  } else {
+    html = '<div class="klein">' + esc(t('chip_text')) + '</div>' +
+      '<div class="knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="chip-pruefen">' + esc(t('chip_pruefen')) + '</button></div>' +
+      chipErgebnisHTML(S.chip);
+  }
+  el.innerHTML = html;
+}
+function zielHTML(z, text) {
+  const mitChip = !eingebettet() && nfcDa();
+  let html = '<div class="karte ziel" data-ziel="' + esc(z.id) + '"><div class="ziel-kopf"><span class="ziel-icon" aria-hidden="true">' + esc(z.icon) + '</span><div style="min-width:0">' +
+    '<div class="ziel-name">' + esc(z.name) + (z.direkt === 'offen' ? '<span class="marke">' + esc(t('marke_offen')) + '</span>' : '') + '</div>' +
+    (text ? '<div class="klein">' + esc(text) + '</div>' : (z.hubName ? '<div class="klein">' + esc(z.hubName) + '</div>' : '')) +
+    '<div class="adresse">' + esc(adresseFuer(z)) + '</div></div></div><div class="knoepfe">' +
+    '<button type="button" class="bos-btn" data-aktion="kopieren" data-id="' + esc(z.id) + '">' + esc(t('adresse_kopieren')) + '</button>';
+  if (mitChip) html += '<button type="button" class="bos-btn" data-aktion="chip" data-id="' + esc(z.id) + '"' + (darf() ? '' : ' disabled') + '>' + esc(t('chip_beschreiben')) + '</button>';
+  html += '<button type="button" class="bos-btn" data-aktion="schild" data-id="' + esc(z.id) + '"' + (darf() ? '' : ' disabled') + '>' + esc(t('schild')) + '</button>';
+  if (!darf()) html += '<span class="klein">' + esc(t('gesperrt_kurz')) + '</span>';
+  return html + '</div></div>';
+}
+function renderZiele() {
+  const gruppen = L.zielListe(apps());
+  let html = zielHTML(L.ZIEL_BOS, t('ziel_bos_text'));
+  if (!gruppen.length) html += '<div class="hinweis">' + esc(t('keine_ziele')) + '</div>';
+  gruppen.forEach(function (g) {
+    html += '<h2 class="abschnitt">' + esc(g.titel) + '</h2>';
+    g.eintraege.forEach(function (z) {
+      if (z.waehlbar) { html += zielHTML(z); return; }
+      html += '<div class="karte ziel aus" data-ziel="' + esc(z.id) + '"><div class="ziel-kopf"><span class="ziel-icon" aria-hidden="true">' + esc(z.icon) + '</span><div style="min-width:0">' +
+        '<div class="ziel-name">' + esc(z.name) + '</div><div class="klein">' + esc(t('grund_' + z.grund)) + '</div></div></div></div>';
+    });
+  });
+  document.getElementById('zielBereich').innerHTML = html;
+}
+function render() { renderSperre(); renderChip(); renderZiele(); renderBlatt(); }
+
+/* ---------- Adresse kopieren (geht immer, auch lokal) ---------- */
+async function kopiereAdresse(id) {
+  const ziel = L.zielNachId(apps(), id);
+  if (!ziel) return;
+  const adr = adresseFuer(ziel);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(adr);
+    else {
+      const ta = document.createElement('textarea');
+      ta.value = adr; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) throw new Error('Der Browser hat das Kopieren abgelehnt');
+    }
+    toast(t('adresse_kopiert'));
+  } catch (err) { zeigeFehler(t('err_kopieren'), err); }
+}
+
+/* ---------- Einzelschild (immer über bos_druck.js, nie direkt) ---------- */
+function oeffneSchild(id) {
+  const ziel = L.zielNachId(apps(), id);
+  if (!ziel) return;
+  if (!darf()) { toast(t('gesperrt_toast')); return; }
+  S.schildZielId = id;
+  document.getElementById('schildTitel').textContent = t('schild_titel', { name: L.anzeigeName(ziel) });
+  document.getElementById('schildAdresse').textContent = adresseFuer(ziel);
+  document.getElementById('schildSpruch').value = L.SPRUCH_VORGABE;
+  document.getElementById('schildFehler').textContent = '';
+  document.querySelector('#schildWahl input[value="beides"]').checked = true;
+  document.getElementById('schildSheet').hidden = false;
+}
+/* Gibt true zurück, wenn ein Schild an den Drucker ging. Die Sperre sitzt
+   HIER: auch ein direkter Aufruf gibt lokal nichts aus. */
+function druckeSchild(id, variante, spruch) {
+  if (!darf()) { toast(t('gesperrt_toast')); return false; }
+  try {
+    const ziel = L.zielNachId(apps(), id);
+    if (!ziel) throw new Error('Ziel „' + id + '“ steht nicht in der Liste');
+    if (!window.BOS_DRUCK) throw new Error('bos_druck.js nicht geladen');
+    const adr = adresseFuer(ziel);
+    if (!Q.darfAusgeben(adr)) throw new Error('Adresse ist keine Online-Adresse: ' + adr);
+    const v = L.VARIANTEN.indexOf(variante) === -1 ? 'beides' : variante;
+    const qr = v === 'chip' ? '' : Q.qrFuer(adr);
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: L.schildHTML(ziel, { variante: v, qrSvg: qr, adresse: adr, spruch: spruch, stand: standHeute() }),
+      appName: 'NFC & QR', mitKopf: false, farbig: false,
+      extraCSS: L.SCHILD_CSS + L.SCHILD_DRUCK_CSS, ausrichtung: 'landscape'
+    });
+    return true;
+  } catch (err) {
+    zeigeFehler(t('err_drucken'), err);
+    document.getElementById('schildFehler').textContent = fehlerText(t('err_drucken'), err);
+    return false;
+  }
+}
+
+/* ---------- Chips ---------- */
+function oeffneChipSheet(titel, text, adr) {
+  document.getElementById('chipSheetTitel').textContent = titel;
+  document.getElementById('chipSheetText').textContent = text;
+  document.getElementById('chipSheetAdresse').textContent = adr || '';
+  document.getElementById('chipSheet').hidden = false;
+}
+function schliesseChipSheet() { document.getElementById('chipSheet').hidden = true; }
+function nfcFehler(titel, err, vorgang) {
+  const art = L.nfcFehlerArt(err, vorgang);
+  if (art === 'nfc_abgebrochen') { toast(t(S.nfcZeit ? 'nfc_zeit' : 'nfc_abgebrochen')); return; }
+  /* erst die Ursache in normaler Sprache, dann die echte Meldung des Browsers */
+  zeigeFehler(titel + ': ' + t(art), err);
+}
+function nfcStart() {
+  S.nfcLaeuft = true; S.nfcZeit = false;
+  S.nfcAbbruch = new AbortController();
+  S.nfcUhr = setTimeout(function () { S.nfcZeit = true; if (S.nfcAbbruch) S.nfcAbbruch.abort(); }, NFC_ZEITLIMIT_MS);
+  return S.nfcAbbruch.signal;
+}
+function nfcEnde() {
+  clearTimeout(S.nfcUhr);
+  S.nfcLaeuft = false; S.nfcAbbruch = null;
+  schliesseChipSheet();
+}
+/* Gibt true zurück, wenn der Chip beschrieben wurde. Die Sperre sitzt HIER:
+   auch ein direkter Aufruf beschreibt lokal nichts. Geschrieben werden nur
+   Online-Adressen (zweite Prüfung an der Adresse selbst). */
+async function schreibeChip(adr, name) {
+  if (!darf() || !Q.darfAusgeben(adr)) { toast(t('gesperrt_toast')); return false; }
+  if (S.nfcLaeuft) return false;
+  if (eingebettet()) { toast(t('eingebettet_titel')); return false; }
+  if (!nfcDa()) { toast(t('kein_nfc_titel')); return false; }
+  const signal = nfcStart();
+  oeffneChipSheet(t('chip_schreiben_titel', { name: name }), t('chip_schreiben_text'), adr);
+  try {
+    const ndef = new NDEFReader();
+    await ndef.write({ records: [{ recordType: 'url', data: adr }] }, { signal: signal });
+    nfcEnde();
+    toast(t('chip_geschrieben', { name: name }));
+    return true;
+  } catch (err) {
+    nfcEnde();
+    nfcFehler(t('err_chip_schreiben'), err, 'schreiben');
+    return false;
+  }
+}
+function schreibeChipFuerZiel(id) {
+  const ziel = L.zielNachId(apps(), id);
+  if (!ziel) return Promise.resolve(false);
+  return schreibeChip(adresseFuer(ziel), L.anzeigeName(ziel));
+}
+/* Kopieren = die gelesene Adresse auf einen zweiten Chip. Nur für Chips,
+   die zu einem WÄHLBAREN Ziel in diesem BOS führen (L2, 04.10.2026):
+   Adressen kommen nie von außen und nie von einer ausgegrauten Seite. */
+function kopiereChip() {
+  const e = S.chip;
+  if (!e || e.art !== 'ziel' || !e.direkt) { toast(t('chip_kopieren_nur_ziel')); return Promise.resolve(false); }
+  return schreibeChip(e.adresse, L.anzeigeName(e.ziel));
+}
+/* Chip auslesen und prüfen. Lesen ist nicht gesperrt: es gibt nichts aus. */
+async function pruefeChip() {
+  if (S.nfcLaeuft) return;
+  if (eingebettet()) { toast(t('eingebettet_titel')); return; }
+  if (!nfcDa()) { toast(t('kein_nfc_titel')); return; }
+  const signal = nfcStart();
+  oeffneChipSheet(t('chip_lesen_titel'), t('chip_lesen_text'), '');
+  try {
+    const ndef = new NDEFReader();
+    const gelesen = new Promise(function (ja, nein) {
+      ndef.onreading = function (ev) { ja(ev.message); };
+      ndef.onreadingerror = function () { const f = new Error('Der Chip hat geantwortet, sein Inhalt war aber nicht lesbar'); f.name = 'ChipLesefehler'; nein(f); };
+      signal.addEventListener('abort', function () { const f = new Error('Lesen abgebrochen'); f.name = 'AbortError'; nein(f); });
+    });
+    gelesen.catch(function () { /* wird unten mit await behandelt; verhindert nur eine zweite, falsche Meldung */ });
+    await ndef.scan({ signal: signal });
+    const nachricht = await gelesen;
+    const abbruch = S.nfcAbbruch;
+    S.chip = L.chipErgebnis(L.adresseAusNachricht(nachricht), Q.wurzel(), apps());
+    nfcEnde();
+    if (abbruch) abbruch.abort();   /* Scan beenden, sonst liest das Handy weiter */
+    renderChip();
+  } catch (err) {
+    nfcEnde();
+    nfcFehler(t('err_chip_lesen'), err, 'lesen');
+  }
+}
+
+/* ==================================================================
+   SAMMELBLATT (Stufe 2). Der EINZIGE Teil der Seite, der die Datenbank
+   anfasst. Fällt sie aus oder lehnt sie ab, steht der Grund in diesem
+   Bereich, und der Rest der Seite läuft weiter.
+   Gespeichert wird je Zeile die id aus der Registry, nie eine Adresse.
+   ================================================================== */
+function mitZeitlimit(promise) {
+  let timer;
+  const zeit = new Promise(function (_, reject) {
+    timer = setTimeout(function () { const e = new Error('Zeitlimit ' + (DB_ZEITLIMIT_MS / 1000) + ' s überschritten'); e.code = 'zeitlimit'; reject(e); }, DB_ZEITLIMIT_MS);
+  });
+  return Promise.race([promise, zeit]).finally(function () { clearTimeout(timer); });
+}
+function zeitMs(wert) { return wert && typeof wert.toMillis === 'function' ? wert.toMillis() : (typeof wert === 'number' ? wert : null); }
+function blattInhalt(b) { return JSON.stringify({ standort: b.standort, ausstattung: b.ausstattung, zeilen: b.zeilen }); }
+function blattGeaendert() { return !!S.blatt && blattInhalt(S.blatt) !== S.blattSauber; }
+function blattCol() { return window.db.collection(L.SAMMELBLATT.COLLECTION); }
+
+/* Zustand der Datenbank für diesen Bereich:
+   'lade' | 'bereit' | 'regel_alt' | 'kein_admin' | 'kein_netz' | 'nicht_geladen' | 'fehler' */
+function dbFehler(zustand, err) {
+  S.db = { zustand: zustand, meldung: err && (err.message || err.code) ? (err.message || err.code) : '', blaetter: [] };
+  console.error('[NFC & QR] Sammelblätter: ' + zustand, err);
+  renderBlatt();
+}
+async function ladeBlaetter() {
+  const snap = await mitZeitlimit(blattCol().get({ source: 'server' }));
+  const liste = [];
+  snap.forEach(function (d) { const daten = d.data(); liste.push(L.blattAusDokument(d.id, daten, zeitMs(daten.geaendertAm))); });
+  liste.sort(function (a, b) { return String(a.standort).localeCompare(String(b.standort), 'de'); });
+  S.db = { zustand: 'bereit', meldung: '', blaetter: liste };
+}
+async function starteDatenbank() {
+  S.db = { zustand: 'lade', meldung: '', blaetter: [] };
+  document.getElementById('regelLeiste').hidden = true;
+  renderBlatt();
+  if (typeof firebase === 'undefined' || !window.db || !window.BOS_AUTH_READY) { dbFehler('nicht_geladen', new Error('Firebase oder bos_firebase_config.js nicht geladen')); return; }
+  try {
+    const nutzer = await mitZeitlimit(window.BOS_AUTH_READY);
+    S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+  } catch (err) { dbFehler(err && err.code === 'zeitlimit' ? 'kein_netz' : 'fehler', err); return; }
+  /* Regelstand-Probe: kennt die eingesetzte Regel die Fassung dieser Seite? */
+  try {
+    await mitZeitlimit(window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }));
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const el = document.getElementById('regelLeiste');
+      el.textContent = t('db_regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
+      el.hidden = false;
+      dbFehler('regel_alt', err); return;
+    }
+    /* anderer Grund (kein Netz …): das Laden unten meldet ihn genauer */
+    console.warn('[NFC & QR] Regelstand nicht prüfbar:', err && err.message);
+  }
+  try { await ladeBlaetter(); renderBlatt(); }
+  catch (err) {
+    const c = err && err.code;
+    dbFehler(c === 'permission-denied' ? 'kein_admin' : (c === 'unavailable' || c === 'zeitlimit') ? 'kein_netz' : 'fehler', err);
+  }
+}
+
+/* ---------- Rückfrage: zwei Knöpfe, keine Vorauswahl (Checkliste §11) ---------- */
+let frageAktionen = [];
+function frage(titel, text, knoepfe) {
+  document.getElementById('frageTitel').textContent = titel;
+  document.getElementById('frageText').textContent = text;
+  frageAktionen = knoepfe.map(function (k) { return k.tun || null; });
+  document.getElementById('frageKnoepfe').innerHTML = knoepfe.map(function (k, i) {
+    return '<button type="button" class="bos-btn ' + (k.klasse || '') + '" data-frage="' + i + '">' + esc(k.text) + '</button>';
+  }).join('');
+  document.getElementById('frageSheet').hidden = false;
+}
+
+/* ---------- Anzeige ---------- */
+function zeilenName(z) {
+  if (z.art === 'ueberschrift') return z.text;
+  const ziel = L.zielNachId(apps(), z.zielId);
+  return ziel ? L.anzeigeName(ziel) : z.zielId;
+}
+function renderBlattUebersicht() {
+  const d = S.db;
+  if (d.zustand === 'lade') return '<div class="klein" id="blattLade">' + esc(t('blatt_lade')) + '</div>';
+  if (d.zustand !== 'bereit') {
+    const text = d.zustand === 'regel_alt' ? t('db_regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI })
+      : d.zustand === 'kein_admin' ? t('db_kein_admin', { kennung: S.kennung || '?' }) : t('db_' + d.zustand);
+    return '<div id="blattGrund"><b>' + esc(text) + '</b>' +
+      (d.meldung ? '<div class="klein" style="margin-top:6px">' + esc(t('db_meldung')) + ' <span id="blattDbMeldung">' + esc(d.meldung) + '</span></div>' : '') +
+      '<div class="knoepfe"><button type="button" class="bos-btn" data-aktion="db-nochmal">' + esc(t('db_nochmal')) + '</button></div></div>';
+  }
+  const sichtbar = d.blaetter.filter(function (b) { return !b.geloescht; });
+  let html = sichtbar.length ? '' : '<div class="klein" id="blattKeine">' + esc(t('blatt_keine')) + '</div>';
+  sichtbar.forEach(function (b) {
+    const p = L.blattPruefung(b, apps());
+    const ziele = b.zeilen.filter(function (z) { return z.art === 'ziel'; }).length;
+    html += '<div class="blatt-zeile" data-blatt="' + esc(b.id) + '"><div class="inhalt"><div class="ziel-name">' + esc(b.standort) + '</div>' +
+      '<div class="klein">' + esc(t('blatt_zeilen_zahl', { ziele: ziele, ueber: b.zeilen.length - ziele })) + '</div>' +
+      (p.ok ? '' : '<div class="blatt-meldung">' + esc(t('blatt_tote_uebersicht', { n: p.tote.length })) + '</div>') + '</div>' +
+      '<button type="button" class="bos-btn" data-aktion="blatt-oeffnen" data-id="' + esc(b.id) + '">' + esc(t('blatt_oeffnen')) + '</button>' +
+      '<button type="button" class="bos-btn" data-aktion="blatt-drucken-liste" data-id="' + esc(b.id) + '"' + (darf() && p.ok ? '' : ' disabled') + '>' + esc(t('blatt_drucken')) + '</button></div>';
+  });
+  html += '<div class="knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="blatt-neu">' + esc(t('blatt_neu')) + '</button>' +
+    (darf() ? '' : '<span class="klein">' + esc(t('blatt_drucken')) + ': ' + esc(t('gesperrt_kurz')) + '</span>') + '</div>';
+  return html;
+}
+function renderBlattEditor() {
+  const b = S.blatt, G = L.SAMMELBLATT, p = L.blattPruefung(b, apps());
+  const tot = {}; p.tote.forEach(function (x) { tot[x.index] = x; });
+  const mitChip = !eingebettet() && nfcDa();
+  const ziele = b.zeilen.filter(function (z) { return z.art === 'ziel'; }).length, ueber = b.zeilen.filter(function (z) { return z.art === 'ueberschrift'; }).length;
+  let html = '<div class="knoepfe" style="margin-top:0"><button type="button" class="bos-btn" data-aktion="blatt-zurueck">' + esc(t('blatt_zurueck')) + '</button>' +
+    '<span class="marke' + (blattGeaendert() ? ' offen' : '') + '" id="blattStand">' + esc(t(blattGeaendert() ? 'blatt_ungespeichert' : 'blatt_gespeichert_stand')) + '</span></div>' +
+    '<label class="feld-label" for="blattStandort" style="margin-top:14px">' + esc(t('blatt_standort')) + '</label>' +
+    '<input class="bos-input" id="blattStandort" maxlength="' + G.STANDORT_MAX + '" autocomplete="off" placeholder="' + esc(t('blatt_standort_platz')) + '" value="' + esc(b.standort) + '">' +
+    '<span class="feld-label" style="margin-top:14px">' + esc(t('blatt_ausstattung')) + '</span><div class="wahl" id="blattWahl">' +
+    L.VARIANTEN.map(function (v) { return '<label><input type="radio" name="blattAusstattung" value="' + v + '"' + (b.ausstattung === v ? ' checked' : '') + '> <span>' + esc(t('variante_' + v)) + '</span></label>'; }).join('') + '</div>' +
+    '<span class="feld-label">' + esc(t('blatt_zeilen')) + '</span>';
+  if (!b.zeilen.length) html += '<div class="klein">' + esc(t('blatt_zeilen_leer')) + '</div>';
+  b.zeilen.forEach(function (z, i) {
+    const istZiel = z.art === 'ziel', ziel = istZiel ? L.zielNachId(apps(), z.zielId) : null, kaputt = z.art !== 'ziel' && z.art !== 'ueberschrift';
+    html += '<div class="blatt-zeile' + (z.art === 'ueberschrift' ? ' ueber' : '') + (tot[i] || kaputt ? ' tot' : '') + '" data-zeile="' + i + '">' +
+      '<button type="button" class="bos-btn klein-btn" data-aktion="zeile-hoch" data-i="' + i + '" aria-label="' + esc(t('blatt_hoch')) + '"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+      '<button type="button" class="bos-btn klein-btn" data-aktion="zeile-runter" data-i="' + i + '" aria-label="' + esc(t('blatt_runter')) + '"' + (i === b.zeilen.length - 1 ? ' disabled' : '') + '>▼</button>' +
+      '<div class="inhalt">' + (kaputt ? esc(t('blatt_zeile_kaputt')) : tot[i] ? '⚠ ' + esc(t('blatt_tot_' + tot[i].grund, { id: z.zielId, name: tot[i].name })) : esc(zeilenName(z))) + '</div>' +
+      (istZiel && ziel && mitChip ? '<button type="button" class="bos-btn" data-aktion="chip" data-id="' + esc(z.zielId) + '"' + (darf() ? '' : ' disabled') + '>' + esc(t('chip_beschreiben')) + '</button>' : '') +
+      '<button type="button" class="bos-btn klein-btn gefahr" data-aktion="zeile-weg" data-i="' + i + '" aria-label="' + esc(t('blatt_zeile_weg')) + '">✕</button></div>';
+  });
+  html += '<div class="blatt-meldung" id="blattMeldung" role="alert">' + esc(S.blattMeldung || '') + '</div>' +
+    '<div class="klein" id="blattZaehler">' + esc(t('blatt_zaehler', { ziele: ziele, maxZiele: G.MAX_ZIELE, ueber: ueber, maxUeber: G.MAX_UEBERSCHRIFTEN })) + '</div>' +
+    '<div class="zusatz-reihe"><select class="bos-input" id="blattZielWahl"><option value="">' + esc(t('blatt_ziel_wahl')) + '</option>' +
+    L.waehlbareZiele(apps()).map(function (z) { return '<option value="' + esc(z.id) + '">' + esc(L.anzeigeName(z)) + '</option>'; }).join('') + '</select>' +
+    '<button type="button" class="bos-btn" data-aktion="ziel-dazu">' + esc(t('blatt_ziel_dazu')) + '</button></div>' +
+    '<div class="zusatz-reihe"><input class="bos-input" id="blattUeberText" maxlength="' + G.UEBERSCHRIFT_MAX + '" autocomplete="off" placeholder="' + esc(t('blatt_ueber_platz')) + '">' +
+    '<button type="button" class="bos-btn" data-aktion="ueber-dazu">' + esc(t('blatt_ueber_dazu')) + '</button></div>' +
+    '<div class="sheet-knoepfe">' +
+    (b.id ? '<button type="button" class="bos-btn gefahr" data-aktion="blatt-entfernen">' + esc(t('blatt_entfernen')) + '</button>' : '') +
+    '<button type="button" class="bos-btn" data-aktion="blatt-drucken"' + (darf() ? '' : ' disabled') + '>' + esc(t('blatt_drucken')) + '</button>' +
+    '<button type="button" class="bos-btn bos-btn--amber" data-aktion="blatt-speichern" id="blattSpeichernBtn">' + esc(t('blatt_speichern')) + '</button></div>' +
+    (darf() ? '' : '<div class="klein" style="text-align:right">' + esc(t('blatt_drucken')) + ': ' + esc(t('gesperrt_kurz')) + '</div>');
+  return html;
+}
+function renderBlatt() {
+  document.getElementById('blattBereich').innerHTML = S.blatt ? renderBlattEditor() : renderBlattUebersicht();
+}
+function blattStandZeigen() {
+  const el = document.getElementById('blattStand');
+  if (!el) return;
+  el.textContent = t(blattGeaendert() ? 'blatt_ungespeichert' : 'blatt_gespeichert_stand');
+  el.className = 'marke' + (blattGeaendert() ? ' offen' : '');
+}
+function blattMelde(text) { S.blattMeldung = text || ''; const el = document.getElementById('blattMeldung'); if (el) el.textContent = S.blattMeldung; }
+
+/* ---------- Blatt bearbeiten (nur im Speicher der Seite) ---------- */
+function oeffneBlatt(id) {
+  const quelle = id ? S.db.blaetter.filter(function (b) { return b.id === id; })[0] : L.blattLeer();
+  if (!quelle) return;
+  S.blatt = JSON.parse(JSON.stringify(quelle));
+  S.blattSauber = blattInhalt(S.blatt); S.blattMeldung = '';
+  renderBlatt();
+}
+function schliesseBlatt() { S.blatt = null; S.blattSauber = null; S.blattMeldung = ''; renderBlatt(); }
+function blattZurueck() {
+  if (!blattGeaendert()) { schliesseBlatt(); return; }
+  frage(t('frage_verlassen_titel'), t('frage_verlassen_text'), [
+    { text: t('frage_verwerfen'), klasse: 'gefahr', tun: schliesseBlatt },
+    { text: t('frage_bleiben') }
+  ]);
+}
+function zielDazu() {
+  const id = document.getElementById('blattZielWahl').value;
+  if (!id) { blattMelde(t('f_ziel_wahl')); return; }
+  /* Ziele kommen NUR aus waehlbareZiele(): auch eine von Hand untergeschobene id wird abgelehnt */
+  if (!L.zielNachId(apps(), id)) { blattMelde(t('blatt_tot_fehlt', { id: id })); return; }
+  if (S.blatt.zeilen.some(function (z) { return z.art === 'ziel' && z.zielId === id; })) { blattMelde(t('f_doppelt')); return; }
+  const grund = L.darfZeileDazu(S.blatt, 'ziel');
+  if (grund) { blattMelde(t('f_' + grund)); return; }
+  S.blatt.zeilen.push({ art: 'ziel', zielId: id }); S.blattMeldung = ''; renderBlatt();
+}
+function ueberDazu() {
+  const text = document.getElementById('blattUeberText').value.trim();
+  if (!text) { blattMelde(t('f_ueber_leer')); return; }
+  const grund = L.darfZeileDazu(S.blatt, 'ueberschrift');
+  if (grund) { blattMelde(t('f_' + grund)); return; }
+  S.blatt.zeilen.push({ art: 'ueberschrift', text: text.slice(0, L.SAMMELBLATT.UEBERSCHRIFT_MAX) }); S.blattMeldung = ''; renderBlatt();
+}
+function zeileVerschieben(i, richtung) { S.blatt.zeilen = L.verschiebeZeile(S.blatt.zeilen, i, richtung); renderBlatt(); }
+function zeileWeg(i) {
+  const z = S.blatt.zeilen[i]; if (!z) return;
+  frage(t('frage_zeile_titel'), t('frage_zeile_text', { name: zeilenName(z) || '?' }), [
+    { text: t('frage_ja_entfernen'), klasse: 'gefahr', tun: function () { S.blatt.zeilen.splice(i, 1); S.blattMeldung = ''; renderBlatt(); } },
+    { text: t('frage_nein') }
+  ]);
+}
+
+/* ---------- Speichern: bewusste Handlung, nie still überschreiben ----------
+   In einer Transaktion: erst den Stand der Datenbank lesen. Hat sich das
+   Blatt seit dem Öffnen geändert (geaendertAm anders), wird NICHT
+   geschrieben, sondern gemeldet. Gibt true zurück, wenn gespeichert. */
+async function schreibeBlatt(blatt) {
+  const neu = !blatt.id, ref = neu ? blattCol().doc() : blattCol().doc(blatt.id);
+  const zeit = firebase.firestore.FieldValue.serverTimestamp();
+  await mitZeitlimit(window.db.runTransaction(async function (tx) {
+    const snap = await tx.get(ref);
+    const konflikt = function () { const e = new Error('Blatt wurde seit dem Öffnen geändert'); e.code = 'konflikt'; return e; };
+    if (neu ? snap.exists : (!snap.exists || zeitMs(snap.data().geaendertAm) !== blatt.geaendertAm)) throw konflikt();
+    tx.set(ref, L.blattDokument(blatt, S.kennung, zeit));
+  }));
+  return ref.id;
+}
+function speicherGrund(err) {
+  const c = err && err.code;
+  return t(c === 'konflikt' ? 'sp_konflikt' : c === 'permission-denied' ? 'sp_kein_recht' : c === 'unavailable' ? 'sp_kein_netz' : c === 'zeitlimit' ? 'sp_zeit' : 'err_blatt_speichern');
+}
+/* entfernen = true: geschrieben wird der ZULETZT GESPEICHERTE Stand plus
+   geloescht, NICHT der Stand aus dem Editor (04.10.2026). Was gerade im
+   Editor steht (halb getippt, Standort geleert), gehört nicht in die
+   Datenbank, nur weil jemand das Blatt wegnimmt. */
+async function speichereBlatt(entfernen) {
+  if (!S.blatt || S.speichert) return false;
+  const gespeichert = S.blatt.id ? S.db.blaetter.filter(function (b) { return b.id === S.blatt.id; })[0] : null;
+  if (entfernen && !gespeichert) return false;   /* ein nie gespeichertes Blatt gibt es in der Datenbank nicht */
+  const kopie = JSON.parse(JSON.stringify(entfernen ? gespeichert : S.blatt));
+  if (entfernen) kopie.geloescht = true;
+  const f = entfernen ? [] : L.blattFehler(kopie);
+  if (f.length) { blattMelde(t('sp_form') + ' ' + f.map(function (k) { return t('f_' + k); }).join(' ')); return false; }
+  S.speichert = true;
+  const btn = document.getElementById('blattSpeichernBtn'); if (btn) btn.disabled = true;
+  try {
+    const id = await schreibeBlatt(kopie);
+    await ladeBlaetter();
+    S.speichert = false;
+    if (entfernen) { toast(t('blatt_entfernt')); schliesseBlatt(); }
+    else { toast(t('blatt_gespeichert')); oeffneBlatt(id); }
+    return true;
+  } catch (err) {
+    S.speichert = false;
+    if (btn) btn.disabled = false;
+    /* erst der Grund in normaler Sprache, dahinter die echte Meldung */
+    blattMelde(speicherGrund(err) + ' (' + t('db_meldung') + ' ' + (err && (err.message || err.code) || err) + ')');
+    zeigeFehler(t('err_blatt_speichern') + ': ' + speicherGrund(err), err);
+    return false;
+  }
+}
+function blattEntfernen() {
+  const gespeichert = S.db.blaetter.filter(function (b) { return b.id === S.blatt.id; })[0];
+  frage(t('frage_blatt_titel'), t('frage_blatt_text', { name: (gespeichert && gespeichert.standort) || S.blatt.standort || '?' }), [
+    { text: t('frage_ja_entfernen'), klasse: 'gefahr', tun: function () { speichereBlatt(true); } },
+    { text: t('frage_nein') }
+  ]);
+}
+
+/* ---------- Sammelblatt drucken (immer über bos_druck.js) ----------
+   Gibt true zurück, wenn ein Blatt an den Drucker ging. DREI Sperren
+   sitzen HIER, nicht nur am Knopf: (1) darfAusgeben, wie beim Einzelschild.
+   (2) Gedruckt wird nur ein GESPEICHERTER Stand: Ist ein Blatt offen und
+   hat ungespeicherte Änderungen, wird nichts gedruckt, egal welches Blatt
+   übergeben wird (04.10.2026). Sonst hinge an der Wand ein Blatt, das es
+   in der Datenbank so nicht gibt, und der Nachdruck sähe anders aus.
+   (3) Ein Blatt mit einem Ziel, das es nicht mehr gibt, wird nicht
+   gedruckt: ein Schild mit totem Code darf nicht entstehen. */
+function druckeSammelblatt(blatt) {
+  if (!darf()) { toast(t('gesperrt_toast')); return false; }
+  if (blattGeaendert()) { blattMelde(t('blatt_druck_ungespeichert')); toast(t('blatt_druck_ungespeichert')); return false; }
+  try {
+    if (!blatt) throw new Error('kein Blatt');
+    const f = L.blattFehler(blatt);
+    if (f.length) { const m = t('sp_form') + ' ' + f.map(function (k) { return t('f_' + k); }).join(' '); blattMelde(m); toast(m); return false; }
+    const p = L.blattPruefung(blatt, apps());
+    if (!p.ok) { const m = t('blatt_druck_tot', { n: p.tote.length }); blattMelde(m); toast(m); return false; }
+    const zielZeilen = blatt.zeilen.filter(function (z) { return z.art === 'ziel'; });
+    if (!zielZeilen.length) { blattMelde(t('blatt_druck_leer')); toast(t('blatt_druck_leer')); return false; }
+    if (!window.BOS_DRUCK) throw new Error('bos_druck.js nicht geladen');
+    const ziele = {};
+    zielZeilen.forEach(function (z) {
+      const ziel = L.zielNachId(apps(), z.zielId), adr = adresseFuer(ziel);
+      if (!Q.darfAusgeben(adr)) throw new Error('Adresse ist keine Online-Adresse: ' + adr);
+      ziele[z.zielId] = { name: ziel.name, hubName: ziel.hubName || '', adresse: adr, qrSvg: blatt.ausstattung === 'chip' ? '' : Q.qrFuer(adr) };
+    });
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: L.sammelblattHTML(blatt, { ziele: ziele, stand: standHeute() }),
+      appName: 'NFC & QR', mitKopf: false, farbig: false,
+      extraCSS: L.SAMMELBLATT_CSS + L.SCHILD_DRUCK_CSS, ausrichtung: 'portrait'
+    });
+    return true;
+  } catch (err) { zeigeFehler(t('err_drucken'), err); blattMelde(fehlerText(t('err_drucken'), err)); return false; }
+}
+
+/* ---------- Hilfe (kanonisch: NFC_QR_ZENTRALE_DOKU.md, Abschnitt Nutzer-Hilfetext) ---------- */
+const helpData = [
+  { heading: 'Wofür ist diese Seite?', text: 'Hier entstehen die Abkürzungen in die echte Backstube: QR-Codes auf Schildern und NFC-Chips. Wer so einen Code scannt oder sein Handy an einen Chip hält, landet direkt auf der richtigen Seite von BäckereiOS, ohne erst zu suchen. Ein Code ist immer nur eine Adresse. Persönlich wird es erst durch die Anmeldung. Deshalb dürfen alle Schilder und Chips offen hängen.' },
+  { heading: 'Die Liste der Ziele', text: 'Die Liste füllt sich von selbst aus allen Programmen, die es in BäckereiOS gibt. Niemand führt sie von Hand. Ganz oben steht „BOS öffnen“: Das führt auf die Startseite mit allen Kacheln. Ausgegraute Einträge sind Seiten, die nicht für den Direktaufruf gebaut sind. Sie bekommen keinen Code und keinen Chip, weil ein fremdes Handy dort vor einer Sperre stehen würde. Der Hinweis „ohne Anmeldung“ bedeutet: Diese Seite öffnet sich sofort, für jeden, der scannt (zum Beispiel der Taschenrechner).' },
+  { heading: 'Adresse kopieren', text: '„Adresse kopieren“ legt die Adresse des Ziels in die Zwischenablage, zum Beispiel um sie jemandem zu schicken. Das geht immer. Adressen werden nie von Hand eingetippt, sie kommen immer aus der Liste. So gibt es keine Tippfehler und kein Schild, das ins Leere führt.' },
+  { heading: 'Erst wenn BOS online ist', text: 'Solange BäckereiOS nur auf dem Tablet läuft und noch nicht unter seiner echten Adresse im Internet, sind „Schild“ und „Chip beschreiben“ gesperrt. Ein jetzt gedrucktes Schild würde vom Handy aus nirgendwohin führen. Die Seite sagt das oben in einem gelben Kasten. Sobald BäckereiOS online ist und du diese Seite dort öffnest, sind die Knöpfe von selbst frei. Es gibt dafür nichts einzustellen.' },
+  { heading: 'Schild drucken', text: '„🖨 Schild“ druckt einen Wegweiser auf DIN A4 quer: groß der Name des Ziels, dazu ein Spruch, eine Erklärung in drei Schritten und unten klein die Adresse. Du wählst, was drauf soll: QR-Code und Chip-Feld, nur QR-Code oder nur Chip-Feld. Das Chip-Feld ist ein gestrichelter Platz mit Kreis. Dort klebst du den Chip auf, damit jeder weiß, wo er sein Handy hinhalten muss. Im Druckdialog auf „Querformat“ achten. Danach in Klarsichtfolie stecken oder laminieren.' },
+  { heading: 'Chip beschreiben', text: '„📡 Chip beschreiben“ schreibt die Adresse des Ziels auf einen NFC-Chip. Das geht nur am Handy in Chrome (Android) mit eingeschaltetem NFC. Auf den Knopf tippen, dann den Chip ruhig an die Rückseite des Handys halten, bis die Bestätigung kommt. Was vorher auf dem Chip stand, wird überschrieben. Chips bleiben überschreibbar, es gibt keinen Schreibschutz. Einen Chip beschreiben geht auch ganz ohne Schild.' },
+  { heading: 'Chip prüfen', text: '„📡 Chip prüfen“ liest einen Chip aus und sagt, wohin er führt. Es gibt drei Ergebnisse: Er führt zu einem Ziel in diesem BOS. Oder er führt in dieses BOS, aber das Ziel gibt es nicht mehr (dann den Chip neu beschreiben). Oder er führt nicht in dieses BOS (dann hat jemand ihn überschrieben, oder es ist ein fremder Chip). Führt der Chip zu einem wählbaren Ziel, kannst du ihn mit „Auf einen anderen Chip kopieren“ verdoppeln. Bei Zielen, die zu einer Gruppe gehören, steht am Bildschirm die Gruppe davor, zum Beispiel „Froster · Ziele“. Auf dem gedruckten Schild und Blatt steht nur der Name.' },
+  { heading: 'Sammelblatt: ein Standort, mehrere Ziele', text: 'Ein Sammelblatt ist ein Blatt DIN A4 hoch für eine Stelle, an der man mehrere Dinge braucht, zum Beispiel die Backstubentür. Mit „＋ Neues Blatt“ legst du eines an: Standort eintippen (das ist nur der Name der Stelle, er steht groß oben), wählen, ob je Zeile ein QR-Code, ein Chip-Feld oder beides stehen soll, dann Ziele aus der Liste hinzufügen. Dazwischen kannst du Überschriften setzen. Mit ▲ und ▼ schiebst du eine Zeile hoch oder runter, mit ✕ nimmst du sie weg (mit Rückfrage). Auf ein Blatt passen höchstens 7 Ziele und 2 Überschriften, damit jeder Code mindestens 3 cm breit bleibt. Wird es mehr, sagt die Seite das, und du legst ein zweites Blatt an. Code und Chip-Feld wechseln von Zeile zu Zeile die Seite. Das ist Absicht: So erwischt das Handy nicht den Chip der Nachbarzeile.' },
+  { heading: 'Sammelblatt speichern und nachdrucken', text: 'Ein Blatt wird erst mit „Speichern“ gesichert. Solange oben „● ungespeicherte Änderungen“ steht, ist nichts gesichert, und die Seite fragt nach, bevor du das Blatt verlässt. Gespeicherte Blätter liegen in der Datenbank, nicht auf diesem Gerät: Du findest sie von jedem Gerät aus wieder und druckst sie mit „🖨 Drucken“ einfach nach. Gedruckt wird immer nur der gespeicherte Stand: Hast du ein Blatt geändert, erst speichern, dann drucken. Gespeichert wird nur, welche Ziele auf dem Blatt stehen, nie eine Adresse. Die Adresse entsteht erst beim Drucken. Ändert sich die Adresse von BäckereiOS, druckst du das Blatt einfach neu. „Blatt entfernen“ nimmt ein Blatt aus der Liste; Änderungen, die du davor nicht gespeichert hast, verfallen dabei. Speichern und lesen darf diese Blätter nur das Systempflege-Konto. Wurde ein Blatt inzwischen woanders geändert, überschreibt die Seite nichts, sondern meldet es.' },
+  { heading: 'Ziel gibt es nicht mehr', text: 'Verschwindet ein Programm aus BäckereiOS oder ist es nicht mehr für den Direktaufruf freigegeben, merkt die Zentrale das beim Laden von selbst: In der Übersicht steht am Blatt eine rote Meldung, im Blatt ist die Zeile rot markiert. So ein Blatt lässt sich nicht drucken, bis du die Zeile entfernt oder durch ein anderes Ziel ersetzt hast. Ein Blatt mit einem Code, der ins Leere führt, soll gar nicht erst entstehen. Denk auch an das Blatt, das schon hängt: abnehmen und neu drucken.' },
+  { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips.' },
+  { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },
+  { heading: 'Wenn etwas nicht klappt', text: 'Jeder Fehler steht oben in einem roten Kasten, mit der Ursache in normaler Sprache und der Meldung des Geräts dahinter. Bei Chips heißt das meistens: NFC am Handy ist aus, die Erlaubnis für den Browser fehlt, oder der Chip wurde zu früh weggezogen. Ein fehlender Code ist kein Notfall: Alles bleibt auch über den Launcher erreichbar.' },
+  { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser.' }
+];
+function oeffneHilfe() {
+  document.getElementById('hilfeTitel').textContent = t('hilfe_titel');
+  document.getElementById('hilfeInhalt').innerHTML = helpData.map(function (h) {
+    return '<h3>' + esc(h.heading) + '</h3><p>' + esc(h.text) + '</p>';
+  }).join('');
+  document.getElementById('hilfeSheet').hidden = false;
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const id = el.getAttribute('data-id');
+  switch (el.getAttribute('data-aktion')) {
+    case 'kopieren': kopiereAdresse(id); break;
+    case 'schild': oeffneSchild(id); break;
+    case 'chip': schreibeChipFuerZiel(id); break;
+    case 'chip-pruefen': pruefeChip(); break;
+    case 'chip-kopieren': kopiereChip(); break;
+    case 'db-nochmal': starteDatenbank(); break;
+    case 'blatt-neu': oeffneBlatt(null); break;
+    case 'blatt-oeffnen': oeffneBlatt(id); break;
+    case 'blatt-zurueck': blattZurueck(); break;
+    case 'ziel-dazu': zielDazu(); break;
+    case 'ueber-dazu': ueberDazu(); break;
+    case 'zeile-hoch': zeileVerschieben(Number(el.getAttribute('data-i')), -1); break;
+    case 'zeile-runter': zeileVerschieben(Number(el.getAttribute('data-i')), 1); break;
+    case 'zeile-weg': zeileWeg(Number(el.getAttribute('data-i'))); break;
+    case 'blatt-speichern': speichereBlatt(false); break;
+    case 'blatt-entfernen': blattEntfernen(); break;
+    case 'blatt-drucken': druckeSammelblatt(S.blatt); break;
+    case 'blatt-drucken-liste': druckeSammelblatt(S.db.blaetter.filter(function (b) { return b.id === id; })[0]); break;
+  }
+});
+/* Standort und Ausstattung: in den Zustand übernehmen, ohne neu zu zeichnen
+   (sonst springt beim Tippen der Cursor) */
+document.addEventListener('input', function (e) {
+  if (!S.blatt) return;
+  if (e.target.id === 'blattStandort') { S.blatt.standort = e.target.value; blattStandZeigen(); }
+  if (e.target.name === 'blattAusstattung') { S.blatt.ausstattung = e.target.value; blattStandZeigen(); }
+});
+document.getElementById('frageKnoepfe').addEventListener('click', function (e) {
+  const el = e.target.closest('[data-frage]');
+  if (!el) return;
+  const tun = frageAktionen[Number(el.getAttribute('data-frage'))];
+  document.getElementById('frageSheet').hidden = true;
+  if (tun) tun();
+});
+/* Seite verlassen mit ungespeichertem Blatt: der Browser fragt nach */
+window.addEventListener('beforeunload', function (e) { if (blattGeaendert()) { e.preventDefault(); e.returnValue = ''; } });
+document.getElementById('hilfeBtn').addEventListener('click', oeffneHilfe);
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').hidden = true; });
+document.getElementById('schildZuBtn').addEventListener('click', function () { document.getElementById('schildSheet').hidden = true; });
+document.getElementById('schildDruckBtn').addEventListener('click', function () {
+  const wahl = document.querySelector('#schildWahl input:checked');
+  if (druckeSchild(S.schildZielId, wahl ? wahl.value : 'beides', document.getElementById('schildSpruch').value.trim())) {
+    document.getElementById('schildSheet').hidden = true;
+  }
+});
+document.getElementById('chipAbbrechenBtn').addEventListener('click', function () { if (S.nfcAbbruch) S.nfcAbbruch.abort(); });
+
+/* ---------- Start ---------- */
+(function start() {
+  wendeI18nAn();
+  try {
+    if (!L) throw new Error('nfc_qr_logik.js nicht geladen');
+    if (!Q) throw new Error('bos_qr.js nicht geladen');
+    if (!Q.wurzel()) throw new Error('bos_qr.js: Wurzel von BOS nicht bestimmbar');
+    if (!window.BOS_APPS) throw new Error('bos_app_registry.js nicht geladen');
+    render();
+  } catch (err) { zeigeFehler(t('err_laden'), err); return; }
+  /* Datenbank zuletzt und getrennt: ihr Fehler darf den Rest nicht aufhalten */
+  starteDatenbank().catch(function (err) { dbFehler('fehler', err); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+/* ================================================================
+   BäckereiOS · Teigecke — gemeinsame Gestaltung der Teigecke-Seiten
+   Einbindung: <link rel="stylesheet" href="teigecke_seite.css"> NACH
+   ../bos_design_tokens.css.
+   Teil 1: wörtlich der <style>-Block aus teigecke_nacht.html v0.8
+   (02.10.2026, 10:30). Die Nachtseite behält ihren eigenen Block bis
+   Etappe 2 (KC, 03.10.2026). Teil 2: Ergänzungen für „Orte“.
+   CHANGELOG
+     2026-10-03 · 04:42 · v0.1 · Erstfassung
+   ================================================================ */
+/* ===== Teil 1 — aus teigecke_nacht.html ===== */
+  :root {
+    --tk-tap: max(56px, var(--bos-tap-min, 44px));  /* Mehlstaub, Teighände: lieber groß */
+  }
+  [hidden] { display: none !important; }
+  body { min-height: 100vh; padding-bottom: 80px; }
+
+  header {
+    background: var(--bos-bg);
+    padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px);
+    display: flex; align-items: center; gap: var(--bos-space-sm, 14px); flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: var(--bos-font-xl, 1.3rem); }
+  .kopf-titel { flex: 1 1 auto; min-width: 180px; }
+  .backtag { font-family: var(--bos-font-label); font-size: var(--bos-font-md, .95rem); color: var(--bos-amber-bright); letter-spacing: .02em; }
+  .backtag small { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .72rem); }
+  .kopf-knoepfe { display: flex; gap: var(--bos-space-2xs, 6px); align-items: center; }
+  .rund-btn { min-width: var(--tk-tap); min-height: var(--tk-tap); font-size: 1.2rem; }
+  .pflege-btn[aria-pressed="true"] { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+
+  #fehlerLeiste {
+    margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0;
+    border: 1px solid var(--bos-red); border-radius: var(--bos-radius-sm);
+    background: var(--bos-surface);   /* Rückfall für ältere WebViews ohne color-mix() */
+    background: color-mix(in srgb, var(--bos-red) 12%, var(--bos-surface));
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px);
+    font-size: var(--bos-font-sm, .82rem); line-height: 1.5;
+  }
+  #fehlerLeiste ul { margin: 4px 0 0; padding-left: 18px; }
+  #fehlerLeiste li { word-break: break-word; }
+  .fehler-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+
+
+  main { padding: var(--bos-space-md, 18px); max-width: 860px; margin: 0 auto; }
+  .status { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); padding: var(--bos-space-sm, 14px) 0; }
+
+  .hinweis {
+    border-left: 4px solid var(--bos-amber); background: var(--bos-surface);
+    border-radius: var(--bos-radius-sm); padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px);
+    margin-bottom: var(--bos-space-xs, 9px); font-size: var(--bos-font-sm, .82rem); line-height: 1.5;
+  }
+  .hinweis.rot { border-left-color: var(--bos-red); }
+  .hinweis.blau { border-left-color: var(--bos-blue); }
+  .hinweis.baustelle { border-left-color: var(--bos-text-faint); color: var(--bos-text-dim); }
+
+  section.block { margin-top: var(--bos-space-lg, 22px); }
+  .block-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: var(--bos-space-xs, 9px); }
+  .block-kopf h2 { margin: 0; font-size: var(--bos-font-lg, 1.15rem); }
+  .block-kopf .klein { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs, 6px); margin-bottom: var(--bos-space-sm, 14px); }
+  .chip {
+    min-height: 44px; padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--bos-border-strong); background: var(--bos-surface-raised); color: var(--bos-text-dim);
+    font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-sm, .82rem); cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--bos-amber-glow); border-color: var(--bos-amber); color: var(--bos-text); }
+  .chip:disabled { opacity: .45; cursor: not-allowed; }
+  .chip.warn { border-color: var(--bos-red); }
+  .link-btn { background: none; border: none; color: var(--bos-amber-bright); font-family: var(--bos-font-label); font-weight: 700; cursor: pointer; padding: 8px 4px; min-height: 44px; }
+
+  .ort-gruppe { margin-bottom: var(--bos-space-sm, 14px); }
+  .ort-kopf { display: flex; align-items: baseline; gap: var(--bos-space-xs, 9px); margin: var(--bos-space-xs, 9px) 0 4px; }
+  .ort-kennung { font-family: var(--bos-font-display); font-weight: 900; font-size: var(--bos-font-2xl, 1.6rem); color: var(--bos-amber-bright); }
+  .ort-name { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); }
+  .ort-kopf.ohne .ort-kennung { color: var(--bos-text-faint); font-size: var(--bos-font-lg, 1.15rem); }
+  .ort-kopf.unbekannt .ort-kennung { color: var(--bos-red); font-size: var(--bos-font-lg, 1.15rem); }
+
+  .zeile {
+    display: flex; align-items: stretch; gap: var(--bos-space-2xs, 6px);
+    margin-bottom: var(--bos-space-2xs, 6px);
+  }
+  .zeile-haupt {
+    flex: 1 1 auto; min-height: var(--tk-tap); text-align: left;
+    display: flex; flex-direction: column; justify-content: center;
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-sm);
+    color: var(--bos-text); padding: 8px 14px; cursor: pointer; font-family: var(--bos-font-body);
+  }
+  .zeile-haupt .z-name { font-size: var(--bos-font-md, .95rem); font-weight: 600; }
+  .zeile-haupt .z-fuer { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); margin-top: 2px; }
+  .zeile-haupt[aria-pressed="true"] { opacity: .45; }
+  .zeile-haupt[aria-pressed="true"] .z-name::before { content: '✓ '; color: var(--bos-green); }
+  .geplant {
+    flex: 0 0 auto; min-height: var(--tk-tap); padding: 6px 10px; max-width: 120px;
+    border: 1px dashed var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+    background: transparent; color: var(--bos-text-faint); font-family: var(--bos-font-label);
+    font-size: var(--bos-font-2xs, .62rem); line-height: 1.2; cursor: help;
+  }
+
+  .karte { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px); margin-bottom: var(--bos-space-sm, 14px); }
+  .karte.archiviert { opacity: .6; border-style: dashed; }
+  .karte-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .karte-kopf h3 { margin: 0; font-size: var(--bos-font-lg, 1.15rem); }
+  .karte-unter { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); margin-top: 4px; line-height: 1.45; }
+  .karte-knoepfe { display: flex; gap: var(--bos-space-2xs, 6px); flex-wrap: wrap; }
+  .karte-knoepfe .bos-btn { min-height: 44px; }
+  .liste { margin: var(--bos-space-xs, 9px) 0 0; padding: 0; list-style: none; }
+  .liste li { padding: 7px 0; border-top: 1px solid var(--bos-border); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .liste li:first-child { border-top: none; }
+  .wo { font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-amber-bright); white-space: nowrap; }
+  .wo.leer { color: var(--bos-text-faint); font-weight: 600; }
+  .unterkopf { font-family: var(--bos-font-label); text-transform: uppercase; letter-spacing: .06em; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); margin-top: var(--bos-space-sm, 14px); }
+  .badge { display: inline-block; font-family: var(--bos-font-label); font-size: var(--bos-font-2xs, .62rem); letter-spacing: .05em; text-transform: uppercase; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 1px 8px; color: var(--bos-text-dim); vertical-align: middle; }
+  .badge.rot { border-color: var(--bos-red); color: var(--bos-red); }
+  .zutat-tap { background: none; border: none; color: inherit; font: inherit; text-align: left; padding: 0; cursor: pointer; min-height: 36px; }
+  .pflege-leiste { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs, 6px); margin: var(--bos-space-sm, 14px) 0; }
+  .pflege-leiste .bos-btn { min-height: var(--tk-tap); }
+
+  /* Bottom-Sheets (Hilfe, Bearbeiten, Startdaten) */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet {
+    background: var(--bos-surface); width: 100%; max-width: 720px; max-height: 92vh; overflow-y: auto;
+    border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; padding: var(--bos-space-md, 18px) var(--bos-space-md, 18px) var(--bos-space-xl, 32px);
+    box-shadow: var(--bos-shadow-lg);
+  }
+  .sheet h2 { margin: 0 0 var(--bos-space-sm, 14px); font-size: var(--bos-font-xl, 1.3rem); }
+  .sheet .sec h3 { margin: var(--bos-space-sm, 14px) 0 4px; font-size: var(--bos-font-md, .95rem); color: var(--bos-amber-bright); }
+  .sheet .sec p { margin: 0; line-height: 1.55; color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); }
+  .feld { margin-bottom: var(--bos-space-sm, 14px); }
+  .feld > label { display: block; margin-bottom: 4px; }
+  .feld .bos-input { min-height: 48px; }
+  .feld-zeile { display: flex; gap: var(--bos-space-2xs, 6px); }
+  .feld-hilfe { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); margin-top: 3px; line-height: 1.4; }
+  .sheet-knoepfe { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs, 6px); margin-top: var(--bos-space-md, 18px); }
+  .sheet-knoepfe .bos-btn { min-height: var(--tk-tap); flex: 1 1 140px; }
+  .sheet-fehler { color: var(--bos-red); font-size: var(--bos-font-sm, .82rem); margin-top: var(--bos-space-xs, 9px); line-height: 1.5; word-break: break-word; }
+  .sheet-info { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); margin-top: var(--bos-space-xs, 9px); line-height: 1.5; }
+  .bos-btn.gefahr { border-color: var(--bos-red); color: var(--bos-red); }
+  .import-liste { font-size: var(--bos-font-sm, .82rem); line-height: 1.5; max-height: 220px; overflow-y: auto; padding-left: 18px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 60;
+    background: var(--bos-surface-raised); border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+    padding: 10px 16px; max-width: 90vw; font-size: var(--bos-font-sm, .82rem); box-shadow: var(--bos-shadow-md);
+  }
+
+  /* ---- Stufe 2 (29.09.2026) ---- */
+  .klein { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); line-height: 1.4; }
+  .hinweis.gruen { border-left-color: var(--bos-green); }
+  .hinweis.gross { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; color: var(--bos-text); }
+  #verbindungLeiste {
+    margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0;
+    border: 1px solid var(--bos-blue); border-radius: var(--bos-radius-sm); background: var(--bos-surface);
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); font-size: var(--bos-font-sm, .82rem); line-height: 1.5;
+  }
+
+
+  .zahl-block { display: flex; flex-direction: column; gap: var(--bos-space-xs, 9px); margin: var(--bos-space-sm, 14px) 0; }
+  .zahl-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); }
+  .zz-name { flex: 1 1 auto; font-size: var(--bos-font-lg, 1.15rem); font-weight: 600; display: flex; flex-direction: column; }
+  .zz-name small { font-size: var(--bos-font-xs, .72rem); font-weight: 400; color: var(--bos-text-faint); }
+  .zahl-eingabe {
+    flex: 0 0 auto; width: 130px; min-height: 64px; text-align: center;
+    font-family: var(--bos-font-label); font-weight: 800; font-size: 2rem;
+    background: var(--bos-surface-raised); color: var(--bos-text);
+    border: 2px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+  }
+  .zahl-eingabe:focus { outline: none; border-color: var(--bos-amber); box-shadow: 0 0 0 3px var(--bos-amber-glow); }
+  .karte-weiter { display: flex; justify-content: flex-end; margin-bottom: var(--bos-space-sm, 14px); }
+  .karte-weiter .bos-btn { min-height: var(--tk-tap); min-width: 160px; font-size: var(--bos-font-lg, 1.15rem); }
+  .info-liste { list-style: none; margin: 0 0 var(--bos-space-sm, 14px); padding: 0; }
+  .info-liste > li { padding: 8px 0; border-top: 1px solid var(--bos-border); font-size: var(--bos-font-md, .95rem); line-height: 1.5; }
+  .info-liste > li:first-child { border-top: none; }
+  .info-liste > li.rot { color: var(--bos-red); }
+  .info-liste > li.wasser { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; }
+  .info-liste > li.ergebnis { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; color: var(--bos-amber-bright); }
+  .info-liste > li.ergebnis.rot { color: var(--bos-red); }
+  .info-liste details summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; gap: 6px; }
+  .info-liste details summary { list-style: none; }
+  .info-liste details summary::-webkit-details-marker { display: none; }
+  .info-liste details summary::before { content: '▸'; color: var(--bos-text-faint); width: 1em; }
+  .info-liste details[open] summary::before { content: '▾'; }
+  .info-liste details .liste { margin-top: 2px; }
+  .abw { display: inline-block; font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .72rem); font-weight: 700; color: var(--bos-amber-bright); border: 1px dashed var(--bos-amber); border-radius: 999px; padding: 0 8px; vertical-align: middle; }
+
+  /* Reiter „Anpassen“: oben nur heute (Mond), darunter die dauerhafte Regel */
+  .nacht-block { border: 1px dashed var(--bos-blue); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px); margin-top: var(--bos-space-sm, 14px); }
+  .nacht-titel { font-weight: 700; margin-bottom: var(--bos-space-xs, 9px); color: var(--bos-blue); }
+  .regel-block { border: 1px solid var(--bos-amber); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px); margin-top: var(--bos-space-md, 18px); }
+  .regel-titel { font-weight: 700; margin-bottom: var(--bos-space-xs, 9px); color: var(--bos-amber-bright); }
+  .anp-zeile { margin-bottom: var(--bos-space-sm, 14px); }
+  .anp-zeile > label { display: block; margin-bottom: 4px; }
+  .anp-zeile .feld-zeile { align-items: center; flex-wrap: wrap; }
+  .anp-zeile .bos-input { min-height: 48px; max-width: 160px; }
+  .tabelle-kopf, .tabelle-zeile { display: grid; grid-template-columns: 1fr 1fr 1fr 48px; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .tabelle-kopf { font-size: var(--bos-font-2xs, .62rem); text-transform: uppercase; letter-spacing: .05em; color: var(--bos-text-faint); font-family: var(--bos-font-label); }
+  .tabelle-zeile .bos-input { min-height: 44px; max-width: none; width: 100%; }
+
+  /* Abwiegefolge, Sauer, Import */
+  .folge-zeile { display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); padding: 6px 0; border-top: 1px solid var(--bos-border); }
+  .folge-zeile .bos-btn { min-width: 52px; min-height: 52px; font-size: 1.1rem; }
+  .fz-nr { width: 2.2em; text-align: right; font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-text-faint); }
+  .fz-name { flex: 1 1 auto; font-weight: 600; }
+  .sauer-eintrag { align-items: center; flex-wrap: wrap; margin-top: var(--bos-space-xs, 9px); }
+  .sauer-eintrag .bos-input { max-width: 120px; min-height: 48px; }
+  .einwaage-tabelle { width: 100%; border-collapse: collapse; font-size: var(--bos-font-sm, .82rem); }
+  .einwaage-tabelle td { padding: 4px 6px; border-top: 1px solid var(--bos-border); }
+  .einwaage-tabelle td:last-child { text-align: right; white-space: nowrap; }
+  .einwaage-tabelle td.rot { color: var(--bos-red); font-weight: 700; }
+
+  /* ---- Feinschliff 02.10.2026 (Ulf: „grob, ohne Feinschliff“) ----
+     Kopf und Reiter kleben zusammen oben; Reiter wie Browser-Tabs (der
+     aktive Tab ist aus demselben Stoff wie die Seite darunter); Karte als
+     schwebendes Fenster wie die Produkt-Karte im Produkt-Config-Editor. */
+  .kopfbereich { position: sticky; top: 0; z-index: 20; background: var(--bos-bg); }
+  .rund-btn { min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 1.15rem; }
+  .pflege-btn { min-height: 48px; }
+
+  nav.reiter {
+    display: flex; align-items: flex-end; gap: 4px;
+    padding: 6px var(--bos-space-md, 18px) 0;
+    background: var(--bos-bg-soft); border-bottom: 1px solid var(--bos-border-strong);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  nav.reiter::-webkit-scrollbar { display: none; }
+  nav.reiter button {
+    flex: 1 1 0; min-width: 0; min-height: 50px; margin-bottom: -1px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 0 14px; border: 1px solid transparent; border-bottom: none;
+    border-radius: 12px 12px 0 0; background: transparent; color: var(--bos-text-dim);
+    font-family: var(--bos-font-label); font-weight: 600; font-size: 1.02rem; letter-spacing: .01em;
+    text-transform: none; white-space: nowrap; cursor: pointer; position: relative;
+    transition: background var(--bos-transition-fast, .12s), color var(--bos-transition-fast, .12s);
+  }
+  nav.reiter button:hover { background: var(--bos-amber-glow-soft); color: var(--bos-text); }
+  nav.reiter button[aria-selected="true"] {
+    background: var(--bos-bg); color: var(--bos-text); border-color: var(--bos-border-strong);
+    box-shadow: inset 0 3px 0 var(--bos-amber);
+  }
+  nav.reiter button:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: -4px; }
+  .reiter-zahl {
+    min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; font-size: .78rem; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--bos-amber-glow-soft); color: var(--bos-amber-bright);
+  }
+  .reiter-zahl:empty { display: none; }
+  @media (max-width: 520px) { nav.reiter { padding: 6px 8px 0; gap: 2px; } nav.reiter button { padding: 0 6px; font-size: .9rem; } }
+
+  /* Teig-Liste: EINE Fläche mit Trennlinien statt einzelner Kacheln */
+  .teig-liste { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); overflow: hidden; }
+  .liste-kopf, .liste-zeile { display: grid; grid-template-columns: 28px 1fr 64px 136px; gap: 10px; align-items: center; }
+  .liste-kopf { padding: 0 16px 6px; font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .liste-kopf span:nth-child(3), .liste-kopf span:nth-child(4) { text-align: right; }
+  .liste-zeile-rahmen { display: flex; align-items: stretch; border-top: 1px solid var(--bos-border); }
+  .liste-zeile-rahmen:first-child { border-top: none; }
+  .liste-zeile-rahmen > .bos-btn { min-width: 56px; border: none; border-left: 1px solid var(--bos-border); border-radius: 0; background: transparent; }
+  .liste-zeile {
+    flex: 1 1 auto; min-height: 62px; text-align: left; cursor: pointer;
+    background: transparent; border: none; color: var(--bos-text); padding: 8px 16px; font-family: var(--bos-font-body);
+  }
+  .liste-zeile:hover, .liste-zeile:focus-visible { background: var(--bos-amber-glow-soft); outline: none; }
+  .lz-status { font-size: 1.1rem; font-weight: 700; text-align: center; color: var(--bos-text-faint); }
+  .lz-status.ok { color: var(--bos-green); } .lz-status.warn { color: var(--bos-red); } .lz-status.teil { color: var(--bos-amber-bright); }
+  .lz-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .lz-name b { font-weight: 600; font-size: var(--bos-font-md, .95rem); }
+  .lz-name small { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .72rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lz-zahl { text-align: right; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-lg, 1.15rem); font-variant-numeric: tabular-nums; }
+  .lz-menge { text-align: right; font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-amber-bright); font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) { .liste-kopf, .liste-zeile { grid-template-columns: 22px 1fr 40px 104px; gap: 6px; } .liste-zeile { padding: 8px 10px; } }
+
+  /* Hinweise, die jede Nacht gleich sind, eingeklappt */
+  details.hinweis > summary { cursor: pointer; list-style: none; font-weight: 600; min-height: 28px; display: flex; align-items: center; gap: 6px; }
+  details.hinweis > summary::-webkit-details-marker { display: none; }
+  details.hinweis > summary::after { content: '▸'; margin-left: auto; color: var(--bos-text-faint); transition: transform var(--bos-transition-fast, .12s); }
+  details.hinweis[open] > summary::after { transform: rotate(90deg); }
+  details.hinweis > div { margin-top: 6px; }
+
+  /* Außentemperatur: eine ruhige Zeile mit Umschalter */
+  .temp-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: var(--bos-space-sm, 14px) 0; }
+  .temp-titel { font-family: var(--bos-font-label); font-weight: 600; color: var(--bos-text-dim); }
+  .temp-wert { font-size: var(--bos-font-md, .95rem); }
+  .temp-wert strong { font-family: var(--bos-font-label); font-size: 1.25rem; }
+  .temp-eingabe { max-width: 96px; min-height: 44px; display: inline-block; }
+  .umschalter { display: inline-flex; border: 1px solid var(--bos-border-strong); border-radius: 999px; overflow: hidden; margin-left: auto; }
+  .umschalter button {
+    min-height: 40px; padding: 0 16px; border: none; background: transparent; color: var(--bos-text-dim);
+    font-family: var(--bos-font-label); font-weight: 600; font-size: .9rem; cursor: pointer;
+  }
+  .umschalter button + button { border-left: 1px solid var(--bos-border-strong); }
+  .umschalter button[aria-pressed="true"] { background: var(--bos-amber); color: #1a1208; }
+
+  /* Karte je Teig: schwebendes Fenster (Muster Produkt-Karte, 04.09.2026) */
+  .karte-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(0,0,0,.55); }
+  .karte-rahmen {
+    width: 100%; max-width: 760px; height: min(780px, 90vh); overflow: hidden;
+    display: flex; flex-direction: column;
+    background: var(--bos-surface); border: 1px solid var(--bos-border-strong); border-radius: 18px;
+    box-shadow: 0 20px 56px rgba(0,0,0,.45);
+  }
+  .karte-kopfzeile { display: flex; align-items: center; gap: 12px; padding: 18px 22px 12px; flex-shrink: 0; }
+  .karte-kopfzeile .rund-btn { background: var(--bos-surface); border: 1px solid var(--bos-border-strong); color: var(--bos-text); }
+  .karte-kopfzeile .rund-btn:disabled { opacity: .3; }
+  .karte-zu { background: none; border: none; color: var(--bos-text-dim); font-size: 1.5rem; width: 48px; height: 48px; cursor: pointer; flex-shrink: 0; }
+  .karte-titelblock { flex: 1 1 auto; min-width: 0; text-align: center; }
+  .karte-titel { font-family: var(--bos-font-display); font-weight: 900; font-size: 1.6rem; color: var(--bos-text); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .karte-untertitel { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-faint); margin-top: 3px; }
+  .karte-reiterleiste { display: flex; gap: 4px; padding: 0 22px; border-bottom: 1px solid var(--bos-border-strong); flex-shrink: 0; }
+  .karte-reiterleiste button {
+    min-height: 46px; padding: 0 22px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: none;
+    border-radius: 10px 10px 0 0; background: transparent; color: var(--bos-text-dim); cursor: pointer;
+    font-family: var(--bos-font-label); font-weight: 600; font-size: 1rem;
+  }
+  .karte-reiterleiste button[aria-selected="true"] { background: var(--bos-surface); color: var(--bos-text); border-color: var(--bos-border-strong); box-shadow: inset 0 3px 0 var(--bos-amber); }
+  .karte-inhalt { flex: 1 1 auto; overflow-y: auto; padding: 4px 22px 28px; }
+  .karte-inhalt #karteMeldung:empty { display: none; }
+  @media (max-width: 560px) {
+    .karte-overlay { padding: 8px; }
+    .karte-rahmen { height: 94vh; border-radius: 14px; }
+    .karte-kopfzeile { padding: 12px 12px 8px; gap: 6px; }
+    .karte-titel { font-size: 1.3rem; }
+    .karte-reiterleiste { padding: 0 12px; }
+    .karte-inhalt { padding: 4px 14px 22px; }
+  }
+
+  /* Ergebnis der Karte: zwei Kacheln (Feinschliff 02.10.2026) */
+  .ergebnis-kacheln { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin: 4px 0 var(--bos-space-sm, 14px); }
+  .kachel { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: var(--bos-radius-md); border: 1px solid var(--bos-border-strong); background: var(--bos-bg-soft); min-width: 0; }
+  .kachel.winback { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .k-label { font-family: var(--bos-font-label); font-weight: 600; font-size: .9rem; color: var(--bos-text-dim); }
+  .k-wert { font-family: var(--bos-font-label); font-weight: 800; font-size: 2.1rem; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--bos-text); }
+  .kachel.winback .k-wert { color: var(--bos-amber-bright); }
+  .k-wert.klein-wert { font-size: 1.15rem; font-weight: 600; color: var(--bos-text-dim); }
+  .k-unter { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .ergebnis-kacheln.sauer { grid-template-columns: 1.4fr 1fr; }
+  .ergebnis-kacheln.vorlaeufig .kachel { border-style: dashed; }
+  .info-liste > li.rechenweg { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-faint); }
+  @media (max-width: 480px) { .ergebnis-kacheln { grid-template-columns: 1fr; } .k-wert { font-size: 1.8rem; } }
+
+  /* Sicherheitsregel 02.10.2026: Zahl je Kessel vorn, Gesamt klein darunter */
+  .lz-menge { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .lz-haupt { white-space: nowrap; }
+  .lz-gesamt { font-family: var(--bos-font-body); font-weight: 400; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); white-space: nowrap; }
+  .lz-name small { white-space: normal; overflow: visible; line-height: 1.5; }
+  .lz-brot { display: inline-block; margin-right: 14px; white-space: nowrap; }
+  .lz-brot .rot, .zz-einwaage.rot { color: var(--bos-red); font-weight: 700; }
+  .zz-einwaage { font-size: var(--bos-font-md, .95rem); font-weight: 600; color: var(--bos-text-dim); margin-top: 2px; }
+
+  /* Vorrat (Konzept Punkt 53) und Vorstufen-Schritte (§5.1a), 02.10.2026 */
+  .vorrat-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 var(--bos-space-sm, 14px); }
+  .vorrat-titel { font-family: var(--bos-font-label); font-weight: 600; color: var(--bos-text-dim); margin-right: 4px; }
+  .vorrat-haken {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 10px; cursor: pointer;
+    border: 1px solid var(--bos-border-strong); border-radius: 999px; background: var(--bos-surface); color: var(--bos-text);
+    font-family: var(--bos-font-body); font-size: var(--bos-font-md, .95rem);
+  }
+  .vorrat-haken[aria-pressed="true"] { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .vh-kasten { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--bos-border-strong); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: var(--bos-amber-bright); }
+  .vorrat-haken[aria-pressed="true"] .vh-kasten { border-color: var(--bos-amber); }
+  .vorrat-marke { font-family: var(--bos-font-label); font-size: .72rem; font-weight: 700; color: var(--bos-blue); border: 1px solid var(--bos-blue); border-radius: 999px; padding: 0 7px; vertical-align: middle; }
+  .vorrat-hinweis { border-left-color: var(--bos-blue); }
+  .vorrat-zeile { flex-wrap: wrap; }
+  .einheit-schalter { margin-left: 0; }
+  .einheit-schalter button { min-height: 48px; }
+  .zz-umrechnung { font-size: var(--bos-font-sm, .82rem); color: var(--bos-amber-bright); font-weight: 600; margin-top: 2px; }
+  .stueck-hinweis { margin: 4px 0 -4px; }
+  .vorstufen-liste li.mit-schritten { flex-wrap: wrap; }
+  .schritt-wahl { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .schritt-wahl .umschalter { margin-left: 0; align-self: flex-start; }
+  .schritt-wahl .umschalter button { min-height: 48px; padding: 0 18px; }
+  .schritt-wahl .umschalter small { font-weight: 400; opacity: .85; }
+  .schritt-aufschluesselung { font-weight: 600; }
+  .sauer-schalter { margin-left: 0; }
+
+  /* Je Behälter eine Zeile; Regelstand-Hinweis (02.10.2026) */
+  .behaelter-liste { list-style: none; margin: 2px 0 0; padding: 0; }
+  .behaelter-liste li { display: block; padding: 6px 0; border-top: 1px dashed var(--bos-border); font-size: var(--bos-font-md, .95rem); }
+  .behaelter-liste li:first-child { border-top: none; }
+  #regelLeiste { margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0; font-weight: 600; }
+
+  /* Kleinere Stufe rechnerisch zu wenig: rötlich wie „Einwaage fehlt“ (02.10.2026) */
+  .vorstufen-liste li.zu-wenig { border-left: 3px solid var(--bos-red); padding-left: 10px; }
+  .vorstufen-liste li.zu-wenig .schritt-aufschluesselung, .vorstufen-liste li.zu-wenig .behaelter-liste li b { color: var(--bos-red); }
+  .schritt-wahl .umschalter button.zu-wenig[aria-pressed="true"] { background: var(--bos-red); color: #fff; }
+  .schritt-wahl .umschalter button.zu-wenig small { opacity: 1; font-weight: 700; }
+
+/* ===== Teil 2 — Orte (03.10.2026) ===== */
+  .such-zeile { display: flex; gap: 10px; align-items: center; margin: 0 0 var(--bos-space-sm, 14px); }
+  .such-zeile .bos-input { max-width: 160px; text-transform: uppercase; font-size: 1.2rem; font-weight: 700; min-height: var(--tk-tap); }
+  .bereich-kopf { display: flex; align-items: baseline; gap: 12px; margin: var(--bos-space-md, 18px) 0 8px; flex-wrap: wrap; }
+  .bereich-kopf h2 { margin: 0; }
+  .bereich-kopf .bereich-buchstabe { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.6rem; color: var(--bos-amber); }
+  .karte.treffer { outline: 3px solid var(--bos-amber); outline-offset: 2px; }
+  .karte .ort-kennung { font-size: 1.9rem; }
+  .gebinde { color: var(--bos-text-dim); font-size: .9em; white-space: nowrap; }
+  .folge-knopf { min-width: var(--tk-tap); min-height: var(--tk-tap); }
+  .kennung-vorschau { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2.4rem; color: var(--bos-amber); line-height: 1; }
+  .hol-liste { max-height: 50vh; overflow: auto; }
+  #schildMessung { position: absolute; left: -99999px; top: 0; visibility: hidden; pointer-events: none; }

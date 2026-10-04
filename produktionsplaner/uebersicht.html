@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BOS · Übersicht</title>
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  body { padding-bottom: 100px; margin: 0; background: var(--bos-bg); }
+  * { box-sizing: border-box; }
+
+  .nfc-header { background:var(--bos-surface); border-bottom:1px solid var(--bos-border); padding:14px 16px; position: sticky; top: 0; z-index: 100; }
+  .nfc-header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .nfc-title  { font-family:var(--bos-font-display); font-weight:900; font-size:1.3rem; color:var(--bos-text); line-height:1.1; }
+  .nfc-sub    { font-family:var(--bos-font-label); font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--bos-text-dim); margin-top:3px; }
+  .nfc-back   { font-family:var(--bos-font-label); font-weight:800; font-size:0.72rem; color:var(--bos-text-dim); text-decoration:none; white-space:nowrap; padding-top:4px; -webkit-tap-highlight-color:transparent; }
+  .nfc-back:active { color:var(--bos-amber); }
+  .nfc-header-actions { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .pp-help-btn { width:30px; height:30px; border-radius:50%; border:none; background:var(--bos-amber); color:#1a1208; font-weight:900; font-size:0.9rem; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+
+  #pp-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #pp-hilfe-inhalt-wrap { background:var(--bos-surface); border-radius:var(--bos-radius-lg,18px) var(--bos-radius-lg,18px) 0 0; max-width:680px; margin:40px auto 0; padding:20px 18px 40px; min-height:50vh; }
+  .pp-hilfe-schritt { margin-bottom:18px; padding-bottom:14px; border-bottom:1px dashed var(--bos-border); }
+  .pp-hilfe-titel { font-family:var(--bos-font-display); font-weight:900; color:var(--bos-amber); margin-bottom:5px; }
+  .pp-hilfe-text { font-family:var(--bos-font-body); font-size:0.85rem; line-height:1.6; color:var(--bos-text-dim); white-space:pre-line; }
+
+  .brain-status { padding:8px 16px; text-align:center; font-size:0.75rem; font-family:var(--bos-font-label); font-weight:700; letter-spacing:0.5px; border-bottom:2px solid var(--bos-border); }
+  .brain-status.loading { color:var(--bos-amber); background:rgba(192,122,16,0.06); }
+  .brain-status.ready   { color:var(--bos-green);  background:rgba(77,184,122,0.06); }
+  .brain-status.error   { color:var(--bos-red);    background:rgba(201,74,74,0.06); }
+
+  .container { max-width:600px; margin:0 auto; padding:14px 12px 20px; }
+
+  .countdown { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:14px 16px; margin-bottom:14px; text-align:center; }
+  .countdown-label { font-family:var(--bos-font-label); font-weight:800; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.8px; color:var(--bos-text-dim); margin-bottom:4px; }
+  .countdown-value { font-family:var(--bos-font-display); font-weight:900; font-size:1.3rem; color:var(--bos-amber); }
+  .countdown-sub { font-family:var(--bos-font-label); font-size:0.7rem; color:var(--bos-text-dim); margin-top:2px; }
+  .countdown.abgelaufen .countdown-value { color:var(--bos-text-dim); }
+
+  .station-card { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:12px; }
+  .station-card.ok { border-color:var(--bos-green); }
+  .station-icon { font-size:1.6rem; flex-shrink:0; }
+  .station-info { flex:1; min-width:0; }
+  .station-name { font-family:var(--bos-font-display); font-weight:900; font-size:1.05rem; color:var(--bos-text); }
+  .station-status { font-family:var(--bos-font-label); font-size:0.72rem; font-weight:700; margin-top:2px; }
+  .station-status.ok { color:var(--bos-green); }
+  .station-status.offen { color:var(--bos-text-dim); }
+  .station-link { font-family:var(--bos-font-label); font-weight:800; font-size:0.7rem; color:var(--bos-amber); text-decoration:none; white-space:nowrap; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+
+  .btn-druck { width:100%; padding:14px; border:none; border-radius:14px; background:var(--bos-amber); color:#1a1208; font-family:var(--bos-font-label); font-weight:900; font-size:1rem; letter-spacing:1px; text-transform:uppercase; cursor:pointer; -webkit-tap-highlight-color:transparent; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:6px; }
+
+  .nachtrag-box { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:14px 16px; margin:18px 0 14px; }
+  .nachtrag-titel { font-family:var(--bos-font-display); font-weight:900; font-size:1rem; color:var(--bos-text); margin-bottom:10px; }
+  .nachtrag-row { display:flex; gap:8px; margin-bottom:8px; }
+  .nachtrag-select { flex:1; padding:9px 8px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-body); font-size:0.85rem; }
+  .nachtrag-menge { width:70px; padding:9px 8px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; text-align:center; }
+  .btn-nachtrag { width:100%; padding:10px; border:none; border-radius:10px; background:var(--bos-amber); color:#1a1208; font-family:var(--bos-font-label); font-weight:900; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .nachtrag-liste { margin-top:12px; }
+  .nachtrag-item { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px dashed var(--bos-border); font-family:var(--bos-font-label); font-size:0.75rem; color:var(--bos-text-dim); }
+  .nachtrag-item b { color:var(--bos-text); font-weight:800; }
+</style>
+</head>
+<body>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'produktionsplaner_uebersicht';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_druck.js"></script>
+
+<div class="nfc-header">
+  <div class="nfc-header-top">
+    <div>
+      <div class="nfc-title">Übersicht</div>
+      <div class="nfc-sub">Produktionsplaner · Wochenstand</div>
+    </div>
+    <div class="nfc-header-actions">
+      <a href="../launcher.html" class="nfc-back" id="nfc-back-link" style="display:none;">← Zurück</a>
+      <button class="pp-help-btn" onclick="ppOeffneHilfe()" title="Hilfe">?</button>
+    </div>
+    <script>
+      if (window.self === window.top) {
+        document.getElementById('nfc-back-link').style.display = 'block';
+      }
+    </script>
+  </div>
+</div>
+
+<div class="brain-status loading" id="brain-status">⏳ Stand wird geladen…</div>
+
+<div class="container">
+  <div class="countdown" id="countdown">
+    <div class="countdown-label">Einreichung noch offen bis</div>
+    <div class="countdown-value" id="countdown-value">…</div>
+    <div class="countdown-sub" id="countdown-sub"></div>
+  </div>
+
+  <div id="stationen-liste">
+    <div style="text-align:center;padding:20px;font-family:var(--bos-font-label);font-weight:700;color:var(--bos-text-dim);">Wird geladen…</div>
+  </div>
+
+  <div class="nachtrag-box">
+    <div class="nachtrag-titel">➕ Nachtrag eintragen</div>
+    <div class="nachtrag-row">
+      <select class="nachtrag-select" id="nachtrag-produkt"><option value="">— Produkt wählen —</option></select>
+      <input class="nachtrag-menge" id="nachtrag-menge" type="number" min="1" placeholder="Menge">
+    </div>
+    <button class="btn-nachtrag" onclick="nachtragEintragen()">Eintragen</button>
+    <div class="nachtrag-liste" id="nachtrag-liste"></div>
+  </div>
+
+  <button class="btn-druck" onclick="druckWoche()">🖨 Wochenübersicht drucken</button>
+</div>
+
+<!-- ═══ Hilfe-Sheet ═══ -->
+<div id="pp-hilfe-modal" onclick="if(event.target===this)ppSchliesseHilfe()">
+  <div id="pp-hilfe-inhalt-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:900;color:var(--bos-amber);font-size:1.05rem;">❓ Anleitung</div>
+      <button onclick="ppSchliesseHilfe()" style="background:none;border:none;font-size:1.3rem;color:var(--bos-text-dim);cursor:pointer;">✕</button>
+    </div>
+    <div id="pp-hilfe-inhalt"></div>
+  </div>
+</div>
+
+<script>
+var STATIONEN = [
+  { station: 'Rondo',           icon: '🔄', url: 'station_rondo.html' },
+  { station: 'Brötchenstraße',  icon: '🥐', url: 'station_broetchenstrasse.html' },
+  { station: 'Frühschicht',     icon: '🌅', url: 'station_fruehschicht.html' },
+  { station: 'Nachtschicht',    icon: '🌙', url: 'station_nachtschicht.html' }
+];
+
+var heute = new Date(); heute.setHours(0,0,0,0);
+
+function isoDatum(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Planungswoche — MUSS identisch zur selben Logik in den Stationsseiten
+// (station_*.html) berechnet werden, sonst passt WOCHE_ISO nicht mehr zu
+// dem, was die Stationen unter `woche` schreiben, und der grüne Haken
+// bleibt trotz Einreichung aus. Siehe ausführlicher Kommentar dort sowie
+// SESSION_2026-09-05_PRODUKTIONSPLANER_WOCHENANKER_FIX.md.
+function planWocheMontag(von) {
+  var mo = naechsterDienstag(von);
+  mo.setDate(mo.getDate() - 1);
+  mo.setHours(0, 0, 0, 0);
+  return mo;
+}
+var wochenMo = planWocheMontag(heute);
+var WOCHE_ISO = isoDatum(wochenMo);
+
+var STAND = {}; // station -> zuletzt eingereichte Doku
+var NACHTRAEGE = []; // in der Planungswoche eingetragene Nachträge, chronologisch
+var PRODUKTE_NACH_STATION = {}; // station -> [{legacyKey, name}], nur nfcSeite:true
+
+function setStatus(cls, text) {
+  var el = document.getElementById('brain-status');
+  el.className = 'brain-status ' + cls;
+  el.textContent = text;
+}
+
+// ── Planungsfenster: Fr 00:01 – Di 23:59, danach HART gesperrt (Ulf,
+// 03.09.2026 — Kurskorrektur gegenüber der ursprünglichen Annahme "weiches
+// Ende"). Dieselbe Berechnung wie in den Stationsseiten, dort zusätzlich
+// für die eigentliche Sperre genutzt — hier nur für die Anzeige.
+function naechsterDienstag(von) {
+  var d = new Date(von);
+  var tag = (d.getDay() + 6) % 7; // Mo=0..So=6
+  var diff = (2 - 1 - tag + 7) % 7; // Ziel: Wochentag-Index 1 (Dienstag, Mo=0-basiert)
+  d.setDate(d.getDate() + diff);
+  d.setHours(23, 59, 0, 0);
+  if (d < von) d.setDate(d.getDate() + 7);
+  return d;
+}
+function planungsfenster(von) {
+  var ende = naechsterDienstag(von);
+  var start = new Date(ende);
+  start.setDate(start.getDate() - 4);
+  start.setHours(0, 1, 0, 0);
+  return { start: start, ende: ende, offen: von >= start && von <= ende };
+}
+
+function fmtWochentagDatum(d) {
+  var wochentage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  return wochentage[d.getDay()] + ', ' + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.';
+}
+
+function renderCountdown() {
+  var jetzt = new Date();
+  var fenster = planungsfenster(jetzt);
+  var box = document.getElementById('countdown');
+  var val = document.getElementById('countdown-value');
+  var sub = document.getElementById('countdown-sub');
+  var label = document.querySelector('.countdown-label');
+
+  if (!fenster.offen) {
+    box.classList.add('abgelaufen');
+    label.textContent = 'Planung gerade gesperrt';
+    val.textContent = '🔒 gesperrt';
+    sub.textContent = 'Öffnet wieder ' + fmtWochentagDatum(fenster.start) + ', 00:01 Uhr';
+    return;
+  }
+
+  box.classList.remove('abgelaufen');
+  label.textContent = 'Einreichung noch offen bis';
+  var diffMs = fenster.ende - jetzt;
+  var tage = Math.floor(diffMs / 86400000);
+  var stunden = Math.floor((diffMs % 86400000) / 3600000);
+  val.textContent = tage > 0 ? ('noch ' + tage + ' Tag' + (tage === 1 ? '' : 'e') + ' ' + stunden + ' Std.') : ('noch ' + stunden + ' Std.');
+  sub.textContent = fmtWochentagDatum(fenster.ende) + ' · 23:59 Uhr';
+}
+
+function relativeZeit(ts) {
+  if (!ts || !ts.toMillis) return '';
+  var diffMin = Math.round((Date.now() - ts.toMillis()) / 60000);
+  if (diffMin < 1) return 'gerade eben';
+  if (diffMin < 60) return 'vor ' + diffMin + ' Min.';
+  var diffStd = Math.round(diffMin / 60);
+  if (diffStd < 24) return 'vor ' + diffStd + ' Std.';
+  return 'vor ' + Math.round(diffStd / 24) + ' Tg.';
+}
+
+function renderStationen() {
+  var html = '';
+  STATIONEN.forEach(function (s) {
+    var d = STAND[s.station];
+    var ok = !!d;
+    html += '<div class="station-card' + (ok ? ' ok' : '') + '">'
+          + '<div class="station-icon">' + s.icon + '</div>'
+          + '<div class="station-info">'
+          + '<div class="station-name">' + s.station + '</div>'
+          + '<div class="station-status ' + (ok ? 'ok' : 'offen') + '">'
+          + (ok ? '✓ eingereicht' + (d.eingereichtVon ? ' von ' + d.eingereichtVon : '') + ' · ' + relativeZeit(d.ts) : '○ steht noch aus')
+          + '</div></div>'
+          + '<a class="station-link" href="' + s.url + '">Zur Station →</a>'
+          + '</div>';
+  });
+  document.getElementById('stationen-liste').innerHTML = html;
+}
+
+async function ladeProduktDropdown() {
+  var select = document.getElementById('nachtrag-produkt');
+  try {
+    var r = await fetch('../produkt_config.json', { cache: 'no-store' });
+    var configData = r.ok ? await r.json() : [];
+    var proTag = configData.filter(function (p) { return p.nfcSeite === true && p.legacyKey; });
+    STATIONEN.forEach(function (s) {
+      var produkteHier = proTag.filter(function (p) { return p.station === s.station; });
+      if (!produkteHier.length) return;
+      var group = document.createElement('optgroup');
+      group.label = s.icon + ' ' + s.station;
+      produkteHier.forEach(function (p) {
+        var opt = document.createElement('option');
+        opt.value = p.legacyKey; opt.textContent = p.name;
+        opt.dataset.station = s.station; opt.dataset.name = p.name;
+        group.appendChild(opt);
+      });
+      select.appendChild(group);
+    });
+  } catch (e) {
+    console.warn('Produktionsplaner Übersicht: Produktliste für Nachtrag konnte nicht geladen werden', e);
+  }
+}
+
+async function ladeStand() {
+  await (window.BOS_AUTH_READY || Promise.resolve());
+  var db = window.db;
+  try {
+    var snap = await db.collection('bos_events')
+      .where('type', '==', 'produktionsplan_einreichung')
+      .where('woche', '==', WOCHE_ISO)
+      .get();
+    var neueste = {};
+    snap.forEach(function (doc) {
+      var d = doc.data();
+      var bestehend = neueste[d.station];
+      var tsNeu = d.ts && d.ts.toMillis ? d.ts.toMillis() : 0;
+      var tsAlt = bestehend && bestehend.ts && bestehend.ts.toMillis ? bestehend.ts.toMillis() : -1;
+      if (!bestehend || tsNeu > tsAlt) neueste[d.station] = d;
+    });
+    STAND = neueste;
+
+    var nachtragSnap = await db.collection('bos_events')
+      .where('type', '==', 'produktionsplan_nachtrag')
+      .where('woche', '==', WOCHE_ISO)
+      .get();
+    NACHTRAEGE = [];
+    nachtragSnap.forEach(function (doc) { NACHTRAEGE.push(doc.data()); });
+    NACHTRAEGE.sort(function (a, b) {
+      var ta = a.ts && a.ts.toMillis ? a.ts.toMillis() : 0;
+      var tb = b.ts && b.ts.toMillis ? b.ts.toMillis() : 0;
+      return tb - ta;
+    });
+
+    setStatus('ready', '✓ Stand geladen · Woche ' + WOCHE_ISO);
+  } catch (e) {
+    console.warn('Produktionsplaner Übersicht: Laden fehlgeschlagen', e);
+    setStatus('error', '⚠ Stand konnte nicht geladen werden');
+  }
+  renderStationen();
+  renderNachtragListe();
+}
+
+function renderNachtragListe() {
+  var el = document.getElementById('nachtrag-liste');
+  if (!NACHTRAEGE.length) { el.innerHTML = ''; return; }
+  el.innerHTML = NACHTRAEGE.map(function (n) {
+    return '<div class="nachtrag-item"><span>' + n.station + ' · <b>' + n.produktName + '</b></span>'
+         + '<span>+' + n.menge + ' · ' + (n.eingetragenVon || '—') + '</span></div>';
+  }).join('');
+}
+
+async function nachtragEintragen() {
+  var select = document.getElementById('nachtrag-produkt');
+  var opt = select.options[select.selectedIndex];
+  var mengeInput = document.getElementById('nachtrag-menge');
+  var menge = parseInt(mengeInput.value);
+
+  if (!select.value || !menge || menge <= 0) {
+    alert('Bitte Produkt und eine Menge größer 0 eingeben.');
+    return;
+  }
+
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    await window.db.collection('bos_events').add({
+      type: 'produktionsplan_nachtrag',
+      station: opt.dataset.station,
+      woche: WOCHE_ISO,
+      legacyKey: select.value,
+      produktName: opt.dataset.name,
+      menge: menge,
+      eingetragenVon: aktuellerProfilName(),
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    select.value = '';
+    mengeInput.value = '';
+    await ladeStand();
+  } catch (e) {
+    console.warn('Produktionsplaner Übersicht: Nachtrag konnte nicht eingetragen werden', e);
+    alert('Nachtrag konnte nicht eingetragen werden — bitte nochmal versuchen.');
+  }
+}
+
+function aktuellerProfilName() {
+  try {
+    var st = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+    if (!st || !st.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(st.localProfiles || []);
+    var p = alle.find(function (x) { return x.id === st.activeProfileId; });
+    return p ? p.name : null;
+  } catch (e) { return null; }
+}
+
+function druckWoche() {
+  var teile = [];
+  STATIONEN.forEach(function (s) {
+    var d = STAND[s.station];
+    teile.push('<h3>' + s.icon + ' ' + s.station + '</h3>');
+    if (!d) {
+      teile.push('<p class="pp-druck-fehlt"><em>Noch keine Planung eingereicht.</em></p>');
+      return;
+    }
+    teile.push('<table class="pp-druck-tabelle"><thead><tr><th>Produkt</th><th>Produktion gesamt</th><th>Endlager</th></tr></thead><tbody>');
+    Object.keys(d.produkte || {}).forEach(function (lk) {
+      var p = d.produkte[lk];
+      teile.push('<tr><td>' + p.name + '</td><td>' + p.gesamtProduktion + ' Bl.</td><td>' + p.endlager + ' Bl.</td></tr>');
+    });
+    teile.push('</tbody></table>');
+    teile.push('<p class="pp-druck-meta">Eingereicht von ' + (d.eingereichtVon || 'unbekannt') + '</p>');
+  });
+
+  // Nachträge bewusst als EIGENER, separater Bereich — nicht in die Tabellen
+  // oben eingerechnet. Auf Ulfs ausdrücklichen Wunsch (03.09.2026): das
+  // System soll die ursprüngliche Planung nicht selbst verändern, das würde
+  // die Person überrumpeln, die den Plan erstellt hat.
+  teile.push('<h3>➕ Nachbestellungen</h3>');
+  if (!NACHTRAEGE.length) {
+    teile.push('<p class="pp-druck-fehlt"><em>Keine Nachträge für diese Planungswoche.</em></p>');
+  } else {
+    teile.push('<table class="pp-druck-tabelle"><thead><tr><th>Station</th><th>Produkt</th><th>Menge</th><th>Von</th></tr></thead><tbody>');
+    NACHTRAEGE.forEach(function (n) {
+      teile.push('<tr><td>' + n.station + '</td><td>' + n.produktName + '</td><td>+' + n.menge + ' Bl.</td><td>' + (n.eingetragenVon || '—') + '</td></tr>');
+    });
+    teile.push('</tbody></table>');
+  }
+
+  window.BOS_DRUCK.drucken({
+    inhaltHTML: teile.join(''),
+    appName: 'Produktionsplaner',
+    titel: 'Wochenübersicht · ' + WOCHE_ISO,
+    mitKopf: true,
+    farbig: true,
+    extraCSS: '.pp-druck-tabelle{width:100%;border-collapse:collapse;margin:4px 0 6px;} .pp-druck-tabelle th,.pp-druck-tabelle td{border:1px solid #ddd;padding:4px 8px;text-align:left;font-size:0.85rem;} .pp-druck-meta{font-size:0.75rem;color:#666;margin:0 0 14px;} .pp-druck-fehlt{color:#888;margin:0 0 14px;}'
+  });
+}
+
+// ── Hilfe ─────────────────────────────────────────────────────────
+const PP_HILFE_SCHRITTE = [
+  ['Wofür ist diese Seite?', 'Sie zeigt auf einen Blick, welche Station ihre Produktionsplanung für die aktuelle Planungswoche (Fr–Di) schon eingereicht hat — mit grünem Haken, wer es war und wann. Fehlt eine Station, steht das genauso sichtbar da.'],
+  ['Zeitfenster', 'Die Planung ist nur Freitag bis Dienstag geöffnet. Die Karte oben zeigt entweder, wie viel Zeit noch bleibt, oder — außerhalb des Fensters — wann es wieder öffnet. Außerhalb des Fensters sind die Stationsseiten gesperrt, es gibt dann nichts mehr zu planen.'],
+  ['Zur Station springen', 'Über "Zur Station →" bei jeder Zeile kommst du direkt zur jeweiligen Stationsseite.'],
+  ['Nachtrag eintragen', 'Braucht es spontan mehr von einem Produkt (z. B. Kundenbestellung) als ursprünglich geplant, trägst du das hier ein — Produkt wählen (nach Station sortiert), Menge, fertig. Das verändert die ursprüngliche Planung NICHT und rechnet auch nichts neu — es ist eine reine Zusatz-Notiz, die separat mit ausgedruckt wird. Wer die Station bedienen darf, darf auch nachtragen.'],
+  ['Drucken', 'Der Button unten druckt alle vier Stationen zusammen auf einen Zettel — auch wenn noch nicht jede Station eingereicht hat. Nachträge erscheinen in einem eigenen Abschnitt am Ende.']
+];
+function ppOeffneHilfe() {
+  const inhalt = document.getElementById('pp-hilfe-inhalt');
+  inhalt.innerHTML = PP_HILFE_SCHRITTE.map(function (s) {
+    return '<div class="pp-hilfe-schritt"><div class="pp-hilfe-titel">' + s[0] + '</div><div class="pp-hilfe-text">' + s[1] + '</div></div>';
+  }).join('');
+  document.getElementById('pp-hilfe-modal').style.display = 'block';
+}
+function ppSchliesseHilfe() {
+  document.getElementById('pp-hilfe-modal').style.display = 'none';
+}
+
+window.addEventListener('load', function () {
+  renderCountdown();
+  setInterval(renderCountdown, 60000);
+  ladeProduktDropdown();
+  ladeStand();
+});
+</script>
+</body>
+</html>

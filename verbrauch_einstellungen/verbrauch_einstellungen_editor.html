@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Verbrauch – Einstellungen · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!--
+  verbrauch_einstellungen_editor.html
+  ------------------------------------------------------------
+  ZWECK: Bearbeitungs-Oberfläche für bos_verbrauch_einstellungen.json
+  (System-Standard für die Durchschnittsberechnung, siehe
+  BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md §3) — zwei Tabs (Manuell/Offiziell,
+  siehe SESSION_2026-08-29_DURCHSCHNITTSBERECHNUNG_ZEITKONTEXT.md §3.1).
+
+  KEIN LIVE-SCHREIBZUGRIFF auf Dateien — GitHub Pages ist statisches
+  Hosting, ein Browser kann Repo-Dateien nicht direkt verändern. Diese
+  Seite lädt die aktuell deployte bos_verbrauch_einstellungen.json (oder
+  startet mit Standardwerten, falls sie fehlt), lässt sie bearbeiten und
+  bietet am Ende "JSON anzeigen"/"Datei herunterladen" — Ulf lädt die
+  Datei herunter und committet sie manuell ins Repo. Gleiches Muster wie
+  produkt_config_sync.html (Import/Export statt Live-Sync).
+
+  PIN-SCHUTZ ENTFERNT (04.10.2026 · 14:24, Vorbereitung Online-Gang):
+  Der PIN stand im Klartext im öffentlichen Quelltext und prüfte nur im
+  Browser — kein Schutz, nur ein Klick-Hindernis. Zugang regelt seit der
+  Konto-Umstellung der Zugriffs-Guard (Registry: roles ['admin']). Die
+  Seite schreibt ohnehin nichts live, sie bietet nur den Datei-Download.
+  bos_pin_config.js wurde mit entfernt (hier war der letzte Nutzer).
+
+  EINBINDUNG/ABLAGEORT: eigener Unterordner (analog anderen Satelliten),
+  Root-Dateien daher mit ../ referenziert:
+    verbrauch_einstellungen/verbrauch_einstellungen_editor.html
+
+  ZUGRIFFSGUARD (umgesetzt 04.09.2026): gleiche Kette wie andere Satelliten
+  (BOS_APP_ID → bos_app_registry.js → bos_launcher_profiles.js →
+  bos_permissions.js → bos_access.js → bos_access_guard.js), ganz am Anfang
+  von <body>, vor dem PIN-Gate. Registry-Eintrag `verbrauch_einstellungen_editor`
+  gegen die echte bos_app_registry.js bestätigt (status: 'live', roles:
+  ['admin']) — Guard greift wirklich, kein Fail-open.
+  Details: SESSION_2026-09-04_ACCESS_GUARD_STANDALONE_ROLLOUT.md.
+
+  KORREKTUR 29.08.2026 — DRITTER TAB ENTFERNT: Es gab hier einen dritten
+  Tab "Hamster-Rechenhilfe", der einen Vorschlagswert aus einem Ferien-
+  Zeitraum-Vergleich berechnete. Anhand echter Altsystem-Dateien
+  (hamster_config.json, hamster_gehirn.js, wochenconfig.json) bestätigt:
+  Hamster hat mit Ferien/Kalender-Zeiträumen nichts zu tun — es ist eine
+  manuelle Tages-Zuweisung (Stufe 0-3), keine aus historischen Daten
+  ableitbare Größe. Der Tab beantwortete eine andere, für sich genommen
+  nicht unsinnige Frage (wie verändert sich der Verbrauch rund um einen
+  Ferienzeitraum), war aber als "Hamster"-Werkzeug falsch beschriftet —
+  daher ersatzlos raus statt umbenannt, um keine Verwirrung zu stiften.
+  Siehe bos_hamster.js/bos_hamster_config.json für die jetzt richtige
+  Stelle, und SESSION_2026-08-29_HAMSTER_KONZEPT.md für die volle
+  Herleitung. Firebase-Einbindung entfernt — ohne die Rechenhilfe
+  braucht dieser Editor kein Firestore mehr.
+
+  KALENDER NACHGEREICHT (29.08.2026): Ulf hatte um eine visuelle,
+  monatliche Kalenderansicht gebeten (Vorbild: wochenconfig_editor.html
+  im Altsystem) — sehen, welche Tage in die Berechnung einfließen, und
+  einzelne Tage per Klick ausschließen können. War in der Erstversion
+  übersehen worden (Ablenkung durch den Hamster-Exkurs), hier nachgeholt.
+  bos_zeitkontext_referenz.js dafür wieder eingebunden (rein lesend, für
+  Feiertags-/Ferien-Markierung — kein Firestore-Zugriff nötig, siehe §Kalender
+  unten). Bewusste Einschränkung, WEITERHIN GÜLTIG: die Kalenderansicht
+  zeigt das BERECHNETE Suchfenster (exakt bei Kontiguierlich, als
+  Suchbereich bei Stichprobe), nicht live, an welchen einzelnen Tagen
+  ein bestimmtes Produkt tatsächlich einen Wert hat — das bräuchte pro
+  Tageskachel einen Firestore-Zugriff pro Produkt, was hier weiterhin
+  bewusst nicht gebaut ist (Aufwand/Nutzen, siehe eigene Doku, offene
+  Punkte).
+
+  DATENBESTAND NACHGEREICHT (31.08.2026) — ARCHITEKTUR-ABWEICHUNG,
+  EXPLIZIT GEFLAGGT: Ulf konnte nach dem Import von backmengen_db.json
+  im Tab "Offiziell" keinerlei Bestätigung sehen, dass die Daten
+  tatsächlich angekommen sind. Grund: dieser Editor hatte bewusst keinen
+  Firestore-Zugriff (siehe Korrektur oben, "Firebase-Einbindung entfernt").
+  Das ist damit eine bewusste Abkehr von jener Entscheidung — nicht
+  dieselbe Einschränkung wie beim Kalender oben: hier geht es um eine
+  einzige, günstige Aggregat-Abfrage pro Datentopf (ein where('type','==',…)
+  auf bos_events, kein Composite-Index nötig, keine Pro-Tag-Kachel-Abfrage),
+  nicht um die live-Kalender-Überlagerung, die weiterhin bewusst aussen
+  vor bleibt. Neue Karte "Datenbestand" (erste Karte in jedem Tab, Manuell
+  wie Offiziell — gleiches Templat für beide Datentöpfe, siehe bestehendes
+  "eine Vorlage, zwei Aufrufer"-Muster dieser Seite) zeigt: Anzahl erfasster
+  Tage, Zeitraum, sowie aufklappbar pro Produkt die Anzahl Tage mit Wert
+  (via legacyKey-Abgleich gegen ../produkt_config.json). Liefert damit die
+  Grundlage, um zu beurteilen, ob genug Datenbasis für den Wechsel auf
+  "Offiziell" vorhanden ist — der eigentliche Umschalter zwischen Manuell/
+  Offiziell für rechnende Apps bleibt ein separates, weiterhin offenes
+  Thema (siehe BOS_BAUSTELLEN.md).
+
+  ÄNDERUNGSPROTOKOLL:
+  29.08.2026 — Erstversion (2 Tabs + Hamster-Rechenhilfe).
+  29.08.2026 — Hamster-Rechenhilfe wieder entfernt, siehe Korrektur oben.
+  29.08.2026 — Kalenderansicht + manuelle Tages-Ausschlüsse nachgereicht.
+  31.08.2026 — Datenbestand-Karte nachgereicht (Firebase-Zugriff dafür
+               wieder eingebunden, siehe Absatz oben). Neue Abhängigkeit
+               auf ../produkt_config.json (nur lesend, für Klarnamen in
+               der Pro-Produkt-Liste).
+  ------------------------------------------------------------
+-->
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root {
+    --ve-bg: var(--bos-bg, #16120e);
+    --ve-oberflaeche: var(--bos-surface, #221b14);
+    --ve-oberflaeche-2: var(--bos-surface-raised, #2b2218);
+    --ve-text: var(--bos-text, #f3ece1);
+    --ve-text-schwach: var(--bos-text-dim, #ab9c8a);
+    --ve-primary: var(--bos-amber, #c07a10);
+    --ve-primary-hell: var(--bos-amber-bright, #e0973a);
+    --ve-rand: var(--bos-border, rgba(255,255,255,0.08));
+    --ve-warnung: var(--bos-red, #d6584a);
+    --ve-warnung-bg: rgba(214,88,74,0.15);
+    --ve-info-bg: rgba(74,143,214,0.16);
+    --ve-info-text: var(--bos-blue, #4a8fd6);
+    --ve-radius: var(--bos-radius-md, 14px);
+    --ve-abstand: 16px;
+    --ve-font-display: var(--bos-font-display, 'Fraunces', serif);
+    --ve-font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --ve-font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--ve-bg); color: var(--ve-text); font-family: var(--ve-font-body); }
+  #app { max-width: 720px; margin: 0 auto; padding: var(--ve-abstand); padding-bottom: var(--bos-space-xl, 96px); }
+
+  .bos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--ve-abstand); }
+  .bos-header h1 { font-family: var(--ve-font-display); font-size: var(--bos-font-xl, 22px); margin: 0; font-weight: 700; }
+  .icon-btn {
+    background: var(--ve-oberflaeche); border: 1px solid var(--ve-rand); color: var(--ve-text);
+    border-radius: 10px; width: 40px; height: 40px; font-size: var(--bos-font-lg, 18px); cursor: pointer;
+  }
+
+  .primaer-btn {
+    width: 100%; padding: var(--bos-space-sm, 12px); border-radius: 10px; border: none; background: var(--ve-primary);
+    color: #1b1305; font-family: var(--ve-font-label); font-weight: 700; font-size: var(--bos-font-md, 16px); cursor: pointer;
+  }
+  .primaer-btn:active { background: var(--ve-primary-hell); }
+
+  /* Tabs */
+  .tab-leiste { display: flex; gap: var(--bos-space-xs, 8px); margin-bottom: var(--ve-abstand); }
+  .tab-btn {
+    flex: 1; padding: var(--bos-space-xs, 10px) var(--bos-space-xs, 8px); border-radius: 10px; border: 1px solid var(--ve-rand);
+    background: var(--ve-oberflaeche); color: var(--ve-text-schwach); font-family: var(--ve-font-label);
+    font-weight: 700; font-size: var(--bos-font-sm, 13px); letter-spacing: .02em; cursor: pointer;
+  }
+  .tab-btn.aktiv { background: var(--ve-primary); color: #1b1305; border-color: var(--ve-primary); }
+  .tab-panel { display: none; }
+  .tab-panel.aktiv { display: block; }
+
+  .karte {
+    background: var(--ve-oberflaeche); border: 1px solid var(--ve-rand); border-radius: var(--ve-radius);
+    padding: var(--ve-abstand); margin-bottom: var(--bos-space-sm, 12px);
+  }
+  .feld-zeile { margin-bottom: var(--bos-space-sm, 16px); }
+  .feld-zeile:last-child { margin-bottom: 0; }
+  .feld-label-zeile { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--bos-space-2xs, 6px); }
+  .feld-label { font-family: var(--ve-font-label); font-weight: 700; letter-spacing: .02em; font-size: var(--bos-font-sm, 14px); }
+  .hilfe-knopf {
+    background: none; border: 1px solid var(--ve-rand); color: var(--ve-text-schwach); border-radius: 50%;
+    width: 22px; height: 22px; font-size: var(--bos-font-xs, 12px); cursor: pointer; line-height: 1; padding: 0;
+  }
+  .feld-erklaerung {
+    font-size: var(--bos-font-sm, 13px); color: var(--ve-text-schwach); background: var(--ve-oberflaeche-2);
+    border-radius: 8px; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); margin-top: var(--bos-space-2xs, 6px); display: none;
+  }
+  .feld-erklaerung.offen { display: block; }
+
+  input[type="number"], input[type="text"], select {
+    width: 100%; font-family: var(--ve-font-body); font-size: var(--bos-font-md, 16px); padding: var(--bos-space-xs, 10px);
+    border-radius: 8px; border: 1px solid var(--ve-rand); background: var(--ve-oberflaeche-2); color: var(--ve-text);
+  }
+
+  .radio-gruppe { display: flex; gap: var(--bos-space-xs, 10px); }
+  .radio-option {
+    flex: 1; display: flex; align-items: center; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-xs, 10px); border-radius: 8px;
+    border: 1px solid var(--ve-rand); background: var(--ve-oberflaeche-2); cursor: pointer;
+  }
+  .radio-option.gewaehlt { border-color: var(--ve-primary); background: rgba(192,122,16,0.15); }
+
+  .modus-block { display: none; }
+  .modus-block.sichtbar { display: block; }
+
+  .export-btn { background: var(--ve-oberflaeche-2); border: 1px solid var(--ve-rand); color: var(--ve-text);
+    font-family: var(--ve-font-label); font-weight: 700; padding: var(--bos-space-xs, 10px); border-radius: 10px; cursor: pointer; width: 100%; margin-top: var(--bos-space-xs, 8px); }
+
+  pre#jsonAusgabe {
+    white-space: pre-wrap; word-break: break-word; background: var(--ve-oberflaeche-2); border: 1px solid var(--ve-rand);
+    border-radius: 8px; padding: var(--bos-space-sm, 12px); font-size: var(--bos-font-xs, 12px); max-height: 300px; overflow: auto;
+  }
+
+  .warnbox { background: var(--ve-warnung-bg); border: 1px solid var(--ve-warnung); border-radius: 8px; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); font-size: var(--bos-font-sm, 13px); margin-top: var(--bos-space-xs, 10px); }
+  .infobox { background: var(--ve-info-bg); border: 1px solid var(--ve-info-text); border-radius: 8px; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); font-size: var(--bos-font-sm, 13px); margin-top: var(--bos-space-xs, 10px); }
+
+  /* Kalender (29.08.2026) */
+  .kal-hinweis { font-size: var(--bos-font-xs, 12px); color: var(--ve-text-schwach); line-height: 1.6; margin: var(--bos-space-xs, 10px) 0; }
+  .kal-legende { display: flex; flex-wrap: wrap; gap: var(--bos-space-xs, 10px); font-size: var(--bos-font-xs, 11px); color: var(--ve-text-schwach); margin-bottom: var(--bos-space-xs, 10px); }
+  .kal-legende span { display: inline-flex; align-items: center; gap: var(--bos-space-3xs, 4px); }
+  .kal-legende i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .kal-monat { border: 1px solid var(--ve-rand); border-radius: 8px; margin-bottom: var(--bos-space-2xs, 6px); overflow: hidden; }
+  .kal-monat-kopf {
+    padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); font-family: var(--ve-font-label); font-weight: 700; font-size: var(--bos-font-sm, 13px);
+    background: var(--ve-oberflaeche-2); cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  }
+  .kal-monat-pfeil { transition: transform 0.15s; font-size: var(--bos-font-xs, 11px); color: var(--ve-text-schwach); }
+  .kal-monat.offen .kal-monat-pfeil { transform: rotate(180deg); }
+  .kal-monat-body { display: none; padding: var(--bos-space-xs, 10px); }
+  .kal-monat.offen .kal-monat-body { display: block; }
+
+  .kal-wt-zeile { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--bos-space-3xs, 3px); margin-bottom: var(--bos-space-3xs, 4px); text-align: center; font-size: var(--bos-font-2xs, 10px); color: var(--ve-text-schwach); font-weight: 700; }
+  .kal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--bos-space-3xs, 3px); }
+  .kal-tag {
+    min-height: 34px; border-radius: 6px; border: 1px dashed var(--ve-rand); background: transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: var(--bos-font-xs, 11px); color: var(--ve-text-schwach); cursor: default;
+  }
+  .kal-tag .kal-sym { font-size: var(--bos-font-2xs, 9px); line-height: 1; margin-top: var(--bos-space-3xs, 1px); }
+  .kal-tag.im-fenster {
+    border-style: solid; border-color: rgba(192,122,16,0.4); background: rgba(192,122,16,0.10);
+    color: var(--ve-text); cursor: pointer;
+  }
+  .kal-tag.im-fenster:active { background: rgba(192,122,16,0.22); }
+  .kal-tag.feiertag { border-color: rgba(74,143,214,0.5); }
+  .kal-tag.im-fenster.feiertag { background: rgba(74,143,214,0.16); }
+  .kal-tag.ausgeschlossen { background: var(--ve-warnung-bg); border-color: var(--ve-warnung); }
+  .kal-tag.ausgeschlossen .kal-datum { text-decoration: line-through; opacity: 0.8; }
+
+  .ausschluss-liste { display: flex; flex-direction: column; gap: var(--bos-space-3xs, 4px); margin-top: var(--bos-space-xs, 10px); }
+  .ausschluss-item {
+    display: flex; align-items: center; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px); border-radius: 8px;
+    background: var(--ve-warnung-bg); border: 1px solid var(--ve-warnung); font-size: var(--bos-font-xs, 12px);
+  }
+  .ausschluss-datum { font-weight: 700; min-width: 76px; }
+  .ausschluss-grund { flex: 1; color: var(--ve-text-schwach); }
+  .ausschluss-entfernen { cursor: pointer; padding: 0 var(--bos-space-3xs, 4px); color: var(--ve-text-schwach); }
+
+  /* Datenbestand (31.08.2026) */
+  .db-zeile { font-size: var(--bos-font-sm, 13px); color: var(--ve-text-schwach); margin-bottom: var(--bos-space-3xs, 4px); }
+  .db-zeile strong { color: var(--ve-text); font-weight: 700; }
+  .db-lade { font-size: var(--bos-font-sm, 13px); color: var(--ve-text-schwach); }
+  .db-toggle {
+    background: var(--ve-oberflaeche-2); border: 1px solid var(--ve-rand); color: var(--ve-text);
+    font-family: var(--ve-font-label); font-weight: 700; font-size: var(--bos-font-xs, 12px); padding: var(--bos-space-xs, 9px) var(--bos-space-xs, 10px);
+    border-radius: 8px; cursor: pointer; width: 100%; margin-top: var(--bos-space-xs, 8px); text-align: left;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .db-toggle .kal-monat-pfeil { transition: transform 0.15s; }
+  .db-toggle.offen .kal-monat-pfeil { transform: rotate(180deg); }
+  .db-produktliste { display: none; margin-top: var(--bos-space-xs, 8px); max-height: 260px; overflow-y: auto; border: 1px solid var(--ve-rand); border-radius: 8px; }
+  .db-produktliste.offen { display: block; }
+  .db-produkt-zeile {
+    display: flex; justify-content: space-between; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-2xs, 7px) var(--bos-space-xs, 10px);
+    font-size: var(--bos-font-xs, 12px); border-bottom: 1px solid var(--ve-rand);
+  }
+  .db-produkt-zeile:last-child { border-bottom: none; }
+  .db-produkt-zeile.leer { color: var(--ve-text-schwach); }
+  .db-produkt-name { flex: 1; }
+  .db-produkt-anzahl { font-weight: 700; color: var(--ve-text); min-width: 20px; text-align: right; }
+
+  .bottom-sheet { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; z-index: 50; }
+  .bottom-sheet[hidden] { display: none; }
+  .bottom-sheet-inhalt {
+    background: var(--ve-oberflaeche); border-radius: 20px 20px 0 0; padding: var(--bos-space-md, 20px); max-height: 85vh; overflow-y: auto;
+    width: 100%; position: relative;
+  }
+  .bottom-sheet-inhalt h2 { font-family: var(--ve-font-display); }
+  .bottom-sheet-inhalt h3 { font-family: var(--ve-font-label); font-size: var(--bos-font-md, 15px); margin-bottom: var(--bos-space-3xs, 4px); }
+  .bottom-sheet-inhalt p { font-size: var(--bos-font-sm, 14px); color: var(--ve-text-schwach); margin-top: 0; }
+</style>
+</head>
+<body>
+<!-- Zugriffs-Guard NEU 04.09.2026 — fehlte bisher komplett, obwohl im
+     Kopfkommentar oben (Zeile 40-43) schon lange als Plan vermerkt.
+     Ergänzt zusätzlich zum bestehenden PIN-Gate unten, nicht als Ersatz:
+     der Guard prüft die Rolle (Fumbling-Schutz), das PIN-Gate bleibt die
+     zusätzliche Admin-Hürde für dieses sensible Config-Tool — siehe
+     SESSION_2026-09-04_ACCESS_GUARD_STANDALONE_ROLLOUT.md. Bekommt bewusst
+     KEINEN Standalone-Login (anders als froster_inventur/verbrauch_manuell):
+     PIN-geschützte Admin-Tools sollen nie per NFC erreichbar sein. -->
+<script>var BOS_APP_ID = 'verbrauch_einstellungen_editor';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<div id="app">
+  <div class="bos-header">
+    <h1>Verbrauch – Einstellungen</h1>
+    <button class="icon-btn" id="hilfeOeffnen" type="button" aria-label="Hilfe">❓</button>
+  </div>
+
+  <div class="tab-leiste">
+    <button class="tab-btn aktiv" data-tab="manuell" type="button">Manuell</button>
+    <button class="tab-btn" data-tab="offiziell" type="button">Offiziell</button>
+  </div>
+
+  <!-- Tab: Manuell / Offiziell — identischer Aufbau, per Datentopf-Template erzeugt -->
+  <div class="tab-panel aktiv" id="tab-manuell" data-datentopf="manuell"></div>
+  <div class="tab-panel" id="tab-offiziell" data-datentopf="offiziell"></div>
+
+  <button class="export-btn" id="jsonAnzeigen" type="button">System-Standard als JSON anzeigen</button>
+  <button class="export-btn" id="jsonHerunterladen" type="button">Als Datei herunterladen</button>
+  <pre id="jsonAusgabe" hidden></pre>
+</div>
+
+<!-- Hilfe-Bottom-Sheet -->
+<div id="hilfeSheet" class="bottom-sheet" hidden>
+  <div class="bottom-sheet-inhalt">
+    <button id="hilfeSchliessen" class="icon-btn" aria-label="Schließen" type="button">✕</button>
+    <h2>Hilfe: Verbrauch-Einstellungen</h2>
+
+    <h3>Wofür sind die Tabs "Manuell" und "Offiziell"?</h3>
+    <p>Es gibt zwei getrennte Quellen für Verbrauchsdaten: manuell eingetragene Werte und (künftig) offiziell
+    erfasste Werte aus einer automatisierten Erfassung. Beide werden nie miteinander vermischt — jede hat ihre
+    eigenen Einstellungen, damit man sie unabhängig voneinander anpassen kann. Der Tab "Offiziell" ist schon
+    vorbereitet, auch wenn die dazugehörige Erfassung noch nicht existiert.</p>
+
+    <h3>Was bedeutet "Stichprobe" vs. "Kontiguierlich"?</h3>
+    <p><strong>Stichprobe</strong> nimmt eine feste Anzahl der letzten Werte für denselben Wochentag (z. B. die
+    letzten 6 Dienstage), sucht dafür aber nur innerhalb eines Suchfensters zurück — findet sich nicht genug in
+    diesem Fenster, gibt es eben weniger Vergleichswerte. <strong>Kontiguierlich</strong> nimmt stattdessen einfach
+    alle Werte innerhalb eines festen Zeitraums (z. B. die letzten 28 Tage), egal wie viele das am Ende sind. Im
+    Zweifel ist Stichprobe die robustere Wahl, weil sie eine gleichbleibende Menge an Vergleichsdaten anstrebt.</p>
+
+    <h3>Was bedeuten die Schwellenwerte?</h3>
+    <p>Ein neuer Wert gilt nur dann als auffällig, wenn er gleichzeitig um die hier eingestellte Mindest-Menge UND
+    um den Mindest-Prozentsatz vom Durchschnitt abweicht. Höhere Werte = die Warnung erscheint seltener
+    (toleranter). Niedrigere Werte = sie erscheint öfter (empfindlicher). Ausführliche Herleitung dieser
+    Zwei-Bedingungen-Logik: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md.</p>
+
+    <h3>Was zeigt der Datenbestand?</h3>
+    <p>Ganz oben in jedem Tab: wie viele Tage in diesem Datentopf tatsächlich in der Datenbank stehen, für
+    welchen Zeitraum, und (aufklappbar) wie viele Tage mit Wert es pro Produkt gibt. Das ist unabhängig von den
+    Einstellungen darunter — es sagt nur, wie viel Datenbasis überhaupt da ist. Nützlich z. B. nach einem Import,
+    um zu sehen, ob und wie viel angekommen ist, bevor man sich auf die Zahlen verlässt.</p>
+
+    <h3>Was zeigt der Kalender?</h3>
+    <p>Markierte Tage liegen im aktuell berechneten Fenster — bei Kontiguierlich exakt, bei Stichprobe nur der
+    Suchbereich (die tatsächlichen Datenpunkte hängen vom jeweiligen Produkt ab). Auf einen markierten Tag tippen
+    schließt ihn manuell aus der Berechnung aus, mit optionalem Grund — nochmal tippen nimmt ihn wieder auf. Blau
+    markierte Tage sind Feiertage/Ferien (nur zur Orientierung, die fließen ohnehin schon automatisch nicht mit
+    ein).</p>
+
+    <h3>Wie speichere ich meine Änderungen?</h3>
+    <p>Diese Seite kann nicht direkt ins Repository schreiben (statisches Hosting). Über die Knöpfe unten die
+    fertige Datei anzeigen oder herunterladen, dann von Hand ins Projekt legen (ersetzt <code>bos_verbrauch_
+    einstellungen.json</code> im Root).</p>
+  </div>
+</div>
+
+<!-- Zeitkontext-Referenz: rein lesend für den Kalender (Feiertags-/Ferien-
+     Markierung). Kein Firebase nötig — anders als bei der früheren
+     Rechenhilfe wird hier nichts aus Firestore gelesen. -->
+<script src="../bos_zeitkontext_referenz.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  const KLASSEN_STANDARD = () => ({
+    modus: 'stichprobe', stichprobeAnzahl: 6, suchfensterWochen: 12,
+    kontiguierlichTage: 28, minStichprobe: 3, schwelleProzent: 0.30, schwelleAbsolut: 5,
+    ausgeschlosseneTage: []
+  });
+
+  const zustand = {
+    einstellungen: { manuell: KLASSEN_STANDARD(), offiziell: KLASSEN_STANDARD() },
+    produkte: [],
+    datenbestand: { manuell: null, offiziell: null } // null = noch nicht geladen
+  };
+
+  const el = {};
+
+  function qs(id) { return document.getElementById(id); }
+
+  /* -----------------------------------------------------------
+   * Tab-Umschaltung
+   * --------------------------------------------------------- */
+  function initTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('aktiv'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('aktiv'));
+        btn.classList.add('aktiv');
+        qs('tab-' + btn.dataset.tab).classList.add('aktiv');
+      });
+    });
+  }
+
+  /* -----------------------------------------------------------
+   * Datentopf-Tabs (Manuell/Offiziell) — identisches Formular,
+   * per Template für beide Datentöpfe erzeugt
+   * --------------------------------------------------------- */
+  function renderDatentopfTab(datentopf) {
+    const panel = qs('tab-' + datentopf);
+    const e = zustand.einstellungen[datentopf];
+    const pfx = datentopf; // eindeutige IDs pro Datentopf
+
+    panel.innerHTML = `
+      <div class="karte">
+        <div class="feld-label-zeile">
+          <span class="feld-label">Datenbestand</span>
+          <button class="hilfe-knopf" data-erklaerung="${pfx}-datenbestandErklaerung" type="button">?</button>
+        </div>
+        <div class="feld-erklaerung" id="${pfx}-datenbestandErklaerung">
+          Wie viele Tage stehen in diesem Datentopf tatsächlich in der Datenbank, für welchen Zeitraum, und
+          (aufklappbar) wie viele Tage mit Wert gibt es pro Produkt. Unabhängig von den Einstellungen unten —
+          zeigt nur, wie viel Datenbasis überhaupt vorhanden ist. Ausführlich über den ❓ oben rechts.
+        </div>
+        <div id="${pfx}-datenbestand-inhalt">
+          <div class="db-lade">Lädt Datenbestand …</div>
+        </div>
+      </div>
+
+      <div class="karte">
+        <div class="feld-zeile">
+          <div class="feld-label-zeile">
+            <span class="feld-label">Modus</span>
+            <button class="hilfe-knopf" data-erklaerung="${pfx}-modusErklaerung" type="button">?</button>
+          </div>
+          <div class="radio-gruppe">
+            <label class="radio-option" id="${pfx}-modus-stichprobe-label">
+              <input type="radio" name="${pfx}-modus" value="stichprobe"> Stichprobe
+            </label>
+            <label class="radio-option" id="${pfx}-modus-kontiguierlich-label">
+              <input type="radio" name="${pfx}-modus" value="kontiguierlich"> Kontiguierlich
+            </label>
+          </div>
+          <div class="feld-erklaerung" id="${pfx}-modusErklaerung">
+            Stichprobe: feste Anzahl Werte, gesucht innerhalb eines Suchfensters. Kontiguierlich: alle Werte
+            innerhalb eines festen Zeitraums, ohne Anzahl-Deckel. Ausführlich über den ❓ oben rechts.
+          </div>
+        </div>
+
+        <div class="modus-block" id="${pfx}-block-stichprobe">
+          <div class="feld-zeile">
+            <div class="feld-label-zeile"><span class="feld-label">Anzahl Werte (Stichprobe)</span></div>
+            <input type="number" id="${pfx}-stichprobeAnzahl" min="1" max="50">
+          </div>
+          <div class="feld-zeile">
+            <div class="feld-label-zeile"><span class="feld-label">Suchfenster (Wochen zurück)</span></div>
+            <input type="number" id="${pfx}-suchfensterWochen" min="1" max="52">
+          </div>
+        </div>
+
+        <div class="modus-block" id="${pfx}-block-kontiguierlich">
+          <div class="feld-zeile">
+            <div class="feld-label-zeile"><span class="feld-label">Zeitraum (Tage)</span></div>
+            <input type="number" id="${pfx}-kontiguierlichTage" min="1" max="365">
+          </div>
+        </div>
+
+        <div class="feld-zeile">
+          <div class="feld-label-zeile">
+            <span class="feld-label">Mindest-Stichprobe (Kaltstart-Schwelle)</span>
+            <button class="hilfe-knopf" data-erklaerung="${pfx}-minErklaerung" type="button">?</button>
+          </div>
+          <input type="number" id="${pfx}-minStichprobe" min="1" max="20">
+          <div class="feld-erklaerung" id="${pfx}-minErklaerung">
+            Unter dieser Anzahl an vorhandenen Vergleichswerten findet gar kein Ausreißer-Check statt — lieber
+            kein Alarm als ein falscher, wenn noch zu wenig Historie da ist ("Kaltstart").
+          </div>
+        </div>
+
+        <div class="feld-zeile">
+          <div class="feld-label-zeile">
+            <span class="feld-label">Relative Mindestabweichung (%)</span>
+            <button class="hilfe-knopf" data-erklaerung="${pfx}-schwelleErklaerung" type="button">?</button>
+          </div>
+          <input type="number" id="${pfx}-schwelleProzent" min="1" max="100">
+        </div>
+
+        <div class="feld-zeile">
+          <div class="feld-label-zeile"><span class="feld-label">Absolute Mindestabweichung (Einheiten)</span></div>
+          <input type="number" id="${pfx}-schwelleAbsolut" min="0" max="1000">
+          <div class="feld-erklaerung" id="${pfx}-schwelleErklaerung">
+            Ein Wert gilt nur als auffällig, wenn er GLEICHZEITIG die absolute UND die relative Schwelle reißt —
+            nicht nur eine davon. Details: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md, Abschnitt "AND-Logik".
+          </div>
+        </div>
+      </div>
+
+      <div class="karte">
+        <div class="feld-label-zeile">
+          <span class="feld-label">Zeitraum &amp; Tage ausschließen</span>
+          <button class="hilfe-knopf" data-erklaerung="${pfx}-kalenderErklaerung" type="button">?</button>
+        </div>
+        <div class="feld-erklaerung" id="${pfx}-kalenderErklaerung">
+          Markierte Tage liegen im aktuell berechneten Fenster. Bei Kontiguierlich ist das exakt — bei Stichprobe
+          nur der Suchbereich, aus dem die tatsächlichen Datenpunkte gezogen werden, je nach Produkt unterschiedlich.
+          Auf einen markierten Tag tippen schließt ihn manuell aus der Berechnung aus (mit optionalem Grund) —
+          nochmal tippen nimmt ihn wieder auf.
+        </div>
+        <div class="kal-legende">
+          <span><i style="background:rgba(192,122,16,0.35);"></i> im Fenster</span>
+          <span><i style="background:rgba(74,143,214,0.5);"></i> Feiertag/Ferien</span>
+          <span><i style="background:var(--ve-warnung);"></i> manuell ausgeschlossen</span>
+        </div>
+        <div id="${pfx}-kalender"></div>
+        <div class="feld-label" style="margin-top:14px;margin-bottom:2px;">Manuell ausgeschlossene Tage</div>
+        <div class="ausschluss-liste" id="${pfx}-ausschluss-liste"></div>
+      </div>
+    `;
+
+    // Werte einsetzen
+    qs(pfx + '-stichprobeAnzahl').value = e.stichprobeAnzahl;
+    qs(pfx + '-suchfensterWochen').value = e.suchfensterWochen;
+    qs(pfx + '-kontiguierlichTage').value = e.kontiguierlichTage;
+    qs(pfx + '-minStichprobe').value = e.minStichprobe;
+    qs(pfx + '-schwelleProzent').value = Math.round(e.schwelleProzent * 100);
+    qs(pfx + '-schwelleAbsolut').value = e.schwelleAbsolut;
+
+    function setzeModusUI(modus) {
+      qs(pfx + '-modus-stichprobe-label').classList.toggle('gewaehlt', modus === 'stichprobe');
+      qs(pfx + '-modus-kontiguierlich-label').classList.toggle('gewaehlt', modus === 'kontiguierlich');
+      qs(pfx + '-block-stichprobe').classList.toggle('sichtbar', modus === 'stichprobe');
+      qs(pfx + '-block-kontiguierlich').classList.toggle('sichtbar', modus === 'kontiguierlich');
+      panel.querySelector(`input[name="${pfx}-modus"][value="${modus}"]`).checked = true;
+    }
+    setzeModusUI(e.modus);
+
+    panel.querySelectorAll(`input[name="${pfx}-modus"]`).forEach(radio => {
+      radio.addEventListener('change', () => {
+        zustand.einstellungen[datentopf].modus = radio.value;
+        setzeModusUI(radio.value);
+        renderKalender(datentopf);
+      });
+    });
+
+    const bindZahl = (id, feld, transform, rueckTransform) => {
+      qs(pfx + '-' + id).addEventListener('input', ev => {
+        const roh = Number(ev.target.value);
+        if (Number.isNaN(roh)) return;
+        zustand.einstellungen[datentopf][feld] = transform ? transform(roh) : roh;
+        if (['stichprobeAnzahl', 'suchfensterWochen', 'kontiguierlichTage'].includes(feld)) {
+          renderKalender(datentopf);
+        }
+      });
+    };
+    bindZahl('stichprobeAnzahl', 'stichprobeAnzahl');
+    bindZahl('suchfensterWochen', 'suchfensterWochen');
+    bindZahl('kontiguierlichTage', 'kontiguierlichTage');
+    bindZahl('minStichprobe', 'minStichprobe');
+    bindZahl('schwelleProzent', 'schwelleProzent', v => v / 100);
+    bindZahl('schwelleAbsolut', 'schwelleAbsolut');
+
+    panel.querySelectorAll('.hilfe-knopf').forEach(btn => {
+      btn.addEventListener('click', () => {
+        qs(btn.dataset.erklaerung).classList.toggle('offen');
+      });
+    });
+
+    renderKalender(datentopf);
+    renderDatenbestand(datentopf); // zeigt Platzhalter oder ggf. bereits geladenen Stand
+  }
+
+  /* -----------------------------------------------------------
+   * Kalender (29.08.2026, nachgereicht) — sehen, welche Tage ins
+   * Berechnungsfenster fallen, und einzelne Tage per Klick manuell
+   * ausschließen. Vorbild: wochenconfig_editor.html (Altsystem).
+   *
+   * Bewusste Einschränkung gegenüber dem Altsystem-Vorbild: kein
+   * Zugriff auf echte Verbrauchsdaten (bräuchte Firestore pro Produkt,
+   * siehe Kopfkommentar) — gezeigt wird das BERECHNETE Fenster, nicht
+   * live, welche Tage tatsächlich befüllt sind.
+   * --------------------------------------------------------- */
+  function addTage(datumStr, deltaTage) {
+    const [j, m, t] = datumStr.split('-').map(Number);
+    const d = new Date(j, m - 1, t);
+    d.setDate(d.getDate() + deltaTage);
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  function heuteISO() {
+    const p = n => String(n).padStart(2, '0');
+    const d = new Date();
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  /**
+   * Berechnet das aktuell gültige Fenster aus den Einstellungen.
+   * Kontiguierlich: exakt (heute - kontiguierlichTage+1 .. heute).
+   * Stichprobe: Suchbereich (heute - suchfensterWochen*7 .. heute) —
+   * die tatsächlichen Datenpunkte sind eine Teilmenge davon, abhängig
+   * vom Produkt, siehe Hinweis im UI.
+   */
+  function berechneFenster(einstellungen) {
+    const heute = heuteISO();
+    if (einstellungen.modus === 'kontiguierlich') {
+      return { von: addTage(heute, -(einstellungen.kontiguierlichTage - 1)), bis: heute, exakt: true };
+    }
+    return { von: addTage(heute, -(einstellungen.suchfensterWochen * 7)), bis: heute, exakt: false };
+  }
+
+  const WOCHENTAGE_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const MONATSNAMEN = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+  function renderKalender(datentopf) {
+    const e = zustand.einstellungen[datentopf];
+    const container = qs(datentopf + '-kalender');
+    if (!container) return; // Panel evtl. noch nicht gerendert
+
+    const fenster = berechneFenster(e);
+    const heute = new Date();
+
+    // Anzahl anzuzeigender Monate: vom aktuellen Monat zurück bis zum
+    // Monat, der die Fenstergrenze enthält, plus ein Puffermonat —
+    // gedeckelt, damit extreme Einstellungen (z. B. 365 Tage) nicht
+    // absurd viele Monate rendern.
+    const [vj, vm] = fenster.von.split('-').map(Number);
+    let monateZurueck = (heute.getFullYear() - vj) * 12 + (heute.getMonth() - (vm - 1)) + 1;
+    monateZurueck = Math.min(Math.max(monateZurueck, 1), 14);
+
+    let html = '';
+    for (let mOffset = 0; mOffset < monateZurueck; mOffset++) {
+      const mStart = new Date(heute.getFullYear(), heute.getMonth() - mOffset, 1);
+      const jahr = mStart.getFullYear();
+      const monat = mStart.getMonth();
+      const tageImMonat = new Date(jahr, monat + 1, 0).getDate();
+      const ersterWochentag = (new Date(jahr, monat, 1).getDay() + 6) % 7; // Mo=0
+
+      const monatVonStr = `${jahr}-${String(monat + 1).padStart(2, '0')}-01`;
+      const monatBisStr = `${jahr}-${String(monat + 1).padStart(2, '0')}-${String(tageImMonat).padStart(2, '0')}`;
+      const beruehrtFenster = monatVonStr <= fenster.bis && monatBisStr >= fenster.von;
+      const offen = mOffset === 0 || beruehrtFenster;
+
+      html += `<div class="kal-monat${offen ? ' offen' : ''}">`;
+      html += `<div class="kal-monat-kopf" data-toggle-monat="${datentopf}-m${mOffset}"><span>${MONATSNAMEN[monat]} ${jahr}</span><span class="kal-monat-pfeil">▾</span></div>`;
+      html += `<div class="kal-monat-body">`;
+      html += `<div class="kal-wt-zeile">${WOCHENTAGE_KURZ.map(w => `<div>${w}</div>`).join('')}</div>`;
+      html += `<div class="kal-grid">`;
+      for (let i = 0; i < ersterWochentag; i++) html += `<div></div>`;
+      for (let tag = 1; tag <= tageImMonat; tag++) {
+        const datumStr = `${jahr}-${String(monat + 1).padStart(2, '0')}-${String(tag).padStart(2, '0')}`;
+        const imFenster = datumStr >= fenster.von && datumStr <= fenster.bis;
+        const feiertagInfo = window.BOS_IST_BESONDERER_TAG?.(datumStr) ?? null;
+        const ausgeschlossen = (e.ausgeschlosseneTage || []).some(x => x.datum === datumStr);
+
+        let klassen = 'kal-tag';
+        if (imFenster) klassen += ' im-fenster';
+        if (feiertagInfo) klassen += ' feiertag';
+        if (ausgeschlossen) klassen += ' ausgeschlossen';
+
+        const klickbar = imFenster ? ` data-kal-tag="${datentopf}|${datumStr}"` : '';
+        const titel = feiertagInfo ? ` title="${feiertagInfo.name}"` : '';
+        html += `<div class="${klassen}"${klickbar}${titel}>`;
+        html += `<div class="kal-datum">${tag}</div>`;
+        if (ausgeschlossen) html += `<div class="kal-sym">✕</div>`;
+        else if (feiertagInfo) html += `<div class="kal-sym">✦</div>`;
+        html += `</div>`;
+      }
+      html += `</div></div></div>`;
+    }
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-toggle-monat]').forEach(kopf => {
+      kopf.addEventListener('click', () => kopf.closest('.kal-monat').classList.toggle('offen'));
+    });
+    container.querySelectorAll('[data-kal-tag]').forEach(tagEl => {
+      tagEl.addEventListener('click', () => {
+        const [dt, datumStr] = tagEl.dataset.kalTag.split('|');
+        kalenderTagKlick(dt, datumStr);
+      });
+    });
+
+    renderAusschlussListe(datentopf);
+  }
+
+  function kalenderTagKlick(datentopf, datumStr) {
+    const e = zustand.einstellungen[datentopf];
+    e.ausgeschlosseneTage = e.ausgeschlosseneTage || [];
+    const idx = e.ausgeschlosseneTage.findIndex(x => x.datum === datumStr);
+    if (idx > -1) {
+      e.ausgeschlosseneTage.splice(idx, 1);
+    } else {
+      const grund = prompt('Grund für den Ausschluss (optional):') ?? '';
+      e.ausgeschlosseneTage.push({ datum: datumStr, grund });
+      e.ausgeschlosseneTage.sort((a, b) => b.datum.localeCompare(a.datum));
+    }
+    renderKalender(datentopf);
+  }
+
+  function renderAusschlussListe(datentopf) {
+    const e = zustand.einstellungen[datentopf];
+    const liste = qs(datentopf + '-ausschluss-liste');
+    if (!liste) return;
+    const eintraege = e.ausgeschlosseneTage || [];
+    if (eintraege.length === 0) {
+      liste.innerHTML = '<div style="font-size:12px;color:var(--ve-text-schwach);">Keine — alle Tage im Fenster fließen in die Berechnung ein.</div>';
+      return;
+    }
+    liste.innerHTML = eintraege.map(x => `
+      <div class="ausschluss-item">
+        <span class="ausschluss-datum">${x.datum}</span>
+        <span class="ausschluss-grund">${x.grund || '—'}</span>
+        <span class="ausschluss-entfernen" data-entfernen="${datentopf}|${x.datum}">✕</span>
+      </div>
+    `).join('');
+    liste.querySelectorAll('[data-entfernen]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [dt, datumStr] = btn.dataset.entfernen.split('|');
+        kalenderTagKlick(dt, datumStr);
+      });
+    });
+  }
+
+
+  /* -----------------------------------------------------------
+   * Datenbestand (31.08.2026, nachgereicht) — zeigt pro Datentopf,
+   * wie viele Tage tatsächlich in bos_events stehen und (aufklappbar)
+   * wie viele davon pro Produkt einen Wert enthalten. Eine einzige
+   * Abfrage pro Datentopf (where('type','==',…), kein Composite-Index
+   * nötig), Auswertung läuft clientseitig — bei der aktuellen Größen-
+   * ordnung (Handvoll Tage bei "Offiziell", vermutlich wenige bei
+   * "Manuell") unkritisch. Gleiches Templat für beide Datentöpfe,
+   * unterschiedliche Dokumentform wird in ladeDatenbestand() aufgelöst:
+   * "offiziell" → ein Tages-Dokument mit produkte-Map ({legacyKey}_stueck/
+   * _bleche); "manuell" → ein Dokument pro Erfassung mit eintraege[]-Array.
+   * --------------------------------------------------------- */
+  async function ladeProdukte() {
+    try {
+      const antwort = await fetch('../produkt_config.json');
+      zustand.produkte = await antwort.json();
+    } catch (fehler) {
+      console.warn('produkt_config.json nicht ladbar — Pro-Produkt-Liste zeigt dann legacyKey statt Klarname.', fehler);
+      zustand.produkte = [];
+    }
+  }
+
+  function produktName(legacyKey) {
+    const p = zustand.produkte.find(x => x.legacyKey === legacyKey);
+    return (p && p.name) ? p.name : legacyKey;
+  }
+
+  function formatDatumDE(isoStr) {
+    if (!isoStr) return '–';
+    const [j, m, t] = isoStr.split('-');
+    return `${t}.${m}.${j}`;
+  }
+
+  async function ladeDatenbestand(datentopf) {
+    const typ = datentopf === 'offiziell' ? 'verbrauch_offiziell' : 'verbrauch_manuell';
+    try {
+      if (window.BOS_AUTH_READY) await window.BOS_AUTH_READY;
+      const snap = await db.collection('bos_events').where('type', '==', typ).get();
+
+      const tage = new Set();
+      const proProduktTage = {}; // legacyKey -> Set(datum)
+      let von = null, bis = null;
+
+      const merke = (legacyKey, datum) => {
+        if (!legacyKey) return;
+        if (!proProduktTage[legacyKey]) proProduktTage[legacyKey] = new Set();
+        if (datum) proProduktTage[legacyKey].add(datum);
+      };
+
+      snap.forEach(doc => {
+        const d = doc.data();
+        const datum = d.datum || null;
+        if (datum) {
+          tage.add(datum);
+          if (!von || datum < von) von = datum;
+          if (!bis || datum > bis) bis = datum;
+        }
+        if (datentopf === 'offiziell') {
+          Object.keys(d.produkte || {}).forEach(feldKey => {
+            merke(feldKey.replace(/_(stueck|bleche)$/, ''), datum);
+          });
+        } else {
+          (d.eintraege || []).forEach(eintrag => merke(eintrag.legacyKey, datum));
+        }
+      });
+
+      const proProdukt = {};
+      Object.keys(proProduktTage).forEach(k => { proProdukt[k] = proProduktTage[k].size; });
+
+      zustand.datenbestand[datentopf] = {
+        status: 'ok', anzahlDokumente: snap.size, anzahlTage: tage.size, von, bis, proProdukt
+      };
+    } catch (fehler) {
+      console.warn(`Datenbestand (${datentopf}) nicht ladbar.`, fehler);
+      zustand.datenbestand[datentopf] = { status: 'fehler', meldung: fehler.message || String(fehler) };
+    }
+    renderDatenbestand(datentopf);
+  }
+
+  function renderDatenbestand(datentopf) {
+    const pfx = datentopf;
+    const ziel = qs(pfx + '-datenbestand-inhalt');
+    if (!ziel) return; // Tab evtl. noch nicht gerendert
+
+    const stand = zustand.datenbestand[datentopf];
+    if (!stand) {
+      ziel.innerHTML = '<div class="db-lade">Lädt Datenbestand …</div>';
+      return;
+    }
+    if (stand.status === 'fehler') {
+      ziel.innerHTML = `<div class="warnbox">Datenbestand konnte nicht geladen werden (${stand.meldung}). Firestore-Zugriff/Verbindung prüfen.</div>`;
+      return;
+    }
+    if (stand.anzahlTage === 0) {
+      ziel.innerHTML = '<div class="infobox">Noch keine Daten in diesem Datentopf gefunden.</div>';
+      return;
+    }
+
+    const produktKeys = Object.keys(stand.proProdukt);
+    const mitWert = produktKeys.filter(k => stand.proProdukt[k] > 0).length;
+    const gesamtProdukte = zustand.produkte.length || null;
+
+    let html = `<div class="db-zeile"><strong>${stand.anzahlTage}</strong> Tag(e) erfasst · Zeitraum ${formatDatumDE(stand.von)} – ${formatDatumDE(stand.bis)}</div>`;
+    html += `<div class="db-zeile"><strong>${mitWert}</strong> Produkt(e) mit mindestens einem Wert${gesamtProdukte ? ` (von ${gesamtProdukte} in produkt_config.json)` : ''}</div>`;
+    html += `<button class="db-toggle" type="button" data-db-toggle="${pfx}"><span>Pro Produkt anzeigen</span><span class="kal-monat-pfeil">▾</span></button>`;
+    html += `<div class="db-produktliste" id="${pfx}-db-produktliste">`;
+
+    const zeilen = produktKeys
+      .map(k => ({ name: produktName(k), anzahl: stand.proProdukt[k] }))
+      .sort((a, b) => b.anzahl - a.anzahl || a.name.localeCompare(b.name, 'de'));
+
+    if (zeilen.length === 0) {
+      html += '<div class="db-produkt-zeile leer">Keine Produktdaten in den Dokumenten gefunden.</div>';
+    } else {
+      zeilen.forEach(z => {
+        html += `<div class="db-produkt-zeile"><span class="db-produkt-name">${z.name}</span><span class="db-produkt-anzahl">${z.anzahl}</span></div>`;
+      });
+    }
+    html += `</div>`;
+
+    ziel.innerHTML = html;
+
+    const toggleBtn = ziel.querySelector('[data-db-toggle]');
+    const liste = qs(pfx + '-db-produktliste');
+    toggleBtn.addEventListener('click', () => {
+      toggleBtn.classList.toggle('offen');
+      liste.classList.toggle('offen');
+    });
+  }
+
+  /* -----------------------------------------------------------
+   * Laden/Export der System-Standard-Datei
+   * --------------------------------------------------------- */
+  async function ladeEinstellungenDatei() {
+    try {
+      const antwort = await fetch('../bos_verbrauch_einstellungen.json');
+      const datei = await antwort.json();
+      ['manuell', 'offiziell'].forEach(dt => {
+        if (datei[dt]) zustand.einstellungen[dt] = { ...KLASSEN_STANDARD(), ...datei[dt] };
+      });
+    } catch (fehler) {
+      console.warn('bos_verbrauch_einstellungen.json nicht ladbar, starte mit Klassen-Standard.', fehler);
+    }
+  }
+
+  function baueExportJson() {
+    return JSON.stringify({
+      _kommentar: 'System-Standard für die Durchschnittsberechnung (bos_verbrauch_durchschnitt.js). Erzeugt über verbrauch_einstellungen_editor.html.',
+      manuell: zustand.einstellungen.manuell,
+      offiziell: zustand.einstellungen.offiziell
+    }, null, 2);
+  }
+
+  function initExport() {
+    qs('jsonAnzeigen').addEventListener('click', () => {
+      const ausgabe = qs('jsonAusgabe');
+      ausgabe.textContent = baueExportJson();
+      ausgabe.hidden = !ausgabe.hidden ? true : false;
+      ausgabe.hidden = false;
+    });
+    qs('jsonHerunterladen').addEventListener('click', () => {
+      const blob = new Blob([baueExportJson()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bos_verbrauch_einstellungen.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  /* -----------------------------------------------------------
+   * Hilfe-Sheet
+   * --------------------------------------------------------- */
+  function initHilfe() {
+    qs('hilfeOeffnen').addEventListener('click', () => { qs('hilfeSheet').hidden = false; });
+    qs('hilfeSchliessen').addEventListener('click', () => { qs('hilfeSheet').hidden = true; });
+  }
+
+  /* -----------------------------------------------------------
+   * App-Start (nach PIN)
+   * --------------------------------------------------------- */
+  async function initApp() {
+    initTabs();
+    initExport();
+    initHilfe();
+    await Promise.all([ladeEinstellungenDatei(), ladeProdukte()]);
+    renderDatentopfTab('manuell');
+    renderDatentopfTab('offiziell');
+    // Datenbestand läuft unabhängig im Hintergrund weiter (Karte zeigt
+    // bis dahin "Lädt Datenbestand …") — blockiert nicht den Rest der Seite.
+    ladeDatenbestand('manuell');
+    ladeDatenbestand('offiziell');
+  }
+
+  initApp(); // PIN-Gate entfernt 04.10.2026 — Zugang regelt der Zugriffs-Guard
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Froster · Produktion — BäckereiOS</title>
+
+<!--
+  MODUL: froster_produktion.html
+  ZWECK: Ist-Erfassung frisch produzierter Ware, die in den Froster kommt —
+         Gegenstück zu froster_inventur.html (die zählt nur den Bestand,
+         meldet aber keine Zugänge). Drei-Schritt-Kachel-Fluss: Station
+         (Zuständigkeits-Gruppe) → Produkt → Menge. Jede Eintragung ist ein
+         eigenes, append-only Firestore-Dokument (laufendes Ereignis, kein
+         Sitzungs-Snapshot wie bei froster_inventur — bewusste Architektur-
+         Entscheidung, siehe SESSION_2026-09-03_FROSTER_PRODUKTION_ZIEL_
+         KONZEPT.md §1).
+  DATENFLUSS: produkt_config.json → gefiltert nach frosterZustaendigkeit
+         !== 'nein' (identischer Filter wie froster_inventur.html — legt die
+         Grundmenge fest) → in Schritt 1 gruppiert nach dem Feld "station"
+         (Rondo/Brötchenstraße/Frühschicht/Nachtschicht, wie beim
+         Produktionsplaner — NICHT nach frosterZustaendigkeit-Gruppe, seit
+         v0.2, Ulf 05.09.: "wo stehe ich gerade" statt "wer ist zuständig")
+         → Produkt-Kachel wählen → Menge per Stepper eintragen → EIN
+         Dokument pro Eintragung nach Firestore-Collection "bos_events"
+         (type: 'froster_produktion').
+  SCHNITTSTELLEN: produkt_config.json (Felder frosterZustaendigkeit,
+         legacyKey, name, kategorie, einheit, frosterSort — alle bereits
+         durch froster_inventur.html etabliert, keine neuen Felder nötig),
+         bos_firebase_config.js, Firestore (Standalone-Login, Anonymous
+         Auth, siehe BOS_ABHAENGIGKEITEN.md §1a). Seit v0.3 zusätzlich
+         bos_ziel_berechnung.js (rein lesend, direkt nach dem Schreiben
+         einer Eintragung, für den Live-Ziel-Stand — siehe dort für die
+         eigentliche Rechenlogik).
+  BEKANNTE OFFENE PUNKTE:
+    - Icon-/Foto-Pipeline (echte Produktfotos + generierte Icons) noch
+      nicht gebaut. Platzhalter: Emoji nach dem Feld "kategorie" (siehe
+      KATEGORIE_ICON weiter unten). Ersetzen, sobald echte Assets als
+      kuratierte, dateibasierte Ressourcen existieren (analog
+      produkt_config.json — kein Firebase Storage nötig, Einzelpfleger).
+    - "Froster-Interpret" (Host-Handler, der Zählung + Produktion +
+      künftig Entnahme zu echtem Bestand verrechnet) existiert weiterhin
+      nicht — diese Seite schreibt rohe Ereignisse, konsumiert aber noch
+      niemand (BOS_ABHAENGIGKEITEN.md §5 Punkt 4, erweitert um diesen
+      neuen Ereignistyp).
+    - Montag/Dienstag-Ziel-Tabelle ("Messlatte") noch nicht gebaut —
+      separates Vorhaben, liest künftig dieselben froster_produktion-
+      Ereignisse, siehe SESSION_2026-09-03_FROSTER_PRODUKTION_ZIEL_
+      KONZEPT.md §3.
+    - Registry-Rollen-Namen ("backstube"/"konditorei") weichen von den in
+      BOS_ABHAENGIGKEITEN.md §2.2 dokumentierten echten Rollen ("baecker"/
+      "konditor") ab. Bestehende Drift (auch bei freezer_inventur und den
+      Produktionsplaner-Stationsseiten vorhanden) — hier nur übernommen,
+      nicht neu eingeführt und in dieser Session nicht behoben.
+    - Aktuell (05.09.2026) haben alle 14 froster-relevanten Produkte ein
+      "station"-Feld (Frühschicht 5×, Brötchenstraße 5×, Nachtschicht 4×,
+      Rondo 0×) — die Rondo-Kachel erscheint deshalb momentan nie, obwohl
+      die Seite alle vier Stationen unterstützt. Analoges Verhalten zu
+      froster_inventur.html (dort: Konditoren/Sonstige nie sichtbar, weil
+      frosterZustaendigkeit bisher nur "baecker" kennt).
+
+  CHANGELOG
+    2026-09-05 · v0.1 · Feature
+      Erste Version. Drei-Schritt-Fluss (Station → Produkt → Menge),
+      ein Firestore-Dokument pro Eintragung, Erfolgs-Rückmeldung mit
+      Direkt-Weiter für Folge-Eintragungen an derselben Station.
+    2026-09-05 · v0.2 · Fix + Änderung
+      (1) Schritt-1-Gruppierung von frosterZustaendigkeit-Gruppe auf das
+      Feld "station" umgestellt (Ulf-Feedback nach erstem Live-Test) —
+      physische Station statt abstrakter Zuständigkeit, gleiche Icons/
+      Reihenfolge wie beim Produktionsplaner. frosterZustaendigkeit bleibt
+      unverändert der Basis-Filter, zusätzlich weiterhin im Firestore-
+      Dokument mitgeschrieben. (2) Mengen-Stepper: Zahlenfeld war technisch
+      schon antippbar/beschreibbar, sah das dem Design aber nicht an (kein
+      Rand/Cursor-Hinweis) — jetzt gestrichelter Unterstrich + Hinweistext.
+      Zusätzlich Langdruck-Beschleunigung auf +/- ergänzt (Ulf-Beispiel:
+      186 Bleche auf einmal eintragen war vorher nur per 186 Einzeltipps
+      oder manueller Zahleneingabe praktikabel).
+    2026-09-05 · v0.3 · Feature
+      Live-Ziel-Stand nach dem Eintragen (Ulf, 05.09.2026): direkt unter
+      der Erfolgs-Meldung erscheint jetzt der aktuelle Fortschritt für
+      genau das gerade eingetragene Produkt (X/Y, Rest bis Zieltag), bei
+      erreichtem Ziel eine Glückwunsch-Meldung statt des Zwischenstands.
+      Neue Abhängigkeit: bos_ziel_berechnung.js (geteiltes Modul, auch
+      von froster/ziele.html genutzt).
+    2026-09-05 · v0.4 · Feature
+      Kleiner, immer sichtbarer Link (🎯) im Header zu froster/ziele.html
+      (Ulf, 05.09.2026: "ist in meinem Kopf mit dieser Seite verbunden").
+      Hub-Kachel für Ziele bleibt zusätzlich bestehen — beide Wege
+      bewusst nebeneinander, nicht ersetzt: Hub für direkten Zugriff
+      ohne Umweg über diese Seite, Header-Link für den unmittelbaren
+      Sprung nach dem Eintragen.
+    2026-09-05 · v0.5 · Fix (wichtig)
+      Ladereihenfolge korrigiert: bos_firebase_config.js,
+      bos_launcher_backgrounds.js und bos_accounts.js gehören laut der
+      echten, laufenden froster_inventur.html in den <head>, nicht in
+      den <body> wie zuvor hier (nach BOS_ABHAENGIGKEITEN.md §1a gebaut,
+      die davon abweicht). Die falsche Reihenfolge führte dazu, dass
+      window.db beim ersten Zugriff noch nicht gesetzt war ("Cannot read
+      properties of null (reading 'collection')", live bei Ulf
+      aufgetreten). §0-Lehre: reale, laufende Datei schlägt Dokumentation
+      — die Doku-Abweichung in froster_inventur.html §6 dieser Datei war
+      also selbst der Fehler, nicht froster_inventur.html.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Standalone-Login-Variante (BOS_ABHAENGIGKEITEN.md §1a): Firebase-SDKs
+     kommen hier VOR dem Rest, nicht danach wie beim reinen Guard. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<!-- Zentrale BOS-Firebase-Config — Reihenfolge korrigiert 05.09.2026 auf das
+     echte, geprüfte Muster aus froster_inventur.html (nicht die davon
+     abweichende BOS_ABHAENGIGKEITEN.md §1a-Beschreibung, die zunächst
+     übernommen wurde und zu einem window.db-Timing-Bug führte). -->
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_accounts.js"></script>
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --frost: var(--bos-blue, #4a8fd6);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --dim-2: var(--bos-text-faint, #736656);
+    --good: var(--bos-green, #4caf7d);
+    --danger: var(--bos-red, #d6584a);
+    --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at top, rgba(192,122,16,.05), transparent 55%), var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ===== Header (identisch im Aufbau zu froster_inventur.html) ===== */
+  header{
+    padding: var(--bos-space-lg, 22px) var(--bos-space-md, 18px) var(--bos-space-sm, 16px);
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+    position:sticky; top:0; z-index:20;
+  }
+  .eyebrow{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    font-size: var(--bos-font-xs, .72rem); color:var(--amber);
+    display:flex; align-items:center; gap: var(--bos-space-xs, 8px);
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{
+    font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl, 1.7rem);
+    margin: var(--bos-space-3xs, 4px) 0 var(--bos-space-3xs, 2px); letter-spacing:-.01em;
+  }
+  .zeit{ font-family:var(--font-label); color:var(--dim); font-size: var(--bos-font-sm, .85rem); letter-spacing:.02em; }
+
+  .hilfe-btn{
+    position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--dim);
+    font-family:var(--font-label); font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .ziele-link{
+    position:absolute; top:20px; right:60px; width:34px; height:34px; border-radius:50%;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--dim);
+    display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:1.05rem;
+  }
+  .ziele-link:active{ border-color:var(--amber); }
+
+  main{padding: var(--bos-space-md, 18px) var(--bos-space-sm, 14px) var(--bos-space-xl, 40px); max-width:640px; margin:0 auto;}
+
+  /* ===== Breadcrumb / Zurück ===== */
+  .zurueck-link{
+    display:inline-flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer;
+    font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-sm, .8rem); letter-spacing:.03em;
+    color:var(--dim); text-transform:uppercase; padding: var(--bos-space-xs, 8px) 0; margin-bottom: var(--bos-space-xs, 6px);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .zurueck-link:active{color:var(--amber-bright);}
+
+  /* ===== Schritt 1: Station-Kacheln ===== */
+  .schritt-titel{
+    font-family:var(--font-label); font-weight:800; font-size: var(--bos-font-sm, .8rem);
+    letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+    margin: 0 0 var(--bos-space-sm, 14px) var(--bos-space-3xs, 2px);
+  }
+  .kachel-grid{ display:grid; grid-template-columns:1fr 1fr; gap: var(--bos-space-sm, 12px); }
+  .station-tile{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap: var(--bos-space-2xs, 6px);
+    background:var(--surface); border:1.5px solid var(--border-strong); border-radius: var(--bos-radius-lg, 20px);
+    padding: var(--bos-space-lg, 26px) var(--bos-space-sm, 12px); cursor:pointer; text-align:center;
+    box-shadow: var(--bos-shadow-sm); transition: border-color .15s ease, transform .1s ease;
+    min-height:132px;
+  }
+  .station-tile:active{ transform:scale(0.96); border-color:var(--amber); }
+  .station-icon{ font-size: var(--bos-font-4xl, 2.4rem); line-height:1; }
+  .station-name{ font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-lg, 1.1rem); color:var(--text); }
+  .station-anzahl{ font-family:var(--font-label); font-size: var(--bos-font-xs, .7rem); color:var(--dim-2); text-transform:uppercase; letter-spacing:.05em; }
+
+  /* ===== Schritt 2: Produkt-Kacheln ===== */
+  .produkt-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap: var(--bos-space-xs, 9px); }
+  .produkt-tile{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap: var(--bos-space-2xs, 5px);
+    background:var(--surface); border:1.5px solid var(--border); border-radius: var(--bos-radius-md, 14px);
+    padding: var(--bos-space-sm, 12px) var(--bos-space-3xs, 4px); cursor:pointer; text-align:center;
+    box-shadow: var(--bos-shadow-sm); transition: border-color .15s ease, transform .1s ease;
+    min-height:104px;
+  }
+  .produkt-tile:active{ transform:scale(0.95); border-color:var(--amber); }
+  .produkt-foto{
+    width:46px; height:46px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border-strong);
+    display:flex; align-items:center; justify-content:center; font-size: var(--bos-font-2xl, 1.5rem);
+  }
+  .produkt-name{ font-family:var(--font-label); font-weight:700; font-size: var(--bos-font-xs, .72rem); color:var(--text); line-height:1.25; }
+
+  .status-box{
+    text-align:center; padding: var(--bos-space-xl, 40px) var(--bos-space-md, 20px); color:var(--dim);
+    font-family:var(--font-body); font-size: var(--bos-font-md, .95rem); grid-column: 1 / -1;
+  }
+  .status-box.fehler{color:var(--danger);}
+
+  /* ===== Schritt 3: Menge (Stepper) ===== */
+  .mengen-produkt-name{
+    font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl, 1.6rem);
+    text-align:center; margin: var(--bos-space-md, 18px) 0 var(--bos-space-3xs, 4px);
+  }
+  .mengen-station{
+    font-family:var(--font-label); font-size: var(--bos-font-xs, .74rem); color:var(--dim); text-align:center;
+    text-transform:uppercase; letter-spacing:.08em; margin-bottom: var(--bos-space-lg, 24px);
+  }
+  .stepper{ display:flex; align-items:center; justify-content:center; gap: var(--bos-space-md, 16px); margin-bottom: var(--bos-space-xs, 8px); }
+  .stepper-btn{
+    width:56px; height:56px; border-radius:50%; border:1.5px solid var(--border-strong); background:var(--surface-2);
+    color:var(--text); font-family:var(--font-display); font-size: var(--bos-font-2xl, 1.7rem); font-weight:900;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;
+  }
+  .stepper-btn:active{ background:var(--amber-glow); border-color:var(--amber); }
+  .stepper-input{
+    width:120px; text-align:center; font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-4xl, 2.6rem);
+    color:var(--amber-bright); background:transparent; border:none; border-bottom:2px dashed var(--border-strong);
+    -moz-appearance:textfield; padding-bottom:2px;
+  }
+  .stepper-input:focus{ outline:none; border-bottom-color:var(--amber); border-bottom-style:solid; }
+  .mengen-tipp{
+    text-align:center; font-family:var(--font-label); font-size: var(--bos-font-2xs, .62rem); color:var(--dim-2);
+    text-transform:uppercase; letter-spacing:.04em; margin-bottom: var(--bos-space-xs, 8px);
+  }
+  .mengen-einheit{
+    text-align:center; font-family:var(--font-label); color:var(--dim); font-size: var(--bos-font-sm, .85rem);
+    margin-bottom: var(--bos-space-lg, 26px); text-transform:uppercase; letter-spacing:.05em;
+  }
+  .mengen-confirm{
+    width:100%; padding: var(--bos-space-sm, 16px); border:none; border-radius:var(--radius);
+    font-family:var(--font-label); font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+    font-size: var(--bos-font-md, 1rem); color:#1b1305;
+    background:linear-gradient(180deg, var(--amber-bright), var(--amber));
+    cursor:pointer; box-shadow:0 4px 18px var(--amber-glow);
+  }
+  .mengen-confirm:disabled{ background:var(--surface-2); color:var(--dim-2); box-shadow:none; cursor:not-allowed; }
+  .mengen-hint{
+    text-align:center; font-family:var(--font-label); font-size: var(--bos-font-xs, .74rem); color:var(--dim);
+    margin-top: var(--bos-space-xs, 8px); letter-spacing:.02em; min-height:1.2em;
+  }
+
+  /* ===== Erfolgs-Ansicht ===== */
+  .erfolg{ text-align:center; padding: var(--bos-space-xl, 50px) var(--bos-space-lg, 24px); }
+  .erfolg .glyph{
+    width:64px; height:64px; border-radius:50%; background:var(--amber-glow); border:2px solid var(--amber);
+    display:flex; align-items:center; justify-content:center; font-size: var(--bos-font-2xl, 1.8rem);
+    margin: 0 auto var(--bos-space-md, 18px);
+  }
+  .erfolg h2{ font-family:var(--font-display); font-size: var(--bos-font-xl, 1.4rem); margin: 0 0 var(--bos-space-xs, 8px); }
+  .erfolg p{ color:var(--dim); font-size: var(--bos-font-md, .92rem); margin: 0 0 var(--bos-space-lg, 24px); }
+  .erfolg-ziel{ margin: 0 0 var(--bos-space-lg, 24px); }
+  .erfolg-ziel-laden{ color:var(--dim-2); font-size: var(--bos-font-sm, .82rem); margin:0; }
+  .erfolg-ziel-stand{
+    font-family:var(--font-label); font-weight:700; font-size: var(--bos-font-md, .92rem); color:var(--amber-bright);
+    background:var(--surface-2); border:1px solid var(--border-strong); border-radius: var(--radius); padding: var(--bos-space-sm, 12px); margin:0;
+  }
+  .erfolg-ziel-glueckwunsch{
+    font-family:var(--font-body); font-size: var(--bos-font-md, .95rem); color:var(--good);
+    background:var(--good-glow, rgba(76,175,125,0.15)); border:1px solid var(--good); border-radius: var(--radius); padding: var(--bos-space-sm, 14px); margin:0;
+  }
+  .erfolg-btns{ display:flex; flex-direction:column; gap: var(--bos-space-xs, 10px); max-width:320px; margin:0 auto; }
+  .erfolg-btn{
+    font-family:var(--font-label); font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+    font-size: var(--bos-font-sm, .85rem); padding: var(--bos-space-sm, 13px); border-radius:10px; cursor:pointer; border:none;
+  }
+  .erfolg-btn.primaer{ background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#1b1305; }
+  .erfolg-btn.sekundaer{ background:var(--surface-2); border:1px solid var(--border); color:var(--text); }
+
+  /* ===== Hilfe-Sheet (identisches Muster wie froster_inventur.html) ===== */
+  .sheet-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end; }
+  .sheet-overlay.offen{ display:flex; }
+  .sheet{
+    background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0;
+    padding: var(--bos-space-lg, 22px) var(--bos-space-md, 20px) calc(24px + env(safe-area-inset-bottom));
+    width:100%; max-width:640px; margin:0 auto;
+  }
+  .sheet h2{ font-family:var(--font-display); font-size: var(--bos-font-xl, 1.25rem); margin: 0 0 var(--bos-space-sm, 12px); }
+  .sheet p{ color:var(--dim); line-height:1.55; font-size: var(--bos-font-md, .94rem); margin: 0 0 var(--bos-space-xs, 10px); }
+  .sheet-schluss{
+    margin-top: var(--bos-space-sm, 16px); width:100%; padding: var(--bos-space-sm, 12px); border-radius:8px;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:var(--font-label);
+    font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size: var(--bos-font-sm, .82rem); cursor:pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+<!-- Standalone-Login-Reihenfolge, BOS_ABHAENGIGKEITEN.md §1a -->
+<script>var BOS_APP_ID = 'freezer_produktion';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_ziel_berechnung.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <a class="ziele-link" href="ziele.html" aria-label="Zu den Zielen" title="Ziele">🎯</a>
+  <div class="eyebrow"><span class="dot"></span><span>Ist-Erfassung</span></div>
+  <h1>Froster · Produktion</h1>
+  <div class="zeit" id="zeitText">—</div>
+</header>
+
+<main id="main">
+  <!-- Schritt 1: Station -->
+  <div id="stationScreen">
+    <div class="schritt-titel">Station auswählen</div>
+    <div class="kachel-grid" id="stationGrid">
+      <div class="status-box" id="statusBox">Lade Produktliste …</div>
+    </div>
+  </div>
+
+  <!-- Schritt 2: Produkt -->
+  <div id="produktScreen" style="display:none;">
+    <button class="zurueck-link" onclick="zeigeStationen()">← Andere Station</button>
+    <div class="schritt-titel" id="produktTitel">Produkt auswählen</div>
+    <div class="produkt-grid" id="produktGrid"></div>
+  </div>
+
+  <!-- Schritt 3: Menge -->
+  <div id="mengenScreen" style="display:none;">
+    <button class="zurueck-link" onclick="zeigeProdukte()">← Anderes Produkt</button>
+    <div class="mengen-produkt-name" id="mengenProduktName"></div>
+    <div class="mengen-station" id="mengenStationName"></div>
+    <div class="stepper">
+      <button class="stepper-btn" onpointerdown="stepperHalten(-1, this)" aria-label="weniger, halten für schneller">−</button>
+      <input class="stepper-input" id="mengenInput" type="number" min="0" step="1" inputmode="decimal" value="1" oninput="onMengenInput(this)">
+      <button class="stepper-btn" onpointerdown="stepperHalten(1, this)" aria-label="mehr, halten für schneller">+</button>
+    </div>
+    <div class="mengen-tipp">Zahl antippen zum Direkteingeben · +/− halten für schneller</div>
+    <div class="mengen-einheit" id="mengenEinheit"></div>
+    <button class="mengen-confirm" id="mengenConfirm" onclick="sendeProduktion()">Eintragen</button>
+    <div class="mengen-hint" id="mengenHint"></div>
+  </div>
+
+  <!-- Erfolg -->
+  <div id="erfolgScreen" style="display:none;"></div>
+</main>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wofür ist diese Seite?</h2>
+    <p>Hier trägst du ein, <b style="color:var(--text)">was gerade frisch produziert wurde und in den Froster kommt</b> — Station wählen, Produkt antippen, Menge einstellen, eintragen.</p>
+    <p>Das ist nicht dasselbe wie die Froster-Inventur: dort zählst du, was gerade insgesamt im Froster liegt. Hier meldest du nur den Zugang von eben — beides zusammen ergibt später den echten Bestand.</p>
+    <p>Nach dem Eintragen kannst du direkt das nächste Produkt derselben Station erfassen, ohne neu zu starten.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+/* ==== i18n-Hook (minimal, DE-only, gleiches Muster wie froster_inventur.html) ==== */
+const STR = {
+  keineProdukte: 'Keine Produkte mit Froster-Zuständigkeit gefunden. Bitte in produkt_config.json das Feld "frosterZustaendigkeit" pflegen.',
+  fehlerConfig: 'produkt_config.json konnte nicht geladen werden.',
+  authFehlt: 'Firebase ist noch nicht bereit — bitte kurz warten.',
+  mengeOk: 'Eintragen bestätigt die Menge.',
+  mengeSenden: 'Wird gesendet …',
+  mengeFehler: 'Senden fehlgeschlagen — erneut versuchen.'
+};
+
+/* ==== Schritt-1-Gruppierung: physische Produktionsstation, nicht die
+   frosterZustaendigkeit-Gruppe (Ulf, 05.09.2026 — "wo stehe ich gerade" statt
+   "wer ist zuständig"). Der frosterZustaendigkeit-Filter selbst bleibt
+   unverändert die Grundmenge (§Datenfluss im Kopf-Kommentar) — er entscheidet
+   WELCHE Produkte überhaupt infrage kommen, "station" nur WIE sie hier
+   gruppiert werden. Reihenfolge/Icons identisch zu den Produktionsplaner-
+   Kacheln in bos_app_registry.js, für Wiedererkennung. */
+const STATIONEN_REIHENFOLGE = ['Rondo', 'Brötchenstraße', 'Frühschicht', 'Nachtschicht'];
+const STATION_ICON = { 'Rondo': '🔄', 'Brötchenstraße': '🥐', 'Frühschicht': '🌅', 'Nachtschicht': '🌙' };
+function stationIcon(s){ return STATION_ICON[s] || '📍'; }
+
+/* ==== Platzhalter-Icons nach Kategorie — siehe Kopf-Kommentar §Offene Punkte.
+   Reale produkt_config.json-Kategorien (Stand 05.09.2026): Brot, Brötchen,
+   Konditorei, Schlawiner, Fettgebäck, Snack. */
+const KATEGORIE_ICON = {
+  'Brot': '🍞', 'Brötchen': '🥐', 'Konditorei': '🍰',
+  'Schlawiner': '🥨', 'Fettgebäck': '🍩', 'Snack': '🥪'
+};
+function produktIcon(p){ return KATEGORIE_ICON[p.kategorie] || '🧺'; }
+
+/* ==== Zeit / Header (identisch zu froster_inventur.html) ==== */
+function renderZeit(){
+  const jetzt = new Date();
+  const tage = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const dd = String(jetzt.getDate()).padStart(2,'0');
+  const mm = String(jetzt.getMonth()+1).padStart(2,'0');
+  const hh = String(jetzt.getHours()).padStart(2,'0');
+  const min = String(jetzt.getMinutes()).padStart(2,'0');
+  document.getElementById('zeitText').textContent = `${tage[jetzt.getDay()]}. ${dd}.${mm}. · ${hh}:${min} Uhr`;
+}
+renderZeit();
+setInterval(renderZeit, 30000);
+
+/* ==== FIREBASE-INIT ==== */
+let db = null, auth = null, authBereit = false, authFehlerText = null;
+function initFirebase(){
+  if (!window.db || typeof window.BOS_AUTH_READY === 'undefined') {
+    console.error('[Froster-Produktion] bos_firebase_config.js nicht gefunden oder liefert window.db/window.BOS_AUTH_READY nicht.');
+    authFehlerText = 'bos_firebase_config.js nicht gefunden.';
+    return;
+  }
+  db = window.db;
+  auth = firebase.auth();
+  window.BOS_AUTH_READY.then(function(){
+    authBereit = true;
+    aktualisiereMengenConfirm();
+  }).catch(function(err){
+    console.error('[Froster-Produktion] Auth-Fehler:', err);
+    authFehlerText = (err && err.message) ? err.message : 'Unbekannter Fehler';
+    aktualisiereMengenConfirm();
+  });
+}
+
+/* ==== Profilname (identische Hilfsfunktion wie station_broetchenstrasse.html —
+   bewusst dupliziert, kein Modul-System, jede Seite bleibt eigenständig) ==== */
+function aktuellerProfilName() {
+  try {
+    var st = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+    if (!st || !st.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(st.localProfiles || []);
+    var p = alle.find(function(x){ return x.id === st.activeProfileId; });
+    return p ? p.name : null;
+  } catch (e) { return null; }
+}
+
+/* ==== Produktliste laden (Filter identisch zu froster_inventur.html;
+   Gruppierung nach "station" ist neu, siehe Kommentar bei STATIONEN_REIHENFOLGE) ==== */
+let PRODUKTE = [];      // {legacyKey, name, zustaendigkeit, station, sort, einheit, kategorie}
+let AKTIVE_STATION = null;
+let AKTIVES_PRODUKT = null;
+
+function ladeConfigAuto(){
+  fetch('../produkt_config.json', { cache: 'no-store' })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(verarbeiteConfig)
+    .catch(function(){
+      document.getElementById('stationGrid').innerHTML =
+        '<div class="status-box fehler">' + STR.fehlerConfig + '</div>';
+    });
+}
+
+function verarbeiteConfig(data){
+  PRODUKTE = data
+    .filter(function(cfg){
+      return cfg.legacyKey && cfg.frosterZustaendigkeit && cfg.frosterZustaendigkeit !== 'nein';
+    })
+    .map(function(cfg){
+      return {
+        legacyKey: cfg.legacyKey,
+        name: cfg.name || cfg.legacyKey,
+        zustaendigkeit: cfg.frosterZustaendigkeit,
+        station: cfg.station || null,
+        sort: (typeof cfg.frosterSort === 'number') ? cfg.frosterSort : null,
+        einheit: cfg.einheit || 'bleche',
+        kategorie: cfg.kategorie || ''
+      };
+    });
+
+  if (PRODUKTE.length === 0) {
+    document.getElementById('stationGrid').innerHTML = '<div class="status-box fehler">' + STR.keineProdukte + '</div>';
+    return;
+  }
+  renderStationen();
+}
+
+/* ==== Schritt 1: Stationen ==== */
+function renderStationen(){
+  const aktive = STATIONEN_REIHENFOLGE.filter(function(s){
+    return PRODUKTE.some(function(p){ return p.station === s; });
+  });
+  const grid = document.getElementById('stationGrid');
+  if (!aktive.length) {
+    grid.innerHTML = '<div class="status-box fehler">Keine der Froster-relevanten Produkte hat ein "station"-Feld gesetzt.</div>';
+    return;
+  }
+  grid.innerHTML = aktive.map(function(s){
+    const anzahl = PRODUKTE.filter(function(p){ return p.station === s; }).length;
+    return '<div class="station-tile" onclick="waehleStation(\'' + s + '\')">'
+         + '<span class="station-icon">' + stationIcon(s) + '</span>'
+         + '<span class="station-name">' + s + '</span>'
+         + '<span class="station-anzahl">' + anzahl + ' Produkt' + (anzahl === 1 ? '' : 'e') + '</span>'
+         + '</div>';
+  }).join('');
+}
+
+function zeigeStationen(){
+  AKTIVE_STATION = null;
+  document.getElementById('produktScreen').style.display = 'none';
+  document.getElementById('mengenScreen').style.display = 'none';
+  document.getElementById('erfolgScreen').style.display = 'none';
+  document.getElementById('stationScreen').style.display = 'block';
+}
+
+/* ==== Schritt 2: Produkte ==== */
+function waehleStation(station){
+  AKTIVE_STATION = station;
+  document.getElementById('produktTitel').textContent = station + ' — Produkt auswählen';
+  renderProdukte();
+  document.getElementById('stationScreen').style.display = 'none';
+  document.getElementById('produktScreen').style.display = 'block';
+}
+
+function renderProdukte(){
+  const liste = PRODUKTE
+    .filter(function(p){ return p.station === AKTIVE_STATION; })
+    .sort(function(a,b){
+      if (a.sort !== null && b.sort !== null) return a.sort - b.sort;
+      if (a.sort !== null) return -1;
+      if (b.sort !== null) return 1;
+      return a.name.localeCompare(b.name, 'de');
+    });
+  document.getElementById('produktGrid').innerHTML = liste.map(function(p){
+    return '<div class="produkt-tile" onclick="waehleProdukt(\'' + p.legacyKey + '\')">'
+         + '<span class="produkt-foto">' + produktIcon(p) + '</span>'
+         + '<span class="produkt-name">' + p.name + '</span>'
+         + '</div>';
+  }).join('');
+}
+
+function zeigeProdukte(){
+  document.getElementById('mengenScreen').style.display = 'none';
+  document.getElementById('erfolgScreen').style.display = 'none';
+  document.getElementById('produktScreen').style.display = 'block';
+}
+
+/* ==== Schritt 3: Menge ==== */
+function waehleProdukt(legacyKey){
+  AKTIVES_PRODUKT = PRODUKTE.find(function(p){ return p.legacyKey === legacyKey; });
+  if (!AKTIVES_PRODUKT) return;
+  document.getElementById('mengenProduktName').textContent = AKTIVES_PRODUKT.name;
+  document.getElementById('mengenStationName').textContent = AKTIVE_STATION;
+  document.getElementById('mengenEinheit').textContent = AKTIVES_PRODUKT.einheit;
+  document.getElementById('mengenInput').value = 1;
+  document.getElementById('mengenHint').textContent = '';
+  aktualisiereMengenConfirm();
+  document.getElementById('produktScreen').style.display = 'none';
+  document.getElementById('mengenScreen').style.display = 'block';
+}
+
+function mengeAendern(delta){
+  const input = document.getElementById('mengenInput');
+  const aktuell = parseFloat(input.value) || 0;
+  input.value = Math.max(0, aktuell + delta);
+  aktualisiereMengenConfirm();
+}
+
+/* ==== Langdruck-Beschleunigung für +/- (Ulf, 05.09.2026 — "186 Bleche
+   eintragen dauert sonst ewig"). Halten wiederholt mengeAendern() und wird
+   dabei schneller, bis losgelassen wird. Direktes Antippen des Zahlenfelds
+   und Tippen der eigenen Zahl funktioniert unabhängig davon weiterhin — der
+   Stepper ist nur die zweite, schnellere Option für kleine Schritte. */
+function stepperHalten(delta, btn){
+  mengeAendern(delta);
+  let intervall = 420;
+  let timeoutId = setTimeout(function wiederhole(){
+    mengeAendern(delta);
+    intervall = Math.max(50, intervall * 0.72);
+    timeoutId = setTimeout(wiederhole, intervall);
+  }, intervall);
+  function stopp(){
+    clearTimeout(timeoutId);
+    btn.removeEventListener('pointerup', stopp);
+    btn.removeEventListener('pointerleave', stopp);
+    btn.removeEventListener('pointercancel', stopp);
+  }
+  btn.addEventListener('pointerup', stopp);
+  btn.addEventListener('pointerleave', stopp);
+  btn.addEventListener('pointercancel', stopp);
+}
+
+function onMengenInput(el){
+  const val = parseFloat(el.value);
+  if (isNaN(val) || val < 0) el.value = 0;
+  aktualisiereMengenConfirm();
+}
+
+function aktualisiereMengenConfirm(){
+  const val = parseFloat(document.getElementById('mengenInput').value);
+  const btn = document.getElementById('mengenConfirm');
+  btn.disabled = !(val > 0) || !authBereit;
+  const hint = document.getElementById('mengenHint');
+  if (authBereit) {
+    hint.textContent = '';
+  } else if (authFehlerText) {
+    var linkMatch = authFehlerText.match(/https?:\/\/\S+/);
+    hint.innerHTML = 'Anmeldung fehlgeschlagen: ' + authFehlerText.replace(/</g, '&lt;') +
+      (linkMatch ? ' <a href="' + linkMatch[0] + '" target="_blank" rel="noopener" style="color:var(--amber-bright);">Link öffnen</a>' : '');
+  } else {
+    hint.textContent = STR.authFehlt;
+  }
+}
+setInterval(function(){
+  if (document.getElementById('mengenScreen').style.display === 'block') aktualisiereMengenConfirm();
+}, 1000);
+
+function sendeProduktion(){
+  const prod = AKTIVES_PRODUKT;
+  const menge = parseFloat(document.getElementById('mengenInput').value);
+  if (!prod || !(menge > 0) || !db) return;
+
+  const btn = document.getElementById('mengenConfirm');
+  btn.disabled = true;
+  btn.textContent = STR.mengeSenden;
+
+  const dokument = {
+    type: 'froster_produktion',
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+    geraet: (auth && auth.currentUser) ? auth.currentUser.uid : null,
+    eingetragenVon: aktuellerProfilName(),
+    legacyKey: prod.legacyKey,
+    zustaendigkeit: prod.zustaendigkeit,
+    station: prod.station,
+    menge: menge,
+    einheit: prod.einheit
+  };
+
+  db.collection('bos_events').add(dokument)
+    .then(function(){ zeigeErfolg(prod, menge); })
+    .catch(function(err){
+      console.error('[Froster-Produktion] Sende-Fehler:', err);
+      btn.disabled = false;
+      btn.textContent = 'Eintragen';
+      document.getElementById('mengenHint').textContent = STR.mengeFehler;
+    });
+}
+
+/* ==== Erfolg ==== */
+function zeigeErfolg(prod, menge){
+  document.getElementById('mengenScreen').style.display = 'none';
+  const el = document.getElementById('erfolgScreen');
+  el.innerHTML =
+    '<div class="erfolg">' +
+    '<div class="glyph">✓</div>' +
+    '<h2>Eingetragen</h2>' +
+    '<p>' + menge + ' ' + prod.einheit + ' ' + prod.name + ' erfasst. Danke fürs Eintragen!</p>' +
+    '<div class="erfolg-ziel" id="erfolgZiel"><p class="erfolg-ziel-laden">Ziel-Stand wird geladen …</p></div>' +
+    '<div class="erfolg-btns">' +
+    '<button class="erfolg-btn primaer" id="weiteresBtn">Weiteres Produkt · ' + AKTIVE_STATION + '</button>' +
+    '<button class="erfolg-btn sekundaer" id="andereStationBtn">Andere Station</button>' +
+    '</div></div>';
+  el.style.display = 'block';
+  document.getElementById('weiteresBtn').addEventListener('click', function(){
+    el.style.display = 'none';
+    zeigeProdukte();
+  });
+  document.getElementById('andereStationBtn').addEventListener('click', function(){
+    el.style.display = 'none';
+    zeigeStationen();
+  });
+  ladeZielStand(prod);
+}
+
+/* ==== Live-Ziel-Stand nach dem Eintragen (v0.3, Ulf 05.09.2026) ====
+   Holt frisch über bos_ziel_berechnung.js den aktuellen Fortschritt für
+   GENAU dieses Produkt — inklusive der Eintragung von eben, da direkt
+   nach dem erfolgreichen Schreiben neu geladen wird. "Für die einfache
+   Eintragung bedanken, bei erreichtem Ziel gratulieren": Danke steht
+   bereits oben immer; hier kommt zusätzlich entweder der Zwischenstand
+   oder — bei erreichtem Ziel — die Glückwunsch-Meldung. Kein Fehler,
+   wenn für dieses Produkt diese Woche kein aktiver Plan existiert
+   (z.B. Station hat noch nicht eingereicht) — Block bleibt dann leer. */
+function ladeZielStand(prod){
+  const box = document.getElementById('erfolgZiel');
+  if (!box || typeof BOS_ZIEL === 'undefined' || !db) { if (box) box.innerHTML = ''; return; }
+
+  const wocheIso = BOS_ZIEL.isoDatum(BOS_ZIEL.montagDerWoche(new Date()));
+  BOS_ZIEL.ladeWoche(db, wocheIso).then(function(kontext){
+    const stand = BOS_ZIEL.berechneProdukt(kontext, AKTIVE_STATION, prod.legacyKey);
+    if (!stand) { box.innerHTML = ''; return; }
+
+    if (stand.erfuellt) {
+      box.innerHTML =
+        '<p class="erfolg-ziel-glueckwunsch">🎉 Glückwunsch 😊 Damit sollte deine Produktion' +
+        (stand.zielLabel ? ' bis ' + stand.zielLabel : '') + ' ausreichen. Danke schön!</p>';
+    } else {
+      box.innerHTML =
+        '<p class="erfolg-ziel-stand">' + stand.produziert + ' / ' + stand.ziel + ' ' + prod.einheit +
+        (stand.zielLabel ? ' · noch ' + stand.offen + ' bis ' + stand.zielLabel : ' · noch ' + stand.offen + ' offen') + '</p>';
+    }
+  }).catch(function(err){
+    console.error('[Froster-Produktion] Ziel-Stand konnte nicht geladen werden:', err);
+    var linkMatch = (err && err.message) ? err.message.match(/https?:\/\/\S+/) : null;
+    box.innerHTML = '<p class="erfolg-ziel-laden">Ziel-Stand aktuell nicht abrufbar.' +
+      (linkMatch ? ' <a href="' + linkMatch[0] + '" target="_blank" rel="noopener" style="color:var(--amber-bright);">Index-Link öffnen</a>' : '') +
+      '</p>';
+  });
+}
+
+/* ==== Hilfe-Sheet ==== */
+document.getElementById('hilfeBtn').addEventListener('click', function(){
+  document.getElementById('hilfeOverlay').classList.add('offen');
+});
+document.getElementById('hilfeSchluss').addEventListener('click', function(){
+  document.getElementById('hilfeOverlay').classList.remove('offen');
+});
+document.getElementById('hilfeOverlay').addEventListener('click', function(e){
+  if (e.target === this) this.classList.remove('offen');
+});
+
+/* ==== Start ==== */
+initFirebase();
+ladeConfigAuto();
+</script>
+</body>
+</html>

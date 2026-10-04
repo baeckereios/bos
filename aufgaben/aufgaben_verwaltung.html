@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Aufgaben</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<!-- gleiche Ebene wie konten_verwaltung.html, die andere echte Admin-/Verwaltungsseite -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  body { min-height: 100vh; }
+  header {
+    padding: var(--bos-space-md, 18px) var(--bos-space-md, 20px); border-bottom: 1px solid var(--bos-border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--bos-bg); z-index: 5; gap: var(--bos-space-sm, 12px);
+  }
+  header h1 { font-size: var(--bos-font-lg, 1.15rem); }
+  .bos-badge { font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .7rem); letter-spacing: .04em; color: var(--bos-amber); text-transform: uppercase; }
+  main { padding: var(--bos-space-md, 18px); max-width: 720px; margin: 0 auto; }
+
+  .af-panel {
+    padding: var(--bos-space-md, 18px); margin-bottom: var(--bos-space-lg, 22px);
+  }
+  .af-row { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 6px); margin-bottom: var(--bos-space-sm, 14px); }
+  textarea.bos-input { resize: vertical; min-height: 4.4em; font-family: var(--bos-font-body); }
+  .af-toggle-row { display: flex; gap: var(--bos-space-xs, 8px); }
+  .af-toggle-row .bos-btn { flex: 1; }
+  .af-toggle-row .bos-btn[data-active="true"] { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  .af-error { color: var(--bos-red); font-size: var(--bos-font-sm, .85rem); min-height: 1.2em; }
+
+  .af-section-head {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-xs, 8px);
+    margin: 0 0 var(--bos-space-xs, 10px); cursor: pointer; user-select: none;
+  }
+  .af-section-head h2 { font-size: var(--bos-font-md, .95rem); margin: 0; display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); }
+  .af-section-head .af-count {
+    font-family: var(--bos-font-label); font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim);
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: 999px; padding: .1em .6em;
+  }
+  .af-section-head .af-caret { color: var(--bos-text-faint); transition: transform var(--bos-transition-fast); font-size: .8rem; }
+  .af-section--collapsed .af-caret { transform: rotate(-90deg); }
+  .af-section--collapsed .af-list { display: none; }
+
+  .af-list { display: flex; flex-direction: column; gap: var(--bos-space-xs, 8px); margin-bottom: var(--bos-space-lg, 22px); }
+  .af-empty { color: var(--bos-text-faint); font-size: var(--bos-font-sm, .85rem); padding: var(--bos-space-sm, 14px) 0; }
+
+  .af-item {
+    display: flex; align-items: flex-start; gap: var(--bos-space-xs, 10px);
+    padding: var(--bos-space-sm, 12px); background: var(--bos-surface); border: 1px solid var(--bos-border);
+    border-radius: var(--bos-radius-sm);
+  }
+  .af-item--done { opacity: .6; }
+  .af-item__check {
+    width: var(--bos-tap-min, 44px); height: var(--bos-tap-min, 44px); flex-shrink: 0; border-radius: var(--bos-radius-sm);
+    border: 1px solid var(--bos-border-strong); background: var(--bos-bg-soft); color: var(--bos-text);
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer;
+  }
+  .af-item--done .af-item__check { background: var(--bos-green); border-color: var(--bos-green); color: #0e1f16; }
+  .af-item__main { flex: 1; min-width: 0; }
+  .af-item__text { font-size: var(--bos-font-md, .95rem); word-break: break-word; white-space: pre-wrap; }
+  .af-item--done .af-item__text { text-decoration: line-through; }
+  .af-item__meta { display: flex; flex-wrap: wrap; gap: .4em; align-items: center; margin-top: .35em; }
+  .af-badge {
+    font-family: var(--bos-font-label); font-size: var(--bos-font-2xs, .62rem); text-transform: uppercase;
+    letter-spacing: .04em; padding: .15em .55em; border-radius: 999px; border: 1px solid var(--bos-border-strong);
+    color: var(--bos-text-dim); white-space: nowrap;
+  }
+  .af-badge--dauerhaft { color: var(--bos-amber); border-color: var(--bos-amber); }
+  .af-item__date { font-size: var(--bos-font-2xs, .65rem); color: var(--bos-text-faint); }
+  .af-item__actions { display: flex; gap: var(--bos-space-2xs, 6px); flex-shrink: 0; }
+  .af-iconbtn {
+    width: 36px; height: 36px; border-radius: var(--bos-radius-sm); border: 1px solid var(--bos-border-strong);
+    background: var(--bos-bg-soft); color: var(--bos-text); display: flex; align-items: center; justify-content: center;
+    font-size: .95rem; cursor: pointer; flex-shrink: 0;
+  }
+  .af-iconbtn:hover { border-color: var(--bos-amber); }
+
+  .af-edit { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 6px); flex: 1; }
+  .af-edit .af-toggle-row .bos-btn { padding: var(--bos-space-3xs, 4px) var(--bos-space-xs, 8px); font-size: var(--bos-font-xs, .72rem); }
+  .af-edit-actions { display: flex; gap: var(--bos-space-2xs, 6px); }
+  .af-edit-actions .bos-btn { flex: 1; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'aufgaben_verwaltung';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+<script src="../bos_aufgaben_logik.js"></script>   <!-- NEU 05.09.2026, geteilt mit bos_taskboard.js -->
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+
+<header>
+  <div class="bos-title">🗒️ Aufgaben</div>
+  <span class="bos-badge" id="fsStatus">Lädt …</span>
+</header>
+
+<main>
+  <div class="af-panel bos-panel">
+    <div class="bos-label" style="margin-bottom:.6em;">Neue Aufgabe</div>
+    <div class="af-row">
+      <textarea class="bos-input" id="afText" maxlength="240" placeholder="z. B. Kühlraum 2 kontrollieren"></textarea>
+    </div>
+    <div class="af-row">
+      <div class="bos-label">Verhalten</div>
+      <div class="af-toggle-row" id="afVerhaltenRow">
+        <button class="bos-btn" data-verhalten="verfaellt" data-active="true">Verfällt heute</button>
+        <button class="bos-btn" data-verhalten="dauerhaft">Bleibt bestehen, bis erfüllt</button>
+      </div>
+    </div>
+    <div class="af-error" id="afError"></div>
+    <button class="bos-btn bos-btn--amber" id="afAddBtn" style="width:100%;">+ Für heute hinzufügen</button>
+  </div>
+
+  <div class="af-section" id="afOffenSection">
+    <div class="af-section-head" id="afOffenHead">
+      <h2 class="bos-title"><span class="af-caret">▾</span> Offen</h2>
+      <span class="af-count" id="afOffenCount">0</span>
+    </div>
+    <div class="af-list" id="afOffenList"></div>
+  </div>
+
+  <div class="af-section af-section--collapsed" id="afVerlaufSection">
+    <div class="af-section-head" id="afVerlaufHead">
+      <h2 class="bos-title"><span class="af-caret">▾</span> Verlauf &amp; Vorlagen</h2>
+      <span class="af-count" id="afVerlaufCount">0</span>
+    </div>
+    <div class="af-list" id="afVerlaufList"></div>
+  </div>
+</main>
+
+<script>
+/* ================================================================
+   BäckereiOS · Aufgaben-Verwaltung (Produktionsleitung)
+   ================================================================
+   Neu 05.09.2026, siehe SESSION_2026-09-05_AUFGABEN_TASKBOARD_KONZEPT.md.
+   Zweite bewusste Ausnahme vom Append-only-Prinzip nach
+   verbrauch_werkstatt.html — diese Seite editiert/löscht bestehende
+   bos_events-Dokumente (type: 'produktionsleiter_aufgabe').
+
+   Zugriff: Rolle produktionsleitung (+ admin), über die normale
+   bos_access_guard.js-Rollenprüfung — bewusst KEIN zweiter PIN-Layer
+   (Ulf-Entscheidung 05.09.2026). Wie im selben Gespräch geklärt: diese
+   Rollenprüfung ist NICHT serverseitig durchsetzbar (die Security Rules
+   kennen nur "admin per Passwort" vs. "alle anderen", siehe
+   bos_accounts.js-Kopfkommentar) — Ulf hat das bewusst akzeptiert,
+   gleiche Schutzstufe wie der Rest des Systems.
+
+   Aktives Profil: liest denselben localStorage-Key wie der Launcher
+   selbst (bos_launcher_state_v2), analog zum BackStore-Satelliten.
+   05.09.2026 gegen das echte backstore.html verifiziert und korrigiert
+   (bsGetProfile()) — die erste Fassung kannte nur state.localProfiles,
+   nicht die vordefinierten Profile aus bos_launcher_profiles.js
+   (window.BOS_PROFILES). Fällt kein aktives Profil auf, wird das Anlegen
+   einer Aufgabe blockiert (siehe afError), nicht stillschweigend mit
+   leerem erstellt_von geschrieben.
+
+   05.09.2026, Fehlerkorrektur: ladeAufgaben() kombinierte ursprünglich
+   where('type','==',...) mit orderBy('erstellt_am') — das verlangt einen
+   Firestore-Composite-Index, der beim allerersten Aufruf noch fehlt und
+   die Query mit failed-precondition scheitern ließ ("Fehler beim Laden").
+   Sortierung läuft jetzt clientseitig, kein Index mehr nötig. Fehlertexte
+   (hier und beim Anlegen) erscheinen jetzt im Klartext im UI statt nur in
+   der Browser-Konsole.
+
+   "Verfällt heute" vs. "Bleibt bestehen": KEINE automatische Löschung/
+   Archivierung. Ein verfallenes, nicht erledigtes Element verschwindet
+   nur aus der "Offen"-Liste (Query-Filter unten), bleibt aber unverändert
+   in Firestore stehen und taucht im Verlauf weiter auf — passt zum
+   Append-only-Grundprinzip des Projekts, auch wenn diese Seite selbst
+   die deklarierte Ausnahme dafür ist.
+   ================================================================ */
+
+var ALLE_AUFGABEN = [];
+var BEARBEITE_ID = null; // Aufgaben-ID, die gerade inline editiert wird
+var NEUER_VERHALTEN = 'verfaellt';
+
+function getActiveProfil() {
+  // Korrigiert 05.09.2026 gegen das echte backstore.html (bsGetProfile()) —
+  // vorherige Fassung kannte nur state.localProfiles, nicht die
+  // vordefinierten Profile aus bos_launcher_profiles.js (window.BOS_PROFILES).
+  // War damals unverifizierte Annahme, siehe Kommentar oben im Dateikopf.
+  try {
+    var raw = localStorage.getItem('bos_launcher_state_v2');
+    if (!raw) return null;
+    var state = JSON.parse(raw);
+    if (!state.activeProfileId) return null;
+    var predefined = window.BOS_PROFILES || [];
+    var local = state.localProfiles || [];
+    var treffer = predefined.concat(local).find(function (p) { return p.id === state.activeProfileId; });
+    return treffer || { id: state.activeProfileId, name: state.activeProfileId };
+  } catch (e) {
+    console.warn('Aufgaben-Verwaltung: aktives Profil konnte nicht gelesen werden', e);
+    return null;
+  }
+}
+
+function istHeute(ts) {
+  return window.BOS_AUFGABEN_LOGIK.istHeute(ts);
+}
+
+function formatDatum(ts) {
+  if (!ts || typeof ts.toDate !== 'function') return 'gerade eben';
+  return ts.toDate().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' +
+    ts.toDate().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+/* ---------------- Laden ---------------- */
+function ladeAufgaben() {
+  document.getElementById('fsStatus').textContent = 'Lädt …';
+  return window.BOS_AUTH_READY.then(function () {
+    // NUR Gleichheits-Filter, bewusst KEIN .orderBy() hier — eine Kombination
+    // aus where('==')+orderBy(anderes Feld) verlangt einen Firestore-
+    // Composite-Index, der beim allerersten Aufruf noch nicht existiert und
+    // die ganze Query mit "failed-precondition" scheitern lässt (vermutlich
+    // die Ursache von "Fehler beim Laden" am 05.09., korrigiert). Sortierung
+    // stattdessen unten clientseitig — bei der zu erwartenden Aufgabenmenge
+    // (täglich, nicht massenhaft) unproblematisch, kein Index nötig.
+    return window.db.collection('bos_events')
+      .where('type', '==', 'produktionsleiter_aufgabe')
+      .get();
+  }).then(function (snap) {
+    ALLE_AUFGABEN = [];
+    snap.forEach(function (doc) {
+      ALLE_AUFGABEN.push(Object.assign({ id: doc.id }, doc.data()));
+    });
+    ALLE_AUFGABEN.sort(function (a, b) {
+      var ta = (a.erstellt_am && typeof a.erstellt_am.toMillis === 'function') ? a.erstellt_am.toMillis() : 0;
+      var tb = (b.erstellt_am && typeof b.erstellt_am.toMillis === 'function') ? b.erstellt_am.toMillis() : 0;
+      return tb - ta; // neueste zuerst
+    });
+    document.getElementById('fsStatus').textContent = ALLE_AUFGABEN.length + ' Aufgaben insgesamt';
+    render();
+  }).catch(function (fehler) {
+    console.warn('Aufgaben-Verwaltung: Laden fehlgeschlagen', fehler);
+    // Echten Fehlertext sichtbar machen statt nur in der Konsole — Ulf testet
+    // von unterwegs, DevTools sind da nicht immer griffbereit.
+    document.getElementById('fsStatus').textContent = 'Fehler: ' + (fehler && fehler.message ? fehler.message : String(fehler));
+  });
+}
+
+/* ---------------- Rendern ---------------- */
+function render() {
+  var offen = [];
+  var verlauf = [];
+  ALLE_AUFGABEN.forEach(function (a) {
+    var aktivHeute = window.BOS_AUFGABEN_LOGIK.istOffen(a);
+    if (aktivHeute) offen.push(a); else verlauf.push(a);
+  });
+
+  document.getElementById('afOffenCount').textContent = offen.length;
+  document.getElementById('afVerlaufCount').textContent = verlauf.length;
+
+  renderListe('afOffenList', offen, false);
+  renderListe('afVerlaufList', verlauf, true);
+}
+
+function renderListe(containerId, liste, istVerlauf) {
+  var el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (!liste.length) {
+    var leer = document.createElement('div');
+    leer.className = 'af-empty';
+    leer.textContent = istVerlauf ? 'Noch kein Verlauf.' : 'Nichts offen — gute Nacht 🌙';
+    el.appendChild(leer);
+    return;
+  }
+  liste.forEach(function (a) {
+    el.appendChild(a.id === BEARBEITE_ID ? buildEditRow(a) : buildRow(a, istVerlauf));
+  });
+}
+
+function buildRow(a, istVerlauf) {
+  var row = document.createElement('div');
+  row.className = 'af-item' + (a.erledigt ? ' af-item--done' : '');
+
+  var check = document.createElement('button');
+  check.className = 'af-item__check';
+  check.title = a.erledigt ? 'Als offen markieren' : 'Als erledigt markieren';
+  check.textContent = a.erledigt ? '✓' : '';
+  check.addEventListener('click', function () { toggleErledigt(a); });
+  row.appendChild(check);
+
+  var main = document.createElement('div');
+  main.className = 'af-item__main';
+  var textEl = document.createElement('div');
+  textEl.className = 'af-item__text';
+  textEl.textContent = a.text;
+  main.appendChild(textEl);
+
+  var meta = document.createElement('div');
+  meta.className = 'af-item__meta';
+  var badge = document.createElement('span');
+  badge.className = 'af-badge' + (a.verhalten === 'dauerhaft' ? ' af-badge--dauerhaft' : '');
+  badge.textContent = a.verhalten === 'dauerhaft' ? 'Bleibt bestehen' : 'Verfällt heute';
+  meta.appendChild(badge);
+  var datum = document.createElement('span');
+  datum.className = 'af-item__date';
+  datum.textContent = a.erledigt
+    ? 'erledigt ' + formatDatum(a.erledigt_am) + (a.erledigt_von ? ' · ' + a.erledigt_von : '')
+    : formatDatum(a.erstellt_am);
+  meta.appendChild(datum);
+  main.appendChild(meta);
+  row.appendChild(main);
+
+  var actions = document.createElement('div');
+  actions.className = 'af-item__actions';
+
+  if (istVerlauf) {
+    var reuseBtn = document.createElement('button');
+    reuseBtn.className = 'af-iconbtn';
+    reuseBtn.title = 'Text für heute übernehmen';
+    reuseBtn.textContent = '↻';
+    reuseBtn.addEventListener('click', function () { uebernehmeAlsVorlage(a); });
+    actions.appendChild(reuseBtn);
+  }
+
+  var editBtn = document.createElement('button');
+  editBtn.className = 'af-iconbtn';
+  editBtn.title = 'Bearbeiten';
+  editBtn.textContent = '✎';
+  editBtn.addEventListener('click', function () { BEARBEITE_ID = a.id; render(); });
+  actions.appendChild(editBtn);
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'af-iconbtn';
+  delBtn.title = 'Löschen';
+  delBtn.textContent = '🗑';
+  delBtn.addEventListener('click', function () { loescheAufgabe(a); });
+  actions.appendChild(delBtn);
+
+  row.appendChild(actions);
+  return row;
+}
+
+function buildEditRow(a) {
+  var row = document.createElement('div');
+  row.className = 'af-item';
+
+  var wrap = document.createElement('div');
+  wrap.className = 'af-edit';
+
+  var input = document.createElement('textarea');
+  input.className = 'bos-input';
+  input.maxLength = 240;
+  input.value = a.text;
+  wrap.appendChild(input);
+
+  var toggleRow = document.createElement('div');
+  toggleRow.className = 'af-toggle-row';
+  var verhalten = a.verhalten === 'dauerhaft' ? 'dauerhaft' : 'verfaellt';
+  ['verfaellt', 'dauerhaft'].forEach(function (v) {
+    var btn = document.createElement('button');
+    btn.className = 'bos-btn';
+    btn.type = 'button';
+    btn.dataset.active = (v === verhalten) ? 'true' : 'false';
+    btn.textContent = v === 'dauerhaft' ? 'Bleibt bestehen' : 'Verfällt heute';
+    btn.addEventListener('click', function () {
+      verhalten = v;
+      toggleRow.querySelectorAll('.bos-btn').forEach(function (b) { b.dataset.active = 'false'; });
+      btn.dataset.active = 'true';
+    });
+    toggleRow.appendChild(btn);
+  });
+  wrap.appendChild(toggleRow);
+
+  var actionsRow = document.createElement('div');
+  actionsRow.className = 'af-edit-actions';
+  var saveBtn = document.createElement('button');
+  saveBtn.className = 'bos-btn bos-btn--amber';
+  saveBtn.textContent = 'Speichern';
+  saveBtn.addEventListener('click', function () {
+    var neuerText = input.value.trim();
+    if (!neuerText) return;
+    speichereBearbeitung(a, neuerText, verhalten);
+  });
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'bos-btn';
+  cancelBtn.textContent = 'Abbrechen';
+  cancelBtn.addEventListener('click', function () { BEARBEITE_ID = null; render(); });
+  actionsRow.appendChild(saveBtn);
+  actionsRow.appendChild(cancelBtn);
+  wrap.appendChild(actionsRow);
+
+  row.appendChild(wrap);
+  return row;
+}
+
+/* ---------------- Schreibaktionen ---------------- */
+function setzeAfError(msg) {
+  document.getElementById('afError').textContent = msg || '';
+}
+
+document.getElementById('afVerhaltenRow').querySelectorAll('.bos-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    NEUER_VERHALTEN = btn.getAttribute('data-verhalten');
+    document.getElementById('afVerhaltenRow').querySelectorAll('.bos-btn').forEach(function (b) {
+      b.setAttribute('data-active', b === btn ? 'true' : 'false');
+    });
+  });
+});
+
+document.getElementById('afAddBtn').addEventListener('click', function () {
+  var text = document.getElementById('afText').value.trim();
+  if (!text) { setzeAfError('Bitte einen Text eingeben.'); return; }
+  var profil = getActiveProfil();
+  if (!profil || !profil.id) {
+    setzeAfError('Kein aktives Profil erkannt — Aufgabe kann nicht zugeordnet werden.');
+    return;
+  }
+  setzeAfError('');
+  document.getElementById('afAddBtn').disabled = true;
+  window.db.collection('bos_events').add({
+    type: 'produktionsleiter_aufgabe',
+    text: text,
+    verhalten: NEUER_VERHALTEN,
+    erstellt_von: profil.id,
+    erstellt_am: firebase.firestore.FieldValue.serverTimestamp(),
+    erledigt: false,
+    erledigt_von: null,
+    erledigt_am: null
+  }).then(function () {
+    document.getElementById('afText').value = '';
+    return ladeAufgaben();
+  }).catch(function (fehler) {
+    console.warn('Aufgaben-Verwaltung: Anlegen fehlgeschlagen', fehler);
+    setzeAfError('Fehler: ' + (fehler && fehler.message ? fehler.message : String(fehler)));
+  }).finally(function () {
+    document.getElementById('afAddBtn').disabled = false;
+  });
+});
+
+function toggleErledigt(a) {
+  var profil = getActiveProfil();
+  var will = !a.erledigt;
+  window.db.collection('bos_events').doc(a.id).update({
+    erledigt: will,
+    erledigt_von: will ? (profil && profil.id ? profil.id : null) : null,
+    erledigt_am: will ? firebase.firestore.FieldValue.serverTimestamp() : null
+  }).then(ladeAufgaben).catch(function (fehler) {
+    console.warn('Aufgaben-Verwaltung: Status-Änderung fehlgeschlagen', fehler);
+  });
+}
+
+function speichereBearbeitung(a, neuerText, neuesVerhalten) {
+  window.db.collection('bos_events').doc(a.id).update({
+    text: neuerText,
+    verhalten: neuesVerhalten
+  }).then(function () {
+    BEARBEITE_ID = null;
+    return ladeAufgaben();
+  }).catch(function (fehler) {
+    console.warn('Aufgaben-Verwaltung: Bearbeiten fehlgeschlagen', fehler);
+  });
+}
+
+function loescheAufgabe(a) {
+  if (!confirm('Aufgabe „' + a.text + '" wirklich löschen?')) return;
+  window.db.collection('bos_events').doc(a.id).delete()
+    .then(ladeAufgaben)
+    .catch(function (fehler) { console.warn('Aufgaben-Verwaltung: Löschen fehlgeschlagen', fehler); });
+}
+
+function uebernehmeAlsVorlage(a) {
+  document.getElementById('afText').value = a.text;
+  NEUER_VERHALTEN = a.verhalten === 'dauerhaft' ? 'dauerhaft' : 'verfaellt';
+  document.getElementById('afVerhaltenRow').querySelectorAll('.bos-btn').forEach(function (b) {
+    b.setAttribute('data-active', b.getAttribute('data-verhalten') === NEUER_VERHALTEN ? 'true' : 'false');
+  });
+  document.getElementById('afText').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('afText').focus();
+}
+
+/* ---------------- Ein-/Ausklappen der Abschnitte ---------------- */
+document.getElementById('afOffenHead').addEventListener('click', function () {
+  document.getElementById('afOffenSection').classList.toggle('af-section--collapsed');
+});
+document.getElementById('afVerlaufHead').addEventListener('click', function () {
+  document.getElementById('afVerlaufSection').classList.toggle('af-section--collapsed');
+});
+
+/* ---------------- Start ---------------- */
+ladeAufgaben();
+</script>
+</body>
+</html>

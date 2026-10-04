@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Urlaub beantragen · SchichtPlaner — BäckereiOS</title>
+
+<!--
+  MODUL: urlaub_anfrage.html
+  ZWECK: Zweiter eigenständiger Satellit im SchichtPlaner-V2-Aufbau, neben
+         Wunschtag. Erfasst eine Urlaubs-ANFRAGE (Zeitraum von–bis) —
+         ausdrücklich NUR eine Bitte, keine Genehmigung. Anders als
+         Wunschtag ist Urlaub ein echter arbeitsrechtlicher Vorgang (Ulf,
+         12.09.2026) — deshalb bewusst deutlichere, wiederholte
+         Formulierung der Unverbindlichkeit als bei Wunschtag, keine
+         Ampel/Zähler-Spielereien. Getrennter Bereich von
+         abwesenheiten_editor.html (das ist der BESTÄTIGTE Zustand, den
+         nur der Vorgesetzte pflegt) — beide sind bewusst nicht dasselbe
+         Datenmodell, siehe dortige Verknüpfung ("Übernehmen").
+  DATENFLUSS: Standalone-Login (bos_accounts) → Formular (Von + Bis +
+         optionale Begründung) → EIN Dokument pro Absenden nach Firestore-
+         Collection "bos_events" (type: 'urlaub_anfrage'). Kein
+         Lesezugriff — bewusst wie Wunschtag, Auslesen ist Aufgabe von
+         abwesenheiten_editor.html.
+  SCHNITTSTELLEN: bos_accounts.js (Identität), bos_firebase_config.js,
+         Firestore (bos_events). Schema bewusst so nah wie möglich an
+         Wunschtag gehalten (bosKontoId, personId, name, quelle) plus
+         von/bis statt kalenderwoche/datum (Urlaub ist ein Zeitraum, kein
+         Einzeltag).
+  BEKANNTE OFFENE PUNKTE:
+    - bosKontoId → interne Person ungelöst, exakt wie bei Wunschtag.
+    - Kein "Anzahl anderer"-Hinweis wie bei Wunschtag (v0.4) — für den
+      ersten Wurf bewusst weggelassen, nachrüstbar.
+    - Keine Prüfung auf bereits genehmigten/überlappenden Urlaub — der
+      Abgleich passiert in abwesenheiten_editor.html, nicht hier.
+
+  CHANGELOG
+    2026-09-12 · v0.1 · Feature
+      Erste Version. Zeitraum-Formular, Standalone-Login, Schreiben nach
+      bos_events.
+    2026-09-12 · 09:50 · v0.2 · Fix
+      Ulf: solche Fehlermeldungen künftig überall zeigen, nicht nur die
+      echte Meldung statt "fehlgeschlagen" konsole-only -- auf Tablet/
+      Handy ist Remote-Debugging umständlich. Alle Fehlermeldungen dieser
+      Datei zeigen jetzt err.message direkt in der UI.
+    2026-09-16 · 22:05 · v0.3 · Fix (T-77)
+      bos_theme_sync.js eingebunden. Das data-theme="dark" am
+      <html>-Tag galt damit unabhaengig vom Launcher-Profil -- die Seite
+      lief IMMER dunkel, egal was der Nutzer eingestellt hatte. Genau das
+      Problem, das am 28.08.2026 fuer die Hub-Kacheln geloest wurde
+      (SESSION_2026-08-28_THEME_SYNC.md); dieser Satellit entstand am
+      12.09. und hat den Einbau nie bekommen. Gefunden durch Ulfs Frage
+      "ist Systemdesign denn ueberhaupt eingebunden?".
+    2026-09-27 · Fix (Namens-Fundament Schritt 7, NF-4; NF-26)
+      Der Urlaubsantrag schreibt KEIN Feld name mehr in bos_events (vorher
+      die Konto-Notiz). Die Anzeige (Abwesenheiten-Editor) löst den Namen
+      seit Schritt 5 über das Konto auf. Alte Anträge bleiben. NF-26: der Alttext „echtes Konto … (Vorname,
+      Geburtsdatum, PIN)“ ist raus (Tür, Kennung, Passwort). Sonst nichts.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- Ergaenzt 16.09.2026 (T-77): bos_theme_sync.js liest das Theme des
+     aktiven Launcher-Profils und setzt data-theme auf DIESEM Dokument --
+     jede Seite laeuft in einem eigenen iframe-Fenster, ein data-theme des
+     Launchers gilt hier nicht automatisch. MUSS vor bos_design_tokens.css
+     stehen, sonst blitzt kurz das falsche Theme auf. Das data-theme="dark"
+     am <html>-Tag bleibt bewusst als Vorbelegung stehen: es gilt, bis das
+     Skript laeuft, und auch dann, wenn es (etwa bei einem stumm
+     fehlgeschlagenen Script-Load, siehe T-74) gar nicht laeuft. -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root{
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --surface-2: var(--bos-surface-raised, #2b2218);
+    --border: var(--bos-border, rgba(255,255,255,0.08));
+    --border-strong: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --amber: var(--bos-amber, #c07a10);
+    --amber-bright: var(--bos-amber-bright, #e0973a);
+    --amber-glow: var(--bos-amber-glow, rgba(192,122,16,0.35));
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --dim-2: var(--bos-text-faint, #736656);
+    --danger: var(--bos-red, #d6584a);
+    --radius: var(--bos-radius-md, 14px);
+    --font-display: var(--bos-font-display, 'Fraunces', serif);
+    --font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg);
+    color:var(--text); font-family:var(--font-body); min-height:100vh;
+    padding-bottom:110px; -webkit-tap-highlight-color:transparent;
+  }
+
+  header{
+    padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px);
+    border-bottom:1px solid var(--border); background:var(--surface);
+    position:sticky; top:0; z-index:20;
+  }
+  .eyebrow{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.14em;
+    text-transform:uppercase; font-size: var(--bos-font-xs,.72rem);
+    color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px);
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-glow);}
+  h1{
+    font-family:var(--font-display); font-weight:900; font-size: var(--bos-font-2xl,1.7rem);
+    margin: var(--bos-space-3xs,4px) 0 var(--bos-space-3xs,2px); letter-spacing:-.01em;
+  }
+  .zeit{font-family:var(--font-label); color:var(--dim); font-size: var(--bos-font-sm,.85rem); letter-spacing:.02em;}
+  .hilfe-btn{
+    position:absolute; top:20px; right:16px; width:34px; height:34px; border-radius:50%;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--dim);
+    font-family:var(--font-label); font-weight:700; display:flex; align-items:center;
+    justify-content:center; cursor:pointer;
+  }
+
+  main{padding: var(--bos-space-md,18px) var(--bos-space-sm,14px) var(--bos-space-xs,8px); max-width:640px; margin:0 auto;}
+
+  .rechtshinweis{
+    font-size: var(--bos-font-md,.95rem); line-height:1.55;
+    margin: 0 0 var(--bos-space-lg,22px); padding: var(--bos-space-sm,14px);
+    background:rgba(214,88,74,.1); border:1px solid rgba(214,88,74,.3); border-radius:var(--radius);
+    color:var(--text);
+  }
+  .rechtshinweis b{color:var(--danger);}
+
+  .feld{margin-bottom: var(--bos-space-lg,22px);}
+  .zwei-spalten{display:grid; grid-template-columns:1fr 1fr; gap: var(--bos-space-sm,12px);}
+  .feld-hinweis{font-size: var(--bos-font-xs,.78rem); color:var(--dim); line-height:1.5; margin: var(--bos-space-2xs,6px) 0 0;}
+  textarea.bos-input{resize:vertical; min-height:70px; font-family:var(--font-body);}
+
+  .warte-box{text-align:center; padding: var(--bos-space-xl,50px) var(--bos-space-md,20px); color:var(--dim); font-size: var(--bos-font-md,.95rem);}
+  .warte-box.fehler{color:var(--danger);}
+
+  .submit-bar{
+    position:fixed; left:0; right:0; bottom:0;
+    padding: var(--bos-space-sm,12px) var(--bos-space-sm,14px) calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, var(--bg) 60%, transparent); z-index:30;
+  }
+  .submit-btn{
+    width:100%; max-width:640px; margin:0 auto; display:block;
+    font-family:var(--font-label); font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+    font-size: var(--bos-font-md,1rem); color:#1b1305;
+    background:linear-gradient(180deg, var(--amber-bright), var(--amber));
+    border:none; border-radius:var(--radius); padding: var(--bos-space-sm,16px); cursor:pointer;
+    box-shadow:0 4px 18px var(--amber-glow);
+  }
+  .submit-btn:disabled{background:var(--surface-2); color:var(--dim-2); box-shadow:none; cursor:not-allowed;}
+  .submit-hint{text-align:center; font-family:var(--font-label); font-size: var(--bos-font-xs,.74rem); color:var(--dim); margin-top: var(--bos-space-xs,8px); letter-spacing:.02em;}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.offen{display:flex;}
+  .sheet{
+    background:var(--surface); border-top:1px solid var(--border); border-radius:18px 18px 0 0;
+    padding: var(--bos-space-lg,22px) var(--bos-space-md,20px) calc(24px + env(safe-area-inset-bottom));
+    width:100%; max-width:640px; margin:0 auto; max-height:80vh; overflow-y:auto;
+  }
+  .sheet h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.25rem); margin: 0 0 var(--bos-space-sm,12px);}
+  .sheet h3{font-family:var(--font-label); font-size: var(--bos-font-sm,.85rem); text-transform:uppercase; letter-spacing:.04em; color:var(--amber-bright); margin: var(--bos-space-md,16px) 0 var(--bos-space-2xs,4px);}
+  .sheet p{color:var(--dim); line-height:1.55; font-size: var(--bos-font-md,.94rem); margin: 0 0 var(--bos-space-xs,10px);}
+  .sheet-schluss{
+    margin-top: var(--bos-space-sm,16px); width:100%; padding: var(--bos-space-sm,12px); border-radius:8px;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+    font-family:var(--font-label); font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    font-size: var(--bos-font-sm,.82rem); cursor:pointer;
+  }
+
+  .erfolg{text-align:center; padding: var(--bos-space-xl,60px) var(--bos-space-lg,24px);}
+  .erfolg .glyph{
+    width:64px; height:64px; border-radius:50%; background:var(--amber-glow); border:2px solid var(--amber);
+    display:flex; align-items:center; justify-content:center; font-size: var(--bos-font-2xl,1.8rem);
+    margin: 0 auto var(--bos-space-md,18px);
+  }
+  .erfolg h2{font-family:var(--font-display); font-size: var(--bos-font-xl,1.4rem); margin: 0 0 var(--bos-space-xs,8px);}
+  .erfolg p{color:var(--dim); font-size: var(--bos-font-md,.92rem); margin: 0 0 var(--bos-space-lg,24px);}
+  .neu-btn{
+    font-family:var(--font-label); font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    font-size: var(--bos-font-sm,.85rem); color:var(--bg); background:var(--amber);
+    border:none; border-radius:8px; padding: var(--bos-space-sm,12px) var(--bos-space-lg,22px); cursor:pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<!-- Standalone-Login-Kette, identisch zu wunschtag.html -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'urlaub_anfrage';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+
+<header>
+  <button class="hilfe-btn" id="hilfeBtn" aria-label="Hilfe">?</button>
+  <div class="eyebrow"><span class="dot"></span>SchichtPlaner</div>
+  <h1>Urlaub beantragen</h1>
+  <div class="zeit" id="zeitText">—</div>
+</header>
+
+<main id="main">
+  <div class="warte-box" id="warteBox">Einen Moment …</div>
+</main>
+
+<div class="submit-bar" id="submitBar" style="display:none;">
+  <button class="submit-btn" id="submitBtn" disabled>Antrag absenden</button>
+  <div class="submit-hint" id="submitHint">Wähle Von- und Bis-Datum.</div>
+</div>
+
+<div class="sheet-overlay" id="hilfeOverlay">
+  <div class="sheet">
+    <h2>Wie funktioniert der Urlaubsantrag?</h2>
+    <p><b style="color:var(--text)">Dieser Antrag ist eine Anfrage, keine Genehmigung.</b> Dein Urlaub gilt erst, wenn du eine ausdrückliche Bestätigung von deiner Vorgesetzten oder deinem Vorgesetzten bekommen hast.</p>
+    <h3>Wann bekomme ich Bescheid?</h3>
+    <p>Das wird persönlich geklärt — dieses Formular selbst gibt keine Rückmeldung über Genehmigung oder Ablehnung.</p>
+    <h3>Kann ich den Antrag ändern?</h3>
+    <p>Einfach nochmal absenden. Solange keine Bestätigung vorliegt, gilt der neueste Antrag.</p>
+    <h3>Was passiert mit der Begründung?</h3>
+    <p>Freiwillig, nur für die planende Person sichtbar. Bitte keine Gesundheits- oder Diagnosedaten eintragen.</p>
+    <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  var WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  var authBereit = false;
+
+  (window.BOS_AUTH_READY || Promise.resolve()).then(function () {
+    authBereit = true;
+    aktualisiereSubmitZustand();
+  }).catch(function (err) { console.error('[Urlaub] Auth-Fehler:', err); });
+
+  function formatDatum(d) {
+    return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + String(d.getFullYear());
+  }
+  function isoDatum(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function heuteIso() { return isoDatum(new Date()); }
+
+  function renderZeit() {
+    var jetzt = new Date();
+    document.getElementById('zeitText').textContent =
+      WOCHENTAGE[jetzt.getDay()] + '. ' + String(jetzt.getDate()).padStart(2,'0') + '.' + String(jetzt.getMonth()+1).padStart(2,'0') + '.' + String(jetzt.getFullYear()).slice(2) +
+      ' · ' + String(jetzt.getHours()).padStart(2,'0') + ':' + String(jetzt.getMinutes()).padStart(2,'0') + ' Uhr';
+  }
+  renderZeit();
+  setInterval(renderZeit, 30000);
+
+  function renderFormular() {
+    var html = '';
+    html += '<div class="rechtshinweis"><b>Dieser Antrag ist nur eine Anfrage — keine Genehmigung.</b> Dein Urlaub gilt erst, wenn du eine ausdrückliche Bestätigung erhältst. Bitte plane nichts Verbindliches, bevor diese Bestätigung vorliegt.</div>';
+
+    html += '<div class="feld zwei-spalten">' +
+      '<div><label class="bos-label" for="vonInput">Von</label><input type="date" class="bos-input" id="vonInput" min="' + heuteIso() + '"></div>' +
+      '<div><label class="bos-label" for="bisInput">Bis</label><input type="date" class="bos-input" id="bisInput" min="' + heuteIso() + '"></div>' +
+      '</div>';
+
+    html += '<div class="feld">' +
+      '<label class="bos-label" for="begruendung">Begründung (freiwillig)</label>' +
+      '<textarea id="begruendung" class="bos-input" rows="3" placeholder="Nur falls du möchtest …"></textarea>' +
+      '<p class="feld-hinweis">Nur für die planende Person sichtbar, nicht öffentlich. Bitte keine Gesundheits- oder Diagnosedaten eintragen.</p>' +
+      '</div>';
+
+    document.getElementById('main').innerHTML = html;
+
+    document.getElementById('vonInput').addEventListener('change', function () {
+      document.getElementById('bisInput').min = this.value || heuteIso();
+      aktualisiereSubmitZustand();
+    });
+    document.getElementById('bisInput').addEventListener('change', aktualisiereSubmitZustand);
+    document.getElementById('begruendung').addEventListener('input', aktualisiereSubmitZustand);
+
+    document.getElementById('submitBar').style.display = 'block';
+  }
+
+  function aktualisiereSubmitZustand() {
+    var btn = document.getElementById('submitBtn');
+    var hint = document.getElementById('submitHint');
+    var von = document.getElementById('vonInput') ? document.getElementById('vonInput').value : '';
+    var bis = document.getElementById('bisInput') ? document.getElementById('bisInput').value : '';
+    if (!von || !bis) { btn.disabled = true; hint.textContent = 'Wähle Von- und Bis-Datum.'; return; }
+    if (bis < von) { btn.disabled = true; hint.textContent = '„Bis" liegt vor „Von" — bitte prüfen.'; return; }
+    if (!authBereit) { btn.disabled = true; hint.textContent = 'Verbinde …'; return; }
+    btn.disabled = false;
+    hint.textContent = 'Begründung ist freiwillig.';
+  }
+
+  function sendeAntrag(profil, kontoId) {
+    var btn = document.getElementById('submitBtn');
+    var von = document.getElementById('vonInput').value;
+    var bis = document.getElementById('bisInput').value;
+    btn.disabled = true;
+    btn.textContent = 'Wird gesendet …';
+
+    var dokument = {
+      type: 'urlaub_anfrage',
+      bosKontoId: kontoId,
+      personId: null,
+      // Schritt 7 (NF-4): KEIN Feld name mehr — der Name kommt beim Anzeigen
+      // aus der Namensliste, über das Konto.
+      von: von,
+      bis: bis,
+      begruendung: document.getElementById('begruendung').value.trim(),
+      quelle: 'selbst',
+      eingereichtAm: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    window.db.collection('bos_events').add(dokument).then(function () {
+      zeigeErfolg();
+    }).catch(function (err) {
+      console.error('[Urlaub] Sende-Fehler:', err);
+      btn.disabled = false;
+      btn.textContent = 'Antrag absenden';
+      document.getElementById('submitHint').textContent = 'Senden fehlgeschlagen: ' + ((err && err.message) || String(err));
+    });
+  }
+
+  function zeigeErfolg() {
+    document.getElementById('submitBar').style.display = 'none';
+    document.getElementById('main').innerHTML =
+      '<div class="erfolg">' +
+      '<div class="glyph">✓</div>' +
+      '<h2>Antrag gesendet</h2>' +
+      '<p>Deine Anfrage ist angekommen — sie ist noch keine Genehmigung. Du bekommst persönlich Bescheid.</p>' +
+      '<button class="neu-btn" id="neuBtn">Weiteren Antrag stellen</button>' +
+      '</div>';
+    document.getElementById('neuBtn').addEventListener('click', function () {
+      renderFormular();
+      aktualisiereSubmitZustand();
+    });
+  }
+
+  /* ==== Profil abwarten (gleicher Mechanismus wie wunschtag.html) ==== */
+  function leseAktivesProfil() {
+    var raw;
+    try { raw = localStorage.getItem('bos_launcher_state_v2'); } catch (e) { return null; }
+    if (!raw) return null;
+    var state;
+    try { state = JSON.parse(raw); } catch (e) { return null; }
+    if (!state || !state.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(state.localProfiles || []);
+    return alle.find(function (p) { return p.id === state.activeProfileId; }) || null;
+  }
+  function hatZugriff(profil) {
+    if (!window.BOS_ACCESS) return true;
+    return window.BOS_ACCESS.can(window.BOS_APP_ID, profil.role, profil.kontoOverrides);
+  }
+  function ermittleKontoId(profil) {
+    if (profil.kontoSchluessel) return profil.kontoSchluessel;
+    if (profil.id && profil.id.indexOf('konto_') === 0) return profil.id.slice(6);
+    return null;
+  }
+
+  function warteAufProfil() {
+    var profil = leseAktivesProfil();
+    if (!profil) { setTimeout(warteAufProfil, 250); return; }
+    if (!hatZugriff(profil)) return;
+    var kontoId = ermittleKontoId(profil);
+    if (!kontoId) {
+      document.getElementById('main').innerHTML =
+        '<div class="warte-box fehler">Auf diesem Gerät ist kein Konto angemeldet — bitte an der Tür mit deiner Kennung und deinem Passwort anmelden.' +
+        '<br><br><button type="button" class="bos-btn bos-btn--amber" id="neuAnmeldenBtn">Neu anmelden</button></div>';
+      document.getElementById('neuAnmeldenBtn').addEventListener('click', function () {
+        if (!confirm('Setzt die Anmeldung auf diesem Gerät zurück — danach meldest du dich an der Tür mit Kennung und Passwort an. Fortfahren?')) return;
+        try {
+          var raw = localStorage.getItem('bos_launcher_state_v2');
+          var state = raw ? JSON.parse(raw) : null;
+          if (state) { state.activeProfileId = null; localStorage.setItem('bos_launcher_state_v2', JSON.stringify(state)); }
+        } catch (e) { /* nichts zu tun -- Reload versucht es trotzdem */ }
+        location.reload();
+      });
+      return;
+    }
+    renderFormular();
+    aktualisiereSubmitZustand();
+    document.getElementById('submitBtn').addEventListener('click', function () { sendeAntrag(profil, kontoId); });
+  }
+  warteAufProfil();
+
+  /* ==== Hilfe-Sheet ==== */
+  document.getElementById('hilfeBtn').addEventListener('click', function () {
+    document.getElementById('hilfeOverlay').classList.add('offen');
+  });
+  document.getElementById('hilfeSchluss').addEventListener('click', function () {
+    document.getElementById('hilfeOverlay').classList.remove('offen');
+  });
+  document.getElementById('hilfeOverlay').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('offen');
+  });
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Zeitkontext & Hamster · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Theme-Sync MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz
+     das falsche Theme auf (siehe bos_theme_sync.js, Kopf-Kommentar) -->
+<script src="../bos_theme_sync.js"></script>
+<!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  :root {
+    --zk-bg: var(--bos-bg, #16120e);
+    --zk-surface: var(--bos-surface, #221b14);
+    --zk-surface-2: var(--bos-surface-raised, #2b2218);
+    --zk-text: var(--bos-text, #f3ece1);
+    --zk-text-dim: var(--bos-text-dim, #ab9c8a);
+    --zk-amber: var(--bos-amber, #c07a10);
+    --zk-amber-hell: var(--bos-amber-bright, #e0973a);
+    --zk-border: var(--bos-border, rgba(255,255,255,0.08));
+    --zk-red: var(--bos-red, #d6584a);
+    --zk-green: var(--bos-green, #4caf7d);
+    --zk-radius: var(--bos-radius-md, 14px);
+    --zk-font-display: var(--bos-font-display, 'Fraunces', serif);
+    --zk-font-label: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+    --zk-font-body: var(--bos-font-body, 'Barlow', sans-serif);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--zk-bg); color: var(--zk-text);
+    font-family: var(--zk-font-body); padding: var(--bos-space-md, 20px) var(--bos-space-sm, 16px) var(--bos-space-xl, 60px);
+  }
+  h1 { font-family: var(--zk-font-display); font-size: var(--bos-font-2xl, 1.5rem); margin: 0 0 var(--bos-space-3xs, 4px); }
+  .sub { color: var(--zk-text-dim); font-size: var(--bos-font-sm, .85rem); margin: 0 0 var(--bos-space-md, 20px); max-width: 520px; }
+
+  .tabs { display: flex; gap: var(--bos-space-3xs, 4px); margin-bottom: var(--bos-space-md, 18px); border-bottom: 1px solid var(--zk-border); flex-wrap: wrap; }
+  .tab-btn {
+    font-family: var(--zk-font-label); font-weight: 700; letter-spacing: .02em; font-size: var(--bos-font-md, .9rem);
+    background: none; border: none; color: var(--zk-text-dim);
+    padding: var(--bos-space-xs, 10px) var(--bos-space-2xs, 6px); cursor: pointer; border-bottom: 3px solid transparent;
+  }
+  .tab-btn.aktiv { color: var(--zk-amber); border-bottom-color: var(--zk-amber); }
+  .tab-inhalt { display: none; }
+  .tab-inhalt.aktiv { display: block; }
+
+  .karte {
+    background: var(--zk-surface); border: 1px solid var(--zk-border);
+    border-radius: var(--zk-radius); padding: var(--bos-space-sm, 16px); margin-bottom: var(--bos-space-sm, 14px);
+  }
+  label {
+    font-family: var(--zk-font-label); font-weight: 700; font-size: var(--bos-font-sm, .8rem);
+    letter-spacing: .02em; display: block; margin-bottom: var(--bos-space-2xs, 6px); color: var(--zk-text-dim);
+  }
+  input[type="date"], input[type="text"], input[type="number"], select {
+    width: 100%; background: var(--zk-surface-2); border: 1px solid var(--zk-border);
+    border-radius: 8px; color: var(--zk-text); padding: var(--bos-space-xs, 10px); font-size: var(--bos-font-md, 1rem);
+    font-family: var(--zk-font-body);
+  }
+
+  .stufen-wahl { display: flex; flex-wrap: wrap; gap: var(--bos-space-xs, 8px); margin-top: var(--bos-space-xs, 8px); }
+  .stufe-btn {
+    flex: 1; min-width: 90px; font-family: var(--zk-font-label); font-weight: 700; font-size: var(--bos-font-sm, .85rem);
+    background: var(--zk-surface-2); border: 1px solid var(--zk-border); border-radius: 8px;
+    color: var(--zk-text-dim); padding: var(--bos-space-xs, 10px) var(--bos-space-2xs, 6px); cursor: pointer; text-align: center;
+  }
+  .stufe-btn.aktiv { background: var(--zk-amber); color: #1b1305; border-color: var(--zk-amber); }
+
+  .offen-toggle { display: flex; gap: var(--bos-space-xs, 8px); }
+  .offen-btn {
+    flex: 1; font-family: var(--zk-font-label); font-weight: 700; font-size: var(--bos-font-md, .9rem);
+    background: var(--zk-surface-2); border: 1px solid var(--zk-border); border-radius: 8px;
+    color: var(--zk-text-dim); padding: var(--bos-space-xs, 10px); cursor: pointer;
+  }
+  .offen-btn.aktiv-offen { background: var(--zk-green); color: #132018; border-color: var(--zk-green); }
+  .offen-btn.aktiv-zu { background: var(--zk-red); color: #2b0f0c; border-color: var(--zk-red); }
+
+  .kopf-zeile { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--bos-space-xs, 10px); }
+  .quelle-badge {
+    font-family: var(--zk-font-label); font-size: var(--bos-font-xs, .68rem); font-weight: 800;
+    letter-spacing: .03em; text-transform: uppercase; padding: var(--bos-space-3xs, 3px) var(--bos-space-xs, 8px); border-radius: 6px;
+  }
+  .quelle-firestore { background: rgba(192,122,16,.22); color: var(--zk-amber-hell); }
+  .quelle-lokal, .quelle-datei { background: rgba(171,156,138,.18); color: var(--zk-text-dim); }
+  .quelle-entwurf { background: rgba(214,88,74,.2); color: var(--zk-red); }
+
+  .save-btn {
+    width: 100%; background: var(--zk-amber); color: #1b1305; border: none; border-radius: 10px;
+    padding: var(--bos-space-sm, 14px); font-family: var(--zk-font-label); font-weight: 800; font-size: var(--bos-font-md, 1rem);
+    letter-spacing: .02em; cursor: pointer; margin-top: var(--bos-space-sm, 14px);
+  }
+  .save-btn:disabled { opacity: .5; cursor: default; }
+  .save-btn.sekundaer { background: var(--zk-surface-2); color: var(--zk-text); border: 1px solid var(--zk-border); }
+
+  .lokal-hinweis {
+    display: flex; gap: var(--bos-space-xs, 8px); align-items: flex-start; font-size: var(--bos-font-sm, .8rem); color: var(--zk-text-dim);
+    background: var(--zk-surface-2); border: 1px dashed var(--zk-border); border-radius: 8px;
+    padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); margin-top: var(--bos-space-sm, 12px); line-height: 1.4;
+  }
+
+  .liste-eintrag {
+    display: flex; justify-content: space-between; align-items: center; gap: var(--bos-space-xs, 10px);
+    padding: var(--bos-space-xs, 10px) 0; border-bottom: 1px solid var(--zk-border);
+  }
+  .liste-eintrag:last-child { border-bottom: none; }
+  .liste-datum { font-family: var(--zk-font-label); font-weight: 700; white-space: nowrap; }
+  .liste-info { color: var(--zk-text-dim); font-size: var(--bos-font-sm, .8rem); flex: 1; }
+  .liste-bearbeiten {
+    background: none; border: 1px solid var(--zk-border); border-radius: 6px; color: var(--zk-text-dim);
+    padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px); font-size: var(--bos-font-sm, .78rem); cursor: pointer; white-space: nowrap;
+  }
+
+  .besonders-hinweis { display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); font-size: var(--bos-font-sm, .85rem); color: var(--zk-amber-hell); }
+
+  /* Tage-Streifen — mehrere Tage rund um das gewählte Datum, einzeln
+     antippbar. Antippen wechselt nur das Datum oben (kein eigener
+     zweiter Speicher-Mechanismus, siehe Kopf-Kommentar im Skript). */
+  .streifen-karte { padding-bottom: var(--bos-space-sm, 12px); }
+  .streifen-kopf { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--bos-space-3xs, 4px); }
+  .tag-davor-btn {
+    background: none; border: 1px solid var(--zk-border); border-radius: 6px; color: var(--zk-text-dim);
+    padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px); font-size: var(--bos-font-sm, .78rem); cursor: pointer; font-family: var(--zk-font-label); font-weight: 700;
+    white-space: nowrap;
+  }
+  .tage-streifen { display: flex; gap: var(--bos-space-xs, 8px); overflow-x: auto; padding: var(--bos-space-2xs, 6px) var(--bos-space-3xs, 2px) var(--bos-space-3xs, 4px); -webkit-overflow-scrolling: touch; }
+  .tag-chip {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: var(--bos-space-3xs, 3px);
+    min-width: 68px; background: var(--zk-surface-2); border: 1px solid var(--zk-border); border-radius: 10px;
+    padding: var(--bos-space-xs, 8px) var(--bos-space-2xs, 6px); cursor: pointer; font-family: var(--zk-font-label); position: relative;
+  }
+  .tag-chip.aktiv { border-color: var(--zk-amber); background: rgba(192,122,16,.18); }
+  .tag-chip.feiertag { box-shadow: inset 0 0 0 1px var(--zk-amber-hell); }
+  .tag-chip.entwurf { border-style: dashed; border-color: var(--zk-red); }
+  .tag-chip-entwurf-marke { position: absolute; top: 4px; right: 6px; color: var(--zk-red); font-size: var(--bos-font-2xs, .55rem); line-height: 1; }
+  .tag-chip-datum { font-weight: 700; font-size: var(--bos-font-sm, .78rem); color: var(--zk-text); white-space: nowrap; }
+  .tag-chip-punkt { font-size: var(--bos-font-md, 1rem); line-height: 1; }
+  .tag-chip-feiertag-label {
+    font-size: var(--bos-font-2xs, .62rem); color: var(--zk-amber-hell); text-align: center; max-width: 64px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .status-text { font-size: var(--bos-font-sm, .85rem); color: var(--zk-text-dim); margin-top: var(--bos-space-xs, 8px); }
+
+  .stufe-karte { margin-bottom: var(--bos-space-3xs, 4px); }
+  .stufe-karte h3 { margin: 0 0 var(--bos-space-xs, 10px); font-family: var(--zk-font-label); font-size: var(--bos-font-md, 1rem); color: var(--zk-amber-hell); }
+  .feld-zeile { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bos-space-xs, 10px); margin-bottom: var(--bos-space-xs, 10px); }
+  .feld-zeile.voll { grid-template-columns: 1fr; }
+
+  .help-btn {
+    position: fixed; top: 16px; right: 16px; width: 36px; height: 36px; border-radius: 50%;
+    background: var(--zk-surface); border: 1px solid var(--zk-border); color: var(--zk-red);
+    font-weight: 800; cursor: pointer; z-index: 50;
+  }
+
+  .bottom-sheet { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; display: flex; align-items: flex-end; }
+  .bottom-sheet-inhalt {
+    background: var(--zk-surface); width: 100%; max-height: 82vh; overflow-y: auto;
+    border-radius: 16px 16px 0 0; padding: var(--bos-space-lg, 24px) var(--bos-space-md, 20px); position: relative;
+  }
+  .bottom-sheet h2 { font-family: var(--zk-font-display); margin-top: 0; }
+  .bottom-sheet h3 { font-family: var(--zk-font-label); margin: var(--bos-space-sm, 16px) 0 var(--bos-space-3xs, 4px); color: var(--zk-amber-hell); }
+  .bottom-sheet p { color: var(--zk-text-dim); font-size: var(--bos-font-md, .9rem); line-height: 1.5; margin: 0; }
+  .icon-btn {
+    position: absolute; top: 12px; right: 12px; background: none; border: none;
+    color: var(--zk-text-dim); font-size: var(--bos-font-xl, 1.3rem); cursor: pointer;
+  }
+
+  /* PIN-Prompt — erscheint nur beim globalen Speichern-Klick, kein
+     Vollseiten-Gate mehr (siehe Änderungsprotokoll 30.08.2026: auf
+     Ulfs Wunsch mit dem lokalen Fallback in einer Datei zusammengelegt). */
+  .pin-prompt-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 500;
+    display: flex; align-items: center; justify-content: center; padding: var(--bos-space-lg, 24px); }
+  .pin-prompt {
+    background: var(--zk-surface); border: 1px solid var(--zk-border); border-radius: var(--zk-radius);
+    padding: var(--bos-space-lg, 22px); width: 100%; max-width: 280px; text-align: center;
+  }
+  .pin-prompt h3 { font-family: var(--zk-font-label); margin: 0 0 var(--bos-space-2xs, 6px); }
+  .pin-prompt p { color: var(--zk-text-dim); font-size: var(--bos-font-sm, .82rem); margin: 0 0 var(--bos-space-sm, 14px); }
+  .pin-prompt input {
+    width: 100%; text-align: center; font-size: var(--bos-font-xl, 1.4rem); letter-spacing: .3em;
+    background: var(--zk-surface-2); border: 1px solid var(--zk-border); border-radius: 10px;
+    color: var(--zk-text); padding: var(--bos-space-sm, 12px); font-family: var(--zk-font-body);
+  }
+  .pin-prompt-buttons { display: flex; gap: var(--bos-space-xs, 8px); margin-top: var(--bos-space-sm, 12px); }
+  .pin-prompt-buttons button {
+    flex: 1; border-radius: 10px; padding: var(--bos-space-xs, 11px); font-family: var(--zk-font-label);
+    font-weight: 800; letter-spacing: .02em; cursor: pointer; border: none;
+  }
+  .pin-prompt-buttons .bestaetigen { background: var(--zk-amber); color: #1b1305; }
+  .pin-prompt-buttons .abbrechen { background: var(--zk-surface-2); color: var(--zk-text); border: 1px solid var(--zk-border); }
+  .pin-prompt .fehler { color: var(--zk-red); font-size: var(--bos-font-sm, .8rem); margin-top: var(--bos-space-xs, 8px); min-height: 1.2em; }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'zeitkontext_editor';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<button class="help-btn" id="hilfeBtn" type="button" aria-label="Hilfe">?</button>
+
+<h1 data-i18n="titel"></h1>
+<p class="sub" data-i18n="untertitel"></p>
+
+<div class="tabs">
+  <button class="tab-btn aktiv" id="tabBtnLokal" type="button" data-i18n="tabLokal"></button>
+  <button class="tab-btn" id="tabBtnKontext" type="button" data-i18n="tabKontext"></button>
+  <button class="tab-btn" id="tabBtnHamster" type="button" data-i18n="tabHamster"></button>
+</div>
+
+<!-- TAB 1: Schnell / lokal — kein PIN, sofort verfügbar für jeden -->
+<div class="tab-inhalt aktiv" id="tabLokal">
+
+  <div class="karte">
+    <label for="datumInputLokal" data-i18n="datumLabel"></label>
+    <input type="date" id="datumInputLokal">
+    <div class="besonders-hinweis" id="besondersHinweisLokal" style="margin-top:8px;" hidden></div>
+  </div>
+
+  <div class="karte streifen-karte">
+    <div class="streifen-kopf">
+      <label style="margin:0;" data-i18n="streifenLabel"></label>
+      <button type="button" class="tag-davor-btn" id="tagDavorBtnLokal" data-i18n="tagDavor"></button>
+    </div>
+    <div class="tage-streifen" id="tageStreifenLokal"></div>
+    <button class="save-btn sekundaer" id="alleSpeichernBtnLokal" type="button" style="margin-top:8px;" hidden></button>
+    <div class="status-text" id="alleSpeichernStatusLokal"></div>
+  </div>
+
+  <div class="karte">
+    <div class="kopf-zeile">
+      <label style="margin:0;" data-i18n="statusLabel"></label>
+      <span class="quelle-badge" id="quelleBadgeLokal"></span>
+    </div>
+
+    <label data-i18n="offenLabel"></label>
+    <div class="offen-toggle">
+      <button type="button" class="offen-btn" id="btnOffenLokal" data-i18n="offenJa"></button>
+      <button type="button" class="offen-btn" id="btnZuLokal" data-i18n="offenNein"></button>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label for="grundInputLokal" data-i18n="grundLabel"></label>
+      <input type="text" id="grundInputLokal">
+    </div>
+
+    <div style="margin-top:14px;">
+      <label data-i18n="hamsterLabel"></label>
+      <div class="stufen-wahl" id="stufenWahlLokal"></div>
+    </div>
+
+    <button class="save-btn" id="speichernBtnLokal" type="button" data-i18n="speichernLokal"></button>
+    <div class="status-text" id="speicherStatusLokal"></div>
+
+    <div class="lokal-hinweis">
+      <span>📍</span>
+      <span data-i18n="lokalHinweisText"></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- TAB 2: Tageskontext (global) — Speichern nur für die Planung (Server-Regel seit 21.09.2026) -->
+<div class="tab-inhalt" id="tabKontext">
+
+  <div class="karte">
+    <label for="datumInput" data-i18n="datumLabel"></label>
+    <input type="date" id="datumInput">
+    <div class="besonders-hinweis" id="besondersHinweis" style="margin-top:8px;" hidden></div>
+  </div>
+
+  <div class="karte streifen-karte">
+    <div class="streifen-kopf">
+      <label style="margin:0;" data-i18n="streifenLabel"></label>
+      <button type="button" class="tag-davor-btn" id="tagDavorBtnGlobal" data-i18n="tagDavor"></button>
+    </div>
+    <div class="tage-streifen" id="tageStreifenGlobal"></div>
+    <button class="save-btn sekundaer" id="alleSpeichernBtnGlobal" type="button" style="margin-top:8px;" hidden></button>
+    <div class="status-text" id="alleSpeichernStatusGlobal"></div>
+  </div>
+
+  <div class="karte">
+    <div class="kopf-zeile">
+      <label style="margin:0;" data-i18n="statusLabel"></label>
+      <span class="quelle-badge" id="quelleBadge"></span>
+    </div>
+
+    <label data-i18n="offenLabel"></label>
+    <div class="offen-toggle">
+      <button type="button" class="offen-btn" id="btnOffen" data-i18n="offenJa"></button>
+      <button type="button" class="offen-btn" id="btnZu" data-i18n="offenNein"></button>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label for="grundInput" data-i18n="grundLabel"></label>
+      <input type="text" id="grundInput">
+    </div>
+
+    <div style="margin-top:14px;">
+      <label data-i18n="hamsterLabel"></label>
+      <div class="stufen-wahl" id="stufenWahl"></div>
+    </div>
+
+    <button class="save-btn" id="speichernBtn" type="button" data-i18n="speichern"></button>
+    <div class="status-text" id="speicherStatus"></div>
+  </div>
+
+  <div class="karte">
+    <label data-i18n="kommendeLabel"></label>
+    <div id="kommendeListe" class="status-text" data-i18n="ladeKommende"></div>
+  </div>
+
+  <div class="karte">
+    <label data-i18n="geplantLabel"></label>
+    <div id="geplantListe" class="status-text" data-i18n="ladeGeplant"></div>
+  </div>
+
+</div>
+
+<!-- TAB 3: Hamster-Konfiguration — kein PIN, kein Firestore-Schreibpfad -->
+<div class="tab-inhalt" id="tabHamster">
+  <div class="karte">
+    <div id="hamsterConfigBereich" class="status-text" data-i18n="ladeConfig"></div>
+  </div>
+  <button class="save-btn sekundaer" id="configSpeichernBtn" type="button" data-i18n="configHerunterladen"></button>
+  <div class="status-text" id="configStatus"></div>
+</div>
+
+
+<!-- Hilfe-Bottom-Sheet -->
+<div id="hilfeSheet" class="bottom-sheet" hidden>
+  <div class="bottom-sheet-inhalt">
+    <button id="hilfeSchliessen" class="icon-btn" type="button" aria-label="Schließen">✕</button>
+    <h2 data-i18n="hilfeTitel"></h2>
+
+    <h3 data-i18n="hilfeWofuerTitel"></h3>
+    <p data-i18n="hilfeWofuerText"></p>
+
+    <h3 data-i18n="hilfeLokalTitel"></h3>
+    <p data-i18n="hilfeLokalText"></p>
+
+    <h3 data-i18n="hilfeKettenTitel"></h3>
+    <p data-i18n="hilfeKettenText"></p>
+
+    <h3 data-i18n="hilfePrioritaetTitel"></h3>
+    <p data-i18n="hilfePrioritaetText"></p>
+
+    <h3 data-i18n="hilfeStreifenTitel"></h3>
+    <p data-i18n="hilfeStreifenText"></p>
+
+    <h3 data-i18n="hilfeHamsterTitel"></h3>
+    <p data-i18n="hilfeHamsterText"></p>
+
+    <h3 data-i18n="hilfeConfigTitel"></h3>
+    <p data-i18n="hilfeConfigText"></p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_hamster.js"></script>
+
+<script>
+(function () {
+
+  /* -----------------------------------------------------------
+   * i18n
+   * --------------------------------------------------------- */
+  const I18N_DE = {
+    titel: 'Zeitkontext & Hamster',
+    untertitel: 'Beliebige Tage im Voraus planen — heute, nächste Woche, irgendwann später —, damit Froster und Lager rechtzeitig wissen, was kommt.',
+    tabLokal: 'Schnell (dieses Gerät)',
+    tabKontext: 'Tageskontext (global)',
+    tabHamster: 'Hamster-Konfiguration',
+    datumLabel: 'Datum',
+    statusLabel: 'Stand für dieses Datum',
+    offenLabel: 'Geöffnet?',
+    offenJa: 'Geöffnet',
+    offenNein: 'Geschlossen',
+    grundLabel: 'Grund (optional)',
+    hamsterLabel: 'Hamster-Stufe',
+    speichern: 'Global speichern',
+    speichernLokal: 'Nur auf diesem Gerät speichern',
+    lokalHinweisText: 'Gilt nur auf diesem Gerät, sofort und ohne weitere Abfrage. Wird automatisch überschrieben, sobald jemand mit Zugriff auf „Tageskontext (global)" für denselben Tag etwas fest einträgt.',
+    streifenLabel: 'Tage im Umfeld',
+    tagDavor: '+ Tag davor',
+    kommendeLabel: 'Kommende Feiertage/Ferien (14 Tage)',
+    ladeKommende: 'Lade …',
+    geplantLabel: 'Bereits global geplante Tage',
+    ladeGeplant: 'Lade …',
+    ladeConfig: 'Lade Konfiguration …',
+    configHerunterladen: '↓ Konfiguration herunterladen',
+    hilfeTitel: 'Hilfe zu dieser Seite',
+    hilfeWofuerTitel: 'Wofür ist diese Seite?',
+    hilfeWofuerText: 'Hier wird für ein beliebiges Datum – heute, nächste Woche, irgendwann später – festgelegt, ob der Betrieb an dem Tag geöffnet ist und ob mit erhöhtem Bedarf (Hamster-Stufe) zu rechnen ist. Der Sinn: weit im Voraus planen, damit rechtzeitig genug in den Froster bzw. ins Lager geht, statt erst am Tag selbst zu merken, dass mehr gebraucht wird.',
+    hilfeLokalTitel: 'Was ist der Unterschied zwischen den ersten beiden Tabs?',
+    hilfeLokalText: '„Schnell (dieses Gerät)" speichert nur lokal auf dem gerade genutzten Gerät, ohne PIN, sofort nutzbar von jedem, der Produktion mitplant. „Tageskontext (global)" speichert für alle Geräte gleichzeitig und steht deshalb nur der Planung zu — wer es trotzdem versucht, bekommt eine Meldung mit dem Grund. Gibt es für einen Tag beides, gewinnt immer die globale Einstellung – die lokale ist ein Fallback für den Fall, dass noch niemand die globale gesetzt hat.',
+    hilfeKettenTitel: 'Wer nutzt das gerade?',
+    hilfeKettenText: 'Aktuell liest die Verbrauchs-Durchschnittsberechnung diese Einträge, um besondere Tage aus dem Vergleich herauszuhalten. Die eigentliche Produktionskette, die daraus konkrete Vorschläge für Froster und Lager ableiten soll, existiert noch nicht – was hier heute gesetzt wird, ist aber schon genau die Grundlage, die sie später braucht.',
+    hilfePrioritaetTitel: 'Was bedeutet die Markierung neben dem Stand?',
+    hilfePrioritaetText: 'Ein Tag kann auf drei Arten bestimmt sein: global fest gesetzt (gewinnt immer), von einem einzelnen Gerät nur lokal gesetzt, oder als System-Standard aus dem Feiertags-/Ferienkalender abgeleitet.',
+    hilfeStreifenTitel: 'Was ist die Tage-Reihe unter dem Datum?',
+    hilfeStreifenText: 'Steht ein Feiertag oder eine Ferienzeit in den nächsten Tagen an, zeigt die Reihe automatisch die Tage davor bis zu diesem besonderen Tag. Ist gerade nichts Besonderes in der Nähe, zeigt sie einfach die letzten Tage vor dem gewählten Datum. Über „+ Tag davor" lässt sie sich beliebig weiter nach vorne verlängern. Antippen wechselt zu dem Tag oben – Eingaben, die dort noch nicht gespeichert wurden, bleiben beim Wechseln zwischen Tagen erhalten (ein kleiner Punkt am Chip zeigt „noch nicht gespeichert") und lassen sich am Ende mit einem Tipp auf „X Tage speichern" unter der Reihe alle auf einmal sichern, statt jeden Tag einzeln.',
+    hilfeHamsterTitel: 'Was bedeutet eine Hamster-Stufe?',
+    hilfeHamsterText: 'Kunden kaufen vor Feiertagen oft mehr auf Vorrat. Die Stufe legt fest, wie stark der Bedarf für diesen Tag angehoben wird – von leicht erhöht bis maximal. „Kein Hamster" bedeutet: normaler Bedarf, keine Vorratskäufe erwartet. Die genaue Rechenregel je Stufe steht im dritten Tab.',
+    hilfeConfigTitel: 'Wofür ist der dritte Tab?',
+    hilfeConfigText: 'Dort wird festgelegt, was jede Hamster-Stufe rechnerisch bedeutet – nicht für einen einzelnen Tag, sondern grundsätzlich für alle. Änderungen werden als Datei heruntergeladen und müssen von Hand im Repository ersetzt werden, genau wie bei der Produkt-Konfiguration. Kein PIN nötig, da hier nichts direkt in eine Datenbank geschrieben wird.'
+  };
+  function t(key) { return I18N_DE[key] || key; }
+  function wendeI18nAn() {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.dataset.i18n); });
+  }
+  wendeI18nAn();
+
+  /* -----------------------------------------------------------
+   * Rollen-Check läuft bereits VOR diesem Skript, siehe
+   * <script src="../bos_access_guard.js"> im Kopf der Datei — der
+   * echte Guard blockiert sich bei Bedarf selbst per eigenem Overlay.
+   * Diese ganze Seite ist danach frei zugänglich (kein Vollseiten-PIN
+   * mehr) — nur der globale Speichern-Button in Tab 2 fragt gezielt
+   * nach dem PIN, siehe „PIN-Prompt" weiter unten.
+   * --------------------------------------------------------- */
+
+  const el = {
+    datumInputLokal: document.getElementById('datumInputLokal'),
+    besondersHinweisLokal: document.getElementById('besondersHinweisLokal'),
+    quelleBadgeLokal: document.getElementById('quelleBadgeLokal'),
+    btnOffenLokal: document.getElementById('btnOffenLokal'),
+    btnZuLokal: document.getElementById('btnZuLokal'),
+    grundInputLokal: document.getElementById('grundInputLokal'),
+    stufenWahlLokal: document.getElementById('stufenWahlLokal'),
+    speichernBtnLokal: document.getElementById('speichernBtnLokal'),
+    speicherStatusLokal: document.getElementById('speicherStatusLokal'),
+    tageStreifenLokal: document.getElementById('tageStreifenLokal'),
+    tagDavorBtnLokal: document.getElementById('tagDavorBtnLokal'),
+    alleSpeichernBtnLokal: document.getElementById('alleSpeichernBtnLokal'),
+    alleSpeichernStatusLokal: document.getElementById('alleSpeichernStatusLokal'),
+
+    datumInput: document.getElementById('datumInput'),
+    besondersHinweis: document.getElementById('besondersHinweis'),
+    quelleBadge: document.getElementById('quelleBadge'),
+    btnOffen: document.getElementById('btnOffen'),
+    btnZu: document.getElementById('btnZu'),
+    grundInput: document.getElementById('grundInput'),
+    stufenWahl: document.getElementById('stufenWahl'),
+    speichernBtn: document.getElementById('speichernBtn'),
+    speicherStatus: document.getElementById('speicherStatus'),
+    tageStreifenGlobal: document.getElementById('tageStreifenGlobal'),
+    tagDavorBtnGlobal: document.getElementById('tagDavorBtnGlobal'),
+    alleSpeichernBtnGlobal: document.getElementById('alleSpeichernBtnGlobal'),
+    alleSpeichernStatusGlobal: document.getElementById('alleSpeichernStatusGlobal'),
+    kommendeListe: document.getElementById('kommendeListe'),
+    geplantListe: document.getElementById('geplantListe'),
+
+    hamsterConfigBereich: document.getElementById('hamsterConfigBereich'),
+    configSpeichernBtn: document.getElementById('configSpeichernBtn'),
+    configStatus: document.getElementById('configStatus'),
+
+    hilfeBtn: document.getElementById('hilfeBtn'),
+    hilfeSheet: document.getElementById('hilfeSheet'),
+    hilfeSchliessen: document.getElementById('hilfeSchliessen'),
+
+    tabBtnLokal: document.getElementById('tabBtnLokal'),
+    tabBtnKontext: document.getElementById('tabBtnKontext'),
+    tabBtnHamster: document.getElementById('tabBtnHamster'),
+    tabLokal: document.getElementById('tabLokal'),
+    tabKontext: document.getElementById('tabKontext'),
+    tabHamster: document.getElementById('tabHamster')
+  };
+
+  const zustand = { offen: true, hamsterStufe: 0, offenLokal: true, hamsterStufeLokal: 0, hamsterConfig: null };
+
+  /* -----------------------------------------------------------
+   * Tabs
+   * --------------------------------------------------------- */
+  el.tabBtnLokal.addEventListener('click', function () { wechsleTab('lokal'); });
+  el.tabBtnKontext.addEventListener('click', function () { wechsleTab('kontext'); });
+  el.tabBtnHamster.addEventListener('click', function () { wechsleTab('hamster'); });
+  function wechsleTab(name) {
+    el.tabBtnLokal.classList.toggle('aktiv', name === 'lokal');
+    el.tabBtnKontext.classList.toggle('aktiv', name === 'kontext');
+    el.tabBtnHamster.classList.toggle('aktiv', name === 'hamster');
+    el.tabLokal.classList.toggle('aktiv', name === 'lokal');
+    el.tabKontext.classList.toggle('aktiv', name === 'kontext');
+    el.tabHamster.classList.toggle('aktiv', name === 'hamster');
+  }
+
+  /* -----------------------------------------------------------
+   * Hilfe
+   * --------------------------------------------------------- */
+  el.hilfeBtn.addEventListener('click', function () { el.hilfeSheet.hidden = false; });
+  el.hilfeSchliessen.addEventListener('click', function () { el.hilfeSheet.hidden = true; });
+
+  function heutigesDatumISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* -----------------------------------------------------------
+   * Tage-Streifen — mehrere Tage rund um das gewählte Datum, siehe
+   * SESSION-Doku vom 31.08.2026 (Ulfs Beobachtung: Hamsterkäufe
+   * betreffen auch die Tage VOR einem Feiertag, nicht nur den Tag
+   * selbst). Bewusst KEIN neuer Speicher-Mechanismus — ein Chip ist
+   * nichts weiter als ein Schnellzugriff auf das bestehende Datumsfeld,
+   * jeder Tag wird weiterhin einzeln über setzeLokal()/setzeFirestore()
+   * gespeichert, genau wie vorher.
+   *
+   * FEIERTAGS_UMKREIS_TAGE spiegelt bewusst denselben Wert (3) wie die
+   * gleichnamige Konstante in verbrauch_manuell.html (dortiger
+   * Feiertagsnähe-Hinweis) — hier lokal dupliziert statt importiert,
+   * da beide Seiten unabhängig voneinander deploybar bleiben sollen.
+   * Bei einer künftigen Konsolidierung wäre bos_zeitkontext_referenz.js
+   * der richtige gemeinsame Ort für diese Zahl (nicht in dieser Session
+   * umgesetzt, um nicht ungefragt eine zweite Datei anzufassen).
+   * --------------------------------------------------------- */
+  const FEIERTAGS_UMKREIS_TAGE = 3;
+
+  function addTage(datumStr, delta) {
+    const teile = datumStr.split('-').map(Number);
+    const d = new Date(teile[0], teile[1] - 1, teile[2]);
+    d.setDate(d.getDate() + delta);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  const WOCHENTAGE_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  function wochentagKurz(datumStr) {
+    return WOCHENTAGE_KURZ[new Date(datumStr + 'T00:00:00').getDay()];
+  }
+
+  /* Sucht ab datumStr bis zu FEIERTAGS_UMKREIS_TAGE Tage vorwärts nach
+   * einem Feiertag/Ferientag. Findet sie einen, endet der Streifen dort
+   * (Feiertag − Umkreis … Feiertag). Findet sie keinen, endet der
+   * Streifen einfach beim gewählten Datum selbst — die Reihe ist so
+   * immer nutzbar, nicht nur in Feiertagsnähe (Ulf, 31.08.2026). */
+  function ermittleStreifenTage(datumStr) {
+    let zielTag = null;
+    if (window.BOS_IST_BESONDERER_TAG) {
+      for (let i = 0; i <= FEIERTAGS_UMKREIS_TAGE; i++) {
+        const kandidat = addTage(datumStr, i);
+        if (window.BOS_IST_BESONDERER_TAG(kandidat)) { zielTag = kandidat; break; }
+      }
+    }
+    const ankerTag = zielTag || datumStr;
+    const tage = [];
+    for (let i = FEIERTAGS_UMKREIS_TAGE; i >= 0; i--) tage.push(addTage(ankerTag, -i));
+    return tage;
+  }
+
+  /* -----------------------------------------------------------
+   * Hamster-Stufen-Auswahl (0-3), Beschriftung aus der echten Config
+   * — einmal pro Tab, da beide Tabs unabhängig ihr eigenes Datum haben.
+   * --------------------------------------------------------- */
+  function baueStufenWahl(container, zustandsFeld) {
+    container.innerHTML = '';
+    const cfg = zustand.hamsterConfig;
+    const stufen = [{ wert: 0, label: 'Kein Hamster', emoji: '—' }];
+    for (let i = 1; i <= 3; i++) {
+      const s = cfg && cfg.stufen && cfg.stufen['hamster_' + i];
+      stufen.push({ wert: i, label: s ? s.bezeichnung : 'Stufe ' + i, emoji: s ? s.emoji : '🐹' });
+    }
+    stufen.forEach(function (s) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'stufe-btn';
+      btn.textContent = s.emoji + ' ' + s.label;
+      btn.dataset.wert = s.wert;
+      btn.addEventListener('click', function () {
+        zustand[zustandsFeld] = s.wert;
+        aktualisiereStufenWahl(container, zustandsFeld);
+      });
+      container.appendChild(btn);
+    });
+    aktualisiereStufenWahl(container, zustandsFeld);
+  }
+  function aktualisiereStufenWahl(container, zustandsFeld) {
+    container.querySelectorAll('.stufe-btn').forEach(function (btn) {
+      btn.classList.toggle('aktiv', Number(btn.dataset.wert) === zustand[zustandsFeld]);
+    });
+  }
+
+  el.btnOffen.addEventListener('click', function () { zustand.offen = true; aktualisiereOffenToggle(el.btnOffen, el.btnZu, true); });
+  el.btnZu.addEventListener('click', function () { zustand.offen = false; aktualisiereOffenToggle(el.btnOffen, el.btnZu, false); });
+  el.btnOffenLokal.addEventListener('click', function () { zustand.offenLokal = true; aktualisiereOffenToggle(el.btnOffenLokal, el.btnZuLokal, true); });
+  el.btnZuLokal.addEventListener('click', function () { zustand.offenLokal = false; aktualisiereOffenToggle(el.btnOffenLokal, el.btnZuLokal, false); });
+  function aktualisiereOffenToggle(btnOffen, btnZu, offen) {
+    btnOffen.classList.toggle('aktiv-offen', offen === true);
+    btnZu.classList.toggle('aktiv-zu', offen === false);
+  }
+
+  function zeigeBesondersHinweis(element, datumStr) {
+    const info = window.BOS_IST_BESONDERER_TAG ? window.BOS_IST_BESONDERER_TAG(datumStr) : null;
+    if (info) {
+      element.textContent = 'ℹ️ ' + (info.typ === 'feiertag' ? 'Feiertag' : 'Ferien') + ': ' + info.name;
+      element.hidden = false;
+    } else {
+      element.hidden = true;
+    }
+  }
+
+  /* -----------------------------------------------------------
+   * Status für ein Datum laden (Firestore > lokal > Datei) — von
+   * beiden Tabs genutzt, rein lesend, braucht deshalb keinen PIN.
+   * --------------------------------------------------------- */
+  async function ladeStatusFuerDatum(datumStr, ziel) {
+    ziel.aktuellesDatum = datumStr;
+    zeigeBesondersHinweis(ziel.hinweis, datumStr);
+    aktualisiereStreifenFuerDatum(datumStr, ziel);
+
+    const entwurf = ziel.entwuerfe[datumStr];
+    if (entwurf) {
+      zustand[ziel.offenFeld] = entwurf.offen;
+      zustand[ziel.stufeFeld] = entwurf.hamsterStufe;
+      ziel.grund.value = entwurf.grund || '';
+      aktualisiereOffenToggle(ziel.btnOffen, ziel.btnZu, entwurf.offen);
+      aktualisiereStufenWahl(ziel.stufenWahl, ziel.stufeFeld);
+      ziel.badge.textContent = 'Ungespeicherter Entwurf';
+      ziel.badge.className = 'quelle-badge quelle-entwurf';
+      ziel.geladenerStand = { datum: datumStr, offen: entwurf.offen, grund: entwurf.grund || '', hamsterStufe: entwurf.hamsterStufe };
+      return;
+    }
+
+    ziel.badge.textContent = '…';
+    try {
+      await window.BOS_AUTH_READY;
+      const status = await window.BOS_ZEITKONTEXT.status(window.db, datumStr);
+      zustand[ziel.offenFeld] = status.offen;
+      zustand[ziel.stufeFeld] = status.hamsterStufe;
+      ziel.grund.value = status.grund || '';
+      aktualisiereOffenToggle(ziel.btnOffen, ziel.btnZu, status.offen);
+      aktualisiereStufenWahl(ziel.stufenWahl, ziel.stufeFeld);
+      const beschriftung = { firestore: 'Global gesetzt', lokal: 'Lokal (dieses Gerät)', datei: 'System-Standard' }[status.quelle] || status.quelle;
+      ziel.badge.textContent = beschriftung;
+      ziel.badge.className = 'quelle-badge quelle-' + status.quelle;
+      ziel.geladenerStand = { datum: datumStr, offen: status.offen, grund: status.grund || '', hamsterStufe: status.hamsterStufe };
+    } catch (fehler) {
+      console.warn('Zeitkontext-Status konnte nicht geladen werden:', fehler);
+      ziel.badge.textContent = '⚠ Fehler';
+    }
+  }
+
+  const zielGlobal = { hinweis: el.besondersHinweis, badge: el.quelleBadge, grund: el.grundInput,
+    btnOffen: el.btnOffen, btnZu: el.btnZu, stufenWahl: el.stufenWahl, offenFeld: 'offen', stufeFeld: 'hamsterStufe',
+    datumInput: el.datumInput, streifenContainer: el.tageStreifenGlobal, tagDavorBtn: el.tagDavorBtnGlobal, streifenTage: [],
+    alleSpeichernBtn: el.alleSpeichernBtnGlobal, alleSpeichernStatus: el.alleSpeichernStatusGlobal,
+    entwuerfe: {}, aktuellesDatum: null, geladenerStand: null };
+  const zielLokal = { hinweis: el.besondersHinweisLokal, badge: el.quelleBadgeLokal, grund: el.grundInputLokal,
+    btnOffen: el.btnOffenLokal, btnZu: el.btnZuLokal, stufenWahl: el.stufenWahlLokal, offenFeld: 'offenLokal', stufeFeld: 'hamsterStufeLokal',
+    datumInput: el.datumInputLokal, streifenContainer: el.tageStreifenLokal, tagDavorBtn: el.tagDavorBtnLokal, streifenTage: [],
+    alleSpeichernBtn: el.alleSpeichernBtnLokal, alleSpeichernStatus: el.alleSpeichernStatusLokal,
+    entwuerfe: {}, aktuellesDatum: null, geladenerStand: null };
+
+  /* -----------------------------------------------------------
+   * Entwürfe — behebt den Bug vom 31.08.2026 (Ulf): bisher gingen
+   * Eingaben für einen Tag verloren, sobald man zu einem anderen Tag
+   * wechselte (Chip, Datumsfeld oder eine der beiden Listen weiter
+   * unten). Jetzt wird beim Wegnavigieren erst geprüft, ob sich etwas
+   * gegenüber dem zuletzt geladenen Stand geändert hat — wenn ja, als
+   * Entwurf im Speicher gemerkt, bis er entweder gespeichert oder auf
+   * den geladenen Stand zurückgesetzt wird. Kein neuer Firestore-Pfad,
+   * nur eine Zwischenablage im Browser-Speicher (siehe §7 Änderungs-
+   * protokoll in der Doku für den vollen Hintergrund).
+   * --------------------------------------------------------- */
+  function erfasseEntwurfFallsGeaendert(ziel) {
+    const datumStr = ziel.aktuellesDatum;
+    if (!datumStr) return;
+    const aktuell = {
+      offen: zustand[ziel.offenFeld],
+      grund: ziel.grund.value.trim(),
+      hamsterStufe: zustand[ziel.stufeFeld]
+    };
+    const basis = ziel.geladenerStand;
+    const unveraendert = basis && basis.datum === datumStr &&
+      basis.offen === aktuell.offen && basis.grund === aktuell.grund && basis.hamsterStufe === aktuell.hamsterStufe;
+    if (unveraendert) {
+      delete ziel.entwuerfe[datumStr];
+    } else {
+      ziel.entwuerfe[datumStr] = aktuell;
+    }
+  }
+
+  function wechsleDatum(neuesDatum, ziel) {
+    erfasseEntwurfFallsGeaendert(ziel);
+    ziel.datumInput.value = neuesDatum;
+    ladeStatusFuerDatum(neuesDatum, ziel);
+  }
+
+  el.datumInput.addEventListener('change', function () {
+    if (el.datumInput.value) wechsleDatum(el.datumInput.value, zielGlobal);
+  });
+  el.datumInputLokal.addEventListener('change', function () {
+    if (el.datumInputLokal.value) wechsleDatum(el.datumInputLokal.value, zielLokal);
+  });
+
+  /* -----------------------------------------------------------
+   * Streifen aufbauen/neu zeichnen. Ein Chip-Klick setzt lediglich
+   * das Datumsfeld und stößt denselben ladeStatusFuerDatum()-Weg an,
+   * den auch die manuelle Datumseingabe nutzt — kein zweiter Pfad.
+   * --------------------------------------------------------- */
+  function aktualisiereStreifenFuerDatum(datumStr, ziel) {
+    if (!ziel.streifenTage.includes(datumStr)) {
+      ziel.streifenTage = ermittleStreifenTage(datumStr);
+    }
+    renderStreifen(ziel);
+  }
+
+  async function renderStreifen(ziel) {
+    const aktivesDatum = ziel.datumInput.value;
+    const tage = ziel.streifenTage;
+    ziel.streifenContainer.innerHTML = '';
+    tage.forEach(function (datumStr) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'tag-chip';
+      chip.dataset.datum = datumStr;
+      chip.innerHTML = '<span class="tag-chip-datum">' + wochentagKurz(datumStr) + ' ' + datumStr.slice(8, 10) + '.' + datumStr.slice(5, 7) + '.</span>' +
+        '<span class="tag-chip-punkt">…</span>';
+      chip.addEventListener('click', function () { wechsleDatum(datumStr, ziel); });
+      ziel.streifenContainer.appendChild(chip);
+    });
+
+    // Status je Chip nachladen (parallel) und Punkt/Feiertags-/Entwurf-Markierung
+    // ergänzen, ohne die Chips beim Warten schon wieder zu verwerfen. Ein
+    // ungespeicherter Entwurf hat Vorrang vor dem geladenen Firestore-Status,
+    // da er den zuletzt eingegebenen (aber noch nicht gesicherten) Stand zeigt.
+    try {
+      await window.BOS_AUTH_READY;
+      const stati = await Promise.all(tage.map(function (datumStr) {
+        return window.BOS_ZEITKONTEXT.status(window.db, datumStr).catch(function () { return null; });
+      }));
+      tage.forEach(function (datumStr, idx) {
+        const chip = ziel.streifenContainer.querySelector('.tag-chip[data-datum="' + datumStr + '"]');
+        if (!chip) return;
+        const entwurf = ziel.entwuerfe[datumStr];
+        const quelle = entwurf || stati[idx];
+        let punkt = '⚪';
+        if (quelle) punkt = quelle.offen === false ? '🔴' : (quelle.hamsterStufe > 0 ? baueHamsterEmoji(quelle.hamsterStufe) : '🟢');
+        chip.querySelector('.tag-chip-punkt').textContent = punkt;
+        const info = window.BOS_IST_BESONDERER_TAG ? window.BOS_IST_BESONDERER_TAG(datumStr) : null;
+        if (info) {
+          chip.classList.add('feiertag');
+          const label = document.createElement('span');
+          label.className = 'tag-chip-feiertag-label';
+          label.textContent = info.name;
+          chip.appendChild(label);
+        }
+        if (entwurf) {
+          chip.classList.add('entwurf');
+          const marke = document.createElement('span');
+          marke.className = 'tag-chip-entwurf-marke';
+          marke.textContent = '●';
+          chip.appendChild(marke);
+        }
+      });
+    } catch (fehler) {
+      console.warn('Status für Tage-Streifen konnte nicht geladen werden:', fehler);
+    }
+
+    // Aktiv-Markierung getrennt vom Status-Nachladen, damit sie sofort stimmt
+    ziel.streifenContainer.querySelectorAll('.tag-chip').forEach(function (chip) {
+      chip.classList.toggle('aktiv', chip.dataset.datum === aktivesDatum);
+    });
+
+    aktualisiereAlleSpeichernButton(ziel);
+  }
+
+  function aktualisiereAlleSpeichernButton(ziel) {
+    const anzahl = Object.keys(ziel.entwuerfe).length;
+    ziel.alleSpeichernBtn.hidden = anzahl === 0;
+    ziel.alleSpeichernBtn.textContent = anzahl === 1
+      ? '✓ 1 ungespeicherten Tag speichern'
+      : '✓ ' + anzahl + ' ungespeicherte Tage speichern';
+  }
+
+  function tagDavorHinzufuegen(ziel) {
+    const erster = ziel.streifenTage[0] || ziel.datumInput.value;
+    ziel.streifenTage = [addTage(erster, -1)].concat(ziel.streifenTage);
+    renderStreifen(ziel);
+  }
+  el.tagDavorBtnGlobal.addEventListener('click', function () { tagDavorHinzufuegen(zielGlobal); });
+  el.tagDavorBtnLokal.addEventListener('click', function () { tagDavorHinzufuegen(zielLokal); });
+
+  /* -----------------------------------------------------------
+   * Lokal speichern — kein PIN, kein Firestore, sofort verfügbar
+   * --------------------------------------------------------- */
+  el.speichernBtnLokal.addEventListener('click', function () {
+    const datumStr = el.datumInputLokal.value;
+    if (!datumStr) return;
+    const erfolg = window.BOS_ZEITKONTEXT.setzeLokal(datumStr, {
+      offen: zustand.offenLokal,
+      grund: el.grundInputLokal.value.trim(),
+      hamsterStufe: zustand.hamsterStufeLokal
+    });
+    el.speicherStatusLokal.textContent = erfolg
+      ? '✓ Lokal gespeichert für ' + datumStr + ' (nur dieses Gerät)'
+      : '⚠ Kein aktives Profil gefunden — Speichern nicht möglich';
+    if (erfolg) { delete zielLokal.entwuerfe[datumStr]; ladeStatusFuerDatum(datumStr, zielLokal); }
+  });
+
+  /* -----------------------------------------------------------
+   * Global speichern — Ebene 1, gewinnt über lokal/Datei.
+   *
+   * PIN ENTFERNT am 21.09.2026 (B-40, Etappe 3.4). Er stand im Klartext
+   * im Code (window.BOS_PIN || '1545') und prüfte nur im Browser. Seit
+   * 3.4 setzt der Server durch, wer global schreiben darf — nur die
+   * Planung —, und ein abgelehnter Versuch zeigt den Grund an
+   * ("Keine Berechtigung — global speichern darf nur die Planung").
+   * Eine zweite Abfrage davor hielt niemanden auf, der den PIN kannte,
+   * und schützte nichts, was der Server nicht ohnehin schützt.
+   *
+   * benoetigePin() bleibt als Name stehen, weil ZWEI Aufrufer daran
+   * hängen (Einzeltag hier, Sammel-Speichern weiter unten); sie führt
+   * die Aktion jetzt einfach aus. Beim nächsten Aufräumen umbenennen.
+   * --------------------------------------------------------- */
+  function benoetigePin(aktion) {
+    aktion();
+  }
+
+  el.speichernBtn.addEventListener('click', function () { benoetigePin(fuehreGlobalesSpeichernAus); });
+
+  async function fuehreGlobalesSpeichernAus() {
+    const datumStr = el.datumInput.value;
+    if (!datumStr) return;
+    el.speichernBtn.disabled = true;
+    el.speicherStatus.textContent = 'Speichere …';
+    try {
+      await window.BOS_AUTH_READY;
+      const launcherState = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+      const activeId = launcherState && launcherState.activeProfileId;
+      const profil = (window.BOS_PROFILES || []).find(function (p) { return p.id === activeId; });
+      const gesetztVon = profil ? profil.name : (activeId || null);
+
+      const erfolg = await window.BOS_ZEITKONTEXT.setzeFirestore(window.db, datumStr, {
+        offen: zustand.offen,
+        grund: el.grundInput.value.trim(),
+        hamsterStufe: zustand.hamsterStufe
+      }, gesetztVon);
+
+      /* Grund des Fehlschlags sichtbar machen (B-40, 21.09.2026). Ohne
+         ihn stand nach Etappe 3.4 nur "fehlgeschlagen" da, und ein
+         Kollege hielt die Seite für kaputt statt für verriegelt. */
+      var grund = erfolg ? '' : (window.BOS_ZEITKONTEXT.grundDesLetztenFehlers
+                                   ? window.BOS_ZEITKONTEXT.grundDesLetztenFehlers() : '');
+      el.speicherStatus.textContent = erfolg
+        ? '✓ Global gespeichert für ' + datumStr
+        : '⚠ Speichern fehlgeschlagen' + (grund ? ': ' + grund : '');
+      if (erfolg) { delete zielGlobal.entwuerfe[datumStr]; ladeGeplanteTage(); ladeStatusFuerDatum(datumStr, zielGlobal); }
+    } catch (fehler) {
+      console.error('Speichern fehlgeschlagen:', fehler);
+      el.speicherStatus.textContent = '⚠ Speichern fehlgeschlagen: ' +
+        ((fehler && fehler.message) || String(fehler));
+    }
+    el.speichernBtn.disabled = false;
+  }
+
+  /* -----------------------------------------------------------
+   * Sammel-Speichern — „Gesamtprozess" statt Einzelschritt (Ulf,
+   * 31.08.2026): speichert alle Tage mit einem offenen Entwurf im
+   * aktuellen Streifen auf einmal, in derselben Reihenfolge wie sie
+   * im Streifen stehen. Nutzt für jeden Tag exakt denselben
+   * Speicher-Mechanismus (setzeLokal()/setzeFirestore()) wie der
+   * Einzeltag-Button — kein neuer Schreibpfad, nur eine Schleife
+   * darüber.
+   * --------------------------------------------------------- */
+  async function alleEntwuerfeSpeichern(ziel, istGlobal) {
+    const daten = Object.keys(ziel.entwuerfe);
+    if (daten.length === 0) return;
+    ziel.alleSpeichernBtn.disabled = true;
+    ziel.alleSpeichernStatus.textContent = 'Speichere ' + daten.length + (daten.length === 1 ? ' Tag …' : ' Tage …');
+
+    let gesetztVon = null;
+    if (istGlobal) {
+      await window.BOS_AUTH_READY;
+      const launcherState = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+      const activeId = launcherState && launcherState.activeProfileId;
+      const profil = (window.BOS_PROFILES || []).find(function (p) { return p.id === activeId; });
+      gesetztVon = profil ? profil.name : (activeId || null);
+    }
+
+    let erfolgreich = 0;
+
+    let letzterGrund = '';
+    for (let i = 0; i < daten.length; i++) {
+      const datumStr = daten[i];
+      const werte = ziel.entwuerfe[datumStr];
+      let erfolg;
+      try {
+        erfolg = istGlobal
+          ? await window.BOS_ZEITKONTEXT.setzeFirestore(window.db, datumStr, werte, gesetztVon)
+          : window.BOS_ZEITKONTEXT.setzeLokal(datumStr, werte);
+      } catch (fehler) {
+        console.error('Speichern fehlgeschlagen für ' + datumStr + ':', fehler);
+        erfolg = false;
+      }
+      if (erfolg) { erfolgreich++; delete ziel.entwuerfe[datumStr]; }
+      else if (istGlobal && !letzterGrund && window.BOS_ZEITKONTEXT.grundDesLetztenFehlers) {
+        letzterGrund = window.BOS_ZEITKONTEXT.grundDesLetztenFehlers();
+      }
+    }
+
+    ziel.alleSpeichernStatus.textContent = erfolgreich === daten.length
+      ? '✓ ' + erfolgreich + (erfolgreich === 1 ? ' Tag' : ' Tage') + ' gespeichert'
+      : '⚠ ' + erfolgreich + ' von ' + daten.length + ' Tagen gespeichert' +
+        (letzterGrund ? ' — ' + letzterGrund : '');
+    ziel.alleSpeichernBtn.disabled = false;
+    if (istGlobal) ladeGeplanteTage();
+    ladeStatusFuerDatum(ziel.datumInput.value, ziel);
+  }
+
+  el.alleSpeichernBtnLokal.addEventListener('click', function () { alleEntwuerfeSpeichern(zielLokal, false); });
+  el.alleSpeichernBtnGlobal.addEventListener('click', function () { benoetigePin(function () { alleEntwuerfeSpeichern(zielGlobal, true); }); });
+
+  /* -----------------------------------------------------------
+   * Kommende Feiertage/Ferien — reine Info, kein Firestore nötig
+   * --------------------------------------------------------- */
+  function ladeKommendeBesondereTage() {
+    if (!window.BOS_BESONDERE_TAGE_IN) { el.kommendeListe.textContent = 'Referenzdatei nicht verfügbar.'; return; }
+    const tage = window.BOS_BESONDERE_TAGE_IN(14);
+    if (tage.length === 0) { el.kommendeListe.textContent = 'Keine Feiertage/Ferien in den nächsten 14 Tagen.'; return; }
+    el.kommendeListe.innerHTML = '';
+    tage.forEach(function (tag) {
+      const zeile = document.createElement('div');
+      zeile.className = 'liste-eintrag';
+      zeile.innerHTML = '<span class="liste-datum">' + tag.datum + '</span><span class="liste-info">' + tag.name + '</span>';
+      const btn = document.createElement('button');
+      btn.className = 'liste-bearbeiten';
+      btn.type = 'button';
+      btn.textContent = 'Wählen';
+      btn.addEventListener('click', function () {
+        wechsleDatum(tag.datum, zielGlobal);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      zeile.appendChild(btn);
+      el.kommendeListe.appendChild(zeile);
+    });
+  }
+
+  /* -----------------------------------------------------------
+   * Bereits global geplante Tage (Firestore, ab heute, max. 30)
+   * --------------------------------------------------------- */
+  async function ladeGeplanteTage() {
+    el.geplantListe.textContent = 'Lade …';
+    try {
+      await window.BOS_AUTH_READY;
+      const heute = heutigesDatumISO();
+      const snap = await window.db.collection('bos_zeitkontext')
+        .where(firebase.firestore.FieldPath.documentId(), '>=', heute)
+        .orderBy(firebase.firestore.FieldPath.documentId())
+        .limit(30)
+        .get();
+      if (snap.empty) { el.geplantListe.textContent = 'Noch keine künftigen Tage global gesetzt.'; return; }
+      el.geplantListe.innerHTML = '';
+      snap.forEach(function (doc) {
+        const data = doc.data();
+        const emoji = data.hamsterStufe > 0 ? baueHamsterEmoji(data.hamsterStufe) : '';
+        const zeile = document.createElement('div');
+        zeile.className = 'liste-eintrag';
+        zeile.innerHTML = '<span class="liste-datum">' + doc.id + '</span>' +
+          '<span class="liste-info">' + (data.offen === false ? 'Geschlossen' : 'Geöffnet') +
+          (emoji ? ' · ' + emoji : '') + (data.grund ? ' · ' + data.grund : '') + '</span>';
+        const btn = document.createElement('button');
+        btn.className = 'liste-bearbeiten';
+        btn.type = 'button';
+        btn.textContent = 'Bearbeiten';
+        btn.addEventListener('click', function () {
+          wechsleDatum(doc.id, zielGlobal);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        zeile.appendChild(btn);
+        el.geplantListe.appendChild(zeile);
+      });
+    } catch (fehler) {
+      console.warn('Geplante Tage konnten nicht geladen werden (evtl. fehlender Firestore-Index beim allerersten Aufruf — Link erscheint dann in der Konsole):', fehler);
+      el.geplantListe.textContent = 'Konnte nicht geladen werden.';
+    }
+  }
+
+  function baueHamsterEmoji(stufe) {
+    const cfg = zustand.hamsterConfig;
+    const s = cfg && cfg.stufen && cfg.stufen['hamster_' + stufe];
+    return s ? s.emoji : '🐹';
+  }
+
+  /* -----------------------------------------------------------
+   * Tab 3: Hamster-Konfiguration (Datei-Export wie produkt_config_
+   * editor.html — ein Schreiber, kein Firestore-Schreibpfad, daher
+   * kein PIN nötig, analog zu jenem Tool)
+   * --------------------------------------------------------- */
+  const MODI = [
+    { wert: 'mittelwert_samstag', label: 'Mittelwert aus normalem und Samstags-Bedarf' },
+    { wert: 'samstag', label: 'Genau Samstags-Bedarf' },
+    { wert: 'faktor_samstag', label: 'Samstags-Bedarf × Faktor' },
+    { wert: 'faktor', label: 'Normaler Bedarf × Faktor (wochentagabhängig)' }
+  ];
+
+  function renderHamsterConfig() {
+    const cfg = zustand.hamsterConfig;
+    el.hamsterConfigBereich.innerHTML = '';
+    [1, 2, 3].forEach(function (i) {
+      const key = 'hamster_' + i;
+      const s = cfg.stufen[key] = cfg.stufen[key] || { bezeichnung: '', emoji: '🐹', modus: 'samstag' };
+
+      const karte = document.createElement('div');
+      karte.className = 'stufe-karte';
+      const titel = document.createElement('h3');
+      titel.textContent = 'Stufe ' + i;
+      karte.appendChild(titel);
+
+      const zeile1 = document.createElement('div');
+      zeile1.className = 'feld-zeile';
+      zeile1.appendChild(feldMitLabel('Bezeichnung', 'text', s.bezeichnung, function (v) { s.bezeichnung = v; }));
+      zeile1.appendChild(feldMitLabel('Emoji', 'text', s.emoji, function (v) { s.emoji = v; }));
+      karte.appendChild(zeile1);
+
+      const modusZeile = document.createElement('div');
+      modusZeile.className = 'feld-zeile voll';
+      const modusWrap = document.createElement('div');
+      const modusLabel = document.createElement('label');
+      modusLabel.textContent = 'Rechenmodus';
+      const modusSelect = document.createElement('select');
+      MODI.forEach(function (m) {
+        const opt = document.createElement('option');
+        opt.value = m.wert; opt.textContent = m.label;
+        if (m.wert === s.modus) opt.selected = true;
+        modusSelect.appendChild(opt);
+      });
+      modusSelect.addEventListener('change', function () { s.modus = modusSelect.value; renderHamsterConfig(); });
+      modusWrap.appendChild(modusLabel);
+      modusWrap.appendChild(modusSelect);
+      modusZeile.appendChild(modusWrap);
+      karte.appendChild(modusZeile);
+
+      if (s.modus === 'faktor_samstag' || s.modus === 'faktor') {
+        const faktorZeile = document.createElement('div');
+        faktorZeile.className = 'feld-zeile';
+        if (s.modus === 'faktor_samstag') {
+          faktorZeile.appendChild(feldMitLabel('Faktor', 'number', s.faktor !== undefined ? s.faktor : 1.5, function (v) { s.faktor = Number(v); }));
+        } else {
+          faktorZeile.appendChild(feldMitLabel('Faktor normal', 'number', s.faktor_normal !== undefined ? s.faktor_normal : 2.0, function (v) { s.faktor_normal = Number(v); }));
+          faktorZeile.appendChild(feldMitLabel('Faktor Samstag', 'number', s.faktor_samstag !== undefined ? s.faktor_samstag : 1.5, function (v) { s.faktor_samstag = Number(v); }));
+        }
+        karte.appendChild(faktorZeile);
+      }
+
+      el.hamsterConfigBereich.appendChild(karte);
+    });
+  }
+
+  function feldMitLabel(labelText, typ, wert, onChange) {
+    const wrap = document.createElement('div');
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    const input = document.createElement('input');
+    input.type = typ;
+    if (typ === 'number') input.step = '0.1';
+    input.value = wert;
+    input.addEventListener('input', function () { onChange(input.value); });
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  el.configSpeichernBtn.addEventListener('click', function () {
+    if (!zustand.hamsterConfig) return;
+    const blob = new Blob([JSON.stringify(zustand.hamsterConfig, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'bos_hamster_config.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    el.configStatus.textContent = '✓ Heruntergeladen — bitte manuell im Repo ersetzen.';
+  });
+
+  /* -----------------------------------------------------------
+   * Init — läuft komplett sofort, kein Warten auf PIN mehr. Nur die
+   * Firestore-Teile hängen an BOS_AUTH_READY, alles andere ist ab
+   * dem ersten Frame nutzbar.
+   * --------------------------------------------------------- */
+  async function init() {
+    const heute = heutigesDatumISO();
+    el.datumInput.value = heute;
+    el.datumInputLokal.value = heute;
+    aktualisiereOffenToggle(el.btnOffen, el.btnZu, true);
+    aktualisiereOffenToggle(el.btnOffenLokal, el.btnZuLokal, true);
+
+    try {
+      const res = await fetch('../bos_hamster_config.json', { cache: 'no-store' });
+      zustand.hamsterConfig = await res.json();
+    } catch (fehler) {
+      console.warn('Hamster-Config konnte nicht geladen werden, Stufen-Auswahl nutzt Fallback-Labels.', fehler);
+      zustand.hamsterConfig = { stufen: {} };
+    }
+    baueStufenWahl(el.stufenWahl, 'hamsterStufe');
+    baueStufenWahl(el.stufenWahlLokal, 'hamsterStufeLokal');
+    renderHamsterConfig();
+    ladeKommendeBesondereTage();
+
+    ladeStatusFuerDatum(heute, zielGlobal);
+    ladeStatusFuerDatum(heute, zielLokal);
+    ladeGeplanteTage();
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>

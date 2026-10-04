@@ -1,0 +1,384 @@
+<!--
+  backstore.html — BäckereiOS V2
+  ------------------------------------------------------------
+  2026-09-02 · v0.1 · Feature
+    Erstversion. App-Katalog zum Installieren/Deinstallieren von
+    Launcher-Kacheln. Konzept + Entscheidungen: siehe
+    SESSION_2026-09-02_BACKSTORE_KONZEPT.md und BACKSTORE_DOKU.md.
+
+    Kernidee: launcher.html füllt den Desktop nicht mehr automatisch
+    mit allem, was die Rolle technisch erlaubt (renderGrid(), siehe
+    dortige Änderung vom selben Datum). Stattdessen entscheidet jedes
+    Profil selbst, was auf seinem Desktop erscheint — hier.
+
+    Technisch bewusst simpel gehalten, kein neuer Host-Mechanismus:
+    - Dieser Satellit läuft als normales IFRAME-Fenster im Launcher,
+      genau wie jeder andere. Er schreibt Install/Deinstall direkt in
+      denselben localStorage-Schlüssel (bos_launcher_state_v2), den
+      launcher.html selbst nutzt — Same-Origin-IFRAME, dieselbe
+      Storage-Partition, kein postMessage/API nötig.
+    - launcher.html bekommt bei fremden Schreibzugriffen auf diesen Key
+      automatisch ein "storage"-Event und rendert sich dadurch selbst
+      neu (siehe dortiger Kommentar bei window.addEventListener
+      ('storage', ...)) — dieser Satellit muss dem Launcher also nichts
+      aktiv mitteilen.
+    - Positionierung (col/row) übernimmt weiterhin ausschließlich
+      launcher.html/renderGrid() beim nächsten Render — dieser Satellit
+      kennt die reale Grid-Breite gar nicht und rechnet deshalb bewusst
+      KEINE Zell-Koordinaten selbst aus. Installieren heißt hier nur:
+      App-ID in profileData[...].installed eintragen.
+    - Beim Deinstallieren wird eine eventuell vorhandene alte Positions-
+      Reservierung mit gelöscht (delete data.positions[id]) — sonst
+      bliebe eine leere Zelle dauerhaft "reserviert". Reinstallieren
+      später bekommt dadurch einen frischen freien Platz statt des alten.
+
+    Rollenoffen nach Taschenrechner-Präzedenzfall: KEIN roles-Feld in
+    der Registry, kein Eintrag in bos_permissions.js → bos_access.js
+    fail-open, auch für Grundkonto vor Rollenzuteilung sichtbar
+    (Entscheidung Ulf, 02.09.2026). Rollen-gesperrte Apps werden hier
+    trotzdem gelistet, nur mit ausgegrautem Button + Rollen-Hinweis
+    statt versteckt — explizit zur Neugierde/Motivation (Ulf: "ein
+    langweiliges System, das nutzerunfreundlich ist, bringt nichts").
+
+    Bewusst NICHT gebaut (siehe SESSION_2026-09-02_BACKSTORE_KONZEPT.md
+    §5 offene Punkte, keine Abstraktion auf Vorrat):
+    - Beschreibungstext/Screenshot pro App (kein Registry-Feld dafür)
+    - "Zugriff anfragen"-Button bei gesperrten Apps — hängt am
+      Messaging-Konzept, das selbst noch nicht gebaut ist
+    - Eigene Sortier-Einstellung — Katalog folgt schlicht der
+      Definitions-Reihenfolge in bos_app_registry.js. Eine frühere
+      Überlegung, dafür das per-Profil-Feld "order" wiederzuverwenden,
+      wurde beim Bauen wieder verworfen: das hätte eine zweite,
+      abweichende Merge-Logik (inkl. customApps) hierher dupliziert,
+      für einen Katalog, der ohnehin für alle gleich aussehen sollte.
+    - Eigene Kacheln (profileData.customApps, über die "+"-Kachel
+      angelegt) erscheinen hier NICHT im Katalog — das sind persönliche
+      Ad-hoc-Verknüpfungen, kein verteilbarer Registry-Eintrag.
+    - Hub-Kind-Kacheln (z.B. freezer_inventur) erscheinen hier NICHT
+      einzeln — sie lassen sich schon in launcher.html nie einzeln auf
+      dem Hauptraster platzieren, nur die Hub-Kachel selbst (freezer)
+      ist installierbar und öffnet sie gebündelt.
+    - 'settings' (type:'system') wurde NICHT zusätzlich als pinned
+      markiert, obwohl es ähnlich "immer gebraucht" wirkt wie BackStore
+      selbst — das war nicht Teil dieser Runde, offen gelassen statt
+      still mitentschieden. Admin installiert es einmalig wie jede
+      andere Kachel.
+
+  WICHTIGER HINWEIS ZU VERBLEIBENDEN ANNAHMEN (§0 BOS_NEUER_SATELLIT_
+  CHECKLISTE.md): bos_design_tokens.css, bos_app_registry.js,
+  bos_permissions.js, bos_access.js sowie launcher.html (vollständig,
+  inkl. State-Schema profileData.positions/installed) wurden diese
+  Session im Original gesehen und geprüft. taschenrechner.html diente
+  als Stil-/Struktur-Vorlage. NICHT im Original gesehen, nur per
+  Pflicht-Block referenziert (unverändert eingebunden, Inhalt aber aus
+  launcher.html-Konsum-Stellen + LAUNCHER_DOKU.md erschlossen, nicht
+  selbst geprüft): bos_launcher_profiles.js (window.BOS_PROFILES-Form),
+  bos_theme_sync.js, bos_density_sync.js, bos_access_guard.js,
+  bos_launcher_roles.js (deshalb: Rollen-Hinweis zeigt die rohen
+  Rollen-Schlüssel aus der Registry, keine hübschen Anzeigenamen).
+  ------------------------------------------------------------
+-->
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>BackStore · BäckereiOS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bos-bg);
+    color: var(--bos-text);
+    font-family: var(--bos-font-body, 'Barlow', sans-serif);
+    min-height: 100vh;
+  }
+
+  /* ── Kopfleiste (identisches Muster zu taschenrechner.html) ── */
+  .bs-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); background: var(--bos-surface);
+    border-bottom: 1px solid var(--bos-border);
+  }
+  .bs-title {
+    font-family: var(--bos-font-display, 'Fraunces'); font-weight: 900;
+    font-size: var(--bos-font-xl, 1.3rem); letter-spacing: 0.3px;
+  }
+  .bs-title span { color: var(--bos-blue); font-style: italic; }
+  .bs-help-btn {
+    width: var(--bos-space-xl, 32px); height: var(--bos-space-xl, 32px);
+    border-radius: 50%; border: none;
+    background: var(--bos-blue); color: #fff; font-weight: 900;
+    cursor: pointer; box-shadow: var(--bos-shadow-sm); flex-shrink: 0;
+  }
+
+  .bs-intro {
+    max-width: 1000px; margin: var(--bos-space-md, 18px) auto 0; padding: 0 var(--bos-space-sm, 16px);
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--bos-space-sm, 14px);
+    flex-wrap: wrap;
+  }
+  .bs-intro p { margin: 0; color: var(--bos-text-dim); font-size: var(--bos-font-sm, 0.88rem); max-width: 60ch; }
+  .bs-count { color: var(--bos-text-faint); font-family: var(--bos-font-label); font-size: var(--bos-font-xs, 0.76rem); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+
+  .bs-noprofile {
+    max-width: 640px; margin: var(--bos-space-xl, 40px) auto; padding: var(--bos-space-lg, 22px);
+    text-align: center; color: var(--bos-text-dim); display: none;
+  }
+
+  /* ── Katalog-Grid ───────────────────────────────────────── */
+  .bs-grid {
+    max-width: 1000px; margin: var(--bos-space-md, 18px) auto var(--bos-space-xl, 40px); padding: 0 var(--bos-space-sm, 16px);
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--bos-space-sm, 14px);
+  }
+  .bs-card {
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md);
+    padding: var(--bos-space-sm, 14px); display: flex; flex-direction: column; gap: var(--bos-space-xs, 9px);
+    transition: border-color var(--bos-transition-fast);
+  }
+  .bs-card--locked { opacity: .62; }
+  .bs-card__icon {
+    width: 48px; height: 48px; border-radius: var(--bos-radius-md); display: flex; align-items: center;
+    justify-content: center; font-size: 1.5rem; flex-shrink: 0;
+  }
+  .bs-card__body { flex: 1; }
+  .bs-card__name {
+    font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-md, 0.95rem);
+    display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); flex-wrap: wrap;
+  }
+  .bs-card__badge {
+    font-family: var(--bos-font-label); font-size: var(--bos-font-2xs, 0.62rem); text-transform: uppercase;
+    letter-spacing: .04em; color: var(--bos-text-faint); border: 1px solid var(--bos-border-strong);
+    border-radius: 999px; padding: .1em .55em; font-weight: 700;
+  }
+  .bs-card__rolehint {
+    font-size: var(--bos-font-xs, 0.74rem); color: var(--bos-text-faint); margin-top: var(--bos-space-3xs, 3px);
+  }
+  .bs-card__btn {
+    font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+    font-size: var(--bos-font-sm, 0.82rem); border-radius: var(--bos-radius-sm); border: 1px solid var(--bos-border-strong);
+    padding: var(--bos-space-2xs, 0.6em) var(--bos-space-sm, 1.2em); cursor: pointer; min-height: var(--bos-tap-min, 44px);
+    transition: background var(--bos-transition-fast), border-color var(--bos-transition-fast), transform var(--bos-transition-fast);
+  }
+  .bs-card__btn:active { transform: scale(0.97); }
+  .bs-card__btn--install { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  .bs-card__btn--install:hover { background: var(--bos-amber-bright); }
+  .bs-card__btn--installed { background: transparent; border-color: var(--bos-green); color: var(--bos-green); }
+  .bs-card__btn--installed:hover { background: color-mix(in srgb, var(--bos-green) 12%, transparent); }
+  .bs-card__btn--locked { background: transparent; color: var(--bos-text-faint); cursor: not-allowed; }
+
+  /* ── Hilfe-Sheet, identisches Muster zu taschenrechner.html ── */
+  #bs-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #bs-hilfe-inhalt-wrap { background: var(--bos-surface); border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; max-width:680px; margin:40px auto 0; padding: var(--bos-space-lg, 20px) var(--bos-space-md, 18px) var(--bos-space-xl, 40px); min-height:50vh; }
+  .bs-hilfe-schritt { margin-bottom: var(--bos-space-md, 18px); padding-bottom: var(--bos-space-sm, 14px); border-bottom:1px dashed var(--bos-border); }
+  .bs-hilfe-titel { font-weight:900; color: var(--bos-blue); margin-bottom: var(--bos-space-3xs, 5px); }
+  .bs-hilfe-text { font-size: var(--bos-font-sm, 0.85rem); line-height:1.6; color: var(--bos-text-dim); white-space: pre-line; }
+  .bs-hilfe-schliessen {
+    font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+    background: var(--bos-blue); color: #fff; border: none; border-radius: var(--bos-radius-sm);
+    padding: var(--bos-space-2xs, 0.65em) var(--bos-space-sm, 1.3em); cursor: pointer; margin-top: var(--bos-space-sm, 14px);
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ Pflicht-Block Body-Anfang (§2 Checkliste) ═══ -->
+<script>var BOS_APP_ID = 'backstore';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_profil_lookup.js"></script>   <!-- NEU 05.09.2026, geteilt mit launcher.html/bos_taskboard.js -->
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<div class="bs-header">
+  <div class="bs-title">Back<span>Store</span></div>
+  <button class="bs-help-btn" onclick="bsOeffneHilfe()">?</button>
+</div>
+
+<div class="bs-intro">
+  <p>Hol dir die Apps, die du brauchst — und entfern sie wieder, wenn du sie nicht mehr brauchst. Nichts geht dabei verloren, du kannst jederzeit neu installieren.</p>
+  <span class="bs-count" id="bsCount"></span>
+</div>
+
+<div class="bs-noprofile" id="bsNoProfile">Kein aktives Profil gefunden. Bitte über den Launcher ein Profil auswählen.</div>
+
+<div class="bs-grid" id="bsGrid"></div>
+
+<!-- ── Hilfe-Sheet ── -->
+<div id="bs-hilfe-modal">
+  <div id="bs-hilfe-inhalt-wrap">
+    <div id="bs-hilfe-inhalt"></div>
+    <button class="bs-hilfe-schliessen" onclick="bsSchliesseHilfe()">Schließen</button>
+  </div>
+</div>
+
+<script>
+// ── Geteilter Launcher-State (gleicher localStorage-Key wie launcher.html) ──
+var BS_STORAGE_KEY = 'bos_launcher_state_v2';
+
+function bsLoadState() {
+  var fallback = { activeProfileId: null, localProfiles: [], profileData: {} };
+  try {
+    var raw = localStorage.getItem(BS_STORAGE_KEY);
+    if (raw) return Object.assign(fallback, JSON.parse(raw));
+  } catch (e) { console.warn('BackStore: State konnte nicht gelesen werden', e); }
+  return fallback;
+}
+function bsSaveState(state) {
+  try { localStorage.setItem(BS_STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { console.warn('BackStore: State konnte nicht gespeichert werden', e); }
+}
+// bsGetProfile() entfernt (05.09.2026) — kam jetzt aus bos_profil_lookup.js,
+// geteilt mit launcher.html/bos_taskboard.js. Aufrufer unten nutzen direkt
+// window.BOS_PROFIL_LOOKUP.findeAktiv(state).
+function bsGetProfileData(state) {
+  if (!state.activeProfileId) return null;
+  var d = state.profileData && state.profileData[state.activeProfileId];
+  if (!d) return null;
+  // Defensive Rückfallebene, falls der BackStore geöffnet wird, bevor
+  // launcher.html die Migration einmal durchlaufen konnte (siehe dort
+  // getActiveProfileData()) — sollte im Normalbetrieb nie greifen, da
+  // dieser Satellit nur aus dem Launcher heraus geöffnet werden kann.
+  if (!d.positions) d.positions = {};
+  if (!d.installed) d.installed = Object.keys(d.positions);
+  return d;
+}
+
+function bsEscapeHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function bsHexToRgba(hex, alpha) {
+  var h = String(hex || '#c07a10').replace('#', '');
+  if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+  var n = parseInt(h, 16) || 0xc07a10;
+  var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+function bsRoleLabel(roles) {
+  return (roles || []).map(function (r) { return r.charAt(0).toUpperCase() + r.slice(1); }).join(', ');
+}
+
+function bsRenderCard(app, data, role, kontoOverrides) {
+  var installed = data.installed.indexOf(app.id) !== -1;
+  var erlaubt = window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, kontoOverrides) : true;
+  var iconBg = bsHexToRgba(app.color, 0.20);
+
+  var badges = '';
+  if (app.status === 'geplant') badges += '<span class="bs-card__badge">geplant</span>';
+  if (app.type === 'hub') badges += '<span class="bs-card__badge">mehrere Funktionen</span>';
+
+  var btnHtml, roleHint = '';
+  if (installed) {
+    btnHtml = '<button class="bs-card__btn bs-card__btn--installed" data-action="uninstall" data-id="' + app.id + '">✓ Installiert</button>';
+  } else if (erlaubt) {
+    btnHtml = '<button class="bs-card__btn bs-card__btn--install" data-action="install" data-id="' + app.id + '">Installieren</button>';
+  } else {
+    btnHtml = '<button class="bs-card__btn bs-card__btn--locked" disabled>Rolle fehlt</button>';
+    roleHint = '<div class="bs-card__rolehint">Benötigt: ' + bsEscapeHtml(bsRoleLabel(app.roles)) + '</div>';
+  }
+
+  return '<div class="bs-card' + (!installed && !erlaubt ? ' bs-card--locked' : '') + '">' +
+      '<div class="bs-card__icon" style="background:' + iconBg + ';color:' + bsEscapeHtml(app.color || '#c07a10') + ';">' + bsEscapeHtml(app.icon || '▫️') + '</div>' +
+      '<div class="bs-card__body">' +
+        '<div class="bs-card__name">' + bsEscapeHtml(app.name) + badges + '</div>' +
+        roleHint +
+      '</div>' +
+      btnHtml +
+    '</div>';
+}
+
+function bsCatalogApps() {
+  // Hub-Kind-Kacheln (a.hub gesetzt) tauchen wie im echten Grid nicht
+  // einzeln auf. Gepinnte Kacheln (aktuell nur der BackStore selbst)
+  // sind nicht über sich selbst installierbar, siehe Kopfkommentar.
+  return (window.BOS_APPS || []).filter(function (a) { return !a.hub && !a.pinned; });
+}
+
+function bsRender() {
+  var state = bsLoadState();
+  var grid = document.getElementById('bsGrid');
+  var noProfile = document.getElementById('bsNoProfile');
+  var countEl = document.getElementById('bsCount');
+
+  var data = bsGetProfileData(state);
+  if (!data) {
+    grid.innerHTML = '';
+    countEl.textContent = '';
+    noProfile.style.display = 'block';
+    return;
+  }
+  noProfile.style.display = 'none';
+
+  var profile = window.BOS_PROFIL_LOOKUP.findeAktiv(state);
+  var role = profile ? profile.role : null;
+  var kontoOverrides = profile ? profile.kontoOverrides : null;
+
+  var apps = bsCatalogApps();
+  grid.innerHTML = apps.map(function (a) { return bsRenderCard(a, data, role, kontoOverrides); }).join('');
+  countEl.textContent = data.installed.length + ' von ' + apps.length + ' installiert';
+}
+
+document.getElementById('bsGrid').addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  var id = btn.dataset.id;
+  var action = btn.dataset.action;
+
+  var state = bsLoadState();
+  var data = bsGetProfileData(state);
+  if (!data) return;
+
+  if (action === 'install') {
+    if (data.installed.indexOf(id) === -1) data.installed.push(id);
+  } else if (action === 'uninstall') {
+    if (!confirm('Diese App wirklich deinstallieren? Du kannst sie jederzeit hier wieder installieren, es geht nichts verloren.')) return;
+    data.installed = data.installed.filter(function (x) { return x !== id; });
+    delete data.positions[id]; // sonst bliebe eine leere Zelle dauerhaft reserviert
+  } else {
+    return;
+  }
+  bsSaveState(state);
+  bsRender();
+});
+
+// Falls sich der geteilte State von außen ändert (z.B. Launcher-Edit-Modus,
+// oder ein zweites offenes BackStore-Fenster) — gleiches Cross-Frame-Muster
+// wie launcher.html, siehe dortiger Kommentar.
+window.addEventListener('storage', function (e) {
+  if (e.key === BS_STORAGE_KEY) bsRender();
+});
+
+// ── Hilfe-Sheet ──
+var BS_HILFE_SCHRITTE = [
+  ['Wofür ist der BackStore?', 'Hier holst du dir die Apps auf deinen Desktop, die du wirklich brauchst — dein Desktop startet leer (bis auf den BackStore selbst) und füllt sich nur durch das, was du hier installierst.'],
+  ['Installieren', 'Tippe bei einer App auf „Installieren" — sie erscheint danach auf deinem Desktop. Wo genau, sucht sich der Launcher automatisch aus.'],
+  ['Deinstallieren', 'Tippe bei einer installierten App auf „✓ Installiert", um sie wieder zu entfernen. Es geht dabei nichts verloren — du kannst sie jederzeit hier erneut installieren.'],
+  ['„Rolle fehlt"', 'Manche Apps sind an eine bestimmte Rolle gebunden. Fehlt dir diese Rolle, siehst du die App trotzdem — so weißt du, was es gibt — kannst sie aber erst installieren, sobald der Admin dir die passende Rolle zuweist.']
+];
+function bsOeffneHilfe() {
+  var inhalt = document.getElementById('bs-hilfe-inhalt');
+  inhalt.innerHTML = BS_HILFE_SCHRITTE.map(function (s) {
+    return '<div class="bs-hilfe-schritt"><div class="bs-hilfe-titel">' + s[0] + '</div><div class="bs-hilfe-text">' + s[1] + '</div></div>';
+  }).join('');
+  document.getElementById('bs-hilfe-modal').style.display = 'block';
+}
+function bsSchliesseHilfe() { document.getElementById('bs-hilfe-modal').style.display = 'none'; }
+
+// ── Start ──
+bsRender();
+</script>
+</body>
+</html>

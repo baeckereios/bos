@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BOS · Nachtschicht</title>
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  body { padding-bottom: 100px; margin: 0; background: var(--bos-bg); }
+
+  .nfc-header { background:var(--bos-surface); border-bottom:1px solid var(--bos-border); padding:14px 16px; position: sticky; top: 0; z-index: 100; }
+  .nfc-header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .nfc-title  { font-family:var(--bos-font-display); font-weight:900; font-size:1.3rem; color:var(--bos-text); line-height:1.1; }
+  .nfc-sub    { font-family:var(--bos-font-label); font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--bos-text-dim); margin-top:3px; }
+  .nfc-back   { font-family:var(--bos-font-label); font-weight:800; font-size:0.72rem; color:var(--bos-text-dim); text-decoration:none; white-space:nowrap; padding-top:4px; -webkit-tap-highlight-color:transparent; }
+  .nfc-back:active { color:var(--bos-amber); }
+
+  .brain-status { padding:8px 16px; text-align:center; font-size:0.75rem; font-family:var(--bos-font-label); font-weight:700; letter-spacing:0.5px; border-bottom:2px solid var(--bos-border); }
+  .brain-status.loading { color:var(--bos-amber); background:rgba(192,122,16,0.06); }
+  .brain-status.ready   { color:var(--bos-green);  background:rgba(77,184,122,0.06); }
+  .brain-status.error   { color:var(--bos-red);    background:rgba(201,74,74,0.06); }
+
+  .froster-bar { padding:9px 16px; border-bottom:2px solid var(--bos-border); }
+  .froster-bar-inner { max-width:600px; margin:0 auto; display:flex; align-items:center; gap:10px; }
+  .froster-label { font-family:var(--bos-font-label); font-weight:900; font-size:0.7rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--bos-text-dim); flex-shrink:0; }
+  .f-toggle { flex:1; display:flex; gap:6px; }
+  .f-btn { flex:1; padding:8px 6px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); border-radius:10px; font-family:var(--bos-font-label); font-weight:900; font-size:0.78rem; color:var(--bos-text-dim); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:0.15s; }
+  .f-btn.yes.active { border-color:var(--bos-green); background:rgba(77,184,122,0.1); color:var(--bos-green); }
+  .f-btn.no.active  { border-color:var(--bos-amber); background:rgba(192,122,16,0.1); color:var(--bos-amber); }
+
+  .settings-bar { padding:7px 16px; border-bottom:2px solid var(--bos-border); }
+  .settings-bar-inner { max-width:600px; margin:0 auto; display:flex; align-items:center; gap:10px; }
+  .settings-label { display:flex; align-items:center; gap:7px; cursor:pointer; font-family:var(--bos-font-label); font-weight:900; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.8px; color:var(--bos-text-dim); }
+  .settings-label input[type=checkbox] { width:15px; height:15px; accent-color:var(--bos-amber); }
+
+  .datentopf-group { display:flex; gap:8px; flex:1; }
+  .datentopf-btn { flex:1; padding:8px 6px; min-height:38px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .datentopf-btn.aktiv { border-color:var(--bos-amber); color:var(--bos-amber); background:rgba(192,122,16,0.12); }
+
+  .container { max-width:600px; margin:0 auto; padding:12px; }
+
+  .prod-card { background:var(--bos-surface); border:2px solid var(--bos-border); border-radius:18px; margin-bottom:14px; overflow:hidden; box-shadow:0 3px 12px var(--bos-shadow-sm); }
+  .prod-card::before { content:''; display:block; height:3px; background:var(--bos-border-strong); transition:background 0.3s; }
+  .prod-card.ok::before        { background:linear-gradient(90deg,var(--bos-green),rgba(77,184,122,0.1)); }
+  .prod-card.warn::before      { background:linear-gradient(90deg,var(--bos-red),rgba(201,74,74,0.1)); }
+  .prod-card.knapp-card::before{ background:linear-gradient(90deg,var(--bos-amber),rgba(192,122,16,0.1)); }
+
+  .prod-name   { font-family:var(--bos-font-display); font-weight:900; font-size:1.05rem; padding:11px 14px 2px; color:var(--bos-text); }
+  .prod-status { font-family:var(--bos-font-label); font-size:0.68rem; font-weight:700; color:var(--bos-text-dim); padding:0 14px 8px; }
+  .prod-status.ok    { color:var(--bos-green); }
+  .prod-status.err   { color:var(--bos-red); }
+  .prod-status.knapp { color:var(--bos-amber); }
+  .verlaesslich-hint { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:800; padding:0 14px 8px; }
+
+  .bestand-row { display:flex; align-items:center; gap:8px; padding:2px 14px 10px; flex-wrap:wrap; }
+  .bestand-label { font-family:var(--bos-font-label); font-weight:900; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.8px; color:var(--bos-text-dim); }
+  .bestand-input { width:64px; padding:4px 6px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; font-size:0.95rem; text-align:center; }
+  .bestand-unit { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:700; color:var(--bos-text-dim); }
+  .bestand-hint { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:700; color:var(--bos-amber); overflow-wrap:anywhere; }
+  .bestand-hint a { color:var(--bos-amber); text-decoration:underline; }
+  .bestand-row.warn .bestand-input { border-color:var(--bos-red); }
+
+  .section { padding:0 12px 10px; }
+  .slabel { font-family:var(--bos-font-label); font-weight:900; font-size:0.62rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--bos-amber); margin-bottom:5px; }
+
+  .day-row { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .day-btn { height:50px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; -webkit-tap-highlight-color:transparent; transition:all 0.12s; user-select:none; padding:0; }
+  .day-btn .db-icon { font-size:1rem; line-height:1; display:block; min-height:1rem; }
+  .day-btn .db-day  { font-family:var(--bos-font-label); font-weight:900; font-size:0.72rem; color:var(--bos-text-dim); line-height:1; }
+  .day-btn .db-date { font-family:var(--bos-font-label); font-weight:700; font-size:0.55rem; color:var(--bos-text-dim); opacity:0.55; }
+  .day-btn.on { background:rgba(192,122,16,0.1); border-color:var(--bos-amber); }
+  .day-btn.on .db-day  { color:var(--bos-amber); }
+  .day-btn.on .db-date { opacity:0.8; color:var(--bos-amber); }
+  .day-btn.disabled { opacity:0.22; cursor:not-allowed; }
+  .day-btn.ist-zu { opacity:0.35; }
+  .day-btn:not(.disabled):active { transform:scale(0.88); }
+
+  .ziel-row { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .ziel-btn { height:50px; border-radius:9px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; -webkit-tap-highlight-color:transparent; transition:all 0.12s; padding:0; }
+  .ziel-btn .z-day  { font-family:var(--bos-font-label); font-weight:900; font-size:0.74rem; color:var(--bos-text-dim); line-height:1; }
+  .ziel-btn .z-date { font-family:var(--bos-font-label); font-weight:700; font-size:0.56rem; color:var(--bos-text-dim); opacity:0.6; }
+  .ziel-btn.on { background:var(--bos-amber); border-color:var(--bos-amber); }
+  .ziel-btn.on .z-day  { color:white; }
+  .ziel-btn.on .z-date { color:rgba(255,255,255,0.85); opacity:1; }
+  .ziel-btn:active { transform:scale(0.88); }
+
+  /* ── VORSCHLAG-FELDER ── */
+  .vorschlag-wrap { border-top:1.5px solid var(--bos-border-strong); padding:10px 12px 4px; }
+  .card-gleichm { display:flex; align-items:center; gap:6px; padding:0 14px 8px; cursor:pointer; font-family:var(--bos-font-label); font-weight:800; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.6px; color:var(--bos-text-dim); -webkit-tap-highlight-color:transparent; }
+  .card-gleichm input[type=checkbox] { width:14px; height:14px; accent-color:var(--bos-amber); }
+  .vorschlag-hint { font-family:var(--bos-font-label); font-size:0.68rem; font-weight:700; color:var(--bos-green); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+  .inline-warn { font-family:var(--bos-font-label); font-size:0.7rem; font-weight:700; padding:5px 8px; border-radius:8px; margin-bottom:6px; }
+  .inline-warn.luecke { background:rgba(201,74,74,0.1); color:var(--bos-red); }
+  .inline-warn.knapp  { background:rgba(192,122,16,0.1); color:var(--bos-amber); }
+  .hint-right { font-weight:700; color:var(--bos-text-dim); font-size:0.65rem; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+
+  .vd-grid { display:grid; gap:8px; }
+  .vd-grid.cols-1 { grid-template-columns:1fr; }
+  .vd-grid.cols-2 { grid-template-columns:1fr 1fr; }
+  .vd-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+
+  .vday-cell { background:var(--bos-surface-raised); border-radius:12px; padding:8px 8px 6px; border:1.5px solid var(--bos-border-strong); }
+  .vday-cell.is-auto   { border-color:var(--bos-amber);  background:rgba(192,122,16,0.05); }
+  .vday-cell.is-soft   { border-color:#60a5fa; background:rgba(96,165,250,0.06); }
+  .vday-cell.is-locked { border-color:var(--bos-green);  background:rgba(77,184,122,0.06); }
+  .vday-cell.is-warn   { border-color:var(--bos-red) !important; background:rgba(201,74,74,0.06) !important; }
+
+  .vday-label { font-family:var(--bos-font-label); font-weight:900; font-size:0.72rem; color:var(--bos-text-dim); text-align:center; margin-bottom:4px; }
+  .vday-label span { font-size:0.58rem; opacity:0.7; }
+  .vday-input { width:100%; height:44px; border:none; background:transparent; color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; font-size:1.6rem; text-align:center; box-sizing:border-box; outline:none; padding:0; }
+  .vday-input.is-soft   { color:#1d4ed8; }
+  .vday-input.is-locked { color:var(--bos-green); }
+
+  .vday-footer { display:flex; align-items:center; justify-content:space-between; margin-top:3px; }
+  .vday-min       { font-family:var(--bos-font-label); font-size:0.6rem; font-weight:700; color:var(--bos-text-dim); opacity:0.65; }
+  .vday-min.warn  { color:var(--bos-red); opacity:1; }
+  .vday-lock { background:none; border:none; cursor:pointer; font-size:0.8rem; opacity:0.28; padding:0; -webkit-tap-highlight-color:transparent; }
+  .vday-lock.active { opacity:1; }
+
+  /* ── AKKORDEON ── */
+  .akk-toggle { width:100%; padding:9px 14px; background:none; border:none; border-top:1.5px solid var(--bos-border-strong); cursor:pointer; display:flex; align-items:center; justify-content:space-between; font-family:var(--bos-font-label); font-weight:900; font-size:0.7rem; color:var(--bos-text-dim); text-transform:uppercase; letter-spacing:0.8px; -webkit-tap-highlight-color:transparent; }
+  .akk-toggle:active { background:var(--bos-surface-raised); }
+  .akk-arrow { transition:transform 0.2s; }
+  .akk-arrow.open { transform:rotate(180deg); }
+  .akk-body { display:none; border-top:1px solid var(--bos-border-strong); }
+  .akk-body.open { display:block; }
+
+  .chain-row { display:flex; align-items:center; padding:5px 12px; gap:6px; border-bottom:1px solid var(--bos-border-strong); }
+  .chain-row:last-child { border-bottom:none; }
+  .chain-row.row-prod   { background:rgba(77,184,122,0.05); }
+  .chain-row.row-luecke { background:rgba(201,74,74,0.06); }
+  .chain-row.row-heute  { background:rgba(192,122,16,0.04); }
+  .chain-row.row-froster { opacity:0.35; }
+  .chain-row.row-zu { opacity:0.35; background:rgba(100,100,100,0.04); }
+  .cr-tag  { font-family:var(--bos-font-label); font-weight:900; font-size:0.75rem; width:28px; color:var(--bos-text-dim); flex-shrink:0; }
+  .cr-date { font-family:var(--bos-font-label); font-size:0.6rem; color:var(--bos-text-dim); opacity:0.55; width:32px; flex-shrink:0; }
+  .cr-verb { width:28px; text-align:center; font-family:var(--bos-font-label); font-size:0.72rem; color:var(--bos-text-dim); flex-shrink:0; }
+  .cr-prod { width:36px; text-align:center; font-family:var(--bos-font-display); font-weight:900; font-size:0.9rem; color:var(--bos-amber); flex-shrink:0; }
+  .cr-prod.empty { color:var(--bos-border); font-size:0.68rem; }
+  .cr-best { flex:1; text-align:right; font-family:var(--bos-font-display); font-weight:900; font-size:1rem; }
+  .cr-best.pos { color:var(--bos-green); }
+  .cr-best.nul { color:var(--bos-amber); }
+  .cr-best.neg { color:var(--bos-red); }
+
+  .warn-row { padding:6px 14px; font-family:var(--bos-font-label); font-size:0.7rem; font-weight:700; border-top:1.5px solid rgba(0,0,0,0.05); }
+  .warn-row.ok     { background:rgba(77,184,122,0.08); color:var(--bos-green); }
+  .warn-row.knapp  { background:rgba(192,122,16,0.08); color:var(--bos-amber); }
+  .warn-row.luecke { background:rgba(201,74,74,0.08);  color:var(--bos-red); }
+
+  .card-footer { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-top:1.5px solid var(--bos-border-strong); }
+  .footer-sum { font-family:var(--bos-font-label); font-size:0.78rem; font-weight:700; color:var(--bos-text-dim); }
+  .footer-sum span { font-family:var(--bos-font-display); font-size:1.05rem; font-weight:900; color:var(--bos-amber); }
+  .btn-reset { padding:5px 11px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:900; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .btn-reset:active { transform:scale(0.95); }
+
+  /* ── EXPORT-BAR ── */
+  .export-bar { position:fixed; bottom:0; left:0; right:0; background:var(--bos-surface); border-top:2px solid var(--bos-border); padding:10px 16px 20px; z-index:200; box-shadow:0 -4px 20px var(--bos-shadow-sm); }
+  .btn-export { width:100%; padding:14px; border:none; border-radius:14px; background:var(--bos-amber); color:#1a1208; font-family:var(--bos-font-label); font-weight:900; font-size:1rem; letter-spacing:1px; text-transform:uppercase; cursor:pointer; -webkit-tap-highlight-color:transparent; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-export:active { transform:scale(0.98); opacity:0.9; }
+  .btn-export.disabled { background:var(--bos-border-strong); color:var(--bos-text-dim); cursor:not-allowed; }
+  .export-count { font-size:0.72rem; font-weight:700; color:var(--bos-text-dim); text-align:center; margin-top:5px; font-family:var(--bos-font-label); }
+  .nfc-header-actions { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .pp-help-btn { width:30px; height:30px; border-radius:50%; border:none; background:var(--bos-amber); color:#1a1208; font-weight:900; font-size:0.9rem; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+
+  #pp-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #pp-hilfe-inhalt-wrap { background:var(--bos-surface); border-radius:var(--bos-radius-lg,18px) var(--bos-radius-lg,18px) 0 0; max-width:680px; margin:40px auto 0; padding:20px 18px 40px; min-height:50vh; }
+  .pp-hilfe-schritt { margin-bottom:18px; padding-bottom:14px; border-bottom:1px dashed var(--bos-border); }
+  .pp-hilfe-titel { font-family:var(--bos-font-display); font-weight:900; color:var(--bos-amber); margin-bottom:5px; }
+  .pp-hilfe-text { font-family:var(--bos-font-body); font-size:0.85rem; line-height:1.6; color:var(--bos-text-dim); white-space:pre-line; }
+</style>
+</head>
+<body>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'produktionsplaner_nachtschicht';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_hamster.js"></script>
+<script src="../bos_produktionskette.js"></script>
+<script src="../bos_froster.js"></script>
+
+<div class="nfc-header">
+  <div class="nfc-header-top">
+    <div>
+      <div class="nfc-title">Nachtschicht</div>
+      <div class="nfc-sub">Tage wählen · Ziel setzen · Zahlen bestätigen</div>
+    </div>
+    <div class="nfc-header-actions">
+      <a href="../launcher.html" class="nfc-back" id="nfc-back-link" style="display:none;">← Zurück</a>
+      <button class="pp-help-btn" onclick="ppOeffneHilfe()" title="Hilfe">?</button>
+    </div>
+    <script>
+      // Nur zeigen, wenn die Seite NICHT im Launcher-iframe hängt (also
+      // per NFC/QR direkt geöffnet wurde) — sonst genau der Launcher-in-
+      // Launcher-Bug aus TASCHENRECHNER_DOKU.md §8 (Link navigiert das
+      // eigene iframe zu launcher.html, der stellt seinen letzten
+      // Fenster-Zustand wieder her -> verschachtelt). Docked im Launcher
+      // reicht das Fenster-Chrome mit eigenem Schließen-Kreuz.
+      if (window.self === window.top) {
+        document.getElementById('nfc-back-link').style.display = 'block';
+      }
+    </script>
+  </div>
+</div>
+
+<div class="brain-status loading" id="brain-status">⏳ Produktdaten werden geladen…</div>
+
+<div class="froster-bar">
+  <div class="froster-bar-inner">
+    <span class="froster-label">Froster</span>
+    <div class="f-toggle">
+      <button class="f-btn yes" id="f-ja"   onclick="setFroster(true)">✓ Fertig</button>
+      <button class="f-btn no active" id="f-nein" onclick="setFroster(false)">noch nicht</button>
+    </div>
+  </div>
+</div>
+
+<div class="settings-bar">
+  <div class="settings-bar-inner">
+    <span class="froster-label">Datenquelle</span>
+    <div class="datentopf-group">
+      <button class="datentopf-btn aktiv" id="dt-manuell" onclick="setzeDatentopf('manuell')">Manuell</button>
+      <button class="datentopf-btn" id="dt-offiziell" onclick="setzeDatentopf('offiziell')">Offiziell</button>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="prod-container">
+  <div style="text-align:center;padding:40px;font-family:var(--bos-font-label);font-weight:700;color:var(--bos-text-dim);">Wird geladen…</div>
+</div>
+
+<!-- EINREICHEN BAR -->
+<div class="export-bar">
+  <button class="btn-export disabled" id="btn-export" onclick="planungEinreichen()">
+    ✓ Planung einreichen
+  </button>
+  <div class="export-count" id="export-count">0 / 0 Produkte mit Vorschlag</div>
+</div>
+
+<!-- ═══ Hilfe-Sheet ═══ -->
+<div id="pp-hilfe-modal" onclick="if(event.target===this)ppSchliesseHilfe()">
+  <div id="pp-hilfe-inhalt-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:900;color:var(--bos-amber);font-size:1.05rem;">❓ Anleitung</div>
+      <button onclick="ppSchliesseHilfe()" style="background:none;border:none;font-size:1.3rem;color:var(--bos-text-dim);cursor:pointer;">✕</button>
+    </div>
+    <div id="pp-hilfe-inhalt"></div>
+  </div>
+</div>
+
+<script>
+var STATION_CFG  = 'Nachtschicht';
+var heute        = new Date(); heute.setHours(0,0,0,0);
+var WT_KURZ      = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+var WT_LANG      = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+
+// ── Planungswoche (Fix 05.09.2026, Ulf) ─────────────────────────────
+// Vorher war "wochenMo" schlicht der Montag der Kalenderwoche, die HEUTE
+// enthält. Das Planungsfenster läuft aber Fr 00:01–Di 23:59 (siehe
+// naechsterDienstag()/planungsfenster() weiter unten) — an einem Fr/Sa/So
+// war "diese Kalenderwoche" damit faktisch schon vorbei, obwohl genau dann
+// die KOMMENDE Woche geplant werden soll. Kollegen konnten freitags keine
+// Produktionstage für die nächste Woche mehr auswählen (nur noch Fr/Sa der
+// zu Ende gehenden Woche). Siehe SESSION_2026-09-05_PRODUKTIONSPLANER_
+// WOCHENANKER_FIX.md.
+// planWocheMontag() verankert die Zielwoche stattdessen robust am
+// Planungsfenster selbst: Montag der Planungswoche = der Tag vor dem
+// Dienstag, an dem das aktuell laufende Fenster schließt. Das liefert an
+// jedem Wochentag innerhalb des Fensters (Fr–Di) dieselbe, korrekte Woche.
+// naechsterDienstag() ist eine Funktionsdeklaration (weiter unten im
+// selben Script) und dank Hoisting hier bereits nutzbar.
+function planWocheMontag(von) {
+  var mo = naechsterDienstag(von);
+  mo.setDate(mo.getDate() - 1);
+  mo.setHours(0, 0, 0, 0);
+  return mo;
+}
+var wochenMo = planWocheMontag(heute);   // Montag der Planungswoche ("Produktionstage")
+var naechsteMo = new Date(wochenMo);      // Woche danach (für "Ziel"-Auswahl)
+naechsteMo.setDate(wochenMo.getDate() + 7);
+
+// Offset-Tabellen (BOS-Index 0=Mo..6=So)
+var dieseWocheOffsets = [], naechsteWocheOffsets = [];
+for (var bi = 0; bi < 7; bi++) {
+  var d1 = new Date(wochenMo);  d1.setDate(wochenMo.getDate() + bi);
+  dieseWocheOffsets[bi] = Math.round((d1 - heute) / 86400000);
+  var d2 = new Date(naechsteMo); d2.setDate(naechsteMo.getDate() + bi);
+  naechsteWocheOffsets[bi] = Math.round((d2 - heute) / 86400000);
+}
+
+function fmtD(d) {
+  return d.getDate().toString().padStart(2,'0') + '.' + (d.getMonth()+1).toString().padStart(2,'0') + '.';
+}
+function fmtFull(d) {
+  return d.getDate().toString().padStart(2,'0') + '.' + (d.getMonth()+1).toString().padStart(2,'0') + '.' + d.getFullYear();
+}
+function offsetToDate(off) {
+  var d = new Date(heute); d.setDate(heute.getDate() + off); return d;
+}
+// Anzeige-Rundung — die Kette rechnet intern mit Bleche-Nachkommastellen
+// (Stück-zu-Blech-Umrechnung, stueckProBlech), aber niemand soll einer
+// Konditorin "12.9375 Bl." ansagen müssen. rd() für normale Anzeige,
+// rdAuf() für die Mindestmenge (lieber etwas mehr als zu knapp).
+function rd(n) { return Math.round(n || 0); }
+function rdAuf(n) { return Math.ceil(n || 0); }
+function setStatus(cls, txt) {
+  var el = document.getElementById('brain-status');
+  el.className = 'brain-status ' + cls; el.textContent = txt;
+}
+
+var frosterFertig = false;
+var state = {};
+var PRODUKTE = [];
+var rebuildTimers = {};
+// DATEN: pro Produkt EINMAL geladen (needs/Bestand ändern sich nicht durch
+// UI-Interaktion). needs (Verbrauch) kommt aus BOS_VERBRAUCH intern in
+// Stück und wird hier auf Bleche umgerechnet (stueckProBlech). Bestand
+// (BOS_FROSTER) dagegen NICHT umrechnen — die Froster-Zählung erfasst
+// direkt in Bleche (bzw. der jeweiligen Einheit aus produkt_config.json),
+// nie in Stück. 06.09.2026 · Fix: vorher wurde Bestand fälschlich ebenfalls
+// durch stueckProBlech geteilt — Verwechslung, weil der alte legacyKey-Name
+// noch "_stueck" heißt (reiner Namensrest aus dem Altsystem, keine
+// tatsächliche Einheitsangabe mehr, siehe Produkt-Config-Aufräumung).
+// getResult() bleibt dadurch SYNCHRON, genau wie im Altsystem — nur der
+// initiale Ladevorgang ist async.
+var DATEN = {};
+// TAGESTYPEN: EIN geteilter Satz für die ganze Seite. Muss bis Offset 17
+// reichen, nicht mehr 14: seit dem Planungswoche-Fix (05.09.2026) kann die
+// "Ziel"-Auswahl (Woche NACH der Planungswoche) an einem Freitag bis zu
+// Offset 16 (So der Folgewoche) reichen — 17 lässt denselben 1-Tag-Puffer
+// wie vorher. Ersetzt die alte wochenconfigMap.
+var TAGESTYPEN = {};
+// Datentopf: 'manuell' (laufende Erfassung) | 'offiziell' (migrierte
+// Altdaten, backmengen_db.json). Gleiches Muster wie schnellrechner.html —
+// beide liefern seit 31.08.2026 echte Daten über holeWochenbedarf(),
+// striktgetrennt, kein Vermischen (siehe bos_verbrauch_durchschnitt.js Kopf).
+var datentopf = 'manuell';
+
+// Fehlmenge: Sofort-Zusatzbedarf oben drauf (z.B. beim Froster-Zählen
+// festgestellt: "brauche zusätzlich noch X schon für morgen"), pro Produkt,
+// analog zum Bestand. bos_froster.js liefert das bewusst nicht mit — laut
+// dessen Kopfkommentar Aufgabe des Aufrufers.
+
+// ── Planungsfenster: Fr 00:01 – Di 23:59, danach HART gesperrt (Ulf,
+// 03.09.2026 — Kurskorrektur gegenüber der ursprünglichen Annahme "weiches
+// Ende"). Dieselbe Berechnung wie in uebersicht.html, dort auch für den
+// Countdown genutzt — bewusst dupliziert (kein Modul-System, jede Seite
+// bleibt eigenständig), nicht als gemeinsame Datei ausgelagert.
+function naechsterDienstag(von) {
+  var d = new Date(von);
+  var tag = (d.getDay() + 6) % 7;
+  var diff = (2 - 1 - tag + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  d.setHours(23, 59, 0, 0);
+  if (d < von) d.setDate(d.getDate() + 7);
+  return d;
+}
+function planungsfenster(von) {
+  var ende = naechsterDienstag(von);
+  var start = new Date(ende);
+  start.setDate(start.getDate() - 4);
+  start.setHours(0, 1, 0, 0);
+  return { start: start, ende: ende, offen: von >= start && von <= ende };
+}
+
+window.addEventListener('load', async function() {
+  var fenster = planungsfenster(new Date());
+  if (!fenster.offen) {
+    var wochentage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    var startTxt = wochentage[fenster.start.getDay()] + ', ' + String(fenster.start.getDate()).padStart(2,'0') + '.' + String(fenster.start.getMonth()+1).padStart(2,'0') + '.';
+    setStatus('loading', '🔒 Planung gerade gesperrt');
+    document.querySelector('.froster-bar').style.display = 'none';
+    document.querySelectorAll('.settings-bar').forEach(function(el){ el.style.display = 'none'; });
+    document.querySelector('.export-bar').style.display = 'none';
+    document.getElementById('prod-container').innerHTML =
+      '<div style="text-align:center;padding:40px 20px;font-family:var(--bos-font-label);color:var(--bos-text-dim);">' +
+      '<div style="font-size:2.4rem;margin-bottom:10px;">🔒</div>' +
+      '<div style="font-weight:900;color:var(--bos-text);margin-bottom:6px;">Planung gerade gesperrt</div>' +
+      '<div>Nächstes Fenster öffnet ' + startTxt + ', 00:01 Uhr.</div>' +
+      '</div>';
+    return;
+  }
+
+  await (window.BOS_AUTH_READY || Promise.resolve());
+  var db = window.db;
+
+  if (!window.BOS_VERBRAUCH || !window.BOS_FROSTER || !window.BOS_KETTE) {
+    setStatus('error', '⚠ Kernmodule nicht geladen'); return;
+  }
+  // Lädt die echte bos_hamster_config.json statt des eingebauten Fallbacks
+  // (der bisher ohnehin exakt übereinstimmt) — bewusst "fire and forget",
+  // kein await: schlägt es fehl, greift automatisch derselbe Fallback,
+  // kein Blocker für den restlichen Seitenaufbau.
+  if (window.BOS_HAMSTER) window.BOS_HAMSTER.init();
+
+  var configData;
+  try {
+    var r = await fetch('../produkt_config.json', { cache: 'no-store' });
+    configData = r.ok ? await r.json() : [];
+  } catch (e) { configData = []; }
+
+  // nfcSeite === true: Opt-in-Filter, getrennt von "station" — nicht jedes
+  // Stationsprodukt soll wöchentlich geplant werden (z.B. tagesaktuell
+  // produzierte Ware). Siehe session_doku_rondo_nfcseite.md.
+  PRODUKTE = configData
+    .filter(function(cfg){ return cfg.station === STATION_CFG && cfg.legacyKey && cfg.nfcSeite === true; })
+    .map(function(cfg){ return { bosId: cfg.legacyKey, name: cfg.name, legacyKey: cfg.legacyKey, stueckProBlech: cfg.stueckProBlech || 1 }; });
+
+  if (!PRODUKTE.length) {
+    setStatus('error','⚠ Keine Produkte für diese Station freigegeben');
+    document.getElementById('prod-container').innerHTML = '<div style="text-align:center;padding:40px;color:var(--bos-text-dim);font-family:var(--bos-font-label);font-weight:700;">Keine Produkte gefunden — Häkchen „Auf Produktionsplaner anzeigen" im Produkt-Config-Editor prüfen.</div>';
+    return;
+  }
+
+  PRODUKTE.forEach(function(prod) {
+    state[prod.bosId] = { zielOff:null, prodTage:{}, manuelleWerte:{}, gesperrtWerte:{}, startBestand:0, fehlmengeAbs:0, gleichmaessig:false, _akkOpen:false };
+  });
+
+  try {
+    var einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
+    var ladeVorgaenge = PRODUKTE.map(function(prod) {
+      return Promise.all([
+        window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf),
+        window.BOS_FROSTER.holeBestand(db, prod.legacyKey)
+      ]).then(function(res) {
+        var wb = res[0], fb = res[1];
+        var faktor = prod.stueckProBlech > 0 ? prod.stueckProBlech : 1;
+        var bestandBleche = (fb.bestand || 0); // 06.09.2026 · Fix: Froster-Zaehlung ist bereits in Bleche, keine Stueck-Umrechnung
+        DATEN[prod.bosId] = {
+          needs: wb.needs.map(function(n){ return n / faktor; }),
+          verlaesslich: wb.verlaesslich,
+          veraltet: fb.veraltet,
+          gefunden: fb.gefunden,
+          // 06.09.2026 · Diagnose-Fix: siehe bos_froster.js Changelog —
+          // macht einen echten Abfragefehler von "nie gezählt" unterscheidbar.
+          fehlerText: fb.fehlerText || null
+        };
+        state[prod.bosId].startBestand = Math.round(bestandBleche);
+      });
+    });
+    ladeVorgaenge.push(
+      window.BOS_KETTE.ermittleTagesTypen(db, heute, 17).then(function(tt){ TAGESTYPEN = tt; })
+    );
+    await Promise.all(ladeVorgaenge);
+  } catch (e) {
+    console.warn('Produktionsplaner Nachtschicht: Datenladung fehlgeschlagen', e);
+    setStatus('error', '⚠ Verbrauchs-/Frosterdaten konnten nicht geladen werden');
+    return;
+  }
+
+  setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen');
+  renderAll();
+});
+
+// Bedarf für alle Produkte neu laden (Erstladung nutzt denselben Weg über
+// den try-Block oben; hier nur der Umschalt-Fall — Bestand/Zeitkontext
+// bleiben unverändert, nur needs[] hängt vom Datentopf ab).
+async function ladeAlleWochenbedarfe() {
+  var db = window.db;
+  var einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
+  await Promise.all(PRODUKTE.map(function(prod) {
+    return window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf).then(function(wb) {
+      var faktor = prod.stueckProBlech > 0 ? prod.stueckProBlech : 1;
+      if (!DATEN[prod.bosId]) DATEN[prod.bosId] = {};
+      DATEN[prod.bosId].needs = wb.needs.map(function(n){ return n / faktor; });
+      DATEN[prod.bosId].verlaesslich = wb.verlaesslich;
+    });
+  }));
+}
+
+async function setzeDatentopf(wert) {
+  if (wert === datentopf || !PRODUKTE.length) return;
+  datentopf = wert;
+  document.getElementById('dt-manuell').classList.toggle('aktiv', wert === 'manuell');
+  document.getElementById('dt-offiziell').classList.toggle('aktiv', wert === 'offiziell');
+  setStatus('loading', '⏳ Bedarf wird neu geladen…');
+  try {
+    await ladeAlleWochenbedarfe();
+    setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen');
+    recalcAll();
+  } catch (e) {
+    console.warn('Produktionsplaner Nachtschicht: Umschalten des Datentopfs fehlgeschlagen', e);
+    setStatus('error', '⚠ Bedarf konnte nicht neu geladen werden');
+  }
+}
+
+function renderAll() {
+  var c = document.getElementById('prod-container');
+  c.innerHTML = '';
+  PRODUKTE.forEach(function(prod){ c.appendChild(buildCard(prod.bosId)); });
+  updateExportBar();
+}
+function recalcAll() {
+  PRODUKTE.forEach(function(prod){ rebuildCard(prod.bosId); });
+  updateExportBar();
+}
+function rebuildCard(bosId) {
+  var old = document.getElementById('card-' + bosId);
+  if (old) old.replaceWith(buildCard(bosId));
+  updateExportBar();
+}
+
+function getResult(bosId) {
+  var prod = PRODUKTE.find(function(x){ return x.bosId === bosId; });
+  if (!prod) return null;
+  var s = state[bosId];
+  if (s.zielOff === null) return null;
+  var d = DATEN[bosId];
+  if (!d) return null;
+  return window.BOS_KETTE.berechne({
+    needs: d.needs,
+    startBestand: s.startBestand,
+    fehlmengeAbs: s.fehlmengeAbs || 0,
+    frosterFertig: frosterFertig,
+    zielOff: s.zielOff,
+    prodTage: s.prodTage,
+    manuelleWerte: s.manuelleWerte,
+    gesperrtWerte: s.gesperrtWerte,
+    gleichmaessig: !!s.gleichmaessig,
+    heute: heute,
+    tagesTypen: TAGESTYPEN
+  });
+}
+
+// 06.09.2026 · Diagnose-Fix: Firestore-Fehlermeldungen wie "The query
+// requires an index. You can create it here: https://..." enthalten oft
+// einen langen, leerzeichenlosen Link, der auf dem Handy sonst nur
+// unantippbarer Fließtext wäre. Macht daraus einen echten <a>-Tag.
+function fehlertextMitLink(text) {
+  return text.replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank" rel="noopener">Index anlegen</a>');
+}
+
+function buildCard(bosId) {
+  var prod = PRODUKTE.find(function(x){ return x.bosId === bosId; });
+  if (!prod) return document.createElement('div');
+  var s = state[bosId];
+  var datenEintrag = DATEN[bosId] || {};
+  var startBest = s.startBestand;
+  var bestandVeraltet = datenEintrag.veraltet !== false; // true = veraltet ODER nie gezählt
+
+  var result = getResult(bosId);
+  var prodKeys = Object.keys(s.prodTage).filter(function(k){ return s.prodTage[k]; });
+  var prodCount = prodKeys.length;
+  var hasWarn = result && result.warnungen.length > 0;
+  var isOk    = result && prodCount > 0 && !hasWarn;
+
+  var card = document.createElement('div');
+  card.id = 'card-' + bosId;
+  var hatLuecke = result && result.warnungen.some(function(w){ return w.typ === 'luecke'; });
+  var hatKnapp  = result && !hatLuecke && result.warnungen.some(function(w){ return w.typ === 'knapp'; });
+  card.className = 'prod-card' + (isOk ? ' ok' : hatLuecke ? ' warn' : hatKnapp ? ' knapp-card' : '');
+
+  var statusTxt = 'Produktionstage und Ziel wählen', statusCls = '';
+  if (s.zielOff !== null && !prodCount) statusTxt = 'Produktionstage wählen';
+  else if (prodCount && s.zielOff === null) statusTxt = 'Zieldatum wählen';
+  else if (isOk)      { statusTxt = '✓ Kette vollständig gedeckt · Bestand: ' + startBest + ' Bl.'; statusCls = ' ok'; }
+  else if (hatLuecke) { statusTxt = '⚠ Lücke — Produktion erhöhen oder Tag hinzufügen'; statusCls = ' err'; }
+  else if (hatKnapp)  { statusTxt = '◌ Bestand 0 an ' + result.warnungen.length + ' Tag' + (result.warnungen.length > 1 ? 'en' : '') + ' — Produktionstag nötig'; statusCls = ' knapp'; }
+
+  // 06.09.2026 · Feature (Ulf: "ne Warnung wäre nett"): dasselbe Muster wie
+  // in schnellrechner.html (srRenderErgebnis()) — verlaesslich[] sagt pro
+  // Wochentag, ob die Mindeststichprobe erreicht wurde. Ohne diese Warnung
+  // sieht "0 Bl. nötig" identisch aus, egal ob echt geprüft oder schlicht
+  // keine Verbrauchsdaten vorhanden (z.B. Datenquelle ohne Erfassung).
+  var verl = datenEintrag.verlaesslich;
+  var alleUnzuverlaessig = !!(verl && verl.length > 0 && verl.every(function(v){ return v === false; }));
+  var teilweiseUnzuverlaessig = !alleUnzuverlaessig && !!(verl && verl.some(function(v){ return v === false; }));
+  var datentopfLabel = datentopf === 'offiziell' ? 'Offiziell' : 'Manuell';
+
+  var html = '<div class="prod-name">' + prod.name + '</div>';
+  html += '<div class="prod-status' + statusCls + '">' + statusTxt + '</div>';
+  if (alleUnzuverlaessig) {
+    html += '<div class="verlaesslich-hint" style="color:var(--bos-red);">⚠️ Keine ausreichenden Verbrauchsdaten (' + datentopfLabel + ') — Ergebnis nicht verlässlich!</div>';
+  } else if (teilweiseUnzuverlaessig) {
+    html += '<div class="verlaesslich-hint" style="color:var(--bos-amber);">◌ Für einzelne Wochentage wenig Vergleichswerte (' + datentopfLabel + ') — teilweise geschätzt.</div>';
+  }
+
+  // ── BESTAND (editierbar, Warnung bei veraltet/nie gezählt) ──
+  html += '<div class="bestand-row' + (bestandVeraltet ? ' warn' : '') + '">'
+        + '<span class="bestand-label">❄️ Bestand</span>'
+        + '<input class="bestand-input" type="number" min="0" value="' + startBest + '"'
+        + ' oninput="onBestandInput(\'' + bosId + '\', this)">'
+        + '<span class="bestand-unit">Bl.</span>'
+        + (bestandVeraltet ? '<span class="bestand-hint">' + (datenEintrag.fehlerText ? ('⚠ Abfrage fehlgeschlagen: ' + fehlertextMitLink(datenEintrag.fehlerText)) : (datenEintrag.gefunden ? 'älter als 24 Std. — bitte prüfen' : 'nie gezählt — bitte eintragen')) + '</span>' : '')
+        + '</div>';
+
+  // ── FEHLMENGE (Sofort-Zusatzbedarf, pro Produkt, Default 0) ──
+  html += '<div class="bestand-row">'
+        + '<span class="bestand-label">➕ Fehlmenge</span>'
+        + '<input class="bestand-input" type="number" min="0" value="' + (s.fehlmengeAbs || 0) + '"'
+        + ' oninput="onFehlmengeInput(\'' + bosId + '\', this)">'
+        + '<span class="bestand-unit">Bl. zusätzlich nötig</span>'
+        + '</div>';
+
+  // ── PRODUKTIONSTAGE (Planungswoche, siehe wochenMo oben) ──
+  html += '<div class="section"><div class="slabel">Produktionstage</div><div class="day-row">';
+  for (var bi = 0; bi < 7; bi++) {
+    var off = dieseWocheOffsets[bi];
+    var d   = offsetToDate(off);
+    // Zeitkontext: ist dieser Tag geschlossen? (ersetzt die alte wochenconfigMap)
+    var istZuTag  = (TAGESTYPEN[off] || 'normal') === 'zu';
+    var isDisabled = (off < 0) || (bi === 6) || istZuTag;
+    var isOn = !isDisabled && !!s.prodTage[off];
+    var cls  = 'day-btn' + (isOn ? ' on' : '') + (isDisabled ? ' disabled' : '') + (istZuTag ? ' ist-zu' : '');
+    var icon = istZuTag ? '🔒' : (isOn ? '🥐' : '&nbsp;');
+    var click = isDisabled ? '' : 'onclick="tapDay(\'' + bosId + '\',' + off + ')"';
+    html += '<div class="' + cls + '" ' + click + '>'
+          + '<span class="db-icon">' + icon + '</span>'
+          + '<span class="db-day">' + WT_KURZ[bi] + '</span>'
+          + '<span class="db-date">' + fmtD(d) + '</span>'
+          + '</div>';
+  }
+  html += '</div></div>';
+
+  // ── ZIEL (Woche NACH der Planungswoche) ──
+  html += '<div class="section"><div class="slabel">Bis wann reicht der Bestand?</div><div class="ziel-row">';
+  for (var bi = 0; bi < 7; bi++) {
+    var off = naechsteWocheOffsets[bi];
+    var d   = offsetToDate(off);
+    var on  = s.zielOff === off ? ' on' : '';
+    html += '<button class="ziel-btn' + on + '" onclick="setZiel(\'' + bosId + '\',' + off + ')">'
+          + '<span class="z-day">' + WT_KURZ[bi] + '</span>'
+          + '<span class="z-date">' + fmtD(d) + '</span>'
+          + '</button>';
+  }
+  html += '</div></div>';
+
+  // ── VORSCHLAG-FELDER ──
+  if (result && prodCount > 0) {
+    var prodOffsets = Object.keys(s.prodTage).map(Number).filter(function(o){ return s.prodTage[o]; }).sort(function(a,b){ return a-b; });
+    var colsCls = prodOffsets.length >= 3 ? 'cols-3' : prodOffsets.length === 2 ? 'cols-2' : 'cols-1';
+
+    html += '<label class="card-gleichm">'
+          + '<input type="checkbox" ' + (s.gleichmaessig ? 'checked' : '') + ' onchange="toggleGleichmaessig(\'' + bosId + '\')">'
+          + '⚖ Gleichmäßige Belastung</label>';
+
+    html += '<div class="vorschlag-wrap">';
+    html += '<div class="vorschlag-hint">🥐 Vorschlag<span class="hint-right" onclick="toggleAkk(\'' + bosId + '\')">Kette prüfen ▾</span></div>';
+    html += '<div class="vd-grid ' + colsCls + '">';
+
+    prodOffsets.forEach(function(off) {
+      var t = result.kette[off];
+      if (!t) return;
+      var cellCls  = t.istGesperrt ? 'is-locked' : t.istManuell ? 'is-soft' : 'is-auto';
+      var inputCls = t.istGesperrt ? 'is-locked' : t.istManuell ? 'is-soft' : '';
+      var lockIcon = t.istGesperrt ? '🔒' : '🔓';
+      var lockCls  = 'vday-lock' + ((t.istGesperrt || t.istManuell) ? ' active' : '');
+
+      // ── MINIMUM ──────────────────────────────────────────────────────
+      // Mindestproduktion = max(0, Brutto-Verbrauch bis nächster Prod-Tag − vorhandener Bestand)
+      // Brutto-Verbrauch: Summe vbAn(off+1) .. vbAn(naechsterProdTag)
+      // Vorhandener Bestand: Bestand VOR dieser Produktion (Bestand nach − Produktion + Verbrauch)
+      var nextOff = prodOffsets.find(function(o){ return o > off; });
+      var bisOff  = nextOff !== undefined ? nextOff : s.zielOff;
+      var futureBedarf = 0;
+      for (var j = off + 1; j <= bisOff; j++) {
+        if (result.kette[j]) futureBedarf += result.kette[j].verbrauch || 0;
+      }
+      // bestandNachMorgen = tiefster Punkt vor dieser Produktion (direkt aus Logik)
+      var puffer = Math.max(0, t.bestandNachMorgen);
+      var minBed = rdAuf(Math.max(0, futureBedarf - puffer));
+      var unterMin = t.vorschlag < minBed;
+
+      // Zell-Klasse: bei Unterschreitung des Minimums rot einrahmen
+      var warnCellCls = unterMin && !t.istGesperrt ? ' is-warn' : '';
+      var minCls = unterMin ? 'vday-min warn' : 'vday-min';
+
+      html += '<div class="vday-cell ' + cellCls + warnCellCls + '">'
+            + '<div class="vday-label">' + t.tagKurz + ' <span>' + fmtD(t.datum) + '</span></div>'
+            + '<input class="vday-input ' + inputCls + '" type="number" min="0" value="' + t.vorschlag + '"'
+            + ' data-bid="' + bosId + '" data-off="' + off + '"'
+            + ' oninput="onInput(\'' + bosId + '\',' + off + ',this)" onfocus="this.select()">'
+            + '<div class="vday-footer">'
+            + '<span class="' + minCls + '">' + (unterMin ? '⚠ min ' + minBed : 'min ' + minBed) + ' Bl.</span>'
+            + '<button class="' + lockCls + '" onclick="toggleLock(\'' + bosId + '\',' + off + ')">' + lockIcon + '</button>'
+            + '</div></div>';
+    });
+    html += '</div></div>';
+
+    // Akkordeon
+    html += '<button class="akk-toggle" onclick="toggleAkk(\'' + bosId + '\')" id="akk-btn-' + bosId + '">'
+          + '<span>Kette prüfen</span><span class="akk-arrow" id="akk-arr-' + bosId + '">▾</span></button>';
+    html += '<div class="akk-body" id="akk-' + bosId + '">';
+    result.kette.forEach(function(t) {
+      var rowCls = 'chain-row';
+      if (t.istHeute)             rowCls += ' row-heute';
+      else if (t.istZu)           rowCls += ' row-zu';
+      else if (t.prodTag)         rowCls += ' row-prod';
+      if (t.warnung === 'luecke') rowCls += ' row-luecke';
+      if (t.gedecktDurchFroster)  rowCls += ' row-froster';
+      var prodTxt = t.prodTag ? '<span class="cr-prod">' + t.vorschlag + '</span>' : '<span class="cr-prod empty">—</span>';
+      var verb;
+      if (t.gedecktDurchFroster) verb = '❄';
+      else if (t.istZu)          verb = '🔒';
+      else if (t.istHamster)     verb = rd(t.verbrauch) + ' 🐹';
+      else                       verb = t.verbrauch ? rd(t.verbrauch) : '—';
+
+      // Bestand-Anzeige:
+      // Bei Produktionstagen zeigen wir den Bestand VOR Produktion (nach Morgen-Verbrauch)
+      // damit klar ist: "mit diesem Bestand öffnet der Laden, DANN wird produziert"
+      var bestandZeigen, bCls;
+      if (t.prodTag && !t.istHeute) {
+        // Zwischenstand nach Morgen (VOR Produktion) — erst runden, dann
+        // einfärben, sonst könnte z.B. "0" rot markiert sein (war vorher -0.3)
+        var bNM = rd(t.bestandNachMorgen);
+        var bNMCls = bNM < 0 ? 'neg' : bNM === 0 ? 'nul' : 'pos';
+        // Endstand nach Produktion
+        var bEnd = rd(t.bestand);
+        var bEndCls = bEnd > 0 ? 'pos' : bEnd === 0 ? 'nul' : 'neg';
+        bestandZeigen = '<span class="cr-best ' + bNMCls + '" title="vor Produktion">' + bNM + '</span>'
+                      + '<span style="font-size:0.55rem;color:var(--bos-text-dim);margin:0 2px;">→</span>'
+                      + '<span class="cr-best ' + bEndCls + '" title="nach Produktion">' + bEnd + '</span>';
+      } else {
+        var bWert = rd(t.bestand);
+        bCls = bWert > 0 ? 'pos' : bWert === 0 ? 'nul' : 'neg';
+        bestandZeigen = '<span class="cr-best ' + bCls + '">' + bWert + '</span>';
+      }
+
+      html += '<div class="' + rowCls + '">'
+            + '<span class="cr-tag">' + t.tagKurz + '</span>'
+            + '<span class="cr-date">' + fmtD(t.datum) + '</span>'
+            + '<span class="cr-verb">' + verb + '</span>'
+            + prodTxt
+            + bestandZeigen
+            + '</div>';
+    });
+    html += '</div>';
+
+    if (!result.warnungen.length) {
+      html += '<div class="warn-row ok">✓ Alle Tage gedeckt · Endlager: ' + rd(result.endlager) + ' Bl.</div>';
+    } else {
+      result.warnungen.forEach(function(w) {
+        html += '<div class="warn-row ' + (w.typ === 'luecke' ? 'luecke' : 'knapp') + '">'
+              + (w.typ === 'luecke' ? '⚠ Lücke ' + w.tag + ' ' + w.datum + ': ' + rdAuf(Math.abs(w.delta)) + ' Bl. fehlen' : '◌ ' + w.tag + ' ' + w.datum + ': Bestand 0 — nächster Produktionstag nötig')
+              + '</div>';
+      });
+    }
+    html += '<div class="card-footer">'
+          + '<div class="footer-sum">Produktion: <span>' + rd(result.gesamtProduktion) + '</span> Bl.</div>'
+          + '<button class="btn-reset" onclick="resetCard(\'' + bosId + '\')">↺ Reset</button>'
+          + '</div>';
+  }
+
+  card.innerHTML = html;
+  if (state[bosId]._akkOpen) {
+    var body = card.querySelector('#akk-' + bosId);
+    var arr  = card.querySelector('#akk-arr-' + bosId);
+    if (body) body.classList.add('open');
+    if (arr)  arr.classList.add('open');
+  }
+  return card;
+}
+
+// ── INTERAKTION ─────────────────────────────────
+function setFroster(v) {
+  frosterFertig = v;
+  document.getElementById('f-ja').classList.toggle('active',  v === true);
+  document.getElementById('f-nein').classList.toggle('active', v === false);
+  recalcAll();
+}
+
+function tapDay(bosId, offset) {
+  var s = state[bosId];
+  if (s.prodTage[offset]) {
+    delete s.prodTage[offset]; delete s.manuelleWerte[offset]; delete s.gesperrtWerte[offset];
+  } else {
+    s.prodTage[offset] = true;
+  }
+  rebuildCard(bosId);
+}
+
+function setZiel(bosId, off) {
+  var s = state[bosId];
+  s.zielOff = (s.zielOff === off) ? null : off;
+  if (s.zielOff !== null) {
+    [s.prodTage, s.manuelleWerte, s.gesperrtWerte].forEach(function(obj) {
+      Object.keys(obj).forEach(function(k) { if (parseInt(k) > s.zielOff) delete obj[k]; });
+    });
+  }
+  rebuildCard(bosId);
+}
+
+function toggleGleichmaessig(bosId) {
+  state[bosId].gleichmaessig = !state[bosId].gleichmaessig;
+  rebuildCard(bosId);
+}
+
+// FIX TASTATUR: Debounce — Rebuild erst nach 700ms Tipp-Pause
+function onInput(bosId, offset, el) {
+  var val = parseInt(el.value), s = state[bosId];
+  if (!isNaN(val) && val >= 0) {
+    s.manuelleWerte[offset] = val;
+    if (s.gesperrtWerte[offset] !== undefined) s.gesperrtWerte[offset] = val;
+  } else {
+    delete s.manuelleWerte[offset]; delete s.gesperrtWerte[offset];
+  }
+  // Kein sofortiges Rebuild — erst nach Pause damit Tastatur offen bleibt
+  clearTimeout(rebuildTimers[bosId]);
+  rebuildTimers[bosId] = setTimeout(function() {
+    rebuildCard(bosId);
+  }, 700);
+}
+
+// Bestand manuell korrigieren (v.a. bei veraltet/nie gezählt nötig)
+function onBestandInput(bosId, el) {
+  var val = parseInt(el.value);
+  state[bosId].startBestand = (!isNaN(val) && val >= 0) ? val : 0;
+  clearTimeout(rebuildTimers['bestand_' + bosId]);
+  rebuildTimers['bestand_' + bosId] = setTimeout(function() {
+    rebuildCard(bosId);
+  }, 700);
+}
+
+// Fehlmenge (Sofort-Zusatzbedarf) manuell setzen, pro Produkt
+function onFehlmengeInput(bosId, el) {
+  var val = parseInt(el.value);
+  state[bosId].fehlmengeAbs = (!isNaN(val) && val >= 0) ? val : 0;
+  clearTimeout(rebuildTimers['fehlmenge_' + bosId]);
+  rebuildTimers['fehlmenge_' + bosId] = setTimeout(function() {
+    rebuildCard(bosId);
+  }, 700);
+}
+
+function toggleLock(bosId, offset) {
+  clearTimeout(rebuildTimers[bosId]);
+  var s = state[bosId];
+  if (s.gesperrtWerte[offset] !== undefined) {
+    delete s.gesperrtWerte[offset];
+  } else {
+    var inp = document.querySelector('input[data-bid="' + bosId + '"][data-off="' + offset + '"]');
+    var wert = parseInt(inp ? inp.value : 0) || 0;
+    s.gesperrtWerte[offset] = wert; s.manuelleWerte[offset] = wert;
+  }
+  rebuildCard(bosId);
+}
+
+function resetCard(bosId) {
+  clearTimeout(rebuildTimers[bosId]);
+  var s = state[bosId];
+  Object.keys(s.manuelleWerte).forEach(function(k) {
+    if (s.gesperrtWerte[k] === undefined) delete s.manuelleWerte[k];
+  });
+  rebuildCard(bosId);
+}
+
+function toggleAkk(bosId) {
+  var s = state[bosId]; s._akkOpen = !s._akkOpen;
+  var body = document.getElementById('akk-' + bosId);
+  var arr  = document.getElementById('akk-arr-' + bosId);
+  if (body) body.classList.toggle('open', s._akkOpen);
+  if (arr)  arr.classList.toggle('open', s._akkOpen);
+}
+
+// ── EXPORT BAR ────────────────────────────────
+function updateExportBar() {
+  var fertig = 0, gesamt = PRODUKTE.length;
+  PRODUKTE.forEach(function(prod) {
+    var s = state[prod.bosId];
+    var prodCount = Object.keys(s.prodTage).filter(function(k){ return s.prodTage[k]; }).length;
+    if (s.zielOff !== null && prodCount > 0) fertig++;
+  });
+  var btn = document.getElementById('btn-export');
+  var cnt = document.getElementById('export-count');
+  btn.className = 'btn-export' + (fertig === 0 ? ' disabled' : '');
+  cnt.textContent = fertig + ' / ' + gesamt + ' Produkte mit Vorschlag';
+}
+
+// ── EINREICHEN (ersetzt den alten WhatsApp-Export) ──────────
+// Schreibt eine Basis-Einreichung nach Firestore (append-only, bos_events),
+// siehe SESSION_2026-09-03_PRODUKTIONSPLANER_KONZEPT.md. Die Übersichtsseite
+// (künftig) liest daraus den grünen Haken pro Station.
+function isoDatum(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function aktuellerProfilName() {
+  try {
+    var st = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+    if (!st || !st.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(st.localProfiles || []);
+    var p = alle.find(function(x){ return x.id === st.activeProfileId; });
+    return p ? p.name : null;
+  } catch (e) { return null; }
+}
+
+async function planungEinreichen() {
+  var btn = document.getElementById('btn-export');
+  if (btn.classList.contains('disabled') || btn.disabled) return;
+
+  var produkteDaten = {};
+  var mind1 = false;
+  PRODUKTE.forEach(function(prod) {
+    var s = state[prod.bosId];
+    var prodOffsets = Object.keys(s.prodTage).filter(function(k){ return s.prodTage[k]; });
+    if (s.zielOff === null || !prodOffsets.length) return;
+    mind1 = true;
+    var result = getResult(prod.bosId);
+    produkteDaten[prod.legacyKey] = {
+      name: prod.name,
+      zielOff: s.zielOff,
+      prodTage: s.prodTage,
+      manuelleWerte: s.manuelleWerte,
+      gesperrtWerte: s.gesperrtWerte,
+      startBestand: s.startBestand,
+      fehlmengeAbs: s.fehlmengeAbs || 0,
+      gesamtProduktion: result ? rd(result.gesamtProduktion) : 0,
+      endlager: result ? rd(result.endlager) : 0,
+      warnungen: result ? result.warnungen : []
+    };
+  });
+  if (!mind1) return;
+
+  var urspruenglicherText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Wird eingereicht …';
+
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    await window.db.collection('bos_events').add({
+      type: 'produktionsplan_einreichung',
+      station: STATION_CFG,
+      woche: isoDatum(wochenMo),
+      frosterFertig: frosterFertig,
+      eingereichtVon: aktuellerProfilName(),
+      ts: firebase.firestore.FieldValue.serverTimestamp(),
+      produkte: produkteDaten
+    });
+    btn.textContent = '✓ Eingereicht';
+    setTimeout(function() {
+      btn.textContent = urspruenglicherText;
+      btn.disabled = false;
+    }, 2500);
+  } catch (fehler) {
+    console.warn('Produktionsplaner Nachtschicht: Einreichen fehlgeschlagen', fehler);
+    btn.textContent = '⚠ Fehlgeschlagen — nochmal tippen';
+    btn.disabled = false;
+  }
+}
+
+// ── Hilfe (Standard-Muster: einfaches Schritte-Array + Bottom-Sheet,
+// Fundament §5.2/§5.2.1 — gab es bei den alten NFC-Seiten nie, war dort
+// bei einem einzigen Nutzer auch nie nötig. Jetzt potenziell jede
+// Person an der Station, allein am eigenen Handy, ohne dass wer
+// danebensteht — deshalb hier ergänzt.) ──────────────────────────────
+const PP_HILFE_SCHRITTE = [
+  ['Wofür ist der Produktionsplaner?', 'Er sagt dir für jedes Produkt dieser Station, wie viel du an welchem Tag produzieren musst — damit bis zu deinem gewählten Ziel-Tag kein Engpass entsteht. Am Ende reichst du die Planung für die Station ein.'],
+  ['Bestand und Fehlmenge — der Unterschied', '"Bestand" ist, was gerade tatsächlich da ist — automatisch aus der letzten Froster-Zählung übernommen, wenn die jünger als 24 Stunden ist. Siehst du einen roten Rahmen und "nie gezählt" oder "älter als 24 Std.", trägst du den aktuellen Bestand von Hand ein. "Fehlmenge" ist etwas anderes: ein zusätzlicher Sofortbedarf OBEN DRAUF, der über den normalen Verbrauch hinausgeht — z. B. eine spontane Kundenbestellung. Ersetzt den Bestand nicht, kommt einfach dazu.'],
+  ['Schritt 1: Produktionstage wählen', 'Oben unter "Produktionstage" wählst du, an welchen Tagen der kommenden Planungswoche produziert wird. Bereits vergangene Tage sind grau und nicht wählbar, geschlossene Tage ebenso.'],
+  ['Schritt 2: Ziel setzen', 'Darunter unter "Bis wann reicht der Bestand?" wählst du dein Zieldatum in der Woche danach — der Tag, für den die ganze Rechnung aufgeht. Je weiter er entfernt ist, desto mehr muss vorher produziert werden.'],
+  ['Vorschlag lesen', 'Die große Zahl ist automatisch berechnet und direkt editierbar — antippen und Wert ändern reicht. Darunter steht "min X Bl." — das ist die Mindestmenge, die für die Kette bis zum nächsten Produktionstag oder Ziel nötig ist. Wird sie unterschritten, färbt sich die Karte rot.'],
+  ['Das Schloss-Symbol', '🔓 offen heißt: automatisch berechnet, ändert sich mit, wenn du an anderer Stelle etwas anpasst. Antippen sperrt (🔒) den gerade angezeigten Wert fest — er wird dann bei weiteren Änderungen NICHT mehr neu berechnet. Nochmal antippen löst die Sperre wieder, die Kette rechnet ab dann wieder automatisch für diesen Tag.'],
+  ['Gleichmäßige Belastung', 'Checkbox direkt über dem Vorschlag, pro Produkt einzeln. Verteilt die benötigte Menge gleichmäßiger auf die gewählten Produktionstage, statt möglichst viel auf einen einzigen Tag zu packen.'],
+  ['Kette prüfen', 'Der Bereich ist standardmäßig aufgeklappt und zeigt Tag für Tag: Verbrauch, Produktion und den Bestand davor/danach. "Lücke" heißt: an dem Tag reicht der Bestand nicht. "Knapp" heißt: heute reicht es noch, morgen nicht mehr ohne Nachschub.'],
+  ['Datenquelle', 'Der Verbrauch pro Tag kommt entweder aus "Manuell" (händisch erfasste Werte) oder "Offiziell" (migrierte historische Zahlen). Betrifft alle Karten gleichzeitig.'],
+  ['Froster fertig?', 'Ganz oben: ob der Froster für morgen schon vorbereitet ist. Beeinflusst, ob morgen als "durch Froster gedeckt" gilt oder normal mitgerechnet wird.'],
+  ['Planung einreichen', 'Der Button unten wird aktiv, sobald mindestens ein Produkt einen Produktionstag und ein Ziel hat. Schickt die aktuelle Planung für diese Station in die zentrale Übersicht — mehrfaches Einreichen ist möglich, es zählt immer die letzte Einreichung.']
+];
+
+function ppOeffneHilfe() {
+  const inhalt = document.getElementById('pp-hilfe-inhalt');
+  inhalt.innerHTML = PP_HILFE_SCHRITTE.map(function (s) {
+    return '<div class="pp-hilfe-schritt"><div class="pp-hilfe-titel">' + s[0] + '</div><div class="pp-hilfe-text">' + s[1] + '</div></div>';
+  }).join('');
+  document.getElementById('pp-hilfe-modal').style.display = 'block';
+}
+function ppSchliesseHilfe() {
+  document.getElementById('pp-hilfe-modal').style.display = 'none';
+}
+</script>
+</body>
+</html>
