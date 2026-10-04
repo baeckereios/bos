@@ -1,0 +1,20 @@
+# BäckereiOS – Repo-Hygiene (04.10.2026)
+test_*.js
+fake_*.js
+harness_funcs.js
+*smoketest*.js
+diagnose.html
+*.v_alt.*
+registry_snippet_*.js
+dokumentationen/
+**/*_DOKU.md
+**/*_KOMPENDIUM.md
+**/SESSION_*.md
+**/OFFENE_PUNKTE_*.md
+**/*_STARTER.md
+schichtplaner/*_migration.json
+schichtplaner/positionen_pools.json
+produkt_config/weggelassene_auto_stubs.txt
+.DS_Store
+Thumbs.db
+desktop.ini
