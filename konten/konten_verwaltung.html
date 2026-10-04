@@ -3,15 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
 <title>BäckereiOS · Konten & Rollen</title>
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
-    2026-10-04 · 14:39 · Online-Gang · Aufräumen
-      Kommentar bei geschuetzteKonten(): alte Admin-Kennung im Klartext
-      entfernt (stand dort als Erinnerung, gehört nicht ins öffentliche
-      Repo). robots noindex im Kopf. Keine Logikänderung.
+    2026-10-04 · 16:12 · v-Beschriften-Weg · Umbau (Bedien-Falle, Ulf 04.10.)
+      Anlass: Ulf wollte online den Rohling backstube04 beschriften, fand
+      den Block nicht, wählte stattdessen „Verknüpfte Person“ — damit galt
+      das Konto nicht mehr als Rohling, der Beschriften-Block verschwand,
+      das Konto hing ohne Rolle und ohne Namen fest.
+      - Rohling-Karte öffnet im Reiter „Konto“, „Beschriften“ steht ganz
+        oben. „Verknüpfte Person“ und „Freigabe“ sind beim Rohling
+        ausgeblendet (Beschriften erledigt beides in einem Zug) — außer am
+        Generalschlüssel.
+      - Beschriften: wartet keine freie Person, ist „neue Person“
+        vorausgewählt und das Namensfeld sofort sichtbar.
+      - Nach „Verknüpfte Person“ zeichnen sich Karte und Liste neu (vorher
+        blieb der alte Stand stehen); Fehler mit Code und Meldung.
+      - Neu kontoAnzeigeName(): Liste, Kartenkopf, Stammdaten, Sortierung
+        und Rückfragen zeigen bei Personen-Konten die Beschreibung der
+        verknüpften Person aus der Namensliste, sonst die Konto-Notiz.
+        Vorher nur die Notiz — beschriftete Personen-Konten standen als
+        „(ohne Namen)“ da.
+      - Stammdaten: beim Rohling Hinweis und Knopf zum Beschriften statt
+        eines Strichs. Freigabe: fehlt nur die Rolle, steht dabei, wo sie
+        gesetzt wird.
+      Keine Änderung an Datenmodell und Regeln. Siehe
+      2026-10-04_KONTEN_BESCHRIFTEN_FEHLER.md.
     2026-09-29 · 19:45 · v-Teigecke-2 · Feature
       Konto-Karte, Stammdaten: drei Teigecke-Haken statt einem.
       „🧺 Wagen & Zutaten pflegen“ (Feld teigeckePflege, bisher „Teigecke
@@ -418,7 +436,7 @@
       </div>
       <div id="sektionUnbestaetigt" class="sektion-unbestaetigt hidden">
         <div class="sektion-kopf"><h2>Rohlinge</h2><span class="anzahl" id="anzahlUnbestaetigt"></span></div>
-        <p style="color:var(--bos-text-dim); font-size:.8rem; margin:0 0 8px;">Konten ohne Rolle. Beschriften: Konto antippen → Reiter „Konto“ → „Beschriften“.</p>
+        <p style="color:var(--bos-text-dim); font-size:.8rem; margin:0 0 8px;">Konten ohne Rolle. Beschriften: Konto antippen — „Beschriften“ steht gleich oben.</p>
         <div class="entry-list" id="listeUnbestaetigt"></div>
       </div>
       <div class="sektion-bestaetigt">
@@ -737,9 +755,19 @@ function erstelltSekunden(konto) {
 }
 function istUnbestaetigt(konto) { return !konto.role; }
 
+// 04.10.2026: EIN Anzeigename für Liste, Kartenkopf, Stammdaten und
+// Rückfragen. Personen-Konto: Beschreibung der verknüpften Person aus der
+// Namensliste; sonst die Konto-Notiz (Ort, Altkonto); sonst leer.
+function kontoAnzeigeName(k) {
+  if (!k) return '';
+  var p = allePersonen.filter(function (x) { return x.bosKontoId === k.id; })[0];
+  if (p) return anzeigeNamePerson(p.id);
+  return String(k.name || '').trim();
+}
+
 function sortierteKonten() {
   var unbest = alleKonten.filter(istUnbestaetigt).sort(function (a, b) { return erstelltSekunden(b) - erstelltSekunden(a); });
-  var best = alleKonten.filter(function (k) { return !istUnbestaetigt(k); }).sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  var best = alleKonten.filter(function (k) { return !istUnbestaetigt(k); }).sort(function (a, b) { return kontoAnzeigeName(a).localeCompare(kontoAnzeigeName(b), 'de'); });
   return { unbest: unbest, best: best };
 }
 
@@ -762,7 +790,7 @@ function roleName(roleId) {
 // ==========================================================================
 // Schutz vor Selbstaussperrung — 26.09.2026 (Ulfs Frage "Kann ich mich
 // selbst aussperren?"). Zwei Konten sind geschützt:
-//   - das Admin-Konto (Kennung aus BOS_BV, nicht im Klartext hier) — Tresorschlüssel
+//   - das Admin-Konto (verwaltung.k7x2, aus BOS_BV) — Tresorschlüssel
 //   - das Konto, mit dem dieses Gerät gerade angemeldet ist (Alltag)
 // Löschen oder die Rolle admin wegnehmen hieße: beim nächsten Öffnen
 // sperrt der Zugriffs-Guard diese Seite, der Weg zurück ginge nur noch
@@ -786,13 +814,13 @@ function kontoRowHTML(konto) {
   if (istGeschuetzt(konto.id)) {
     return '<div class="entry-row" onclick="oeffneKontoKarte(\'' + konto.id + '\')">' +
       '<span class="entry-icon">' + (b.role ? rollenIconFuer(b.role) : '❔') + '</span>' +
-      '<span class="entry-name">' + esc(konto.name || '(ohne Namen)') + ' <span class="entry-sub">· ' + esc(konto.id) + ' · geschützt' + hakenMarke(konto) + '</span></span>' +
+      '<span class="entry-name">' + esc(kontoAnzeigeName(konto) || '(ohne Namen)') + ' <span class="entry-sub">· ' + esc(konto.id) + ' · geschützt' + hakenMarke(konto) + '</span></span>' +
       '<span class="entry-sub" title="Eigenes Konto: nicht löschbar, Rolle nicht änderbar — sonst sperrst du dich aus dieser Seite aus.">🛡 ' + esc(roleName(b.role) || 'ohne Rolle') + '</span>' +
     '</div>';
   }
   return '<div class="entry-row" onclick="oeffneKontoKarte(\'' + konto.id + '\')">' +
     '<span class="entry-icon">' + (b.role ? rollenIconFuer(b.role) : '❔') + '</span>' +
-    '<span class="entry-name">' + esc(konto.name || '(ohne Namen)') + ' <span class="entry-sub">· ' + esc(konto.id) + hakenMarke(konto) + '</span></span>' +
+    '<span class="entry-name">' + esc(kontoAnzeigeName(konto) || '(ohne Namen)') + ' <span class="entry-sub">· ' + esc(konto.id) + hakenMarke(konto) + '</span></span>' +
     '<select class="bos-input" onclick="event.stopPropagation()" onchange="setzeKontoRolle(\'' + konto.id + '\', this.value)">' + rollenOptionsHTML(b.role) + '</select>' +
     '<button type="button" class="entry-del" title="Konto unwiderruflich löschen" onclick="event.stopPropagation(); loescheKontoKlick(\'' + konto.id + '\')">🗑</button>' +
   '</div>';
@@ -840,7 +868,7 @@ function loescheKontoKlick(kontoId) {
     return;
   }
   var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
-  var name = (k && k.name) || '(ohne Namen)';
+  var name = kontoAnzeigeName(k) || '(ohne Namen)';
   var verknuepft = allePersonen.filter(function (p) { return p.bosKontoId === kontoId; })[0];
   var zusatz = verknuepft ? '\n\nDie Verknüpfung mit ' + anzeigeNamePerson(verknuepft.id) + ' wird dabei gelöst; die Person selbst bleibt.' : '';
   if (!confirm('Konto von „' + name + '" (Kennung: ' + kontoId + ') wirklich unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.' + zusatz + '\n\nDen Login in der Firebase-Konsole bitte zusätzlich dort löschen.')) return;
@@ -873,7 +901,14 @@ var KONTO_KARTEN_TABS = [
       var b = bearbeitung[k.id];
       return (
         '<div class="detail-section">' +
-          '<div class="detail-feld"><label>Name</label><div class="readonly-wert">' + esc(k.name || '—') + '</div></div>' +
+          '<div class="detail-feld"><label>Name</label>' +
+            (kontoAnzeigeName(k)
+              ? '<div class="readonly-wert">' + esc(kontoAnzeigeName(k)) + '</div>'
+              : (istRohling(k)
+                ? '<div class="readonly-wert">Noch nicht beschriftet.</div>' +
+                  '<button type="button" class="bos-btn bos-btn--amber" style="margin-top:8px;" onclick="waehleKontoKartenTab(\'konto\')">Jetzt beschriften …</button>'
+                : '<div class="readonly-wert">— kein Name. Reiter „Konto“: Person verknüpfen (Person) oder Weggang und neu beschriften.</div>')) +
+          '</div>' +
           (k.geburtsdatum ? '<div class="detail-feld"><label>Geburtsdatum (Altkonto)</label><div class="readonly-wert">' + esc(k.geburtsdatum) + '</div></div>' : '') +
         '</div>' +
         '<div class="detail-section full">' +
@@ -917,6 +952,17 @@ var KONTO_KARTEN_TABS = [
         .map(function (p) {
           return '<option value="' + p.id + '"' + (verknuepftePerson && p.id === verknuepftePerson.id ? ' selected' : '') + '>' + esc(anzeigeNamePerson(p.id)) + '</option>';
         }).join('');
+      // 04.10.2026: Rohling = nur Beschriften (oben). Verknüpfung und
+      // Freigabe erst danach — das Verknüpfungsfeld machte den Rohling
+      // sonst zum Nicht-Rohling und blendete „Beschriften“ aus.
+      var nurBeschriften = istRohling(k) && !istAdminKennung(k.id);
+      if (nurBeschriften) {
+        return (
+          beschriftenHTML(k) +
+          '<div class="detail-section full"><div class="detail-feld"><label>Status</label><div class="readonly-wert">Rohling — angelegt am ' + formatiertesDatum(k) + ', noch ohne Namen, Rolle und Haken</div></div></div>' +
+          '<p style="color:var(--bos-text-faint); font-size:.78rem; margin-top:10px;">Verknüpfung, Freigabe und Zugangsblatt erscheinen hier, sobald das Konto beschriftet ist. Löschen geht über das 🗑 in der Liste.</p>'
+        );
+      }
       return (
         '<div class="detail-section full"><div class="detail-feld"><label>Status</label><div class="readonly-wert">' +
           (istUnbestaetigt(k) ? 'Unbestätigt — Grundkonto ohne Rolle' : 'Bestätigt') + '</div></div></div>' +
@@ -941,7 +987,8 @@ function oeffneKontoKarte(kontoId) {
   kontoKarteListe = sortiert.unbest.concat(sortiert.best).map(function (k) { return k.id; });
   if (kontoKarteListe.indexOf(kontoId) === -1) kontoKarteListe.push(kontoId);
   kontoKarteId = kontoId;
-  kontoKarteAktiverTab = 'stamm';
+  var kOeffnen = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
+  kontoKarteAktiverTab = (kOeffnen && istRohling(kOeffnen) && !istAdminKennung(kontoId)) ? 'konto' : 'stamm';
   renderKontoKarte();
   document.getElementById('kontoKarteOverlay').classList.remove('hidden');
 }
@@ -963,7 +1010,7 @@ function waehleKontoKartenTab(id) {
 function renderKontoKarte() {
   var k = alleKonten.filter(function (x) { return x.id === kontoKarteId; })[0];
   if (!k) { schliesseKontoKarte(); return; }
-  document.getElementById('kkName').textContent = k.name || '(ohne Namen)';
+  document.getElementById('kkName').textContent = kontoAnzeigeName(k) || '(ohne Namen)';
   var b = bearbeitung[k.id];
   document.getElementById('kkSub').textContent = istUnbestaetigt(k) ? 'Unbestätigt' : ((rollenIconFuer(b.role) || '') + ' ' + (roleName(b.role) || ''));
 
@@ -1058,7 +1105,8 @@ function freigabeHTML(k) {
     return '<option value="' + a + '"' + (k.art === a ? ' selected' : '') + '>' + ARTEN[a] + '</option>';
   }).join('');
   var sperrgrund = '';
-  if (!an && fehlt.length) sperrgrund = 'Fehlt: ' + fehlt.join(', ') + '.';
+  if (!an && fehlt.length) sperrgrund = 'Fehlt: ' + fehlt.join(', ') + '.' +
+    (!k.role ? ' Rolle: Reiter „Stammdaten“ wählen, Karte schließen, „Änderungen speichern“.' : '');
   if (an && geschuetzt) sperrgrund = '🛡 Geschützt — der Haken lässt sich hier nicht entfernen (Admin-Konto oder das Konto, mit dem dieses Gerät angemeldet ist).';
   var person = allePersonen.filter(function (x) { return x.bosKontoId === k.id; })[0] || null;
   return '<div class="detail-section full"><div class="detail-feld"><label>Freigabe (Schritt 2)</label>' +
@@ -1110,7 +1158,7 @@ function setzeFreigeschaltet(kontoId, wert) {
     var fehlt = hakenFehlt(k);
     if (fehlt.length) { alert('Noch nicht freischaltbar. Fehlt: ' + fehlt.join(', ') + '.'); renderKontoKarte(); return; }
   }
-  if (!confirm((wert ? 'Konto freischalten' : 'Haken entfernen (Konto sperren)') + ': ' + (k.name || kontoId) + ' (Kennung: ' + kontoId + ')?' +
+  if (!confirm((wert ? 'Konto freischalten' : 'Haken entfernen (Konto sperren)') + ': ' + (kontoAnzeigeName(k) || kontoId) + ' (Kennung: ' + kontoId + ')?' +
       (wert ? '' : '\n\nOhne Haken darf dieses Konto nichts mehr außer sein eigenes Konto-Dokument lesen.'))) { renderKontoKarte(); return; }
   var adminDb = window.BOS_ACCOUNTS.adminFirestore();
   adminDb.collection('bos_accounts').doc(kontoId).update({ freigeschaltet: !!wert }).then(function () {
@@ -1271,12 +1319,16 @@ function beschriftenHTML(k) {
   var vorschlagRolle = ((/^([a-z]+)\d+$/.exec(k.id) || [])[1]) || '';
   var freiePersonen = allePersonen.filter(function (p) { return !p.bosKontoId && p.aktiv !== false; })
     .sort(function (a, b) { return anzeigeNamePerson(a.id).localeCompare(anzeigeNamePerson(b.id), 'de'); });
-  return '<div class="detail-section full"><div class="detail-feld"><label>Beschriften (Rohling, Schritt 4)</label>' +
+  // 04.10.2026: wartet keine freie Person, ist „neue Person“ vorausgewählt
+  // und das Namensfeld sofort sichtbar.
+  var startArt = freiePersonen.length ? 'a' : 'b';
+  return '<div class="detail-section full"><div class="detail-feld"><label>Beschriften — wem gehört dieses Konto?</label>' +
     '<select id="bArt-' + k.id + '" onchange="beschriftenArtWechsel(\'' + k.id + '\')">' +
-      '<option value="a">vorhandene Person</option><option value="b">neue Person</option><option value="c">Ort (z. B. Tablet)</option></select>' +
-    '<select id="bPerson-' + k.id + '" style="margin-top:6px;"><option value="">— Person wählen —</option>' +
+      '<option value="a"' + (startArt === 'a' ? ' selected' : '') + '>vorhandene Person' + (freiePersonen.length ? '' : ' (keine frei)') + '</option>' +
+      '<option value="b"' + (startArt === 'b' ? ' selected' : '') + '>neue Person</option><option value="c">Ort (z. B. Tablet)</option></select>' +
+    '<select id="bPerson-' + k.id + '"' + (startArt === 'a' ? '' : ' class="hidden"') + ' style="margin-top:6px;"><option value="">— Person wählen —</option>' +
       freiePersonen.map(function (p) { return '<option value="' + p.id + '">' + esc(anzeigeNamePerson(p.id)) + ' (' + p.id + ')</option>'; }).join('') + '</select>' +
-    '<input type="text" id="bText-' + k.id + '" class="bos-input hidden" maxlength="30" style="margin-top:6px;" placeholder="Beschreibung, z. B. Jörg">' +
+    '<input type="text" id="bText-' + k.id + '" class="bos-input' + (startArt === 'a' ? ' hidden' : '') + '" maxlength="30" style="margin-top:6px;" placeholder="Beschreibung, z. B. Jörg">' +
     '<select id="bRolle-' + k.id + '" style="margin-top:6px;">' + rollenOptionsHTML(vorschlagRolle) + '</select>' +
     '<button type="button" class="bos-btn bos-btn--amber" style="margin-top:8px;" onclick="beschriftenKlick(\'' + k.id + '\')">Beschriften und freischalten</button>' +
     '<div id="bStatus-' + k.id + '" style="font-size:.78rem; margin-top:6px;"></div>' +
@@ -1471,10 +1523,21 @@ function setzeVerknuepftePerson(kontoId, neuePersonId) {
       if (vorherigePerson && p.id === vorherigePerson.id) p.bosKontoId = null;
       if (neuePersonId && p.id === neuePersonId) p.bosKontoId = kontoId;
     });
-    if (statusEl) statusEl.textContent = neuePersonId ? 'Verknüpft mit ' + anzeigeNamePerson(neuePersonId) + '.' : 'Verknüpfung entfernt.';
+    // 04.10.2026: Karte und Liste neu zeichnen — Name, Freigabe-Gründe
+    // und Rohling-Zustand hängen an der Verknüpfung.
+    renderKontenListen();
+    if (kontoKarteId === kontoId) renderKontoKarte();
+    var text = neuePersonId ? '✓ Verknüpft mit ' + anzeigeNamePerson(neuePersonId) + '.' : '✓ Verknüpfung entfernt.';
+    var neuEl = document.getElementById('verknuepfungStatus-' + kontoId);
+    if (neuEl) neuEl.textContent = text;
+    var st = document.getElementById('saveStatus'); if (st) { st.textContent = text; st.className = 'status-ok'; }
   }).catch(function (fehler) {
     console.error('[Konten & Rollen] Verknüpfung fehlgeschlagen:', fehler);
-    if (statusEl) statusEl.textContent = 'Fehlgeschlagen: ' + ((fehler && fehler.message) || String(fehler));
+    var text = 'Verknüpfung nicht gespeichert: ' + freigabeFehler(fehler);
+    if (kontoKarteId === kontoId) renderKontoKarte();   // Auswahlfeld zurück auf den echten Stand
+    var neuEl = document.getElementById('verknuepfungStatus-' + kontoId);
+    if (neuEl) { neuEl.textContent = text; neuEl.style.color = 'var(--bos-red)'; }
+    var st = document.getElementById('saveStatus'); if (st) { st.textContent = text; st.className = 'status-err'; }
   });
 }
 
