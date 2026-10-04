@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#16120e">
+<title>BäckereiOS · Seite nicht gefunden</title>
+
+<!--
+  MODUL: 404.html
+  ZWECK: Fehlerseite für GitHub Pages. Liegt eine aufgerufene Adresse nicht
+         im Repo (Tippfehler, umgezogener Satellit, veraltetes Schild oder
+         Chip), liefert GitHub Pages automatisch DIESE Datei aus — statt der
+         grauen GitHub-Standardseite. Sie zeigt die versuchte Adresse (damit
+         man das falsche Schild erkennt) und einen Knopf zurück zu BOS.
+
+  WARUM EIGENE CSS-WERTE STATT bos_design_tokens.css:
+         Eine 404-Seite wird unter JEDER falschen Adresse ausgeliefert, auch
+         tief in Unterordnern, die es nicht gibt. Ein relativer Pfad zur
+         Design-Datei würde dort ins Leere laufen. Deshalb sind die wenigen
+         Farben hier fest eingetragen — es sind dieselben Werte wie in
+         bos_design_tokens.css (Ofenkohle #16120e, Kruste #221b14, Mehl
+         #f3ece1, Honig #c07a10, Glut #e0973a).
+
+  WIE DER KNOPF SEINE ADRESSE FINDET:
+         GitHub Pages liefert BOS entweder unter https://<name>.github.io/<repo>/
+         (dann ist die Wurzel das erste Pfadstück) oder direkt unter der
+         Wurzel. Das Skript probiert zuerst "/<erstes Pfadstück>/index.html"
+         und fällt sonst auf "/index.html" zurück. Ohne JavaScript zeigt der
+         Knopf bereits die wahrscheinlichste Variante.
+
+  CHANGELOG
+    2026-10-04 · 14:24 · v1 · Neu (Vorbereitung Online-Gang, siehe 2026-10-04_ONLINE_GANG.md)
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Fraunces:wght@700;900&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #16120e; --surface: #221b14; --border: rgba(255,255,255,0.08);
+    --text: #f3ece1; --dim: #ab9c8a; --faint: #736656;
+    --amber: #c07a10; --amber-bright: #e0973a; --glow: rgba(192,122,16,0.35);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  main {
+    width: 100%; max-width: 460px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 22px; padding: 32px 28px;
+    box-shadow: 0 0 60px var(--glow);
+  }
+  h1 {
+    font-family: 'Fraunces', Georgia, serif; font-weight: 900;
+    font-size: 28px; margin: 0 0 4px; letter-spacing: 0.01em;
+  }
+  .unter { color: var(--dim); font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 24px; }
+  p { line-height: 1.5; margin: 0 0 14px; }
+  code {
+    display: block; margin: 6px 0 18px; padding: 10px 12px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 13px; color: var(--dim); word-break: break-all;
+  }
+  a.knopf {
+    display: block; text-align: center; text-decoration: none;
+    min-height: 48px; line-height: 48px; padding: 0 20px;
+    background: var(--amber); color: #1b1305; font-weight: 600; font-size: 16px;
+    border-radius: 14px; transition: background .15s, box-shadow .15s;
+  }
+  a.knopf:hover, a.knopf:focus-visible { background: var(--amber-bright); box-shadow: 0 0 0 3px var(--glow); outline: none; }
+  .hinweis { margin-top: 18px; font-size: 13px; color: var(--faint); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hier ist nichts.</h1>
+  <p class="unter">BäckereiOS · Seite nicht gefunden</p>
+
+  <p>Diese Adresse gibt es in BOS nicht (mehr). Das passiert bei einem Tippfehler, einem alten Schild oder einem Chip, der auf eine umgezogene Seite zeigt.</p>
+  <code id="adresse">…</code>
+
+  <a class="knopf" id="zurueck" href="/index.html">BOS öffnen</a>
+
+  <p class="hinweis">Steht die Adresse auf einem Schild oder Chip: Ulf Bescheid geben, dann wird das Schild erneuert.</p>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var pfad = window.location.pathname || '/';
+  var el = document.getElementById('adresse');
+  el.textContent = window.location.origin + pfad + (window.location.search || '');
+
+  // Wurzel bestimmen: Projekt-Seite (/<repo>/…) oder Wurzel-Seite (/…)
+  var teile = pfad.split('/').filter(Boolean);
+  var kandidaten = [];
+  if (teile.length) kandidaten.push('/' + teile[0] + '/');
+  kandidaten.push('/');
+
+  var knopf = document.getElementById('zurueck');
+  knopf.href = kandidaten[0] + 'index.html'; // beste Vermutung sofort, auch ohne fetch
+
+  // Nachprüfen: welche Wurzel hat wirklich das Manifest?
+  function pruefe(i) {
+    if (i >= kandidaten.length) return;
+    fetch(kandidaten[i] + 'manifest.webmanifest', { method: 'HEAD', cache: 'no-store' })
+      .then(function (r) {
+        if (r.ok) { knopf.href = kandidaten[i] + 'index.html'; }
+        else { pruefe(i + 1); }
+      })
+      .catch(function () { pruefe(i + 1); });
+  }
+  pruefe(0);
+})();
+</script>
+</body>
+</html>

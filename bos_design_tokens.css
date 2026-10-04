@@ -1,0 +1,259 @@
+/* ================================================================
+   BäckereiOS · Satellite — Design-Tokens
+   ================================================================
+   Zentrale Design-Datei für den gesamten Rebuild. Host (Launcher)
+   UND jeder Satellit binden diese Datei ein:
+
+     <link rel="stylesheet" href="../bos_design_tokens.css">
+
+   Ändert sich hier ein Wert, ändert er sich überall — das ist der
+   ganze Sinn dieser Datei. Keine App dupliziert diese Variablen.
+
+   Design-Idee: "Nachtschicht-Leitstand" statt generisches Admin-Dashboard.
+   Ulf arbeitet nachts (22–06 Uhr) — dunkel ist hier der Normalfall,
+   nicht ein Zusatz-Toggle. Die Akzentfarbe (Amber) ist bewusst aus
+   dem alten System übernommen (Wiedererkennung), aber gegen den
+   dunklen Grund neu kalibriert — wie Glut/Ofenlicht in einer
+   dunklen Backstube.
+   ================================================================ */
+
+:root {
+  /* ---------- Schrift (identisch zum Altsystem, bewusste Kontinuität) ---------- */
+  --bos-font-display: 'Fraunces', Georgia, serif;
+  --bos-font-label:   'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --bos-font-body:    'Barlow', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ---------- Farben: Dunkel (Standard) ----------
+     Ofenkohle / Kruste / Glut / Mehl — Palette aus der Backstube,
+     nicht aus dem generischen Dashboard-Baukasten. */
+  --bos-bg:             #16120e;   /* Ofenkohle */
+  --bos-bg-soft:        #1c160f;
+  --bos-surface:        #221b14;   /* Kruste */
+  --bos-surface-raised: #2b2218;
+  --bos-border:         rgba(255,255,255,0.08);
+  --bos-border-strong:  rgba(255,255,255,0.18);
+
+  --bos-text:           #f3ece1;   /* Mehl */
+  --bos-text-dim:       #ab9c8a;
+  --bos-text-faint:     #736656;
+
+  --bos-amber:          #c07a10;   /* Honig — bestehende Systemfarbe */
+  --bos-amber-bright:   #e0973a;   /* Glut — Hover/Fokus-Glow */
+  --bos-amber-glow:     rgba(192,122,16,0.35);
+  --bos-amber-glow-soft:rgba(192,122,16,0.16);
+
+  --bos-green: #4caf7d;  /* Status: ok / verbunden */
+  --bos-red:   #d6584a;  /* Status: Fehler / Lücke */
+  --bos-blue:  #4a8fd6;  /* Neutral-Akzent (z.B. Kühlung) */
+  --bos-purple:#8b5cf6;  /* System-Kacheln (Einstellungen etc.) */
+
+  --bos-radius-sm: 6px;
+  --bos-radius-md: 14px;
+  --bos-radius-lg: 22px;
+
+  /* ---------- Dichte-Skala: Standard (Default, siehe html[data-density]) ----------
+     Ergänzt 01.09.2026 auf Wunsch von Ulf ("filigraner, wie bei Windows,
+     einstellbar"). Vorgabewerte hier entsprechen 1:1 dem, was bisher in
+     schnellrechner.html/taschenrechner.html hart codiert war — "standard"
+     ändert also optisch nichts am bestehenden Look. Erst html[data-density=
+     "compact"] weiter unten definiert die tatsächlich engere Variante.
+     Jeder Satellit MUSS diese Tokens verwenden statt eigener fester px/rem-
+     Werte, sonst wirkt die Einstellung dort nicht (siehe BOS_DICHTE_DOKU.md). */
+  --bos-space-3xs: 3px;
+  --bos-space-2xs: 6px;
+  --bos-space-xs:  9px;
+  --bos-space-sm:  14px;
+  --bos-space-md:  18px;
+  --bos-space-lg:  22px;
+  --bos-space-xl:  32px;
+
+  --bos-font-2xs: 0.62rem;
+  --bos-font-xs:  0.72rem;
+  --bos-font-sm:  0.82rem;
+  --bos-font-md:  0.95rem;
+  --bos-font-lg:  1.15rem;
+  --bos-font-xl:  1.3rem;
+  --bos-font-2xl: 1.6rem;
+  --bos-font-3xl: 2.2rem;
+  --bos-font-4xl: 3.4rem;
+  --bos-font-5xl: 4rem;   /* nur für den Schnellrechner-Hero-Wert, siehe dortige CSS-Kommentare */
+
+  /* Mindest-Tastenhöhe — wird auch im Kompakt-Modus nicht unterschritten.
+     Das ist Touchscreen (Finger, ggf. mehlig/nass), keine Maus mit Pixel-
+     genauem Zeiger wie unter echtem Windows — "filigraner" heißt hier
+     weniger Leerraum/kleinere Schrift, nicht kleinere Trefferflächen. */
+  --bos-tap-min: 44px;
+
+  --bos-shadow-sm: 0 2px 10px rgba(0,0,0,0.4);
+  --bos-shadow-md: 0 10px 28px rgba(0,0,0,0.5);
+  --bos-shadow-lg: 0 20px 56px rgba(0,0,0,0.6);
+
+  --bos-ease: cubic-bezier(.4,0,.2,1);
+  --bos-transition-fast: 140ms var(--bos-ease);
+  --bos-transition: 220ms var(--bos-ease);
+}
+
+/* ---------- Farben: Hell (optional — z.B. Tagbetrieb / Büro) ---------- */
+html[data-theme="light"] {
+  --bos-bg:             #f6f1e8;
+  --bos-bg-soft:        #efe7d6;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #ffffff;
+  --bos-border:         rgba(0,0,0,0.09);
+  --bos-border-strong:  rgba(0,0,0,0.18);
+
+  --bos-text:           #221b14;
+  --bos-text-dim:       #6b6154;
+  --bos-text-faint:     #a49a89;
+
+  --bos-amber-bright:   #a8690d;
+  --bos-amber-glow:     rgba(192,122,16,0.20);
+  --bos-amber-glow-soft:rgba(192,122,16,0.10);
+
+  --bos-shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+  --bos-shadow-md: 0 8px 24px rgba(0,0,0,0.10);
+  --bos-shadow-lg: 0 16px 48px rgba(0,0,0,0.14);
+}
+
+/* ---------- Dichte: Kompakt (optional — z.B. für Windows-Nutzung, Maus statt Finger) ----------
+   Ergänzt 01.09.2026. Aktivierung über <html data-density="compact">, per
+   Profil gespeichert und synchronisiert wie das Theme (siehe
+   bos_density_sync.js, analog bos_theme_sync.js). Fehlt das Attribut
+   komplett, gilt automatisch die Standard-Skala aus :root — Kompakt ist
+   nirgends Voraussetzung. Radius bewusst mit reduziert (nicht nur
+   Spacing/Schrift): kleinere Rundungen wirken kantiger/präziser, das war
+   Teil von Ulfs "wie bei Windows"-Vergleich, nicht nur die reine Größe. */
+html[data-density="compact"] {
+  --bos-space-3xs: 2px;
+  --bos-space-2xs: 4px;
+  --bos-space-xs:  6px;
+  --bos-space-sm:  9px;
+  --bos-space-md:  12px;
+  --bos-space-lg:  16px;
+  --bos-space-xl:  22px;
+
+  --bos-font-2xs: 0.58rem;
+  --bos-font-xs:  0.66rem;
+  --bos-font-sm:  0.75rem;
+  --bos-font-md:  0.85rem;
+  --bos-font-lg:  0.98rem;
+  --bos-font-xl:  1.1rem;
+  --bos-font-2xl: 1.3rem;
+  --bos-font-3xl: 1.7rem;
+  --bos-font-4xl: 2.5rem;
+  --bos-font-5xl: 2.8rem;
+
+  --bos-radius-sm: 4px;
+  --bos-radius-md: 9px;
+  --bos-radius-lg: 14px;
+
+  --bos-tap-min: 40px; /* etwas enger, bleibt aber touch-tauglich, siehe :root-Kommentar */
+}
+
+/* ---------- Zoomstufe: 100/80/65% (optional — z.B. für Kiosk-Displays mit
+   deaktiviertem Pinch-Zoom, siehe launcher.html viewport-meta) ----------
+   Ergänzt 11.09.2026 auf Wunsch von Ulf ("Ansicht überall kleiner", Vorbild:
+   Chrome-Seitenzoom 65% fühlte sich richtig an). Anders als Dichte (ändert
+   nur einzelne Token-WERTE je Dokument) skaliert Zoom die GESAMTE gerenderte
+   Seite gleichmäßig per CSS zoom-Property — Layout, Icons, Pixelmaße, alles,
+   wie echter Browser-Seitenzoom. Aktivierung über <html data-zoom="80"> bzw.
+   "65", per Profil gespeichert und synchronisiert wie Theme/Dichte (siehe
+   bos_zoom_sync.js, analog bos_density_sync.js — dort auch die wichtige
+   Iframe-Weiche gegen doppeltes Schrumpfen). "100" bzw. fehlendes Attribut
+   braucht keine eigene Regel — das ist bereits der unskalierte Normalzustand.
+   Unabhängig von Dichte kombinierbar (z. B. Kompakt + 80% Zoom). */
+html[data-zoom="80"] { zoom: 80%; }
+html[data-zoom="65"] { zoom: 65%; }
+
+/* ================================================================
+   Basis-Reset — gilt für jede BOS-Seite, die diese Datei einbindet
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bos-bg);
+  color: var(--bos-text);
+  font-family: var(--bos-font-body);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+body { transition: background var(--bos-transition), color var(--bos-transition); }
+
+::selection { background: var(--bos-amber-glow); color: var(--bos-text); }
+
+/* Sichtbarer Fokus-Ring — Pflicht, nicht optional (Zugänglichkeit) */
+:focus-visible {
+  outline: 2px solid var(--bos-amber-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ================================================================
+   Wiederverwendbare Bausteine — für Host und Satelliten gleichermaßen
+   ================================================================ */
+.bos-panel {
+  background: var(--bos-surface);
+  border: 1px solid var(--bos-border);
+  border-radius: var(--bos-radius-md);
+  box-shadow: var(--bos-shadow-sm);
+}
+
+.bos-btn {
+  font-family: var(--bos-font-label);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: var(--bos-font-sm, 0.85rem);
+  border: 1px solid var(--bos-border-strong);
+  background: var(--bos-surface-raised);
+  color: var(--bos-text);
+  border-radius: var(--bos-radius-sm);
+  padding: var(--bos-space-2xs, 0.65em) var(--bos-space-sm, 1.3em);
+  cursor: pointer;
+  transition: background var(--bos-transition-fast), border-color var(--bos-transition-fast), transform var(--bos-transition-fast);
+}
+.bos-btn:hover  { border-color: var(--bos-amber); }
+.bos-btn:active { transform: scale(0.97); }
+.bos-btn--amber {
+  background: var(--bos-amber);
+  border-color: var(--bos-amber);
+  color: #1a1208;
+}
+.bos-btn--amber:hover { background: var(--bos-amber-bright); }
+.bos-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.bos-btn--ghost:hover { border-color: var(--bos-border-strong); }
+
+.bos-title {
+  font-family: var(--bos-font-display);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+.bos-label {
+  font-family: var(--bos-font-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bos-text-dim);
+  font-size: var(--bos-font-xs, 0.78rem);
+}
+
+.bos-input {
+  font-family: var(--bos-font-body);
+  background: var(--bos-bg-soft);
+  border: 1px solid var(--bos-border-strong);
+  border-radius: var(--bos-radius-sm);
+  color: var(--bos-text);
+  padding: var(--bos-space-2xs, 0.6em) var(--bos-space-xs, 0.8em);
+  font-size: var(--bos-font-md, 0.95rem);
+  width: 100%;
+}
+.bos-input:focus { border-color: var(--bos-amber); }

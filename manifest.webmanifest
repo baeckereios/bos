@@ -1,0 +1,17 @@
+{
+  "name": "BäckereiOS",
+  "short_name": "BOS",
+  "description": "Betriebssystem der Backstube — Produktion, Froster, Pläne und Werkzeuge an einem Ort.",
+  "lang": "de",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#16120e",
+  "theme_color": "#16120e",
+  "icons": [
+    { "src": "pwa/bos_icon_192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "pwa/bos_icon_512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "pwa/bos_icon_maskable_512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

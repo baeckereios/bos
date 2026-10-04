@@ -1,0 +1,169 @@
+{
+  "hinweis_fuer_editor": "Dies ist das Feld-Glossar zu produkt_config.json. Jedes Feld bekommt hier eine Bezeichnung, eine ausführliche Erklärung in einfacher Sprache und die Angabe, welche Satelliten es lesen. Der künftige Produkt-Config-Editor V2 soll diese Datei laden und pro Spalte/Feld ein Hilfe-Symbol mit 'beschreibung' anzeigen. Regel (siehe SESSION_2026-08-28_PRODUKT_CONFIG_FELD_GLOSSAR.md): kein neues Feld in produkt_config.json ohne Eintrag hier — analog zur Hilfetext-Pflicht pro Satellit (Fundament §5.2.1).",
+
+  "felder": {
+
+    "legacyKey": {
+      "bezeichnung": "Interner Schlüssel",
+      "status": "bestätigt",
+      "typ": "string",
+      "beschreibung": "Der eindeutige, technische Name eines Produkts. Verbindet die Datei mit der Datenbank und alle Satelliten untereinander — wenn zwei Stellen vom selben Produkt sprechen sollen, müssen sie denselben legacyKey benutzen. Darf nach der Anlage praktisch nie mehr geändert werden, sonst reißen alle Verknüpfungen ab (Firestore-Dokument-ID im Sync-Tool ist z. B. genau dieser Wert).",
+      "beispiel": "hasenberger_stueck",
+      "genutztVon": ["alle lesenden Satelliten (Verknüpfung)", "produkt_config_sync.html (Dokument-ID)"]
+    },
+
+    "name": {
+      "bezeichnung": "Produktname (Anzeige)",
+      "status": "bestätigt (28.08. gegen echte produkt_config.json geprüft)",
+      "typ": "string",
+      "beschreibung": "Der Name, wie er Kolleginnen und Kollegen auf dem Bildschirm angezeigt wird — im Unterschied zum legacyKey, der nur technisch ist und nie angezeigt werden soll.",
+      "beispiel": "Hasenberger",
+      "genutztVon": ["alle Satelliten mit sichtbarer Produktliste"]
+    },
+
+    "kategorie": {
+      "bezeichnung": "Produktkategorie",
+      "status": "bestätigt (28.08.) — bei der ersten Glossar-Fassung übersehen, da ohne Dateizugriff nicht bekannt",
+      "typ": "enum",
+      "werte": ["Brötchen", "Brot", "Konditorei", "Fettgebäck", "Snack", "Schlawiner"],
+      "beschreibung": "Die grobe Produktgruppe, nach der die Produktliste im Editor sortiert und eingefärbt wird (jede Kategorie hat ihre eigene Randfarbe). Bei allen 87 Produkten gesetzt — Pflichtfeld in der Praxis, auch wenn technisch nicht erzwungen.",
+      "beispiel": "Brötchen",
+      "genutztVon": ["produkt_config_editor.html (Gruppierung/Filter)"]
+    },
+
+    "artNr": {
+      "bezeichnung": "Artikelnummer",
+      "status": "bestätigt",
+      "typ": "string oder null",
+      "beschreibung": "Die Artikelnummer aus dem Warenwirtschaftssystem. Bei 18 Produkten (v. a. komplette Schlawiner-Familie) bewusst leer (null) — das ist eine bekannte, akzeptierte Lücke aus dem Altsystem, keine Fehleingabe und nichts, was automatisch aufgefüllt werden sollte.",
+      "beispiel": "4021 oder null",
+      "genutztVon": ["Stammdaten-Anzeige"]
+    },
+
+    "station": {
+      "bezeichnung": "Arbeitsstation / Schicht",
+      "status": "bestätigt (28.08., mit echten Werten abgeglichen)",
+      "typ": "enum",
+      "werte": ["Brötchenstraße", "Nachtschicht", "Frühschicht", "Rondo", "Konditorei", "Versand"],
+      "beschreibung": "Zu welcher physischen Arbeitsstation bzw. Schicht ein Produkt gehört — WICHTIG: Das ist NICHT dasselbe wie 'frosterZustaendigkeit' (siehe dort) und auch nicht dasselbe wie die Sichtbarkeit auf einer NFC-Stationsseite (bekannter Verwechslungspunkt aus dem Altsystem, Fundament §6). Aktuell nutzen nur 64 von 87 Produkten dieses Feld überhaupt (23 ohne, z. B. reine Konditorei-Artikel ohne Schichtbindung); von den 6 möglichen Werten kommen aktuell nur 4 tatsächlich in den Daten vor ('Konditorei' und 'Versand' sind im Editor als Option vorgesehen, aber bislang bei keinem Produkt gesetzt).",
+      "beispiel": "Frühschicht",
+      "genutztVon": ["produkt_config_editor.html"]
+    },
+
+    "einheit": {
+      "bezeichnung": "Mengeneinheit",
+      "status": "bestätigt (28.08.) — Feld am 28.08. von Zwei-Werte-Checkbox auf Freitext mit Vorschlägen umgestellt",
+      "typ": "string (Freitext mit Autocomplete-Vorschlägen, bewusst KEIN geschlossenes enum)",
+      "werte": ["stueck", "bleche", "Lochblech", "rote Diele", "blaue Diele", "Kuchenblech", "Schlawinerblech"],
+      "beschreibung": "In welcher Einheit ein Produkt gezählt wird. Ulf nutzt in der Praxis deutlich mehr als zwei Einheiten (verschiedene Blech- und Dielentypen). Entscheidung vom 28.08.2026: Statt einer festen Liste bekommt das Feld ein Textfeld mit Autocomplete-Vorschlägen aus den oben genannten, bereits bekannten Werten — neue, bisher unbekannte Einheiten lassen sich trotzdem jederzeit frei eintippen. Bewusst KEINE geschlossene Kategorien-/Regel-Verwaltung gebaut (wäre hypothetische Abstraktion gewesen) — nur dafür gesorgt, dass echte Werte nicht mehr auf zwei Buckets gezwungen und dabei verfälscht werden. Geprüft (28.08., Quellcode lag jetzt vor): froster_inventur.html las dieses Feld bisher komplett NICHT — jede Zeile zeigte unabhängig vom Wert hart codiert 'Bl.' an. Am 28.08. korrigiert, zeigt jetzt den echten Wert (Fallback 'bleche', wenn das Feld fehlt).",
+      "beispiel": "rote Diele",
+      "genutztVon": ["froster_inventur.html (Umfang unbestätigt)", "verbrauch_manuell.html (nur Anzeige)", "produkt_config_editor.html"]
+    },
+
+    "ausTeig": {
+      "bezeichnung": "Aus Teig",
+      "status": "bestätigt (29.09.2026, Teigecke Stufe 2)",
+      "typ": "string (Teig-Kennung, z. B. korbbrot) oder nicht vorhanden",
+      "beschreibung": "Aus welchem Teig dieses Brot gemacht wird. Die Kennung ist der feste Name des Teigs in der Teigecke (Firestore teigecke_teige, Dokument-ID) und ändert sich nie. Ein Produkt gehört zu höchstens einem Teig; die Teigecke rechnet aus allen Broten desselben Teigs die Teigmenge. Gepflegt im Produkt-Config-Editor, Reiter Backinformationen (Auswahl aus den Teigen der Teigecke). Wichtig: Die Teigecke liest dieses Feld aus der Datei. Eine neue Zuordnung wirkt also erst, wenn die exportierte produkt_config.json im Repo liegt. Zeigt ein Produkt auf einen Teig, den es nicht (mehr) gibt, zeigt die Teigecke das als Hinweis an. Ersetzt seit 29.09.2026 die Liste produkte im Teig-Dokument (Entscheidung Ulf: wer ändern darf, entscheidet über den Ort).",
+      "beispiel": "korbbrot",
+      "genutztVon": ["teigecke/teigecke_nacht.html", "produkt_config_editor.html"]
+    },
+
+    "backTage": {
+      "bezeichnung": "Back-Wochentage",
+      "status": "bestätigt (28.08.) — bei der ersten Glossar-Fassung übersehen",
+      "typ": "array aus Zahlen 0–6 (0 = Sonntag, 1 = Montag … 6 = Samstag, wie JavaScript Date.getDay())",
+      "beschreibung": "An welchen Wochentagen ein Produkt gebacken wird. Wird im Editor als anklickbare Mo–So-Buttons dargestellt. WICHTIG — entdeckter und behobener Fehler (28.08.): Bei allen 16 Schlawiner-Produkten stand hier statt Zahlen eine Liste von Wochentags-Kürzeln als Text (z. B. 'Mo', 'Di'). Die Buttons im Editor konnten diesen Zustand nicht erkennen (zeigten fälschlich 'nichts ausgewählt'), obwohl Werte vorhanden waren. Wurde am 28.08.2026 einmalig auf das einheitliche Zahlenschema umgestellt (alle 16 Schlawiner-Produkte hatten ohnehin alle 7 Wochentage aktiv, keine inhaltliche Änderung — nur Format).",
+      "beispiel": "[0,1,2,3,4,5,6]",
+      "genutztVon": ["produkt_config_editor.html", "künftige Planungs-/Kettenberechnung"]
+    },
+
+    "stueckProBlech": {
+      "bezeichnung": "Stück pro Blech",
+      "status": "bestätigt",
+      "typ": "number",
+      "beschreibung": "Wie viele Stück eines Produkts auf ein Blech passen. Hieß im Altsystem 'charge' — wurde umbenannt, weil der alte Name leicht mit 'batchSize' (heute produktionsSchritt) verwechselt wurde, obwohl beide Felder fachlich nichts miteinander zu tun haben. Aktuell nur bei Hasenpfötchen befüllt (12), bei allen anderen 86 Produkten noch offen.",
+      "beispiel": "20",
+      "genutztVon": ["künftige Kettenberechnung"]
+    },
+
+    "produktionsSchritt": {
+      "bezeichnung": "Produktions-Rundungsschritt",
+      "status": "bestätigt",
+      "typ": "number",
+      "beschreibung": "Die Mindest-Blechzahl pro Produktionslauf bzw. das Vielfache, auf das aufgerundet wird — verhindert zu kleine Teigmengen und hält die Frosterauslastung sinnvoll. Hieß im Altsystem 'batchSize'. Ist die Datenquelle für die 'Aufrundung auf Chargengröße' in der automatischen Kettenberechnung (Fundament §3.3).",
+      "beispiel": "12",
+      "genutztVon": ["künftige Kettenberechnung"]
+    },
+
+    "pressenGroesse": {
+      "bezeichnung": "Pressengröße",
+      "status": "bestätigt, nur bei Bedarf befüllt",
+      "typ": "number oder nicht vorhanden",
+      "beschreibung": "Nur bei Produkten gesetzt, für die dieser Wert tatsächlich relevant ist — kein Platzhalter-null bei allen anderen. Fehlt das Feld komplett, ist das kein Fehler, sondern bedeutet 'nicht zutreffend'.",
+      "beispiel": "—",
+      "genutztVon": ["Stammdaten-Anzeige, produktspezifisch"]
+    },
+
+    "teiggewichtAufschlag": {
+      "bezeichnung": "Teiggewicht-Aufschlag",
+      "status": "bestätigt, nur bei Bedarf befüllt",
+      "typ": "number oder nicht vorhanden",
+      "beschreibung": "Wie pressenGroesse: nur gesetzt, wo tatsächlich ein Wert vorhanden war. Kein Platzhalter für alle Produkte.",
+      "beispiel": "—",
+      "genutztVon": ["Stammdaten-Anzeige, produktspezifisch"]
+    },
+
+    "hinweis": {
+      "bezeichnung": "Freitext-Hinweis",
+      "status": "bestätigt, nur bei Bedarf befüllt",
+      "typ": "string oder nicht vorhanden",
+      "beschreibung": "Ein kurzer Freitext für produktspezifische Besonderheiten, die in keins der anderen Felder passen. Bewusst kein Pflichtfeld.",
+      "beispiel": "Nur auf Vorbestellung",
+      "genutztVon": ["Stammdaten-Anzeige"]
+    },
+
+    "frosterZustaendigkeit": {
+      "bezeichnung": "Froster-Zuständigkeit",
+      "status": "bestätigt als Feld — aber aktuell bei 0 von 87 Produkten befüllt (Stand 28.08.)",
+      "typ": "enum",
+      "werte": ["nein", "baecker", "konditoren", "sonstige"],
+      "beschreibung": "Ob und welche Berufsgruppe für die Froster-Vorbereitung eines Produkts zuständig ist. Steuert die Poka-Yoke-Abfrage 'Vorbereitung für morgen fertig?' in der Froster-Inventur — jede Gruppe bekommt nur ihre eigenen Produkte zur Bestätigung vorgelegt. NICHT zu verwechseln mit 'station': station beschreibt die physische Arbeitsstation/Schicht eines Produkts (z. B. Frühschicht) und ist bei 64 von 87 Produkten bereits gepflegt. frosterZustaendigkeit ist ein eigenes, unabhängiges Feld speziell für die Froster-Verantwortung und entspricht am ehesten dem alten V1-Feld 'für Froster Inventur relevant' — der Wert 'nein' ist das direkte Gegenstück zu 'inventurRelevant: false' von damals, nur dass zusätzlich noch die zuständige Gruppe mit angegeben wird, falls relevant.",
+      "beispiel": "baecker",
+      "genutztVon": ["froster_inventur.html"]
+    },
+
+    "manuelleErfassung": {
+      "bezeichnung": "Manuelle Verbrauchserfassung (Opt-in)",
+      "status": "bestätigt, neu am 28.08.2026",
+      "typ": "boolean",
+      "beschreibung": "Schaltet ein Produkt für die Schnellerfassung frei. Nur Produkte mit true erscheinen dort in der Eingabeliste — bewusstes Opt-in, damit die Liste kurz und schnell bleibt statt alle 87 Produkte zu zeigen. Standard bei neuen Produkten ist false bzw. gar nicht gesetzt.",
+      "beispiel": "true",
+      "genutztVon": ["verbrauch_manuell.html"]
+    },
+
+    "schnellrechnerRelevant": {
+      "bezeichnung": "Schnellrechner relevant (Opt-in)",
+      "status": "bestätigt, 04.09.2026 korrigiert — stand fälschlich noch in der Liste der bewusst nicht migrierten V1-Flags (unten), ist aber im aktuellen produkt_config_editor.html aktiv (neuesProdukt() setzt es, eigene Checkbox)",
+      "typ": "boolean",
+      "beschreibung": "Schaltet ein Produkt für den Schnellrechner frei, analog zum Opt-in-Prinzip von manuelleErfassung. Standard bei neuen Produkten: false.",
+      "beispiel": "true",
+      "genutztVon": ["produkt_config_editor.html (Produkt-Karte, Tab Einstellungen)", "künftiger Schnellrechner"]
+    },
+
+    "nfcSeite": {
+      "bezeichnung": "Auf Produktionsplaner anzeigen",
+      "status": "bestätigt, 04.09.2026 gegen echten Code von produkt_config_editor.html geprüft — Feld ist aktiv (neuesProdukt() setzt es, eigene Checkbox in der Produkt-Karte)",
+      "typ": "boolean",
+      "beschreibung": "Der interne Feldname stammt noch aus dem ursprünglichen NFC-Stationsseiten-Konzept, die Anzeige im Editor heißt aber inzwischen 'Auf Produktionsplaner anzeigen' — nicht dasselbe wie 'station' (das ist die fachliche Zuordnung, dies hier ist ein zusätzlicher, bewusst getrennter Sichtbarkeits-Schalter für die wöchentliche Planung). Standard bei neuen Produkten: false.",
+      "beispiel": "true",
+      "genutztVon": ["produkt_config_editor.html (Produkt-Karte, Tab Einstellungen)"]
+    }
+
+  },
+
+  "bewusst_nicht_migrierte_v1_flags": {
+    "hinweis": "Diese Felder gab es im Altsystem, wurden bei der Migration am 27.08.2026 bewusst NICHT übernommen — sie waren an die UI-Bedürfnisse der alten Einzelseiten gekoppelt. Werden pro V2-Satellit neu und bedarfsgerecht vergeben (wie frosterZustaendigkeit und manuelleErfassung oben), nicht pauschal wiederbelebt. Hier nur als Gedächtnisstütze gelistet, damit niemand rätselt, ob sie vergessen wurden. (schnellrechnerRelevant am 04.09.2026 hier entfernt — ist entgegen dem früheren Stand doch aktiv, siehe Feld-Eintrag oben.)",
+    "felder": ["inventurRelevant", "frosterliste", "filialeProdukt"]
+  }
+}

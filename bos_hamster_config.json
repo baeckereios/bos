@@ -1,0 +1,23 @@
+{
+  "_kommentar": "System-Standard für die Hamster-Stufen (bos_hamster.js). Ein Schreiber (Ulf), daher Datei statt Firestore. Root-Ebene. Werte 1:1 aus dem Altsystem übernommen (hamster_config.json, Stand 25.05.2026) — unverändert, nicht neu erfunden.",
+  "erstellt": "2026-05-25",
+  "beschreibung": "Hamster-Multiplikatoren für erhöhten Bedarf an Vorfeiertagen",
+  "stufen": {
+    "hamster_1": {
+      "bezeichnung": "Leicht erhöht",
+      "emoji": "🐹",
+      "modus": "mittelwert_samstag"
+    },
+    "hamster_2": {
+      "bezeichnung": "Samstag-Niveau",
+      "emoji": "🐹🐹",
+      "modus": "samstag"
+    },
+    "hamster_3": {
+      "bezeichnung": "Maximal",
+      "emoji": "🐹🐹🐹",
+      "modus": "faktor_samstag",
+      "faktor": 1.5
+    }
+  }
+}

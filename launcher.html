@@ -1,0 +1,2583 @@
+<!DOCTYPE html>
+<!--
+  MODUL: launcher.html
+  ZWECK: Startoberfläche von BäckereiOS — Kachelraster, Fensterverwaltung,
+         Taskleiste, persönliche Einstellungen.
+  DATENFLUSS: index.html (Anmeldung) → bos_firebase_config.js (Sitzung) →
+         bos_accounts.js (Rolle aus bos_accounts/<kennung>) →
+         bos_profil_sync.js (persönliche Einstellungen) → Kachelraster.
+         Rollenfilter über bos_access.js + bos_permissions.js.
+  ZUSTAND: localStorage 'bos_launcher_state_v2' (activeProfileId,
+         localProfiles, profileData) — seit 05.09.2026 zusätzlich in
+         Firestore gespiegelt, siehe bos_profil_sync.js.
+
+  BEKANNTE OFFENE PUNKTE
+    - Profilauswahl, Registrierungsformular und PIN-Abfrage stehen noch als
+      Markup und Funktionen im Dokument, haben aber keinen Aufrufer mehr.
+      Aufräumen erst, wenn der Kontostart im Betrieb bestätigt ist.
+    - Ausnahme: deleteLocalProfile() ruft showProfileOverlay() noch auf —
+      erreichbar ist die Funktion aber nur aus dem Overlay selbst.
+
+  CHANGELOG
+    2026-10-04 · 14:39 · v2.7 · Feature (Online-Gang)
+      Kopf ergänzt um theme-color, Verweis auf manifest.webmanifest, App-
+      Symbol (pwa/bos_icon_192.png) und robots noindex — gleicher Satz wie
+      in index.html, damit die Installation auch vom Launcher aus geht.
+      Keine Logikänderung. Siehe 2026-10-04_ONLINE_GANG.md.
+    2026-09-27 · v2.6 · Fix (Namens-Fundament, NF-51, NF-52)
+      NF-51: Der Hinweiskasten (#startHinweis) sitzt jetzt OBERHALB der
+      unteren Leiste (bottom: 67px = Leiste 64px + 3px Rand, plus
+      Sicherheitsabstand unten) — vorher lag er auf Höhe der Leiste und
+      der runde Knopf unten links verdeckte ihn.
+      NF-52: Konto ohne Haken — die Hintergrund-Lesevorgänge, die ohne Haken
+      zu Recht scheitern und je für sich „keine Berechtigung“ meldeten,
+      werden gar nicht erst versucht; es bleibt der EINE Hinweis „Noch nicht
+      freigeschaltet“ (Einzelheiten beim Code, Stichwort NF-52).
+    2026-09-26 · v2.5 · Feature (Namens-Fundament, Schritt 2, §11.5, K-15)
+      Konto ohne Haken „freigeschaltet“: Hinweis „Noch nicht
+      freigeschaltet“ (die Rolle übernimmt bos_konto_profil.js dann nicht).
+      Tür mit dem Generalschlüssel angemeldet: roter Streifen oben (K-15),
+      Vergleich über BOS_BV.adminKennung().
+    2026-09-26 · v2.4 · Fix (Namens-Fundament, Schritt 1)
+      selectProfile(): scheitert das Nachladen der Rolle eines auf diesem
+      Gerät gespeicherten Konto-Profils, erscheint der Grund jetzt im
+      Hinweiskasten statt nur in der Konsole. Seit die Kontenliste zu ist,
+      darf jedes Konto nur sein eigenes Dokument lesen — ein fremdes,
+      gespeichertes Profil scheitert dort mit permission-denied.
+      NACHTRAG 26.09. (Kontroll-Chat, NF-18): selectProfile() ist seit der
+      Kontenumstellung nur noch aus dem toten Profil-Overlay erreichbar
+      (B-25) — dieser Hinweis erscheint also bei keinem Nutzer. Keine
+      Codeänderung, nur zur Richtigstellung.
+    2026-09-19 · v2.3 · Fix
+      Meldet Admin beim Start Satelliten, die laut Registry Rollen
+      haben, aber in bos_permissions.js fehlen — die erscheinen sonst
+      als Kachel für jede Rolle, ohne dass es jemand merkt.
+    2026-09-19 · v2.2 · Fix
+      Warnstreifen, wenn bos_access.js oder bos_permissions.js fehlen.
+      Ohne sie filtert der Launcher nicht mehr und zeigt alle Kacheln —
+      vorher ohne jeden Hinweis (F-24).
+    2026-09-19 · v2.1 · Fix
+      Profileintrag wird über bos_konto_profil.js gebaut — dieselbe
+      Mechanik, die seit 19.09. auch index.html benutzt. Vorher schrieb
+      ihn nur der Launcher, wodurch der Zugriffs-Guard beim NFC-Direkt-
+      aufruf auf einem frischen Gerät sperrte.
+    2026-09-19 · v2.0 · Umbau
+      Start über das angemeldete Konto statt über die Profilauswahl
+      (Etappe 2, Schritt 2 der Kontenumstellung). Kontoschlüssel ist der
+      Teil der Kennung vor dem @. Profilauswahl, Registrierung und
+      PIN-Abfrage entfallen als Weg; "Profil wechseln" wird "Abmelden".
+      Startanzeige mit sichtbaren Fehlermeldungen ergänzt, Rückfall auf den
+      zuletzt bekannten Stand bei Netzproblemen.
+    (davor kein Kopf-Changelog — Versionsgeschichte siehe
+     SESSION_*-Dokumentationen)
+-->
+<html lang="de" data-theme="dark" data-density="standard" data-kachelgroesse="standard" data-zoom="100">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#16120e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="pwa/bos_icon_192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="pwa/bos_icon_192.png">
+<title>BäckereiOS · Satellite — Launcher</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&family=Fraunces:ital,wght@0,600;0,700;0,900;1,700&display=swap" rel="stylesheet">
+
+<!-- Zentrale Design-Datei — jeder künftige Satellit bindet dieselbe Datei ein -->
+<link rel="stylesheet" href="bos_design_tokens.css">
+
+<!-- Firebase — Reihenfolge ist bindend (siehe BOS_REBUILD_FUNDAMENT.md §1.1) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="bos_firebase_config.js"></script>
+
+<style>
+  /* ================================================================
+     Launcher-spezifische Styles (nicht Teil der geteilten Design-Datei,
+     weil sie nur den Launcher selbst betreffen, keine Satelliten)
+     ================================================================ */
+
+  html, body { height: 100%; overflow: hidden; }
+
+  /* ---------- Hintergründe (pro Profil wählbar) ----------
+     Reine CSS-Muster, keine Bild-Uploads — nutzen dieselben Design-
+     Tokens wie der Rest, passen sich also automatisch an Theme und
+     eigene Akzentfarbe an. Dieselben Selektoren gelten für den
+     echten Hintergrund (body[data-bg]) UND die Vorschau-Swatches
+     in den Einstellungen (.bos-bgswatch[data-bg]) — ein Muster,
+     zwei Verwendungen, keine doppelte Pflege. */
+  body { background-repeat: repeat; background-attachment: fixed; }
+  body[data-bg="ofenkohle"] { background-image: none; }
+  body[data-bg="glut"], .bos-bgswatch[data-bg="glut"] {
+    background-image: radial-gradient(ellipse 70% 55% at 16% 100%, var(--bos-amber-glow-soft), transparent 70%);
+  }
+  body[data-bg="konditorei"], .bos-bgswatch[data-bg="konditorei"] {
+    background-image: linear-gradient(180deg, var(--bos-bg) 0%, var(--bos-bg-soft) 100%);
+  }
+  body[data-bg="mehlstaub"], .bos-bgswatch[data-bg="mehlstaub"] {
+    background-image: radial-gradient(var(--bos-border-strong) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  body[data-bg="kachelraster"], .bos-bgswatch[data-bg="kachelraster"] {
+    background-image: linear-gradient(var(--bos-border) 1px, transparent 1px), linear-gradient(90deg, var(--bos-border) 1px, transparent 1px);
+    background-size: 54px 54px;
+  }
+  .bos-bgswatch-row { display: flex; gap: .6rem; margin-top: .45rem; flex-wrap: wrap; }
+  .bos-bgswatch {
+    width: 44px; height: 44px; border-radius: var(--bos-radius-sm); background-color: var(--bos-bg);
+    border: 2px solid var(--bos-border-strong); cursor: pointer; flex-shrink: 0;
+    transition: border-color var(--bos-transition-fast), transform var(--bos-transition-fast);
+  }
+  .bos-bgswatch:hover { transform: translateY(-2px); }
+  .bos-bgswatch--active { border-color: var(--bos-amber); }
+
+  /* ---------- Profil-Auswahl ---------- */
+  .bos-profile-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1900; background: var(--bos-bg);
+    align-items: center; justify-content: center; padding: 2rem; overflow: auto;
+  }
+  .bos-profile-overlay--visible { display: flex; }
+  .bos-profile-overlay__inner { display: flex; flex-direction: column; align-items: center; gap: 1.6rem; max-width: 640px; width: 100%; }
+  .bos-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem; width: 100%; }
+  .bos-profile-tile {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: .55rem; padding: 1.4rem 1rem;
+    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-lg);
+    cursor: pointer; transition: border-color var(--bos-transition-fast), transform var(--bos-transition-fast);
+  }
+  .bos-profile-tile:hover { border-color: var(--bos-amber); transform: translateY(-2px); }
+  .bos-profile-tile--add { border-style: dashed; }
+  .bos-profile-tile__icon { font-size: 2rem; }
+  .bos-profile-tile__name { font-family: var(--bos-font-label); font-weight: 700; text-transform: uppercase; font-size: .85rem; text-align: center; }
+  .bos-profile-tile__lock { font-size: .68rem; color: var(--bos-text-faint); }
+  .bos-profile-tile__delete {
+    position: absolute; top: -7px; left: -7px; width: 23px; height: 23px; border-radius: 50%;
+    background: var(--bos-red); color: #fff; border: 2px solid var(--bos-bg); font-size: .68rem;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 3;
+    box-shadow: var(--bos-shadow-sm);
+  }
+  .bos-profile-pin, .bos-profile-add { display: flex; flex-direction: column; gap: .6rem; width: min(100%, 300px); }
+  .bos-profile-pin__error { color: var(--bos-red); font-size: .8rem; }
+  .bos-profile-pin__actions { display: flex; gap: .6rem; }
+  .bos-profile-pin__actions .bos-btn { flex: 1; }
+
+  /* ---------- Topbar ---------- */
+  .bos-topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px;
+    display: flex; align-items: center; gap: 1.1rem; padding: 0 1rem;
+    background: var(--bos-bg-soft); border-bottom: 1px solid var(--bos-border);
+    z-index: 600;
+  }
+  .bos-topbar__brand { font-size: 1.15rem; display: flex; align-items: baseline; gap: .45rem; white-space: nowrap; }
+  .bos-topbar__brand small {
+    font-family: var(--bos-font-label); font-size: .62rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--bos-amber); font-weight: 800;
+  }
+  .bos-topbar__spacer { flex: 1; }
+  .bos-topbar__status {
+    display: flex; align-items: center; gap: .45rem; font-family: var(--bos-font-label);
+    font-size: .72rem; color: var(--bos-text-dim); text-transform: uppercase; letter-spacing: .03em;
+    white-space: nowrap;
+  }
+  .bos-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bos-text-faint); flex-shrink: 0; }
+  .bos-topbar__clockwrap { text-align: right; line-height: 1.1; }
+  .bos-topbar__clock { font-family: var(--bos-font-label); font-weight: 800; font-size: .95rem; font-variant-numeric: tabular-nums; }
+  .bos-topbar__clockdate { font-family: var(--bos-font-label); font-size: .68rem; color: var(--bos-text-dim); text-transform: uppercase; letter-spacing: .04em; }
+  .bos-icon-btn {
+    width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--bos-border-strong);
+    background: var(--bos-surface); color: var(--bos-text); display: flex; align-items: center;
+    justify-content: center; cursor: pointer; font-size: 1rem; flex-shrink: 0;
+    transition: border-color var(--bos-transition-fast);
+  }
+  .bos-icon-btn:hover { border-color: var(--bos-amber); }
+
+  /* ---------- Kachelgröße (NEU 06.09.2026) ----------
+     Fünfte, unabhängige Achse neben Theme/Dichte/Symbolpaket/Icon-Stil —
+     siehe SESSION_2026-09-06_LAUNCHER_KACHELGROESSE_KONZEPT.md. Bewusst
+     KEINE dritte Dichte-Stufe: Dichte wirkt systemweit auf alle Satelliten
+     (Abstände/Schrift/Radien), diese Achse betrifft ausschließlich die
+     Symbole auf dem Launcher-Desktop selbst — für Sehschwache UND für
+     Nutzer, die einzelne Apps bevorzugt größer haben wollen (siehe
+     Einzel-Override weiter unten, .bos-tile--span-*). Alle Werte hier sind
+     die EINZIGE Quelle der Wahrheit für die Grid-Zellmaße — getCellSize()
+     liest sie zur Laufzeit per getComputedStyle() zurück, damit CSS und
+     JS nie auseinanderlaufen können. */
+  html, :root {
+    --bos-cell-w: 108px; --bos-cell-h: 122px; --bos-tile-w: 92px;
+    --bos-tile-icon: 56px; --bos-tile-icon-font: 1.7rem;
+    --bos-tile-name-font: .74rem; --bos-tile-status-font: .58rem;
+  }
+  html[data-kachelgroesse="gross"] {
+    --bos-cell-w: 140px; --bos-cell-h: 158px; --bos-tile-w: 120px;
+    --bos-tile-icon: 74px; --bos-tile-icon-font: 2.2rem;
+    --bos-tile-name-font: .88rem; --bos-tile-status-font: .66rem;
+  }
+  html[data-kachelgroesse="riesig"] {
+    --bos-cell-w: 176px; --bos-cell-h: 198px; --bos-tile-w: 152px;
+    --bos-tile-icon: 94px; --bos-tile-icon-font: 2.8rem;
+    --bos-tile-name-font: 1.02rem; --bos-tile-status-font: .74rem;
+  }
+
+  /* ---------- Desktop / Grid ---------- */
+  .bos-desktop { position: fixed; top: 52px; bottom: 64px; left: 0; right: 0; overflow: auto; padding: 1.6rem; }
+  .bos-grid {
+    position: relative; width: 100%; max-width: 1600px; min-height: 200px;
+  }
+
+  /* Windows-Explorer-artige Symbole: kein Karten-Hintergrund, Icon+Label
+     liegen direkt auf dem Desktop, nur ein dezenter Hover-/Fokus-Rahmen. */
+  .bos-tile {
+    position: absolute; width: var(--bos-tile-w); display: flex; flex-direction: column;
+    align-items: center; gap: .35rem; padding: .5rem .3rem;
+    background: transparent; border: 1px solid transparent; border-radius: var(--bos-radius-sm);
+    cursor: pointer; user-select: none; touch-action: manipulation;
+    transition: background var(--bos-transition-fast), border-color var(--bos-transition-fast), width var(--bos-transition-fast), height var(--bos-transition-fast);
+  }
+  /* Einzel-Override (NEU 06.09.2026, korrigiert nach Ulf-Rückmeldung —
+     "breit" war kein sinnvolles Konzept, stattdessen eine symmetrische
+     Skala um Standard herum): jede Kachel kann unabhängig von den anderen
+     auf eine von fünf Stufen relativ zur aktuellen Grundgröße gestellt
+     werden. Winzig/Klein bleiben in ihrer eigenen Grid-Zelle (nur der
+     Inhalt schrumpft, keine Verdichtung des Rasters). Groß/Riesig
+     brauchen mehr Fläche als eine Zelle, deshalb 2×2 bzw. 3×3 Zellen
+     Footprint — Kollision dabei verdrängt NICHTS automatisch (Ulf-
+     Entscheidung, 06.09.2026), schnappt wie beim normalen Ziehen zur
+     nächstgelegenen freien Fläche, s. nearestFreeCell() im Skript.
+     Ein Skalierungsfaktor pro Stufe (--bos-scale-*) treibt sowohl die
+     Kachel-Box als auch Icon/Schrift — eine Zahl, drei Verwendungen. */
+  html, :root {
+    --bos-scale-winzig: .62; --bos-scale-klein: .8;
+    --bos-scale-gross: 1.6; --bos-scale-riesig: 2.3;
+  }
+  .bos-tile--groesse-winzig { width: calc(var(--bos-tile-w) * var(--bos-scale-winzig)); }
+  .bos-tile--groesse-winzig .bos-tile__icon {
+    width: calc(var(--bos-tile-icon) * var(--bos-scale-winzig)); height: calc(var(--bos-tile-icon) * var(--bos-scale-winzig));
+    font-size: calc(var(--bos-tile-icon-font) * var(--bos-scale-winzig));
+  }
+  .bos-tile--groesse-winzig .bos-tile__name { font-size: max(.5rem, calc(var(--bos-tile-name-font) * var(--bos-scale-winzig))); }
+  .bos-tile--groesse-klein { width: calc(var(--bos-tile-w) * var(--bos-scale-klein)); }
+  .bos-tile--groesse-klein .bos-tile__icon {
+    width: calc(var(--bos-tile-icon) * var(--bos-scale-klein)); height: calc(var(--bos-tile-icon) * var(--bos-scale-klein));
+    font-size: calc(var(--bos-tile-icon-font) * var(--bos-scale-klein));
+  }
+  .bos-tile--groesse-klein .bos-tile__name { font-size: max(.55rem, calc(var(--bos-tile-name-font) * var(--bos-scale-klein))); }
+  .bos-tile--groesse-gross {
+    width: calc(var(--bos-cell-w) * 2 - 16px);
+    height: calc(var(--bos-cell-h) * 2 - 20px);
+    justify-content: center;
+  }
+  .bos-tile--groesse-gross .bos-tile__icon {
+    width: calc(var(--bos-tile-icon) * var(--bos-scale-gross)); height: calc(var(--bos-tile-icon) * var(--bos-scale-gross));
+    font-size: calc(var(--bos-tile-icon-font) * var(--bos-scale-gross));
+  }
+  .bos-tile--groesse-gross .bos-tile__name { font-size: calc(var(--bos-tile-name-font) * 1.1); }
+  .bos-tile--groesse-riesig {
+    width: calc(var(--bos-cell-w) * 3 - 16px);
+    height: calc(var(--bos-cell-h) * 3 - 20px);
+    justify-content: center;
+  }
+  .bos-tile--groesse-riesig .bos-tile__icon {
+    width: calc(var(--bos-tile-icon) * var(--bos-scale-riesig)); height: calc(var(--bos-tile-icon) * var(--bos-scale-riesig));
+    font-size: calc(var(--bos-tile-icon-font) * var(--bos-scale-riesig));
+  }
+  .bos-tile--groesse-riesig .bos-tile__name { font-size: calc(var(--bos-tile-name-font) * 1.2); }
+  .bos-tile:hover, .bos-tile:focus-visible {
+    background: rgba(255,255,255,0.07); border-color: var(--bos-border);
+  }
+  html[data-theme="light"] .bos-tile:hover, html[data-theme="light"] .bos-tile:focus-visible {
+    background: rgba(0,0,0,0.05);
+  }
+
+  .bos-tile__icon {
+    width: var(--bos-tile-icon); height: var(--bos-tile-icon); border-radius: var(--bos-radius-md); display: flex; align-items: center;
+    justify-content: center; font-size: var(--bos-tile-icon-font); flex-shrink: 0;
+    transition: width var(--bos-transition-fast), height var(--bos-transition-fast), font-size var(--bos-transition-fast);
+  }
+  /* Icon-Stil (NEU 05.09.2026, siehe SESSION_2026-09-05_BLOBMOJI.md):
+     img.emoji-glyph ersetzt bei iconStil:'blobmoji' das reine Text-Emoji.
+     1em/1em heißt: skaliert automatisch mit der font-size des jeweiligen
+     Containers (Kachel 1.7rem, Hub-Kachel 1.35rem, Platzhalter 2.3rem,
+     Titelleiste/Taskbar kleiner) — keine Größenregel pro Aufrufer nötig. */
+  img.emoji-glyph { width: 1em; height: 1em; vertical-align: -.15em; object-fit: contain; }
+  /* ---------- Symbolpaket (NEU 05.09.2026) ----------
+     Kachel-Beschriftung war bisher an data-theme gekoppelt (UI-Farbschema).
+     Problem: das Wallpaper ist eine unabhängige Wahl (Ulf will z.B. ein
+     helles Aquarell-Bild UND dunkles UI-Theme kombinieren können) — eine
+     an die Bildhelligkeit gekoppelte Schrift kann sich nicht mehr am Theme
+     orientieren. Neues, eigenes Attribut data-symbolpaket="hell"|"dunkel"
+     auf <html>, vom User bewusst passend zum gewählten Hintergrund
+     ausgewählt (Einstellungen, direkt über der Hintergrund-Auswahl).
+     "hell" = helle Schrift (Default, entspricht dem bisherigen Aussehen,
+     passt zu dunklen Hintergründen). "dunkel" = dunkle Schrift, passt zu
+     hellen Hintergründen (Aquarell/Anime). Siehe
+     SESSION_2026-09-05_SYMBOLPAKET.md. */
+  .bos-tile__name {
+    font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-tile-name-font);
+    text-align: center; line-height: 1.15;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    color: rgba(250,242,231,.96); text-shadow: 0 1px 3px rgba(0,0,0,.55);
+  }
+  [data-symbolpaket="dunkel"] .bos-tile__name { color: rgba(32,21,12,.92); text-shadow: 0 1px 2px rgba(255,255,255,.75); }
+  .bos-tile__status {
+    font-family: var(--bos-font-label); font-size: var(--bos-tile-status-font); text-transform: uppercase;
+    letter-spacing: .05em; color: var(--bos-text-faint); text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  }
+  [data-symbolpaket="dunkel"] .bos-tile__status { color: rgba(32,21,12,.6); text-shadow: 0 1px 2px rgba(255,255,255,.65); }
+  .bos-tile--planned .bos-tile__icon { opacity: .6; }
+  .bos-tile--add .bos-tile__icon { background: transparent; border: 2px dashed var(--bos-border-strong); color: var(--bos-text-faint); }
+  .bos-tile--add:hover { border-color: transparent; }
+  .bos-tile--add:hover .bos-tile__icon { border-color: var(--bos-amber); }
+
+  .bos-tile__delete {
+    position: absolute; top: -4px; left: 6px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--bos-red); color: #fff; border: 2px solid var(--bos-bg); font-size: .66rem;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 3;
+    box-shadow: var(--bos-shadow-sm);
+  }
+
+  .bos-tile--dragging {
+    background: rgba(255,255,255,0.12); border-color: var(--bos-border-strong);
+    box-shadow: var(--bos-shadow-lg); z-index: 500;
+  }
+
+  @keyframes bos-wiggle { 0% { transform: rotate(-1.1deg); } 100% { transform: rotate(1.1deg); } }
+  .bos-editmode .bos-tile:not(.bos-tile--add):not(.bos-tile--dragging) { animation: bos-wiggle 230ms ease-in-out infinite alternate; }
+  .bos-editmode .bos-tile { touch-action: none; }
+
+  /* ---------- Fenster ---------- */
+  .bos-windows-layer { position: fixed; top: 52px; bottom: 64px; left: 0; right: 0; pointer-events: none; z-index: 400; }
+  .bos-window {
+    position: absolute; pointer-events: auto; display: flex; flex-direction: column;
+    background: var(--bos-surface-raised); border: 1px solid var(--bos-border-strong);
+    border-radius: var(--bos-radius-md); box-shadow: var(--bos-shadow-lg); overflow: hidden;
+    min-width: 300px; min-height: 220px;
+  }
+  .bos-window--active { border-color: var(--bos-amber); }
+  .bos-window--minimized { display: none; }
+  .bos-window__titlebar {
+    display: flex; align-items: center; gap: .55rem; padding: .55rem .8rem;
+    background: var(--bos-surface); border-bottom: 1px solid var(--bos-border);
+    cursor: grab; font-family: var(--bos-font-label); font-weight: 700; text-transform: uppercase;
+    font-size: .8rem; letter-spacing: .03em; user-select: none; flex-shrink: 0;
+    touch-action: none;
+  }
+  .bos-window__titlebar:active { cursor: grabbing; }
+  .bos-window__title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bos-window__controls { display: flex; gap: .35rem; flex-shrink: 0; }
+  .bos-window__btn {
+    width: 25px; height: 25px; border-radius: 50%; border: 1px solid var(--bos-border-strong);
+    background: var(--bos-bg-soft); color: var(--bos-text); display: flex; align-items: center;
+    justify-content: center; cursor: pointer; font-size: .75rem; line-height: 1;
+  }
+  .bos-window__btn--close:hover { background: var(--bos-red); border-color: var(--bos-red); color: #fff; }
+  .bos-window__btn--min:hover, .bos-window__btn--max:hover { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  .bos-window--maximized .bos-window__resize { display: none; }
+  .bos-window--maximized .bos-window__titlebar { cursor: default; }
+  .bos-window__body { flex: 1; overflow: auto; position: relative; }
+  .bos-window__body iframe { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+  .bos-window__placeholder { padding: 1.6rem; display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
+  .bos-window__resize {
+    position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize;
+    background-image: repeating-linear-gradient(135deg, var(--bos-border-strong) 0 2px, transparent 2px 4px);
+    touch-action: none;
+  }
+
+  /* ---------- Hub-Zwischenseite (mehrere verwandte Aktionen, gleichrangig) ---------- */
+  .bos-hub-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1rem; padding: 1.4rem; height: 100%; align-content: start;
+  }
+  .bos-hubtile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;
+    aspect-ratio: 1 / 1; background: var(--bos-surface); border: 1px solid var(--bos-border);
+    border-radius: var(--bos-radius-lg); cursor: pointer;
+    transition: transform var(--bos-transition-fast), border-color var(--bos-transition-fast);
+  }
+  .bos-hubtile:hover { transform: translateY(-2px); border-color: var(--bos-border-strong); }
+  .bos-hubtile__icon { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; }
+  .bos-hubtile__name {
+    font-family: var(--bos-font-label); font-weight: 700; font-size: .78rem; text-align: center;
+    padding: 0 .3rem; line-height: 1.15;
+  }
+  .bos-hubtile__status { font-family: var(--bos-font-label); font-size: .6rem; text-transform: uppercase; letter-spacing: .04em; color: var(--bos-text-faint); }
+
+  /* ---------- Taskbar ---------- */
+  .bos-taskbar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 64px;
+    display: flex; align-items: center; gap: .7rem; padding: 0 .9rem;
+    background: var(--bos-bg-soft); /* NEU 05.09.2026: gleicher Wert wie .bos-topbar (war var(--bos-surface) — im Hell-Theme reines Weiß gegen das Creme des Headers, deshalb der optische Bruch, den Ulf schon am ersten Screenshot bemängelt hatte) */
+    border-top: 1px solid var(--bos-border);
+    border-bottom: 3px solid var(--bos-amber);
+    box-shadow: 0 6px 14px rgba(0,0,0,.45);
+    z-index: 600;
+  }
+  /* Signatur-Element: Amber-Taktstriche über der Taskbar, wie eine Gär-/Ofenschiene */
+  .bos-taskbar::before {
+    content: ''; position: absolute; top: -2px; left: 0; right: 0; height: 3px;
+    background-image: repeating-linear-gradient(90deg, var(--bos-amber) 0 2px, transparent 2px 15px);
+    opacity: .55;
+  }
+  .bos-taskbar__home {
+    width: 40px; height: 40px; border-radius: 50%; border: none; flex-shrink: 0;
+    background: var(--bos-amber); color: #1a1208; font-family: var(--bos-font-display);
+    font-weight: 900; font-size: 1rem; cursor: pointer;
+  }
+  .bos-taskbar__apps { flex: 1; display: flex; gap: .5rem; overflow-x: auto; height: 100%; align-items: center; }
+  .bos-taskbar__item {
+    display: flex; align-items: center; gap: .4rem; padding: .45rem .85rem; flex-shrink: 0;
+    border-radius: var(--bos-radius-sm); background: var(--bos-surface); border: 1px solid var(--bos-border);
+    cursor: pointer; font-family: var(--bos-font-label); font-size: .78rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .02em; position: relative; white-space: nowrap; color: var(--bos-text);
+  }
+  .bos-taskbar__item[data-active="true"] { border-color: var(--bos-amber); }
+  .bos-taskbar__item[data-active="true"]::after {
+    content: ''; position: absolute; left: 14%; right: 14%; bottom: -8px; height: 3px;
+    background: var(--bos-amber); border-radius: 2px;
+  }
+  .bos-taskbar__item[data-minimized="true"] { opacity: .55; }
+
+  /* ---------- Bearbeiten-Modus Leiste ---------- */
+  .bos-editbar {
+    position: fixed; top: 62px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    background: var(--bos-amber); color: #1a1208; padding: .5rem 1.3rem; border-radius: 999px;
+    font-family: var(--bos-font-label); font-weight: 800; text-transform: uppercase;
+    letter-spacing: .04em; font-size: .8rem; box-shadow: var(--bos-shadow-md); cursor: pointer;
+    z-index: 700; opacity: 0; pointer-events: none; transition: opacity var(--bos-transition), transform var(--bos-transition);
+  }
+  .bos-editbar--visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Modal ---------- */
+  .bos-modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,7,4,.62); display: flex; align-items: center;
+    justify-content: center; z-index: 900; opacity: 0; pointer-events: none; transition: opacity var(--bos-transition);
+  }
+  .bos-modal-overlay--visible { opacity: 1; pointer-events: auto; }
+  .bos-modal {
+    width: min(92vw, 380px); background: var(--bos-surface-raised); border: 1px solid var(--bos-border-strong);
+    border-radius: var(--bos-radius-lg); padding: 1.4rem; display: flex; flex-direction: column;
+    gap: 1rem; box-shadow: var(--bos-shadow-lg); max-height: 88vh; overflow: auto;
+  }
+  .bos-modal h3 { margin: 0; font-size: 1.15rem; }
+  .bos-modal__row { display: flex; flex-direction: column; gap: .35rem; }
+  .bos-modal__actions { display: flex; align-items: center; gap: .6rem; margin-top: .3rem; }
+  .bos-modal__color-row { display: flex; gap: .6rem; align-items: center; }
+  input[type=color].bos-color {
+    width: 46px; height: 38px; border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm);
+    background: none; padding: 2px; cursor: pointer;
+  }
+
+  /* ---------- Hilfe Bottom-Sheet ---------- */
+  .bos-help-backdrop {
+    position: fixed; inset: 0; background: rgba(10,7,4,.55); opacity: 0; pointer-events: none;
+    transition: opacity var(--bos-transition); z-index: 790;
+  }
+  .bos-help-backdrop--visible { opacity: 1; pointer-events: auto; }
+  .bos-help-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; max-height: 68vh;
+    background: var(--bos-surface-raised); border-top: 1px solid var(--bos-border-strong);
+    border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0;
+    transform: translateY(100%); transition: transform var(--bos-transition);
+    z-index: 800; padding: 1.3rem 1.4rem 1.6rem; overflow: auto; box-shadow: var(--bos-shadow-lg);
+  }
+  .bos-help-sheet--open { transform: translateY(0); }
+  .bos-help-sheet h3 { margin-top: 0; }
+  .bos-help-item {
+    padding: .6rem 0; border-bottom: 1px solid var(--bos-border); font-size: .92rem; color: var(--bos-text-dim);
+  }
+  .bos-help-item:last-of-type { border-bottom: none; }
+
+  @media (max-width: 680px) {
+    .bos-topbar__clockdate, .bos-topbar__status:nth-of-type(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+<!-- Startanzeige — NEU 19.09.2026 (Kontenumstellung, Etappe 2 Schritt 2).
+     Überbrückt die Zeit, bis das Konto aus Firestore geladen ist, und trägt
+     im Fehlerfall die echte Meldung. Ohne sie stünde man vor einem leeren
+     Raster und wüsste nicht, ob es lädt oder kaputt ist.
+     z-index 1940 liegt bewusst UNTER dem Bootscreen (1950, siehe
+     bos_bootscreen.js) — sonst verdeckt diese Anzeige die Startanimation
+     vollständig, und es sieht aus, als wäre der Bootscreen verschwunden.
+     Fund im Praxistest, 19.09.2026. -->
+<!-- Schmale Hinweisleiste für Fälle, die den Start NICHT aufhalten dürfen —
+     etwa eine Rolle, die wegen fehlender Verbindung nicht geprüft werden
+     konnte. Aussperren bei Netzproblemen ist ausdrücklich unerwünscht. -->
+<div id="startHinweis" style="position:fixed;left:0;right:0;bottom:calc(67px + env(safe-area-inset-bottom, 0px));z-index:8500;display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(214,88,74,0.14);border-top:1px solid rgba(214,88,74,0.4);color:var(--bos-text,#f3ece1);font-family:var(--bos-font-body,Barlow,sans-serif);font-size:13px;line-height:1.5;">
+  <span id="startHinweisText" style="flex:1;"></span>
+  <button id="startHinweisZu" class="bos-icon-btn" title="Hinweis schließen">✕</button>
+</div>
+<div id="startStatus" style="position:fixed;inset:0;z-index:1940;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bos-bg,#16120e);color:var(--bos-text,#f3ece1);font-family:var(--bos-font-body,Barlow,sans-serif);text-align:center;">
+  <div style="max-width:420px;">
+    <p id="startStatusText" style="margin:0 0 8px;font-size:15px;line-height:1.6;">Anmeldung wird geprüft …</p>
+    <p id="startStatusDetail" style="margin:0 0 16px;font-size:12px;color:var(--bos-text-faint,#736656);word-break:break-word;"></p>
+    <button id="startStatusAbmelden" class="bos-btn bos-btn--amber" style="display:none;">Abmelden und neu anmelden</button>
+  </div>
+</div>
+
+  <div class="bos-profile-overlay" id="profileOverlay">
+    <div class="bos-profile-overlay__inner">
+      <div class="bos-title" style="font-size:1.4rem;" data-i18n="profile.title"></div>
+      <div class="bos-profile-grid" id="profileGrid"></div>
+
+      <div class="bos-profile-pin" id="profilePinWrap" style="display:none;">
+        <label class="bos-label" data-i18n="profile.pinLabel"></label>
+        <input type="password" inputmode="numeric" class="bos-input" id="profilePinInput" maxlength="8">
+        <div class="bos-profile-pin__error" id="profilePinError" style="display:none;" data-i18n="profile.pinError"></div>
+        <div class="bos-profile-pin__actions">
+          <button class="bos-btn" id="profilePinCancel" data-i18n="modal.cancel"></button>
+          <button class="bos-btn bos-btn--amber" id="profilePinConfirm" data-i18n="profile.pinConfirm"></button>
+        </div>
+      </div>
+
+      <div class="bos-profile-add" id="profileAddWrap" style="display:none;">
+        <div style="font-size:.8rem;color:var(--bos-text-faint);max-width:280px;text-align:center;" data-i18n="profile.addHint"></div>
+        <div class="bos-modal__row">
+          <label class="bos-label" data-i18n="profile.addName"></label>
+          <input type="text" class="bos-input" id="profileAddName" maxlength="24">
+        </div>
+        <div class="bos-modal__row">
+          <label class="bos-label" data-i18n="profile.addGeburtsdatum"></label>
+          <div style="display:flex;gap:.5rem;">
+            <select class="bos-input" id="profileAddGebTag" style="flex:0.9;"></select>
+            <select class="bos-input" id="profileAddGebMonat" style="flex:1.5;"></select>
+            <select class="bos-input" id="profileAddGebJahr" style="flex:1.1;"></select>
+          </div>
+        </div>
+        <div class="bos-modal__row">
+          <label class="bos-label" data-i18n="profile.addIcon"></label>
+          <input type="text" class="bos-input" id="profileAddIcon" maxlength="4">
+        </div>
+        <div class="bos-modal__row">
+          <label class="bos-label" data-i18n="profile.addPin"></label>
+          <input type="text" inputmode="numeric" class="bos-input" id="profileAddPin" maxlength="8">
+        </div>
+        <div class="bos-modal__row" id="profileAddZusatzRow" style="display:none;">
+          <label class="bos-label" data-i18n="profile.addZusatz"></label>
+          <input type="text" class="bos-input" id="profileAddZusatz" maxlength="12">
+        </div>
+        <div class="bos-profile-pin__error" id="profileAddError" style="display:none;"></div>
+        <div class="bos-profile-pin__actions">
+          <button class="bos-btn" id="profileAddCancel" data-i18n="modal.cancel"></button>
+          <button class="bos-btn bos-btn--amber" id="profileAddSave" data-i18n="modal.save"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bos-topbar">
+    <div class="bos-topbar__brand bos-title">BäckereiOS <small data-i18n="launcher.subtitle"></small></div>
+    <div class="bos-topbar__spacer"></div>
+    <div class="bos-topbar__status">
+      <span class="bos-status-dot" id="firestoreDot"></span>
+      <span id="firestoreLabel" data-i18n="status.firestoreConnecting"></span>
+    </div>
+    <div class="bos-topbar__clockwrap">
+      <div class="bos-topbar__clock" id="clock">--:--</div>
+      <div class="bos-topbar__clockdate" id="clockDate"></div>
+    </div>
+    <button class="bos-icon-btn" id="profileSwitchBtn" title="Abmelden">👤</button>
+    <button class="bos-icon-btn" id="themeToggle" title="Theme">🌙</button>
+    <button class="bos-icon-btn" id="helpBtn" title="Hilfe">❓</button>
+  </div>
+
+  <div class="bos-desktop" id="desktop">
+    <div class="bos-grid" id="grid"></div>
+  </div>
+
+  <div class="bos-windows-layer" id="windowsLayer"></div>
+
+  <div class="bos-taskbar">
+    <button class="bos-taskbar__home" id="taskbarHome" title="Desktop anzeigen">B</button>
+    <div class="bos-taskbar__apps" id="taskbarApps"></div>
+  </div>
+
+  <div class="bos-editbar" id="editbar" data-i18n="editbar.done"></div>
+
+  <div class="bos-modal-overlay" id="modalOverlay">
+    <div class="bos-modal">
+      <h3 class="bos-title" id="modalTitle"></h3>
+      <div class="bos-modal__row">
+        <label class="bos-label" data-i18n="modal.name"></label>
+        <input type="text" class="bos-input" id="modalName" maxlength="28">
+      </div>
+      <div class="bos-modal__row">
+        <label class="bos-label" data-i18n="modal.icon"></label>
+        <input type="text" class="bos-input" id="modalIcon" maxlength="4">
+      </div>
+      <div class="bos-modal__row">
+        <label class="bos-label" data-i18n="modal.color"></label>
+        <div class="bos-modal__color-row">
+          <input type="color" class="bos-color" id="modalColor" value="#c07a10">
+        </div>
+      </div>
+      <div class="bos-modal__row">
+        <label class="bos-label" data-i18n="modal.url"></label>
+        <input type="text" class="bos-input" id="modalUrl" placeholder="z.B. ../froster/froster_inventar.html">
+        <span style="font-size:.74rem;color:var(--bos-text-faint);" data-i18n="modal.urlHint"></span>
+      </div>
+      <div class="bos-modal__row">
+        <label class="bos-label" data-i18n="modal.size"></label>
+        <div style="display:flex;gap:.6rem;margin-top:.3rem;flex-wrap:wrap;">
+          <button type="button" class="bos-btn" id="modalSizeWinzig" data-i18n="modal.sizeWinzig"></button>
+          <button type="button" class="bos-btn" id="modalSizeKlein" data-i18n="modal.sizeKlein"></button>
+          <button type="button" class="bos-btn" id="modalSizeStandard" data-i18n="modal.sizeStandard"></button>
+          <button type="button" class="bos-btn" id="modalSizeGross" data-i18n="modal.sizeGross"></button>
+          <button type="button" class="bos-btn" id="modalSizeRiesig" data-i18n="modal.sizeRiesig"></button>
+        </div>
+      </div>
+      <div class="bos-modal__actions">
+        <button class="bos-btn bos-btn--ghost" id="modalDeleteBtn" data-i18n="modal.delete" style="color:var(--bos-red);"></button>
+        <div style="flex:1;"></div>
+        <button class="bos-btn" id="modalCancel" data-i18n="modal.cancel"></button>
+        <button class="bos-btn bos-btn--amber" id="modalSave" data-i18n="modal.save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEU 02.09.2026: BackStore-Hinweis, siehe BACKSTORE_DOKU.md. Nutzt bewusst
+       dieselben .bos-modal-overlay/.bos-modal-Klassen wie das Kachel-Modal oben
+       — gleiche Optik, kein eigenes CSS nötig. -->
+  <div class="bos-modal-overlay" id="backstoreHinweisOverlay">
+    <div class="bos-modal">
+      <h3 class="bos-title" data-i18n="backstore.hinweisTitle"></h3>
+      <p style="color:var(--bos-text-dim);font-size:.92rem;line-height:1.5;margin:0;" data-i18n="backstore.hinweisText"></p>
+      <div class="bos-modal__actions">
+        <button class="bos-btn bos-btn--ghost" id="backstoreHinweisLater" data-i18n="backstore.hinweisLater"></button>
+        <div style="flex:1;"></div>
+        <button class="bos-btn bos-btn--amber" id="backstoreHinweisOpen" data-i18n="backstore.hinweisOpen"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bos-help-backdrop" id="helpBackdrop"></div>
+  <div class="bos-help-sheet" id="helpSheet">
+    <h3 class="bos-title" data-i18n="help.title"></h3>
+    <div id="helpList"></div>
+    <button class="bos-btn bos-btn--amber" id="helpCloseBtn" data-i18n="help.close" style="margin-top:.7rem;"></button>
+  </div>
+
+  <script src="bos_app_registry.js"></script>
+  <script src="bos_launcher_roles.js"></script>
+  <script src="bos_launcher_profiles.js"></script>
+  <script src="bos_profil_lookup.js"></script>   <!-- NEU 05.09.2026, geteilt mit backstore.html/bos_taskboard.js -->
+  <script src="bos_permissions.js"></script>   <!-- NEU seit 31.08.2026 -->
+  <script src="bos_access.js"></script>         <!-- NEU seit 31.08.2026 -->
+  <script src="bos_launcher_backgrounds.js" onerror=""></script>
+  <script src="bos_accounts.js"></script>
+<script src="bos_konto_profil.js"></script>
+  <script src="bos_profil_sync.js"></script>   <!-- NEU seit 05.09.2026, siehe SESSION_2026-09-04_PROFIL_EINSTELLUNGEN_SYNC_KONZEPT.md -->
+  <!-- Ausgelagert aus launcher.html am 03.09.2026, siehe SESSION_2026-09-03_BOOTSCREEN_SCREENSAVER_AUSLAGERUNG.md -->
+  <script src="bos_bootscreen.js"></script>
+  <script src="bos_screensaver_content.js"></script>
+  <script src="bos_screensaver.js"></script>
+  <!-- NEU 05.09.2026, siehe SESSION_2026-09-05_AUFGABEN_TASKBOARD_KONZEPT.md -->
+  <script src="bos_aufgaben_logik.js"></script>
+  <script src="bos_taskboard.js"></script>
+  <script>
+  /* ================================================================
+     BOS Launcher — Logik
+     Doku: siehe LAUNCHER_DOKU.md im selben Ordner.
+
+     Begriffe:
+       Rolle   — Berechtigungs-Rahmen (was ist technisch erlaubt),
+                 definiert in bos_launcher_roles.js
+       Profil  — eine echte Person (du, ein Fahrer, ...), hat eine
+                 Rolle UND eine eigene, persönliche Kachel-Anordnung
+     ================================================================ */
+
+  var STORAGE_KEY = 'bos_launcher_state_v2';
+
+  var BOS_I18N = { de: {
+    'launcher.subtitle': 'Satellite',
+    'boot.status': 'System wird gestartet …',
+    'status.firestoreConnecting': 'Firestore: verbinde …',
+    'status.firestoreConnected': 'Firestore: verbunden',
+    'status.firestoreError': 'Firestore: Fehler',
+    'editbar.done': 'Fertig',
+    'tile.add': 'Kachel hinzufügen',
+    'tile.planned': 'geplant',
+    'tile.delete': 'Entfernen',
+    'tile.deleteConfirm': 'Diese Kachel wirklich entfernen?',
+    'window.minimize': 'Minimieren',
+    'window.maximize': 'Maximieren',
+    'window.restore': 'Wiederherstellen',
+    'window.close': 'Schließen',
+    'window.placeholder': 'Diese App ist geplant, aber noch nicht gebaut. Sobald sie fertig ist: Adresse einfach in den Kachel-Einstellungen eintragen.',
+    'modal.createTitle': 'Neue Kachel',
+    'modal.editTitle': 'Kachel bearbeiten',
+    'modal.name': 'Name',
+    'modal.icon': 'Icon (Emoji)',
+    'modal.color': 'Farbe',
+    'modal.url': 'Adresse (URL, optional)',
+    'modal.urlHint': 'Leer lassen = Kachel zeigt „geplant" und öffnet einen Platzhalter.',
+    'modal.size': 'Kachelgröße',
+    'modal.sizeWinzig': 'Winzig',
+    'modal.sizeKlein': 'Klein',
+    'modal.sizeStandard': 'Standard',
+    'modal.sizeGross': 'Groß',
+    'modal.sizeRiesig': 'Riesig',
+    'modal.cancel': 'Abbrechen',
+    'modal.save': 'Speichern',
+    'modal.delete': 'Löschen',
+    'modal.unnamed': 'Unbenannt',
+    'settings.theme': 'Darstellung',
+    'settings.dark': 'Dunkel',
+    'settings.light': 'Hell',
+    'settings.density': 'Dichte',
+    'settings.densityStandard': 'Standard',
+    'settings.densityCompact': 'Kompakt',
+    'settings.zoom': 'Zoomstufe',
+    'settings.zoom100': '100%',
+    'settings.zoom80': '80%',
+    'settings.zoom65': '65%',
+    'settings.kachelgroesse': 'Kachelgröße (Launcher)',
+    'settings.kachelgroesseStandard': 'Standard',
+    'settings.kachelgroesseGross': 'Groß',
+    'settings.kachelgroesseRiesig': 'Sehr groß',
+    'settings.accent': 'Akzentfarbe',
+    'settings.accentReset': 'Zurücksetzen',
+    'settings.layout': 'Layout',
+    'settings.layoutReset': 'Auf Standard zurücksetzen',
+    'settings.layoutResetConfirm': 'Deine Kachel-Anpassungen (Reihenfolge, eigene Kacheln, Design) werden zurückgesetzt. Fortfahren?',
+    'settings.info': 'Erste Version des Launchers · noch ohne Firestore-Anbindung.',
+    'settings.symbolpaket': 'Symbolpaket (Beschriftung)',
+    'settings.symbolpaketHell': 'Hell',
+    'settings.symbolpaketDunkel': 'Dunkel',
+    'settings.iconStil': 'Icon-Stil',
+    'settings.iconStilEmoji': 'Emoji',
+    'settings.iconStilBlobmoji': 'Blobmoji',
+    'settings.background': 'Hintergrund',
+    'settings.bg.ofenkohle': 'Ofenkohle (flächig)',
+    'settings.bg.glut': 'Glut',
+    'settings.bg.konditorei': 'Verlauf',
+    'settings.bg.mehlstaub': 'Mehlstaub',
+    'settings.bg.kachelraster': 'Kachelraster',
+    'help.title': 'Kurz erklärt',
+    'help.profile': 'Das Personen-Symbol oben wechselt dein Profil — jedes Profil hat seine eigene Kachel-Anordnung.',
+    'help.tap': 'Kachel antippen → öffnet die App in einem Fenster.',
+    'help.longpress': 'Kachel lange gedrückt halten → Bearbeiten-Modus: verschieben, umbenennen, Farbe/Größe ändern (nur Admin-Profile).',
+    'help.add': 'Gestrichelte „+"-Kachel → eigene Verknüpfung hinzufügen.',
+    'help.window': 'Fenster per Titelleiste verschieben, unten rechts an der Ecke in der Größe ändern.',
+    'help.taskbar': 'Leiste unten zeigt alle geöffneten Apps — antippen wechselt oder minimiert.',
+    'help.close': 'Schließen',
+    'profile.title': 'Wer bist du?',
+    'profile.pinLabel': 'PIN eingeben',
+    'profile.pinConfirm': 'Bestätigen',
+    'profile.pinError': 'PIN falsch — nochmal versuchen.',
+    'profile.addNew': 'Neues Profil',
+    'profile.addHint': 'Du bekommst sofort Zugang zu allgemeinen Werkzeugen. Deine Rolle weist dir der Admin danach zu. Der PIN schützt dein Konto, falls du an einem anderen Gerät wieder Vorname+Geburtsdatum eingibst.',
+    'profile.addName': 'Vorname',
+    'profile.addGeburtsdatum': 'Geburtsdatum',
+    'profile.addIcon': 'Icon (Emoji)',
+    'profile.addPin': 'PIN (4-stellig, merken!)',
+    'profile.addZusatz': 'Zusatz (z. B. Kürzel) — nur falls Name+Geburtsdatum schon vergeben',
+    'profile.addMissing': 'Bitte Vorname, Geburtsdatum und PIN eingeben.',
+    'profile.addOffline': 'Keine Verbindung zur Datenbank — später erneut versuchen.',
+    'profile.addError': 'Registrierung fehlgeschlagen — bitte nochmal versuchen.',
+    'profile.addPending': 'Einen Moment …',
+    'profile.addFalscherPin': 'Diesen Namen mit diesem Geburtsdatum gibt es schon, aber der PIN stimmt nicht. Falls das dein bestehendes Konto ist: PIN nochmal prüfen. Falls du eine andere Person bist: unten einen Zusatz eintragen und erneut versuchen.',
+    'profile.deleteConfirm': 'Dieses Profil wirklich entfernen? Persönliche Anpassungen gehen dabei verloren.',
+    'hub.empty': 'Für dein Profil gibt es hier aktuell nichts zu sehen.',
+    'backstore.hinweisTitle': 'Willkommen bei BäckereiOS',
+    'backstore.hinweisText': 'Dein Desktop ist noch leer. Über den BackStore holst du dir die Werkzeuge, die du brauchst — und kannst sie jederzeit wieder entfernen.',
+    'backstore.hinweisLater': 'Später',
+    'backstore.hinweisOpen': 'BackStore öffnen',
+    'help.backstore': 'Über die BackStore-Kachel installierst oder entfernst du Apps auf deinem Desktop — jederzeit änderbar.'
+  }};
+  var BOS_LANG = 'de';
+  function t(key) { return (BOS_I18N[BOS_LANG] && BOS_I18N[BOS_LANG][key]) || key; }
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function hexToRgba(hex, alpha) {
+    var h = String(hex || '#c07a10').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var n = parseInt(h, 16) || 0xc07a10;
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  /* ---------------- Icon-Stil (NEU 05.09.2026) ----------------
+     "Eine Mechanik, viele Aufrufer": bos_app_registry.js bekommt für
+     Blobmoji KEIN eigenes Feld pro App — der Codepoint wird aus dem
+     bestehenden `icon`-Emoji live berechnet. Neue Registry-Einträge
+     brauchen dadurch nie eine zweite Icon-Angabe. Variationsselektor
+     (FE0F) wird weggelassen, das entspricht der Konvention, die sich
+     beim Testen der Blob-/OpenMoji-CDN-Pfade als korrekt gezeigt hat
+     (siehe SESSION_2026-09-05_BLOBMOJI.md). Falls ein Codepoint im
+     Blob-Set fehlt (Blobmoji wurde 2017 eingestellt, kennt also keine
+     neueren Emoji), fällt das <img> per onerror automatisch auf das
+     native Emoji zurück — nie ein kaputtes Bild.
+     Alle drei Stellen, die bisher app.icon direkt als Text einsetzten
+     (Hauptkachel, Hub-Kachel, Platzhalter-Fenster), rufen jetzt diese
+     eine Funktion auf statt eigene Kopien der Logik zu pflegen. */
+  function blobmojiUrl(emoji) {
+    var codepoints = [];
+    for (var i = 0; i < emoji.length; i++) {
+      var cp = emoji.codePointAt(i);
+      if (cp > 0xFFFF) i++; // Surrogatpaar: zweite Hälfte überspringen
+      if (cp === 0xFE0F) continue; // Variationsselektor weglassen
+      codepoints.push(cp.toString(16).toUpperCase());
+    }
+    return 'https://cdn.jsdelivr.net/npm/@svgmoji/blob@2.0.0/svg/' + codepoints.join('-') + '.svg';
+  }
+  function iconGlyphHTML(emoji) {
+    var glyph = emoji || '▫️';
+    var safe = escapeHtml(glyph);
+    var data = getActiveProfileData();
+    if ((data.iconStil || 'emoji') === 'blobmoji' && emoji) {
+      return '<img class="emoji-glyph" src="' + blobmojiUrl(emoji) + '" alt="" onerror="this.outerHTML=\'' + safe + '\'">';
+    }
+    return safe;
+  }
+
+  /* ---------------- State ----------------
+     Pro-Profil-Daten (Kachel-Reihenfolge, eigene Kacheln, Design) leben
+     in state.profileData[profileId] — nicht mehr global. */
+  var state = { activeProfileId: null, localProfiles: [], profileData: {} };
+
+  function defaultProfileData() {
+    return { theme: 'dark', density: 'standard', kachelgroesse: 'standard', zoom: '100', accent: null, background: 'ofenkohle', symbolpaket: 'hell', iconStil: 'emoji', order: [], overrides: {}, customApps: [], positions: {}, installed: [], backstoreHinweisGesehen: false };
+  }
+  var BG_OPTIONS_BUILTIN = [
+    { id: 'ofenkohle', name: 'settings.bg.ofenkohle', type: 'css' },
+    { id: 'glut', name: 'settings.bg.glut', type: 'css' },
+    { id: 'konditorei', name: 'settings.bg.konditorei', type: 'css' },
+    { id: 'mehlstaub', name: 'settings.bg.mehlstaub', type: 'css' },
+    { id: 'kachelraster', name: 'settings.bg.kachelraster', type: 'css' }
+  ];
+  function getBackgroundOptions() {
+    var images = (window.BOS_BACKGROUNDS || []).map(function (b) {
+      return { id: 'img_' + b.id, name: b.name, type: 'image', file: b.file };
+    });
+    return BG_OPTIONS_BUILTIN.concat(images);
+  }
+  function applyBackground(id) {
+    var opts = getBackgroundOptions();
+    var opt = opts.find(function (o) { return o.id === id; }) || opts[0];
+    document.body.setAttribute('data-bg', opt.id);
+    if (opt.type === 'image') {
+      // Kein Verdunkelungs-Overlay mehr (bis 05.09.2026: linear-gradient(rgba(10,7,4,.4)…)
+      // davor) — Lesbarkeit kommt jetzt vom Symbolpaket (siehe .bos-tile__name weiter oben),
+      // nicht mehr vom Abdunkeln des Bildes. Bilder behalten so ihre volle Farbwirkung.
+      document.body.style.backgroundImage = 'url(' + encodeURI(opt.file) + ')';
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+    } else {
+      document.body.style.backgroundImage = '';
+      document.body.style.backgroundSize = '';
+      document.body.style.backgroundPosition = '';
+    }
+  }
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { var parsed = JSON.parse(raw); Object.assign(state, parsed); }
+    } catch (e) { console.warn('BOS Launcher: state konnte nicht geladen werden', e); }
+  }
+  function saveState(keinSync) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { console.warn('BOS Launcher: state konnte nicht gespeichert werden', e); }
+    // NEU 05.09.2026: persönliche Einstellungen zusätzlich geräteübergreifend
+    // spiegeln (debounced, fire-and-forget) — siehe bos_profil_sync.js. Zentral
+    // hier statt an jeder einzelnen Änderungsstelle: "eine Mechanik, ein
+    // zusätzlicher Aufrufer". keinSync=true nutzt selectProfile() direkt nach
+    // dem Laden aus Firestore, um den gerade erst empfangenen Stand nicht
+    // sofort wieder ins selbe Dokument zurückzuschreiben.
+    if (!keinSync && state.activeProfileId && state.profileData[state.activeProfileId] && window.BOS_PROFIL_SYNC && window.db && !aktivesProfilOhneHaken()) {
+      window.BOS_PROFIL_SYNC.speichere(window.db, state.activeProfileId, state.profileData[state.activeProfileId]);
+    }
+  }
+
+  /* ---------------- Profile ---------------- */
+  // NEU 05.09.2026: Zusammenführung selbst kommt jetzt aus bos_profil_lookup.js
+  // (geteilt mit backstore.html/bos_taskboard.js) — das custom-Tagging bleibt
+  // hier, weil es reines Anzeige-Detail für die Profil-Kacheln ist, keine
+  // "wer ist aktiv"-Logik.
+  function getMergedProfiles() {
+    var predefinedIds = (window.BOS_PROFILES || []).map(function (p) { return p.id; });
+    return BOS_PROFIL_LOOKUP.mergeProfile(state).map(function (p) {
+      return Object.assign({}, p, { custom: predefinedIds.indexOf(p.id) === -1 });
+    });
+  }
+  function getProfileById(id) {
+    return BOS_PROFIL_LOOKUP.findeProfil(state, id);
+  }
+  function getActiveProfile() {
+    return BOS_PROFIL_LOOKUP.findeAktiv(state);
+  }
+  function getActiveProfileData() {
+    if (!state.activeProfileId) return defaultProfileData();
+    if (!state.profileData[state.activeProfileId]) state.profileData[state.activeProfileId] = defaultProfileData();
+    var d = state.profileData[state.activeProfileId];
+    var migriert = false;
+    if (!d.positions) { d.positions = {}; migriert = true; } // Migration: ältere gespeicherte Profile kannten dieses Feld noch nicht
+    if (!d.density) { d.density = 'standard'; migriert = true; } // Migration: neu 01.09.2026, siehe BOS_DICHTE_DOKU.md
+    if (!d.kachelgroesse) { d.kachelgroesse = 'standard'; migriert = true; } // Migration: neu 06.09.2026, siehe SESSION_2026-09-06_LAUNCHER_KACHELGROESSE_KONZEPT.md
+    if (!d.zoom) { d.zoom = '100'; migriert = true; } // Migration: neu 11.09.2026, siehe SESSION_2026-09-11_ZOOMSTUFE_KONZEPT.md
+    if (!d.installed) {
+      // Migration: neu 02.09.2026, siehe BACKSTORE_DOKU.md. Bestehende Profile
+      // kannten "installed" noch nicht — alles, was schon eine Position hat,
+      // gilt ab jetzt als installiert. Am sichtbaren Desktop ändert sich für
+      // bestehende Profile dadurch nichts. Neue Profile starten mit [] =
+      // leerer Desktop, bis auf gepinnte Kacheln (z.B. BackStore selbst).
+      d.installed = Object.keys(d.positions);
+      migriert = true;
+    }
+    if (!('backstoreHinweisGesehen' in d)) { d.backstoreHinweisGesehen = false; migriert = true; }
+    if (!d.symbolpaket) { d.symbolpaket = 'hell'; migriert = true; } // Migration: neu 05.09.2026, siehe SESSION_2026-09-05_SYMBOLPAKET.md — bestehende Profile behalten das bisherige Aussehen (helle Schrift)
+    if (!d.iconStil) { d.iconStil = 'emoji'; migriert = true; } // Migration: neu 05.09.2026, siehe SESSION_2026-09-05_BLOBMOJI.md — bestehende Profile behalten natives Emoji
+    // Sofort persistieren statt auf die nächste renderGrid()-Auto-Platzierung zu
+    // warten: der BackStore-Satellit liest denselben localStorage-Key direkt aus
+    // einem eigenen IFRAME und muss dieselbe migrierte Form vorfinden.
+    if (migriert) saveState();
+    return d;
+  }
+
+  /* ---------------- Apps: zusammenführen + Rollen-Filter ---------------- */
+  function getMergedApps() {
+    var data = getActiveProfileData();
+    var registry = (window.BOS_APPS || []).map(function (a) { return Object.assign({}, a, { custom: false }); });
+    var custom = data.customApps.map(function (a) { return Object.assign({}, a, { custom: true }); });
+    var all = registry.concat(custom);
+    var byId = {};
+    all.forEach(function (a) { byId[a.id] = a; });
+    Object.keys(data.overrides).forEach(function (id) {
+      if (byId[id]) Object.assign(byId[id], data.overrides[id]);
+    });
+    var order = data.order.filter(function (id) { return byId[id]; });
+    var missing = Object.keys(byId).filter(function (id) { return order.indexOf(id) === -1; });
+    order = order.concat(missing);
+    if (order.join(',') !== data.order.join(',')) data.order = order;
+    return order.map(function (id) { return byId[id]; });
+  }
+  function isVisibleForRole(app) {
+    /* 31.08.2026: prüft jetzt gegen BOS_ACCESS.can() (bos_permissions.js),
+       dieselbe Mechanik wie bos_access_guard.js bei den Satelliten selbst —
+       eine Stelle, zwei Verwendungen, nie zwei Wahrheiten pflegen. Fail-open
+       bei unkonfigurierten Kacheln bleibt erhalten, siehe bos_access.js. */
+    var p = getActiveProfile();
+    var role = p ? p.role : null;
+    var overrides = p ? p.kontoOverrides : null;
+    return window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, overrides) : true;
+  }
+
+  /* ---------------- i18n für statische Markup-Elemente ---------------- */
+  function applyI18nStatic() {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      el.textContent = t(el.getAttribute('data-i18n'));
+    });
+  }
+
+  /* ---------------- Grid ---------------- */
+  /* ---------------- Freie Icon-Positionierung ----------------
+     Jedes Icon bekommt eine eigene Zell-Koordinate (col/row), nicht nur
+     einen Platz in einer Reihenfolge. Zellen sind ein unsichtbares
+     Raster — Symbole schnappen beim Loslassen zur nächsten freien
+     Zelle ein, können aber frei irgendwohin gezogen werden. */
+  /* NEU 06.09.2026: keine festen Konstanten mehr, sondern aus den CSS-Tokens
+     gelesen (s. Kachelgröße-Block oben in <style>) — die reagieren bereits auf
+     data-kachelgroesse und sind die einzige Quelle der Wahrheit für die
+     Zellmaße. getCellSize() spiegelt also automatisch die aktuelle Stufe des
+     aktiven Profils, ohne eine zweite Werte-Tabelle in JS zu pflegen. */
+  function getCellSize() {
+    var cs = getComputedStyle(document.documentElement);
+    var w = parseFloat(cs.getPropertyValue('--bos-cell-w'));
+    var h = parseFloat(cs.getPropertyValue('--bos-cell-h'));
+    return { w: w || 108, h: h || 122 };
+  }
+  /* Einzel-Override, korrigiert 06.09.2026 (Ulf: "breit" ergab keinen Sinn,
+     stattdessen eine symmetrische Skala Winzig…Riesig) — app.groesse kommt
+     aus data.overrides[id].groesse bzw. bei eigenen Kacheln direkt vom
+     customApp-Objekt, über getMergedApps() bereits eingemischt. GROESSE_STUFEN
+     ist die EINZIGE Quelle der Wahrheit für Footprint (Grid-Zellen) UND
+     CSS-Klasse — Modal und Grid-Platzierung lesen beide von hier, keine
+     zweite Tabelle. */
+  var GROESSE_STUFEN = {
+    winzig:   { cols: 1, rows: 1 },
+    klein:    { cols: 1, rows: 1 },
+    standard: { cols: 1, rows: 1 },
+    gross:    { cols: 2, rows: 2 },
+    riesig:   { cols: 3, rows: 3 }
+  };
+  function appGroesseKey(app) {
+    var g = app && app.groesse;
+    return GROESSE_STUFEN[g] ? g : 'standard';
+  }
+  function appSpan(app) {
+    return GROESSE_STUFEN[appGroesseKey(app)];
+  }
+  function appGroesseClass(app) {
+    var g = appGroesseKey(app);
+    return g === 'standard' ? '' : ' bos-tile--groesse-' + g;
+  }
+  function buildSpansMap(apps) {
+    var spans = {};
+    apps.forEach(function (a) { spans[a.id] = appSpan(a); });
+    return spans;
+  }
+
+  /* NEU 05.09.2026 (Querformat-Sperre entfernt, siehe Chat-Verlauf): gespeicherte
+     Positionen (data.positions) werden im breiteren Querformat vergeben. Im
+     Hochformat passen weniger Spalten auf den Bildschirm — reine Anzeige-Position,
+     s. renderGrid(). Wird bei jedem Render aktualisiert, u.a. für die
+     Kollisionsprüfung beim Draggen (endDrag) gegen das, was gerade sichtbar ist. */
+  var lastDisplayPositions = {};
+  var lastDisplaySpans = {}; // NEU 06.09.2026: Span-Pendant zu lastDisplayPositions, für endDrag()
+
+  /* NEU 06.09.2026: von reiner Einzel-Zell-Prüfung auf Flächen-Prüfung erweitert
+     (Rechteck-Überlappung), wegen Einzel-Override-Kacheln, die mehr als eine
+     Zelle belegen können. spans = Map appId → {cols,rows}, optional — fehlt sie
+     (Aufrufer ohne Override-Kontext), gilt für jede fremde Kachel 1×1. */
+  function isAreaFree(positions, col, row, spanCols, spanRows, exceptId, spans) {
+    return !Object.keys(positions).some(function (id) {
+      if (id === exceptId) return false;
+      var p = positions[id];
+      var s = (spans && spans[id]) || { cols: 1, rows: 1 };
+      return col < p.col + s.cols && p.col < col + spanCols && row < p.row + s.rows && p.row < row + spanRows;
+    });
+  }
+  function isCellFree(positions, col, row, exceptId, spans) {
+    return isAreaFree(positions, col, row, 1, 1, exceptId, spans);
+  }
+  function nearestFreeCell(positions, col, row, exceptId, spans, spanCols, spanRows) {
+    spanCols = spanCols || 1; spanRows = spanRows || 1;
+    if (isAreaFree(positions, col, row, spanCols, spanRows, exceptId, spans)) return { col: col, row: row };
+    for (var radius = 1; radius < 60; radius++) {
+      for (var dx = -radius; dx <= radius; dx++) {
+        for (var dy = -radius; dy <= radius; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue; // nur der Ring-Rand
+          var c = col + dx, r = row + dy;
+          if (c < 0 || r < 0) continue;
+          if (isAreaFree(positions, c, r, spanCols, spanRows, exceptId, spans)) return { col: c, row: r };
+        }
+      }
+    }
+    return { col: 0, row: row + 1 };
+  }
+  function nextFreeCellInOrder(positions, cols, exceptId, spans, spanCols, spanRows) {
+    spanCols = spanCols || 1; spanRows = spanRows || 1;
+    var row = 0;
+    while (true) {
+      for (var col = 0; col <= cols - spanCols; col++) {
+        if (isAreaFree(positions, col, row, spanCols, spanRows, exceptId, spans)) return { col: col, row: row };
+      }
+      row++;
+      // Sicherheitsnetz — greift auch, wenn spanCols > cols (Kachel breiter als
+      // der sichtbare Bildschirm): kein Endlos-Loop, aber Platzierung bleibt in
+      // diesem Extremfall unschön. Bekannte Grenze, siehe Konzept-Doku.
+      if (row > 500) return { col: 0, row: row };
+    }
+  }
+  function computeCols(gridEl) {
+    var cell = getCellSize();
+    var w = (gridEl && gridEl.clientWidth) || (gridEl && gridEl.parentElement && gridEl.parentElement.clientWidth) || 900;
+    return Math.max(1, Math.floor(w / cell.w));
+  }
+  function positionTileEl(el, col, row) {
+    var cell = getCellSize();
+    el.style.left = (col * cell.w) + 'px';
+    el.style.top = (row * cell.h) + 'px';
+  }
+
+  function buildTileEl(app) {
+    var el = document.createElement('div');
+    el.className = 'bos-tile' + (app.status === 'geplant' ? ' bos-tile--planned' : '') + appGroesseClass(app);
+    el.dataset.id = app.id;
+    var badge = app.custom ? '<button class="bos-tile__delete" data-role="delete" title="' + t('tile.delete') + '">✕</button>' : '';
+    var statusLabel = app.status === 'geplant' ? '<div class="bos-tile__status">' + t('tile.planned') + '</div>' : '';
+    var iconBg = hexToRgba(app.color, 0.20);
+    el.innerHTML =
+      badge +
+      '<div class="bos-tile__icon" style="background:' + iconBg + ';color:' + escapeHtml(app.color || '#c07a10') + ';">' + iconGlyphHTML(app.icon) + '</div>' +
+      '<div class="bos-tile__name">' + escapeHtml(app.name) + '</div>' +
+      statusLabel;
+    return el;
+  }
+  function buildAddTileEl() {
+    var el = document.createElement('div');
+    el.className = 'bos-tile bos-tile--add';
+    el.innerHTML =
+      '<div class="bos-tile__icon">+</div>' +
+      '<div class="bos-tile__name">' + t('tile.add') + '</div>';
+    return el;
+  }
+  function renderGrid() {
+    var apps = getMergedApps().filter(isVisibleForRole).filter(function (a) { return !a.hub; });
+    var data = getActiveProfileData();
+    var grid = document.getElementById('grid');
+    var cols = computeCols(grid);
+    var positionsChanged = false;
+
+    /* BackStore-Modell (02.09.2026, siehe BACKSTORE_DOKU.md): eine Kachel
+       erscheint nur noch, wenn sie entweder "pinned" ist (fest im Desktop,
+       z.B. BackStore selbst) oder über den BackStore installiert wurde
+       (data.installed). Vorher bekam automatisch JEDE Kachel, die die Rolle
+       technisch erlaubte, sofort einen Platz — neue Satelliten tauchten so
+       ungefragt bei allen berechtigten Profilen auf. */
+    var shownApps = apps.filter(function (app) {
+      return app.pinned || data.installed.indexOf(app.id) !== -1;
+    });
+    var spans = buildSpansMap(shownApps); // NEU 06.09.2026: Kachelgröße-Konzept
+
+    shownApps.forEach(function (app) {
+      if (!data.positions[app.id]) {
+        var s = spans[app.id];
+        data.positions[app.id] = nextFreeCellInOrder(data.positions, cols, app.id, spans, s.cols, s.rows);
+        positionsChanged = true;
+      }
+    });
+
+    /* ---------------- Anzeige-Positionen (Reflow für schmalere Breiten) ----------------
+       data.positions ist die dauerhaft gespeicherte, freie Anordnung — im Querformat
+       gesetzt. Passt eine gespeicherte Spalte nicht mehr in die aktuell sichtbare
+       Spaltenzahl (Hochformat = weniger Spalten), würde die Kachel rechts aus dem
+       Bildschirm ragen und ein horizontales Scrollen erzwingen. Solche Kacheln
+       bekommen NUR für diesen Render eine freie Zelle innerhalb der sichtbaren
+       Breite zugewiesen — data.positions bleibt unangetastet, damit im Querformat
+       wieder exakt die ursprüngliche Anordnung erscheint. */
+    var displayPositions = {};
+    var overflowIds = [];
+    shownApps.forEach(function (app) {
+      var pos = data.positions[app.id];
+      var s = spans[app.id];
+      if (pos.col + s.cols <= cols) { displayPositions[app.id] = pos; } // span-bewusst: NEU 06.09.2026
+      else { overflowIds.push(app.id); }
+    });
+    overflowIds.forEach(function (id) {
+      var s = spans[id];
+      displayPositions[id] = nextFreeCellInOrder(displayPositions, cols, id, spans, s.cols, s.rows);
+    });
+
+    grid.innerHTML = '';
+    var maxRow = 0;
+    shownApps.forEach(function (app) {
+      var pos = displayPositions[app.id];
+      var s = spans[app.id];
+      maxRow = Math.max(maxRow, pos.row + s.rows - 1);
+      var el = buildTileEl(app);
+      positionTileEl(el, pos.col, pos.row);
+      grid.appendChild(el);
+    });
+
+    var p = getActiveProfile();
+    if (p && p.role === 'admin') {
+      var addPos = nextFreeCellInOrder(displayPositions, cols, '__add__', spans);
+      var addEl = buildAddTileEl();
+      positionTileEl(addEl, addPos.col, addPos.row);
+      grid.appendChild(addEl);
+      maxRow = Math.max(maxRow, addPos.row);
+      displayPositions.__add__ = addPos;
+    }
+    grid.style.height = ((maxRow + 1) * getCellSize().h + 20) + 'px';
+    lastDisplayPositions = displayPositions;
+    lastDisplaySpans = spans; // NEU 06.09.2026: für endDrag()-Kollisionsprüfung
+
+    if (positionsChanged) saveState();
+  }
+  document.getElementById('grid').addEventListener('click', function (e) {
+    if (e.target.closest('.bos-tile--add')) openCreateModal();
+  });
+  window.addEventListener('resize', function () {
+    if (state.activeProfileId) renderGrid();
+  });
+  /* NEU 02.09.2026: der BackStore-Satellit läuft in einem eigenen (Same-Origin-)
+     IFRAME-Fenster und schreibt Install/Deinstall direkt in denselben
+     localStorage-Key — kein eigener Host-Mechanismus nötig dafür. Same-Origin-
+     Dokumente bekommen bei FREMDEN Schreibzugriffen automatisch ein "storage"-
+     Event (nicht bei eigenen) — darüber synchronisiert sich der Desktop live,
+     auch während das BackStore-Fenster noch offen ist. Siehe BACKSTORE_DOKU.md. */
+  window.addEventListener('storage', function (e) {
+    if (e.key === STORAGE_KEY && state.activeProfileId) {
+      loadState();
+      renderGrid();
+    }
+  });
+
+  /* ---------------- Bearbeiten-Modus (nur Admin-Profile) ---------------- */
+  var editMode = false;
+  function enterEditMode() {
+    if (editMode) return;
+    var p = getActiveProfile();
+    if (!p || p.role !== 'admin') return;
+    editMode = true;
+    document.getElementById('grid').classList.add('bos-editmode');
+    document.getElementById('editbar').classList.add('bos-editbar--visible');
+  }
+  function exitEditMode() {
+    if (!editMode) return;
+    editMode = false;
+    document.getElementById('grid').classList.remove('bos-editmode');
+    document.getElementById('editbar').classList.remove('bos-editbar--visible');
+    saveState();
+  }
+  document.getElementById('editbar').addEventListener('click', exitEditMode);
+  document.getElementById('desktop').addEventListener('pointerdown', function (e) {
+    if (editMode && (e.target.id === 'desktop' || e.target.id === 'grid')) exitEditMode();
+  });
+
+  /* ---------------- Drag zum Umsortieren ---------------- */
+  var dragCtx = null;
+  function beginDrag(e, tileEl, id) {
+    dragCtx = {
+      id: id,
+      tileEl: tileEl,
+      startLeft: tileEl.offsetLeft,
+      startTop: tileEl.offsetTop,
+      startX: e.clientX,
+      startY: e.clientY,
+      pendingDx: 0,
+      pendingDy: 0,
+      raf: null
+    };
+    tileEl.classList.add('bos-tile--dragging');
+    tileEl.style.zIndex = 500;
+  }
+  function updateDrag(e) {
+    if (!dragCtx) return;
+    dragCtx.pendingDx = e.clientX - dragCtx.startX;
+    dragCtx.pendingDy = e.clientY - dragCtx.startY;
+    if (!dragCtx.raf) {
+      dragCtx.raf = requestAnimationFrame(function () {
+        if (!dragCtx) return;
+        dragCtx.tileEl.style.transform = 'translate(' + dragCtx.pendingDx + 'px,' + dragCtx.pendingDy + 'px)';
+        dragCtx.raf = null;
+      });
+    }
+  }
+  function endDrag() {
+    if (!dragCtx) return;
+    if (dragCtx.raf) cancelAnimationFrame(dragCtx.raf);
+    var cell = getCellSize();
+    var finalLeft = dragCtx.startLeft + dragCtx.pendingDx;
+    var finalTop = dragCtx.startTop + dragCtx.pendingDy;
+    var col = Math.max(0, Math.round(finalLeft / cell.w));
+    var row = Math.max(0, Math.round(finalTop / cell.h));
+    var data = getActiveProfileData();
+    var mySpan = appSpan((getMergedApps().find(function (a) { return a.id === dragCtx.id; })) || null);
+    /* Kollisionsprüfung gegen lastDisplayPositions (das gerade Sichtbare), nicht gegen
+       data.positions — bei einer im Hochformat reflowten Kachel wäre deren rohe
+       (Querformat-)Position sonst fälschlich als "frei" erkannt worden. Span-bewusst
+       seit 06.09.2026: schnappt zur nächsten Fläche, die den vollen Footprint der
+       Kachel aufnimmt — verdrängt dabei NICHTS (Ulf-Entscheidung, 06.09.2026). */
+    var target = nearestFreeCell(lastDisplayPositions, col, row, dragCtx.id, lastDisplaySpans, mySpan.cols, mySpan.rows);
+    data.positions[dragCtx.id] = target;
+
+    dragCtx.tileEl.style.transform = '';
+    dragCtx.tileEl.style.zIndex = '';
+    dragCtx.tileEl.classList.remove('bos-tile--dragging');
+    dragCtx = null;
+    saveState();
+    renderGrid();
+  }
+
+  /* ---------------- Tap / Long-Press / Drag — zentral über Pointer-Events ---------------- */
+  var pointerTrack = null;
+  document.addEventListener('pointerdown', function (e) {
+    var delBtn = e.target.closest('.bos-tile__delete');
+    if (delBtn) {
+      e.stopPropagation();
+      var tEl = delBtn.closest('.bos-tile');
+      if (tEl) deleteCustomTile(tEl.dataset.id);
+      return;
+    }
+    var tileEl = e.target.closest('.bos-tile:not(.bos-tile--add)');
+    if (!tileEl) return;
+    pointerTrack = { id: tileEl.dataset.id, downX: e.clientX, downY: e.clientY, dragStarted: false, longPressFired: false };
+    pointerTrack.timer = setTimeout(function () {
+      pointerTrack.longPressFired = true;
+      enterEditMode();
+      if (navigator.vibrate) navigator.vibrate(12);
+    }, 480);
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!pointerTrack) return;
+    var dx = e.clientX - pointerTrack.downX, dy = e.clientY - pointerTrack.downY;
+    if (!pointerTrack.dragStarted && Math.hypot(dx, dy) > 9) {
+      clearTimeout(pointerTrack.timer);
+      if (editMode) {
+        pointerTrack.dragStarted = true;
+        var tileEl = document.querySelector('.bos-tile[data-id="' + pointerTrack.id + '"]');
+        if (tileEl) beginDrag(e, tileEl, pointerTrack.id);
+      }
+    }
+    if (pointerTrack.dragStarted) updateDrag(e);
+  });
+  document.addEventListener('pointerup', function (e) {
+    if (!pointerTrack) return;
+    clearTimeout(pointerTrack.timer);
+    if (pointerTrack.dragStarted) {
+      endDrag();
+    } else if (!pointerTrack.longPressFired) {
+      if (editMode) openEditModal(pointerTrack.id); else launchApp(pointerTrack.id);
+    }
+    pointerTrack = null;
+  });
+  document.addEventListener('pointercancel', function () {
+    if (pointerTrack) { clearTimeout(pointerTrack.timer); if (pointerTrack.dragStarted) endDrag(); pointerTrack = null; }
+  });
+  document.addEventListener('contextmenu', function (e) {
+    if (e.target.closest('.bos-tile:not(.bos-tile--add)')) e.preventDefault();
+  });
+
+  function deleteCustomTile(id) {
+    if (!confirm(t('tile.deleteConfirm'))) return;
+    var data = getActiveProfileData();
+    data.customApps = data.customApps.filter(function (a) { return a.id !== id; });
+    data.order = data.order.filter(function (x) { return x !== id; });
+    data.installed = data.installed.filter(function (x) { return x !== id; }); // NEU 02.09.2026
+    delete data.overrides[id];
+    delete data.positions[id]; // NEU 02.09.2026, nebenbei behoben: sonst bleibt eine tote Zell-Reservierung liegen
+    saveState();
+    renderGrid();
+  }
+
+  /* ---------------- Modal: Kachel anlegen / bearbeiten ---------------- */
+  var modalMode = null, modalTargetId = null;
+  /* Korrigiert 06.09.2026 (Ulf: "breit" ergab keinen Sinn) — Einzel-Override-Größe
+     wird als einfacher Schlüssel gehalten (kein aktiver-Zustand an den Buttons,
+     exakt wie Theme/Dichte/Symbolpaket/Icon-Stil in den Einstellungen — Ulf merkt
+     sich seine Wahl selbst, gleiches Muster im ganzen Launcher). Werte/Footprint
+     kommen zentral aus GROESSE_STUFEN weiter oben, keine zweite Tabelle hier. */
+  var modalGroesseKey = 'standard';
+  function showModal() { document.getElementById('modalOverlay').classList.add('bos-modal-overlay--visible'); }
+  function hideModal() { document.getElementById('modalOverlay').classList.remove('bos-modal-overlay--visible'); }
+
+  function openCreateModal() {
+    modalMode = 'create'; modalTargetId = null; modalGroesseKey = 'standard';
+    document.getElementById('modalTitle').textContent = t('modal.createTitle');
+    document.getElementById('modalName').value = '';
+    document.getElementById('modalIcon').value = '🔗';
+    document.getElementById('modalColor').value = '#c07a10';
+    document.getElementById('modalUrl').value = '';
+    document.getElementById('modalDeleteBtn').style.display = 'none';
+    showModal();
+  }
+  function openEditModal(id) {
+    var app = getMergedApps().find(function (a) { return a.id === id; });
+    if (!app) return;
+    modalMode = 'edit'; modalTargetId = id;
+    document.getElementById('modalTitle').textContent = t('modal.editTitle');
+    document.getElementById('modalName').value = app.name || '';
+    document.getElementById('modalIcon').value = app.icon || '';
+    document.getElementById('modalColor').value = app.color || '#c07a10';
+    document.getElementById('modalUrl').value = app.url || '';
+    document.getElementById('modalDeleteBtn').style.display = app.custom ? 'inline-flex' : 'none';
+    modalGroesseKey = appGroesseKey(app);
+    showModal();
+  }
+  document.getElementById('modalSizeWinzig').addEventListener('click', function () { modalGroesseKey = 'winzig'; });
+  document.getElementById('modalSizeKlein').addEventListener('click', function () { modalGroesseKey = 'klein'; });
+  document.getElementById('modalSizeStandard').addEventListener('click', function () { modalGroesseKey = 'standard'; });
+  document.getElementById('modalSizeGross').addEventListener('click', function () { modalGroesseKey = 'gross'; });
+  document.getElementById('modalSizeRiesig').addEventListener('click', function () { modalGroesseKey = 'riesig'; });
+  document.getElementById('modalCancel').addEventListener('click', hideModal);
+  document.getElementById('modalOverlay').addEventListener('pointerdown', function (e) {
+    if (e.target.id === 'modalOverlay') hideModal();
+  });
+  document.getElementById('modalSave').addEventListener('click', function () {
+    var name = document.getElementById('modalName').value.trim() || t('modal.unnamed');
+    var icon = document.getElementById('modalIcon').value.trim() || '▫️';
+    var color = document.getElementById('modalColor').value || '#c07a10';
+    var url = document.getElementById('modalUrl').value.trim() || null;
+    var data = getActiveProfileData();
+    if (modalMode === 'create') {
+      var id = 'custom_' + Date.now();
+      data.customApps.push({ id: id, name: name, icon: icon, color: color, url: url, status: url ? 'live' : 'geplant', custom: true, groesse: modalGroesseKey });
+      data.order.push(id);
+      data.installed.push(id); // NEU 02.09.2026: eigene Kacheln erscheinen sofort, ohne Umweg über den BackStore
+    } else if (modalMode === 'edit') {
+      data.overrides[modalTargetId] = Object.assign({}, data.overrides[modalTargetId], {
+        name: name, icon: icon, color: color, url: url, status: url ? 'live' : 'geplant', groesse: modalGroesseKey
+      });
+    }
+    saveState();
+    hideModal();
+    exitEditMode();
+    renderGrid();
+  });
+  document.getElementById('modalDeleteBtn').addEventListener('click', function () {
+    if (modalTargetId) deleteCustomTile(modalTargetId);
+    hideModal();
+  });
+
+  /* ---------------- Fenster / Taskbar ---------------- */
+  var openWindows = {};
+  var zTop = 100;
+  var openOrderCount = 0;
+  var activeWindowId = null;
+
+  /* opts.maximiert: das neue Fenster gleich maximiert öffnen. Wird von
+     einem Hub gesetzt, der selbst maximiert ist (22.09.2026) — sonst öffnete
+     eine App aus einem groß gezogenen Hub wieder im kleinen Fenster. Alle
+     übrigen Aufrufer (Desktop-Kacheln) übergeben nichts und verhalten sich
+     wie bisher. */
+  function launchApp(id, opts) {
+    var app = getMergedApps().find(function (a) { return a.id === id; });
+    if (!app) return;
+    if (openWindows[id]) {
+      if (openWindows[id].minimized) restoreWindow(id); else focusWindow(id);
+      return;
+    }
+    createWindow(app, opts);
+  }
+
+  function buildPlaceholderBody(app) {
+    return '<div class="bos-window__placeholder">' +
+      '<div style="font-size:2.3rem;">' + iconGlyphHTML(app.icon) + '</div>' +
+      '<div class="bos-title" style="font-size:1.1rem;">' + escapeHtml(app.name) + '</div>' +
+      '<p style="color:var(--bos-text-dim);max-width:34ch;margin:0;">' + t('window.placeholder') + '</p>' +
+      '</div>';
+  }
+  function buildHubBody(app) {
+    var children = getMergedApps().filter(function (a) { return a.hub === app.id; }).filter(isVisibleForRole);
+    if (!children.length) {
+      return '<div class="bos-window__placeholder">' +
+        '<div style="font-size:2.3rem;">' + iconGlyphHTML(app.icon) + '</div>' +
+        '<p style="color:var(--bos-text-dim);margin:0;">' + t('hub.empty') + '</p>' +
+        '</div>';
+    }
+    var tiles = children.map(function (child) {
+      var iconBg = hexToRgba(child.color, 0.20);
+      var statusLabel = child.status === 'geplant' ? '<div class="bos-hubtile__status">' + t('tile.planned') + '</div>' : '';
+      return '<div class="bos-hubtile" data-hub-child="' + escapeHtml(child.id) + '">' +
+        '<div class="bos-hubtile__icon" style="background:' + iconBg + ';color:' + escapeHtml(child.color || '#c07a10') + ';">' + iconGlyphHTML(child.icon) + '</div>' +
+        '<div class="bos-hubtile__name">' + escapeHtml(child.name) + '</div>' +
+        statusLabel +
+        '</div>';
+    }).join('');
+    return '<div class="bos-hub-grid">' + tiles + '</div>';
+  }
+  /* Hub bleibt offen, wenn eine App daraus geöffnet wird (22.09.2026).
+     Vorher stand hier closeWindow(hubId) — der Hub verschwand beim Tippen,
+     die App erschien an seiner Stelle. Ulfs Vergleich: als würde ein Ordner
+     verschwinden, sobald man eine Datei darin öffnet. Jetzt liegt der Hub
+     hinter der App und ist über die Taskleiste erreichbar; die nächste App
+     aus demselben Hub braucht keinen neuen Weg durch den Desktop.
+     Die App erbt den Zustand des Hubs: ist er maximiert, öffnet sie
+     ebenfalls maximiert. */
+  function attachHubHandlers(el, hubId) {
+    el.querySelectorAll('[data-hub-child]').forEach(function (tileEl) {
+      tileEl.addEventListener('click', function () {
+        var childId = tileEl.getAttribute('data-hub-child');
+        var hub = openWindows[hubId];
+        launchApp(childId, { maximiert: !!(hub && hub.maximized) });
+      });
+    });
+  }
+  function buildSettingsBody() {
+    var data = getActiveProfileData();
+    var currentBg = data.background || 'ofenkohle';
+    var bgSwatches = getBackgroundOptions().map(function (opt) {
+      var active = currentBg === opt.id ? ' bos-bgswatch--active' : '';
+      var label = opt.type === 'css' ? t(opt.name) : opt.name;
+      var attrs = 'data-role="bg-pick" data-select-id="' + escapeHtml(opt.id) + '" title="' + escapeHtml(label) + '"';
+      if (opt.type === 'css') {
+        attrs += ' data-bg="' + escapeHtml(opt.id) + '"';
+      } else {
+        attrs += ' style="background-image:url(' + escapeHtml(opt.file) + ');background-size:cover;background-position:center;"';
+      }
+      return '<div class="bos-bgswatch' + active + '" ' + attrs + '></div>';
+    }).join('');
+    return '<div class="bos-window__placeholder" style="gap:1.2rem;padding:1.5rem;">' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.theme') + '</div>' +
+        '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
+          '<button class="bos-btn" data-role="theme-dark">' + t('settings.dark') + '</button>' +
+          '<button class="bos-btn" data-role="theme-light">' + t('settings.light') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.density') + '</div>' +
+        '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
+          '<button class="bos-btn" data-role="density-standard">' + t('settings.densityStandard') + '</button>' +
+          '<button class="bos-btn" data-role="density-compact">' + t('settings.densityCompact') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.zoom') + '</div>' +
+        '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
+          '<button class="bos-btn" data-role="zoom-100">' + t('settings.zoom100') + '</button>' +
+          '<button class="bos-btn" data-role="zoom-80">' + t('settings.zoom80') + '</button>' +
+          '<button class="bos-btn" data-role="zoom-65">' + t('settings.zoom65') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.kachelgroesse') + '</div>' +
+        '<div style="display:flex;gap:.6rem;margin-top:.45rem;flex-wrap:wrap;">' +
+          '<button class="bos-btn" data-role="kachelgroesse-standard">' + t('settings.kachelgroesseStandard') + '</button>' +
+          '<button class="bos-btn" data-role="kachelgroesse-gross">' + t('settings.kachelgroesseGross') + '</button>' +
+          '<button class="bos-btn" data-role="kachelgroesse-riesig">' + t('settings.kachelgroesseRiesig') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.accent') + '</div>' +
+        '<div style="display:flex;gap:.6rem;align-items:center;margin-top:.45rem;">' +
+          '<input type="color" class="bos-color" id="settingsAccent" value="' + (data.accent || '#c07a10') + '">' +
+          '<button class="bos-btn bos-btn--ghost" data-role="accent-reset">' + t('settings.accentReset') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.symbolpaket') + '</div>' +
+        '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
+          '<button class="bos-btn" data-role="symbolpaket-hell">' + t('settings.symbolpaketHell') + '</button>' +
+          '<button class="bos-btn" data-role="symbolpaket-dunkel">' + t('settings.symbolpaketDunkel') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.iconStil') + '</div>' +
+        '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
+          '<button class="bos-btn" data-role="iconstil-emoji">' + t('settings.iconStilEmoji') + '</button>' +
+          '<button class="bos-btn" data-role="iconstil-blobmoji">' + t('settings.iconStilBlobmoji') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.background') + '</div>' +
+        '<div class="bos-bgswatch-row">' + bgSwatches + '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="bos-label">' + t('settings.layout') + '</div>' +
+        '<button class="bos-btn" data-role="layout-reset" style="margin-top:.45rem;">' + t('settings.layoutReset') + '</button>' +
+      '</div>' +
+      '<div style="color:var(--bos-text-faint);font-size:.8rem;">' + t('settings.info') + '</div>' +
+      '</div>';
+  }
+  function attachSettingsHandlers(el) {
+    el.querySelector('[data-role="theme-dark"]').addEventListener('click', function () { setTheme('dark'); });
+    el.querySelector('[data-role="theme-light"]').addEventListener('click', function () { setTheme('light'); });
+    el.querySelector('[data-role="density-standard"]').addEventListener('click', function () { setDensity('standard'); });
+    el.querySelector('[data-role="density-compact"]').addEventListener('click', function () { setDensity('compact'); });
+    el.querySelector('[data-role="zoom-100"]').addEventListener('click', function () { setZoom('100'); });
+    el.querySelector('[data-role="zoom-80"]').addEventListener('click', function () { setZoom('80'); });
+    el.querySelector('[data-role="zoom-65"]').addEventListener('click', function () { setZoom('65'); });
+    el.querySelector('[data-role="kachelgroesse-standard"]').addEventListener('click', function () { setKachelgroesse('standard'); });
+    el.querySelector('[data-role="kachelgroesse-gross"]').addEventListener('click', function () { setKachelgroesse('gross'); });
+    el.querySelector('[data-role="kachelgroesse-riesig"]').addEventListener('click', function () { setKachelgroesse('riesig'); });
+    el.querySelector('[data-role="symbolpaket-hell"]').addEventListener('click', function () { setSymbolpaket('hell'); });
+    el.querySelector('[data-role="symbolpaket-dunkel"]').addEventListener('click', function () { setSymbolpaket('dunkel'); });
+    el.querySelector('[data-role="iconstil-emoji"]').addEventListener('click', function () { setIconStil('emoji'); });
+    el.querySelector('[data-role="iconstil-blobmoji"]').addEventListener('click', function () { setIconStil('blobmoji'); });
+    el.querySelector('#settingsAccent').addEventListener('input', function (e) { setAccent(e.target.value); });
+    el.querySelector('[data-role="accent-reset"]').addEventListener('click', function () { setAccent(null); });
+    el.querySelectorAll('[data-role="bg-pick"]').forEach(function (sw) {
+      sw.addEventListener('click', function () {
+        setBackground(sw.getAttribute('data-select-id'));
+        el.querySelectorAll('.bos-bgswatch').forEach(function (s) { s.classList.remove('bos-bgswatch--active'); });
+        sw.classList.add('bos-bgswatch--active');
+      });
+    });
+    el.querySelector('[data-role="layout-reset"]').addEventListener('click', function () {
+      if (confirm(t('settings.layoutResetConfirm')) && state.activeProfileId) {
+        state.profileData[state.activeProfileId] = defaultProfileData();
+        saveState();
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-density', 'standard');
+        document.documentElement.setAttribute('data-kachelgroesse', 'standard');
+        document.documentElement.setAttribute('data-symbolpaket', 'hell');
+        document.documentElement.setAttribute('data-zoom', '100');
+        document.getElementById('themeToggle').textContent = '🌙';
+        applyBackground('ofenkohle');
+        applyAccent();
+        renderGrid();
+      }
+    });
+  }
+
+  function createWindow(app, opts) {
+    var layer = document.getElementById('windowsLayer');
+    var el = document.createElement('div');
+    el.className = 'bos-window';
+    var n = openOrderCount++;
+    var offset = (n % 6) * 26;
+    var w, h;
+    if (app.type === 'hub') {
+      w = Math.min(520, Math.max(320, window.innerWidth * 0.34));
+      h = Math.min(420, Math.max(260, window.innerHeight * 0.42));
+    } else {
+      w = Math.min(760, Math.max(340, window.innerWidth * 0.55));
+      h = Math.min(560, Math.max(280, window.innerHeight * 0.62));
+    }
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+    el.style.left = (50 + offset) + 'px';
+    el.style.top = (24 + offset) + 'px';
+
+    var bodyHtml = app.type === 'system' ? buildSettingsBody()
+      : app.type === 'hub' ? buildHubBody(app)
+      : (app.url ? '<iframe src="' + escapeHtml(app.url) + '" title="' + escapeHtml(app.name) + '"></iframe>' : buildPlaceholderBody(app));
+
+    el.innerHTML =
+      '<div class="bos-window__titlebar" data-role="drag">' +
+        '<span>' + iconGlyphHTML(app.icon) + '</span>' +
+        '<span class="bos-window__title">' + escapeHtml(app.name) + '</span>' +
+        '<div class="bos-window__controls">' +
+          '<button class="bos-window__btn bos-window__btn--min" data-role="min" title="' + t('window.minimize') + '">–</button>' +
+          '<button class="bos-window__btn bos-window__btn--max" data-role="max" title="' + t('window.maximize') + '">□</button>' +
+          '<button class="bos-window__btn bos-window__btn--close" data-role="close" title="' + t('window.close') + '">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bos-window__body">' + bodyHtml + '</div>' +
+      '<div class="bos-window__resize" data-role="resize"></div>';
+
+    layer.appendChild(el);
+    openWindows[app.id] = { el: el, minimized: false, maximized: false, restoreBounds: null, app: app };
+    if (app.type === 'system') attachSettingsHandlers(el);
+    if (app.type === 'hub') attachHubHandlers(el, app.id);
+    attachWindowChrome(el, app.id);
+    focusWindow(app.id);
+
+    /* Hubs öffnen maximiert (22.09.2026, Ulfs Entscheidung): wer einen Hub
+       öffnet, will darin etwas suchen — groß ist der Normalfall, klein die
+       Ausnahme. Über toggleMaximize() statt durch direktes Setzen der
+       Größe: so merkt sich das Fenster seine normale Größe als
+       restoreBounds, und "Verkleinern" führt genau dorthin zurück.
+       Dasselbe für Apps, die aus einem maximierten Hub kommen. */
+    if (app.type === 'hub' || (opts && opts.maximiert)) toggleMaximize(app.id);
+
+    renderTaskbar();
+  }
+
+  function attachWindowChrome(el, id) {
+    el.addEventListener('pointerdown', function () { focusWindow(id); });
+
+    var titlebar = el.querySelector('[data-role="drag"]');
+    var moveCtx = null;
+    titlebar.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button')) return;
+      if (openWindows[id] && openWindows[id].maximized) return;
+      focusWindow(id);
+      var layerRect = document.getElementById('windowsLayer').getBoundingClientRect();
+      var startLeft = el.offsetLeft, startTop = el.offsetTop;
+      moveCtx = {
+        startLeft: startLeft, startTop: startTop,
+        startX: e.clientX, startY: e.clientY,
+        minDx: -startLeft, maxDx: layerRect.width - 90 - startLeft,
+        minDy: -startTop, maxDy: layerRect.height - 40 - startTop,
+        pendingDx: 0, pendingDy: 0, raf: null
+      };
+      titlebar.setPointerCapture(e.pointerId);
+    });
+    titlebar.addEventListener('pointermove', function (e) {
+      if (!moveCtx) return;
+      var dx = Math.max(moveCtx.minDx, Math.min(e.clientX - moveCtx.startX, moveCtx.maxDx));
+      var dy = Math.max(moveCtx.minDy, Math.min(e.clientY - moveCtx.startY, moveCtx.maxDy));
+      moveCtx.pendingDx = dx; moveCtx.pendingDy = dy;
+      if (!moveCtx.raf) {
+        moveCtx.raf = requestAnimationFrame(function () {
+          if (!moveCtx) return;
+          el.style.transform = 'translate(' + moveCtx.pendingDx + 'px,' + moveCtx.pendingDy + 'px)';
+          moveCtx.raf = null;
+        });
+      }
+    });
+    function endWindowMove(e) {
+      if (!moveCtx) return;
+      if (moveCtx.raf) cancelAnimationFrame(moveCtx.raf);
+      el.style.transform = '';
+      el.style.left = (moveCtx.startLeft + moveCtx.pendingDx) + 'px';
+      el.style.top = (moveCtx.startTop + moveCtx.pendingDy) + 'px';
+      moveCtx = null;
+      try { titlebar.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    titlebar.addEventListener('pointerup', endWindowMove);
+    titlebar.addEventListener('pointercancel', endWindowMove);
+    titlebar.addEventListener('dblclick', function (e) {
+      if (e.target.closest('button')) return;
+      toggleMaximize(id);
+    });
+
+    el.querySelector('[data-role="close"]').addEventListener('click', function () { closeWindow(id); });
+    el.querySelector('[data-role="min"]').addEventListener('click', function () { minimizeWindow(id); });
+    el.querySelector('[data-role="max"]').addEventListener('click', function () { toggleMaximize(id); });
+
+    var resizeHandle = el.querySelector('[data-role="resize"]');
+    var resizeCtx = null;
+    resizeHandle.addEventListener('pointerdown', function (e) {
+      e.stopPropagation();
+      if (openWindows[id] && openWindows[id].maximized) return;
+      focusWindow(id);
+      resizeCtx = { startW: el.offsetWidth, startH: el.offsetHeight, startX: e.clientX, startY: e.clientY, pendingW: null, pendingH: null, raf: null };
+      resizeHandle.setPointerCapture(e.pointerId);
+    });
+    resizeHandle.addEventListener('pointermove', function (e) {
+      if (!resizeCtx) return;
+      resizeCtx.pendingW = Math.max(320, resizeCtx.startW + (e.clientX - resizeCtx.startX));
+      resizeCtx.pendingH = Math.max(220, resizeCtx.startH + (e.clientY - resizeCtx.startY));
+      if (!resizeCtx.raf) {
+        resizeCtx.raf = requestAnimationFrame(function () {
+          if (!resizeCtx) return;
+          el.style.width = resizeCtx.pendingW + 'px';
+          el.style.height = resizeCtx.pendingH + 'px';
+          resizeCtx.raf = null;
+        });
+      }
+    });
+    function endWindowResize(e) {
+      if (!resizeCtx) return;
+      if (resizeCtx.raf) cancelAnimationFrame(resizeCtx.raf);
+      resizeCtx = null;
+      try { resizeHandle.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    resizeHandle.addEventListener('pointerup', endWindowResize);
+    resizeHandle.addEventListener('pointercancel', endWindowResize);
+  }
+
+  function toggleMaximize(id) {
+    var w = openWindows[id]; if (!w) return;
+    var el = w.el;
+    var btn = el.querySelector('[data-role="max"]');
+    if (!w.maximized) {
+      w.restoreBounds = { left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height };
+      el.style.left = '0';
+      el.style.top = '0';
+      el.style.width = '100%';
+      el.style.height = '100%';
+      w.maximized = true;
+    } else {
+      if (w.restoreBounds) {
+        el.style.left = w.restoreBounds.left;
+        el.style.top = w.restoreBounds.top;
+        el.style.width = w.restoreBounds.width;
+        el.style.height = w.restoreBounds.height;
+      }
+      w.maximized = false;
+    }
+    el.classList.toggle('bos-window--maximized', w.maximized);
+    if (btn) {
+      btn.textContent = w.maximized ? '❐' : '□';
+      btn.title = w.maximized ? t('window.restore') : t('window.maximize');
+    }
+    focusWindow(id);
+  }
+
+  function focusWindow(id) {
+    var w = openWindows[id]; if (!w) return;
+    zTop += 1;
+    w.el.style.zIndex = zTop;
+    w.el.classList.remove('bos-window--minimized');
+    w.minimized = false;
+    Object.keys(openWindows).forEach(function (k) { openWindows[k].el.classList.toggle('bos-window--active', k === id); });
+    activeWindowId = id;
+    renderTaskbar();
+  }
+  function minimizeWindow(id) {
+    var w = openWindows[id]; if (!w) return;
+    w.minimized = true;
+    w.el.classList.add('bos-window--minimized');
+    if (activeWindowId === id) activeWindowId = null;
+    renderTaskbar();
+  }
+  function restoreWindow(id) {
+    var w = openWindows[id]; if (!w) return;
+    w.minimized = false;
+    w.el.classList.remove('bos-window--minimized');
+    focusWindow(id);
+  }
+  function closeWindow(id) {
+    var w = openWindows[id]; if (!w) return;
+    w.el.remove();
+    delete openWindows[id];
+    if (activeWindowId === id) activeWindowId = null;
+    renderTaskbar();
+  }
+
+  function renderTaskbar() {
+    var wrap = document.getElementById('taskbarApps');
+    wrap.innerHTML = '';
+    Object.keys(openWindows).forEach(function (id) {
+      var w = openWindows[id];
+      var btn = document.createElement('button');
+      btn.className = 'bos-taskbar__item';
+      btn.dataset.active = (activeWindowId === id) ? 'true' : 'false';
+      btn.dataset.minimized = w.minimized ? 'true' : 'false';
+      btn.innerHTML = '<span>' + iconGlyphHTML(w.app.icon) + '</span><span>' + escapeHtml(w.app.name) + '</span>';
+      btn.addEventListener('click', function () {
+        if (w.minimized) restoreWindow(id);
+        else if (activeWindowId === id) minimizeWindow(id);
+        else focusWindow(id);
+      });
+      wrap.appendChild(btn);
+    });
+  }
+  // Bis 05.09.2026 stand hier "alle Fenster minimieren" auf Klick. Gestrichen
+  // (Ulf-Entscheidung, siehe SESSION_2026-09-05_AUFGABEN_TASKBOARD_KONZEPT.md):
+  // ungenutzt, und der Knopf hat jetzt eine neue Aufgabe — siehe bos_taskboard.js,
+  // das #taskbarHome übernimmt und seinen eigenen Klick-Handler registriert.
+
+  /* ---------------- Theme / Akzentfarbe (pro Profil) ---------------- */
+  function setTheme(mode) {
+    var data = getActiveProfileData();
+    data.theme = mode;
+    document.documentElement.setAttribute('data-theme', mode);
+    document.getElementById('themeToggle').textContent = mode === 'dark' ? '🌙' : '☀️';
+    saveState();
+  }
+  /* NEU 01.09.2026 (Ulf: "geht es nicht etwas filigraner... systemweit,
+     einstellbar?") — zweite, unabhängige Achse neben dem Theme: Theme
+     regelt Farben, Dichte regelt Abstände/Schrift/Radien. Gleiches
+     Speicher- und Anwendungsmuster wie setTheme() oben, siehe
+     BOS_DICHTE_DOKU.md. Satelliten lesen data-density selbst über
+     bos_density_sync.js — der Launcher setzt hier nur die eigene
+     Attribut-/State-Seite, genau wie bei data-theme. */
+  function setDensity(mode) {
+    var data = getActiveProfileData();
+    data.density = mode;
+    document.documentElement.setAttribute('data-density', mode);
+    saveState();
+  }
+  /* NEU 11.09.2026 (Ulf: "Ansicht überall kleiner", ausgelöst durch Vergleich
+     mit Chrome-Seitenzoom auf 65%, siehe SESSION_2026-09-11_ZOOMSTUFE_KONZEPT.md)
+     — sechste, unabhängige Achse. WICHTIGER UNTERSCHIED zu Dichte: Dichte
+     ändert nur CSS-Token-WERTE (Abstände/Schrift/Radien) je Dokument, das
+     kaskadiert nicht über Iframe-Grenzen und kann sich daher nicht
+     "aufsummieren". Zoom dagegen ist eine echte Rendering-Skalierung
+     (CSS zoom-Property) — wirkt sie hier auf den Launcher (immer das äußerste
+     Dokument im normalen Betrieb), skaliert sie automatisch ALLES mit, auch
+     bereits offene Satelliten-Fenster (Iframes) als Teil des gesamten
+     Kompositbilds — exakt wie Chromes eigener Seitenzoom, den Ulf schon
+     getestet hat. Genau DESHALB darf bos_zoom_sync.js (für Satelliten) sich
+     NICHT auch noch selbst zoomen, wenn er in einem Launcher-Fenster läuft —
+     das würde doppelt schrumpfen. Siehe dortigen Kopfkommentar für die
+     Iframe-Weiche. Setzt hier, wie setDensity() oben, nur die eigene
+     Attribut-/State-Seite des Launchers.
+     UNGEPRÜFTE ANNAHME (nicht an einem echten Tablet getestet): dass CSS
+     zoom auf einem Vorfahren-Element tatsächlich den gerenderten Inhalt
+     verschachtelter Iframes mitskaliert (nicht nur deren Außenmaße). Sollte
+     nach dem ersten echten Test mit offenem Satelliten-Fenster bei aktivem
+     Zoom verifiziert werden — siehe BOS_BAUSTELLEN.md. */
+  function setZoom(stufe) {
+    var data = getActiveProfileData();
+    data.zoom = stufe;
+    document.documentElement.setAttribute('data-zoom', stufe);
+    saveState();
+  }
+  /* NEU 05.09.2026 (Ulf: "User weiß ja, welchen Hintergrund er nimmt") —
+     dritte, unabhängige Achse neben Theme und Dichte: regelt NUR die
+     Lesbarkeit der Kachel-Beschriftung auf dem gewählten Hintergrundbild,
+     bewusst entkoppelt vom UI-Theme. Gleiches Speicher-/Anwendungsmuster
+     wie setDensity() oben. Siehe SESSION_2026-09-05_SYMBOLPAKET.md. */
+  /* NEU 06.09.2026 (Ulf: Einstellung für sehschwache Nutzer und für alle, die
+     einzelne Apps bevorzugt größer haben wollen) — fünfte, unabhängige Achse,
+     wirkt NUR auf den Launcher-Desktop (nicht wie Dichte systemweit auf alle
+     Satelliten). Gleiches Speicher-/Anwendungsmuster wie setDensity() oben.
+     Die CSS-Tokens reagieren allein über das data-Attribut; renderGrid() muss
+     zusätzlich neu laufen, weil sich Spaltenzahl/Zellmaße ändern — anders als
+     bei Theme/Symbolpaket reicht das reine CSS-Attribut hier nicht aus, siehe
+     SESSION_2026-09-06_LAUNCHER_KACHELGROESSE_KONZEPT.md. */
+  function setKachelgroesse(mode) {
+    var data = getActiveProfileData();
+    data.kachelgroesse = mode;
+    document.documentElement.setAttribute('data-kachelgroesse', mode);
+    saveState();
+    renderGrid();
+  }
+  function setSymbolpaket(mode) {
+    var data = getActiveProfileData();
+    data.symbolpaket = mode;
+    document.documentElement.setAttribute('data-symbolpaket', mode);
+    saveState();
+  }
+  /* NEU 05.09.2026 (Ulf mochte Blobmoji im Vergleichs-Prototyp) — vierte,
+     unabhängige Achse: WELCHE Icon-Technik gerendert wird, nicht wie sie
+     eingefärbt/lesbar gemacht wird (das regelt weiterhin das Symbolpaket
+     oben, unverändert). Anders als Theme/Dichte/Symbolpaket kein reines
+     CSS-Attribut — iconGlyphHTML() erzeugt bei 'blobmoji' ein <img> statt
+     nur Text, das muss aktiv neu gerendert werden, daher renderGrid()
+     hier explizit. Offene Hub-Fenster/Taskbar-Einträge übernehmen den
+     neuen Stil beim nächsten Öffnen automatisch (iconGlyphHTML liest den
+     Profil-Stand live). Siehe SESSION_2026-09-05_BLOBMOJI.md. */
+  function setIconStil(mode) {
+    var data = getActiveProfileData();
+    data.iconStil = mode;
+    saveState();
+    renderGrid();
+  }
+  function setAccent(hex) {
+    var data = getActiveProfileData();
+    data.accent = hex;
+    applyAccent();
+    saveState();
+  }
+  function applyAccent() {
+    var data = getActiveProfileData();
+    if (data.accent) document.documentElement.style.setProperty('--bos-amber', data.accent);
+    else document.documentElement.style.removeProperty('--bos-amber');
+  }
+  function setBackground(id) {
+    var data = getActiveProfileData();
+    data.background = id;
+    applyBackground(id);
+    saveState();
+  }
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var data = getActiveProfileData();
+    setTheme(data.theme === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---------------- Profil-Auswahl ---------------- */
+  var pendingProfileId = null;
+
+  function buildProfileTileEl(p) {
+    var el = document.createElement('div');
+    el.className = 'bos-profile-tile';
+    el.dataset.id = p.id;
+    var lock = p.pin ? '<div class="bos-profile-tile__lock">🔒</div>' : '';
+    var delBtn = p.custom ? '<button class="bos-profile-tile__delete" data-role="delete-profile">✕</button>' : '';
+    el.innerHTML = delBtn +
+      '<div class="bos-profile-tile__icon">' + escapeHtml(p.icon || '🙂') + '</div>' +
+      '<div class="bos-profile-tile__name">' + escapeHtml(p.name) + '</div>' + lock;
+    var del = el.querySelector('[data-role="delete-profile"]');
+    if (del) {
+      del.addEventListener('click', function (e) {
+        e.stopPropagation();
+        deleteLocalProfile(p.id);
+      });
+    }
+    el.addEventListener('click', function () { selectProfile(p.id); });
+    return el;
+  }
+  function renderProfilePicker() {
+    var grid = document.getElementById('profileGrid');
+    grid.innerHTML = '';
+    getMergedProfiles().forEach(function (p) { grid.appendChild(buildProfileTileEl(p)); });
+    var addEl = document.createElement('div');
+    addEl.className = 'bos-profile-tile bos-profile-tile--add';
+    addEl.innerHTML =
+      '<div class="bos-profile-tile__icon" style="color:var(--bos-text-faint);">+</div>' +
+      '<div class="bos-profile-tile__name">' + t('profile.addNew') + '</div>';
+    addEl.addEventListener('click', showAddProfileForm);
+    grid.appendChild(addEl);
+  }
+  function deleteLocalProfile(id) {
+    if (!confirm(t('profile.deleteConfirm'))) return;
+    state.localProfiles = state.localProfiles.filter(function (p) { return p.id !== id; });
+    delete state.profileData[id];
+    if (state.activeProfileId === id) state.activeProfileId = null;
+    saveState();
+    if (!state.activeProfileId) { showProfileOverlay(); } else { renderProfilePicker(); }
+  }
+
+  /* Drei Dropdowns statt Kalender-Widget — bei <input type="date"> muss man
+     sich auf Android/Chrome monatsweise bis zum Geburtsjahr zurückklicken,
+     das nervt spürbar. Jahr absteigend ab (aktuelles Jahr - 14), damit die
+     wahrscheinlicheren Jahre für erwachsenes Personal oben in der Liste
+     stehen — reine Sortier-Bequemlichkeit, keine harte Grenze. */
+  function populateGeburtsdatumSelects() {
+    var tagSel = document.getElementById('profileAddGebTag');
+    var monatSel = document.getElementById('profileAddGebMonat');
+    var jahrSel = document.getElementById('profileAddGebJahr');
+    if (tagSel.options.length) return;
+
+    var tagLeer = document.createElement('option');
+    tagLeer.value = '';
+    tagLeer.textContent = 'Tag';
+    tagSel.appendChild(tagLeer);
+    for (var t = 1; t <= 31; t++) {
+      var ot = document.createElement('option');
+      ot.value = (t < 10 ? '0' : '') + t;
+      ot.textContent = t;
+      tagSel.appendChild(ot);
+    }
+
+    var monate = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    var monatLeer = document.createElement('option');
+    monatLeer.value = '';
+    monatLeer.textContent = 'Monat';
+    monatSel.appendChild(monatLeer);
+    monate.forEach(function (name, i) {
+      var om = document.createElement('option');
+      om.value = (i + 1 < 10 ? '0' : '') + (i + 1);
+      om.textContent = name;
+      monatSel.appendChild(om);
+    });
+
+    var jahrLeer = document.createElement('option');
+    jahrLeer.value = '';
+    jahrLeer.textContent = 'Jahr';
+    jahrSel.appendChild(jahrLeer);
+    var heuer = new Date().getFullYear();
+    for (var j = heuer - 14; j >= heuer - 80; j--) {
+      var oj = document.createElement('option');
+      oj.value = String(j);
+      oj.textContent = j;
+      jahrSel.appendChild(oj);
+    }
+  }
+  /* Gibt "YYYY-MM-DD" zurück, oder '' wenn unvollständig/ungültig
+     (z.B. 31. Februar) — echter Rundtrip-Check über Date, keine Annahme. */
+  function leseGeburtsdatum() {
+    var t = document.getElementById('profileAddGebTag').value;
+    var m = document.getElementById('profileAddGebMonat').value;
+    var j = document.getElementById('profileAddGebJahr').value;
+    if (!t || !m || !j) return '';
+    var probe = new Date(Number(j), Number(m) - 1, Number(t));
+    if (probe.getFullYear() !== Number(j) || probe.getMonth() !== Number(m) - 1 || probe.getDate() !== Number(t)) {
+      return '';
+    }
+    return j + '-' + m + '-' + t;
+  }
+  populateGeburtsdatumSelects();
+
+  function showAddProfileForm() {
+    document.getElementById('profileAddName').value = '';
+    document.getElementById('profileAddGebTag').value = '';
+    document.getElementById('profileAddGebMonat').value = '';
+    document.getElementById('profileAddGebJahr').value = '';
+    document.getElementById('profileAddIcon').value = '🙂';
+    document.getElementById('profileAddPin').value = '';
+    document.getElementById('profileAddZusatz').value = '';
+    document.getElementById('profileAddZusatzRow').style.display = 'none';
+    document.getElementById('profileAddError').style.display = 'none';
+    document.getElementById('profilePinWrap').style.display = 'none';
+    document.getElementById('profileAddWrap').style.display = 'flex';
+  }
+  function hideAddProfileForm() { document.getElementById('profileAddWrap').style.display = 'none'; }
+  document.getElementById('profileAddCancel').addEventListener('click', hideAddProfileForm);
+
+  /* Registrierung/Anmeldung über bos_accounts (Firestore). PIN ist Pflicht
+     seit heute Abend (siehe BOS_BAUSTELLEN.md #7/#8) — ohne ihn könnte
+     jeder mit Vorname+Geburtsdatum einer Kollegin/eines Kollegen deren
+     Konto auf einem neuen Gerät übernehmen. Erst prüfen ob das Konto
+     schon existiert, dann je nachdem neu anlegen ODER mit PIN anmelden.
+     Falscher PIN bei bestehendem Konto => evtl. andere Person mit
+     gleichem Namen+Geburtsdatum, Zusatz-Feld einblenden statt blockieren. */
+  document.getElementById('profileAddSave').addEventListener('click', function () {
+    var vorname = document.getElementById('profileAddName').value.trim();
+    var geburtsdatum = leseGeburtsdatum();
+    var icon = document.getElementById('profileAddIcon').value.trim() || '🙂';
+    var pin = document.getElementById('profileAddPin').value.trim();
+    var zusatz = document.getElementById('profileAddZusatz').value.trim();
+    var errEl = document.getElementById('profileAddError');
+    var btn = document.getElementById('profileAddSave');
+
+    if (!vorname || !geburtsdatum || !pin) {
+      errEl.textContent = t('profile.addMissing');
+      errEl.style.display = 'block';
+      return;
+    }
+    if (!window.BOS_ACCOUNTS || !window.db) {
+      errEl.textContent = t('profile.addOffline');
+      errEl.style.display = 'block';
+      return;
+    }
+
+    errEl.textContent = t('profile.addPending');
+    errEl.style.display = 'block';
+    btn.disabled = true;
+
+    function schreibeLokalUndAktiviere(kontoId, daten) {
+      var id = 'konto_' + kontoId;
+      var bestehend = state.localProfiles.find(function (p) { return p.id === id; });
+      var profil = bestehend || { id: id, quelle: 'konto', kontoSchluessel: kontoId };
+      profil.name = daten.name;
+      profil.icon = icon;
+      profil.role = daten.role;
+      profil.kontoOverrides = daten.overrides || {};
+      if (!bestehend) state.localProfiles.push(profil);
+      saveState();
+      btn.disabled = false;
+      hideAddProfileForm();
+      activateProfile(id);
+    }
+
+    (window.BOS_AUTH_READY || Promise.resolve())
+      .then(function () { return window.BOS_ACCOUNTS.pruefeKonto(window.db, vorname, geburtsdatum, zusatz); })
+      .then(function (stand) {
+        if (!stand.existiert) {
+          return window.BOS_ACCOUNTS.registriereNeu(window.db, vorname, geburtsdatum, pin, zusatz)
+            .then(function (ergebnis) { schreibeLokalUndAktiviere(ergebnis.id, ergebnis.daten); });
+        }
+        return window.BOS_ACCOUNTS.loginMitPin(window.db, stand.id, pin).then(function (ergebnis) {
+          if (!ergebnis || ergebnis.falscherPin) {
+            btn.disabled = false;
+            document.getElementById('profileAddZusatzRow').style.display = 'flex';
+            errEl.textContent = t('profile.addFalscherPin');
+            errEl.style.display = 'block';
+            return;
+          }
+          schreibeLokalUndAktiviere(ergebnis.id, ergebnis.daten);
+        });
+      })
+      .catch(function (fehler) {
+        console.warn('BOS Launcher: Registrierung/Anmeldung fehlgeschlagen', fehler);
+        btn.disabled = false;
+        errEl.textContent = t('profile.addError');
+        errEl.style.display = 'block';
+      });
+  });
+
+  function weiterNachProfilwahl(id, p) {
+    if (p.pin) {
+      pendingProfileId = id;
+      document.getElementById('profileAddWrap').style.display = 'none';
+      document.getElementById('profilePinError').style.display = 'none';
+      document.getElementById('profilePinInput').value = '';
+      document.getElementById('profilePinWrap').style.display = 'flex';
+      document.getElementById('profilePinInput').focus();
+    } else {
+      activateProfile(id);
+    }
+  }
+  function selectProfile(id) {
+    var p = getProfileById(id);
+    if (!p) return;
+
+    /* Konto-Profile (Selbstregistrierung): Rolle/Overrides bei jedem
+       Antippen frisch aus Firestore holen — eine Freischaltung durch
+       den Admin muss ohne Neu-Registrierung sofort wirken. Alte lokale
+       Profile und das feste Admin-Fallback-Profil (aus
+       bos_launcher_profiles.js) bleiben unverändert synchron. */
+    var rollenPromise = (p.quelle === 'konto' && p.kontoSchluessel && window.BOS_ACCOUNTS && window.db)
+      ? (window.BOS_AUTH_READY || Promise.resolve())
+          .then(function () { return window.BOS_ACCOUNTS.ladeKonto(window.db, p.kontoSchluessel); })
+          .then(function (daten) {
+            if (daten) {
+              var eintrag = state.localProfiles.find(function (lp) { return lp.id === id; });
+              if (eintrag) {
+                eintrag.role = daten.role;
+                eintrag.kontoOverrides = daten.overrides || {};
+                eintrag.name = daten.name;
+                saveState();
+              }
+            }
+          })
+          .catch(function (fehler) {
+            console.warn('BOS Launcher: Rolle konnte nicht aktualisiert werden, nutze zwischengespeicherten Stand', fehler);
+            /* 26.09.2026 (Namens-Fundament, Kontenliste zu): jedes Konto darf
+               nur noch sein EIGENES Konto-Dokument lesen. Ein anderes, auf
+               diesem Gerät gespeichertes Konto-Profil scheitert deshalb mit
+               permission-denied — vorher still, jetzt sichtbar. */
+            var angemeldet = (firebase.auth().currentUser && firebase.auth().currentUser.email) || '—';
+            zeigeStartHinweis((fehler && fehler.code === 'permission-denied')
+              ? ('Das Konto „' + p.kontoSchluessel + '“ kann hier nicht geprüft werden — angemeldet ist ' + angemeldet +
+                 '. Es gilt der zuletzt bekannte Stand. Zum Wechseln an der Tür abmelden und mit der anderen Karte anmelden.')
+              : ('Rolle konnte nicht aktualisiert werden — es gilt der zuletzt bekannte Stand. ' +
+                 ((fehler && fehler.code ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler)))));
+          })
+      : Promise.resolve();
+
+    /* NEU 05.09.2026: persönliche Einstellungen (Theme, Dichte, Layout,
+       installierte Apps, …) geräteübergreifend laden — siehe
+       bos_profil_sync.js. Anders als die Rolle oben gilt das für JEDES
+       Profil, nicht nur Konto-Profile — auch für feste Profile wie Ulfs
+       Admin-Profil aus bos_launcher_profiles.js, das kein bos_accounts-
+       Dokument hat. Läuft parallel zur Rollen-Abfrage, ein Fehlschlag
+       hier blockt den anderen Pfad nicht. */
+    var einstellungenPromise = (window.BOS_PROFIL_SYNC && window.db && !(p && p.freigeschaltet === false))
+      ? (window.BOS_AUTH_READY || Promise.resolve())
+          .then(function () { return window.BOS_PROFIL_SYNC.lade(window.db, id); })
+          .then(function (daten) {
+            if (daten) {
+              if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
+              Object.assign(state.profileData[id], daten);
+              saveState(true); // keinSync: gerade erst aus Firestore geladen, nicht sofort zurückschreiben
+            }
+          })
+          .catch(function (fehler) {
+            console.warn('BOS Launcher: Einstellungen konnten nicht synchronisiert werden, nutze lokalen Stand', fehler);
+          })
+      : Promise.resolve();
+
+    Promise.all([rollenPromise, einstellungenPromise]).then(function () {
+      weiterNachProfilwahl(id, getProfileById(id));
+    });
+  }
+  function activateProfile(id) {
+    state.activeProfileId = id;
+    if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
+    saveState();
+    document.getElementById('profilePinWrap').style.display = 'none';
+    pendingProfileId = null;
+    hideProfileOverlay();
+    applyProfileUI();
+  }
+  /* ====================================================================
+     Start über das angemeldete Konto — NEU 19.09.2026
+     --------------------------------------------------------------------
+     Ersetzt die Profilauswahl. Wer am System sitzt, steht seit der
+     Anmeldung auf index.html fest; der Launcher fragt es nicht noch
+     einmal. Der Kontoschlüssel IST der Teil der Kennung vor dem @ —
+     backstube01@baeckereios.intern → bos_accounts/backstube01.
+
+     Damit entfallen: Profilauswahl, Registrierungsformular, PIN-Abfrage
+     und die Schlüsselberechnung aus Vorname/Geburtsdatum. Die Nachlade-
+     Logik für Rolle und persönliche Einstellungen ist dieselbe wie in
+     selectProfile() — sie bekommt ihre ID nur aus dem Konto statt aus
+     einem Antippen.
+
+     Drei Zustände, alle mit sichtbarer Auskunft statt stummem Nichts:
+       - keine Sitzung / anonyme Altsitzung → zurück zur Anmeldung
+       - Sitzung, aber kein bos_accounts-Dokument → Grundkonto, also das,
+         was ohnehin für alle offen ist (Taschenrechner, Schnelldruck,
+         BackStore). Bewusste Entscheidung vom 17.09., kein Sonderbild.
+       - Fehler → echte Meldung plus Abmelde-Knopf
+     ==================================================================== */
+  function zurAnmeldung() {
+    // Gleiche Iframe-Weiche wie in bos_firebase_config.js und bos_zoom_sync.js:
+    // aus einem Satellitenfenster heraus das äußere Fenster schicken.
+    var fenster = (window.self !== window.top) ? window.top : window;
+    try { fenster.location.replace('index.html?wechseln=1'); }
+    catch (e) { window.location.replace('index.html?wechseln=1'); }
+  }
+
+  function setzeStartStatus(text, detail, mitAbmelden) {
+    var box = document.getElementById('startStatus');
+    if (!box) return;
+    box.style.display = 'flex';
+    document.getElementById('startStatusText').textContent = text;
+    document.getElementById('startStatusDetail').textContent = detail || '';
+    document.getElementById('startStatusAbmelden').style.display = mitAbmelden ? '' : 'none';
+  }
+
+  /* K-15 (Schritt 2, 26.09.2026): Ist die Tür mit dem Generalschlüssel
+     angemeldet, steht oben ein roter Streifen. Vergleich über
+     BOS_BV.adminKennung() — die Kennung steht nirgends im Klartext. */
+  /* NF-52 (27.09.2026): Ist das aktive Konto ohne Haken? Dann werden die
+     Hintergrund-Zugriffe (Einstellungen laden/speichern) gar nicht erst
+     versucht — sie scheitern ohne Haken an der Regel. Profile ohne das Feld
+     (vor Schritt 2) zählen nicht als „ohne Haken“. */
+  function aktivesProfilOhneHaken() {
+    var p = state && state.localProfiles ? state.localProfiles.find(function (x) { return x.id === state.activeProfileId; }) : null;
+    return !!(p && p.freigeschaltet === false && p.kontoVorhanden !== false);
+  }
+
+  function zeigeGeneralschluesselStreifen(kennung) {
+    try {
+      var admin = window.BOS_BV && typeof window.BOS_BV.adminKennung === 'function' ? window.BOS_BV.adminKennung() : null;
+      if (!admin || !kennung || String(admin).split('@')[0].toLowerCase() !== kennung) return;
+      if (document.getElementById('generalschluesselStreifen')) return;
+      var d = document.createElement('div');
+      d.id = 'generalschluesselStreifen';
+      d.setAttribute('role', 'alert');
+      d.setAttribute('style', 'position:relative;z-index:50;margin:0;padding:9px 14px;background:#7d2f25;color:#fdeae7;' +
+        'font-family:sans-serif;font-size:13px;line-height:1.45;font-weight:600;');
+      d.textContent = '⚠️ Angemeldet mit dem Generalschlüssel. Er ist nur für die Kontenverwaltung gedacht — ' +
+        'für den Alltag an der Tür mit deinem eigenen Konto anmelden.';
+      document.body.insertBefore(d, document.body.firstChild);
+    } catch (e) {
+      console.error('BOS Launcher: Generalschlüssel-Prüfung fehlgeschlagen', e);
+    }
+  }
+
+  function zeigeStartHinweis(text) {
+    var box = document.getElementById('startHinweis');
+    if (!box) return;
+    document.getElementById('startHinweisText').textContent = text;
+    // display statt hidden: das Attribut hidden wird vom Inline-Style
+    // überstimmt, der Kasten wäre sonst ab dem ersten Bildaufbau sichtbar
+    // und liesse sich nicht schliessen. Fund im Praxistest, 19.09.2026.
+    box.style.display = 'flex';
+  }
+
+  function versteckeStartStatus() {
+    var box = document.getElementById('startStatus');
+    if (box) box.style.display = 'none';
+  }
+
+  function starteMitKonto() {
+    if (!window.BOS_AUTH_READY) {
+      setzeStartStatus('Anmeldung nicht verfügbar.',
+        'bos_firebase_config.js ist nicht geladen — window.BOS_AUTH_READY fehlt.', false);
+      return;
+    }
+
+    window.BOS_AUTH_READY.then(function (nutzer) {
+      // Anonyme Altsitzung (Stand vor dem 17.09.) hat keine Kennung.
+      if (!nutzer || !nutzer.email) { zurAnmeldung(); return; }
+
+      var kennung = window.BOS_KONTO_PROFIL.kennungAus(nutzer);
+      var id = window.BOS_KONTO_PROFIL.profilIdAus(kennung);
+      zeigeGeneralschluesselStreifen(kennung);
+
+      var eintrag = state.localProfiles.find(function (p) { return p.id === id; });
+      if (!eintrag) {
+        eintrag = { id: id, quelle: 'konto', kontoSchluessel: kennung,
+                    name: kennung, icon: '🙂', role: null, kontoOverrides: {} };
+        state.localProfiles.push(eintrag);
+      }
+
+      var warBekannt = (eintrag.role !== null && eintrag.role !== undefined);
+
+      /* Scheitert das Laden des Konto-Dokuments — offline, Firestore
+         zickt, Regel greift unerwartet —, darf das den Start NICHT
+         aufhalten. Ab dem zweiten Start liegt die zuletzt bekannte Rolle
+         in state.localProfiles; darauf fällt dieser Zweig zurück und
+         blendet einen Hinweis ein, statt den Launcher zu verweigern.
+         Nachts allein in der Backstube mit hakeligem Netz ist das kein
+         theoretischer Fall — und die Regeln setzen die echten Rechte
+         ohnehin serverseitig durch, eine veraltete Rolle im Browser ist
+         nur Anzeige. */
+      var kontoPromise = (window.BOS_ACCOUNTS && window.db)
+        ? window.BOS_ACCOUNTS.ladeKonto(window.db, kennung).catch(function (fehler) {
+            console.warn('BOS Launcher: Konto konnte nicht geladen werden', fehler);
+            zeigeStartHinweis(warBekannt
+              ? ('Rolle konnte nicht geprüft werden — es gilt der zuletzt bekannte Stand. '
+                 + ((fehler && fehler.message) || String(fehler)))
+              : ('Rolle konnte nicht geprüft werden und es liegt kein früherer Stand vor — '
+                 + 'vorerst nur die allgemein offenen Kacheln. '
+                 + ((fehler && fehler.message) || String(fehler))));
+            return warBekannt ? { name: eintrag.name, role: eintrag.role, overrides: eintrag.kontoOverrides } : null;
+          })
+        : Promise.resolve(null);
+
+      return kontoPromise.then(function (daten) {
+        /* Form des Eintrags kommt aus bos_konto_profil.js — dieselbe
+           Mechanik, die auch die Tür benutzt. Zwei Schreiber derselben
+           Struktur würden sonst irgendwann auseinanderlaufen. */
+        window.BOS_KONTO_PROFIL.aktualisiere(state, kennung, daten);
+        /* Schritt 2 (§11.5): Konto da, aber ohne Haken — sagen, warum
+           nur die offenen Kacheln da sind. */
+        var aktuell = state.localProfiles.find(function (p) { return p.id === id; });
+        if (daten && aktuell && aktuell.freigeschaltet === false) {
+          zeigeStartHinweis('Noch nicht freigeschaltet — dein Konto ist angelegt, aber noch nicht aktiv. Sag Ulf Bescheid.');
+        }
+        // keinSync: activeProfileId hat gerade erst gewechselt —
+        // ein Sync würde die Einstellungen des vorigen Profils
+        // sinnlos erneut hochschreiben.
+        saveState(true);
+
+        // Persönliche Einstellungen geräteübergreifend nachziehen. Ein
+        // Fehlschlag hier darf den Start nicht aufhalten — dann gilt der
+        // lokale Stand.
+        if (!(window.BOS_PROFIL_SYNC && window.db)) return;
+        // NF-52: ohne Haken die persönlichen Einstellungen nicht laden — die
+        // Regel verweigert es, der Versuch war nur eine Warnung mehr.
+        if (aktuell && aktuell.freigeschaltet === false) return;
+        return window.BOS_PROFIL_SYNC.lade(window.db, id)
+          .then(function (gespeichert) {
+            if (gespeichert) {
+              if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
+              Object.assign(state.profileData[id], gespeichert);
+              saveState(true); // gerade geladen, nicht sofort zurückschreiben
+            }
+          })
+          .catch(function (fehler) {
+            console.warn('BOS Launcher: Einstellungen konnten nicht geladen werden, nutze lokalen Stand', fehler);
+          });
+      }).then(function () {
+        versteckeStartStatus();
+        activateProfile(id);
+        var akt = state.localProfiles.find(function (p) { return p.id === id; });
+        if (window.BOS_UNKONFIGURIERT_PRUEFEN) {
+          window.BOS_UNKONFIGURIERT_PRUEFEN(akt ? akt.role : null);
+        }
+      });
+    }).catch(function (fehler) {
+      console.error('BOS Launcher: Start fehlgeschlagen', fehler);
+      setzeStartStatus('Start fehlgeschlagen.',
+        (fehler && fehler.code ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler)),
+        true);
+    });
+  }
+
+  /* Die Profilauswahl bleibt vorerst als Markup im Dokument stehen, wird
+     aber aus dem Startpfad nicht mehr aufgerufen. Ein Aufrufer ist noch
+     übrig: deleteLocalProfile() (Zeile ~1890) — erreichbar ist diese
+     Funktion allerdings nur aus dem Overlay selbst, also ebenfalls toter
+     Weg. Aufräumen erst, wenn der Kontostart im Betrieb bestätigt ist
+     (siehe B-25). */
+  function showProfileOverlay() {
+    renderProfilePicker();
+    document.getElementById('profilePinWrap').style.display = 'none';
+    document.getElementById('profileAddWrap').style.display = 'none';
+    document.getElementById('profileOverlay').classList.add('bos-profile-overlay--visible');
+  }
+  function hideProfileOverlay() {
+    document.getElementById('profileOverlay').classList.remove('bos-profile-overlay--visible');
+  }
+  function applyProfileUI() {
+    var p = getActiveProfile();
+    document.getElementById('profileSwitchBtn').textContent = p ? (p.icon || '🙂') : '👤';
+    var data = getActiveProfileData();
+    document.documentElement.setAttribute('data-theme', data.theme || 'dark');
+    document.documentElement.setAttribute('data-density', data.density || 'standard');
+    document.documentElement.setAttribute('data-kachelgroesse', data.kachelgroesse || 'standard');
+    document.documentElement.setAttribute('data-symbolpaket', data.symbolpaket || 'hell');
+    document.documentElement.setAttribute('data-zoom', data.zoom || '100');
+    document.getElementById('themeToggle').textContent = data.theme === 'light' ? '☀️' : '🌙';
+    applyBackground(data.background || 'ofenkohle');
+    applyAccent();
+    if (!p || p.role !== 'admin') exitEditMode();
+    renderGrid();
+    maybeShowBackstoreHinweis(); // NEU 02.09.2026, siehe BACKSTORE_DOKU.md
+    if (window.BOS_SCREENSAVER) window.BOS_SCREENSAVER.start(); // NEU 03.09.2026, siehe bos_screensaver.js
+  }
+
+  /* ---------------- BackStore-Hinweis ----------------
+     Ein Profil, das noch nichts installiert hat, sieht beim Aktivieren einmalig
+     einen Hinweis auf den BackStore. Bewusst EIN Trigger statt zwei getrennter
+     ("erster Start" / "nach Freischaltung") — beide Momente sind an derselben
+     Bedingung erkennbar: "installed" ist leer. Einmal gesehen/geschlossen →
+     backstoreHinweisGesehen, taucht danach nicht mehr auf. */
+  function maybeShowBackstoreHinweis() {
+    var data = getActiveProfileData();
+    if (data.installed.length === 0 && !data.backstoreHinweisGesehen) {
+      document.getElementById('backstoreHinweisOverlay').classList.add('bos-modal-overlay--visible');
+    }
+  }
+  function dismissBackstoreHinweis() {
+    var data = getActiveProfileData();
+    data.backstoreHinweisGesehen = true;
+    saveState();
+    document.getElementById('backstoreHinweisOverlay').classList.remove('bos-modal-overlay--visible');
+  }
+  document.getElementById('backstoreHinweisOpen').addEventListener('click', function () {
+    dismissBackstoreHinweis();
+    launchApp('backstore');
+  });
+  document.getElementById('backstoreHinweisLater').addEventListener('click', dismissBackstoreHinweis);
+  // 19.09.2026: aus "Profil wechseln" wird "Abmelden". Ein Gerät, ein
+  // Konto — der Wechsel läuft über die Anmeldetür, nicht über ein
+  // Antippen ohne Nachweis. Ersetzt zugleich die alte Baustelle
+  // "Profilwechsel verlangt keinen PIN".
+  document.getElementById('profileSwitchBtn').addEventListener('click', function () {
+    zurAnmeldung();
+  });
+  document.getElementById('startStatusAbmelden').addEventListener('click', function () {
+    zurAnmeldung();
+  });
+  document.getElementById('startHinweisZu').addEventListener('click', function () {
+    document.getElementById('startHinweis').style.display = 'none';
+  });
+  document.getElementById('profileOverlay').addEventListener('pointerdown', function (e) {
+    if (e.target.id === 'profileOverlay' && state.activeProfileId) hideProfileOverlay();
+  });
+  document.getElementById('profilePinCancel').addEventListener('click', function () {
+    document.getElementById('profilePinWrap').style.display = 'none';
+    pendingProfileId = null;
+  });
+  document.getElementById('profilePinConfirm').addEventListener('click', confirmProfilePin);
+  document.getElementById('profilePinInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') confirmProfilePin();
+  });
+  function confirmProfilePin() {
+    var p = getProfileById(pendingProfileId);
+    var val = document.getElementById('profilePinInput').value;
+    if (p && val === p.pin) {
+      activateProfile(pendingProfileId);
+    } else {
+      document.getElementById('profilePinError').style.display = 'block';
+    }
+  }
+
+  /* ---------------- Hilfe ---------------- */
+  function renderHelp() {
+    var items = ['help.profile', 'help.backstore', 'help.tap', 'help.longpress', 'help.add', 'help.window', 'help.taskbar'];
+    document.getElementById('helpList').innerHTML = items.map(function (k) {
+      return '<div class="bos-help-item">' + t(k) + '</div>';
+    }).join('');
+  }
+  function openHelp() {
+    document.getElementById('helpSheet').classList.add('bos-help-sheet--open');
+    document.getElementById('helpBackdrop').classList.add('bos-help-backdrop--visible');
+  }
+  function closeHelp() {
+    document.getElementById('helpSheet').classList.remove('bos-help-sheet--open');
+    document.getElementById('helpBackdrop').classList.remove('bos-help-backdrop--visible');
+  }
+  document.getElementById('helpBtn').addEventListener('click', openHelp);
+  document.getElementById('helpBackdrop').addEventListener('click', closeHelp);
+  document.getElementById('helpCloseBtn').addEventListener('click', closeHelp);
+
+  /* ---------------- Uhr ---------------- */
+  function updateClock() {
+    var now = new Date();
+    document.getElementById('clock').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('clockDate').textContent = now.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  }
+
+  /* ---------------- Start ---------------- */
+  /* ---------------- Firestore-Verbindungsstatus (echt, kein Platzhalter mehr) ---------------- */
+  function initFirestoreStatus() {
+    var dot = document.getElementById('firestoreDot');
+    var label = document.getElementById('firestoreLabel');
+    if (!window.BOS_AUTH_READY) {
+      // bos_firebase_config.js nicht geladen (z.B. lokal ohne Internet getestet)
+      label.textContent = t('status.firestoreError');
+      dot.style.background = 'var(--bos-red)';
+      return;
+    }
+    window.BOS_AUTH_READY.then(function () {
+      label.textContent = t('status.firestoreConnected');
+      dot.style.background = 'var(--bos-green)';
+    }).catch(function () {
+      label.textContent = t('status.firestoreError');
+      dot.style.background = 'var(--bos-red)';
+    });
+  }
+
+  function init() {
+    loadState();
+    applyI18nStatic();
+    renderHelp();
+    renderTaskbar();
+    updateClock();
+    setInterval(updateClock, 15000);
+    initFirestoreStatus();
+    if (window.BOS_TASKBOARD) window.BOS_TASKBOARD.init(); // NEU 05.09.2026
+
+    /* Fallen die Rechtedaten aus, filtert isVisibleForRole() nicht mehr
+       und der Launcher zeigt ALLE Kacheln — lautlos. Der Warnstreifen
+       aus bos_access_guard.js greift hier nicht, weil der Launcher den
+       Guard gar nicht lädt: er prüft selbst. Damit ist ausgerechnet die
+       auffälligste Stelle die einzige ohne Warnung gewesen.
+       Fund 19.09.2026, siehe F-24. */
+    if (!window.BOS_ACCESS || !window.BOS_PERMISSIONS) {
+      var fehlt = [];
+      if (!window.BOS_ACCESS) fehlt.push('bos_access.js');
+      if (!window.BOS_PERMISSIONS) fehlt.push('bos_permissions.js');
+      console.error('[BOS Launcher] Rechtedaten fehlen (' + fehlt.join(', ') +
+                    ') — es werden alle Kacheln angezeigt.');
+      zeigeStartHinweis('Berechtigung konnte nicht geprüft werden — es werden ' +
+        'alle Kacheln angezeigt. Fehlt: ' + fehlt.join(', ') +
+        '. Seite neu laden; bleibt es, stimmt etwas mit den Dateien nicht.');
+    }
+
+    /* Zweiter Fail-open-Grund: ein Satellit, der laut Registry Rollen
+       hat, aber in bos_permissions.js fehlt — der erscheint hier als
+       Kachel für JEDE Rolle. Bewusst NUR für Admin gemeldet:
+         - für einen Bäcker ist eine Kachel zu viel folgenlos
+         - ein roter Balken bei jedem Start würde zur Tapete, und dann
+           ignoriert man auch den wichtigen
+         - der Admin ist der Einzige, der den Eintrag nachtragen kann,
+           und meistens der, der den Satelliten gebaut hat
+       Die Meldung erscheint deshalb erst nach dem Laden des Kontos. */
+    window.BOS_UNKONFIGURIERT_PRUEFEN = function (rolle) {
+      if (rolle !== 'admin') return;
+      if (!window.BOS_ACCESS || !window.BOS_PERMISSIONS || !window.BOS_APPS) return;
+      var offen = window.BOS_APPS.filter(function (a) {
+        if (!a.roles || !a.roles.length) return false;   // gewollt offen
+        return typeof window.BOS_ACCESS.istGelistet === 'function'
+          ? !window.BOS_ACCESS.istGelistet(a.id)
+          : false;
+      }).map(function (a) { return a.id; });
+      if (!offen.length) return;
+      console.error('[BOS Launcher] Satelliten ohne Eintrag in bos_permissions.js:', offen);
+      zeigeStartHinweis('Diese Satelliten stehen in keiner Rechte-Matrix und sind ' +
+        'für alle offen: ' + offen.join(', ') + '. Einträge in bos_permissions.js ergänzen.');
+    };
+
+    BOS_BOOT.play(function () {
+      // 19.09.2026: kein Profilwahl-Zweig mehr. Wer da ist, steht seit der
+      // Anmeldung fest; starteMitKonto() holt Rolle und Einstellungen und
+      // ruft anschließend activateProfile().
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.setAttribute('data-density', 'standard');
+      document.documentElement.setAttribute('data-kachelgroesse', 'standard');
+      document.documentElement.setAttribute('data-symbolpaket', 'hell');
+      document.documentElement.setAttribute('data-zoom', '100');
+      starteMitKonto();
+    });
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

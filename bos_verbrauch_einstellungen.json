@@ -1,0 +1,24 @@
+{
+  "_kommentar": "System-Standard für die Durchschnittsberechnung (bos_verbrauch_durchschnitt.js). Erzeugt über verbrauch_einstellungen_editor.html.",
+  "manuell": {
+    "modus": "stichprobe",
+    "stichprobeAnzahl": 6,
+    "suchfensterWochen": 12,
+    "kontiguierlichTage": 28,
+    "minStichprobe": 3,
+    "schwelleProzent": 0.3,
+    "schwelleAbsolut": 5,
+    "ausgeschlosseneTage": []
+  },
+  "offiziell": {
+    "modus": "stichprobe",
+    "stichprobeAnzahl": 6,
+    "suchfensterWochen": 30,
+    "kontiguierlichTage": 28,
+    "minStichprobe": 3,
+    "schwelleProzent": 0.3,
+    "schwelleAbsolut": 5,
+    "ausgeschlosseneTage": [],
+    "_kommentar": "Vorbereitet für den künftigen zweiten Datentopf (verbrauch_offiziell) — es existiert noch keine konsumierende Logik dafür, siehe BOS_ZEITKONTEXT_DOKU.md und BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md. Werte hier sind Platzhalter, identisch zu 'manuell'."
+  }
+}

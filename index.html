@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#16120e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="pwa/bos_icon_192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="pwa/bos_icon_192.png">
+<title>BäckereiOS</title>
+
+<!--
+  MODUL: index.html
+  ZWECK: Eingangstür des Systems. Einzige Stelle im ganzen BOS, an der
+         eine Firebase-Anmeldung stattfindet. Danach gilt die Sitzung
+         für launcher.html und jeden Satelliten — Firebase merkt sich
+         die Anmeldung pro Adresse, nicht pro Seite.
+  ENTSTEHUNG: Ulfs Vorschlag, 17.09.2026 ("Was würde eigentlich
+         passieren, wenn wir den Login auf den Index verlegen"). Löst
+         das Iframe-Problem ersatzlos: steht die Tür vor dem Launcher,
+         existiert die Sitzung bereits, bevor das erste Satelliten-
+         fenster aufgeht. Kein Anmeldedialog im Fenster im Fenster.
+  DATENFLUSS: bos_firebase_config.js (mit BOS_LOGIN_SEITE = true, damit
+         die Konfiguration NICHT hierher zurückleitet) → Firebase Auth
+         → bei Erfolg weiter zu ?weiter=<pfad> oder launcher.html.
+  ROLLE IM UMBAU: Etappe 2, Schritt 1. Der Launcher bleibt in diesem
+         Schritt unangetastet; er bekommt die Sitzung geschenkt und
+         verhält sich sonst exakt wie bisher.
+
+  BEKANNTE OFFENE PUNKTE
+    - Meldungsband (unten) ist gebaut, aber ungefüllt: MELDUNGEN ist
+      leer, dann erscheint der Bereich gar nicht erst. Später aus
+      Firestore speisen — die Einsprungstelle ist markiert.
+    - Mobile Ansicht ist ein Platzhalter (ZIEL_MOBIL = null). Der Knopf
+      sagt es dem Benutzer, statt stumm nichts zu tun.
+    - Kein Passwort-Zurücksetzen. Ohne echte Mailadresse gibt es keinen
+      Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
+
+  CHANGELOG
+    2026-10-04 · 14:39 · Online-Gang · Feature
+      Kopf ergänzt um theme-color, Verweis auf manifest.webmanifest, App-
+      Symbol (pwa/bos_icon_192.png als Favicon und Apple-Touch-Icon) und
+      robots noindex. Damit ist BOS auf GitHub Pages als App installierbar
+      („Zum Startbildschirm“) und bleibt aus Suchmaschinen. Keine Logik-
+      änderung. Siehe 2026-10-04_ONLINE_GANG.md.
+    2026-09-26 · Schritt 2 (Namens-Fundament, §11.5) · Feature
+      Konto vorhanden, aber ohne Haken „freigeschaltet“: Hinweis „Noch
+      nicht freigeschaltet — … Sag Ulf Bescheid.“ (gelb, kein Fehler),
+      dann weiter zum Launcher. „Berechtigung konnte nicht geladen werden“
+      bleibt dem echten Fehlerfall.
+    2026-09-19 · 09:0x · v0.9 · Fix
+      zielPfad() entfernt Tabulator/Zeilenumbruch/Wagenrücklauf VOR
+      allen Prüfungen und weist übrige Steuerzeichen ab. Sonst
+      passiert "java<TAB>script:…" die Schema-Prüfung und wird vom
+      Browser danach wieder zusammengesetzt.
+    2026-09-19 · 08:5x · v0.8 · Fix
+      zielPfad() verwirft jetzt auch Werte mit Rückschrägstrich (T-116)
+      — sonst liesse sich die Tür als offener Weiterleiter auf eine
+      fremde Adresse benutzen.
+    2026-09-19 · 08:3x · v0.7 · Fix
+      Statusanzeige läuft während des Profileintrags weiter
+      ("Berechtigung wird geladen …") und meldet, wenn die
+      Drei-Sekunden-Grenze greift, statt kommentarlos weiterzuleiten.
+      Gehört zu T-117.
+    2026-09-19 · 08:3x · v0.6 · Fix
+      Die Tür schreibt jetzt den Launcher-Profileintrag (Rolle aus
+      bos_accounts), bevor sie weiterleitet. Ohne das sperrte der
+      Zugriffs-Guard beim NFC-Direktaufruf auf einem Gerät, das den
+      Launcher noch nie geöffnet hatte — die Rolle war dort schlicht
+      nicht bekannt.
+    2026-09-18 · 08:4x · v0.5 · Feature
+      Knopf „Mobile Ansicht (in Planung)" als Platzhalter ergänzt —
+      Erinnerung an die geplante vereinfachte Handy-Darstellung.
+      Noch ohne Ziel; ZIEL_MOBIL setzen, dann ist es ein Abzweig.
+    2026-09-17 · 10:2x · v0.4 · Fix
+      Bestehende Sitzung wird nicht mehr wortlos durchgewunken: zwei
+      Sekunden Pause, dabei wird die angemeldete Kennung genannt und
+      der Abmelde-Link bleibt erreichbar. Vorher war die Tür für
+      Angemeldete unsichtbar — man kam nie ans Formular.
+    2026-09-17 · 10:1x · v0.3 · Fix
+      Zeitausfall (12 s) bei der Anmeldung. Ohne ihn blieb "Meldet
+      an …" bei fehlendem Netz endlos stehen, ohne jede Auskunft.
+    2026-09-17 · 10:0x · v0.2 · Fix
+      Kontowechsel ergänzt (?wechseln=1 + Link unter dem Formular).
+      Ohne ihn war die Tür eine Sackgasse: eine bestehende Sitzung
+      leitete sofort weiter, das Formular war nie erreichbar.
+      Fund im ersten Praxistest.
+    2026-09-17 · 09:4x · v0.1 · Feature
+      Erste Version. Anmeldung mit Kennung + Passwort, Weiterleitung
+      per ?weiter=, sichtbare Fehlermeldungen mit übersetzten
+      Firebase-Codes.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=Fraunces:ital,wght@0,600;0,900;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="bos_design_tokens.css">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    min-height: 100%;
+    background: var(--bos-bg);
+    color: var(--bos-text);
+    font-family: var(--bos-font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Der Raum: eine einzige Spalte, optisch etwas oberhalb der Mitte —
+     tiefer gesetzt wirkt eine Anmeldung schwerfällig. */
+  .raum {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    padding: var(--bos-space-xl) var(--bos-space-md);
+  }
+
+  .mitte {
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
+    align-self: center;
+    padding-bottom: 6vh;
+  }
+
+  /* --- Die Glut: der einzige Moment, an dem die Seite laut wird ----
+     Ein warmer Schein hinter der Wortmarke, der sehr langsam atmet.
+     Restwärme im Ofen, nicht Leuchtreklame. */
+  .marke { position: relative; text-align: center; margin-bottom: var(--bos-space-xl); }
+
+  .marke::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 48%;
+    width: 320px; height: 320px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+      var(--bos-amber-glow) 0%,
+      var(--bos-amber-glow-soft) 38%,
+      transparent 68%);
+    animation: glut 9s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes glut {
+    0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+    50%      { opacity: 1;    transform: translate(-50%, -50%) scale(1.09); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marke::before { animation: none; opacity: 0.7; }
+  }
+
+  .wortmarke {
+    position: relative; z-index: 1;
+    font-family: var(--bos-font-display);
+    font-weight: 900;
+    font-size: clamp(2.1rem, 11vw, 2.9rem);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 0;
+  }
+
+  .gruss {
+    position: relative; z-index: 1;
+    margin: var(--bos-space-sm) 0 0;
+    font-family: var(--bos-font-label);
+    font-size: var(--bos-font-sm);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--bos-text-faint);
+  }
+
+  /* --- Formular --------------------------------------------------- */
+  .feld { margin-bottom: var(--bos-space-sm); }
+
+  .feld label {
+    display: block;
+    margin-bottom: var(--bos-space-2xs);
+    font-family: var(--bos-font-label);
+    font-size: var(--bos-font-xs);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bos-text-dim);
+  }
+
+  .feld input {
+    width: 100%;
+    min-height: var(--bos-tap-min);
+    padding: 0 var(--bos-space-sm);
+    background: var(--bos-surface);
+    border: 1px solid var(--bos-border);
+    border-radius: var(--bos-radius-md);
+    color: var(--bos-text);
+    font-family: var(--bos-font-body);
+    font-size: var(--bos-font-md);
+    transition: border-color var(--bos-transition-fast), box-shadow var(--bos-transition-fast);
+  }
+
+  .feld input:focus {
+    outline: none;
+    border-color: var(--bos-amber);
+    box-shadow: 0 0 0 3px var(--bos-amber-glow-soft);
+  }
+
+  .feld input:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: 2px; }
+
+  .tuer {
+    width: 100%;
+    min-height: var(--bos-tap-min);
+    margin-top: var(--bos-space-md);
+    background: var(--bos-amber);
+    border: none;
+    border-radius: var(--bos-radius-md);
+    color: #15100a;
+    font-family: var(--bos-font-label);
+    font-size: var(--bos-font-md);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background var(--bos-transition-fast), transform var(--bos-transition-fast);
+  }
+
+  .tuer:hover:not(:disabled) { background: var(--bos-amber-bright); }
+  .tuer:active:not(:disabled) { transform: translateY(1px); }
+  .tuer:disabled { opacity: 0.5; cursor: default; }
+  .tuer:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: 3px; }
+
+  /* Zweiter Weg — heute nur ein Platzhalter, siehe Kommentar im Skript. */
+  .nebenweg {
+    width: 100%;
+    min-height: var(--bos-tap-min);
+    margin-top: var(--bos-space-xs);
+    background: transparent;
+    border: 1px dashed var(--bos-border-strong);
+    border-radius: var(--bos-radius-md);
+    color: var(--bos-text-dim);
+    font-family: var(--bos-font-label);
+    font-size: var(--bos-font-sm);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--bos-space-2xs);
+    transition: border-color var(--bos-transition-fast), color var(--bos-transition-fast);
+  }
+
+  .nebenweg:hover { border-color: var(--bos-amber); color: var(--bos-text); }
+  .nebenweg:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: 3px; }
+
+  .nebenweg .planung {
+    font-family: var(--bos-font-body);
+    font-size: var(--bos-font-xs);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--bos-text-faint);
+  }
+
+  /* --- Meldung: Fehler sichtbar, nicht in der Konsole -------------- */
+  .meldung {
+    margin-top: var(--bos-space-sm);
+    padding: var(--bos-space-xs) var(--bos-space-sm);
+    border-radius: var(--bos-radius-sm);
+    font-size: var(--bos-font-sm);
+    line-height: 1.5;
+    display: none;
+  }
+
+  .meldung.sichtbar { display: block; }
+
+  .meldung.hinweis { background: rgba(201,162,39,.12); border: 1px solid rgba(201,162,39,.45); color: #f1dc9a; }
+  .meldung.fehler {
+    background: rgba(214,88,74,0.12);
+    border: 1px solid rgba(214,88,74,0.4);
+    color: #f0a49a;
+  }
+
+  .meldung.laeuft {
+    background: var(--bos-surface);
+    border: 1px solid var(--bos-border);
+    color: var(--bos-text-dim);
+  }
+
+  .technisch {
+    display: block;
+    margin-top: var(--bos-space-2xs);
+    font-size: var(--bos-font-xs);
+    color: var(--bos-text-faint);
+    word-break: break-word;
+  }
+
+  .wechsel {
+    margin: var(--bos-space-md) 0 0;
+    text-align: center;
+    font-size: var(--bos-font-sm);
+  }
+
+  .wechsel a {
+    color: var(--bos-text-faint);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 1px;
+    transition: color var(--bos-transition-fast), border-color var(--bos-transition-fast);
+  }
+
+  .wechsel a:hover, .wechsel a:focus-visible {
+    color: var(--bos-text-dim);
+    border-bottom-color: var(--bos-border-strong);
+  }
+
+  .wechsel[hidden] { display: none; }
+
+  /* --- Meldungsband ------------------------------------------------ */
+  .band {
+    align-self: end;
+    max-width: 380px;
+    width: 100%;
+    margin: 0 auto;
+    padding-top: var(--bos-space-md);
+    border-top: 1px solid var(--bos-border);
+    font-size: var(--bos-font-sm);
+    color: var(--bos-text-dim);
+    line-height: 1.6;
+  }
+
+  .band[hidden] { display: none; }
+  .band p { margin: 0 0 var(--bos-space-2xs); }
+  .band p:last-child { margin-bottom: 0; }
+
+  .band .wann {
+    font-family: var(--bos-font-label);
+    font-size: var(--bos-font-xs);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bos-text-faint);
+    margin-right: var(--bos-space-2xs);
+  }
+</style>
+</head>
+<body>
+
+<div class="raum">
+  <main class="mitte">
+    <div class="marke">
+      <h1 class="wortmarke">BäckereiOS</h1>
+      <p class="gruss" id="gruss">Willkommen</p>
+    </div>
+
+    <div class="feld">
+      <label for="kennung">Kennung</label>
+      <input type="text" id="kennung" autocomplete="username"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
+             inputmode="email" placeholder="z.&nbsp;B. backstube01">
+    </div>
+
+    <div class="feld">
+      <label for="passwort">Passwort</label>
+      <input type="password" id="passwort" autocomplete="current-password">
+    </div>
+
+    <button type="button" class="tuer" id="anmeldenBtn">Anmelden</button>
+
+    <button type="button" class="nebenweg" id="mobilBtn">
+      Mobile Ansicht <span class="planung">(in Planung)</span>
+    </button>
+
+    <div class="meldung" id="meldung" role="status" aria-live="polite"></div>
+
+    <p class="wechsel"><a href="?wechseln=1" id="wechselLink">Abmelden und andere Kennung verwenden</a></p>
+  </main>
+
+  <aside class="band" id="band" hidden></aside>
+</div>
+
+<!-- Firebase: nur App + Auth. Firestore wird hier nicht gebraucht,
+     die Seite liest und schreibt keine Daten. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- MUSS vor bos_firebase_config.js stehen: verhindert, dass die
+     Konfiguration von dieser Seite aus wieder hierher zurückleitet
+     (Endlosschleife). -->
+<script>window.BOS_LOGIN_SEITE = true;</script>
+<script src="bos_firebase_config.js"></script>
+<!-- Rollen-Liste für das Symbol im Profileintrag, Kontenmodul und die
+     gemeinsame Mechanik, die den Launcher-Profileintrag schreibt.
+     Seit 19.09.2026: die Tür legt den Eintrag an, nicht erst der
+     Launcher — sonst sperrt der Zugriffs-Guard beim NFC-Direktaufruf
+     auf einem Gerät aus, das den Launcher noch nie gesehen hat. -->
+<script src="bos_launcher_roles.js"></script>
+<script src="bos_accounts.js"></script>
+<script src="bos_konto_profil.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* Endung der synthetischen Adressen. Das bestehende Admin-Konto
+     (angelegt 31.08.2026) nutzt '@baeckereios.intern' — deshalb hier
+     dieselbe Endung und nicht das im Starter vorgeschlagene
+     '.invalid'. Zwei Endungen nebeneinander wären eine Fehlerquelle
+     ohne Gegenwert. */
+  var KENNUNG_ENDUNG = '@baeckereios.intern';
+
+  var STARTSEITE = 'launcher.html';
+
+  /* Firebase kann bei fehlendem oder schlechtem Netz sehr lange
+     weiterprobieren, ohne abzubrechen. Ohne diesen Zeitausfall steht
+     dann ewig "Meldet an …" da — eine stumme Sackgasse ohne jede
+     Auskunft. Fund im Praxistest, 17.09.2026. */
+  var GEDULD_MS = 12000;
+
+  /* Kurze Pause, bevor eine bestehende Sitzung durchgewinkt wird.
+     Zwei Gründe: man sieht, ALS WER man angemeldet ist (steht sonst
+     nirgends im System), und man kommt überhaupt an den Kontowechsel
+     heran. Ohne die Pause war die Tür für Angemeldete unsichtbar —
+     Fund im Praxistest, 17.09.2026. */
+  var DURCHWINK_MS = 2000;
+
+  /* MELDUNGSBAND — später aus Firestore speisen. Solange die Liste
+     leer ist, erscheint der Bereich gar nicht. Format je Eintrag:
+     { wann: 'kurzer Zeitbezug', text: 'die Meldung' }
+     Einsprungstelle für den späteren Umbau: diese Konstante durch
+     einen Firestore-Lesevorgang ersetzen und zeigeBand() aufrufen. */
+  var MELDUNGEN = [];
+
+  var kennungFeld  = document.getElementById('kennung');
+  var passwortFeld = document.getElementById('passwort');
+  var btn          = document.getElementById('anmeldenBtn');
+  var meldungBox   = document.getElementById('meldung');
+  var grussZeile   = document.getElementById('gruss');
+  var bandBox      = document.getElementById('band');
+  var wechselZeile = document.querySelector('.wechsel');
+
+  /* --- Begrüßung nach der echten Uhrzeit -------------------------- */
+  function setzeGruss() {
+    var stunde = new Date().getHours();
+    var text;
+    if (stunde >= 22 || stunde < 4)       text = 'Gute Nacht';
+    else if (stunde < 9)                  text = 'Guten Morgen';
+    else if (stunde < 12)                 text = 'Guten Vormittag';
+    else if (stunde < 18)                 text = 'Guten Tag';
+    else                                  text = 'Guten Abend';
+    grussZeile.textContent = text;
+  }
+
+  /* --- Meldungen -------------------------------------------------- */
+  function zeigeMeldung(text, art, technisch) {
+    meldungBox.className = 'meldung sichtbar ' + art;
+    meldungBox.textContent = text;
+    if (technisch) {
+      var span = document.createElement('span');
+      span.className = 'technisch';
+      span.textContent = technisch;
+      meldungBox.appendChild(span);
+    }
+  }
+
+  function versteckeMeldung() {
+    meldungBox.className = 'meldung';
+    meldungBox.textContent = '';
+  }
+
+  /* Firebase-Codes in Klartext. Alles Unbekannte bekommt zusätzlich
+     die technische Meldung angehängt — nie nur "fehlgeschlagen". */
+  function uebersetze(fehler) {
+    var code = (fehler && fehler.code) || '';
+    switch (code) {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found':
+        return 'Kennung oder Passwort stimmt nicht.';
+      case 'auth/invalid-email':
+        return 'Diese Kennung hat kein gültiges Format.';
+      case 'auth/user-disabled':
+        return 'Diese Kennung ist gesperrt.';
+      case 'auth/too-many-requests':
+        return 'Zu viele Versuche. Ein paar Minuten warten, dann noch einmal.';
+      case 'auth/network-request-failed':
+        return 'Keine Verbindung. Netz prüfen und noch einmal versuchen.';
+      default:
+        return 'Anmeldung fehlgeschlagen.';
+    }
+  }
+
+  /* --- Weiterleitungsziel ----------------------------------------- */
+  /* Nur seiteneigene, relative Pfade. Ein absoluter oder fremder Wert
+     würde die Seite zu einem offenen Weiterleiter machen. */
+  function zielPfad() {
+    var roh = new URLSearchParams(window.location.search).get('weiter');
+    if (!roh) return STARTSEITE;
+
+    /* ZUERST säubern, DANN prüfen — 19.09.2026.
+       Browser entfernen Tabulator, Zeilenumbruch und Wagenrücklauf,
+       bevor sie eine Adresse auflösen (URL-Standard). Ohne diesen
+       Schritt prüfen wir einen anderen Wert als den, der später
+       benutzt wird: "java<TAB>script:alert(1)" passiert die
+       Schema-Prüfung unbeschadet und wird vom Browser danach wieder
+       zu javascript:alert(1) — ausgeführt im Kontext der Seite, mit
+       Zugriff auf die angemeldete Sitzung. */
+    roh = roh.replace(/[\t\n\r]/g, '').trim();
+    if (!roh) return STARTSEITE;
+
+    /* Übrige Steuerzeichen werden vom Browser nicht entfernt, sondern
+       kodiert — sie können also kein Schema wiederherstellen. Trotzdem
+       abweisen statt umschreiben: in einem Dateipfad haben sie nichts
+       zu suchen, und Abweisen ist ehrlicher als stilles Verändern. */
+    if (/[\u0000-\u001F\u007F]/.test(roh)) return STARTSEITE;
+
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(roh)) return STARTSEITE; // http:, javascript: …
+    if (roh.charAt(0) === '/' || roh.indexOf('//') === 0) return STARTSEITE;
+    if (roh.indexOf('..') !== -1) return STARTSEITE;
+    /* T-116, 19.09.2026: Rückschrägstrich verwerfen. Browser wandeln \ in /
+       um, also wird aus weiter=\\fremde-seite.tld ein //fremde-seite.tld —
+       eine Adresse ohne Protokoll, und die Tür leitet nach außen weiter.
+       Genau das offene Weiterleiten, das diese Prüfung verhindern soll. */
+    if (roh.indexOf('\\') !== -1) return STARTSEITE;
+    return roh;
+  }
+
+  /* Vor dem Weiterleiten den Launcher-Profileintrag sicherstellen.
+     Der Zugriffs-Guard auf jeder Satellitenseite liest die Rolle
+     synchron aus dem localStorage; ohne Eintrag ist sie null und der
+     Guard sperrt — auch jemanden, der die Seite bedienen darf. Betrifft
+     genau den NFC-Weg auf einem frischen Gerät. Fund 19.09.2026. */
+  function weiter() {
+    var ziel = zielPfad();
+    var nutzer = firebase.auth().currentUser;
+
+    if (!nutzer || !window.BOS_KONTO_PROFIL) {
+      window.location.replace(ziel);
+      return;
+    }
+
+    var abgeschickt = false;
+    function los() {
+      if (abgeschickt) return;
+      abgeschickt = true;
+      window.location.replace(ziel);
+    }
+
+    zeigeMeldung('Berechtigung wird geladen …', 'laeuft');
+
+    /* Der Profileintrag darf den Weg nicht blockieren: was nach drei
+       Sekunden nicht da ist, holt der Launcher später nach. Die Grenze
+       bleibt, aber sie ist nicht mehr stumm (T-117) — sonst landet man
+       ohne Erklärung auf einer Seite, die anschließend "Berechtigung
+       unbekannt" zeigt, und weiß nicht, warum. */
+    var geduld = setTimeout(function () {
+      if (abgeschickt) return;
+      zeigeMeldung('Berechtigung konnte nicht rechtzeitig geladen werden. ' +
+                   'Es geht trotzdem weiter — bei Bedarf im Launcher neu laden.',
+                   'fehler');
+      setTimeout(los, 1600);
+    }, 3000);
+
+    window.BOS_KONTO_PROFIL.stelleSicher(window.db, nutzer)
+      .then(function (ergebnis) {
+        clearTimeout(geduld);
+        if (abgeschickt) return;
+        /* Schritt 2 (§11.5): Konto da, aber ohne Haken — ein Hinweis,
+           kein Fehler. Weiter geht es trotzdem (der Launcher zeigt dann
+           nur die offenen Kacheln). */
+        if (ergebnis && ergebnis.geladen && ergebnis.kontoVorhanden && ergebnis.freigeschaltet === false) {
+          zeigeMeldung('Noch nicht freigeschaltet — dein Konto ist angelegt, aber noch nicht aktiv. ' +
+                       'Sag Ulf Bescheid.', 'hinweis');
+          setTimeout(los, 2600);
+          return;
+        }
+        if (!ergebnis || !ergebnis.geladen) {
+          zeigeMeldung('Berechtigung konnte nicht geladen werden — ' +
+                       'es gilt der zuletzt bekannte Stand.', 'fehler',
+                       ergebnis && ergebnis.fehler
+                         ? ((ergebnis.fehler.message) || String(ergebnis.fehler))
+                         : '');
+          setTimeout(los, 1600);
+          return;
+        }
+        los();
+      })
+      .catch(function (fehler) {
+        clearTimeout(geduld);
+        if (abgeschickt) return;
+        console.error('[BOS Anmeldung] Profileintrag nicht geschrieben', fehler);
+        zeigeMeldung('Berechtigung konnte nicht gespeichert werden.', 'fehler',
+                     (fehler && fehler.message) || String(fehler));
+        setTimeout(los, 1600);
+      });
+  }
+
+  /* --- Meldungsband ----------------------------------------------- */
+  function zeigeBand(eintraege) {
+    if (!eintraege || !eintraege.length) return;
+    bandBox.textContent = '';
+    eintraege.forEach(function (m) {
+      var p = document.createElement('p');
+      if (m.wann) {
+        var wann = document.createElement('span');
+        wann.className = 'wann';
+        wann.textContent = m.wann;
+        p.appendChild(wann);
+      }
+      p.appendChild(document.createTextNode(m.text || ''));
+      bandBox.appendChild(p);
+    });
+    bandBox.hidden = false;
+  }
+
+  /* --- Anmeldung -------------------------------------------------- */
+  function anmelden() {
+    var kennung = kennungFeld.value.trim();
+    var passwort = passwortFeld.value;
+
+    if (!kennung)  { zeigeMeldung('Kennung eingeben.', 'fehler'); kennungFeld.focus(); return; }
+    if (!passwort) { zeigeMeldung('Passwort eingeben.', 'fehler'); passwortFeld.focus(); return; }
+
+    var adresse = kennung.indexOf('@') === -1 ? kennung + KENNUNG_ENDUNG : kennung;
+
+    btn.disabled = true;
+    zeigeMeldung('Meldet an …', 'laeuft');
+
+    var fertig = false;
+    var uhr = setTimeout(function () {
+      if (fertig) return;
+      fertig = true;
+      btn.disabled = false;
+      zeigeMeldung(
+        'Keine Antwort von Firebase. Meist fehlt dem Gerät gerade die ' +
+        'Internetverbindung — die Seite selbst läuft ja lokal weiter. ' +
+        'Netz prüfen und noch einmal versuchen.',
+        'fehler',
+        'Zeitausfall nach ' + (GEDULD_MS / 1000) + ' Sekunden. Adresse: ' + adresse
+      );
+    }, GEDULD_MS);
+
+    firebase.auth().signInWithEmailAndPassword(adresse, passwort)
+      .then(function () {
+        if (fertig) return;   /* Zeitausfall war schneller — nicht überschreiben */
+        fertig = true; clearTimeout(uhr);
+        zeigeMeldung('Angemeldet. Einen Moment …', 'laeuft');
+        weiter();
+      })
+      .catch(function (fehler) {
+        if (fertig) return;
+        fertig = true; clearTimeout(uhr);
+        btn.disabled = false;
+        passwortFeld.value = '';
+        console.error('[BOS Anmeldung] fehlgeschlagen:', fehler);
+        zeigeMeldung(
+          uebersetze(fehler),
+          'fehler',
+          (fehler && fehler.code ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler))
+        );
+        passwortFeld.focus();
+      });
+  }
+
+  /* --- Start ------------------------------------------------------ */
+  setzeGruss();
+  zeigeBand(MELDUNGEN);
+
+  /* --- Mobile Ansicht ---------------------------------------------
+     PLATZHALTER, 18.09.2026. Noch kein Verhalten, bewusst so — der
+     Knopf ist eine Erinnerung an die geplante, stark vereinfachte
+     Darstellung fürs Handy. Später wird das hier ein Abzweig: gleiche
+     Anmeldung, danach eine andere Oberfläche statt des Launchers.
+
+     Zum Scharfschalten genügt es, ZIEL_MOBIL zu setzen und den
+     Klick-Handler unten auf weiter() umzustellen — dann landet man
+     nach der Anmeldung dort statt im Launcher. */
+  var ZIEL_MOBIL = null;   // z. B. 'mobil.html'
+
+  document.getElementById('mobilBtn').addEventListener('click', function () {
+    if (ZIEL_MOBIL) {
+      window.location.replace(ZIEL_MOBIL);
+      return;
+    }
+    zeigeMeldung('Die mobile Ansicht ist noch nicht gebaut — ' +
+                 'bis dahin führt „Anmelden" in den gewohnten Launcher.', 'laeuft');
+  });
+
+  btn.addEventListener('click', anmelden);
+  [kennungFeld, passwortFeld].forEach(function (feld) {
+    feld.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') anmelden();
+    });
+    feld.addEventListener('input', versteckeMeldung);
+  });
+
+  /* Schon angemeldet? Dann gar nicht erst fragen — ausser beim
+     ausdrücklichen Kontowechsel (?wechseln=1). Ohne diesen Weg wäre
+     die Tür eine Sackgasse: wer angemeldet ist, käme nie an das
+     Formular, um sich mit einer anderen Kennung anzumelden.
+     Fund im ersten Praxistest, 17.09.2026.
+
+     Betrifft auch die bestehenden anonymen Sitzungen — solange
+     Anonymous Auth in der Konsole aktiv bleibt, kommt ein Gerät mit
+     alter Sitzung ohne Anmeldung durch. Genau das ist der Rückweg,
+     falls hier etwas klemmt. */
+  function beobachteAnmeldung() {
+    firebase.auth().onAuthStateChanged(function (nutzer) {
+      if (nutzer) {
+        var wer = nutzer.email || (nutzer.isAnonymous ? 'anonyme Sitzung (alter Stand)' : nutzer.uid);
+        zeigeMeldung('Angemeldet als ' + wer + '. Weiter zum Launcher …', 'laeuft');
+        btn.disabled = true;
+        kennungFeld.disabled = true;
+        passwortFeld.disabled = true;
+        setTimeout(weiter, DURCHWINK_MS);
+      } else {
+        kennungFeld.disabled = false;
+        passwortFeld.disabled = false;
+        kennungFeld.focus();
+      }
+    });
+  }
+
+  if (new URLSearchParams(window.location.search).get('wechseln')) {
+    /* Erst abmelden, DANN beobachten — sonst gewinnt der alte Nutzer
+       das Rennen und leitet weiter, bevor signOut() durch ist. */
+    if (wechselZeile) wechselZeile.hidden = true;
+    zeigeMeldung('Meldet ab …', 'laeuft');
+    btn.disabled = true;
+    firebase.auth().signOut()
+      .then(function () {
+        versteckeMeldung();
+        btn.disabled = false;
+        beobachteAnmeldung();
+      })
+      .catch(function (fehler) {
+        btn.disabled = false;
+        console.error('[BOS Anmeldung] Abmelden fehlgeschlagen:', fehler);
+        zeigeMeldung(
+          'Abmelden fehlgeschlagen.',
+          'fehler',
+          (fehler && fehler.code ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler))
+        );
+        beobachteAnmeldung();
+      });
+  } else {
+    beobachteAnmeldung();
+  }
+})();
+</script>
+
+</body>
+</html>
