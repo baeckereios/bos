@@ -159,7 +159,32 @@
       "beispiel": "true",
       "genutztVon": ["produkt_config_editor.html (Produkt-Karte, Tab Einstellungen)"]
     }
+,
 
+    "reihenfolge": {
+      "bezeichnung": "Reihenfolge in der Liste (nur Datenbank)",
+      "status": "neu 05.10.2026 (Produkte aus Firestore, Stufe 1)",
+      "typ": "number (ganze Zahl, 0 = erstes Produkt)",
+      "beschreibung": "Firestore kennt keine Reihenfolge, die Datei schon — und sieben Seiten zeigen die Produkte in der Reihenfolge der Datei (Stationsseiten, Übersicht, Verbrauch manuell, Teigecke). Deshalb schreibt das Sync-Tool beim Einspielen je Produkt die Position in der Datei in dieses Feld, und bos_produkte.js sortiert danach. Produkte ohne das Feld kommen ans Ende, untereinander nach legacyKey. Das Feld steht NUR in der Datenbank: Editor-Download und Sync-Export schreiben es nicht in die Datei, beim Einspielen zählt allein die Position in der Datei. Im Editor nicht bearbeitbar.",
+      "beispiel": "0",
+      "genutztVon": [
+        "bos_produkte.js (Sortierung, Feld wird vor der Übergabe an die Seiten entfernt)",
+        "produkt_config_sync.html (Import schreibt es, Export lässt es weg)"
+      ]
+    },
+
+    "geloescht": {
+      "bezeichnung": "Als gelöscht markiert (nur Datenbank)",
+      "status": "neu 05.10.2026 (Produkte aus Firestore, Stufe 1)",
+      "typ": "boolean",
+      "beschreibung": "Ein Produkt wird nie hart aus der Datenbank gelöscht — an seinem Schlüssel hängen Verbrauchs- und Froster-Daten. Stattdessen setzt das Sync-Tool (mit Haken, bei Produkten, die nur in der Datenbank und nicht in der Datei stehen) dieses Kennzeichen. bos_produkte.js blendet solche Produkte in der Sicht 'aktive' aus; die Sicht 'alle' zeigt sie mit geloescht: true (für Seiten, die Namen zu alten Daten nachschlagen, und für die Schlüsselprüfung im Editor — ein gelöschter Schlüssel wird nie neu vergeben). Steht ein gelöschtes Produkt wieder in einer eingespielten Datei, wird es wieder aktiv. Das Feld steht NUR in der Datenbank, nie in der Datei.",
+      "beispiel": "true",
+      "genutztVon": [
+        "bos_produkte.js (Sichten 'aktive' und 'alle')",
+        "produkt_config_sync.html (Import setzt es mit Haken, Export lässt gelöschte weg)",
+        "produkt_config_editor.html (Schlüsselprüfung gegen Sicht 'alle')"
+      ]
+    }
   },
 
   "bewusst_nicht_migrierte_v1_flags": {
