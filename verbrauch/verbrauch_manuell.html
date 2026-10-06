@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler mit echter Meldung im Hinweisblock, „keine freigeschaltet“ nur nach erfolgreichem Laden. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -373,6 +374,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 
 <!-- Standalone-Login-Voraussetzungen (NEU 04.09.2026, siehe bos_standalone_login.js
      Kopf-Kommentar): bos_launcher_backgrounds.js MUSS vor bos_accounts.js stehen,
@@ -425,7 +427,7 @@
     pokaYokeFrage: 'Ist heute ein normaler Tag oder ein besonderer Tag (Ferien, Feiertag, Ausnahme)?',
     pokaYokeNormal: 'Normaler Tag',
     pokaYokeBesonders: 'Ferien / besonderer Tag',
-    keineProdukte: 'Für die manuelle Erfassung sind aktuell keine Produkte freigeschaltet. In produkt_config.json muss bei den gewünschten Produkten das Feld „manuelleErfassung": true gesetzt sein.',
+    keineProdukte: 'Für die manuelle Erfassung sind aktuell keine Produkte freigeschaltet. Im Produkt-Config-Editor muss bei den gewünschten Produkten das Feld „manuelleErfassung": true gesetzt sein.',
     speichern: 'Speichern',
     ausreisserTitel: 'Ungewöhnliche Werte',
     ausreisserErklaerung: 'Diese Werte weichen deutlich vom bisherigen Schnitt für diesen Wochentag ab. Bitte kurz prüfen, bevor gespeichert wird.',
@@ -648,15 +650,22 @@
   }
 
   /* -----------------------------------------------------------
-   * 7) Produktliste laden (Opt-in über produkt_config.json)
+   * 7) Produktliste laden (Opt-in über Feld manuelleErfassung).
+   *    05.10.2026 (Stufe 1): aus Firestore über bos_produkte.js statt aus
+   *    der Datei. Ein Ladefehler zeigt die echte Meldung — vorher stand
+   *    bei jedem Fehler „keine Produkte freigeschaltet“ (K8).
    * --------------------------------------------------------- */
   async function ladeProdukte() {
     let alleProdukte = [];
     try {
-      const antwort = await fetch('../produkt_config.json', { cache: 'no-store' });
-      alleProdukte = await antwort.json();
+      if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+      const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+      alleProdukte = ergebnis.liste;
+      const hinweis = window.BOS_PRODUKTE.hinweisText(ergebnis);
+      if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
     } catch (fehler) {
-      console.error('produkt_config.json konnte nicht geladen werden:', fehler);
+      console.error('Produktliste konnte nicht geladen werden:', fehler);
+      el.keineProdukteHinweis.textContent = '⚠ ' + (window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(fehler) : ((fehler && fehler.message) || String(fehler)));
       el.keineProdukteHinweis.hidden = false;
       return;
     }

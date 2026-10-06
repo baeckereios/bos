@@ -91,7 +91,7 @@
   var UMSCHALT_STUNDE = 12;   // Ulf, 28.09.2026: ab 12:00 gilt der Backtag „morgen“
 
   /* ---------- Backtag ----------
-     backTage in produkt_config.json = der Tag, FÜR den gebacken wird
+     backTage in der Produkt-Config (seit 05.10.2026 aus Firestore) = der Tag, FÜR den gebacken wird
      (Nacht zum Mittwoch = Mittwoch). Lokal gerechnet, nie über
      toISOString() — das ist UTC und liefert zwischen 0 und 2 Uhr den
      Vortag (Checkliste §13). */
@@ -594,7 +594,7 @@
         else Object.keys(t.einwaage).forEach(function (lk) {
           var g = t.einwaage[lk];
           if (g !== null && !(istZahl(g) && g > 0)) fehler.push(wer + ': Einwaage für „' + lk + '“ muss Gramm über 0 oder null (fehlt) sein.');
-          if (!pm[lk]) hinweise.push(wer + ': Einwaage für „' + lk + '“ — dieses Produkt steht nicht in produkt_config.json.');
+          if (!pm[lk]) hinweise.push(wer + ': Einwaage für „' + lk + '“ — dieses Produkt steht nicht in der Produkt-Config.');
           else if (pm[lk].ausTeig !== t.kennung) hinweise.push(wer + ': „' + (pm[lk].name || lk) + '“ gehört laut Produkt-Config zu „' + (pm[lk].ausTeig || 'keinem Teig') + '“, nicht zu „' + t.kennung + '“.');
           einwaagen.push({ teig: t.name, lk: lk, produkt: pm[lk] ? pm[lk].name : lk, gramm: istZahl(g) ? g : null });
         });

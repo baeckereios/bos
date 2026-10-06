@@ -3,6 +3,23 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-05 · 08:34 · v-firestore-1 · Umbau (Produkte aus Firestore, Stufe 1)
+      SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md (Freigabe Kontroll-Chat 08:18 Uhr, von Ulf weitergegeben).
+      Der Editor lädt beim Öffnen aus der Datenbank (bos_produkte.js, Sicht
+      „alle“, immer frisch vom Server, nie die Gerätekopie — wer einen alten
+      Stand bearbeitet und einspielt, dreht neuere Änderungen zurück, F4).
+      Der Knopf „↻ Datei laden“ entfällt (F5: die Datei im Repo veraltet ab
+      der ersten Änderung, Laden + Einspielen hätte die Datenbank zurück-
+      gedreht); „☁ Firestore laden“ heißt jetzt „↻ Neu laden“; der Upload von
+      Hand bleibt für die Notfall-Kopie. Schlüsselprüfung (eindeutiger-
+      Schluessel) kennt jetzt auch die in der Datenbank als gelöscht
+      markierten Schlüssel (K2: ein gelöschter Schlüssel wird nie neu
+      vergeben, sonst erbt das neue Produkt die Verbrauchs-/Froster-Daten
+      des alten). Download unverändert (ohne reihenfolge/geloescht — die
+      Lade-Datei entfernt sie, K7), kein reihenfolge-Feld im Editor (F6: die
+      Position am Listenende leistet dasselbe). Speichern in die Datenbank
+      ist weiterhin NICHT hier (Stufe 2) — Weg: ⬇ Datei → Sync-Tool.
+      Hilfetexte und Statusmeldungen entsprechend. Fehler mit echter Meldung.
     2026-09-29 · 19:45 · v-ausTeig-1 · Feature
       Neues Feld „Aus Teig“ (ausTeig) im Reiter Backinformationen: Auswahl
       aus den Teigen der Teigecke. Die Liste liest der Editor mit seiner
@@ -263,8 +280,7 @@
 </div>
 
 <div class="toolbar">
-  <button class="btn btn-outline" onclick="ladeVonServer()">↻ Datei laden</button>
-  <button class="btn btn-outline" onclick="ladeVonFirestore()">☁ Firestore laden</button>
+  <button class="btn btn-outline" onclick="ladeVonFirestore()">↻ Neu laden</button>
   <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📂 Upload</button>
   <input type="file" id="fileInput" accept=".json">
   <div class="sep"></div>
@@ -281,9 +297,9 @@
 
 <div id="uploadZone" onclick="document.getElementById('fileInput').click()">
   <div class="icon">📋</div>
-  <p><strong>produkt_config.json</strong></p>
-  <p>Lädt automatisch von <code>../produkt_config.json</code> — falls das scheitert:
-     Datei hierher ziehen/klicken, oder „Firestore laden" versuchen.</p>
+  <p><strong>Produktliste</strong></p>
+  <p>Lädt automatisch aus der Datenbank — falls das scheitert, steht der Grund in der Statuszeile.
+     Eine Notfall-Kopie (<code>produkt_config.json</code>) kannst du hierher ziehen/klicken.</p>
 </div>
 
 <div id="tabLeiste" class="tab-leiste"></div>
@@ -321,9 +337,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 
 <script>
-var COLLECTION = 'produkte'; // Annahme, siehe SESSION_2026-08-27_PRODUKT_CONFIG_ZWITTER.md
+var COLLECTION = 'produkte'; // seit 05.10.2026 gemessen, nicht mehr Annahme (PRODUKTE_KOMPENDIUM.md §2a)
 var KATEGORIEN = ['Brötchen','Brot','Konditorei','Fettgebäck','Snack','Schlawiner'];
 var KAT_FARBEN = { 'Brötchen':'#c9932e','Brot':'#8b5a2b','Konditorei':'#6c3483','Fettgebäck':'#1a6b8a','Snack':'#4caf7d','Schlawiner':'#a8452e' };
 var daten = [];
@@ -334,8 +351,10 @@ var FELD_GLOSSAR = null; // aus produkt_config_felder.json, siehe ladeFeldGlossa
 // Produkt den Schlüssel eines eben gelöschten, und der Sync würde das alte
 // Firestore-Dokument (samt der Verbrauchs-/Froster-Historie unter diesem
 // Schlüssel) mit dem neuen Produkt überschreiben. Wird bei jedem Laden
-// geleert. Sitzungsübergreifend schützt das nicht — siehe Session-Doku.
+// geleert. Sitzungsübergreifend schützt seit 05.10.2026 dbGeloeschteSchluessel:
+// die Schlüssel, die in der Datenbank als gelöscht markiert sind (K2).
 var geloeschteSchluessel = {};
+var dbGeloeschteSchluessel = {};
 
 // ── Übersicht: Tab-Zustand (ersetzt das frühere eingeklappt-Akkordeon) ──
 var aktiveKat = KATEGORIEN[0];
@@ -403,42 +422,32 @@ function markiereGeaendert() {
   status(daten.length + ' Produkte · ungespeicherte Änderungen', 'err');
 }
 
-// ── Laden: Datei (Auto-Fetch) ────────────────────────────────
-async function ladeVonServer() {
-  try {
-    status('Lade Datei …');
-    var res = await fetch('../produkt_config.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    daten = await res.json();
-    geloeschteSchluessel = {};
-    document.getElementById('quelleName').textContent = 'produkt_config.json (Datei)';
-    geaendert = false;
-    document.getElementById('saveBanner').style.display = 'none';
-    render();
-    status('✓ ' + daten.length + ' Produkte aus Datei', 'ok');
-  } catch (err) {
-    status('⚠ ' + err.message + ' — Upload oder Firestore versuchen', 'err');
-  }
-}
-
-// ── Laden: Firestore ──────────────────────────────────────────
+// ── Laden: Datenbank (seit 05.10.2026 der einzige automatische Weg) ────
+// Sicht „alle“: aktive Produkte in die Arbeitsliste, gelöschte nur als
+// belegte Schlüssel. Immer frisch und nur vom Server (nurServer, frisch):
+// der Editor arbeitet nie mit der Gerätekopie (F4).
 async function ladeVonFirestore() {
   try {
-    status('Lade aus Firestore …');
-    await window.BOS_AUTH_READY;
-    var snap = await db.collection(COLLECTION).get();
-    var arr = [];
-    snap.forEach(function (doc) { arr.push(doc.data()); });
-    arr.sort(function (a, b) { return (a.legacyKey || '').localeCompare(b.legacyKey || ''); });
+    status('Lade aus der Datenbank …');
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    var e = await window.BOS_PRODUKTE.lade({ sicht: 'alle', nurServer: true, frisch: true });
+    var arr = [], gel = {};
+    e.liste.forEach(function (p) {
+      if (p.geloescht === true) { if (p.legacyKey) gel[p.legacyKey] = true; return; }
+      arr.push(p);
+    });
     daten = arr;
     geloeschteSchluessel = {};
-    document.getElementById('quelleName').textContent = 'Firestore (' + COLLECTION + ')';
+    dbGeloeschteSchluessel = gel;
+    document.getElementById('quelleName').textContent = 'Datenbank (Stand-Zettel ' + (e.standNummer === null ? 'noch nicht angelegt' : 'Nr. ' + e.standNummer) + ')';
     geaendert = false;
     document.getElementById('saveBanner').style.display = 'none';
     render();
-    status('✓ ' + daten.length + ' Produkte aus Firestore', 'ok');
+    var warn = (e.warnungen && e.warnungen.length) ? ' · ⚠ ' + e.warnungen.join(' ') : '';
+    status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + warn, warn ? 'err' : 'ok');
   } catch (err) {
-    status('⚠ ' + err.message, 'err');
+    console.error('[Produkt-Config] Laden:', err);
+    status('⚠ ' + (window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(err) : err.message) + ' — Notfall-Kopie per Upload möglich', 'err');
   }
 }
 
@@ -485,7 +494,7 @@ function downloadJSON() {
   URL.revokeObjectURL(url);
   geaendert = false;
   document.getElementById('saveBanner').style.display = 'none';
-  status('✓ ' + daten.length + ' Produkte als Datei gespeichert — jetzt im Root ersetzen', 'ok');
+  status('✓ ' + daten.length + ' Produkte als Datei gespeichert — jetzt im Sync-Tool einspielen, Kopie in die private Cloud', 'ok');
   // NEU 28.09.2026 (Teil B): Doppelte Schlüssel nicht still mit herausgeben.
   // Kein Abbruch (die Datei soll zum Reparieren herunterladbar bleiben),
   // aber die Statuszeile sagt es — der Sync lehnt so eine Datei ohnehin ab.
@@ -495,10 +504,10 @@ function downloadJSON() {
   }
 }
 
-// Bewusst KEIN Schreibpfad nach Firestore hier. Änderungen landen nur in der
-// heruntergeladenen Datei. Übernahme nach Firestore läuft ausschließlich über
-// produkt_config_sync.html (Import mit Vorschau/Diff) — ein einziges,
-// bewusstes Nadelöhr statt zweier Schreibwege.
+// Stufe 1 (05.10.2026): noch KEIN Schreibpfad nach Firestore hier. Änderungen
+// landen in der heruntergeladenen Datei, Übernahme über produkt_config_sync.html
+// (Import mit Vorschau, Stand-Zettel). Stufe 2 (eigener Auftrag): Speichern
+// direkt hier, mit Sicherung der Vorversion im selben Batch.
 
 // ── Gemeinsame Optionslisten (früher pro Tabellenzeile neu gebaut, jetzt
 //    einmal auf Modulebene, weil die Karte immer nur EIN Produkt zeigt) ──
@@ -805,6 +814,7 @@ function eindeutigerSchluessel(name) {
   var belegt = {};
   daten.forEach(function (p) { if (p && p.legacyKey) belegt[p.legacyKey] = true; });
   Object.keys(geloeschteSchluessel).forEach(function (k) { belegt[k] = true; });
+  Object.keys(dbGeloeschteSchluessel).forEach(function (k) { belegt[k] = true; });   // K2, seit 05.10.2026
   var basis = slugify(name);                       // z. B. zwiebelbrot_500g_stueck
   if (!belegt[basis]) return basis;
   var stamm = basis.replace(/_stueck$/, '');       // Zähler VOR die gemeinsame Endung
@@ -900,15 +910,15 @@ var helpData = {
     },
     {
       heading: "Woher kommen die Daten?",
-      text: "Automatisch von der aktuellen produkt_config.json-Datei. Klappt das nicht, kannst du stattdessen aus der Datenbank (Firestore) laden oder eine Datei von Hand hochladen."
+      text: "Automatisch aus der Datenbank, immer frisch vom Server. Dieselbe Liste lesen alle anderen Seiten (Teigecke, Froster, Produktionsplaner, Schnellrechner, Verbrauch). Klappt das Laden nicht, steht der Grund in der Statuszeile; eine Notfall-Kopie (Datei) kannst du von Hand hochladen."
     },
     {
       heading: "Was passiert mit meinen Änderungen?",
-      text: "Erstmal bleibt alles nur in diesem Browser-Fenster. Erst wenn du auf 'Datei' tippst, entsteht eine neue produkt_config.json mit deinen Änderungen. Diese Seite schreibt nie direkt in die Datenbank — das passiert bewusst an anderer Stelle (Produkt-Config Sync), damit vor jeder echten Änderung noch eine Kontrolle dazwischen liegt."
+      text: "Erstmal bleibt alles nur in diesem Browser-Fenster. Mit ⬇ Datei entsteht eine produkt_config.json mit deinen Änderungen. Die spielst du im Sync-Tool ein — ab dann sehen alle Seiten die neue Liste. Direkt speichern aus dieser Seite heraus kommt in einem späteren Schritt (Stufe 2)."
     },
     {
       heading: "Was mache ich mit der heruntergeladenen Datei?",
-      text: "Entweder ersetzt du damit die alte produkt_config.json direkt im System, oder du lädst sie im Sync-Tool hoch, damit die Änderungen auch in der Datenbank ankommen."
+      text: "Im Sync-Tool einspielen (Vorschau lesen, dann bestätigen). Dieselbe Datei ist gleichzeitig deine Notfall-Kopie: in der privaten Cloud ablegen, nicht im Repo. Ein Produkt löschen: hier löschen, Datei herunterladen, im Sync-Tool einspielen und dort den Haken „nur in der Datenbank → als gelöscht markieren“ setzen. Der Schlüssel eines gelöschten Produkts wird nie neu vergeben."
     },
     {
       heading: "Wichtig zu wissen",
@@ -952,7 +962,7 @@ document.getElementById('helpSheet').addEventListener('click', function (e) {
 // Auto-Laden beim Start
 ladeFeldGlossar();
 ladeTeigListe();   // NEU 29.09.2026, Auswahl „Aus Teig“
-ladeVonServer().catch(function () {});
+ladeVonFirestore().catch(function () {});
 </script>
 </body>
 </html>

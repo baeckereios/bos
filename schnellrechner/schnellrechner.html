@@ -1,6 +1,12 @@
 <!--
   schnellrechner.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-05 · 08:34 · v0.20 · Umbau (Produkte aus Firestore, Stufe 1)
+    srLadeProdukte() liest die Produktliste über ../bos_produkte.js aus
+    Firestore statt per fetch aus produkt_config.json. Filter
+    (schnellrechnerRelevant) und Sortierung (Name) unverändert. Ein
+    Ladefehler steht jetzt sichtbar in der Meldezeile oben (vorher nur
+    console.warn, K8). SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md
   2026-09-06 · v0.19 · Fix
     Ulf, live an den Produktionsplaner-Stationsseiten entdeckt und hier
     gegengeprüft: die am 01.09.2026 (v0.? Kommentar bei srEinheitFaktor())
@@ -548,6 +554,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 
 <!-- ═══ Host-Funktionen — Reihenfolge wegen Abhängigkeiten wichtig ═══ -->
 <script src="../bos_zeitkontext_referenz.js"></script>
@@ -712,14 +719,19 @@ const FIXES_FENSTER_ENDE = tageBisSonntagDieseWoche + 7;
 // heißt schnellrechnerRelevant, ein wiederbelebtes V1-Feld (stand vorher
 // in "bewusst_nicht_migrierte_v1_flags", jetzt dort entfernt und als
 // echter Glossar-Eintrag ergänzt).
+// 05.10.2026 (Stufe 1): aus Firestore über bos_produkte.js statt aus der
+// Datei; Ladefehler sichtbar in der Meldezeile statt nur console.warn (K8).
 async function srLadeProdukte() {
   try {
-    const antwort = await fetch('../produkt_config.json', { cache: 'no-store' });
-    const alle = await antwort.json();
-    produktConfig = alle.filter(p => p.schnellrechnerRelevant === true);
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    produktConfig = ergebnis.liste.filter(p => p.schnellrechnerRelevant === true);
+    const hinweis = window.BOS_PRODUKTE.hinweisText(ergebnis);
+    if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
   } catch (fehler) {
-    console.warn('Schnellrechner: produkt_config.json nicht ladbar.', fehler);
+    console.error('Schnellrechner: Produktliste nicht ladbar.', fehler);
     produktConfig = [];
+    if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung(window.BOS_PRODUKTE.fehlerText(fehler), 'fehler');
   }
   const sel = document.getElementById('sr-prod-select');
   produktConfig

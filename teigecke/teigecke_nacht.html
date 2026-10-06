@@ -4,6 +4,15 @@
   MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-10-05 · 08:34 · v0.10 · Umbau (Produkte aus Firestore, Stufe 1)
+      ladeProdukte() liest die Produktliste über ../bos_produkte.js aus
+      Firestore „produkte“ statt per fetch aus produkt_config.json. Die
+      eigene Gerätekopie (PRODUKTE_SPIEGEL_KEY) ist in die Lade-Datei
+      gewandert; der alte Eintrag im Gerät wird einmalig entfernt. Der
+      Hinweis „Produktliste vom Gerät (Stand …)“ bleibt und zeigt jetzt die
+      Zeit der gemeinsamen Kopie. Ladefehler mit echter Meldung in der
+      Fehlerleiste. Vorauswahl, Brote je Teig, Rechnung: unverändert.
+      SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md
     2026-10-03 · 04:42 · v0.9 · Umbau (Orte ziehen aus, Etappe 1)
       ANWEISUNG_2026-10-02_TEIGECKE_ORTE_HUB.md (KC 03.10., 03:42), Bauplan
       SESSION_2026-10-03_TEIGECKE_ORTE_HUB_BAU.md. Der Reiter „Orte“, die
@@ -524,6 +533,7 @@
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_zeitkontext_referenz.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 <script src="../bos_zeitkontext.js"></script>
 <script src="../bos_accounts.js"></script>
 <script>var BOS_APP_ID = 'teigecke_nacht';</script>
@@ -649,7 +659,7 @@ const HAKEN_FUER = {
 };
 const SCHREIB_ZEITLIMIT_MS = 20000;
 const LOKAL_KEY = 'bos_teigecke_nacht_lokal';
-const PRODUKTE_SPIEGEL_KEY = 'bos_teigecke_produkte_spiegel';
+const PRODUKTE_SPIEGEL_KEY_ALT = 'bos_teigecke_produkte_spiegel';   /* bis 05.10.2026 eigene Gerätekopie, wird nur noch entfernt */
 const WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const WT_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const WT_REIHE = [1, 2, 3, 4, 5, 6, 0];
@@ -676,7 +686,7 @@ const I18N_DE = {
   nicht_gefunden_info: 'In Planung: „nicht gefunden“ soll später eine Aufgabe im Taskboard anlegen (pro Nacht und Zutat eine, mit Zähler). Bisher darf nur die Produktionsleitung Aufgaben anlegen — das wird noch geklärt.',
   hinweis_geschlossen: 'Laut Zeitkontext ist {tag} geschlossen{grund}. Die Vorauswahl der Teige zeigt trotzdem die üblichen Sorten — bitte prüfen.',
   hinweis_ohne_teig_kurz: '🚧 {n} Brote am {tag} noch ohne Teig',
-  hinweis_produkte_fehlen: '⚠ produkt_config.json ließ sich nicht laden — ohne Produktliste gibt es keine Vorauswahl der Teige. Teige von Hand antippen.',
+  hinweis_produkte_fehlen: '⚠ Die Produktliste ließ sich nicht laden (Grund steht in der Fehlerleiste) — ohne Produktliste gibt es keine Vorauswahl der Teige. Teige von Hand antippen.',
   noch_ohne: 'noch ohne Zuhause', unbekannt: 'unbekannt',
   orte_leer: 'Noch keine Orte angelegt. Die Kennungen vergibt Ulf, sobald die Wagen beschriftet sind.',
   ort_art_wagen: 'Wagen', ort_art_ort: 'anderer Ort', ort_leer: 'noch keine Zutaten', ohne_zuhause_karte: 'Zutaten ohne Zuhause',
@@ -774,7 +784,7 @@ const I18N_DE = {
   neu_teig: '＋ Teig', alle_teige_an: 'alle Teige zeigen', alle_teige_aus: 'nur Teige von heute', andere_teige: 'Teige, die heute nicht dran sind',
   e_titel_teig_neu: 'Neuer Teig', e_titel_teig: 'Rezept bearbeiten',
   f_teig_kennung: 'Feste Kennung', f_teig_kennung_auto: 'wird aus dem Namen gebildet', f_teig_kennung_hilfe: 'Bleibt für immer (die Brote zeigen darauf). Leer lassen = aus dem Namen.',
-  f_teig_kennung_fest: 'Nicht änderbar — die Brote in der Produkt-Config zeigen darauf.', f_brote: 'Brote aus diesem Teig', f_brote_hilfe: 'Wird in der Produkt-Config gepflegt (Feld „Aus Teig“), nicht hier. Neu zugeordnete Brote erscheinen erst, wenn die exportierte produkt_config.json im Repo liegt.',
+  f_teig_kennung_fest: 'Nicht änderbar — die Brote in der Produkt-Config zeigen darauf.', f_brote: 'Brote aus diesem Teig', f_brote_hilfe: 'Wird in der Produkt-Config gepflegt (Feld „Aus Teig“), nicht hier. Neu zugeordnete Brote erscheinen, sobald die Änderung im Sync-Tool eingespielt ist (seit 05.10.2026 ohne Repo-Schritt).',
   f_mit_sauer: 'mit eigenem Sauer', f_ohne_schuettwasser: 'ohne Schüttwasser', f_ist_sauerteig: 'ist der Sauerteig',
   f_hinweis_oben: 'Hinweis ganz oben (optional)', f_hinweis_oben_hilfe: 'Erscheint in der Karte ganz oben, z. B. „Zuerst Schaumsauer ansetzen“.',
   f_zutaten: 'Handverwogene Zutaten (Hauptteig)', f_vorstufe: 'Vorstufe (optional)', f_vorstufe_hilfe: 'Name der Vorstufe, z. B. Quellstück. Leer lassen, wenn es keine gibt.',
@@ -952,22 +962,21 @@ function einstZahl(feld, vorgabe) { const v = S.einstellungen && S.einstellungen
 function folgeFuer(wd) { const f = S.einstellungen && S.einstellungen.abwiegefolge; return (f && Array.isArray(f[String(wd)])) ? f[String(wd)] : null; }
 function sauerteig() { return L.aktiv(S.teige).filter(function (x) { return x.istSauerteig; })[0] || null; }
 
-/* ---------- Laden: Produkte (Datei), Konto, Zeitkontext ---------- */
+/* ---------- Laden: Produkte (Firestore über bos_produkte.js), Konto, Zeitkontext ----------
+   05.10.2026 (Stufe 1): Die eigene Gerätekopie (PRODUKTE_SPIEGEL_KEY) ist in die
+   gemeinsame Lade-Datei gewandert — eine Mechanik, zwölf Aufrufer. Der Hinweis
+   „Produktliste vom Gerät (Stand …)“ bleibt (S.produkteAusSpiegel). Der alte
+   Eintrag im Gerät wird einmalig entfernt (er stammte aus der Datei, F10). */
 async function ladeProdukte() {
+  try { localStorage.removeItem(PRODUKTE_SPIEGEL_KEY_ALT); } catch (e) { /* egal */ }
   try {
-    const res = await fetch('../produkt_config.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' beim Laden von produkt_config.json');
-    const liste = await res.json();
-    if (!Array.isArray(liste)) throw new Error('produkt_config.json ist keine Liste');
-    S.produkte = liste; S.produkteOk = true; S.produkteAusSpiegel = null;
-    try { localStorage.setItem(PRODUKTE_SPIEGEL_KEY, JSON.stringify({ zeit: Date.now(), liste: liste })); } catch (e) { /* voll/gesperrt: egal */ }
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    S.produkte = e.liste; S.produkteOk = true;
+    S.produkteAusSpiegel = (e.quelle === 'geraetekopie') ? (e.kopieZeit || e.stand) : null;
+    if (e.quelle === 'geraetekopie' && e.grund) zeigeFehler(t('err_laden', { was: 'Produktliste' }), e.grund);
   } catch (err) {
-    zeigeFehler(t('err_laden', { was: 'produkt_config.json' }), err);
-    /* Offline-Schicht 1: öffentliche Produktliste vom letzten erfolgreichen Laden. */
-    try {
-      const sp = JSON.parse(localStorage.getItem(PRODUKTE_SPIEGEL_KEY) || 'null');
-      if (sp && Array.isArray(sp.liste)) { S.produkte = sp.liste; S.produkteOk = true; S.produkteAusSpiegel = new Date(sp.zeit); return; }
-    } catch (e) { /* kein Spiegel */ }
+    zeigeFehler(t('err_laden', { was: 'Produktliste' }), err);
     S.produkte = []; S.produkteOk = false;
   }
 }

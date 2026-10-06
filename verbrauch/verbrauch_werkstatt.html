@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“, mit gelöschten) statt fetch(produkt_config.json); Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -188,6 +189,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 <!-- MUSS vor bos_accounts.js — liefert BOS_BV.silbe()/adminKennung() -->
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_accounts.js"></script>
@@ -235,14 +237,22 @@
    * für Produkte enthalten, die inzwischen wieder ausgeschaltet wurden.
    * --------------------------------------------------------- */
   var produktNamen = {};
+  // 05.10.2026 (Stufe 1): aus Firestore über bos_produkte.js, Sicht „alle“ —
+  // auch gelöschte Produkte, damit alte Dokumente Namen statt Rohschlüssel
+  // zeigen (K3). Ladefehler sichtbar in der Meldezeile (K8).
   function ladeProduktNamen() {
-    return fetch('../produkt_config.json', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (liste) {
-        (liste || []).forEach(function (p) { produktNamen[p.legacyKey] = p.name || p.legacyKey; });
+    if (!window.BOS_PRODUKTE) {
+      return Promise.reject(new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)'));
+    }
+    return window.BOS_PRODUKTE.lade({ sicht: 'alle' })
+      .then(function (e) {
+        (e.liste || []).forEach(function (p) { produktNamen[p.legacyKey] = p.name || p.legacyKey; });
+        var hinweis = window.BOS_PRODUKTE.hinweisText(e);
+        if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
       })
       .catch(function (fehler) {
-        console.warn('produkt_config.json konnte nicht geladen werden, zeige Rohschlüssel:', fehler);
+        console.error('Produktliste konnte nicht geladen werden, zeige Rohschlüssel:', fehler);
+        window.BOS_PRODUKTE.zeigeMeldung('Produktnamen fehlen, Liste zeigt Rohschlüssel: ' + window.BOS_PRODUKTE.fehlerText(fehler), 'fehler');
       });
   }
   function produktName(legacyKey) { return produktNamen[legacyKey] || legacyKey; }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“) statt fetch(produkt_config.json); „von N aktiven Produkten“ zählt nur aktive; Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -110,6 +111,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 <script src="../bos_theme_sync.js"></script>
 <!-- NEU 01.09.2026: zweite, unabhängige Achse (Abstände/Schrift) neben dem Theme — siehe bos_density_sync.js / BOS_DICHTE_DOKU.md -->
 <script src="../bos_density_sync.js"></script>
@@ -737,13 +739,23 @@
    * "offiziell" → ein Tages-Dokument mit produkte-Map ({legacyKey}_stueck/
    * _bleche); "manuell" → ein Dokument pro Erfassung mit eintraege[]-Array.
    * --------------------------------------------------------- */
+  // 05.10.2026 (Stufe 1): aus Firestore über bos_produkte.js. Sicht „alle“
+  // zum Nachschlagen der Namen (auch gelöschte, K3), Zahl der aktiven für
+  // die Anzeige „von N aktiven Produkten“ (F11). Eine Abfrage, zwei Sichten.
   async function ladeProdukte() {
+    zustand.produkteAktiv = 0;
     try {
-      const antwort = await fetch('../produkt_config.json');
-      zustand.produkte = await antwort.json();
+      if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+      const alle = await window.BOS_PRODUKTE.lade({ sicht: 'alle' });
+      const aktive = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+      zustand.produkte = alle.liste;
+      zustand.produkteAktiv = aktive.liste.length;
+      const hinweis = window.BOS_PRODUKTE.hinweisText(alle);
+      if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
     } catch (fehler) {
-      console.warn('produkt_config.json nicht ladbar — Pro-Produkt-Liste zeigt dann legacyKey statt Klarname.', fehler);
+      console.error('Produktliste nicht ladbar — Pro-Produkt-Liste zeigt dann legacyKey statt Klarname.', fehler);
       zustand.produkte = [];
+      if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung('Produktnamen fehlen, Liste zeigt Rohschlüssel: ' + window.BOS_PRODUKTE.fehlerText(fehler), 'fehler');
     }
   }
 
@@ -825,10 +837,10 @@
 
     const produktKeys = Object.keys(stand.proProdukt);
     const mitWert = produktKeys.filter(k => stand.proProdukt[k] > 0).length;
-    const gesamtProdukte = zustand.produkte.length || null;
+    const gesamtProdukte = zustand.produkteAktiv || null;
 
     let html = `<div class="db-zeile"><strong>${stand.anzahlTage}</strong> Tag(e) erfasst · Zeitraum ${formatDatumDE(stand.von)} – ${formatDatumDE(stand.bis)}</div>`;
-    html += `<div class="db-zeile"><strong>${mitWert}</strong> Produkt(e) mit mindestens einem Wert${gesamtProdukte ? ` (von ${gesamtProdukte} in produkt_config.json)` : ''}</div>`;
+    html += `<div class="db-zeile"><strong>${mitWert}</strong> Produkt(e) mit mindestens einem Wert${gesamtProdukte ? ` (von ${gesamtProdukte} aktiven Produkten)` : ''}</div>`;
     html += `<button class="db-toggle" type="button" data-db-toggle="${pfx}"><span>Pro Produkt anzeigen</span><span class="kal-monat-pfeil">▾</span></button>`;
     html += `<div class="db-produktliste" id="${pfx}-db-produktliste">`;
 

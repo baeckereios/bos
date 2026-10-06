@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Nachtrag-Auswahl liest über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -70,6 +71,7 @@
 <body>
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 <script src="../bos_accounts.js"></script>
 <script>var BOS_APP_ID = 'produktionsplaner_uebersicht';</script>
 <script src="../bos_app_registry.js"></script>
@@ -253,9 +255,14 @@ function renderStationen() {
 
 async function ladeProduktDropdown() {
   var select = document.getElementById('nachtrag-produkt');
+  // 05.10.2026 (Stufe 1): Produktliste aus Firestore über bos_produkte.js;
+  // Ladefehler sichtbar in der Meldezeile statt nur console.warn (K8).
   try {
-    var r = await fetch('../produkt_config.json', { cache: 'no-store' });
-    var configData = r.ok ? await r.json() : [];
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    var produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    var configData = produktErgebnis.liste;
+    var produktHinweis = window.BOS_PRODUKTE.hinweisText(produktErgebnis);
+    if (produktHinweis) window.BOS_PRODUKTE.zeigeMeldung(produktHinweis, 'hinweis');
     var proTag = configData.filter(function (p) { return p.nfcSeite === true && p.legacyKey; });
     STATIONEN.forEach(function (s) {
       var produkteHier = proTag.filter(function (p) { return p.station === s.station; });
@@ -271,7 +278,10 @@ async function ladeProduktDropdown() {
       select.appendChild(group);
     });
   } catch (e) {
-    console.warn('Produktionsplaner Übersicht: Produktliste für Nachtrag konnte nicht geladen werden', e);
+    console.error('Produktionsplaner Übersicht: Produktliste für Nachtrag konnte nicht geladen werden', e);
+    var text = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(e) : ((e && e.message) || String(e));
+    if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung('Nachtrag ohne Produktliste: ' + text, 'fehler');
+    else setStatus('error', '⚠ ' + text);
   }
 }
 

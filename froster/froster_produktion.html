@@ -16,7 +16,8 @@
          Sitzungs-Snapshot wie bei froster_inventur — bewusste Architektur-
          Entscheidung, siehe SESSION_2026-09-03_FROSTER_PRODUKTION_ZIEL_
          KONZEPT.md §1).
-  DATENFLUSS: produkt_config.json → gefiltert nach frosterZustaendigkeit
+  DATENFLUSS: Produktliste aus Firestore "produkte" über ../bos_produkte.js
+         (seit 05.10.2026, vorher produkt_config.json) → gefiltert nach frosterZustaendigkeit
          !== 'nein' (identischer Filter wie froster_inventur.html — legt die
          Grundmenge fest) → in Schritt 1 gruppiert nach dem Feld "station"
          (Rondo/Brötchenstraße/Frühschicht/Nachtschicht, wie beim
@@ -25,7 +26,7 @@
          → Produkt-Kachel wählen → Menge per Stepper eintragen → EIN
          Dokument pro Eintragung nach Firestore-Collection "bos_events"
          (type: 'froster_produktion').
-  SCHNITTSTELLEN: produkt_config.json (Felder frosterZustaendigkeit,
+  SCHNITTSTELLEN: Produktliste (Felder frosterZustaendigkeit,
          legacyKey, name, kategorie, einheit, frosterSort — alle bereits
          durch froster_inventur.html etabliert, keine neuen Felder nötig),
          bos_firebase_config.js, Firestore (Standalone-Login, Anonymous
@@ -61,6 +62,13 @@
       frosterZustaendigkeit bisher nur "baecker" kennt).
 
   CHANGELOG
+    2026-10-05 · 08:34 · v0.6 · Umbau (Produkte aus Firestore, Stufe 1)
+      ladeConfigAuto() liest die Produktliste über ../bos_produkte.js aus
+      Firestore statt per fetch aus produkt_config.json; Fehler mit echter
+      Meldung im Stations-Bereich (zeigeProduktFehler), Gerätekopie-Hinweis
+      oben. Filter, Gruppierung nach station, Sortierung unverändert.
+      STR.fehlerConfig entfällt, STR.keineProdukte nennt den Editor.
+      SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md
     2026-09-05 · v0.1 · Feature
       Erste Version. Drei-Schritt-Fluss (Station → Produkt → Menge),
       ein Firestore-Dokument pro Eintragung, Erfolgs-Rückmeldung mit
@@ -119,6 +127,7 @@
      abweichende BOS_ABHAENGIGKEITEN.md §1a-Beschreibung, die zunächst
      übernommen wurde und zu einem window.db-Timing-Bug führte). -->
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_accounts.js"></script>
 
@@ -398,8 +407,7 @@
 <script>
 /* ==== i18n-Hook (minimal, DE-only, gleiches Muster wie froster_inventur.html) ==== */
 const STR = {
-  keineProdukte: 'Keine Produkte mit Froster-Zuständigkeit gefunden. Bitte in produkt_config.json das Feld "frosterZustaendigkeit" pflegen.',
-  fehlerConfig: 'produkt_config.json konnte nicht geladen werden.',
+  keineProdukte: 'Keine Produkte mit Froster-Zuständigkeit gefunden. Bitte im Produkt-Config-Editor das Feld "frosterZustaendigkeit" pflegen.',
   authFehlt: 'Firebase ist noch nicht bereit — bitte kurz warten.',
   mengeOk: 'Eintragen bestätigt die Menge.',
   mengeSenden: 'Wird gesendet …',
@@ -477,14 +485,26 @@ let PRODUKTE = [];      // {legacyKey, name, zustaendigkeit, station, sort, einh
 let AKTIVE_STATION = null;
 let AKTIVES_PRODUKT = null;
 
+/* 05.10.2026 (Produkte aus Firestore, Stufe 1): Produktliste über
+   bos_produkte.js aus Firestore statt aus der Datei; echte Fehlermeldung
+   im Stations-Bereich (textContent, kein HTML). */
 function ladeConfigAuto(){
-  fetch('../produkt_config.json', { cache: 'no-store' })
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(verarbeiteConfig)
-    .catch(function(){
-      document.getElementById('stationGrid').innerHTML =
-        '<div class="status-box fehler">' + STR.fehlerConfig + '</div>';
-    });
+  if (!window.BOS_PRODUKTE) { zeigeProduktFehler('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.'); return; }
+  window.BOS_PRODUKTE.lade({ sicht: 'aktive' })
+    .then(function(e){
+      var hinweis = window.BOS_PRODUKTE.hinweisText(e);
+      if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
+      verarbeiteConfig(e.liste);
+    })
+    .catch(function(err){ console.error('[Froster-Produktion] Produktliste:', err); zeigeProduktFehler(window.BOS_PRODUKTE.fehlerText(err)); });
+}
+function zeigeProduktFehler(text){
+  const grid = document.getElementById('stationGrid');
+  grid.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'status-box fehler';
+  box.textContent = text;
+  grid.appendChild(box);
 }
 
 function verarbeiteConfig(data){

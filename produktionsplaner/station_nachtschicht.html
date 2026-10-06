@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar (zeigeProduktFehler), „keine freigegeben“ nur nach erfolgreichem Laden; Gerätekopie-Hinweis über BOS_PRODUKTE.zeigeMeldung. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -179,6 +180,7 @@
 <body>
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 <script src="../bos_accounts.js"></script>
 <script>var BOS_APP_ID = 'produktionsplaner_nachtschicht';</script>
 <script src="../bos_app_registry.js"></script>
@@ -321,6 +323,15 @@ function setStatus(cls, txt) {
   var el = document.getElementById('brain-status');
   el.className = 'brain-status ' + cls; el.textContent = txt;
 }
+// 05.10.2026: echte Fehlermeldung der Produktliste im Seiteninhalt (textContent, kein HTML).
+function zeigeProduktFehler(text) {
+  var c = document.getElementById('prod-container');
+  c.innerHTML = '';
+  var d = document.createElement('div');
+  d.style.cssText = 'text-align:center;padding:40px 20px;color:var(--bos-red);font-family:var(--bos-font-label);font-weight:700;word-break:break-word;';
+  d.textContent = text;
+  c.appendChild(d);
+}
 
 var frosterFertig = false;
 var state = {};
@@ -407,11 +418,28 @@ window.addEventListener('load', async function() {
   // kein Blocker für den restlichen Seitenaufbau.
   if (window.BOS_HAMSTER) window.BOS_HAMSTER.init();
 
+  // 05.10.2026 (Produkte aus Firestore, Stufe 1): Produktliste über
+  // bos_produkte.js aus Firestore statt aus der Datei. Ein Ladefehler wird
+  // SICHTBAR gemeldet — vorher catch → [] und dann die falsche Meldung
+  // „Keine Produkte für diese Station freigegeben“ (B10/K8).
   var configData;
+  var produktErgebnis = null;
+  if (!window.BOS_PRODUKTE) {
+    setStatus('error', '⚠ Produktliste nicht geladen');
+    zeigeProduktFehler('Produktliste: bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    return;
+  }
   try {
-    var r = await fetch('../produkt_config.json', { cache: 'no-store' });
-    configData = r.ok ? await r.json() : [];
-  } catch (e) { configData = []; }
+    produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    configData = produktErgebnis.liste;
+  } catch (e) {
+    console.error('[Stationsseite] Produktliste:', e);
+    setStatus('error', '⚠ Produktliste nicht geladen');
+    zeigeProduktFehler(window.BOS_PRODUKTE.fehlerText(e));
+    return;
+  }
+  var produktHinweis = window.BOS_PRODUKTE.hinweisText(produktErgebnis);
+  if (produktHinweis) window.BOS_PRODUKTE.zeigeMeldung(produktHinweis, 'hinweis');
 
   // nfcSeite === true: Opt-in-Filter, getrennt von "station" — nicht jedes
   // Stationsprodukt soll wöchentlich geplant werden (z.B. tagesaktuell

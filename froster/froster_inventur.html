@@ -11,13 +11,14 @@
   ZWECK: Erster Satellit im BOS-V2-Rebuild. Reine Ist-Zustand-Erfassung des
          Frosterbestands ("was liegt gerade drin"). Keine Berechnung, keine
          Fehlmengen-Logik — das passiert in der Bedeutungs-Schicht im Host.
-  DATENFLUSS: produkt_config.json (Auto-Fetch "../produkt_config.json" oder
+  DATENFLUSS: Produktliste aus Firestore "produkte" über ../bos_produkte.js
+         (seit 05.10.2026; vorher produkt_config.json per Auto-Fetch oder
          manueller Upload) → gefiltert nach frosterZustaendigkeit !== 'nein'
          → Poka-Yoke-Abfrage "Vorbereitung fertig?" pro aktiver Zuständigkeits-
          Gruppe (blockierend, keine Vorauswahl — sakrosankt, siehe Manifest)
          → Zählung durch Nutzer → EIN Snapshot-Dokument pro Absenden nach
          Firestore-Collection "bos_events" (type: 'froster_zaehlung').
-  SCHNITTSTELLEN: produkt_config.json (Feld frosterZustaendigkeit: 'nein' |
+  SCHNITTSTELLEN: Produktliste (Feld frosterZustaendigkeit: 'nein' |
          'baecker' | 'konditoren' | 'sonstige', optional frosterSort: number,
          optional einheit: string, Freitext, Fallback 'bleche' — seit v0.4),
          bos_firebase_config.js (zentrale, geteilte Firebase-Config — siehe
@@ -32,6 +33,15 @@
          nächste Schritt.
 
   CHANGELOG
+    2026-10-05 · 08:34 · v0.9 · Umbau (Produkte aus Firestore, Stufe 1)
+      ladeConfigAuto() liest die Produktliste über ../bos_produkte.js aus
+      Firestore statt per fetch aus produkt_config.json. Der Datei-Upload
+      als Notbehelf (zeigeManuellenUpload, STR.fehlerConfig,
+      STR.manuellHochladen) entfällt: ohne Netz kommt die Gerätekopie der
+      Lade-Datei (Hinweis oben), sonst steht die echte Fehlermeldung im
+      Hauptbereich (zeigeProduktFehler). Filter, Gruppierung, Sortierung
+      (frosterSort, Name) unverändert. STR.keineProdukte nennt den Editor
+      statt der Datei. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md
     2026-08-16 · v0.1 · Feature
       Erste Version. Ist-Zustand-Zählung, Gruppierung nach
       frosterZustaendigkeit, Fortschrittsanzeige, Snapshot-Write nach
@@ -126,6 +136,7 @@
 
 <!-- Zentrale BOS-Firebase-Config — eine Quelle für Host + alle Satelliten -->
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 
 <!-- Standalone-Login-Voraussetzungen (NEU 04.09.2026, siehe bos_standalone_login.js
      Kopf-Kommentar): bos_launcher_backgrounds.js MUSS vor bos_accounts.js stehen,
@@ -519,9 +530,7 @@
 /* ==== i18n-Hook (minimal, DE-only bisher — Sprachumfang noch offen) ==== */
 const STR = {
   ladeProdukte: 'Lade Produktliste …',
-  fehlerConfig: 'produkt_config.json konnte nicht automatisch geladen werden.',
-  manuellHochladen: 'Manuell hochladen',
-  keineProdukte: 'Keine Produkte mit Froster-Zuständigkeit gefunden. Bitte in produkt_config.json das Feld "frosterZustaendigkeit" pflegen.',
+  keineProdukte: 'Keine Produkte mit Froster-Zuständigkeit gefunden. Bitte im Produkt-Config-Editor das Feld "frosterZustaendigkeit" pflegen.',
   progress: (n,total) => `${n} / ${total} erfasst`,
   submit: 'Zählung absenden',
   submitSenden: 'Wird gesendet …',
@@ -663,11 +672,19 @@ document.getElementById('pkConfirm').addEventListener('click', function(){
   aktualisiereSubmitZustand();
 });
 
+/* 05.10.2026 (Produkte aus Firestore, Stufe 1): Produktliste über
+   bos_produkte.js aus Firestore statt aus der Datei. Der Datei-Upload als
+   Notbehelf (zeigeManuellenUpload) entfällt — ohne Netz liefert die Lade-
+   Datei die Gerätekopie, sonst steht hier die echte Fehlermeldung. */
 function ladeConfigAuto(){
-  fetch('../produkt_config.json', { cache: 'no-store' })
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(verarbeiteConfig)
-    .catch(function(){ zeigeManuellenUpload(); });
+  if (!window.BOS_PRODUKTE) { zeigeProduktFehler('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.'); return; }
+  window.BOS_PRODUKTE.lade({ sicht: 'aktive' })
+    .then(function(e){
+      var hinweis = window.BOS_PRODUKTE.hinweisText(e);
+      if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
+      verarbeiteConfig(e.liste);
+    })
+    .catch(function(err){ console.error('[Froster-Inventur] Produktliste:', err); zeigeProduktFehler(window.BOS_PRODUKTE.fehlerText(err)); });
 }
 
 function verarbeiteConfig(data){
@@ -698,29 +715,16 @@ function verarbeiteConfig(data){
   initPokaYoke();
 }
 
-function zeigeManuellenUpload(){
+function zeigeProduktFehler(text){
   const overlay = document.getElementById('pkOverlay');
   overlay.classList.add('ausblenden');
   setTimeout(function(){ overlay.style.display = 'none'; }, 180);
-
-  document.getElementById('main').innerHTML =
-    '<div class="status-box fehler">' + t('fehlerConfig') +
-    '<br><label class="upload-btn">' + t('manuellHochladen') +
-    '<input type="file" id="fileInput" accept="application/json"></label></div>';
-  document.getElementById('fileInput').addEventListener('change', function(e){
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(evt){
-      try {
-        const data = JSON.parse(evt.target.result);
-        verarbeiteConfig(data);
-      } catch(err) {
-        document.getElementById('statusBox').textContent = 'Ungültige JSON-Datei.';
-      }
-    };
-    reader.readAsText(file);
-  });
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'status-box fehler';
+  box.textContent = text;   /* textContent: echte Meldung, kein HTML */
+  main.appendChild(box);
 }
 
 function renderListe(){
