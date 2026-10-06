@@ -3,6 +3,24 @@
 <!--
   MODUL: produkt_config/produkt_config_sync.html — Produkt-Config Sync
   CHANGELOG
+    2026-10-05 · 08:41 · v-stand-1 · Umbau (Produkte aus Firestore, Stufe 1)
+      SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md (Freigabe Kontroll-Chat 08:18 Uhr, von Ulf weitergegeben).
+      Die Seite ist jetzt NOTFALL-WERKZEUG: Alle Seiten lesen aus Firestore
+      (bos_produkte.js), die Datei ist nur noch die Notfall-Kopie in Ulfs
+      privater Cloud. Import: schreibt je Produkt „reihenfolge“ = Position
+      in der Datei (Firestore kennt keine Reihenfolge, sieben Seiten
+      brauchen die der Datei); zählt den Stand-Zettel produkte_stand/
+      aktuell im selben Batch hoch (die Regel erzwingt es, kein Einspielen
+      ohne Hochzählen); Produkte, die nur in der Datenbank stehen, werden
+      mit Haken als „geloescht: true“ markiert, nie hart gelöscht (an den
+      Schlüsseln hängen Verbrauchs- und Froster-Daten). Vorschau vergleicht
+      feldweise und unabhängig von der Feld-Reihenfolge (K6: vorher
+      JSON.stringify, meldete „87 geändert“ bei 23), nennt geänderte
+      Produkte mit Feld, „neu nur in der Datenbank“ mit Namen, „schon
+      gelöscht“ nur als Zahl, „wird wieder aktiv“ mit Namen, Reihenfolge-
+      Änderungen als eigene Zahl. Export über bos_produkte.js (Sicht
+      „aktive“: sortiert, ohne gelöschte, ohne reihenfolge/geloescht — das
+      Dateiformat bleibt). Fehler mit echter Meldung in der Statuszeile.
     2026-10-04 · 14:24 · v-online-1 · Aufräumen
       PIN-Gate entfernt (Vorbereitung Online-Gang). Der PIN stand im
       Klartext im öffentlichen Quelltext und prüfte nur im Browser — kein
@@ -134,31 +152,37 @@
   <main>
 
     <div class="card">
-      <h2>📥 Import — Datei → Firestore</h2>
+      <h2>📥 Import — Notfall-Kopie → Datenbank</h2>
       <p class="desc">
-        JSON-Array mit Produkt-Stammdaten hochladen (jedes Element braucht <code>legacyKey</code>).
-        Schreibt jedes Produkt als eigenes Dokument, Dokument-ID = <code>legacyKey</code>.
-        Last-Write-Wins — bestehende Dokumente mit gleicher ID werden überschrieben, sonst bleibt alles unberührt.
+        Notfall-Werkzeug. Eine <code>produkt_config.json</code> (Editor-Download oder die Kopie aus der
+        privaten Cloud) wird in die Datenbank geschrieben, Dokument-ID = <code>legacyKey</code>.
+        Die Reihenfolge der Datei wird mitgeschrieben und der Stand-Zettel hochgezählt — danach holen sich
+        alle Seiten die neue Liste von selbst. Produkte, die nur in der Datenbank stehen, bleiben, bis du sie
+        unten ankreuzt (sie werden dann als gelöscht markiert, nie entfernt).
       </p>
       <input type="file" id="importFile" accept=".json">
       <div id="importPreview" class="preview hidden"></div>
       <div class="row">
-        <button id="importBtn" disabled>Vorschau gegen Firestore prüfen</button>
+        <button id="importBtn" disabled>Vorschau gegen die Datenbank prüfen</button>
+      </div>
+      <div id="importLoeschRow" class="row hidden">
+        <label><input type="checkbox" id="importLoeschHaken"> Produkte, die nur in der Datenbank stehen, als gelöscht markieren</label>
       </div>
       <div id="importConfirmRow" class="row hidden">
-        <button id="importConfirmBtn">✓ Jetzt in Firestore schreiben</button>
+        <button id="importConfirmBtn">✓ Jetzt in die Datenbank schreiben</button>
       </div>
       <div id="importStatus" class="status"></div>
     </div>
 
     <div class="card">
-      <h2>📤 Export — Firestore → Datei</h2>
+      <h2>📤 Export — Datenbank → Notfall-Kopie</h2>
       <p class="desc">
-        Lädt den aktuellen Stand aus Firestore und erzeugt eine <code>produkt_config.json</code> zum
-        Download. Diese Datei danach manuell im Repo ersetzen (GitHub-Weboberfläche reicht) —
-        erst dann sehen die Lese-Satelliten (Froster-Inventur, NFC-Stationen, mega_erfassung …) die Änderung.
+        Lädt den aktuellen Stand aus der Datenbank (immer vom Server, nie vom Gerät) und erzeugt eine
+        <code>produkt_config.json</code>. Das ist die Notfall-Kopie: in der privaten Cloud ablegen, nicht im Repo.
+        Reihenfolge wie auf den Seiten, gelöschte Produkte fehlen, die Felder <code>reihenfolge</code> und
+        <code>geloescht</code> stehen nicht in der Datei.
       </p>
-      <button id="exportBtn">Aus Firestore laden &amp; herunterladen</button>
+      <button id="exportBtn">Aus der Datenbank laden &amp; herunterladen</button>
       <div id="exportStatus" class="status"></div>
     </div>
 
@@ -169,6 +193,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
 
 <script>
 // ==========================================================================
@@ -192,23 +217,23 @@ var helpData = {
   sections: [
     {
       heading: "Wofür ist diese Seite?",
-      text: "Verbindet zwei Orte, an denen Produktdaten liegen: die Datei produkt_config.json (die Froster-Inventur, NFC-Stationsseiten und andere Seiten lesen) und die Datenbank (Firestore), in der künftig mehrere Personen Produktdaten pflegen können. Diese Seite überträgt Daten zwischen beiden — in beide Richtungen."
+      text: "Notfall-Werkzeug für die Produktliste. Im Alltag braucht es diese Seite nicht: Produkte werden im Editor gepflegt, und alle Seiten (Teigecke, Froster, Produktionsplaner, Schnellrechner, Verbrauch) lesen die Liste aus der Datenbank. Diese Seite spielt eine Notfall-Kopie (Datei) in die Datenbank zurück oder zieht eine neue Notfall-Kopie aus der Datenbank."
     },
     {
       heading: "Was macht der Import?",
-      text: "Eine Datei mit Produktdaten wird ausgewählt und in die Datenbank geschrieben. Vorher zeigt die Seite eine Vorschau: wie viele Produkte sind neu, wie viele geändert, wie viele bleiben gleich. Erst nach Bestätigung wird tatsächlich geschrieben. Bestehende Produkte mit gleichem Namen (legacyKey) werden dabei überschrieben — nichts wird stillschweigend gemischt. Enthält die Datei denselben Produkt-Schlüssel zweimal, lehnt die Seite sie sofort ab und nennt die betroffenen Schlüssel — dann wird gar nichts geschrieben, auch nicht der Rest."
+      text: "Eine Datei mit Produktdaten wird ausgewählt und in die Datenbank geschrieben. Vorher zeigt die Seite eine Vorschau: welche Produkte sind neu, welche geändert (mit dem Feld, das sich ändert), wie viele bleiben gleich, bei wie vielen ändert sich nur die Reihenfolge, welche stehen nur in der Datenbank und nicht in der Datei. Erst nach Bestätigung wird geschrieben, alles in einem Rutsch, zusammen mit dem Stand-Zettel — daran erkennen die Seiten, dass sie die Liste neu holen müssen. Produkte, die nur in der Datenbank stehen, bleiben unberührt, außer du setzt den Haken: dann werden sie als gelöscht markiert (nicht entfernt, an den Schlüsseln hängen Verbrauchs- und Froster-Daten). Steht ein früher gelöschtes Produkt wieder in der Datei, wird es wieder aktiv — die Vorschau sagt es. Enthält die Datei denselben Produkt-Schlüssel zweimal, lehnt die Seite sie sofort ab."
     },
     {
       heading: "Was macht der Export?",
-      text: "Holt den aktuellen Stand aller Produkte aus der Datenbank und lädt sie als Datei herunter. Diese Datei muss danach manuell die alte produkt_config.json im System ersetzen — erst dann sehen die anderen Seiten die Änderungen. Der Export ist gleichzeitig Backup und Vorbereitung für diesen Veröffentlichen-Schritt."
+      text: "Holt den aktuellen Stand aller Produkte aus der Datenbank (immer vom Server) und lädt sie als Datei herunter — in der Reihenfolge, wie sie auf den Seiten stehen, ohne gelöschte Produkte. Das ist die Notfall-Kopie. Ablage: private Cloud, nicht im Repo. Faustregel: nach jeder größeren Pflege-Runde eine neue Kopie ziehen."
     },
     {
       heading: "Für wen ist das gedacht?",
-      text: "Nur für die Person(en), die Produktdaten pflegen — die Seite ist deshalb nur mit Admin-Rolle erreichbar. Für den täglichen Betrieb (Froster zählen, Produktion planen usw.) wird diese Seite nicht gebraucht."
+      text: "Nur für die Person, die Produktdaten pflegt — die Seite ist nur mit Admin-Rolle erreichbar, und nur die Admin-Rolle darf in die Datenbank schreiben. Für den täglichen Betrieb wird diese Seite nicht gebraucht."
     },
     {
       heading: "Wichtig zu wissen",
-      text: "Diese Seite entfernt keine Produkte aus der Datenbank — sie legt neue an oder überschreibt bestehende. Ein Produkt komplett löschen geht hierüber bisher nicht."
+      text: "Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind."
     }
   ]
 };
@@ -248,9 +273,78 @@ function initApp() {
 }
 
 // ==========================================================================
-// Import
+// Import — Notfall-Kopie → Datenbank (Stufe 1, 05.10.2026)
 // ==========================================================================
+var STAND_COLLECTION = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.STAND_COLLECTION : 'produkte_stand';
+var STAND_DOK = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.STAND_DOK : 'aktuell';
 var importedData = null;
+var vorschau = null;
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function fehlerText(err) {
+  return window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(err) : ((err && err.message) || String(err));
+}
+
+/* --- VERGLEICH ANFANG (reine Logik, geprüft in pruefe_sync_vorschau.js) ---
+   Feldweise, unabhängig von der Reihenfolge der Felder (K6). Die Felder
+   reihenfolge und geloescht gehören der Datenbank, nicht der Datei (K7),
+   und werden nicht verglichen. */
+var VERGLEICH_AUSGENOMMEN = ['reihenfolge', 'geloescht'];
+function inhaltOhne(p) {
+  var o = {};
+  Object.keys(p || {}).forEach(function (k) { if (VERGLEICH_AUSGENOMMEN.indexOf(k) === -1) o[k] = p[k]; });
+  return o;
+}
+function feldGleich(a, b) {
+  return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+}
+function geaenderteFelder(datei, db) {
+  var a = inhaltOhne(datei), b = inhaltOhne(db), felder = {};
+  Object.keys(a).concat(Object.keys(b)).forEach(function (k) { felder[k] = true; });
+  return Object.keys(felder).filter(function (k) { return !feldGleich(a[k], b[k]); }).sort();
+}
+/* datei: Liste aus der Datei; roh: [{ id, daten }] aus der Datenbank (Sicht „roh“). */
+function vergleicheImport(datei, roh) {
+  var inDb = {};
+  (roh || []).forEach(function (d) { inDb[d.id] = d.daten; });
+  var inDatei = {};
+  datei.forEach(function (p) { inDatei[p.legacyKey] = p; });
+  var r = { neu: [], geaendert: [], unveraendert: 0, wiederAktiv: [], reihenfolgeNeu: 0, nurDb: [], schonGeloescht: 0 };
+  datei.forEach(function (p, i) {
+    var db = inDb[p.legacyKey];
+    if (!db) { r.neu.push({ key: p.legacyKey, name: p.name || p.legacyKey }); return; }
+    var felder = geaenderteFelder(p, db);
+    if (felder.length) r.geaendert.push({ key: p.legacyKey, name: p.name || p.legacyKey, felder: felder });
+    else r.unveraendert++;
+    if (db.geloescht === true) r.wiederAktiv.push({ key: p.legacyKey, name: p.name || p.legacyKey });
+    if (db.reihenfolge !== i) r.reihenfolgeNeu++;
+  });
+  Object.keys(inDb).forEach(function (id) {
+    if (inDatei[id]) return;
+    if (inDb[id] && inDb[id].geloescht === true) r.schonGeloescht++;
+    else r.nurDb.push({ key: id, name: (inDb[id] && inDb[id].name) || id });
+  });
+  return r;
+}
+/* --- VERGLEICH ENDE --- */
+
+function vorschauHTML(v, anzahlDatei) {
+  var namen = function (liste) { return liste.map(function (x) { return esc(x.name) + ' <span style="color:var(--dim)">(' + esc(x.key) + ')</span>'; }).join(', '); };
+  var h = '<div><strong>' + anzahlDatei + ' Produkte in der Datei</strong> — ' + v.neu.length + ' neu, ' + v.geaendert.length + ' geändert, ' + v.unveraendert + ' unverändert.</div>';
+  if (v.neu.length) h += '<div style="margin-top:6px"><strong>Neu:</strong> ' + namen(v.neu) + '</div>';
+  if (v.geaendert.length) {
+    h += '<div style="margin-top:6px"><strong>Geändert:</strong><ul style="margin:4px 0 0 18px;padding:0">' +
+      v.geaendert.map(function (g) { return '<li>' + esc(g.name) + ' <span style="color:var(--dim)">(' + esc(g.key) + ')</span>: ' + esc(g.felder.join(', ')) + '</li>'; }).join('') + '</ul></div>';
+  }
+  h += '<div style="margin-top:6px">Reihenfolge ändert sich bei <strong>' + v.reihenfolgeNeu + '</strong> Produkt(en).</div>';
+  if (v.wiederAktiv.length) h += '<div style="margin-top:6px"><strong>Wird wieder aktiv</strong> (war gelöscht, steht in der Datei): ' + namen(v.wiederAktiv) + '</div>';
+  if (v.nurDb.length) h += '<div style="margin-top:6px;color:var(--amber)"><strong>Neu nur in der Datenbank, nicht in der Datei</strong> (' + v.nurDb.length + '): ' + namen(v.nurDb) + '<br>Ohne Haken unten bleiben sie, wie sie sind. Mit Haken werden sie als gelöscht markiert.</div>';
+  else h += '<div style="margin-top:6px">Nur in der Datenbank: keine.</div>';
+  if (v.schonGeloescht) h += '<div style="margin-top:6px;color:var(--dim)">Schon gelöscht (bleiben so): ' + v.schonGeloescht + '</div>';
+  return h;
+}
+
+function setzeStatus(el, text, klasse) { el.textContent = text; el.className = 'status' + (klasse ? ' ' + klasse : ''); }
 
 document.getElementById('importFile').onchange = function (e) {
   var file = e.target.files[0];
@@ -260,10 +354,13 @@ document.getElementById('importFile').onchange = function (e) {
     var previewEl = document.getElementById('importPreview');
     var statusEl = document.getElementById('importStatus');
     var btn = document.getElementById('importBtn');
+    document.getElementById('importConfirmRow').classList.add('hidden');
+    document.getElementById('importLoeschRow').classList.add('hidden');
+    vorschau = null;
     try {
       var data = JSON.parse(evt.target.result);
       if (!Array.isArray(data)) throw new Error("Erwarte ein JSON-Array");
-      var ohneKey = data.filter(function (p) { return !p.legacyKey; });
+      var ohneKey = data.filter(function (p) { return !p || !p.legacyKey; });
       if (ohneKey.length > 0) {
         throw new Error(ohneKey.length + " Produkt(e) ohne legacyKey — abgebrochen, keine Erfindung von IDs");
       }
@@ -283,14 +380,13 @@ document.getElementById('importFile').onchange = function (e) {
         data[0].name + " (" + data[0].legacyKey + ")";
       previewEl.classList.remove('hidden');
       btn.disabled = false;
-      statusEl.textContent = '';
+      setzeStatus(statusEl, '');
     } catch (err) {
       console.error('[Produkt-Config Sync] Import abgelehnt:', err);
       importedData = null;
       previewEl.classList.add('hidden');
       btn.disabled = true;
-      statusEl.textContent = '✗ ' + err.message;
-      statusEl.className = 'status err';
+      setzeStatus(statusEl, '✗ ' + err.message, 'err');
     }
   };
   reader.readAsText(file);
@@ -299,68 +395,94 @@ document.getElementById('importFile').onchange = function (e) {
 document.getElementById('importBtn').onclick = function () {
   if (!importedData) return;
   var statusEl = document.getElementById('importStatus');
-  statusEl.textContent = 'Lade aktuellen Firestore-Stand …';
-  statusEl.className = 'status';
-  db.collection(COLLECTION).get().then(function (snapshot) {
-    var existing = {};
-    snapshot.forEach(function (doc) { existing[doc.id] = doc.data(); });
-    var neu = 0, geaendert = 0, unveraendert = 0;
-    importedData.forEach(function (p) {
-      if (!existing[p.legacyKey]) neu++;
-      else if (JSON.stringify(existing[p.legacyKey]) !== JSON.stringify(p)) geaendert++;
-      else unveraendert++;
-    });
-    document.getElementById('importPreview').textContent =
-      importedData.length + " Produkte — " + neu + " neu, " + geaendert + " geändert, " + unveraendert + " unverändert.";
-    statusEl.textContent = '';
+  setzeStatus(statusEl, 'Lade aktuellen Stand der Datenbank …');
+  if (!window.BOS_PRODUKTE) { setzeStatus(statusEl, '✗ bos_produkte.js ist nicht geladen (neue Fassung noch nicht online? Seite neu laden).', 'err'); return; }
+  /* immer frisch und nur vom Server — eine Vorschau gegen eine Gerätekopie wäre eine Lüge (F4) */
+  window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true, frisch: true }).then(function (e) {
+    vorschau = vergleicheImport(importedData, e.liste);
+    document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
+    document.getElementById('importLoeschRow').classList.toggle('hidden', !vorschau.nurDb.length);
+    document.getElementById('importLoeschHaken').checked = false;
+    setzeStatus(statusEl, e.warnungen && e.warnungen.length ? '⚠ ' + e.warnungen.join(' ') : '');
     document.getElementById('importConfirmRow').classList.remove('hidden');
   }).catch(function (err) {
-    statusEl.textContent = '✗ ' + err.message;
-    statusEl.className = 'status err';
+    if (err && err.art === 'leer') {
+      /* Leere Datenbank: alles in der Datei ist neu. Das ist beim ersten Einspielen der Normalfall. */
+      vorschau = vergleicheImport(importedData, []);
+      document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
+      document.getElementById('importLoeschRow').classList.add('hidden');
+      setzeStatus(statusEl, 'Die Datenbank ist leer — alle Produkte der Datei sind neu.');
+      document.getElementById('importConfirmRow').classList.remove('hidden');
+      return;
+    }
+    console.error('[Produkt-Config Sync] Vorschau:', err);
+    setzeStatus(statusEl, '✗ ' + fehlerText(err), 'err');
   });
 };
 
 document.getElementById('importConfirmBtn').onclick = function () {
-  if (!importedData) return;
+  if (!importedData || !vorschau) return;
   var btn = this;
   var statusEl = document.getElementById('importStatus');
+  var loeschen = document.getElementById('importLoeschHaken').checked && vorschau.nurDb.length > 0;
   btn.disabled = true;
   btn.textContent = 'Schreibe …';
+  var zurueck = function () { btn.disabled = false; btn.textContent = '✓ Jetzt in die Datenbank schreiben'; };
 
-  // Firestore-Batches sind auf 500 Schreibvorgänge begrenzt.
-  // Bei aktuell 87 Produkten unproblematisch — bei künftigem Wachstum ggf. chunken.
-  var batch = db.batch();
   var col = db.collection(COLLECTION);
-  importedData.forEach(function (p) {
-    batch.set(col.doc(p.legacyKey), p);
-  });
+  var standRef = db.collection(STAND_COLLECTION).doc(STAND_DOK);
+  var nutzer = firebase.auth().currentUser;
+  var kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+  if (!kennung) { setzeStatus(statusEl, '✗ Keine Kennung — bist du angemeldet?', 'err'); zurueck(); return; }
 
-  batch.commit().then(function () {
-    statusEl.textContent = '✓ ' + importedData.length + ' Produkte in Firestore geschrieben.';
-    statusEl.className = 'status ok';
-    document.getElementById('importConfirmRow').classList.add('hidden');
-    btn.disabled = false;
-    btn.textContent = '✓ Jetzt in Firestore schreiben';
+  /* Stand-Zettel lesen (ein Lesevorgang), dann alles in EINEM Batch: Produkte mit
+     reihenfolge, Löschmarken, Stand + 1. Die Regel lehnt den ganzen Batch ab,
+     wenn der Stand nicht steigt — zwei gleichzeitige Einspielungen blockieren
+     sich so gegenseitig, statt sich zu überschreiben. Firestore-Batches sind auf
+     500 Schreibvorgänge begrenzt: 87 Produkte + Löschmarken + 1 Stand, weit darunter. */
+  standRef.get({ source: 'server' }).then(function (standSnap) {
+    var alt = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : 0;
+    var neu = alt + 1;
+    var ts = firebase.firestore.FieldValue.serverTimestamp();
+    var batch = db.batch();
+    importedData.forEach(function (p, i) {
+      batch.set(col.doc(p.legacyKey), Object.assign(inhaltOhne(p), { reihenfolge: i }));
+    });
+    if (loeschen) {
+      vorschau.nurDb.forEach(function (x) { batch.update(col.doc(x.key), { geloescht: true }); });
+    }
+    var standDaten = { nummer: neu, geaendertAm: ts, geaendertVon: kennung };
+    if (standSnap.exists) batch.update(standRef, standDaten); else batch.set(standRef, standDaten);
+    return batch.commit().then(function () {
+      setzeStatus(statusEl, '✓ ' + importedData.length + ' Produkte geschrieben' +
+        (loeschen ? ', ' + vorschau.nurDb.length + ' als gelöscht markiert' : '') +
+        '. Stand-Zettel jetzt Nummer ' + neu + ' — die Seiten holen die Liste beim nächsten Öffnen neu.', 'ok');
+      document.getElementById('importConfirmRow').classList.add('hidden');
+      document.getElementById('importLoeschRow').classList.add('hidden');
+      vorschau = null;
+      zurueck();
+    });
   }).catch(function (err) {
-    statusEl.textContent = '✗ ' + err.message;
-    statusEl.className = 'status err';
-    btn.disabled = false;
-    btn.textContent = '✓ Jetzt in Firestore schreiben';
+    console.error('[Produkt-Config Sync] Schreiben:', err);
+    var code = (err && err.code) || '';
+    setzeStatus(statusEl, '✗ ' + (code === 'permission-denied'
+      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel kennt den Stand-Zettel noch nicht (firestore_regeln_2026-10-05_produkte_stand.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
+      : '') + fehlerText(err), 'err');
+    zurueck();
   });
 };
 
 // ==========================================================================
-// Export
+// Export — Datenbank → Notfall-Kopie
 // ==========================================================================
 document.getElementById('exportBtn').onclick = function () {
   var statusEl = document.getElementById('exportStatus');
-  statusEl.textContent = 'Lade aus Firestore …';
-  statusEl.className = 'status';
-  db.collection(COLLECTION).get().then(function (snapshot) {
-    var arr = [];
-    snapshot.forEach(function (doc) { arr.push(doc.data()); });
-    arr.sort(function (a, b) { return (a.legacyKey || '').localeCompare(b.legacyKey || ''); });
-
+  setzeStatus(statusEl, 'Lade aus der Datenbank …');
+  if (!window.BOS_PRODUKTE) { setzeStatus(statusEl, '✗ bos_produkte.js ist nicht geladen (neue Fassung noch nicht online? Seite neu laden).', 'err'); return; }
+  /* Sicht „aktive“: sortiert nach reihenfolge, ohne gelöschte, ohne die zwei
+     Datenbank-Felder — das Dateiformat bleibt, wie es ist (K7). Nie vom Gerät. */
+  window.BOS_PRODUKTE.lade({ sicht: 'aktive', nurServer: true, frisch: true }).then(function (e) {
+    var arr = e.liste;
     var blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -370,12 +492,11 @@ document.getElementById('exportBtn').onclick = function () {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-
-    statusEl.textContent = '✓ ' + arr.length + ' Produkte heruntergeladen. Jetzt manuell im Repo ersetzen.';
-    statusEl.className = 'status ok';
+    setzeStatus(statusEl, '✓ ' + arr.length + ' Produkte heruntergeladen (Stand-Zettel ' +
+      (e.standNummer === null ? 'noch nicht angelegt' : 'Nummer ' + e.standNummer) + '). Notfall-Kopie in der privaten Cloud ablegen.', 'ok');
   }).catch(function (err) {
-    statusEl.textContent = '✗ ' + err.message;
-    statusEl.className = 'status err';
+    console.error('[Produkt-Config Sync] Export:', err);
+    setzeStatus(statusEl, '✗ ' + fehlerText(err), 'err');
   });
 };
 </script>
