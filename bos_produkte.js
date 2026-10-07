@@ -27,7 +27,7 @@
    Sichten:
      'aktive'  Standard. Ohne gelöschte, sortiert nach `reihenfolge`
                (Dokumente ohne das Feld ans Ende, dort nach legacyKey),
-               ohne die Felder `reihenfolge` und `geloescht`.
+               ohne die Datenbank-Felder `reihenfolge`, `geloescht`, `sicherungId`.
      'alle'    wie 'aktive', aber mit gelöschten — die tragen
                `geloescht: true`. Für Seiten, die Namen zu alten Daten
                nachschlagen (Werkstatt, Verbrauch-Einstellungen) und für
@@ -73,6 +73,11 @@
    Datum nie über toISOString() (UTC-Falle zwischen 0 und 2 Uhr).
 
    CHANGELOG
+     2026-10-06 · v0.2 · Stufe 2 (KC-Freigabe S2, 08:26)
+       sicherungId gehört wie reihenfolge/geloescht der Datenbank und wird aus
+       den Sichten 'aktive' und 'alle' entfernt (DB_FELDER) — sonst landete das
+       Feld in jeder Leser-Seite, im Sync-Export und in der Vorschau. Sonst
+       unverändert; Regelstand-Fassung bleibt produkte-2026-10-05.
      2026-10-05 · v0.1 · Neu
        Erstfassung. Bauplan SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_
        STUFE1.md (Freigabe Kontroll-Chat 08:18 Uhr, von Ulf weitergegeben). Zeitlimit kopiert aus
@@ -169,6 +174,9 @@
     return t('kopie_grund_netz');
   }
 
+  /* Felder, die der Datenbank gehören und nie in die Liste kommen (K7; sicherungId seit Stufe 2). */
+  var DB_FELDER = ['reihenfolge', 'geloescht', 'sicherungId'];
+
   /* ---------- Sortieren und Sichten (reine Logik, testbar) ---------- */
   function vergleich(a, b) {
     var ra = typeof a.reihenfolge === 'number' ? a.reihenfolge : null;
@@ -189,14 +197,14 @@
     var sortiert = roh.map(function (d) { return d.daten; }).slice().sort(vergleich);
     if (name === 'alle') {
       return sortiert.map(function (p) {
-        var o = ohneFelder(p, ['reihenfolge', 'geloescht']);
+        var o = ohneFelder(p, DB_FELDER);
         if (p.geloescht === true) o.geloescht = true;
         return o;
       });
     }
     return sortiert
       .filter(function (p) { return p.geloescht !== true; })
-      .map(function (p) { return ohneFelder(p, ['reihenfolge', 'geloescht']); });
+      .map(function (p) { return ohneFelder(p, DB_FELDER); });
   }
   function warnungenFuer(roh) {
     var w = [];
@@ -417,7 +425,7 @@
       versteckeMeldung: versteckeMeldung,
       /* Konstanten für Sync-Tool, Editor und Tests */
       COLLECTION: COLLECTION, STAND_COLLECTION: STAND_COLLECTION, STAND_DOK: STAND_DOK,
-      KOPIE_KEY: KOPIE_KEY, REGEL_FASSUNG: REGEL_FASSUNG, REGEL_DATEI: REGEL_DATEI,
+      KOPIE_KEY: KOPIE_KEY, REGEL_FASSUNG: REGEL_FASSUNG, REGEL_DATEI: REGEL_DATEI, DB_FELDER: DB_FELDER,
       ZEITLIMIT_MS: zeitlimitMs, ZEITNETZ_MS: zeitnetzMs,
       /* reine Logik, auch für den Sync-Export */
       sicht: sicht, vergleich: vergleich, warnungenFuer: warnungenFuer, mitZeitlimit: mitZeitlimit

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-06 · 07:29 · Nachtrag (Ulf): Statuszeile nennt nach dem Laden, woher die Produktliste kam („Liste vom Gerät/Server, Stand N“, aus bos_produkte.js quelle/standNummer); in der Ladephase danach heißt es „Bedarf und Frosterbestand werden geladen…“ statt irreführend „Produktdaten werden geladen…“ (B11 Nebenfund 1). SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar (zeigeProduktFehler), „keine freigegeben“ nur nach erfolgreichem Laden; Gerätekopie-Hinweis über BOS_PRODUKTE.zeigeMeldung. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
@@ -319,6 +320,7 @@ function offsetToDate(off) {
 // rdAuf() für die Mindestmenge (lieber etwas mehr als zu knapp).
 function rd(n) { return Math.round(n || 0); }
 function rdAuf(n) { return Math.ceil(n || 0); }
+var produktQuelleText = '';   // 06.10.2026: „Liste vom Gerät/Server, Stand N“ (Nachtrag)
 function setStatus(cls, txt) {
   var el = document.getElementById('brain-status');
   el.className = 'brain-status ' + cls; el.textContent = txt;
@@ -424,6 +426,8 @@ window.addEventListener('load', async function() {
   // „Keine Produkte für diese Station freigegeben“ (B10/K8).
   var configData;
   var produktErgebnis = null;
+  // 06.10.2026: Herkunft der Produktliste für die Statuszeile (Nachtrag, Ulf).
+  produktQuelleText = '';
   if (!window.BOS_PRODUKTE) {
     setStatus('error', '⚠ Produktliste nicht geladen');
     zeigeProduktFehler('Produktliste: bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
@@ -440,6 +444,9 @@ window.addEventListener('load', async function() {
   }
   var produktHinweis = window.BOS_PRODUKTE.hinweisText(produktErgebnis);
   if (produktHinweis) window.BOS_PRODUKTE.zeigeMeldung(produktHinweis, 'hinweis');
+  produktQuelleText = ' · Liste ' + ({ server: 'vom Server', geraetekopie_aktuell: 'vom Gerät', geraetekopie: 'vom Gerät (kein Netz)' }[produktErgebnis.quelle] || produktErgebnis.quelle)
+    + ', Stand ' + (produktErgebnis.standNummer === null ? '–' : produktErgebnis.standNummer);
+  setStatus('loading', '⏳ Bedarf und Frosterbestand werden geladen…');
 
   // nfcSeite === true: Opt-in-Filter, getrennt von "station" — nicht jedes
   // Stationsprodukt soll wöchentlich geplant werden (z.B. tagesaktuell
@@ -490,7 +497,7 @@ window.addEventListener('load', async function() {
     return;
   }
 
-  setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen');
+  setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText);
   renderAll();
 });
 
@@ -518,7 +525,7 @@ async function setzeDatentopf(wert) {
   setStatus('loading', '⏳ Bedarf wird neu geladen…');
   try {
     await ladeAlleWochenbedarfe();
-    setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen');
+    setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText);
     recalcAll();
   } catch (e) {
     console.warn('Produktionsplaner Brötchenstraße: Umschalten des Datentopfs fehlgeschlagen', e);

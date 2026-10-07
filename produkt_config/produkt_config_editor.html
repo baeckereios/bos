@@ -3,6 +3,25 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-06 · 08:58 · v-firestore-2 · Stufe 2: der Editor schreibt direkt
+      SESSION_2026-10-06_PRODUKTE_AUS_FIRESTORE_STUFE2.md (KC 08:26, Ulf 08:40).
+      Speichern je Produkt aus der Karte (Knopf 💾): EINE Batch = Sicherung der
+      Vorversion (produkte_sicherungen, vorher = rohes Serverdokument), Produkt
+      (set, mit reihenfolge + sicherungId), Stand-Zettel = geladener Stand + 1.
+      Der Stand ist damit Sperrzettel: hat jemand seit dem Laden gespeichert,
+      lehnt die Regel ab (Konfliktmeldung, Knopf „Neu laden und diese Änderung
+      behalten“, Ulf 08:05). Löschen = geloescht: true mit Sicherung
+      'archivieren', Schlüssel bleibt gesperrt. Reiter „Vorversionen“ je Karte
+      mit „Diesen Stand zurückholen“ (= Speichern mit 'wiederherstellen').
+      Neues Produkt: reihenfolge = höchste + 1, Sicherung 'anlegen'. Upload
+      sperrt das Speichern (nur ansehen, ⬇ Datei, Sync-Tool). Erinnerung an die
+      Notfall-Kopie (letzte 'export'-Sicherung, nach Änderungen, 30 Tage
+      Untergrenze) mit Knopf „jetzt herunterladen“. Regelstand-Probe eigene
+      Fassung produkte-sicherung-2026-10-06. Echte Fehlermeldung überall.
+    2026-10-06 · 07:11 · v-firestore-1a · Kopfzeile (Ulf, nach Schub 2 online)
+      „nur Datei-Export, kein Firestore-Schreiben“ war für den Editor noch wahr,
+      las sich aber wie eine Aussage über das ganze System. Jetzt: „Stufe 1 ·
+      liest aus der Datenbank · ändern: ⬇ Datei → im Sync-Tool einspielen“.
     2026-10-05 · 08:34 · v-firestore-1 · Umbau (Produkte aus Firestore, Stufe 1)
       SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md (Freigabe Kontroll-Chat 08:18 Uhr, von Ulf weitergegeben).
       Der Editor lädt beim Öffnen aus der Datenbank (bos_produkte.js, Sicht
@@ -263,7 +282,7 @@
   <h1>Produkt-Config · Editor</h1>
   <div style="display:flex; align-items:center; gap:10px;">
     <div class="meta">
-      <div>BäckereiOS V2 · nur Datei-Export, kein Firestore-Schreiben</div>
+      <div>Stufe 2 · speichert direkt in die Datenbank, mit Sicherung</div>
       <div id="quelleName">keine Daten geladen</div>
     </div>
     <button id="helpOpenBtn" class="help-btn" title="Hilfe">❓</button>
@@ -294,12 +313,18 @@
 
 <!-- NEU 28.09.2026 (Teil B): sichtbare Warnung bei doppelten Schlüsseln -->
 <div id="doppelWarnung" class="hidden" role="alert"></div>
+<!-- Stufe 2: Erinnerung an die Notfall-Kopie (Ulf 06.10.: nach Änderungen, 30 Tage Untergrenze) -->
+<div id="notfallZeile" class="hidden" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;font-size:.78rem;border-bottom:1px solid var(--border);">
+  <span id="notfallText"></span>
+  <button class="btn btn-outline" style="padding:4px 10px;font-size:.75rem" onclick="notfallKopie()">Notfall-Kopie jetzt herunterladen</button>
+</div>
 
 <div id="uploadZone" onclick="document.getElementById('fileInput').click()">
   <div class="icon">📋</div>
   <p><strong>Produktliste</strong></p>
   <p>Lädt automatisch aus der Datenbank — falls das scheitert, steht der Grund in der Statuszeile.
-     Eine Notfall-Kopie (<code>produkt_config.json</code>) kannst du hierher ziehen/klicken.</p>
+     Eine Notfall-Kopie (<code>produkt_config.json</code>) kannst du hierher ziehen/klicken — zum Ansehen;
+     gespeichert wird aus einer Datei nicht, dafür gibt es das Sync-Tool.</p>
 </div>
 
 <div id="tabLeiste" class="tab-leiste"></div>
@@ -316,6 +341,15 @@
       <button class="karte-nav-btn" id="karteVorBtn" onclick="karteNav(1)" title="Nächstes Produkt">›</button>
       <button class="karte-close" onclick="schliesseKarte()" title="Schließen">✕</button>
     </div>
+    <div id="karteAktionen" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 26px 10px;">
+      <button class="btn btn-amber" id="karteSpeichernBtn" onclick="speichereKarte(karteIdx, null)">💾 Speichern</button>
+      <button class="btn btn-outline" id="karteLoeschenBtn" onclick="loescheProdukt(karteIdx)">🗑 Löschen</button>
+      <span id="karteSpeicherHinweis" style="font-size:.75rem;color:var(--dim)"></span>
+    </div>
+    <div id="karteKonflikt" class="hidden" role="alert" style="margin:0 26px 10px;padding:10px 12px;border:1px solid var(--red);border-radius:8px;font-size:.8rem;">
+      <div id="karteKonfliktText"></div>
+      <button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:.75rem" onclick="neuLadenBehalten(karteIdx)">↻ Neu laden und diese Änderung behalten</button>
+    </div>
     <div class="karte-tabs" id="karteTabs"></div>
     <div class="karte-body" id="karteBody"></div>
   </div>
@@ -331,7 +365,7 @@
   <option value="Schlawinerblech">
 </datalist>
 
-<div id="saveBanner" onclick="downloadJSON()">⬇ Ungespeicherte Änderungen — Datei jetzt herunterladen</div>
+<div id="saveBanner" onclick="oeffneErsteGeaenderte()">💾 Ungespeicherte Änderungen — in der Karte speichern</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -355,6 +389,19 @@ var FELD_GLOSSAR = null; // aus produkt_config_felder.json, siehe ladeFeldGlossa
 // die Schlüssel, die in der Datenbank als gelöscht markiert sind (K2).
 var geloeschteSchluessel = {};
 var dbGeloeschteSchluessel = {};
+/* Stufe 2 (06.10.2026): rohe Serverdokumente je Schlüssel (für vorher == Serverstand
+   in der Sicherung und für reihenfolge), geladener Stand-Zettel (Sperrzettel), Herkunft
+   der Liste ('db' | 'upload'), Karten mit ungespeicherten Änderungen. */
+var serverRoh = {};
+var geladenerStand = null;
+var quelle = 'db';
+var geaenderteKarten = {};
+var SICH_COLLECTION = 'produkte_sicherungen';
+var STAND_COLLECTION = 'produkte_stand', STAND_DOK = 'aktuell';
+var REGEL_FASSUNG_EDITOR = 'produkte-sicherung-2026-10-06';
+var REGEL_DATEI_EDITOR = 'firestore_regeln_2026-10-06_produkte_sicherung.rules';
+var DB_FELDER = ['reihenfolge', 'geloescht', 'sicherungId'];
+var ERINNERUNG_TAGE = 30, ERINNERUNG_STAENDE = 5;
 
 // ── Übersicht: Tab-Zustand (ersetzt das frühere eingeklappt-Akkordeon) ──
 var aktiveKat = KATEGORIEN[0];
@@ -416,10 +463,21 @@ function status(msg, typ) {
   el.textContent = msg;
   el.className = typ || '';
 }
-function markiereGeaendert() {
+function markiereGeaendert(idx) {
   geaendert = true;
-  document.getElementById('saveBanner').style.display = 'block';
-  status(daten.length + ' Produkte · ungespeicherte Änderungen', 'err');
+  if (typeof idx === 'number' && daten[idx] && daten[idx].legacyKey) geaenderteKarten[daten[idx].legacyKey] = true;
+  var n = Object.keys(geaenderteKarten).length;
+  var b = document.getElementById('saveBanner');
+  b.style.display = 'block';
+  b.textContent = '💾 ' + n + ' Produkt' + (n === 1 ? '' : 'e') + ' mit ungespeicherten Änderungen — in der Karte speichern' + (quelle === 'upload' ? ' (aus Datei geladen: Speichern gesperrt, nur ⬇ Datei)' : '');
+  status(daten.length + ' Produkte · ' + n + ' ungespeichert', 'err');
+  if (karteIdx === idx) zeigeKartenKnoepfe();
+}
+function oeffneErsteGeaenderte() {
+  var keys = Object.keys(geaenderteKarten);
+  if (!keys.length) return;
+  var idx = daten.findIndex(function (p) { return p.legacyKey === keys[0]; });
+  if (idx !== -1) oeffneKarte(idx);
 }
 
 // ── Laden: Datenbank (seit 05.10.2026 der einzige automatische Weg) ────
@@ -431,6 +489,12 @@ async function ladeVonFirestore() {
     status('Lade aus der Datenbank …');
     if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
     var e = await window.BOS_PRODUKTE.lade({ sicht: 'alle', nurServer: true, frisch: true });
+    var roh = await window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true });   /* dieselbe Abfrage, kein zweiter Lesevorgang */
+    serverRoh = {};
+    roh.liste.forEach(function (d) { serverRoh[d.id] = d.daten; });
+    geladenerStand = (typeof e.standNummer === 'number') ? e.standNummer : null;
+    quelle = 'db';
+    geaenderteKarten = {};
     var arr = [], gel = {};
     e.liste.forEach(function (p) {
       if (p.geloescht === true) { if (p.legacyKey) gel[p.legacyKey] = true; return; }
@@ -444,6 +508,7 @@ async function ladeVonFirestore() {
     document.getElementById('saveBanner').style.display = 'none';
     render();
     var warn = (e.warnungen && e.warnungen.length) ? ' · ⚠ ' + e.warnungen.join(' ') : '';
+    ladeNotfallZeile();
     status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + warn, warn ? 'err' : 'ok');
   } catch (err) {
     console.error('[Produkt-Config] Laden:', err);
@@ -460,7 +525,8 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
     try {
       daten = JSON.parse(ev.target.result);
       geloeschteSchluessel = {};
-      document.getElementById('quelleName').textContent = file.name + ' (Upload)';
+      quelle = 'upload'; serverRoh = {}; geladenerStand = null; geaenderteKarten = {};   /* Stufe 2: aus Datei nur ansehen, nie speichern */
+      document.getElementById('quelleName').textContent = file.name + ' (Upload — nur ansehen, Speichern gesperrt)';
       geaendert = false;
       document.getElementById('saveBanner').style.display = 'none';
       render();
@@ -494,7 +560,7 @@ function downloadJSON() {
   URL.revokeObjectURL(url);
   geaendert = false;
   document.getElementById('saveBanner').style.display = 'none';
-  status('✓ ' + daten.length + ' Produkte als Datei gespeichert — jetzt im Sync-Tool einspielen, Kopie in die private Cloud', 'ok');
+  status('✓ ' + daten.length + ' Produkte als Datei gespeichert (Arbeitsliste, mit ungespeicherten Änderungen). Für die Notfall-Kopie den Knopf oben nehmen — der zieht den Serverstand und vermerkt die Kopie.', 'ok');
   // NEU 28.09.2026 (Teil B): Doppelte Schlüssel nicht still mit herausgeben.
   // Kein Abbruch (die Datei soll zum Reparieren herunterladbar bleiben),
   // aber die Statuszeile sagt es — der Sync lehnt so eine Datei ohnehin ab.
@@ -504,10 +570,9 @@ function downloadJSON() {
   }
 }
 
-// Stufe 1 (05.10.2026): noch KEIN Schreibpfad nach Firestore hier. Änderungen
-// landen in der heruntergeladenen Datei, Übernahme über produkt_config_sync.html
-// (Import mit Vorschau, Stand-Zettel). Stufe 2 (eigener Auftrag): Speichern
-// direkt hier, mit Sicherung der Vorversion im selben Batch.
+// Stufe 2 (06.10.2026): Speichern direkt hier (speichereKarte), je Produkt eine
+// Batch mit Sicherung der Vorversion. Der Download bleibt nur als Datei der
+// Arbeitsliste; die Notfall-Kopie zieht notfallKopie() vom Server.
 
 // ── Gemeinsame Optionslisten (früher pro Tabellenzeile neu gebaut, jetzt
 //    einmal auf Modulebene, weil die Karte immer nur EIN Produkt zeigt) ──
@@ -674,7 +739,7 @@ function kfTeig(wert) {
 }
 function aendereAusTeig(idx, wert) {
   if (wert) daten[idx].ausTeig = wert; else delete daten[idx].ausTeig;
-  markiereGeaendert();
+  markiereGeaendert(idx);
 }
 
 function kfCheckbox(feld, label, wert) {
@@ -736,6 +801,12 @@ var KARTEN_TABS = [
         '<div class="detail-section full">' + kfCheckbox('nfcSeite', 'Auf Produktionsplaner anzeigen', p.nfcSeite) + '</div>'
       );
     }
+  },
+  {
+    id: 'versionen', label: 'Vorversionen',
+    render: function (p) {
+      return '<div class="detail-section full"><div id="versionenListe" style="font-size:.82rem">Lade Vorversionen …</div></div>';
+    }
   }
 ];
 
@@ -781,11 +852,23 @@ function renderKarte() {
 
   var aktivesTab = KARTEN_TABS.filter(function (t) { return t.id === karteAktiverTab; })[0] || KARTEN_TABS[0];
   document.getElementById('karteBody').innerHTML = aktivesTab.render(p);
+  zeigeKartenKnoepfe();
+  if (karteAktiverTab === 'versionen') ladeVersionen(p.legacyKey);
+}
+function zeigeKartenKnoepfe() {
+  var p = daten[karteIdx]; if (!p) return;
+  var dirty = !!geaenderteKarten[p.legacyKey];
+  var neu = !serverRoh[p.legacyKey];
+  var sp = document.getElementById('karteSpeichernBtn'), lo = document.getElementById('karteLoeschenBtn'), hw = document.getElementById('karteSpeicherHinweis');
+  sp.disabled = quelle !== 'db' || !dirty;
+  lo.disabled = quelle !== 'db';
+  hw.textContent = quelle !== 'db' ? 'Aus Datei geladen — Speichern gesperrt (Sync-Tool).' : (neu ? 'Noch nicht in der Datenbank — Speichern legt es an.' : (dirty ? 'Geändert, noch nicht gespeichert.' : 'Gespeicherter Stand.'));
+  document.getElementById('karteKonflikt').classList.add('hidden');
 }
 
 function aendere(idx, feld, wert) {
   daten[idx][feld] = wert;
-  markiereGeaendert();
+  markiereGeaendert(idx);
 }
 
 function slugify(name) {
@@ -867,7 +950,7 @@ function neuesProdukt() {
     nfcSeite: false
   };
   daten.push(neu);
-  markiereGeaendert();
+  markiereGeaendert(daten.length - 1);
   aktiveKat = kat;
   document.getElementById('suchfeld').value = '';
   karteAktiverTab = 'stamm';
@@ -879,11 +962,234 @@ function neuesProdukt() {
 
 function loescheProdukt(idx) {
   var p = daten[idx];
-  if (!confirm('„' + p.name + '" wirklich löschen?')) return;
+  if (quelle !== 'db') { status('⚠ Aus Datei geladen — löschen nur nach ↻ Neu laden aus der Datenbank', 'err'); return; }
+  if (!serverRoh[p.legacyKey]) {
+    /* noch nie gespeichert: nur lokal entfernen, der Schlüssel war nie vergeben */
+    if (!confirm('„' + p.name + '" ist noch nicht gespeichert — verwerfen?')) return;
+    delete geaenderteKarten[p.legacyKey];
+    daten.splice(idx, 1);
+    if (karteIdx === idx) { document.getElementById('karteOverlay').classList.add('hidden'); karteIdx = null; }
+    markiereGeaendert(); render(); return;
+  }
+  if (!confirm('„' + p.name + '" wirklich löschen?\n\nDas Produkt wird in der Datenbank als gelöscht markiert (Sicherung bleibt, Schlüssel bleibt gesperrt).')) return;
   if (p.legacyKey) geloeschteSchluessel[p.legacyKey] = true; // NEU 28.09.2026 (Teil B)
-  daten.splice(idx, 1);
-  markiereGeaendert();
-  render();
+  speichereKarte(idx, 'archivieren');
+}
+
+// ═══════════════════════════════════════
+// Stufe 2 (06.10.2026): Speichern, Konflikt, Vorversionen, Notfall-Kopie
+// ═══════════════════════════════════════
+function ohneDbFelder(p) {
+  var o = {};
+  Object.keys(p || {}).forEach(function (k) { if (DB_FELDER.indexOf(k) === -1) o[k] = p[k]; });
+  return o;
+}
+/* reine Logik, geprüft in pruefe_editor_schluessel.js */
+function naechsteReihenfolge(rohMap) {
+  var max = -1;
+  Object.keys(rohMap || {}).forEach(function (k) { var r = rohMap[k] && rohMap[k].reihenfolge; if (typeof r === 'number' && r > max) max = r; });
+  return max + 1;
+}
+function kennungJetzt() {
+  var n = firebase.auth().currentUser;
+  return n && n.email ? n.email.split('@')[0] : null;
+}
+function fehlerText(err) { return window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(err) : ((err && err.message) || String(err)); }
+
+/* Ein Produkt speichern — EINE Batch: Sicherung (vorher = rohes Serverdokument), Produkt, Stand + 1.
+   aktion: null (= 'aendern' / 'anlegen' automatisch), 'archivieren', 'wiederherstellen'. */
+async function speichereKarte(idx, aktion) {
+  var p = daten[idx]; if (!p) return;
+  var key = p.legacyKey;
+  if (quelle !== 'db') { status('⚠ Aus Datei geladen — Speichern gesperrt. ↻ Neu laden aus der Datenbank.', 'err'); return; }
+  if (!window.BOS_PRODUKTE || !window.db || !window.firebase) { status('⚠ Datenbank nicht geladen (bos_firebase_config.js / bos_produkte.js fehlt?)', 'err'); return; }
+  var kennung = kennungJetzt();
+  if (!kennung) { status('⚠ Keine Kennung — bist du angemeldet?', 'err'); return; }
+  var roh = serverRoh[key] || null;
+  if (!aktion) aktion = roh ? 'aendern' : 'anlegen';
+  var btn = document.getElementById('karteSpeichernBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Speichere …'; }
+  var fertig = function () { if (btn) btn.textContent = '💾 Speichern'; zeigeKartenKnoepfe(); };
+  try {
+    await window.BOS_AUTH_READY;
+    var standRef = db.collection(STAND_COLLECTION).doc(STAND_DOK);
+    /* Vorab-Vergleich: nur für die Meldung — die Regel lehnt sonst ab (nummer = geladen + 1). */
+    var standSnap = await standRef.get({ source: 'server' });
+    var serverStand = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : null;
+    if (serverStand !== geladenerStand) { zeigeKonflikt(idx, serverStand); fertig(); return; }
+
+    var sichRef = db.collection(SICH_COLLECTION).doc();
+    var wirdGeloescht = aktion === 'archivieren' || (aktion === 'wiederherstellen' && p.__geloescht === true);
+    delete p.__geloescht;
+    var inhalt = ohneDbFelder(p);
+    inhalt.reihenfolge = roh && typeof roh.reihenfolge === 'number' ? roh.reihenfolge : naechsteReihenfolge(serverRoh);
+    inhalt.sicherungId = sichRef.id;
+    if (wirdGeloescht) inhalt.geloescht = true;
+    var ts = firebase.firestore.FieldValue.serverTimestamp();
+    var neuerStand = (geladenerStand === null ? 0 : geladenerStand) + 1;
+    var batch = db.batch();
+    batch.set(sichRef, { collection: COLLECTION, dokId: key, aktion: aktion, vorher: roh, konto: kennung, ts: ts });
+    batch.set(db.collection(COLLECTION).doc(key), inhalt);
+    var standDaten = { nummer: neuerStand, geaendertAm: ts, geaendertVon: kennung };
+    if (standSnap.exists) batch.update(standRef, standDaten); else batch.set(standRef, standDaten);
+    await batch.commit();
+
+    serverRoh[key] = inhalt;
+    geladenerStand = neuerStand;
+    delete geaenderteKarten[key];
+    if (inhalt.geloescht === true) {
+      dbGeloeschteSchluessel[key] = true;
+      daten.splice(idx, 1);
+      document.getElementById('karteOverlay').classList.add('hidden'); karteIdx = null;
+      status('✓ „' + (p.name || key) + '“ als gelöscht markiert (Sicherung angelegt, Stand ' + neuerStand + ')', 'ok');
+    } else {
+      status('✓ „' + (p.name || key) + '“ gespeichert' + (aktion === 'anlegen' ? ' (neu)' : aktion === 'wiederherstellen' ? ' (zurückgeholt)' : '') + ' · Sicherung angelegt · Stand ' + neuerStand, 'ok');
+    }
+    document.getElementById('quelleName').textContent = 'Datenbank (Stand-Zettel Nr. ' + neuerStand + ')';
+    var n = Object.keys(geaenderteKarten).length;
+    document.getElementById('saveBanner').style.display = n ? 'block' : 'none';
+    if (n) markiereGeaendert();
+    render(); fertig();
+    ladeNotfallZeile();
+  } catch (err) {
+    console.error('[Produkt-Config] Speichern:', err);
+    await erklaereAblehnung(idx, err);
+    fertig();
+  }
+}
+/* Nach einer Ablehnung: Konflikt? Regel alt? Rolle? — mit echter Meldung. */
+async function erklaereAblehnung(idx, err) {
+  var code = (err && err.code) || '';
+  if (code !== 'permission-denied') { status('⚠ Speichern fehlgeschlagen: ' + fehlerText(err), 'err'); return; }
+  try {
+    var snap = await db.collection(STAND_COLLECTION).doc(STAND_DOK).get({ source: 'server' });
+    var serverStand = snap.exists && typeof snap.data().nummer === 'number' ? snap.data().nummer : null;
+    if (serverStand !== geladenerStand) { zeigeKonflikt(idx, serverStand); return; }
+  } catch (e2) { /* weiter unten */ }
+  try {
+    await db.collection('bos_regelstand').doc(REGEL_FASSUNG_EDITOR).get({ source: 'server' });
+  } catch (e3) {
+    if (e3 && e3.code === 'permission-denied') {
+      status('⚠ Die Firestore-Regeln sind älter als diese Seite. In der Firebase-Konsole ' + REGEL_DATEI_EDITOR + ' einsetzen (Fassung ' + REGEL_FASSUNG_EDITOR + '). Original: ' + fehlerText(err), 'err');
+      return;
+    }
+  }
+  status('⚠ Keine Berechtigung — Konto ohne Rolle admin? Oder die Sicherung passt nicht zum Serverstand (vorher ≠ Datenbank): ↻ Neu laden. Original: ' + fehlerText(err), 'err');
+}
+function zeigeKonflikt(idx, serverStand) {
+  var box = document.getElementById('karteKonflikt');
+  document.getElementById('karteKonfliktText').textContent = 'Jemand hat inzwischen gespeichert (Stand ' + (serverStand === null ? '–' : serverStand) + ', geladen war ' + (geladenerStand === null ? '–' : geladenerStand) + '). Nichts wurde geschrieben. Neu laden, dann noch einmal ändern — oder:';
+  box.classList.remove('hidden');
+  status('⚠ Konflikt: Stand ' + serverStand + ' auf dem Server, geladen war ' + geladenerStand, 'err');
+}
+/* Ulf 06.10. (S4): neu laden; ist das Produkt auf dem Server unverändert, bleiben die eingetippten Felder. */
+async function neuLadenBehalten(idx) {
+  var p = daten[idx]; if (!p) return;
+  var key = p.legacyKey;
+  var behalten = JSON.parse(JSON.stringify(p));
+  var altRoh = serverRoh[key] ? JSON.stringify(sortiert(serverRoh[key])) : null;
+  await ladeVonFirestore();
+  var neuRoh = serverRoh[key] ? JSON.stringify(sortiert(serverRoh[key])) : null;
+  var neuIdx = daten.findIndex(function (x) { return x.legacyKey === key; });
+  if (altRoh === neuRoh && (neuIdx !== -1 || altRoh === null)) {
+    if (neuIdx === -1) { daten.push(behalten); neuIdx = daten.length - 1; } else { daten[neuIdx] = behalten; }
+    markiereGeaendert(neuIdx);
+    oeffneKarte(neuIdx);
+    status('✓ Neu geladen (Stand ' + geladenerStand + '), deine Änderung an „' + (behalten.name || key) + '“ ist noch in der Karte — jetzt speichern', 'ok');
+  } else {
+    if (neuIdx !== -1) oeffneKarte(neuIdx);
+    status('⚠ „' + (behalten.name || key) + '“ wurde inzwischen auf dem Server geändert — die Karte zeigt den Serverstand, deine Eingaben sind verworfen. Bitte vergleichen und erneut ändern.', 'err');
+  }
+}
+function sortiert(o) { var r = {}; Object.keys(o).sort().forEach(function (k) { r[k] = o[k]; }); return r; }
+
+/* Vorversionen eines Produkts: Gleichheitsabfrage ohne orderBy (kein Index nötig), Sortierung im Browser. */
+async function ladeVersionen(key) {
+  var el = document.getElementById('versionenListe'); if (!el) return;
+  if (quelle !== 'db') { el.textContent = 'Aus Datei geladen — Vorversionen gibt es nur aus der Datenbank.'; return; }
+  try {
+    var snap = await db.collection(SICH_COLLECTION).where('dokId', '==', key).get({ source: 'server' });
+    var liste = [];
+    snap.forEach(function (d) { var x = d.data(); liste.push({ id: d.id, ms: x.ts && x.ts.toMillis ? x.ts.toMillis() : 0, konto: x.konto, aktion: x.aktion, vorher: x.vorher }); });
+    liste.sort(function (a, b) { return b.ms - a.ms; });
+    if (!liste.length) { el.textContent = 'Noch keine Sicherung für dieses Produkt (entsteht beim ersten Speichern).'; return; }
+    el.innerHTML = '';
+    liste.forEach(function (v) {
+      var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--border)';
+      var t = document.createElement('span');
+      var d = new Date(v.ms); var pad = function (n) { return String(n).padStart(2, '0'); };
+      t.textContent = pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' Uhr · ' + v.konto + ' · ' + v.aktion + (v.vorher ? ' · vorher: „' + (v.vorher.name || key) + '“' + (v.vorher.geloescht ? ' (gelöscht)' : '') : ' · (kein Vorstand)');
+      row.appendChild(t);
+      if (v.vorher) {
+        var b = document.createElement('button'); b.className = 'btn btn-outline'; b.style.cssText = 'padding:4px 10px;font-size:.75rem';
+        b.textContent = 'Diesen Stand zurückholen';
+        b.onclick = function () { zurueckholen(key, v); };
+        row.appendChild(b);
+      }
+      el.appendChild(row);
+    });
+  } catch (err) {
+    console.error('[Produkt-Config] Vorversionen:', err);
+    el.textContent = '⚠ Vorversionen nicht lesbar: ' + fehlerText(err);
+  }
+}
+/* Zurückholen = Speichern mit aktion 'wiederherstellen': Karte = vorher (ohne Datenbank-Felder),
+   reihenfolge bleibt die aktuelle, geloescht kommt aus vorher. */
+function zurueckholen(key, v) {
+  var idx = daten.findIndex(function (x) { return x.legacyKey === key; });
+  if (idx === -1) { status('⚠ Produkt nicht in der Liste', 'err'); return; }
+  if (!confirm('Stand vom ' + new Date(v.ms).toLocaleString('de-DE') + ' („' + (v.vorher.name || key) + '“) zurückholen?\n\nDie jetzige Fassung wird vorher gesichert.')) return;
+  var neu = ohneDbFelder(v.vorher);
+  neu.legacyKey = key;
+  if (v.vorher.geloescht === true) neu.__geloescht = true;
+  daten[idx] = neu;
+  geaenderteKarten[key] = true;
+  speichereKarte(idx, 'wiederherstellen');
+}
+
+/* Erinnerung an die Notfall-Kopie (reine Logik wie im Sync-Tool, geprüft in pruefe_erinnerung.js). */
+function erinnerungsText(letzter, jetztStand, jetztMs) {
+  if (!letzter) return { text: 'Noch keine Notfall-Kopie vermerkt — jetzt herunterladen.', warnen: true };
+  var gleich = letzter.stand === jetztStand;
+  var tage = Math.floor((jetztMs - letzter.zeitMs) / 86400000);
+  var staende = (typeof jetztStand === 'number' ? jetztStand : 0) - letzter.stand;
+  var warnen = !gleich && (tage >= ERINNERUNG_TAGE || staende > ERINNERUNG_STAENDE);
+  var d = new Date(letzter.zeitMs); var pad = function (n) { return String(n).padStart(2, '0'); };
+  var wann = pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear();
+  var text = 'Notfall-Kopie: Stand ' + letzter.stand + ' vom ' + wann + ' · jetzt Stand ' + jetztStand +
+    (gleich ? ' — aktuell.' : (warnen ? ' — bitte neue Kopie herunterladen (' + staende + ' Änderung(en), ' + tage + ' Tage).' : ' (' + staende + ' Änderung(en) seit der Kopie).'));
+  return { text: text, warnen: warnen };
+}
+async function ladeNotfallZeile() {
+  var zeile = document.getElementById('notfallZeile'), txt = document.getElementById('notfallText');
+  if (!zeile || quelle !== 'db' || !window.db) return;
+  try {
+    var snap = await db.collection(SICH_COLLECTION).where('aktion', '==', 'export').get({ source: 'server' });
+    var letzter = null;
+    snap.forEach(function (d) { var x = d.data(); var ms = x.ts && x.ts.toMillis ? x.ts.toMillis() : 0; if (!letzter || ms > letzter.zeitMs) letzter = { stand: (x.vorher && x.vorher.stand) || 0, zeitMs: ms }; });
+    var e = erinnerungsText(letzter, geladenerStand, Date.now());
+    txt.textContent = e.text; txt.style.color = e.warnen ? 'var(--amber)' : 'var(--dim)';
+    zeile.classList.remove('hidden');
+  } catch (err) {
+    console.error('[Produkt-Config] Erinnerung:', err);
+    txt.textContent = 'Erinnerung nicht lesbar: ' + fehlerText(err); txt.style.color = 'var(--red)'; zeile.classList.remove('hidden');
+  }
+}
+/* Notfall-Kopie: immer vom Server (nie die Arbeitsliste mit ungespeicherten Änderungen), dann Vermerk. */
+async function notfallKopie() {
+  try {
+    status('Lade Stand vom Server …');
+    var e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive', nurServer: true, frisch: true });
+    var blob = new Blob([JSON.stringify(e.liste, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'produkt_config.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    await db.collection(SICH_COLLECTION).add({ collection: COLLECTION, dokId: '*', aktion: 'export', vorher: { stand: (typeof e.standNummer === 'number') ? e.standNummer : 0 }, konto: kennungJetzt(), ts: firebase.firestore.FieldValue.serverTimestamp() });
+    status('✓ Notfall-Kopie (' + e.liste.length + ' Produkte, Stand ' + e.standNummer + ') heruntergeladen und vermerkt — in die private Cloud legen', 'ok');
+    ladeNotfallZeile();
+  } catch (err) {
+    console.error('[Produkt-Config] Notfall-Kopie:', err);
+    status('⚠ Notfall-Kopie: ' + fehlerText(err), 'err');
+  }
 }
 
 function esc(s) {
@@ -910,15 +1216,15 @@ var helpData = {
     },
     {
       heading: "Woher kommen die Daten?",
-      text: "Automatisch aus der Datenbank, immer frisch vom Server. Dieselbe Liste lesen alle anderen Seiten (Teigecke, Froster, Produktionsplaner, Schnellrechner, Verbrauch). Klappt das Laden nicht, steht der Grund in der Statuszeile; eine Notfall-Kopie (Datei) kannst du von Hand hochladen."
+      text: "Aus der Datenbank, immer frisch vom Server. Dieselbe Liste lesen alle anderen Seiten (Teigecke, Froster, Produktionsplaner, Schnellrechner, Verbrauch). Klappt das Laden nicht, steht der Grund in der Statuszeile; eine Notfall-Kopie (Datei) kannst du von Hand hochladen."
     },
     {
       heading: "Was passiert mit meinen Änderungen?",
-      text: "Erstmal bleibt alles nur in diesem Browser-Fenster. Mit ⬇ Datei entsteht eine produkt_config.json mit deinen Änderungen. Die spielst du im Sync-Tool ein — ab dann sehen alle Seiten die neue Liste. Direkt speichern aus dieser Seite heraus kommt in einem späteren Schritt (Stufe 2)."
+      text: "Jede Karte hat einen Knopf 💾 Speichern. Damit landet genau dieses Produkt in der Datenbank — vorher wird die alte Fassung automatisch gesichert. Alle anderen Seiten sehen die Änderung beim nächsten Öffnen. Was du nicht speicherst, bleibt nur in diesem Fenster (Banner unten)."
     },
     {
-      heading: "Was mache ich mit der heruntergeladenen Datei?",
-      text: "Im Sync-Tool einspielen (Vorschau lesen, dann bestätigen). Dieselbe Datei ist gleichzeitig deine Notfall-Kopie: in der privaten Cloud ablegen, nicht im Repo. Ein Produkt löschen: hier löschen, Datei herunterladen, im Sync-Tool einspielen und dort den Haken „nur in der Datenbank → als gelöscht markieren“ setzen. Der Schlüssel eines gelöschten Produkts wird nie neu vergeben."
+      heading: "Was ist die Notfall-Kopie?",
+      text: "Die ganze Produktliste als Datei in deiner privaten Cloud, nicht im Repo. Die Zeile oben sagt, von welchem Stand die letzte Kopie ist, und wird bernsteinfarben, wenn seit der Kopie etwas geändert wurde und sie älter als 30 Tage ist oder mehr als fünf Änderungen zurückliegt. Der Knopf daneben zieht den Serverstand und merkt sich die Kopie. ⬇ Datei dagegen speichert nur deine Arbeitsliste (auch ungespeicherte Änderungen)."
     },
     {
       heading: "Wichtig zu wissen",
@@ -931,6 +1237,18 @@ var helpData = {
     {
       heading: "Was ist der Unterschied zwischen „Station\u201c und „Auf Produktionsplaner anzeigen\u201c?",
       text: "„Station\u201c legt fest, wo ein Produkt grundsätzlich dazugehört. „Auf Produktionsplaner anzeigen\u201c (nfcSeite, Einstellungen-Tab der Karte) ist ein zusätzlicher, bewusst getrennter Schalter: nicht jedes Produkt einer Station soll auch in der wöchentlichen Planung auftauchen — z. B. Ware, die tagesaktuell produziert wird und keine Wochenplanung braucht. Ein Produkt kann also eine Station haben, ohne hier angehakt zu sein."
+    },
+    {
+      heading: "Was sind Vorversionen?",
+      text: "Jede Karte hat den Reiter Vorversionen: alle gesicherten Stände dieses Produkts (Zeit, Konto, was passiert ist). „Diesen Stand zurückholen“ macht den alten Stand wieder zum aktuellen — und sichert vorher die jetzige Fassung, du verlierst also nichts."
+    },
+    {
+      heading: "Was heißt „Jemand hat inzwischen gespeichert“?",
+      text: "Zwischen deinem Laden und deinem Speichern hat jemand (oder du an einem anderen Gerät) etwas gespeichert. Dann schreibt die Seite nichts, damit nichts überschrieben wird. „Neu laden und diese Änderung behalten“ holt den neuen Stand und lässt deine Eingaben in der Karte stehen, wenn genau dieses Produkt unverändert ist."
+    },
+    {
+      heading: "Was passiert beim Löschen?",
+      text: "Ein Produkt wird nie wirklich entfernt — es wird als gelöscht markiert, verschwindet aus der Liste, und sein Schlüssel bleibt gesperrt (an ihm hängen Verbrauchs- und Froster-Daten). Zurückholen geht über das Sync-Tool: dort die Sammel-Sicherung von vor dem Löschen als Datei herunterladen und wieder einspielen."
     },
     {
       heading: "Was bedeutet „Aus Teig“?",

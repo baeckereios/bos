@@ -3,6 +3,15 @@
 <!--
   MODUL: produkt_config/produkt_config_sync.html — Produkt-Config Sync
   CHANGELOG
+    2026-10-06 · 08:58 · v-sicherung-1 · Stufe 2 (SESSION_2026-10-06_PRODUKTE_AUS_FIRESTORE_STUFE2.md)
+      Import schreibt EINE Sammel-Sicherung (produkte_sicherungen, aktion
+      'einspielen', dokId '*', vorher = Liste aller rohen Serverstände) im selben
+      Batch; alle Produkte und Löschmarken tragen deren sicherungId (Regel
+      produktGesichert, KC SP1). Export schreibt eine 'export'-Sicherung
+      ({ stand: N }) — Grundlage der Erinnerung an die Notfall-Kopie (Ulf: nach
+      Änderungen, 30 Tage Untergrenze). Neu: „Letzte Sammel-Sicherungen“ mit
+      Download als produkt_config.json (Rückweg nach einem falschen Einspielen,
+      Ulf 08:05). Vorschau ignoriert jetzt auch sicherungId. Erinnerungszeile oben.
     2026-10-05 · 08:41 · v-stand-1 · Umbau (Produkte aus Firestore, Stufe 1)
       SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md (Freigabe Kontroll-Chat 08:18 Uhr, von Ulf weitergegeben).
       Die Seite ist jetzt NOTFALL-WERKZEUG: Alle Seiten lesen aus Firestore
@@ -182,8 +191,19 @@
         Reihenfolge wie auf den Seiten, gelöschte Produkte fehlen, die Felder <code>reihenfolge</code> und
         <code>geloescht</code> stehen nicht in der Datei.
       </p>
+      <div id="notfallZeile" class="status" style="margin-bottom:8px"></div>
       <button id="exportBtn">Aus der Datenbank laden &amp; herunterladen</button>
       <div id="exportStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>🗄 Letzte Sammel-Sicherungen</h2>
+      <p class="desc">
+        Vor jedem Einspielen sichert die Seite den ganzen Stand der Datenbank als Sammel-Sicherung.
+        Rückweg nach einem falschen Einspielen: die passende Sicherung als <code>produkt_config.json</code>
+        herunterladen und oben wieder einspielen (Vorschau lesen).
+      </p>
+      <div id="sammelListe" class="status">Lade …</div>
     </div>
 
   </main>
@@ -233,7 +253,7 @@ var helpData = {
     },
     {
       heading: "Wichtig zu wissen",
-      text: "Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind."
+      text: "Vor jedem Einspielen sichert die Seite den ganzen bisherigen Stand als Sammel-Sicherung (unten, als Datei herunterladbar) — das ist der Rückweg. Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind."
     }
   ]
 };
@@ -279,6 +299,8 @@ var STAND_COLLECTION = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.STAND_COLLECTIO
 var STAND_DOK = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.STAND_DOK : 'aktuell';
 var importedData = null;
 var vorschau = null;
+var vorschauRoh = null;   /* rohe Serverstände der Vorschau — werden zur Sammel-Sicherung (Stufe 2) */
+var SICH_COLLECTION = 'produkte_sicherungen';
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function fehlerText(err) {
@@ -289,7 +311,7 @@ function fehlerText(err) {
    Feldweise, unabhängig von der Reihenfolge der Felder (K6). Die Felder
    reihenfolge und geloescht gehören der Datenbank, nicht der Datei (K7),
    und werden nicht verglichen. */
-var VERGLEICH_AUSGENOMMEN = ['reihenfolge', 'geloescht'];
+var VERGLEICH_AUSGENOMMEN = ['reihenfolge', 'geloescht', 'sicherungId'];   /* Stufe 2: + sicherungId */
 function inhaltOhne(p) {
   var o = {};
   Object.keys(p || {}).forEach(function (k) { if (VERGLEICH_AUSGENOMMEN.indexOf(k) === -1) o[k] = p[k]; });
@@ -400,6 +422,7 @@ document.getElementById('importBtn').onclick = function () {
   /* immer frisch und nur vom Server — eine Vorschau gegen eine Gerätekopie wäre eine Lüge (F4) */
   window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true, frisch: true }).then(function (e) {
     vorschau = vergleicheImport(importedData, e.liste);
+    vorschauRoh = e.liste.map(function (d) { return d.daten; });
     document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
     document.getElementById('importLoeschRow').classList.toggle('hidden', !vorschau.nurDb.length);
     document.getElementById('importLoeschHaken').checked = false;
@@ -409,6 +432,7 @@ document.getElementById('importBtn').onclick = function () {
     if (err && err.art === 'leer') {
       /* Leere Datenbank: alles in der Datei ist neu. Das ist beim ersten Einspielen der Normalfall. */
       vorschau = vergleicheImport(importedData, []);
+      vorschauRoh = [];
       document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
       document.getElementById('importLoeschRow').classList.add('hidden');
       setzeStatus(statusEl, 'Die Datenbank ist leer — alle Produkte der Datei sind neu.');
@@ -445,18 +469,25 @@ document.getElementById('importConfirmBtn').onclick = function () {
     var neu = alt + 1;
     var ts = firebase.firestore.FieldValue.serverTimestamp();
     var batch = db.batch();
+    /* Stufe 2: EINE Sammel-Sicherung je Einspielen (aktion 'einspielen', dokId '*',
+       vorher = alle rohen Serverstände). Jedes Produkt und jede Löschmarke trägt
+       ihre sicherungId — die Regel (produktGesichert) verlangt sie, auch beim
+       update (KC SP1). Fünf Pfade je Batch, siehe Bauplan §1.1. */
+    var sichRef = db.collection(SICH_COLLECTION).doc();
+    batch.set(sichRef, { collection: COLLECTION, dokId: '*', aktion: 'einspielen', vorher: vorschauRoh || [], konto: kennung, ts: ts });
     importedData.forEach(function (p, i) {
-      batch.set(col.doc(p.legacyKey), Object.assign(inhaltOhne(p), { reihenfolge: i }));
+      batch.set(col.doc(p.legacyKey), Object.assign(inhaltOhne(p), { reihenfolge: i, sicherungId: sichRef.id }));
     });
     if (loeschen) {
-      vorschau.nurDb.forEach(function (x) { batch.update(col.doc(x.key), { geloescht: true }); });
+      vorschau.nurDb.forEach(function (x) { batch.update(col.doc(x.key), { geloescht: true, sicherungId: sichRef.id }); });
     }
     var standDaten = { nummer: neu, geaendertAm: ts, geaendertVon: kennung };
     if (standSnap.exists) batch.update(standRef, standDaten); else batch.set(standRef, standDaten);
     return batch.commit().then(function () {
       setzeStatus(statusEl, '✓ ' + importedData.length + ' Produkte geschrieben' +
         (loeschen ? ', ' + vorschau.nurDb.length + ' als gelöscht markiert' : '') +
-        '. Stand-Zettel jetzt Nummer ' + neu + ' — die Seiten holen die Liste beim nächsten Öffnen neu.', 'ok');
+        '. Sammel-Sicherung angelegt. Stand-Zettel jetzt Nummer ' + neu + ' — die Seiten holen die Liste beim nächsten Öffnen neu.', 'ok');
+      ladeSammelSicherungen(); ladeNotfallZeile();
       document.getElementById('importConfirmRow').classList.add('hidden');
       document.getElementById('importLoeschRow').classList.add('hidden');
       vorschau = null;
@@ -466,7 +497,7 @@ document.getElementById('importConfirmBtn').onclick = function () {
     console.error('[Produkt-Config Sync] Schreiben:', err);
     var code = (err && err.code) || '';
     setzeStatus(statusEl, '✗ ' + (code === 'permission-denied'
-      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel kennt den Stand-Zettel noch nicht (firestore_regeln_2026-10-05_produkte_stand.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
+      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel kennt Stand-Zettel oder Sammel-Sicherung noch nicht (einzusetzen: firestore_regeln_2026-10-06_produkte_sicherung.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
       : '') + fehlerText(err), 'err');
     zurueck();
   });
@@ -494,11 +525,95 @@ document.getElementById('exportBtn').onclick = function () {
     URL.revokeObjectURL(url);
     setzeStatus(statusEl, '✓ ' + arr.length + ' Produkte heruntergeladen (Stand-Zettel ' +
       (e.standNummer === null ? 'noch nicht angelegt' : 'Nummer ' + e.standNummer) + '). Notfall-Kopie in der privaten Cloud ablegen.', 'ok');
+    /* Stufe 2: merken, bei welchem Stand die Kopie gezogen wurde (Erinnerung). */
+    return schreibeExportSicherung(e.standNummer).then(ladeNotfallZeile).catch(function (err) {
+      console.error('[Produkt-Config Sync] Export-Sicherung:', err);
+      setzeStatus(statusEl, '✓ Datei heruntergeladen, aber der Export-Vermerk ließ sich nicht speichern: ' + fehlerText(err), 'err');
+    });
   }).catch(function (err) {
     console.error('[Produkt-Config Sync] Export:', err);
     setzeStatus(statusEl, '✗ ' + fehlerText(err), 'err');
   });
 };
+
+// ==========================================================================
+// Stufe 2: Export-Vermerk, Erinnerung, Sammel-Sicherungen
+// ==========================================================================
+var ERINNERUNG_TAGE = 30;      /* Ulf 06.10.: nach Änderungen, 30 Tage Untergrenze */
+var ERINNERUNG_STAENDE = 5;
+
+function schreibeExportSicherung(standNummer) {
+  var nutzer = firebase.auth().currentUser;
+  var kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+  if (!kennung) return Promise.reject(new Error('Keine Kennung — bist du angemeldet?'));
+  return db.collection(SICH_COLLECTION).add({
+    collection: COLLECTION, dokId: '*', aktion: 'export',
+    vorher: { stand: (typeof standNummer === 'number') ? standNummer : 0 },
+    konto: kennung, ts: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+function zeitText(ms) {
+  var d = new Date(ms); var p = function (n) { return String(n).padStart(2, '0'); };
+  return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() + ', ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ' Uhr';
+}
+function tsMs(ts) { return ts && typeof ts.toMillis === 'function' ? ts.toMillis() : 0; }
+
+/* Erinnerung (reine Logik, geprüft in pruefe_erinnerung.js):
+   letzterExport { stand, zeitMs } | null; jetztStand; jetztMs → { text, warnen } */
+function erinnerungsText(letzter, jetztStand, jetztMs) {
+  if (!letzter) return { text: 'Noch keine Notfall-Kopie vermerkt — jetzt herunterladen.', warnen: true };
+  var gleich = letzter.stand === jetztStand;
+  var tage = Math.floor((jetztMs - letzter.zeitMs) / 86400000);
+  var staende = (typeof jetztStand === 'number' ? jetztStand : 0) - letzter.stand;
+  var warnen = !gleich && (tage >= ERINNERUNG_TAGE || staende > ERINNERUNG_STAENDE);
+  var text = 'Notfall-Kopie: Stand ' + letzter.stand + ' vom ' + zeitText(letzter.zeitMs) + ' · jetzt Stand ' + jetztStand +
+    (gleich ? ' — aktuell.' : (warnen ? ' — bitte neue Kopie herunterladen (' + staende + ' Änderung(en), ' + tage + ' Tage).' : ' (' + staende + ' Änderung(en) seit der Kopie).'));
+  return { text: text, warnen: warnen };
+}
+function ladeNotfallZeile() {
+  var el = document.getElementById('notfallZeile');
+  if (!el || !window.BOS_PRODUKTE) return Promise.resolve();
+  return Promise.all([
+    db.collection(SICH_COLLECTION).where('aktion', '==', 'export').get({ source: 'server' }),
+    db.collection(STAND_COLLECTION).doc(STAND_DOK).get({ source: 'server' })
+  ]).then(function (r) {
+    var letzter = null;
+    r[0].forEach(function (d) { var x = d.data(); var ms = tsMs(x.ts); if (!letzter || ms > letzter.zeitMs) letzter = { stand: (x.vorher && x.vorher.stand) || 0, zeitMs: ms }; });
+    var jetzt = r[1].exists && typeof r[1].data().nummer === 'number' ? r[1].data().nummer : null;
+    var e = erinnerungsText(letzter, jetzt, Date.now());
+    setzeStatus(el, e.text, e.warnen ? 'err' : '');
+  }).catch(function (err) { console.error('[Produkt-Config Sync] Erinnerung:', err); setzeStatus(el, 'Erinnerung nicht lesbar: ' + fehlerText(err), 'err'); });
+}
+function ladeSammelSicherungen() {
+  var el = document.getElementById('sammelListe');
+  if (!el) return;
+  db.collection(SICH_COLLECTION).where('aktion', '==', 'einspielen').get({ source: 'server' }).then(function (snap) {
+    var liste = [];
+    snap.forEach(function (d) { var x = d.data(); liste.push({ id: d.id, ms: tsMs(x.ts), konto: x.konto, anzahl: Array.isArray(x.vorher) ? x.vorher.length : 0, vorher: x.vorher }); });
+    liste.sort(function (a, b) { return b.ms - a.ms; });
+    if (!liste.length) { setzeStatus(el, 'Noch keine Sammel-Sicherung (entsteht beim nächsten Einspielen).'); return; }
+    el.className = 'status'; el.innerHTML = '';
+    liste.slice(0, 5).forEach(function (x) {
+      var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:10px;align-items:center;margin:4px 0;flex-wrap:wrap';
+      var t = document.createElement('span'); t.textContent = zeitText(x.ms) + ' · ' + x.konto + ' · ' + x.anzahl + ' Produkte';
+      var b = document.createElement('button'); b.textContent = 'als Datei herunterladen'; b.style.cssText = 'padding:4px 10px';
+      b.onclick = function () { ladeSicherungHerunter(x); };
+      row.appendChild(t); row.appendChild(b); el.appendChild(row);
+    });
+    if (liste.length > 5) { var m = document.createElement('div'); m.textContent = '… und ' + (liste.length - 5) + ' ältere.'; el.appendChild(m); }
+  }).catch(function (err) { console.error('[Produkt-Config Sync] Sammel-Sicherungen:', err); setzeStatus(el, 'Sammel-Sicherungen nicht lesbar: ' + fehlerText(err), 'err'); });
+}
+/* Sicherung → Datei im Dateiformat: Sicht „aktive“ der Lade-Datei (sortiert, ohne gelöschte, ohne Datenbank-Felder). */
+function ladeSicherungHerunter(x) {
+  var roh = (x.vorher || []).map(function (d) { return { id: d.legacyKey, daten: d }; });
+  var arr = window.BOS_PRODUKTE.sicht(roh, 'aktive');
+  var blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'produkt_config.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  setzeStatus(document.getElementById('exportStatus'), '✓ Sicherung vom ' + zeitText(x.ms) + ' als produkt_config.json heruntergeladen (' + arr.length + ' aktive Produkte). Zum Zurückspielen oben einspielen, Vorschau lesen.', 'ok');
+}
+if (window.BOS_AUTH_READY) window.BOS_AUTH_READY.then(function () { ladeNotfallZeile(); ladeSammelSicherungen(); }).catch(function (err) { console.error('[Produkt-Config Sync] Anmeldung:', err); });
 </script>
 </body>
 </html>
