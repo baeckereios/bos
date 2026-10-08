@@ -29,6 +29,13 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-08 · 14:17 · v1.3 · Hilfetext (zweites festes Ziel)
+      Nur der Hilfetext „Schilder der Teigecke“ nennt das neue feste Ziel
+      „Teigecke · Vorbereitungen“ (nfc_qr_logik.js v1.3). Die Liste zeigt es
+      von selbst (zielListe). Dazu Pflege: REGEL_DATEI nennt die neueste
+      Regeldatei (stand seit dem 04.10. auf der damaligen; wer sie bei einer
+      zu alten Regel einsetzte, hätte Produkte und Teigecke hinausgeworfen).
+      Fassung nfc-qr-2026-10-04 unverändert. Sonst unverändert.
     2026-10-04 · 11:58 · v1.2 · Fix (drei Korrekturen, KC 04.10., Kompendium §P10)
       Sammelblatt drucken nur im gespeicherten Stand: Sperre in
       druckeSammelblatt(), Meldung „erst speichern, dann drucken“.
@@ -258,7 +265,7 @@ const NFC_ZEITLIMIT_MS = 30000;   /* wie im alten Programm */
    Lehnt die Datenbank ab, ist die eingesetzte Regel älter als diese Seite.
    REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft). */
 const REGEL_FASSUNG = 'nfc-qr-2026-10-04';
-const REGEL_DATEI = 'firestore_regeln_2026-10-04_nfc_sammelblatt.rules';
+const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';
 const DB_ZEITLIMIT_MS = 10000;
 
 /* ---------- i18n (Checkliste §6) ---------- */
@@ -981,7 +988,7 @@ const helpData = [
   { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips.' },
   { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },
   { heading: 'Wenn etwas nicht klappt', text: 'Jeder Fehler steht oben in einem roten Kasten, mit der Ursache in normaler Sprache und der Meldung des Geräts dahinter. Bei Chips heißt das meistens: NFC am Handy ist aus, die Erlaubnis für den Browser fehlt, oder der Chip wurde zu früh weggezogen. Ein fehlender Code ist kein Notfall: Alles bleibt auch über den Launcher erreichbar.' },
-  { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser.' }
+  { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser. Einer davon gehört in die Teigecke: „Teigecke · Vorbereitungen“ steht in der Liste direkt unter „Teigecke Nacht“ und öffnet die Teigecke Nacht gleich im Reiter „Vorbereitungen“ — als QR-Schild oder Chip, wie jedes andere Ziel.' }
 ];
 function oeffneHilfe() {
   document.getElementById('hilfeTitel').textContent = t('hilfe_titel');

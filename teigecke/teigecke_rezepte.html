@@ -5,6 +5,16 @@
   Doku:  teigecke/TEIGECKE_REZEPTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit „Orte“)
   CHANGELOG
+    2026-10-08 · 14:17 · v0.2 · Feature (Nachtrag Nachtseite, Langzeitteig)
+      ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md Teil B, Bauplan
+      SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md §4.2 (KC 13:26 frei).
+      Schritt 3 heißt „Sauer, Vorstufe & Führung“ und fragt zusätzlich
+      „Langzeitteig?“ (Merkmal langzeit am Teig; nein = kein Feld). Daneben
+      die Hinweise „Vorstufe für Langzeitteig nicht unterstützt“ und
+      „Langzeitteig mit Sauer“. Zusammenfassung nennt den Langzeitteig.
+      FELDER: teigecke_teige + langzeit, teigecke_teigwerte + Mehl-Regel und
+      Langzeit-Hefe (sonst löschte das Speichern der Einwaage diese Felder,
+      Bauplan N1). REGEL_FASSUNG teigecke-nacht-2026-10-08. Sonst unverändert.
     2026-10-08 · 08:22 · v0.1 · Erstfassung (Teigecke Etappe 2, Schub 2)
       ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teile A–D,
       Bauplan SESSION_2026-10-07_TEIGECKE_REZEPTE_BAU.md (freigegeben).
@@ -127,9 +137,10 @@ const FELDER = {
     'vorstufeZutaten', 'vorstufeHinweis', 'beiBedarf', 'sauerJeKg', 'hefeJeKg', 'vorstufeJeKg', 'anstellgutAnteil',
     'rezeptBasisKg', 'sort', 'geloescht',
     'vorstufeSchritt', 'vorstufeSchritteJeBehaelter', 'vorstufeBehaelter',
-    'winbackFeld', 'winbackName', 'vorstufeWinbackFeld', 'vorstufeWinbackName'],
+    'winbackFeld', 'winbackName', 'vorstufeWinbackFeld', 'vorstufeWinbackName', 'langzeit'],
   teigecke_teigwerte: ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter', 'tabelle', 'einwaage',
-    'kesselMaxKg', 'kesselrestKg'],
+    'kesselMaxKg', 'kesselrestKg', 'mehlKgJeKg', 'mehlRefBrote', 'mehlRefKg', 'mehlRefZugabeKg', 'mehlZutatId',
+    'langzeitHefeSommerG', 'langzeitHefeSommerBeiKg', 'langzeitHefeWinterG', 'langzeitHefeWinterBeiKg'],
   teigecke_rezeptmengen: ['eingabe'],
   teigecke_zutaten: ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'gruppe', 'geloescht']
 };
@@ -138,8 +149,8 @@ const HAKEN_FUER = {
   teigecke_teige: 'rezepte', teigecke_rezeptmengen: 'rezepte',
   teigecke_teigwerte: 'teige', teigecke_zutaten: 'wagen'
 };
-const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* Rezeptmengen und Feld gruppe (RK §18) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-07_teigecke_rezepte.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_FASSUNG = 'teigecke-nacht-2026-10-08';   /* Rezeptmengen, gruppe (RK §18) + langzeit (RK §19) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 const VORSTUFEN_VORSCHLAG = ['Quellstück', 'Brühstück', 'Kochstück', 'Vorteig'];
 const PROBE_BROTE = 60;   /* Proberechnung in der Zusammenfassung (Anweisung §4 B5) */
 const SCHRITTE = 5;
@@ -195,7 +206,7 @@ const I18N_DE = {
   f_bei_bedarf: 'Nur bei Bedarf', f_bei_bedarf_hilfe: 'Hat ein Zuhause, gehört aber nicht jede Nacht in die Einsammelliste (z. B. nur zum Auffrischen).',
   /* Strecke */
   s_titel_neu: 'Neuer Teig', s_titel: 'Rezept: {name}', s_abbrechen: '✕ Abbrechen', s_zurueck: '‹ Zurück', s_weiter: 'Weiter ›', s_zur_liste: 'Fertig — zur Liste',
-  s_schritt_1: 'Name', s_schritt_2: 'Brote', s_schritt_3: 'Sauer & Vorstufe', s_schritt_4: 'Hauptteig', s_schritt_5: 'Zusammenfassung',
+  s_schritt_1: 'Name', s_schritt_2: 'Brote', s_schritt_3: 'Sauer, Vorstufe & Führung', s_schritt_4: 'Hauptteig', s_schritt_5: 'Zusammenfassung',
   s_summe_bisher: 'Summe bisher: {kg}', s_summe_unvollstaendig: '· Mengen unvollständig, die Werte je kg bleiben, wie sie sind',
   s_summe_leer: 'Noch keine Menge eingetippt.',
   s_verwerfen_titel: 'Eingabe verwerfen?', s_verwerfen_text: 'Du hast in der Strecke etwas eingetippt, das noch nicht gespeichert ist. Es steht nur auf diesem Bildschirm und ist weg, wenn du jetzt gehst.',
@@ -225,6 +236,11 @@ const I18N_DE = {
   s3_sauer_unbekannt: 'Bisher steht hier „unbekannt“ — die Nacht rechnet den Sauer für diesen Teig nicht. Mit ja oder nein beantworten.',
   s3_sauer_kg: 'Sauer im Rezept (kg)', s3_sauer_kg_hilfe: 'Wie viel kg Sauer im ganzen Rezept stehen. Leer lassen, wenn du die Mengen nicht eintippst.',
   s3_vorstufe_frage: 'Vorteig, Brühstück oder Quellstück?',
+  s3_langzeit_frage: 'Langzeitteig — wird der ganze Teig in der Vornacht angesetzt?',
+  s3_langzeit_hilfe: 'Ja: Der Teig steht in der Nacht vor dem Backtag in der Teige-Liste (Gruppe „Langzeitteig für …“), die Anzahl kommt aus der Prognose, die Hefe aus einem Sommer- oder Winterwert. Am Backtag wird er nur aufgearbeitet.',
+  s3_langzeit_vorstufe: 'Vorstufe für Langzeitteig: nicht unterstützt — sie müsste zwei Nächte vor dem Backtag stehen. Die Nacht rechnet sie nicht; bitte von Hand.',
+  s3_langzeit_sauer: 'Langzeitteig mit Sauer: Der Sauer wird in der Nacht des Ansetzens gebraucht, der Ansatz der Nacht davor kennt ihn nicht. Die Nacht zeigt das als Hinweis, „Reicht der Sauer?“ rechnet ihn mit.',
+  s5_langzeit: 'Langzeitteig: ja — steht in der Nacht vor dem Backtag in der Teige-Liste.',
   s3_vorstufe_name: 'Name der Vorstufe', s3_vorstufe_kg: 'Davon im Rezept (kg)', s3_vorstufe_kg_hilfe: 'Wie viel kg der fertigen Vorstufe in den Teig kommen.',
   s3_schritt: 'Ein Schritt — was kommt hinein?', s3_schritt_hilfe: 'Eine Portion, so wie sie angesetzt wird, z. B. 3 kg Schrot und 9 L Wasser. Die Nacht zeigt dann die passenden Anzahlen zur Wahl.',
   s3_behaelter: 'Behälter (Name)', s3_behaelter_platz: 'Behälter', s3_je_behaelter: 'Schritte je Behälter höchstens', s3_je_behaelter_hilfe: 'Leer = ohne Grenze.',
@@ -808,6 +824,11 @@ function schritt3HTML() {
       '<div class="feld-zeile rz-zwei">' + feldHTML(t('s3_behaelter'), textFeld('vorstufe.behaelter', v.behaelter, 'maxlength="40" placeholder="' + esc(t('s3_behaelter_platz')) + '"')) +
       feldHTML(t('s3_je_behaelter'), zahlFeld('vorstufe.jeBehaelter', v.jeBehaelter, 'inputmode="numeric"'), t('s3_je_behaelter_hilfe')) + '</div></div>';
   }
+  /* Langzeitteig (v0.2, Bauplan §4.2): Führung der Nacht — hier, weil Sauer und
+     Vorstufe gleich daneben stehen und sich mit ihm vertragen müssen. */
+  html += feldHTML(t('s3_langzeit_frage'), jaNein('langzeit-antwort', z.langzeit === true), t('s3_langzeit_hilfe'));
+  if (z.langzeit === true && v.ja === true) html += '<div class="hinweis rot">' + esc(t('s3_langzeit_vorstufe')) + '</div>';
+  if (z.langzeit === true && z.sauer.antwort === true) html += '<div class="hinweis">' + esc(t('s3_langzeit_sauer')) + '</div>';
   return html;
 }
 /* Eine Zeile „Zutat ▾ · Menge · kg/L · ✕“ (Hauptteig oder Vorstufe). */
@@ -881,6 +902,7 @@ function schritt5HTML() {
   /* Silo */
   const silo = z.zeilen.filter(function (r) { const x = zm()[r.zutatId]; return x && L.istSilo(x); }).map(function (r) { return zutatName(r.zutatId); });
   if (silo.length) html += li(t('s5_silo', { liste: silo.join(', ') }));
+  if (z.langzeit === true) html += li(t('s5_langzeit'));
   html += '</ul>';
   /* Brote */
   const schaetzung = L.broteSchaetzung(L.istZahl(p.teig.rezeptBasisKg) ? p.teig.rezeptBasisKg : null, z.brote);
@@ -1332,6 +1354,7 @@ document.addEventListener('click', function (e) {
     case 'schritt-weiter': if (st) geheZu(st.schritt + 1); break;
     case 'schritt-zurueck': if (st) geheZu(st.schritt - 1); break;
     case 'brot-an': if (st) { brotUmschalten(el.getAttribute('data-lk')); } break;
+    case 'langzeit-antwort': if (st) { st.z.langzeit = el.getAttribute('data-wert') === 'true'; st.geaendert = true; zeichneStrecke(); } break;
     case 'sauer-antwort': if (st) { st.z.sauer.antwort = el.getAttribute('data-wert') === 'true'; st.geaendert = true; zeichneStrecke(); } break;
     case 'vorstufe-antwort': if (st) {
       st.z.vorstufe.ja = el.getAttribute('data-wert') === 'true';
@@ -1395,7 +1418,7 @@ const helpData = {
     { heading: 'Die Liste', text: 'Oben steht der Sauerteig in einer eigenen kleinen Karte, darunter alle Teige mit ihren Broten. „Rumpf, noch keine Rezeptwerte“ heißt: Der Teig hat noch keine Hefe je kg und keine Zutaten — die Nacht kann ihn nicht rechnen. „ohne Brot“ heißt: Kein Produkt zeigt auf diesen Teig. Der eingeklappte Kasten „Brote ohne Teig“ ist nur eine Übersicht, keine Mahnung; manche Brote haben bewusst keinen eigenen Teig.' },
     { heading: 'Ein Rezept eintippen: die Strecke', text: 'Teig antippen oder „＋ Neuer Teig“. Die Strecke hat fünf Schritte: Name, Brote, Sauer & Vorstufe, Hauptteig, Zusammenfassung. Mit „Weiter“ und „Zurück“ (oder den Nummern oben) gehst du vor und zurück, ohne dass etwas verloren geht. Gespeichert wird erst am Ende. Ab Schritt 3 steht unten „Summe bisher“. Was du eintippst, steht nur auf diesem Bildschirm — gehst du vorher weg, fragt die Seite nach.' },
     { heading: 'Schritt 1 und 2: Name und Brote', text: 'Unter dem Namen siehst du die Kennung, die BOS daraus bildet (aus „Kürbis-Käse Kruste“ wird „kuerbis_kaese_kruste“). Nach dem ersten Speichern bleibt sie fest. Zeigen schon Brote auf diese Kennung (weil sie im Produkt-Editor schon diesem Teig zugeordnet sind), steht das unter dem Namen, und in Schritt 2 sind sie schon angehakt. In Schritt 2 hakst du die Brote an, die aus dem Teig gemacht werden — vorn alle Brote, über das Suchfeld alles andere — und trägst je Brot die Einwaage in g ein: das Teiggewicht, nicht das Ausbackgewicht. Hängt ein Brot schon an einem anderen Teig, steht das darunter; anhaken zieht es um. Ohne Brot darfst du speichern, aber dann rechnet die Nacht den Teig nicht. Brote umhängen darf nur ein Konto mit der Rolle admin, wie im Produkt-Editor.' },
-    { heading: 'Schritt 3: Sauer und Vorstufe', text: 'Sauerteig im Teig? Bei ja trägst du ein, wie viel kg Sauer im Rezept stehen. Vorteig, Brühstück oder Quellstück? Bei ja: Name, wie viel kg davon in den Teig kommen, und ein Schritt so, wie er angesetzt wird, als Zeilen (z. B. 3 kg Schrot und 9 L Wasser). „Wasser“ steht fest in der Auswahl. Dazu der Behälter und wie viele Schritte höchstens in einen Behälter passen (leer = ohne Grenze). Die Nacht zeigt daraus die passenden Anzahlen zur Wahl.' },
+    { heading: 'Schritt 3: Sauer, Vorstufe & Führung', text: 'Sauerteig im Teig? Bei ja trägst du ein, wie viel kg Sauer im Rezept stehen. Vorteig, Brühstück oder Quellstück? Bei ja: Name, wie viel kg davon in den Teig kommen, und ein Schritt so, wie er angesetzt wird, als Zeilen (z. B. 3 kg Schrot und 9 L Wasser). „Wasser“ steht fest in der Auswahl. Dazu der Behälter und wie viele Schritte höchstens in einen Behälter passen (leer = ohne Grenze). Die Nacht zeigt daraus die passenden Anzahlen zur Wahl. Zuletzt: Langzeitteig? Bei ja steht der Teig in der Nacht vor dem Backtag in der Teige-Liste (eigene Gruppe „Langzeitteig für …“), mit der Anzahl aus der Prognose und der Hefe aus einem Sommer- oder Winterwert; am Backtag wird er nur aufgearbeitet. Eine Vorstufe rechnet die Nacht bei einem Langzeitteig nicht (sie müsste zwei Nächte vorher stehen) — das steht dann rot daneben.' },
     { heading: 'Schritt 4: Hauptteig', text: 'Oben zwei feste Zeilen: Schüttwasser in L (leer oder 0 = dieser Teig hat kein Schüttwasser) und Hefe (Zutat wählen, kg eintragen; leer = ohne Hefe). Darunter die übrigen Zutaten als Zeilen: Zutat wählen, Menge, kg oder L. Die Auswahl ist nach Gruppen sortiert. Fehlt eine Zutat, legst du sie direkt in der Auswahl mit „＋ neue Zutat“ an (Name und Gruppe; braucht den Haken 🧺 Wagen & Zutaten). Zutaten der Gruppe Silo zählen in der Summe mit, stehen aber nie auf der Einsammelliste.' },
     { heading: 'Schritt 5: Zusammenfassung', text: 'Hier steht die Teigsumme, Hefe, Sauer und Vorstufe je kg Teig, ob der Teig Schüttwasser hat, je Brot „ergibt … kg Teig ≈ … Brote“ (nur zur Info) und was am Brot geändert wird. Die Proberechnung zeigt, was die Nacht bei 60 Broten sagen würde — mit denselben Rechnungen wie nachts. Unter „Hinweise & Sonstiges“ pflegst du den Hinweis oben in der Karte, den Hinweis zur Vorstufe, „nur bei Bedarf“, die Reihenfolge und das Archivieren.' },
     { heading: 'Speichern in zwei Schritten', text: 'Erst das Rezept (Teig, Einwaagen und Mengen in einem Rutsch), dann die Brote. Jeder Schritt sagt selbst, ob es geklappt hat, mit der echten Meldung, wenn nicht, und lässt sich einzeln wiederholen. Klappt das Rezept und nur das Umhängen der Brote nicht, bleibt das Rezept gespeichert. Was sich nicht geändert hat, wird nicht geschrieben.' },

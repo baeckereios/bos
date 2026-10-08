@@ -11,12 +11,24 @@
    Seite nfc_qr_zentrale.html ruft nur auf.
 
    KEINE Daten in dieser Datei: keine Namen, keine Adressen von Hand.
-   Die Ziele kommen aus bos_app_registry.js. Einzige Ausnahme, bewusst:
-   ZIEL_BOS („BOS öffnen“, führt auf launcher.html). Der Launcher steht
-   nicht in der Registry; dieses eine Ziel wird hier von Hand geführt
-   (Ulf, 03.10.2026) und steht auch in bos_code_adressen.json.
+   Die Ziele kommen aus bos_app_registry.js. Ausnahmen, bewusst (FESTE_ZIELE):
+   ZIEL_BOS („BOS öffnen“, führt auf launcher.html; der Launcher steht
+   nicht in der Registry, Ulf 03.10.2026) und seit 08.10.2026
+   ZIEL_TEIGECKE_VORBEREITUNGEN (ein Reiter einer Seite, also eine Adresse
+   mit Zusatz, die die Registry nicht führen kann). Beide stehen auch in
+   bos_code_adressen.json.
 
    CHANGELOG
+     2026-10-08 · 14:17 · v1.3 · Feature (zweites festes Ziel, Teigecke)
+       ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md Teil D, Bauplan
+       SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md §2.5 (KC 13:26 frei).
+       Neu: ZIEL_TEIGECKE_VORBEREITUNGEN („Vorbereitungen“, Teigecke,
+       teigecke/teigecke_nacht.html?reiter=vorbereitungen) und die Liste
+       FESTE_ZIELE. Ein festes Ziel mit „seite“ steht in der Zielliste direkt
+       hinter seiner Seite und ist nur wählbar, wenn die Seite direkt
+       aufrufbar ist. chipErgebnis erkennt feste Ziele samt Zusatz vor dem
+       Seitentreffer; waechter prüft alle festen Ziele gegen „fest“ in
+       bos_code_adressen.json. „BOS öffnen“ unverändert.
      2026-10-04 · 11:58 · v1.2 · Fix (Gruppe vom Papier, Ulf 04.10., 11:57)
        Zwei getrennte Schalter statt einem: GRUPPE_AM_BILDSCHIRM (an) und
        GRUPPE_AUF_PAPIER (aus). Einzelschild und Sammelblatt tragen keine
@@ -68,6 +80,14 @@
 
   /* Das eine Ziel, das nicht in der Registry steht. */
   var ZIEL_BOS = { id: 'bos_oeffnen', name: 'BOS öffnen', icon: '🏠', url: 'launcher.html', direkt: 'anmeldung', fest: true };
+  /* Zweites festes Ziel (08.10.2026, Konzept Punkt 68): der Reiter
+     „Vorbereitungen“ der Teigecke Nacht, als QR/Chip in der Teigecke. Steht
+     auch in bos_code_adressen.json („fest“) — die Adresse darf nach dem
+     ersten Druck nie mehr geändert werden. Gruppe (hubName) kommt aus der
+     Registry der Seite, nicht von Hand. */
+  var ZIEL_TEIGECKE_VORBEREITUNGEN = { id: 'teigecke_vorbereitungen', name: 'Vorbereitungen', icon: '🥣',
+    url: 'teigecke/teigecke_nacht.html?reiter=vorbereitungen', direkt: 'anmeldung', fest: true, seite: 'teigecke_nacht' };
+  var FESTE_ZIELE = [ZIEL_BOS, ZIEL_TEIGECKE_VORBEREITUNGEN];
 
   /* Reihenfolge und Überschriften der Gruppen. Werte wie das Feld
      „bereich“ der Registry; Einträge ohne bereich (die offenen Werkzeuge)
@@ -97,6 +117,18 @@
         id: a.id, name: a.name, icon: a.icon || '', url: a.url, direkt: waehlbar ? a.direkt : null,
         hubName: a.hub && hubName[a.hub] ? hubName[a.hub] : '',
         waehlbar: waehlbar, grund: waehlbar ? '' : 'nicht_direkt'
+      });
+    });
+    /* Feste Ziele mit „seite“ direkt hinter ihre Seite (wählbar nur, wenn die Seite es ist). */
+    FESTE_ZIELE.forEach(function (f) {
+      if (!f.seite) return;
+      Object.keys(gruppen).forEach(function (b) {
+        var i = -1;
+        gruppen[b].forEach(function (e, j) { if (e.id === f.seite) i = j; });
+        if (i === -1) return;
+        var s = gruppen[b][i];
+        gruppen[b].splice(i + 1, 0, { id: f.id, name: f.name, icon: f.icon, url: f.url, direkt: s.waehlbar ? f.direkt : null,
+          hubName: s.hubName, waehlbar: s.waehlbar, grund: s.waehlbar ? '' : s.grund, fest: true });
       });
     });
     return BEREICHE.filter(function (b) { return gruppen[b.id]; }).map(function (b) {
@@ -130,6 +162,15 @@
     var zusatz = roh.slice(ohne.length);
     if (pfad === '' || pfad === ZIEL_BOS.url || pfad === 'index.html') {
       return { art: 'ziel', adresse: roh, ziel: ZIEL_BOS, direkt: true, zusatz: zusatz };
+    }
+    /* Feste Ziele mit Zusatz (z. B. ?reiter=vorbereitungen) vor dem Seitentreffer. */
+    var mitZusatz = roh.split('#')[0].slice(w.length);
+    var festTreffer = FESTE_ZIELE.filter(function (f) { return f.seite && f.url === mitZusatz; })[0];
+    if (festTreffer) {
+      var seite = (apps || []).filter(function (a) { return a && a.id === festTreffer.seite; })[0];
+      if (seite) return { art: 'ziel', adresse: roh, zusatz: '',
+        ziel: { id: festTreffer.id, name: festTreffer.name, icon: festTreffer.icon, url: festTreffer.url, hubName: (seite.hub && hubNamen(apps)[seite.hub]) || '' },
+        direkt: seite.direkt === 'anmeldung' || seite.direkt === 'offen' };
     }
     var treffer = (apps || []).filter(function (a) { return a && a.url && ohneZusatz(a.url) === pfad; })[0];
     if (!treffer) return { art: 'ziel_fehlt', adresse: roh, pfad: pfad };
@@ -441,7 +482,12 @@
     Object.keys(ist).forEach(function (id) {
       if (!(id in soll)) aus.push(id + ': hat in der Registry das Feld direkt, fehlt aber in bos_code_adressen.json');
     });
-    if (fest[ZIEL_BOS.id] !== ZIEL_BOS.url) aus.push(ZIEL_BOS.id + ': festes Ziel weicht ab (freigegeben „' + fest[ZIEL_BOS.id] + '“, Zentrale „' + ZIEL_BOS.url + '“)');
+    FESTE_ZIELE.forEach(function (f) {
+      if (fest[f.id] !== f.url) aus.push(f.id + ': festes Ziel weicht ab (freigegeben „' + fest[f.id] + '“, Zentrale „' + f.url + '“)');
+    });
+    Object.keys(fest).forEach(function (id) {
+      if (!FESTE_ZIELE.some(function (f) { return f.id === id; })) aus.push(id + ': steht unter „fest“ in bos_code_adressen.json, die Zentrale kennt es nicht');
+    });
     return aus;
   }
   var WAECHTER_SATZ = 'Diese Adresse darf auf Schildern stehen. Wenn schon gedruckt wurde: alte Adresse stehen lassen und weiterleiten. Wenn noch nichts hängt: Datei anpassen.';
@@ -468,6 +514,7 @@
 
   var api = {
     esc: esc, ohneZusatz: ohneZusatz, ZIEL_BOS: ZIEL_BOS, BEREICHE: BEREICHE,
+    ZIEL_TEIGECKE_VORBEREITUNGEN: ZIEL_TEIGECKE_VORBEREITUNGEN, FESTE_ZIELE: FESTE_ZIELE,
     zielListe: zielListe, waehlbareZiele: waehlbareZiele, zielNachId: zielNachId,
     chipErgebnis: chipErgebnis, decodeUrlRecord: decodeUrlRecord, adresseAusNachricht: adresseAusNachricht,
     nfcFehlerArt: nfcFehlerArt,

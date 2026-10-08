@@ -4,6 +4,30 @@
   MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-10-08 · 14:17 · v0.12 · Feature (Nachtrag Nachtseite)
+      ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md (KC 13:07), Bauplan
+      SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md (KC 13:26 frei).
+      A Mehl-Regel: je Teig in teigecke_teigwerte (mehlKgJeKg, mehlRef…,
+        mehlZutatId), gepflegt wie die Wasserregel; „Mehl dazu heute“ in den
+        Anpassungen (teige.<id>.mehlKg); T = D + r − m, Kessel auf T + m,
+        Hefe auf T; dritte Kachel „Mehl dazu“; Mehl mit Menge auf der
+        Einsammelliste. Ohne Mehl-Regel keine Kachel, kein Feld.
+      B Langzeitteig: Gruppe „Langzeitteig für <Tag>“ unter den Teigen der
+        Nacht vor dem Backtag (Rolle 'langzeit'): Anzahl aus der Prognose
+        für morgen, änderbar, gespeichert in teigecke_naechte/<heute>.langzeit
+        — spätestens, wenn der Teig fertig gerechnet ist (KC 13:26 b); Hefe
+        in Gramm aus Sommer-/Winterwert (teigwerte, Umschalter jahreszeit
+        unter ✎ Pflegen, kein stiller Standard). Am Backtag „nur aufarbeiten“:
+        keine Rechnung, kein Zähler, nicht offen, nicht auf der
+        Einsammelliste (KC 13:26 a). Sauer-Plan und Vorstufen für morgen ohne
+        Langzeitteige; Reicht-Prüfung mit der Gruppe von heute.
+      C Vornacht: an der Karte die Zahl aus der Vornacht (gewählt / Vorschlag
+        / laut Prognose / nichts gespeichert); Kasten „Aus der Vornacht für
+        heute“ oben in Vorbereitungen.
+      D ?reiter=vorbereitungen|teige|einsammeln öffnet den Reiter.
+      N1: FELDER kennt die neuen Felder, speichereRegel übernimmt alle
+      vorhandenen Werte (vorher entstand das Dokument aus einer festen
+      Auswahl neu). REGEL_FASSUNG teigecke-nacht-2026-10-08.
     2026-10-08 · 08:22 · v0.11 · Umbau (Teige ziehen aus, Etappe 2, Schub 2)
       ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teil E.
       Teige anlegen und Rezepte pflegen, „Startdaten einlesen“ und das
@@ -547,6 +571,26 @@
   .vorstufen-liste li.zu-wenig .schritt-aufschluesselung, .vorstufen-liste li.zu-wenig .behaelter-liste li b { color: var(--bos-red); }
   .schritt-wahl .umschalter button.zu-wenig[aria-pressed="true"] { background: var(--bos-red); color: #fff; }
   .schritt-wahl .umschalter button.zu-wenig small { opacity: 1; font-weight: 700; }
+
+  /* v0.12 (08.10.2026): Mehl-Kachel, Langzeit-Gruppe, „nur aufarbeiten“, Vornacht */
+  .ergebnis-kacheln.drei { grid-template-columns: 1fr 1fr 1.4fr; }
+  .ergebnis-kacheln.drei .k-wert { font-size: 1.75rem; }
+  .kachel.mehl .k-wert { color: var(--bos-text); }
+  .langzeit-block { border-top: 3px double var(--bos-border-strong); padding-top: var(--bos-space-sm, 14px); }
+  .langzeit-block .bos-title { color: var(--bos-blue); }
+  .lz-marke { font-family: var(--bos-font-label); font-size: .72rem; font-weight: 700; color: var(--bos-blue); border: 1px solid var(--bos-blue); border-radius: 999px; padding: 0 7px; vertical-align: middle; white-space: nowrap; }
+  .liste-zeile-rahmen.aufarbeiten .lz-name b, .liste-zeile-rahmen.aufarbeiten .lz-zahl { color: var(--bos-text-dim); }
+  .langzeit-hinweis { border-left-color: var(--bos-blue); }
+  .zz-prognose { font-size: var(--bos-font-sm, .82rem); color: var(--bos-amber-bright); font-weight: 600; margin-left: auto; margin-right: 10px; }
+  .vornacht-zeile { font-weight: 600; }
+  .vornacht-zeile.rot { color: var(--bos-red); }
+  .vornacht-liste li { gap: 12px; }
+  .vornacht-liste li > span:last-child { text-align: right; font-weight: 600; }
+  .z-mehl { color: var(--bos-amber-bright); font-weight: 600; }
+  .jahreszeit-leiste { display: inline-flex; align-items: center; gap: 8px; margin-left: 12px; flex-wrap: wrap; }
+  .jahreszeit-leiste .umschalter { margin-left: 0; }
+  @media (max-width: 640px) { .ergebnis-kacheln.drei { grid-template-columns: 1fr 1fr; } .ergebnis-kacheln.drei .kachel.winback { grid-column: 1 / -1; } }
+  @media (max-width: 480px) { .ergebnis-kacheln.drei { grid-template-columns: 1fr; } .vornacht-liste li { flex-direction: column; align-items: flex-start; } .vornacht-liste li > span:last-child { text-align: left; } }
 </style>
 </head>
 <body>
@@ -663,12 +707,13 @@ const COL = {
    test_teigecke.js vergleicht beides automatisch. */
 const FELDER = {
   teigecke_teigwerte: ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter', 'tabelle', 'einwaage',
-    'kesselMaxKg', 'kesselrestKg'],
+    'kesselMaxKg', 'kesselrestKg', 'mehlKgJeKg', 'mehlRefBrote', 'mehlRefKg', 'mehlRefZugabeKg', 'mehlZutatId',
+    'langzeitHefeSommerG', 'langzeitHefeSommerBeiKg', 'langzeitHefeWinterG', 'langzeitHefeWinterBeiKg'],
   teigecke_einstellungen: ['abwiegefolge', 'kesselMaxVorgabeKg', 'sauerKesselMaxKg', 'sauerStufeKg', 'sauerHalbStufeKg',
-    'sauerSchwelleKg']
+    'sauerSchwelleKg', 'jahreszeit']
 };
 const NACHT_FELDER = ['brote', 'kesselrest', 'temperatur', 'prognose', 'sauerAnsatz', 'rezeptStand',
-  'vorrat', 'vorratHaken', 'vorstufeWahl'];
+  'vorrat', 'vorratHaken', 'vorstufeWahl', 'langzeit'];
 const ANPASSUNG_FELDER = ['backtag', 'teige'];
 /* Welcher Haken darf welche Collection schreiben (drei Schlüssel, Konzept §6.1a).
    Rezepte (teigecke_teige) schreibt seit 08.10.2026 „Teige & Rezepte“. */
@@ -798,6 +843,38 @@ const I18N_DE = {
   err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Drei mögliche Gründe: (1) Dir fehlt der passende Haken (🧺 Wagen & Zutaten, 🥣 Teige, 📜 Rezepte) bzw. für die Nachtwerte die Rolle Backstube/Produktionsleitung. (2) Du bist mit dem Generalschlüssel 👑 angemeldet — der schreibt in der Teigecke nie. (3) Die Regeln sind älter als diese Seite (die Seite schickt Felder, die die alte Regel nicht kennt) — Regelstand in der Firebase-Konsole prüfen.',
   err_perm_regel_alt: 'Wahrscheinlich Grund (3): Beim Laden passte der Regelstand nicht zur Seite. ',
   err_haken_fehlt: 'Dafür fehlt dir der passende Haken in der Kontenverwaltung (🧺 Wagen & Zutaten, 🥣 Teige oder 📜 Rezepte).',
+  /* ---- neu 08.10.2026, v0.12 (Mehl, Langzeit, Vornacht) ---- */
+  k_mehl: 'Mehl dazu', k_mehl_je: 'Mehl dazu, je Kessel', mehl_dazu: '{kg} Mehl dazu', mehl_zutat_fehlt: 'Mehl nicht gewählt',
+  rechnung_mehl: '{kg} Mehl dazu',
+  anp_mehl: 'Mehl dazu heute (kg)', anp_mehl_hilfe: 'Leer = laut Regel. 0 = heute kein Mehl.',
+  regel_mehl: 'Mehl dazu (von Hand)', regel_mehl_kg: 'kg Mehl dazu', regel_mehl_welches: 'Welches Mehl?', regel_mehl_waehlen: '— Mehl wählen —',
+  regel_mehl_bisher: '{brote} × {name}: bisher {kg} Mehl dazu laut Regel.', regel_mehl_gepflegt: 'Gepflegt: bei {brote} Broten {kg} Mehl dazu.',
+  regel_mehl_keine: '(noch keine Mehl-Regel)', regel_mehl_hilfe: 'Wird der Teig zu weich, trag ein, was beim nächsten Mal dazukommt. In WinBack wird dann entsprechend weniger eingegeben. 0 kg = Regel ohne Zugabe (dann lässt sich „Mehl dazu heute“ eintragen).',
+  regel_mehl_silo: '⚠ Diese Zutat kommt aus dem Silo. Für Mehl von Hand eine Zutat mit Zuhause wählen (Seite „Orte“).',
+  v_mehlregel: 'Mehl-Regel: Anzahl Brote über 0, kg ab 0 und ein Mehl eintragen.', v_mehlregel_einwaage: 'Mehl-Regel lässt sich nicht umrechnen: Es fehlt eine Einwaage oder eine Brotzahl.',
+  mehl_sammeln: 'Mehl dazu: {kg} ({teig})', mehl_sammeln_offen: 'Mehl dazu für {teig} — Menge, sobald die Brotzahlen stehen',
+  langzeit_titel: 'Langzeitteig für {tag}', langzeit_klein: 'heute Nacht komplett ansetzen — gebacken am {tag}',
+  langzeit_karte: 'Langzeitteig für {tag}', langzeit_hinweis: 'Langzeitteig: heute Nacht komplett ansetzen, gebacken am {tag}. Die Anzahl kommt aus der Prognose für {tag} und lässt sich ändern.',
+  langzeit_prognose_fehlt: 'Erst die Prognose für {tag} eintippen (Reiter Vorbereitungen) — vorher rechnet BOS nichts.',
+  langzeit_prognose: 'Prognose {n}', langzeit_marke: 'Langzeit · heute Nacht ansetzen',
+  aufarbeiten_marke: 'nur aufarbeiten', aufarbeiten_text: 'In der Vornacht angesetzt für {n} Brote — nur aufarbeiten.',
+  aufarbeiten_vorschlag: 'In der Vornacht angesetzt für {n} Brote (Zahl aus der Prognose) — nur aufarbeiten.',
+  aufarbeiten_keine: 'Langzeitteig, in der Vornacht angesetzt. Vornacht: keine Zahl gespeichert — nur aufarbeiten.',
+  aufarbeiten_hilfe: 'Die Backzettel-Zahl trägst du wie immer ein (Historie). Es wird nichts gerechnet und nichts verglichen.',
+  hefe_g: 'Hefe ({jz}): {g}', hefe_langzeit_fehlt: '(laut Rezept — noch kein {jz}wert)', hefe_jahreszeit_fehlt: '(laut Rezept — Sommer/Winter noch nicht gewählt, ✎ Pflegen)',
+  jz_sommer: 'Sommer', jz_winter: 'Winter', jahreszeit_titel: 'Hefe Langzeitteige:', jahreszeit_offen: 'noch nicht gewählt',
+  anp_hefe_g: 'Hefe heute, für den ganzen Teig (g)',
+  regel_lz_hefe: 'Hefe für den Langzeitteig (Gramm, ohne Temperatur-Tabelle)', regel_lz_sommer: 'Sommer', regel_lz_winter: 'Winter',
+  regel_lz_g: 'g Hefe bei', regel_lz_kg: 'kg Teig', regel_lz_hilfe: 'So, wie ihr es sagt: „15 g auf 90 kg“. BOS rechnet mit der Menge mit. Die Hefe-Spalte der Tabelle gilt für Langzeitteige nicht.',
+  v_lz_hefe: 'Hefe Langzeit: Gramm ab 0 und kg über 0 eintragen (oder beides leer lassen).',
+  vorstufe_lz: 'Vorstufe für Langzeitteig: nicht unterstützt — sie muss zwei Nächte vor dem Backtag stehen, bitte von Hand.',
+  vorstufe_lz_liste: 'Vorstufen von Langzeitteigen rechnet BOS nicht (sie müssen zwei Nächte vor dem Backtag stehen): {liste} — bitte von Hand.',
+  sauer_lz: 'Langzeitteig heute Nacht mit Sauer: {liste} — der Ansatz von gestern kannte ihn nicht. Die Prüfung „Reicht der Sauer?“ rechnet ihn mit.',
+  vornacht_gewaehlt: 'Vornacht: {stufe} → reicht für {n} Brote', vornacht_gewaehlt_ohne: 'Vornacht: {stufe} gewählt',
+  vornacht_vorschlag: 'Vornacht (Vorschlag, nicht gewählt): {stufe} → reicht für {n} Brote',
+  vornacht_kg: 'Vornacht (laut Prognose): für {n} Brote = {kg}', vornacht_keine: 'Vornacht: keine Stufe gespeichert.',
+  vornacht_titel: 'Aus der Vornacht für heute', vornacht_klein: 'nur zum Lesen', vornacht_sauer: 'Sauer-Ansatz: {kg} ({quelle})',
+  vornacht_lz: 'angesetzt für {n} Brote — nur aufarbeiten', vornacht_lz_vorschlag: 'angesetzt für {n} Brote (Zahl aus der Prognose) — nur aufarbeiten',
   regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Speichern kann deshalb abgelehnt werden. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.'
 };
 function t(schluessel, werte) {
@@ -822,7 +899,8 @@ const S = {
   karte: null,
   regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
   aufgeklappt: {},  // eingeklappte Hinweise, nur für die Sitzung
-  vorratEinheit: {} // je Vorrats-Brot: Eingabe in 'bleche' oder 'stueck' (nur dieses Gerät)
+  vorratEinheit: {}, // je Vorrats-Brot: Eingabe in 'bleche' oder 'stueck' (nur dieses Gerät)
+  langzeitGesichert: {} // v0.12: schon geschriebene Langzeit-Anzahlen dieser Sitzung (kein Doppelschreiben)
 };
 const abos = { stamm: [], naechte: [] };
 
@@ -895,7 +973,9 @@ function setzeLokalTag(datum, teil) {
 function auswahl(datum) {
   const lokal = lokalTag(datum);
   if (Array.isArray(lokal.auswahl)) return { ids: lokal.auswahl, manuell: true };
-  return { ids: S.produkteOk ? L.vorauswahl(S.teige, S.produkte, datum.getDay(), vorratHaken(L.datumStr(datum))) : [], manuell: false };
+  /* Für heute Nacht: ohne „nur aufarbeiten“, mit den Langzeitteigen, die heute für morgen angesetzt werden. */
+  const morgenWd = L.datumStr(datum) === heuteStr() ? S.backtagMorgen.getDay() : undefined;
+  return { ids: S.produkteOk ? L.vorauswahl(S.teige, S.produkte, datum.getDay(), vorratHaken(L.datumStr(datum)), morgenWd) : [], manuell: false };
 }
 
 /* ---------- Datum/Backtag ---------- */
@@ -1025,6 +1105,10 @@ async function start() {
   wendeI18nAn();
   renderHilfe();
   setzeBacktag();
+  /* ?reiter=vorbereitungen (QR „Vorbereitungen“, Konzept Punkt 68). Unbekannt → Teige. */
+  const rw = L.reiterAusAdresse(window.location.search);
+  S.tab = rw.reiter;
+  if (rw.unbekannt) console.warn('[Teigecke] Unbekannter Reiter in der Adresse: „' + rw.unbekannt + '“ — öffne „Teige“.');
   if (!window.db || !window.BOS_AUTH_READY) {
     zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt'));
     return;
@@ -1072,8 +1156,8 @@ window.addEventListener('offline', planeRender);
    eine ältere Regel lehnt ab (kein passender match-Block). Ein Lesevorgang,
    kein Schreiben, keine Daten. Nur „permission-denied“ vom SERVER zählt als
    „alt“; ohne Netz oder bei anderen Fehlern bleibt es still (unbekannt). */
-const REGEL_FASSUNG = 'teigecke-2026-10-02';
-const REGEL_DATEI = 'firestore_regeln_2026-10-07_teigecke_rezepte.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
+const REGEL_FASSUNG = 'teigecke-nacht-2026-10-08';   /* Mehl-Regel, Langzeit, Jahreszeit (RK §19) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
 async function pruefeRegelstand() {
   try {
     await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' });
@@ -1164,41 +1248,131 @@ function temperaturHTML() {
 }
 
 /* ---------- Ein Teig in einer Nacht (Anzeige + Rechnung) ---------- */
+/* Rollen: 'heute' (Teige des Backtags), 'prognose' (Vorbereitungen, morgen),
+   'langzeit' (seit v0.12: Langzeitteig, heute Nacht angesetzt für morgen —
+   Brote und Einwaagen von morgen, alles andere von heute). Ein Langzeitteig
+   in der Rolle 'heute' ist „nur aufarbeiten“ (aufarbeiten: true). */
 function teigRechnung(teig, rolle) {
+  const lzRolle = rolle === 'langzeit';
   const datum = rolle === 'prognose' ? S.backtagMorgen : S.backtag;
+  const brotDatum = (rolle === 'prognose' || lzRolle) ? S.backtagMorgen : S.backtag;
   const tag = L.datumStr(datum);
   const nacht = S.naechte[tag] || {};
   const vorrat = rolle === 'heute' && istVorrat(teig);
-  const zahlen = (rolle === 'prognose' ? nacht.prognose : vorrat ? nacht.vorrat : nacht.brote) || {};
+  const aufarbeiten = rolle === 'heute' && L.istLangzeit(teig, S.produkte);
   const tw = S.teigwerte[teig.id] || {};
   const stamm = tw.einwaage || {};
-  const anp = rolle === 'heute' ? (L.anpassungHeute(S.anpassung, tag)[teig.id] || {}) : {};
+  const anp = (rolle === 'heute' || lzRolle) ? (L.anpassungHeute(S.anpassung, tag)[teig.id] || {}) : {};
   const anpE = anp.einwaage || {};
   /* Vorrat: alle Brote des Teigs (nicht an den Backtag gebunden). */
-  const produkte = L.produkteDesTeigs(teig.id, S.produkte, vorrat ? undefined : datum.getDay());
+  const produkte = L.produkteDesTeigs(teig.id, S.produkte, vorrat ? undefined : brotDatum.getDay());
+  const lz = lzRolle ? L.langzeitZahlen(produkte, nacht.langzeit, (S.naechte[morgenStr()] || {}).prognose) : null;
+  const zahlen = (rolle === 'prognose' ? nacht.prognose : vorrat ? nacht.vorrat : nacht.brote) || {};
   const posten = produkte.map(function (p) {
     const lk = p.legacyKey;
     const abw = L.istZahl(anpE[lk]);
-    return { lk: lk, name: p.name, anzahl: L.istZahl(zahlen[lk]) ? zahlen[lk] : undefined,
-      einwaageG: abw ? anpE[lk] : stamm[lk], stammG: stamm[lk], abw: abw };
+    const anzahl = lz ? lz[lk].anzahl : (L.istZahl(zahlen[lk]) ? zahlen[lk] : undefined);
+    return { lk: lk, name: p.name, anzahl: anzahl, einwaageG: abw ? anpE[lk] : stamm[lk], stammG: stamm[lk], abw: abw,
+      prognose: lz ? lz[lk].prognose : undefined, gespeichert: lz ? lz[lk].gespeichert : undefined };
   });
   const kesselrestStamm = L.istZahl(tw.kesselrestKg) ? tw.kesselrestKg : 0;
-  const kesselrestNacht = (rolle === 'heute' && nacht.kesselrest && L.istZahl(nacht.kesselrest[teig.id])) ? nacht.kesselrest[teig.id] : null;
-  const aussen = rolle === 'heute' ? temperaturHeute().wertC : null;
+  const kesselrestNacht = ((rolle === 'heute' || lzRolle) && nacht.kesselrest && L.istZahl(nacht.kesselrest[teig.id])) ? nacht.kesselrest[teig.id] : null;
+  const aussen = (rolle === 'heute' || lzRolle) ? temperaturHeute().wertC : null;
   const hefeT = L.interpoliere(tw.tabelle, aussen, 'hefeDeltaG');
   const wasserT = L.interpoliere(tw.tabelle, aussen, 'wasserC');
+  /* Langzeit-Hefe (Punkt 67): Gramm aus Sommer-/Winterwert, ohne Tabelle.
+     Fehlt der Wert: Rezeptwert ohne Tabelle, die Karte sagt warum. */
+  const lzHefe = lzRolle ? L.langzeitHefe(tw, (S.einstellungen || {}).jahreszeit) : null;
   const calc = L.rechneTeig({
     posten: posten,
     kesselrestKg: kesselrestNacht !== null ? kesselrestNacht : kesselrestStamm,
     literJeKg: tw.wasserLiterJeKg,
     wasserL: L.istZahl(anp.wasserL) ? anp.wasserL : null,
     ohneSchuettwasser: !!teig.ohneSchuettwasser,
+    mehlKgJeKg: (rolle === 'prognose') ? null : tw.mehlKgJeKg,
+    mehlKg: (rolle !== 'prognose' && L.istZahl(tw.mehlKgJeKg) && L.istZahl(anp.mehlKg)) ? anp.mehlKg : null,
     kesselMaxKg: L.istZahl(tw.kesselMaxKg) ? tw.kesselMaxKg : einstZahl('kesselMaxVorgabeKg', KESSEL_VORGABE_KG),
-    hefeJeKg: teig.hefeJeKg, hefeDeltaG: hefeT.wert, rezeptBasisKg: teig.rezeptBasisKg,
+    hefeJeKg: teig.hefeJeKg, hefeDeltaG: lzRolle ? null : hefeT.wert, rezeptBasisKg: teig.rezeptBasisKg,
+    hefeGJeKg: lzHefe && L.istZahl(lzHefe.gJeKg) ? lzHefe.gJeKg : null,
     hefeKg: L.istZahl(anp.hefeKg) ? anp.hefeKg : null
   });
-  return { teig: teig, rolle: rolle, tag: tag, vorrat: vorrat, produkte: produkte, posten: posten, tw: tw, anp: anp, kesselrestStamm: kesselrestStamm,
-    kesselrestNacht: kesselrestNacht, aussen: aussen, hefeT: hefeT, wasserT: wasserT, calc: calc };
+  return { teig: teig, rolle: rolle, tag: tag, vorrat: vorrat, aufarbeiten: aufarbeiten, produkte: produkte, posten: posten, tw: tw, anp: anp,
+    kesselrestStamm: kesselrestStamm, kesselrestNacht: kesselrestNacht, aussen: aussen, hefeT: hefeT, wasserT: wasserT, lzHefe: lzHefe, calc: calc };
+}
+/* Hat der Teig eine Mehl-Regel (auch mit 0 kg)? Nur dann gibt es Kachel und Feld. */
+function hatMehlRegel(tw) { return !!tw && L.istZahl(tw.mehlKgJeKg); }
+/* Am Backtag: für wie viele Brote wurde ein Langzeitteig in der Vornacht angesetzt? */
+function vornachtLz(teig) {
+  const produkte = L.produkteDesTeigs(teig.id, S.produkte, S.backtag.getDay());
+  return L.vornachtLangzeit(produkte, (S.naechte[gesternStr()] || {}).langzeit, (S.naechte[heuteStr()] || {}).prognose);
+}
+function aufarbeitenText(teig) {
+  const v = vornachtLz(teig);
+  if (!v) return t('aufarbeiten_keine');
+  return t(v.gespeichert ? 'aufarbeiten_text' : 'aufarbeiten_vorschlag', { n: v.anzahl });
+}
+/* Prognose, die gestern für heute eingetippt wurde, als Rechnung (nur D):
+   Grundlage für „Der Vorschlag gilt“ und die Vornacht-Anzeige. */
+function prognoseRechnungHeute(teig) {
+  const prog = (S.naechte[heuteStr()] || {}).prognose || {};
+  const tw = S.teigwerte[teig.id] || {}, stamm = tw.einwaage || {};
+  const posten = L.produkteDesTeigs(teig.id, S.produkte, S.backtag.getDay()).map(function (p) {
+    return { lk: p.legacyKey, name: p.name, anzahl: L.istZahl(prog[p.legacyKey]) ? prog[p.legacyKey] : undefined, einwaageG: stamm[p.legacyKey] };
+  });
+  return L.rechneTeig({ posten: posten, kesselrestKg: L.istZahl(tw.kesselrestKg) ? tw.kesselrestKg : 0, ohneSchuettwasser: true });
+}
+/* Vornacht einer Vorstufe (Punkt 68, Bauplan §2.4): gewählt / Vorschlag / kg / nichts. */
+function vornachtVorstufeText(teig) {
+  const c = prognoseRechnungHeute(teig);
+  const wahl = ((S.naechte[heuteStr()] || {}).vorstufeWahl || {})[teig.id];
+  const fertig = istFertig(c) && L.istZahl(c.D) && c.D > 0;
+  if (L.istSchritt(teig.vorstufeSchritt)) {
+    const stufeText = function (n) { return n + ' × (' + L.schrittText(teig.vorstufeSchritt, 1) + ')'; };
+    if (fertig && L.istZahl(teig.vorstufeJeKg)) {
+      const st = L.vorstufeStufe(teig.vorstufeJeKg * c.D, teig.vorstufeSchritt, teig.vorstufeSchritteJeBehaelter, c.anzahl, wahl);
+      if (st) return t(st.gewaehlt ? 'vornacht_gewaehlt' : 'vornacht_vorschlag', { stufe: stufeText(st.n), n: st.reichtBrote });
+    }
+    if (L.istZahl(wahl)) return t('vornacht_gewaehlt_ohne', { stufe: stufeText(wahl) });
+    return t('vornacht_keine');
+  }
+  if (fertig && L.istZahl(teig.vorstufeJeKg)) return t('vornacht_kg', { n: c.anzahl, kg: fmtKg(teig.vorstufeJeKg * c.D) });
+  return t('vornacht_keine');
+}
+/* Sauer-Ansatz von gestern: eingetragen, sonst der Vorschlag aus der Prognose
+   für heute (wie gestern gerechnet — ohne Langzeitteige). null = unbekannt. */
+function sauerGestern(a, einst) {
+  const gestern = (S.naechte[gesternStr()] || {}).sauerAnsatz;
+  if (gestern && L.istZahl(gestern.kg)) return { kg: gestern.kg, quelle: 'eingetragen' };
+  const prog = (S.naechte[heuteStr()] || {}).prognose;
+  if (!prog || !Object.keys(prog).length || !L.istZahl(a)) return null;
+  const rechnungen = L.planTeige(S.teige, S.produkte, S.backtag.getDay(), null, {}).map(function (x) { return { teig: x, calc: prognoseRechnungHeute(x) }; });
+  if (!rechnungen.every(function (r) { return istFertig(r.calc); })) return null;
+  const v = L.sauerAnsatz(sauerBedarfAus(rechnungen, 'D'), a, einst);
+  return v ? { kg: v.ansatzKg, quelle: 'vorschlag' } : null;
+}
+function sauerEinst() {
+  return { stufeKg: einstZahl('sauerStufeKg', L.SAUER_VORGABE.stufeKg), halbStufeKg: einstZahl('sauerHalbStufeKg', L.SAUER_VORGABE.halbStufeKg),
+    schwelleKg: einstZahl('sauerSchwelleKg', L.SAUER_VORGABE.schwelleKg), chargeMaxKg: einstZahl('sauerKesselMaxKg', L.SAUER_VORGABE.chargeMaxKg) };
+}
+/* Nachtrag KC 13:26 (b): Die Anzahl eines Langzeitteigs wird in der Nacht des
+   Ansetzens gespeichert, spätestens wenn der Teig fertig gerechnet ist (grüner
+   Haken) — auch ohne Änderung an der Prognose. Geschrieben werden nur Brote
+   ohne gespeicherte Zahl; je Sitzung einmal (kein Dauerschreiben). */
+function sichereLangzeit() {
+  if (!S.geladen || !S.kennung || !S.produkteOk) return;
+  teigeFuer('langzeit').forEach(function (teig) {
+    const r = teigRechnung(teig, 'langzeit');
+    if (!istFertig(r.calc)) return;
+    const offen = r.posten.filter(function (p) { return !p.gespeichert && L.istZahl(p.anzahl); });
+    if (!offen.length) return;
+    const schluessel = heuteStr() + '|' + teig.id + '|' + offen.map(function (p) { return p.lk + '=' + p.anzahl; }).join(',');
+    if (S.langzeitGesichert[schluessel]) return;
+    S.langzeitGesichert[schluessel] = true;
+    const d = { langzeit: {}, rezeptStand: {} };
+    offen.forEach(function (p) { d.langzeit[p.lk] = p.anzahl; });
+    d.rezeptStand[teig.id] = teig.sicherungId || '';
+    schreibeNacht(heuteStr(), d);
+  });
 }
 function istFertig(calc) { return calc.status === 'fertig' || calc.status === 'null'; }
 
@@ -1236,7 +1410,9 @@ function render() {
     knopf.setAttribute('aria-selected', knopf.getAttribute('data-tab') === S.tab ? 'true' : 'false');
   });
   document.getElementById('pflegeBtn').setAttribute('aria-pressed', S.pflegeModus ? 'true' : 'false');
-  document.getElementById('reiterZahlTeige').textContent = String(teigeFuer('heute').length || '');
+  /* Zähler: Teige mit Arbeit heute Nacht — „nur aufarbeiten“ zählt nicht (KC 13:26 a), die Langzeit-Gruppe schon. */
+  const zahlTeige = teigeFuer('heute').filter(function (x) { return !L.istLangzeit(x, S.produkte); }).length + teigeFuer('langzeit').length;
+  document.getElementById('reiterZahlTeige').textContent = String(zahlTeige || '');
   const ansichten = { teige: 'ansichtTeige', vorbereitungen: 'ansichtVorbereitungen', einsammeln: 'ansichtEinsammeln' };
   Object.keys(ansichten).forEach(function (k) { document.getElementById(ansichten[k]).hidden = S.tab !== k; });
   if (fokusIn(document.querySelector('main'))) renderAufgeschoben = true;
@@ -1246,6 +1422,7 @@ function render() {
     if (S.tab === 'einsammeln') renderEinsammeln();
   }
   if (S.karte) renderKarte(false);
+  sichereLangzeit();
 }
 
 function hinweiseHTML() {
@@ -1282,8 +1459,14 @@ function vorratHaken(tag) {
 }
 function istVorrat(teig) { return L.istVorratsTeig(teig.id, S.produkte); }
 function teigeFuer(rolle) {
+  if (rolle === 'langzeit') return S.produkteOk ? L.langzeitTeigeFuer(S.teige, S.produkte, S.backtagMorgen.getDay()) : [];
   const datum = rolle === 'prognose' ? S.backtagMorgen : S.backtag;
   return L.teigeDesTages(S.teige, S.produkte, datum.getDay(), folgeFuer(datum.getDay()), rolle === 'prognose' ? {} : vorratHaken(heuteStr()));
+}
+/* Teige der Nacht mit Arbeit (heute ohne „nur aufarbeiten“, dazu die Langzeit-Gruppe) — für Sauer und Mehl. */
+function teigeMitArbeit() {
+  return teigeFuer('heute').filter(function (x) { return !L.istLangzeit(x, S.produkte); }).map(function (x) { return teigRechnung(x, 'heute'); })
+    .concat(teigeFuer('langzeit').map(function (x) { return teigRechnung(x, 'langzeit'); }));
 }
 function vorratZeileHTML() {
   const vt = L.vorratsTeige(S.teige, S.produkte);
@@ -1316,14 +1499,23 @@ function vorratUmschalten(id, bestaetigt) {
 }
 function listeHTML(rolle) {
   const teige = teigeFuer(rolle);
-  if (!teige.length) return '<p class="status">' + esc(t(rolle === 'prognose' ? 'keine_teige_morgen' : 'keine_teige_heute')) + '</p>';
+  if (!teige.length) return rolle === 'langzeit' ? '' : '<p class="status">' + esc(t(rolle === 'prognose' ? 'keine_teige_morgen' : 'keine_teige_heute')) + '</p>';
   const kopf = '<div class="liste-kopf"><span></span><span>' + esc(t('spalte_teig')) + '</span><span>' + esc(t('spalte_anzahl')) + '</span><span>' +
     esc(t(rolle === 'prognose' ? 'spalte_teigmenge' : 'spalte_winback')) + '</span></div>';
   return kopf + '<div class="teig-liste">' + teige.map(function (teig) {
     const r = teigRechnung(teig, rolle);
     const c = r.calc;
     let menge = '';
-    if (c.status === 'einwaageFehlt') menge = '<span class="badge rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>';
+    /* „nur aufarbeiten“ (KC 13:26 a): kein Status, keine Mahnung, keine Rechnung. */
+    if (r.aufarbeiten) {
+      const v = vornachtLz(teig);
+      return '<div class="liste-zeile-rahmen aufarbeiten"><button type="button" class="liste-zeile" data-aktion="karte-oeffnen" data-rolle="heute" data-id="' + esc(teig.id) + '">' +
+        '<span class="lz-status neutral" title="' + esc(t('aufarbeiten_marke')) + '">↻</span>' +
+        '<span class="lz-name"><b>' + esc(teig.name) + ' <span class="lz-marke">' + esc(t('aufarbeiten_marke')) + '</span></b><small>' + esc(aufarbeitenText(teig)) + '</small></span>' +
+        '<span class="lz-zahl">' + (v ? esc(String(v.anzahl)) : '') + '</span><span class="lz-menge"></span></button></div>';
+    }
+    if (rolle === 'langzeit' && c.status === 'leer') menge = '<span class="badge rot">' + esc(t('prognose_fehlt')) + '</span>';
+    else if (c.status === 'einwaageFehlt') menge = '<span class="badge rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>';
     else if (c.status === 'null') menge = esc(t('heute_nicht'));
     /* Sicherheitsregel 02.10.2026: In „in WinBack“ steht nur die Zahl, die
        eingegeben wird — bei Kesseln je Kessel („2 × 106,6 kg“); die
@@ -1342,7 +1534,8 @@ function listeHTML(rolle) {
     }).join('');
     return '<div class="liste-zeile-rahmen"><button type="button" class="liste-zeile" data-aktion="karte-oeffnen" data-rolle="' + rolle + '" data-id="' + esc(teig.id) + '">' +
       statusSymbol(c) +
-      '<span class="lz-name"><b>' + esc(teig.name) + (r.vorrat ? ' <span class="vorrat-marke">' + esc(t('vorrat_marke')) + '</span>' : '') + '</b><small>' + brote + '</small></span>' +
+      '<span class="lz-name"><b>' + esc(teig.name) + (r.vorrat ? ' <span class="vorrat-marke">' + esc(t('vorrat_marke')) + '</span>' : '') +
+        (rolle === 'prognose' && L.istLangzeit(teig, S.produkte) ? ' <span class="lz-marke">' + esc(t('langzeit_marke')) + '</span>' : '') + '</b><small>' + brote + '</small></span>' +
       '<span class="lz-zahl">' + (c.status === 'leer' ? '' : esc(String(c.anzahl))) + '</span>' +
       '<span class="lz-menge">' + menge + '</span></button>' +
       '</div>';
@@ -1352,17 +1545,49 @@ function listeHTML(rolle) {
 function renderTeige() {
   const el = document.getElementById('ansichtTeige');
   let html = hinweiseHTML() + temperaturHTML() + vorratZeileHTML();
-  if (S.pflegeModus && pflegtTeige()) html += '<div class="pflege-leiste"><button type="button" class="bos-btn" data-aktion="folge-oeffnen">' + esc(t('folge_knopf')) + '</button></div>';
+  if (S.pflegeModus && pflegtTeige()) html += '<div class="pflege-leiste"><button type="button" class="bos-btn" data-aktion="folge-oeffnen">' + esc(t('folge_knopf')) + '</button>' + jahreszeitHTML() + '</div>';
   else if (S.pflegeModus && S.haken.teige && !online()) html += '<div class="pflege-leiste"><span class="klein">' + esc(t('offline_pflege')) + '</span></div>';
   html += '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('teige_titel', { tag: tagText(S.backtag) })) + '</h2></div>' + listeHTML('heute') + '</section>';
+  /* Langzeitteige für morgen: eigene Gruppe, abgegrenzt (Ulf 13:04). */
+  if (teigeFuer('langzeit').length) {
+    html += '<section class="block langzeit-block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('langzeit_titel', { tag: tagText(S.backtagMorgen) })) + '</h2>' +
+      '<span class="klein">' + esc(t('langzeit_klein', { tag: WOCHENTAGE[S.backtagMorgen.getDay()] })) + '</span></div>' + listeHTML('langzeit') + '</section>';
+  }
   /* Teige anlegen, Rezepte, Startdaten, Archiv: Seite „Teige & Rezepte“ (08.10.2026); Link nur mit Haken. */
   if (hatHaken()) html += '<div class="pflege-leiste"><a class="link-btn" href="teigecke_rezepte.html">' + esc(t('rezepte_pflegen')) + '</a></div>';
   el.innerHTML = html;
 }
 
+/* Umschalter Sommer/Winter für die Langzeit-Hefe (nur unter ✎ Pflegen, nur wenn es Langzeitteige gibt). */
+function jahreszeitHTML() {
+  if (!L.aktiv(S.teige).some(function (x) { return L.istLangzeit(x, S.produkte); })) return '';
+  const jz = (S.einstellungen || {}).jahreszeit;
+  const knopf = function (w) { return '<button type="button" data-aktion="jahreszeit" data-wert="' + w + '" aria-pressed="' + (jz === w) + '">' + esc(t(w === 'sommer' ? 'jz_sommer' : 'jz_winter')) + '</button>'; };
+  return '<span class="jahreszeit-leiste"><span class="klein">' + esc(t('jahreszeit_titel')) + (jz ? '' : ' ' + esc(t('jahreszeit_offen'))) + '</span>' +
+    '<span class="umschalter" role="group" aria-label="' + esc(t('jahreszeit_titel')) + '">' + knopf('sommer') + knopf('winter') + '</span></span>';
+}
+async function setzeJahreszeit(wert) {
+  if (!S.haken.teige || (wert !== 'sommer' && wert !== 'winter')) return;
+  const vorher = (S.einstellungen && S.einstellungen.id) ? S.einstellungen : null;
+  if (vorher && vorher.jahreszeit === wert) return;
+  const daten = Object.assign({}, vorher || {}, { jahreszeit: wert });
+  try {
+    await schreibe(COL.einstellungen, 'allgemein', daten, vorher ? 'aendern' : 'anlegen', vorher);
+    toast(t('gespeichert'));
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(COL.einstellungen, 'allgemein', vorher);
+      if (konflikt) { toast(konflikt); return; }
+    }
+    zeigeFehler(t('err_speichern'), err);
+  }
+}
+
 /* ---------- Vorbereitungen: Sauer, Prognose, Vorstufen ---------- */
+/* Grundlage für Sauer und Vorstufen für morgen: die Teige von morgen OHNE
+   Langzeitteige (die werden heute Nacht gemacht, Bauplan §2.2/§2.3). */
 function prognoseStand() {
-  const teige = teigeFuer('prognose');
+  const teige = L.planTeige(S.teige, S.produkte, S.backtagMorgen.getDay(), folgeFuer(S.backtagMorgen.getDay()), {});
   const rechnungen = teige.map(function (x) { return teigRechnung(x, 'prognose'); });
   const offen = rechnungen.filter(function (r) { return !istFertig(r.calc); });
   return { rechnungen: rechnungen, offen: offen };
@@ -1377,8 +1602,7 @@ function sauerBedarfAus(rechnungen, feld) {
 function sauerHTML() {
   const st = sauerteig();
   const a = st && st.anstellgutAnteil;
-  const einst = { stufeKg: einstZahl('sauerStufeKg', L.SAUER_VORGABE.stufeKg), halbStufeKg: einstZahl('sauerHalbStufeKg', L.SAUER_VORGABE.halbStufeKg),
-    schwelleKg: einstZahl('sauerSchwelleKg', L.SAUER_VORGABE.schwelleKg), chargeMaxKg: einstZahl('sauerKesselMaxKg', L.SAUER_VORGABE.chargeMaxKg) };
+  const einst = sauerEinst();
   let html = '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('sauer_titel')) + '</h2><span class="klein">' + esc(t('sauer_klein', { tag: tagText(S.backtagMorgen) })) + '</span></div>';
   if (!L.istZahl(a)) return html + '<div class="hinweis baustelle">' + esc(t('sauer_kein_rezept')) + '</div></section>';
   const pg = prognoseStand();
@@ -1389,6 +1613,8 @@ function sauerHTML() {
   if (unbekannt.length) html += '<div class="hinweis rot">' + esc(t('sauer_unbekannt', { liste: unbekannt.join(', ') })) + '</div>';
   const vorratMitSauer = L.vorratsTeige(S.teige, S.produkte).filter(function (x) { return x.mitSauer === true; }).map(function (x) { return x.name; });
   if (vorratMitSauer.length) html += '<div class="hinweis">' + esc(t('sauer_vorrat', { liste: vorratMitSauer.join(', ') })) + '</div>';
+  const lzMitSauer = teigeFuer('langzeit').filter(function (x) { return x.mitSauer === true; }).map(function (x) { return x.name; });
+  if (lzMitSauer.length) html += '<div class="hinweis">' + esc(t('sauer_lz', { liste: lzMitSauer.join(', ') })) + '</div>';
   let vorschlag = null;
   if (pg.offen.length) {
     html += '<div class="hinweis">' + esc(t('sauer_prognose_offen', { liste: pg.offen.map(function (r) { return r.teig.name; }).join(', ') })) + '</div>';
@@ -1421,26 +1647,14 @@ function sauerHTML() {
 /* Reicht-Prüfung für heute: gestriger Ansatz − Sauer der heutigen Teige (auf T)
    ≥ Anstellgut für den neuen Ansatz. Nur ein Hinweis, kein Vorschlag (Punkt 34). */
 function reichtHTML(a, einst, ansatzHeute) {
-  const gestern = (S.naechte[gesternStr()] || {}).sauerAnsatz;
-  let ansatzGestern = gestern && L.istZahl(gestern.kg) ? gestern.kg : null, quelle = 'eingetragen';
-  if (ansatzGestern === null) {
-    /* „Der Vorschlag gilt“ (Frage 9): aus der Prognose, die gestern für heute eingetippt wurde. */
-    const prog = (S.naechte[heuteStr()] || {}).prognose;
-    if (prog && Object.keys(prog).length) {
-      const rechnungen = teigeFuer('heute').map(function (x) {
-        const r = teigRechnung(x, 'heute');
-        const posten = r.posten.map(function (p) { return Object.assign({}, p, { anzahl: L.istZahl(prog[p.lk]) ? prog[p.lk] : undefined, einwaageG: p.stammG }); });
-        return { teig: x, calc: L.rechneTeig({ posten: posten, kesselrestKg: r.kesselrestStamm, ohneSchuettwasser: true }) };
-      });
-      if (rechnungen.every(function (r) { return istFertig(r.calc); })) {
-        const v = L.sauerAnsatz(sauerBedarfAus(rechnungen, 'D'), a, einst);
-        if (v) { ansatzGestern = v.ansatzKg; quelle = 'vorschlag'; }
-      }
-    }
-  }
+  /* „Der Vorschlag gilt“ (Frage 9) steckt in sauerGestern(); seit v0.12 dieselbe
+     Teigliste wie der Plan von gestern (ohne Langzeitteige). */
+  const sg = sauerGestern(a, einst);
+  const ansatzGestern = sg ? sg.kg : null, quelle = sg ? sg.quelle : 'eingetragen';
   let html = '<div class="unterkopf">' + esc(t('reicht_titel')) + '</div>';
   if (ansatzGestern === null) return html + '<div class="hinweis baustelle">' + esc(t('reicht_gestern_fehlt')) + '</div>';
-  const heute = teigeFuer('heute').map(function (x) { return teigRechnung(x, 'heute'); });
+  /* Verbrauch heute Nacht: Teige mit Arbeit, also mit der Langzeit-Gruppe, ohne „nur aufarbeiten“. */
+  const heute = teigeMitArbeit();
   const offen = heute.filter(function (r) { return !istFertig(r.calc); });
   if (offen.length) return html + '<div class="hinweis">' + esc(t('reicht_heute_offen', { liste: offen.map(function (r) { return r.teig.name; }).join(', ') })) + '</div>';
   if (!L.istZahl(ansatzHeute)) return html + '<div class="hinweis">' + esc(t('reicht_ansatz_fehlt')) + '</div>';
@@ -1455,6 +1669,8 @@ function vorstufenHTML() {
   const vorratMit = L.vorratsTeige(S.teige, S.produkte).filter(function (x) { return x.vorstufe; }).map(function (x) { return x.name; });
   let html = '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('vorstufen_titel')) + '</h2><span class="klein">' + esc(t('vorstufen_klein', { tag: tagText(S.backtagMorgen) })) + '</span></div>';
   if (vorratMit.length) html += '<div class="hinweis">' + esc(t('vorstufe_vorrat', { liste: vorratMit.join(', ') })) + '</div>';
+  const lzMit = L.aktiv(S.teige).filter(function (x) { return x.vorstufe && L.istLangzeit(x, S.produkte); }).map(function (x) { return x.name; });
+  if (lzMit.length) html += '<div class="hinweis baustelle">' + esc(t('vorstufe_lz_liste', { liste: lzMit.join(', ') })) + '</div>';
   if (!mit.length) return html + '<p class="status">' + esc(t('vorstufen_keine')) + '</p></section>';
   const wahlen = (S.naechte[morgenStr()] || {}).vorstufeWahl || {};
   return html + '<ul class="liste vorstufen-liste">' + mit.map(function (r) {
@@ -1490,9 +1706,26 @@ function vorstufenHTML() {
     return '<li class="' + (schritte ? 'mit-schritten' : '') + (zuWenig ? ' zu-wenig' : '') + '"><span>' + esc(x.vorstufe + ' ' + x.name) + (x.vorstufeHinweis ? '<br><small>' + esc(x.vorstufeHinweis) + '</small>' : '') + '</span>' + menge + schritte + '</li>';
   }).join('') + '</ul></section>';
 }
+/* „Aus der Vornacht für heute“ (Punkt 68): nur lesen, nur wenn es etwas gibt. */
+function vornachtKastenHTML() {
+  const zeilen = [];
+  L.planTeige(S.teige, S.produkte, S.backtag.getDay(), folgeFuer(S.backtag.getDay()), {}).filter(function (x) { return x.vorstufe; }).forEach(function (x) {
+    zeilen.push('<li><span>' + esc(x.vorstufe + ' ' + x.name) + '</span><span>' + esc(vornachtVorstufeText(x)) + '</span></li>');
+  });
+  teigeFuer('heute').filter(function (x) { return L.istLangzeit(x, S.produkte); }).forEach(function (x) {
+    const v = vornachtLz(x);
+    zeilen.push('<li><span>' + esc(x.name) + '</span><span>' + esc(v ? t(v.gespeichert ? 'vornacht_lz' : 'vornacht_lz_vorschlag', { n: v.anzahl }) : t('aufarbeiten_keine')) + '</span></li>');
+  });
+  const st = sauerteig();
+  const sg = st && L.istZahl(st.anstellgutAnteil) ? sauerGestern(st.anstellgutAnteil, sauerEinst()) : null;
+  if (sg) zeilen.push('<li><span>' + esc(st.name) + '</span><span>' + esc(t('vornacht_sauer', { kg: fmtKg(sg.kg), quelle: t(sg.quelle === 'vorschlag' ? 'reicht_quelle_vorschlag' : 'reicht_quelle_eingetragen') })) + '</span></li>');
+  if (!zeilen.length) return '';
+  return '<section class="block vornacht-block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('vornacht_titel')) + '</h2><span class="klein">' + esc(t('vornacht_klein')) + '</span></div>' +
+    '<ul class="liste vornacht-liste">' + zeilen.join('') + '</ul></section>';
+}
 function renderVorbereitungen() {
   const el = document.getElementById('ansichtVorbereitungen');
-  el.innerHTML = hinweiseHTML() + sauerHTML() +
+  el.innerHTML = hinweiseHTML() + vornachtKastenHTML() + sauerHTML() +
     '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('prognose_titel', { tag: tagText(S.backtagMorgen) })) + '</h2><span class="klein">' + esc(t('prognose_klein')) + '</span></div>' +
     listeHTML('prognose') + '</section>' + vorstufenHTML();
 }
@@ -1545,16 +1778,25 @@ function renderKarte(voll) {
         inp.value = p && L.istZahl(p.anzahl) ? String(p.anzahl) : '';
         inp.setAttribute('data-geschrieben', inp.value);
       });
+      /* Langzeit: Marke „Prognose n“, sobald die Anzahl abweicht (v0.12) */
+      document.querySelectorAll('#karteBody [data-prognose-lk]').forEach(function (sp) {
+        const p = r.posten.filter(function (x) { return x.lk === sp.getAttribute('data-prognose-lk'); })[0];
+        sp.hidden = !(p && L.istZahl(p.prognose) && p.anzahl !== p.prognose);
+        if (p && L.istZahl(p.prognose)) sp.textContent = t('langzeit_prognose', { n: p.prognose });
+      });
       return;
     }
     if (fokusIn(sheet)) return;
   }
   k.gerendert = schluessel;
   document.getElementById('karteTitel').textContent = teig.name;
-  document.getElementById('karteUntertitel').textContent = (k.rolle === 'prognose' ? t('karte_prognose', { tag: tagText(S.backtagMorgen) }) : tagText(S.backtag)) + ' · ' + (k.index + 1) + '/' + k.liste.length;
+  document.getElementById('karteUntertitel').textContent = (k.rolle === 'prognose' ? t('karte_prognose', { tag: tagText(S.backtagMorgen) })
+    : k.rolle === 'langzeit' ? t('langzeit_karte', { tag: tagText(S.backtagMorgen) }) : tagText(S.backtag)) + ' · ' + (k.index + 1) + '/' + k.liste.length;
   document.getElementById('karteZurueckBtn').disabled = k.index <= 0;
   document.getElementById('karteVorBtn').disabled = k.index >= k.liste.length - 1;
-  const reiter = k.rolle === 'heute' ? [['zahlen', t('reiter_zahlen')], ['anpassen', t('reiter_anpassen')]] : [['zahlen', t('reiter_zahlen')]];
+  const mitAnpassen = (k.rolle === 'heute' && !r.aufarbeiten) || k.rolle === 'langzeit';
+  if (!mitAnpassen && k.reiter === 'anpassen') k.reiter = 'zahlen';
+  const reiter = mitAnpassen ? [['zahlen', t('reiter_zahlen')], ['anpassen', t('reiter_anpassen')]] : [['zahlen', t('reiter_zahlen')]];
   document.getElementById('karteReiter').innerHTML = reiter.map(function (x) {
     return '<button type="button" role="tab" data-aktion="karte-reiter" data-reiter="' + x[0] + '" aria-selected="' + (k.reiter === x[0]) + '">' + esc(x[1]) + '</button>';
   }).join('');
@@ -1580,7 +1822,13 @@ function vorratFeldHTML(r, p) {
 }
 function zahlenHTML(r) {
   let html = '';
-  if (r.rolle === 'heute' && r.teig.hinweisOben) html += '<div class="hinweis rot gross">' + esc(r.teig.hinweisOben) + '</div>';
+  if ((r.rolle === 'heute' || r.rolle === 'langzeit') && r.teig.hinweisOben) html += '<div class="hinweis rot gross">' + esc(r.teig.hinweisOben) + '</div>';
+  if (r.aufarbeiten) html += '<div class="hinweis blau gross">' + esc(aufarbeitenText(r.teig)) + '</div><div class="klein">' + esc(t('aufarbeiten_hilfe')) + '</div>';
+  if (r.rolle === 'langzeit') {
+    const morgenName = WOCHENTAGE[S.backtagMorgen.getDay()];
+    html += '<div class="hinweis langzeit-hinweis">' + esc(t('langzeit_hinweis', { tag: morgenName })) + '</div>';
+    if (r.calc.status === 'leer') html += '<div class="hinweis rot">' + esc(t('langzeit_prognose_fehlt', { tag: morgenName })) + '</div>';
+  }
   if (r.vorrat) {
     html += '<div class="hinweis vorrat-hinweis">' + esc(t('vorrat_hilfe')) + '</div>' +
       '<div class="zahl-block">' + r.posten.map(function (p) { return vorratFeldHTML(r, p); }).join('') + '</div>' +
@@ -1593,6 +1841,7 @@ function zahlenHTML(r) {
     return '<label class="zahl-zeile"><span class="zz-name">' + esc(p.name) + (L.istZahl(p.einwaageG)
         ? '<span class="zz-einwaage">' + esc(t('einwaage_klein', { g: Math.round(p.einwaageG) })) + (p.abw ? ' ' + esc(t('einwaage_heute')) : '') + '</span>'
         : '<span class="zz-einwaage rot">' + esc(t('einwaage_fehlt_kurz')) + '</span>') + '</span>' +
+      (r.rolle === 'langzeit' ? '<span class="zz-prognose" data-prognose-lk="' + esc(p.lk) + '"' + (L.istZahl(p.prognose) && p.anzahl !== p.prognose ? '' : ' hidden') + '>' + esc(L.istZahl(p.prognose) ? t('langzeit_prognose', { n: p.prognose }) : '') + '</span>' : '') +
       '<input class="zahl-eingabe" data-lk="' + esc(p.lk) + '" data-teig="' + esc(r.teig.id) + '" data-rolle="' + esc(r.rolle) + '" data-geschrieben="' + esc(L.istZahl(p.anzahl) ? String(p.anzahl) : '') + '" inputmode="numeric" enterkeyhint="next" autocomplete="off" value="' + esc(L.istZahl(p.anzahl) ? String(p.anzahl) : '') + '"></label>';
   }).join('') + '</div>' +
   '<div class="karte-weiter"><button type="button" class="bos-btn bos-btn--amber" data-aktion="karte-weiter">' + esc(t('weiter')) + '</button></div>' +
@@ -1602,6 +1851,8 @@ function zahlenHTML(r) {
 function karteInfoHTML(r) {
   const c = r.calc, x = r.teig, anp = r.anp;
   const zeilen = [];
+  /* „nur aufarbeiten“: keine Rechnung, kein Abgleich (Ulf, Entscheidung 8). */
+  if (r.aufarbeiten) return '';
   if (r.rolle === 'prognose') {
     if (c.status === 'einwaageFehlt') zeilen.push('<li class="rot">' + esc(t('einwaage_fehlt_lang', { liste: c.fehlendeEinwaage.map(produktName).join(', ') })) + '</li>');
     else if (istFertig(c) || c.status === 'teilweise') {
@@ -1632,8 +1883,21 @@ function karteInfoHTML(r) {
     else if (r.wasserT.ohneTemperatur) zeilen.push('<li class="klein">' + esc(t('wassertemp_ohne_aussen')) + '</li>');
     else zeilen.push('<li>' + esc(t('wassertemp', { c: Math.round(r.wasserT.wert) })) + (r.wasserT.rand ? ' <span class="klein">' + esc(t('tabelle_rand')) + '</span>' : '') + '</li>');
   }
+  /* 2b. Mehl dazu (nur mit Mehl-Regel; steht sonst in der Kachel) */
+  if (!mitKacheln && hatMehlRegel(r.tw) && c.m > 0) zeilen.push('<li>' + esc(t('mehl_dazu', { kg: fmtMehl(c.m) })) + ' ' + esc(mehlName(r.tw)) + '</li>');
+  /* 3a. Hefe des Langzeitteigs in Gramm (Sommer/Winter, ohne Tabelle) */
+  if (r.rolle === 'langzeit' && L.istZahl(c.hefeKg)) {
+    const n = c.kessel > 1 ? c.kessel : 1, jeG = c.hefeKg * 1000 / n;
+    const jz = r.lzHefe && r.lzHefe.jahreszeit ? t(r.lzHefe.jahreszeit === 'sommer' ? 'jz_sommer' : 'jz_winter') : '';
+    let h = '<li>' + esc(t('hefe_g', { jz: jz || t('jahreszeit_offen'), g: (n > 1 ? n + ' × ' : '') + L.grammText(jeG) })) +
+      (n > 1 ? ' <span class="klein">(' + esc(L.grammText(c.hefeKg * 1000)) + ' gesamt)</span>' : '');
+    if (L.istZahl(anp.hefeKg)) h += abw(t('heute_angepasst'));
+    else if (r.lzHefe && r.lzHefe.fehlt === 'jahreszeit') h += ' <span class="klein">' + esc(t('hefe_jahreszeit_fehlt')) + '</span>';
+    else if (r.lzHefe && r.lzHefe.fehlt) h += ' <span class="klein">' + esc(t('hefe_langzeit_fehlt', { jz: jz })) + '</span>';
+    zeilen.push(h + '</li>');
+  }
   /* 3. Hefe (auf T, wie WinBack) */
-  if (L.istZahl(c.hefeKg)) {
+  else if (L.istZahl(c.hefeKg)) {
     const hm = L.mengeJeKessel(c.hefeKg, c.kessel, 'kg', 2);
     let h = '<li>' + esc(t('hefe', { kg: hm.haupt })) + (hm.gesamt ? ' <span class="klein">(' + esc(hm.gesamt) + ')</span>' : '');
     if (L.istZahl(anp.hefeKg)) h += abw(t('heute_statt', { statt: L.istZahl(c.hefeRezeptKg) ? fmtHefe(c.hefeRezeptKg + (c.hefeDeltaKg || 0)) : '–' }));
@@ -1656,7 +1920,8 @@ function karteInfoHTML(r) {
   else if (c.status === 'null') erg = t('status_null');
   else if (c.status === 'einwaageFehlt') erg = t('einwaage_fehlt_lang', { liste: c.fehlendeEinwaage.map(produktName).join(', ') });
   else {
-    erg = t(r.vorrat ? 'rechnung_vorrat' : 'rechnung', { summe: fmtKg(c.summeKg), rest: fmtKg(kr) }) + (x.ohneSchuettwasser || !c.r ? '' : ', ' + t('wasser_weniger', { l: fmtL(c.r) })) + ' → ' +
+    erg = t(r.vorrat ? 'rechnung_vorrat' : 'rechnung', { summe: fmtKg(c.summeKg), rest: fmtKg(kr) }) + (x.ohneSchuettwasser || !c.r ? '' : ', ' + t('wasser_weniger', { l: fmtL(c.r) })) +
+      (c.m ? ', ' + t('rechnung_mehl', { kg: fmtMehl(c.m) }) : '') + ' → ' +
       (c.kessel > 1 ? t('in_winback_kessel', { gesamt: fmtKg(c.T), n: c.kessel, je: fmtKg(c.jeKesselKg) }) : t('in_winback', { kg: fmtKg(c.T) }));
     if (c.status === 'teilweise') erg = t('noch_nicht_alle') + ' ' + erg;
   }
@@ -1672,24 +1937,46 @@ function karteInfoHTML(r) {
       else if (!L.istZahl(r.tw.wasserLiterJeKg)) wasser += '<span class="k-unter">' + esc(t('keine_wasserregel')) + '</span>';
     }
     const km = L.mengeJeKessel(c.T, c.kessel, 'kg', 1);
-    kacheln = '<div class="ergebnis-kacheln' + (c.status === 'teilweise' ? ' vorlaeufig' : '') + '">' +
-      '<div class="kachel"><span class="k-label">' + esc(t('k_wasser')) + '</span>' + wasser + '</div>' +
+    /* Dritte Kachel „Mehl dazu“ nur mit Mehl-Regel und Menge über 0 oder Nacht-Wert (Anweisung A). */
+    const mitMehl = hatMehlRegel(r.tw) && (c.m > 0 || L.istZahl(anp.mehlKg));
+    let mehl = '';
+    if (mitMehl) {
+      const mm = L.mengeJeKessel(c.m, c.m ? c.kessel : 1, 'kg', mehlStellen(c.m / (c.m ? c.kessel : 1)));
+      mehl = '<div class="kachel mehl"><span class="k-label">' + esc(t(c.kessel > 1 && c.m ? 'k_mehl_je' : 'k_mehl')) + '</span><span class="k-wert">' + esc(mm.haupt) + '</span>' +
+        '<span class="k-unter">' + esc(mehlName(r.tw) + (mm.gesamt ? ' · ' + mm.gesamt : '')) + '</span>' +
+        (L.istZahl(anp.mehlKg) ? '<span class="k-unter">' + abw(t('heute_statt', { statt: fmtMehl(c.mRegel || 0) })) + '</span>' : '') + '</div>';
+    }
+    kacheln = '<div class="ergebnis-kacheln' + (mitMehl ? ' drei' : '') + (c.status === 'teilweise' ? ' vorlaeufig' : '') + '">' +
+      '<div class="kachel"><span class="k-label">' + esc(t('k_wasser')) + '</span>' + wasser + '</div>' + mehl +
       '<div class="kachel winback"><span class="k-label">' + esc(t(c.status === 'teilweise' ? 'k_winback_vorlaeufig' : (c.kessel > 1 ? 'k_winback_je' : 'k_winback'))) + '</span><span class="k-wert">' + esc(km.haupt) + '</span>' +
         '<span class="k-unter">' + esc(km.gesamt ? km.gesamt + ' · ' + t('k_kg_nicht_stueck') : t('k_kg_nicht_stueck')) + '</span></div></div>';
   }
   let html = kacheln + '<ul class="info-liste">' + zeilen.join('') + '</ul>' + (mitKacheln ? '' : '<div class="hinweis">' + esc(t('winback_hinweis')) + '</div>');
   if (x.zutaten && x.zutaten.length) html += '<div class="unterkopf">' + esc(t('teig_zutaten')) + '</div>' + zutatenListeHTML(x.zutaten);
-  if (x.vorstufe) html += '<div class="unterkopf">' + esc(t('teig_vorstufe', { name: x.vorstufe })) + '</div><div class="klein">' + esc(t('vorstufe_gestern')) + '</div>';
+  /* Vornacht (Punkt 68): statt des festen Satzes die Zahl aus der Vornacht.
+     Beim Langzeitteig: Vorstufe nicht unterstützt (Bauplan §2.3). */
+  if (x.vorstufe) html += '<div class="unterkopf">' + esc(t('teig_vorstufe', { name: x.vorstufe })) + '</div><div class="vornacht-zeile' + (r.rolle === 'langzeit' ? ' rot' : '') + '">' +
+    esc(r.rolle === 'langzeit' ? t('vorstufe_lz') : vornachtVorstufeText(x)) + '</div>';
   return html;
+}
+/* Mehl: 0,75 kg statt 0,8 kg — bei halben Kilo und weniger zwei Stellen. */
+function mehlStellen(kg) { return Math.abs(Math.round(kg * 10) - kg * 10) > 1e-6 ? 2 : 1; }
+function fmtMehl(kg) { return fmt(kg, mehlStellen(kg)) + ' kg'; }
+function mehlName(tw) {
+  const z = tw && tw.mehlZutatId ? zm()[tw.mehlZutatId] : null;
+  return z ? z.name : t('mehl_zutat_fehlt');
 }
 /* Reiter „Anpassen“: oben „nur heute Nacht“ für jeden, darunter die dauerhafte
    Regel nur mit Teig-Haken (ohne Haken ausgeblendet, nicht gesperrt). */
 function anpassenHTML(r) {
   const x = r.teig, anp = r.anp, c = r.calc;
-  const feld = function (label, anpFeld, wertJetzt, einheit, extra) {
+  /* faktor (v0.12): Anzeige ≠ Speicher, z. B. Hefe des Langzeitteigs in g, gespeichert in kg. */
+  const feld = function (label, anpFeld, wertJetzt, einheit, extra, faktor) {
+    const f = faktor || 1;
     const gesetzt = L.istZahl(anpFeld === 'kesselrest' ? r.kesselrestNacht : (anpFeld.indexOf('einwaage:') === 0 ? (anp.einwaage || {})[anpFeld.slice(9)] : anp[anpFeld]));
+    const ist = gesetzt ? (anpFeld === 'kesselrest' ? r.kesselrestNacht : (anpFeld.indexOf('einwaage:') === 0 ? anp.einwaage[anpFeld.slice(9)] : anp[anpFeld])) : null;
     return '<div class="anp-zeile"><label class="bos-label">' + esc(label) + '</label><div class="feld-zeile">' +
-      '<input class="bos-input" data-anp="' + esc(anpFeld) + '" inputmode="decimal" placeholder="' + esc(zahlText(wertJetzt)) + '" value="' + (gesetzt ? esc(zahlText(anpFeld === 'kesselrest' ? r.kesselrestNacht : (anpFeld.indexOf('einwaage:') === 0 ? anp.einwaage[anpFeld.slice(9)] : anp[anpFeld]))) : '') + '"> ' + esc(einheit) +
+      '<input class="bos-input" data-anp="' + esc(anpFeld) + '"' + (f !== 1 ? ' data-faktor="' + f + '"' : '') + ' inputmode="decimal" placeholder="' + esc(zahlText(wertJetzt)) + '" value="' + (gesetzt ? esc(zahlText(f !== 1 ? Math.round(ist * f * 1000) / 1000 : ist)) : '') + '"> ' + esc(einheit) +
       (gesetzt ? ' <button type="button" class="bos-btn" data-aktion="anp-zurueck" data-anp="' + esc(anpFeld) + '">' + esc(t('normalwert')) + '</button>' : '') +
       '</div>' + (extra ? '<div class="feld-hilfe">' + esc(extra) + '</div>' : '') + '</div>';
   };
@@ -1698,7 +1985,9 @@ function anpassenHTML(r) {
     html += feld(t('anp_wasser'), 'wasserL', L.istZahl(c.rRegel) ? Math.round(c.rRegel * 10) / 10 : null, 'L', t('anp_wasser_hilfe'));
     html += feld(t('anp_wassertemp'), 'wasserC', r.wasserT && L.istZahl(r.wasserT.wert) ? Math.round(r.wasserT.wert) : null, '°C');
   }
-  html += feld(t('anp_hefe'), 'hefeKg', L.istZahl(c.hefeRezeptKg) ? Math.round((c.hefeRezeptKg + (c.hefeDeltaKg || 0)) * 100) / 100 : null, 'kg');
+  if (hatMehlRegel(r.tw)) html += feld(t('anp_mehl'), 'mehlKg', L.istZahl(c.mRegel) ? Math.round(c.mRegel * 100) / 100 : null, 'kg', t('anp_mehl_hilfe'));
+  if (r.rolle === 'langzeit') html += feld(t('anp_hefe_g'), 'hefeKg', L.istZahl(c.hefeRezeptKg) ? Math.round(c.hefeRezeptKg * 10000) / 10 : null, 'g', '', 1000);
+  else html += feld(t('anp_hefe'), 'hefeKg', L.istZahl(c.hefeRezeptKg) ? Math.round((c.hefeRezeptKg + (c.hefeDeltaKg || 0)) * 100) / 100 : null, 'kg');
   html += feld(t('anp_kesselrest'), 'kesselrest', r.kesselrestStamm, 'kg');
   r.posten.forEach(function (p) { html += feld(t('anp_einwaage', { name: p.name }), 'einwaage:' + p.lk, p.stammG, 'g'); });
   html += temperaturHTML() + '</div>';
@@ -1710,8 +1999,13 @@ function regelEntwurf(r) {
   const brote = r.calc.anzahl > 0 ? r.calc.anzahl : (L.istZahl(tw.wasserRefBrote) ? tw.wasserRefBrote : null);
   const literBisher = (L.istZahl(tw.wasserLiterJeKg) && L.istZahl(r.calc.D) && r.calc.anzahl > 0) ? Math.round(tw.wasserLiterJeKg * r.calc.D * 10) / 10
     : (L.istZahl(tw.wasserRefLiter) ? tw.wasserRefLiter : null);
+  const mehlBisher = (L.istZahl(tw.mehlKgJeKg) && L.istZahl(r.calc.D) && r.calc.anzahl > 0) ? Math.round(tw.mehlKgJeKg * r.calc.D * 100) / 100
+    : (L.istZahl(tw.mehlRefZugabeKg) ? tw.mehlRefZugabeKg : null);
   return {
     refBrote: brote, refLiter: literBisher, wasserGeaendert: false,
+    mehlBrote: brote, mehlKg: mehlBisher, mehlZutatId: tw.mehlZutatId || '', mehlGeaendert: false,
+    lzSommerG: L.istZahl(tw.langzeitHefeSommerG) ? tw.langzeitHefeSommerG : null, lzSommerKg: L.istZahl(tw.langzeitHefeSommerBeiKg) ? tw.langzeitHefeSommerBeiKg : null,
+    lzWinterG: L.istZahl(tw.langzeitHefeWinterG) ? tw.langzeitHefeWinterG : null, lzWinterKg: L.istZahl(tw.langzeitHefeWinterBeiKg) ? tw.langzeitHefeWinterBeiKg : null,
     tabelle: (tw.tabelle || []).map(function (z) { return { aussenC: z.aussenC, wasserC: z.wasserC, hefeDeltaG: z.hefeDeltaG }; }),
     einwaage: Object.assign({}, tw.einwaage || {}),
     kesselMaxKg: L.istZahl(tw.kesselMaxKg) ? tw.kesselMaxKg : null,
@@ -1733,6 +2027,15 @@ function regelHTML(r) {
       '<div class="feld-zeile">' + esc(t('regel_bei')) + ' ' + eing('refBrote', e.refBrote, ' style="max-width:90px"') + ' ' + esc(t('regel_brote')) + ' ' +
       eing('refLiter', e.refLiter, ' style="max-width:90px"') + ' ' + esc(t('regel_liter')) + '</div><div class="feld-hilfe">' + esc(t('regel_wasser_hilfe')) + '</div></div>';
   }
+  html += mehlRegelHTML(r, e, eing);
+  if (L.istLangzeit(x, S.produkte)) {
+    html += '<div class="anp-zeile"><label class="bos-label">' + esc(t('regel_lz_hefe')) + '</label>' +
+      ['Sommer', 'Winter'].map(function (jz) {
+        return '<div class="feld-zeile"><span class="fz-name">' + esc(t(jz === 'Sommer' ? 'regel_lz_sommer' : 'regel_lz_winter')) + '</span>' +
+          eing('lz' + jz + 'G', e['lz' + jz + 'G'], ' style="max-width:90px"') + ' ' + esc(t('regel_lz_g')) + ' ' +
+          eing('lz' + jz + 'Kg', e['lz' + jz + 'Kg'], ' style="max-width:90px"') + ' ' + esc(t('regel_lz_kg')) + '</div>';
+      }).join('') + '<div class="feld-hilfe">' + esc(t('regel_lz_hilfe')) + '</div></div>';
+  }
   html += '<div class="anp-zeile"><label class="bos-label">' + esc(t('regel_tabelle')) + '</label><div class="feld-hilfe">' + esc(t('regel_tabelle_hilfe')) + '</div>' +
     '<div class="tabelle-kopf"><span>' + esc(t('tab_aussen')) + '</span><span>' + esc(t('tab_wasser')) + '</span><span>' + esc(t('tab_hefe')) + '</span><span></span></div>' +
     e.tabelle.map(function (z, i) {
@@ -1751,17 +2054,43 @@ function regelHTML(r) {
   }
   return html + '</div>';
 }
+/* Mehl-Regel im Regel-Block (Anweisung A): „Bei n Broten x kg [Mehl ▾]“. */
+function mehlRegelHTML(r, e, eing) {
+  const tw = r.tw, x = r.teig;
+  const bisher = (L.istZahl(tw.mehlKgJeKg) && L.istZahl(r.calc.D) && r.calc.anzahl > 0)
+    ? t('regel_mehl_bisher', { brote: r.calc.anzahl, name: x.name, kg: fmtMehl(tw.mehlKgJeKg * r.calc.D) })
+    : (L.istZahl(tw.mehlRefBrote) ? t('regel_mehl_gepflegt', { brote: tw.mehlRefBrote, kg: fmtMehl(tw.mehlRefZugabeKg || 0) }) : t('regel_mehl_keine'));
+  /* Auswahl: Gruppe „Mehle & Schrote“ vorn, dann alle übrigen; Silo-Zutaten markiert. */
+  const zut = L.aktiv(S.zutaten).slice().sort(function (a, b) {
+    const ga = L.gruppeVon(a) === 'mehle' ? 0 : 1, gb = L.gruppeVon(b) === 'mehle' ? 0 : 1;
+    return ga - gb || String(a.name).localeCompare(String(b.name), 'de');
+  });
+  const gewaehlt = e.mehlZutatId ? zm()[e.mehlZutatId] : null;
+  const auswahl = '<select class="bos-input" data-entwurf="mehlZutatId" style="max-width:240px"><option value="">' + esc(t('regel_mehl_waehlen')) + '</option>' +
+    zut.map(function (z) { return '<option value="' + esc(z.id) + '"' + (z.id === e.mehlZutatId ? ' selected' : '') + '>' + esc(z.name + (L.istSilo(z) ? ' (Silo)' : '')) + '</option>'; }).join('') + '</select>';
+  return '<div class="anp-zeile"><label class="bos-label">' + esc(t('regel_mehl')) + '</label><div class="klein">' + esc(bisher) + '</div>' +
+    '<div class="feld-zeile">' + esc(t('regel_bei')) + ' ' + eing('mehlBrote', e.mehlBrote, ' style="max-width:90px"') + ' ' + esc(t('regel_brote')) + ' ' +
+    eing('mehlKg', e.mehlKg, ' style="max-width:90px"') + ' ' + esc(t('regel_mehl_kg')) + '</div>' +
+    '<div class="feld-zeile"><span class="fz-name">' + esc(t('regel_mehl_welches')) + '</span>' + auswahl + '</div>' +
+    (gewaehlt && L.istSilo(gewaehlt) ? '<div class="hinweis rot">' + esc(t('regel_mehl_silo')) + '</div>' : '') +
+    '<div class="feld-hilfe">' + esc(t('regel_mehl_hilfe')) + '</div></div>';
+}
 async function speichereRegel() {
   const k = S.karte;
   if (!k || !k.entwurf) return;
   const teig = tm()[k.liste[k.index]];
-  const r = teigRechnung(teig, 'heute');
+  const r = teigRechnung(teig, k.rolle === 'langzeit' ? 'langzeit' : 'heute');
   const e = k.entwurf, tw = r.tw, meldung = document.getElementById('karteMeldung');
   meldung.textContent = '';
   if (!S.haken.teige) { meldung.textContent = t('err_perm'); return; }
   if (!online()) { meldung.textContent = t('offline_pflege'); return; }
   if (S.verbindung.ausstehend.teigwerte) { meldung.textContent = t('warte_uebertragung'); return; }
-  const daten = {};
+  /* N1 (Bauplan 08.10.): vom vorhandenen Dokument ausgehen und nur Geändertes
+     überschreiben — vorher entstand es aus einer festen Feldauswahl neu und
+     hätte jedes Feld verloren, das diese Funktion nicht kennt. */
+  const daten = Object.assign({}, tw);
+  ['id', 'sicherungId', 'geaendertVon', 'geaendertAm'].forEach(function (f) { delete daten[f]; });
+  ['einwaage', 'tabelle', 'kesselMaxKg', 'kesselrestKg'].forEach(function (f) { delete daten[f]; });
   const einwaage = {};
   let fehler = '';
   Object.keys(e.einwaage).forEach(function (lk) {
@@ -1782,17 +2111,40 @@ async function speichereRegel() {
   if (L.istZahl(e.kesselMaxKg)) { if (e.kesselMaxKg > 0) daten.kesselMaxKg = e.kesselMaxKg; else fehler = t('v_kessel'); }
   if (L.istZahl(e.kesselrestKg)) { if (e.kesselrestKg >= 0) daten.kesselrestKg = e.kesselrestKg; else fehler = t('v_kesselrest'); }
   /* Wasserregel: nur neu umrechnen, wenn sie geändert wurde — sonst bliebe
-     sie nicht exakt dieselbe, weil sich die Brotmischung der Nacht ändert. */
-  ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter'].forEach(function (f) { if (L.istZahl(tw[f])) daten[f] = tw[f]; });
+     sie nicht exakt dieselbe, weil sich die Brotmischung der Nacht ändert.
+     (Die bisherigen Werte stehen seit v0.12 schon in daten.) */
+  /* Bezugsmenge in kg Teig für „bei n Broten“ — Wasser und Mehl gleich. */
+  const bezugKg = function (brote) {
+    if (r.calc.anzahl > 0 && L.istZahl(r.calc.D) && r.calc.D > 0) return r.calc.D * brote / r.calc.anzahl;
+    const erste = r.produkte.map(function (p) { return einwaage[p.legacyKey]; }).filter(L.istZahl)[0];
+    return L.istZahl(erste) ? brote * erste / 1000 : null;
+  };
+  /* Mehl-Regel (v0.12): nur neu umrechnen, wenn geändert. Leer = Regel entfernen. */
+  if (e.mehlGeaendert) {
+    const leer = !L.istZahl(e.mehlKg) && !L.istZahl(e.mehlBrote) && !e.mehlZutatId;
+    if (leer) ['mehlKgJeKg', 'mehlRefBrote', 'mehlRefKg', 'mehlRefZugabeKg', 'mehlZutatId'].forEach(function (f) { delete daten[f]; });
+    else if (!(L.istZahl(e.mehlBrote) && e.mehlBrote > 0) || !(L.istZahl(e.mehlKg) && e.mehlKg >= 0) || !e.mehlZutatId) fehler = t('v_mehlregel');
+    else {
+      const refKg = bezugKg(e.mehlBrote);
+      if (!L.istZahl(refKg)) fehler = t('v_mehlregel_einwaage');
+      else {
+        daten.mehlKgJeKg = L.mehlRegelKgJeKg(e.mehlKg, refKg);
+        daten.mehlRefBrote = e.mehlBrote; daten.mehlRefKg = refKg; daten.mehlRefZugabeKg = e.mehlKg; daten.mehlZutatId = e.mehlZutatId;
+      }
+    }
+  }
+  /* Langzeit-Hefe (v0.12): je Jahreszeit beide Zahlen oder keine. */
+  ['Sommer', 'Winter'].forEach(function (jz) {
+    const g = e['lz' + jz + 'G'], kg = e['lz' + jz + 'Kg'];
+    const fg = 'langzeitHefe' + jz + 'G', fkg = 'langzeitHefe' + jz + 'BeiKg';
+    if (!L.istZahl(g) && !L.istZahl(kg)) { delete daten[fg]; delete daten[fkg]; return; }
+    if (!(L.istZahl(g) && g >= 0 && L.istZahl(kg) && kg > 0)) { fehler = t('v_lz_hefe'); return; }
+    daten[fg] = g; daten[fkg] = kg;
+  });
   if (e.wasserGeaendert && !teig.ohneSchuettwasser) {
     if (!(L.istZahl(e.refBrote) && e.refBrote > 0) || !(L.istZahl(e.refLiter) && e.refLiter >= 0)) fehler = t('v_wasserregel');
     else {
-      let refKg = null;
-      if (r.calc.anzahl > 0 && L.istZahl(r.calc.D) && r.calc.D > 0) refKg = r.calc.D * e.refBrote / r.calc.anzahl;
-      else {
-        const erste = r.produkte.map(function (p) { return einwaage[p.legacyKey]; }).filter(L.istZahl)[0];
-        if (L.istZahl(erste)) refKg = e.refBrote * erste / 1000;
-      }
+      const refKg = bezugKg(e.refBrote);
       if (!L.istZahl(refKg)) fehler = t('v_wasserregel_einwaage');
       else {
         daten.wasserLiterJeKg = L.wasserRegelLiterJeKg(e.refLiter, refKg);
@@ -1839,10 +2191,10 @@ function commitZahl(inp) {
     schreibeNacht(heuteStr(), dv);
     return;
   }
-  const feld = rolle === 'prognose' ? 'prognose' : 'brote';
+  const feld = rolle === 'prognose' ? 'prognose' : rolle === 'langzeit' ? 'langzeit' : 'brote';
   const tag = rolle === 'prognose' ? morgenStr() : heuteStr();
   const daten = {}; daten[feld] = {}; daten[feld][lk] = n === null ? FV().delete() : n;
-  if (rolle === 'heute') { daten.rezeptStand = {}; daten.rezeptStand[teig.id] = teig.sicherungId || ''; }
+  if (rolle === 'heute' || rolle === 'langzeit') { daten.rezeptStand = {}; daten.rezeptStand[teig.id] = teig.sicherungId || ''; }
   schreibeNacht(tag, daten);
 }
 function commitAnpassung(inp) {
@@ -1850,8 +2202,10 @@ function commitAnpassung(inp) {
   if (!k) return;
   const teig = tm()[k.liste[k.index]];
   const feld = inp.getAttribute('data-anp');
-  const n = parseZahl(inp.value);
-  if (n !== null && !(n >= 0)) { toast(t('v_zahl')); return; }
+  const roh = parseZahl(inp.value);
+  if (roh !== null && !(roh >= 0)) { toast(t('v_zahl')); return; }
+  const faktor = Number(inp.getAttribute('data-faktor')) || 1;
+  const n = roh === null ? null : roh / faktor;
   if (feld === 'kesselrest') {
     const d = { kesselrest: {} }; d.kesselrest[teig.id] = n === null ? FV().delete() : n;
     schreibeNacht(heuteStr(), d);
@@ -1866,7 +2220,8 @@ function entwurfEingabe(inp) {
   const wert = (n === null || isNaN(n)) ? null : n;
   if (feld === 'tabelle') e.tabelle[Number(inp.getAttribute('data-zeile'))][inp.getAttribute('data-spalte')] = wert;
   else if (feld === 'einwaage') e.einwaage[inp.getAttribute('data-lk')] = wert;
-  else { e[feld] = wert; if (feld === 'refBrote' || feld === 'refLiter') e.wasserGeaendert = true; }
+  else if (feld === 'mehlZutatId') { e.mehlZutatId = String(inp.value || ''); e.mehlGeaendert = true; }
+  else { e[feld] = wert; if (feld === 'refBrote' || feld === 'refLiter') e.wasserGeaendert = true; if (feld === 'mehlBrote' || feld === 'mehlKg') e.mehlGeaendert = true; }
 }
 
 function wo(zutatId) {
@@ -1897,7 +2252,7 @@ function teigChipsHTML(datum, rolle) {
 function sammelHTML(datum, rolle, feld) {
   const a = auswahl(datum);
   if (!a.ids.length) return '<p class="status">' + esc(t('keine_auswahl')) + '</p>';
-  const gruppen = L.einsammelliste(a.ids, S.teige, S.zutaten, S.orte, feld);
+  const gruppen = L.einsammelliste(a.ids, S.teige, S.zutaten, S.orte, feld, rolle === 'heute' ? mehlZusatz(a.ids) : null);
   if (!gruppen.length) return '<p class="status">' + esc(t('nichts_zu_sammeln')) + '</p>';
   const haken = lokalTag(datum)['haken_' + rolle] || {};
   return gruppen.map(function (g) {
@@ -1910,7 +2265,8 @@ function sammelHTML(datum, rolle, feld) {
       const an = !!haken[e.zutatId];
       return '<div class="zeile">' +
         '<button type="button" class="zeile-haupt" aria-pressed="' + an + '" data-aktion="abhaken" data-rolle="' + rolle + '" data-id="' + esc(e.zutatId) + '">' +
-          '<span class="z-name">' + esc(name) + '</span><span class="z-fuer">' + esc(t('fuer', { liste: e.teige.join(', ') })) + '</span></button>' +
+          '<span class="z-name">' + esc(name) + '</span>' + (e.teige.length ? '<span class="z-fuer">' + esc(t('fuer', { liste: e.teige.join(', ') })) + '</span>' : '') +
+          (e.mengen || []).map(function (m) { return '<span class="z-fuer z-mehl">' + esc(L.istZahl(m.kg) ? t('mehl_sammeln', { kg: fmtMehl(m.kg), teig: m.teig }) : t('mehl_sammeln_offen', { teig: m.teig })) + '</span>'; }).join('') + '</button>' +
         '<button type="button" class="geplant" aria-disabled="true" data-aktion="nicht-gefunden">' + esc(t('nicht_gefunden')) + '</button>' +
       '</div>';
     }).join('');
@@ -1918,6 +2274,23 @@ function sammelHTML(datum, rolle, feld) {
   }).join('');
 }
 
+/* Mehl von Hand auf die Einsammelliste (Anweisung A): je ausgewähltem Teig der
+   Nacht mit Mehl-Regel und Mehl-Zutat; Menge, sobald die Brotzahlen stehen.
+   Mehl 0 heute (Regel 0 oder „heute 0“) → kein Eintrag. */
+function mehlZusatz(ids) {
+  const arbeit = {};
+  teigeMitArbeit().forEach(function (r) { arbeit[r.teig.id] = r; });
+  const aus = [];
+  ids.forEach(function (id) {
+    const r = arbeit[id];
+    if (!r || !hatMehlRegel(r.tw) || !r.tw.mehlZutatId) return;
+    const fertig = istFertig(r.calc) || r.calc.status === 'teilweise';
+    if (fertig && !(r.calc.m > 0)) return;
+    if (!fertig && !(r.tw.mehlKgJeKg > 0) && !(r.anp.mehlKg > 0)) return;
+    aus.push({ zutatId: r.tw.mehlZutatId, teigName: r.teig.name, kg: istFertig(r.calc) ? r.calc.m : null });
+  });
+  return aus;
+}
 function renderEinsammeln() {
   const el = document.getElementById('ansichtEinsammeln');
   el.innerHTML =
@@ -2180,12 +2553,14 @@ document.addEventListener('click', function (e) {
       if (offen) commitZahl(offen);
       S.vorratEinheit[el.getAttribute('data-lk')] = el.getAttribute('data-einheit'); renderKarte(true); break;
     }
+    case 'jahreszeit': setzeJahreszeit(el.getAttribute('data-wert')); break;
     case 'vorstufe-wahl': { const dw = { vorstufeWahl: {} }; dw.vorstufeWahl[id] = Number(el.getAttribute('data-n')); schreibeNacht(morgenStr(), dw); break; }
     case 'abbrechen': schliesseEdit(); break;
   }
 });
 document.addEventListener('change', function (e) {
   const el = e.target;
+  if (el.tagName === 'SELECT' && el.hasAttribute('data-entwurf')) { entwurfEingabe(el); renderKarte(true); return; }
   if (el.classList && el.classList.contains('zahl-eingabe')) commitZahl(el);
   else if (el.hasAttribute && el.hasAttribute('data-anp')) commitAnpassung(el);
   else if (el.id === 'tempManuell') {
@@ -2227,18 +2602,19 @@ const helpData = {
   sections: [
     { heading: 'Wofür ist diese Seite?', text: 'In die Teigecke gehen, Brotzahlen eingeben, loslegen. Die Seite sagt dir je Teig, welche Menge du in WinBack eingibst, wie viel Wasser du weglässt, welche Wassertemperatur und wie viel Hefe passen — und welche Zutaten du brauchst und in welchem Wagen sie stehen. Die einzelnen Mengen zeigt dir weiter WinBack beim Abwiegen. BOS ist der Vermittler, nicht der Rezeptcomputer.' },
     { heading: 'Welcher Tag wird angezeigt?', text: 'Oben steht der Backtag: der Tag, FÜR den gebacken wird. In der Nacht zum Mittwoch ist das Mittwoch. Ab 12 Uhr mittags springt die Seite auf den nächsten Backtag um. Alles, was du „nur für heute Nacht“ geändert hast, ist dann wieder weg, und es gelten die normalen Werte.' },
-    { heading: 'Reiter „Teige“: die Liste', text: 'Du siehst die Teige des Backtags in der Reihenfolge, in der sie abgewogen werden. Unter dem Namen stehen die Brote des Teigs, jeweils mit ihrer Einwaage; fehlt eine, steht dort rot „Einwaage fehlt“. Rechts stehen die Anzahl und die Zahl für WinBack. Passt der Teig nicht in einen Kessel, steht dort die Menge je Kessel, zum Beispiel „2 × 106,6 kg“: zweimal 106,6 kg eingeben, nicht die Gesamtmenge. Die steht nur klein darunter („213,2 kg gesamt“). Tippst du einen Teig an, öffnet sich seine Karte. Ein grüner Haken heißt: alle Zahlen stehen. Ein Strich heißt: heute nicht (alle Brote 0) — damit sieht man den Unterschied zu „vergessen“. Ein Warnzeichen heißt: bei einem Brot fehlt die Einwaage, dann rechnet BOS bewusst keine Menge.' },
-    { heading: 'Die Karte eines Teigs', text: 'Oben tippst du die Brotzahlen ein, eine Zahl je Brot. Mit der Eingabetaste oder „Weiter“ springst du ins nächste Feld und nach dem letzten zum nächsten Teig — wie eine Diashow. Die Pfeile ‹ › blättern ebenfalls; das ✕ oder ein Tipp neben das Fenster bringt dich zurück zur Liste. Unter den Zahlen stehen zwei große Kästen: links, wie viel Schüttwasser du weglässt, rechts, wie viel kg du in WinBack eingibst. Ist es mehr als in einen Kessel passt, teilt BOS gleichmäßig auf: Dann zeigen beide Kästen und die Hefe die Menge je Kessel („2 × …“), die Gesamtmenge steht nur klein darunter. Darunter stehen Wassertemperatur, Hefe, Einwaage und Kesselrest und klein der Rechenweg. Darunter stehen die Zutaten des Teigs mit ihrem Wagen. Tippt ein Kollege auf einem anderen Gerät, siehst du seine Zahlen sofort.' },
-    { heading: 'Warum mehr kg in WinBack als Teig?', text: 'Wer Wasser weglässt, bekommt sonst weniger Teig, und es reicht nicht für alle Brote. Deshalb rechnet BOS die Liter, die du weglässt, auf die Menge drauf: „2 L weniger Wasser → 122 kg statt 120 kg eingeben“. WinBack verteilt dann alle Zutaten auf diese Menge, du lässt die Liter weg, und übrig bleibt genau der Teig, den du brauchst. Auch die Hefe rechnet BOS auf diese Menge, damit sie zu WinBack passt. Wichtig: In WinBack immer die kg-Menge eingeben, nicht Stück.' },
-    { heading: 'Reiter „Anpassen“: nur für heute Nacht', text: 'Merkst du am Kessel, dass heute etwas anders ist, darfst du für diese Nacht alles anpassen: Wasserabzug, Wassertemperatur, Hefe, Kesselrest, Einwaage und die Außentemperatur. Das gilt nur bis 12 Uhr mittags und ändert keine Regel. Angepasste Werte sind in der Karte markiert („heute, sonst …“). Mit „↺ Normalwert“ nimmst du eine Anpassung zurück.' },
+    { heading: 'Reiter „Teige“: die Liste', text: 'Du siehst die Teige des Backtags in der Reihenfolge, in der sie abgewogen werden. Unter dem Namen stehen die Brote des Teigs, jeweils mit ihrer Einwaage; fehlt eine, steht dort rot „Einwaage fehlt“. Rechts stehen die Anzahl und die Zahl für WinBack. Passt der Teig nicht in einen Kessel, steht dort die Menge je Kessel, zum Beispiel „2 × 106,6 kg“: zweimal 106,6 kg eingeben, nicht die Gesamtmenge. Die steht nur klein darunter („213,2 kg gesamt“). Tippst du einen Teig an, öffnet sich seine Karte. Ein grüner Haken heißt: alle Zahlen stehen. Ein Strich heißt: heute nicht (alle Brote 0) — damit sieht man den Unterschied zu „vergessen“. Ein Warnzeichen heißt: bei einem Brot fehlt die Einwaage, dann rechnet BOS bewusst keine Menge. Ein Kreispfeil ↻ mit „nur aufarbeiten“ ist ein Langzeitteig, der schon in der Vornacht angesetzt wurde — er zählt nicht als offener Teig. Unter den Teigen der Nacht steht manchmal eine zweite Gruppe „Langzeitteig für …“: Das sind Teige, die du heute Nacht komplett für morgen ansetzt.' },
+    { heading: 'Die Karte eines Teigs', text: 'Oben tippst du die Brotzahlen ein, eine Zahl je Brot. Mit der Eingabetaste oder „Weiter“ springst du ins nächste Feld und nach dem letzten zum nächsten Teig — wie eine Diashow. Die Pfeile ‹ › blättern ebenfalls; das ✕ oder ein Tipp neben das Fenster bringt dich zurück zur Liste. Unter den Zahlen stehen zwei große Kästen: links, wie viel Schüttwasser du weglässt, rechts, wie viel kg du in WinBack eingibst. Hat der Teig eine Mehl-Regel, steht dazwischen ein dritter Kasten: wie viel Mehl von Hand dazukommt, und welches. Ist es mehr als in einen Kessel passt, teilt BOS gleichmäßig auf: Dann zeigen beide Kästen und die Hefe die Menge je Kessel („2 × …“), die Gesamtmenge steht nur klein darunter. Darunter stehen Wassertemperatur, Hefe, Einwaage und Kesselrest und klein der Rechenweg. Darunter stehen die Zutaten des Teigs mit ihrem Wagen. Hat der Teig eine Vorstufe, steht ganz unten, was in der Vornacht dafür gewählt wurde, zum Beispiel „Vornacht: 6 × (3 kg Schrot + 9 L Wasser) → reicht für 187 Brote“. „Vorschlag, nicht gewählt“ heißt: Gestern hat niemand eine Stufe angetippt, BOS zeigt, was vorgeschlagen war. Tippt ein Kollege auf einem anderen Gerät, siehst du seine Zahlen sofort.' },
+    { heading: 'Warum mehr kg in WinBack als Teig?', text: 'Wer Wasser weglässt, bekommt sonst weniger Teig, und es reicht nicht für alle Brote. Deshalb rechnet BOS die Liter, die du weglässt, auf die Menge drauf: „2 L weniger Wasser → 122 kg statt 120 kg eingeben“. WinBack verteilt dann alle Zutaten auf diese Menge, du lässt die Liter weg, und übrig bleibt genau der Teig, den du brauchst. Auch die Hefe rechnet BOS auf diese Menge, damit sie zu WinBack passt. Mit Mehl ist es umgekehrt: Kommen 1,5 kg Mehl von Hand dazu, gibst du in WinBack 1,5 kg weniger ein, und das Mehl kommt in den Kessel. Beides kann zusammen vorkommen: 100 kg Teig, 2 L weniger Wasser, 1,5 kg Mehl dazu → 100,5 kg in WinBack. Wichtig: In WinBack immer die kg-Menge eingeben, nicht Stück.' },
+    { heading: 'Reiter „Anpassen“: nur für heute Nacht', text: 'Merkst du am Kessel, dass heute etwas anders ist, darfst du für diese Nacht alles anpassen: Wasserabzug, Mehl dazu (wenn der Teig eine Mehl-Regel hat), Wassertemperatur, Hefe, Kesselrest, Einwaage und die Außentemperatur. Das gilt nur bis 12 Uhr mittags und ändert keine Regel. Angepasste Werte sind in der Karte markiert („heute, sonst …“). Mit „↺ Normalwert“ nimmst du eine Anpassung zurück.' },
     { heading: 'Vorrat heute (Baguette, L\'amourette, Zwiebelstangen)', text: 'Diese Teige werden auf Vorrat für den Froster gemacht, nicht nach Backzettel. Sie stehen deshalb nicht von selbst in der Liste. Oben unter „Vorrat heute“ hakst du an, was du heute machst; dann erscheint der Teig in der Liste und in der Diashow, auf allen Geräten. Seine Karte fragt nicht nach der Backzettel-Zahl, sondern nach den Teiglingen, die heute produziert werden: in Blechen bzw. Dielen oder in Stück (Umschalter am Feld). BOS rechnet in Stück um und zeigt beides („4 Bleche = 24 Stück“). Am nächsten Backtag ist nichts mehr angehakt. Nimmst du einen Haken weg, obwohl schon Teiglinge drinstehen, fragt BOS vorher nach und löscht sie dann.' },
     { heading: 'Die Außentemperatur', text: 'Automatisch holt BOS die aktuelle Temperatur für Havelse vom Wetterdienst. Mit dem Umschalter „von Hand“ trägst du sie selbst ein. Jede Nacht steht der Umschalter wieder auf automatisch. Ist der Wetterdienst nicht erreichbar, steht das oben in Rot — dann bitte von Hand eintragen. Aus der Außentemperatur ergeben sich Wassertemperatur und Hefe, sobald für den Teig eine Tabelle gepflegt ist. Solange es keine gibt, steht dort „noch keine Tabelle“ und die Hefe laut Rezept.' },
-    { heading: 'Die Regel (dauerhaft)', text: 'Wer den Haken „Teige pflegen“ hat, sieht im Reiter „Anpassen“ unten die dauerhafte Regel: Wasserregel, Tabelle, Einwaagen, Kessel. Die Wasserregel pflegst du an der echten Menge: Die Karte zeigt zum Beispiel „83 Korbbrote: bisher 1,4 L weniger“. War der Teig zu weich, trägst du ein „bei 83 Broten 2 L“ — BOS rechnet das selbst auf jede andere Menge um. Wer den Haken nicht hat, sieht diesen Teil nicht; für die Nacht anpassen darf trotzdem jeder.' },
-    { heading: 'Reiter „Vorbereitungen“', text: 'Hier geht es um den nächsten Backtag. Oben steht der Sauer: wie viel du ansetzt, in wie vielen Chargen, und wie viel Anstellgut du vom heutigen Sauer zurückhältst. BOS rundet auf 30-kg-Schritte und nimmt einen 15-kg-Schritt, wenn der 30er deutlich zu viel wäre. Darunter tippst du die Prognose vom Büro-Zettel ein — mit derselben Liste und denselben Karten wie bei den Teigen. Daraus rechnet BOS den Sauer und die Vorstufen (Quellstück und Co.) für morgen. Mit „So angesetzt“ hältst du fest, was du wirklich angesetzt hast; sonst gilt der Vorschlag. Bei Vorstufen in festen Schritten ist auch die kleinere Stufe bewusst wählbar (Erfahrung zählt); reicht sie rechnerisch nicht für die Prognose, wird sie rot gezeigt („reicht nur für … von … Broten“).' },
+    { heading: 'Die Regel (dauerhaft)', text: 'Wer den Haken „Teige pflegen“ hat, sieht im Reiter „Anpassen“ unten die dauerhafte Regel: Wasserregel, Tabelle, Einwaagen, Kessel. Die Wasserregel pflegst du an der echten Menge: Die Karte zeigt zum Beispiel „83 Korbbrote: bisher 1,4 L weniger“. War der Teig zu weich, trägst du ein „bei 83 Broten 2 L“ — BOS rechnet das selbst auf jede andere Menge um. Genauso die Mehl-Regel: „bei 83 Broten 1,5 kg“ und welches Mehl (Mehle stehen vorn in der Auswahl; ein Mehl aus dem Silo ist markiert, weil es nicht von Hand kommt). Mit 0 kg gibt es die Regel ohne Zugabe — dann lässt sich „Mehl dazu heute“ eintragen. Bei einem Langzeitteig steht dort zusätzlich die Hefe für Sommer und Winter („15 g auf 90 kg“). Wer den Haken nicht hat, sieht diesen Teil nicht; für die Nacht anpassen darf trotzdem jeder.' },
+    { heading: 'Langzeitteig', text: 'Ein Langzeitteig wird in der Nacht vor dem Backtag komplett angesetzt. Er steht dann in dieser Nacht unter den Teigen, in einer eigenen Gruppe „Langzeitteig für …“, und läuft wie jeder Teig: Brotzahl, Wasser, Mehl, Kessel, WinBack, Einsammelliste. Die Anzahl kommt aus der Prognose für morgen (Reiter Vorbereitungen); du kannst sie ändern, wenn du ein paar mehr ansetzt. Spätestens wenn der Teig fertig gerechnet ist, merkt sich BOS die Zahl. Die Hefe kommt nicht aus der Temperatur-Tabelle, sondern in Gramm aus dem Sommer- oder Winterwert; umgeschaltet wird unter „✎ Pflegen“. Am Backtag steht er nur noch mit „In der Vornacht angesetzt für … Brote — nur aufarbeiten“ da: keine Rechnung, keine Einsammelliste, kein Vergleich mit dem Backzettel. Die Backzettel-Zahl trägst du trotzdem ein. Ob ein Teig ein Langzeitteig ist, steht im Rezept (Seite „Teige & Rezepte“, Schritt 3). Eine Vorstufe rechnet BOS bei einem Langzeitteig nicht.' },
+    { heading: 'Reiter „Vorbereitungen“', text: 'Hier geht es um den nächsten Backtag. Ganz oben steht, was die Vornacht für heute vorbereitet hat: Vorstufen mit Stufe und Brotzahl, Langzeitteige mit ihrer Brotzahl, der Sauer-Ansatz. Nur zum Lesen — statt Zettel und Pappe. Darunter steht der Sauer: wie viel du ansetzt, in wie vielen Chargen, und wie viel Anstellgut du vom heutigen Sauer zurückhältst. BOS rundet auf 30-kg-Schritte und nimmt einen 15-kg-Schritt, wenn der 30er deutlich zu viel wäre. Darunter tippst du die Prognose vom Büro-Zettel ein — mit derselben Liste und denselben Karten wie bei den Teigen. Daraus rechnet BOS den Sauer und die Vorstufen (Quellstück und Co.) für morgen. Mit „So angesetzt“ hältst du fest, was du wirklich angesetzt hast; sonst gilt der Vorschlag. Langzeitteige zählen hier nicht mit, sie werden schon heute Nacht gemacht. Ein QR-Schild „Teigecke · Vorbereitungen“ (aus der NFC-/QR-Zentrale) öffnet diesen Reiter direkt. Bei Vorstufen in festen Schritten ist auch die kleinere Stufe bewusst wählbar (Erfahrung zählt); reicht sie rechnerisch nicht für die Prognose, wird sie rot gezeigt („reicht nur für … von … Broten“).' },
     { heading: 'Sauer unbekannt und Vorstufen in Schritten', text: 'Steht bei einem Teig noch nicht im Rezept, ob er Sauer braucht (z. B. die neuen Teige ohne Rezept), zeigt der Sauer-Block ihn rot als „Sauer unbekannt“ und rechnet ihn NICHT mit. Wer den Rezept-Haken hat, beantwortet auf der Seite „Teige & Rezepte“ die Frage „Sauerteig im Teig?“ mit ja oder nein. Vorstufen, die in festen Portionen angesetzt werden (z. B. 3 kg Schrot + 9 L Wasser), zeigen statt der genauen kg zwei Möglichkeiten zur Wahl, etwa „5 ×“ oder „6 ×“, jeweils mit „reicht für … Brote“. Vorgewählt ist die größere. Darunter steht, was genau hineinkommt und wie es auf die Behälter verteilt wird. Die Wahl gilt für diese Nacht und wird mit der Prognose gespeichert.' },
     { heading: 'Reicht der Sauer von gestern?', text: 'Sobald alle Brotzahlen von heute stehen, prüft BOS: Bleibt nach den Teigen von heute genug Sauer als Anstellgut für den neuen Ansatz übrig? Wenn nicht, steht dort ein roter Hinweis mit den Zahlen, bevor der Sauer verteilt ist. Was dann zu tun ist, entscheidest du.' },
-    { heading: 'Reiter „Einsammeln“', text: '„Einsammeln“ zeigt, was du für die Teige heute Nacht und für die Vorstufen von morgen einsammeln musst, sortiert nach Ort; vor jeder Gruppe steht die Kennung des Orts (z. B. B01), wie sie auf dem Schild steht. Abhaken gilt nur auf diesem Gerät. Orte, Zutaten und Schilder pflegst du nicht mehr hier, sondern auf der Seite „Orte“ (im Launcher unter „Teigecke“); mit dem Haken „Wagen & Zutaten“ steht unten ein Link dorthin.' },
-    { heading: 'Wer darf was ändern?', text: 'Anzeigen und die Zahlen der Nacht eintragen darf jeder Teigmacher. Dauerhaft ändern hängt an drei Haken in der Kontenverwaltung: „Wagen & Zutaten pflegen“ (Orte, Zuhause der Zutaten, Gebinde, Schilder — auf der Seite „Orte“), „Teige pflegen“ (Wasserregel, Tabelle, Einwaagen, Kessel, Abwiegefolge) und „Rezepte pflegen“ (Teige anlegen und Rezepte eintippen — auf der Seite „Teige & Rezepte“, faktisch nur Ulf). Wer den Haken Teige hat, sieht hier oben „✎ Pflegen“ (Abwiegefolge); mit Haken Teige oder Rezepte steht unter der Liste der Link „Teige & Rezepte“. Die Datenbank prüft jeden Haken selbst.' },
+    { heading: 'Reiter „Einsammeln“', text: '„Einsammeln“ zeigt, was du für die Teige heute Nacht und für die Vorstufen von morgen einsammeln musst, sortiert nach Ort; vor jeder Gruppe steht die Kennung des Orts (z. B. B01), wie sie auf dem Schild steht. Ein Mehl von Hand steht mit seiner Menge dabei („Mehl dazu: 1,5 kg“), sobald die Brotzahlen stehen. Die Zutaten eines Langzeitteigs stehen in der Nacht, in der er angesetzt wird. Abhaken gilt nur auf diesem Gerät. Orte, Zutaten und Schilder pflegst du nicht mehr hier, sondern auf der Seite „Orte“ (im Launcher unter „Teigecke“); mit dem Haken „Wagen & Zutaten“ steht unten ein Link dorthin.' },
+    { heading: 'Wer darf was ändern?', text: 'Anzeigen und die Zahlen der Nacht eintragen darf jeder Teigmacher. Dauerhaft ändern hängt an drei Haken in der Kontenverwaltung: „Wagen & Zutaten pflegen“ (Orte, Zuhause der Zutaten, Gebinde, Schilder — auf der Seite „Orte“), „Teige pflegen“ (Wasserregel, Mehl-Regel, Tabelle, Einwaagen, Kessel, Abwiegefolge, Sommer/Winter) und „Rezepte pflegen“ (Teige anlegen und Rezepte eintippen — auf der Seite „Teige & Rezepte“, faktisch nur Ulf). Wer den Haken Teige hat, sieht hier oben „✎ Pflegen“ (Abwiegefolge, Sommer/Winter für die Langzeit-Hefe); mit Haken Teige oder Rezepte steht unter der Liste der Link „Teige & Rezepte“. Die Datenbank prüft jeden Haken selbst.' },
     { heading: 'Wird etwas überschrieben?', text: 'Dauerhafte Änderungen bekommen vorher eine Sicherung der alten Fassung, in einem Schritt. Hat jemand anderes denselben Eintrag inzwischen geändert, lehnt die Datenbank ab, und die Seite sagt „Inzwischen von … geändert, neu geladen, bitte erneut speichern“. Die Brotzahlen der Nacht speichert BOS Feld für Feld: Tippen zwei Geräte verschiedene Brote ein, geht nichts verloren. Tippen beide dasselbe Brot, gilt die spätere Eingabe — beide sehen sie sofort.' },
     { heading: 'Ohne Netz', text: 'Fällt das Netz weg, bleibt alles auf dem Bildschirm, und oben steht „Ohne Verbindung — Stand von …“. Brotzahlen und Anpassungen kannst du weiter eintragen, sie werden übertragen, sobald das Netz wieder da ist. Dauerhafte Änderungen gehen ohne Netz nicht. Wichtig: Die Seite ohne Netz nicht neu laden — dann kann sie sich nicht öffnen.' },
     { heading: 'Teige anlegen und Rezepte', text: 'Neue Teige, Rezepte, „Startdaten einlesen“ und das Archiv der Teige liegen seit dem 08.10. auf der Seite „Teige & Rezepte“ (im Launcher unter „Teigecke“). Mit dem Haken Teige oder Rezepte steht unter der Liste der Teige ein Link dorthin, ebenso im roten Kasten, wenn ein Brot auf einen Teig zeigt, den es nicht gibt. Hier in der Nacht wird nur gerechnet; die Nacht merkt nicht, ob ein Teig aus den Startdaten oder aus der Strecke kommt.' },

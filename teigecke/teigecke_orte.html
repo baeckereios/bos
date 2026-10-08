@@ -5,6 +5,12 @@
   Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
   CHANGELOG
+    2026-10-08 · 14:17 · v0.3a · Pflege (Nachtrag Nachtseite)
+      Nur REGEL_DATEI: nennt die neue Regeldatei
+      firestore_regeln_2026-10-08_teigecke_nacht.rules (sie erfüllt die Fassung
+      dieser Seite weiter, teigecke-rezepte-2026-10-07 bleibt). Sonst nichts —
+      sonst hieße der rote Hinweis bei einer zu alten Regel, die Datei vom
+      07.10. einzusetzen, und das würfe die neuen Felder wieder hinaus.
     2026-10-08 · 06:03 · v0.3 · Feature (Etappe 2, Schub 1: Gruppe an der Zutat)
       ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teil C.
       „Zutat bearbeiten“ hat ein viertes Feld „Gruppe“ (für die Vorsortierung
@@ -148,7 +154,7 @@ const HAKEN_FUER = {
   teigecke_orte: 'wagen', teigecke_zutaten: 'wagen'
 };
 const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* seit 08.10.2026: die Seite schreibt das Feld gruppe (RK §18) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-07_teigecke_rezepte.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 /* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
    Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
 try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }

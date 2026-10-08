@@ -15,6 +15,19 @@
    bewusst Platzhalter.
 
    CHANGELOG
+     2026-10-08 · 14:17 · v0.12 · Feature (Nachtrag Nachtseite)
+       ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md (KC 13:07), Bauplan
+       SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md (KC 13:26 frei).
+       rechneTeig: Mehl von Hand m (Regel mehlKgJeKg × D oder Nacht-Wert
+       mehlKg), T = D + r − m, Kessel auf T + m, Hefe weiter auf T (Ulf);
+       hefeGJeKg für Langzeitteige (Gramm je kg, ohne Tabelle). Ohne Mehl
+       und ohne Langzeit Ergebnis gleich v0.11 (Gegenprobe in Teil 11).
+       Neu: mehlRegelKgJeKg, istLangzeit, langzeitTeigeFuer, planTeige,
+       langzeitHefe, grammText, langzeitZahlen, vornachtLangzeit,
+       vorstufeStufe, REITER, reiterAusAdresse. vorauswahl lässt
+       Langzeitteige des Tages weg und nimmt mit wochentagMorgen die der
+       Ansatz-Nacht dazu; einsammelliste kennt zusatz (Mehl mit Menge);
+       Strecke: Merkmal langzeit (nein = kein Feld); probeNacht mit Mehl.
      2026-10-08 · 08:22 · v0.11 · Feature (Etappe 2, Schub 2: Rezept-Strecke)
        ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16) Teil B/D.
        Nur ergänzt: streckeLeer, streckeAusBestand, streckeSumme,
@@ -205,9 +218,16 @@
     return neu;
   }
 
-  /* Einsammeln-Vorauswahl: Teige, deren Brote an diesem Wochentag gebacken werden. */
-  function vorauswahl(teige, produkte, wochentag, vorrat) {
-    return teigeDesTages(teige, produkte, wochentag, null, vorrat).map(function (t) { return t.id; });
+  /* Einsammeln-Vorauswahl: Teige, deren Brote an diesem Wochentag gebacken werden.
+     Seit v0.12: Langzeitteige des Tages fallen weg (sie wurden in der Vornacht
+     gemacht); mit wochentagMorgen kommen die Langzeitteige dazu, die heute
+     Nacht für morgen angesetzt werden. Ohne Langzeitteig wie vorher. */
+  function vorauswahl(teige, produkte, wochentag, vorrat, wochentagMorgen) {
+    var ids = planTeige(teige, produkte, wochentag, null, vorrat).map(function (t) { return t.id; });
+    if (typeof wochentagMorgen === 'number') {
+      langzeitTeigeFuer(teige, produkte, wochentagMorgen).forEach(function (t) { if (ids.indexOf(t.id) === -1) ids.push(t.id); });
+    }
+    return ids;
   }
   /* Nachtbrote, die an dem Tag gebacken werden, aber keinen Teig haben —
      offene Baustelle, sichtbar statt versteckt. */
@@ -241,7 +261,11 @@
      bewusst NICHT drin (nur Teig- und Orts-Ansicht).
      Ergebnis: Gruppen nach Ort, in Gangreihenfolge; „noch ohne Zuhause“
      und „unbekannt“ am Ende, damit nichts verschwindet. */
-  function einsammelliste(teigIds, teige, zutaten, orte, feld) {
+  /* zusatz (seit v0.12, Mehl-Regel): [{ zutatId, teigName, kg (Zahl oder null =
+     Menge noch offen) }] — Mehl von Hand. Steht die Zutat schon in der Liste,
+     bekommt der Eintrag die Menge dazu (mengen), sonst entsteht er neu.
+     Ohne zusatz wie vorher. */
+  function einsammelliste(teigIds, teige, zutaten, orte, feld, zusatz) {
     var tm = nachId(teige), zm = nachId(zutaten), om = nachId(orte);
     var sammel = {};   // zutatId -> { zutat, teige: [namen] }
     (teigIds || []).forEach(function (tid) {
@@ -251,6 +275,11 @@
         if (!sammel[zid]) sammel[zid] = { zutatId: zid, zutat: zm[zid] || null, teige: [] };
         if (sammel[zid].teige.indexOf(t.name) === -1) sammel[zid].teige.push(t.name);
       });
+    });
+    (zusatz || []).forEach(function (x) {
+      if (!x || !x.zutatId) return;
+      var e = sammel[x.zutatId] || (sammel[x.zutatId] = { zutatId: x.zutatId, zutat: zm[x.zutatId] || null, teige: [] });
+      (e.mengen = e.mengen || []).push({ teig: x.teigName, kg: istZahl(x.kg) ? x.kg : null });
     });
     var gruppen = {};  // ortId | '_ohne' | '_unbekannt'
     Object.keys(sammel).forEach(function (zid) {
@@ -355,12 +384,22 @@
      D = Σ Anzahl × Einwaage + Kesselrest (einmal je Teig, Ulf 29.09.)
      r = Wasserabzug (Nacht-Abweichung vor Regel × D); ohne Schüttwasser 0
      T = D + r → WinBack. Hefe auf T (Auflage KC: WinBack verteilt alles auf T).
-     Kessel: gleichmäßig, Wasser anteilig. */
+     Kessel: gleichmäßig, Wasser anteilig.
+     Seit v0.12 (08.10.2026, Mehl-Regel, Konzept Punkt 63): m = Mehl von Hand
+     (Nacht-Abweichung mehlKg vor Regel mehlKgJeKg × D). T = D + r − m — in
+     WinBack weniger eingeben, das Mehl kommt von Hand dazu. Kessel zählen
+     auf T + m (wie das zurückgehaltene Wasser: alles, was in den Kessel
+     kommt; KC 13:26). Hefe bleibt auf T (Ulf 13:26: „BOS ist nur Vermittler,
+     die WinBack-Toleranz liegt bei etwa 20 g“). Ohne Mehl ist m = 0 und alles
+     wie vorher, auf die Kommastelle.
+     Langzeitteig (Punkt 67): hefeGJeKg = Gramm Hefe je kg Teig aus dem
+     Sommer-/Winterwert; dann Hefe = hefeGJeKg × T ÷ 1000 ohne Tabelle. */
   function rechneTeig(o) {
     var posten = o.posten || [];
     var eingetragen = posten.filter(function (p) { return istZahl(p.anzahl); });
     var erg = { status: 'leer', fehlendeEinwaage: [], summeKg: null, D: null, rRegel: null, r: null, T: null,
-      kessel: null, jeKesselKg: null, jeKesselL: null, hefeRezeptKg: null, hefeDeltaKg: null, hefeKg: null, anzahl: 0 };
+      kessel: null, jeKesselKg: null, jeKesselL: null, hefeRezeptKg: null, hefeDeltaKg: null, hefeKg: null, anzahl: 0,
+      mRegel: null, m: 0, jeKesselMehlKg: 0, hefeLangzeit: false };
     if (!eingetragen.length) return erg;
     erg.anzahl = eingetragen.reduce(function (s, p) { return s + p.anzahl; }, 0);
     erg.fehlendeEinwaage = eingetragen.filter(function (p) { return p.anzahl > 0 && !(istZahl(p.einwaageG) && p.einwaageG > 0); })
@@ -368,7 +407,7 @@
     var alle = eingetragen.length === posten.length;
     if (erg.fehlendeEinwaage.length) { erg.status = 'einwaageFehlt'; return erg; }
     erg.summeKg = eingetragen.reduce(function (s, p) { return s + (p.anzahl > 0 ? p.anzahl * p.einwaageG / 1000 : 0); }, 0);
-    if (alle && erg.anzahl === 0) { erg.status = 'null'; erg.D = 0; erg.r = 0; erg.T = 0; return erg; }
+    if (alle && erg.anzahl === 0) { erg.status = 'null'; erg.D = 0; erg.r = 0; erg.T = 0; erg.m = 0; return erg; }
     var kesselrest = istZahl(o.kesselrestKg) ? o.kesselrestKg : 0;
     erg.D = erg.summeKg + kesselrest;
     if (o.ohneSchuettwasser) { erg.rRegel = 0; erg.r = 0; }
@@ -376,12 +415,20 @@
       erg.rRegel = istZahl(o.literJeKg) ? o.literJeKg * erg.D : null;
       erg.r = istZahl(o.wasserL) ? o.wasserL : (erg.rRegel || 0);
     }
-    erg.T = erg.D + erg.r;
+    erg.mRegel = istZahl(o.mehlKgJeKg) ? o.mehlKgJeKg * erg.D : null;
+    erg.m = istZahl(o.mehlKg) ? o.mehlKg : (erg.mRegel || 0);
+    erg.T = erg.m ? erg.D + erg.r - erg.m : erg.D + erg.r;
     var max = istZahl(o.kesselMaxKg) && o.kesselMaxKg > 0 ? o.kesselMaxKg : 190;
-    erg.kessel = Math.max(1, Math.ceil(erg.T / max - 1e-9));
+    erg.kessel = Math.max(1, Math.ceil((erg.m ? erg.T + erg.m : erg.T) / max - 1e-9));
     erg.jeKesselKg = erg.T / erg.kessel;
     erg.jeKesselL = erg.r / erg.kessel;
-    if (istZahl(o.hefeJeKg)) {
+    erg.jeKesselMehlKg = erg.m / erg.kessel;
+    if (istZahl(o.hefeGJeKg)) {
+      erg.hefeLangzeit = true;
+      erg.hefeRezeptKg = o.hefeGJeKg * erg.T / 1000;
+      erg.hefeDeltaKg = 0;
+      erg.hefeKg = erg.hefeRezeptKg;
+    } else if (istZahl(o.hefeJeKg)) {
       erg.hefeRezeptKg = o.hefeJeKg * erg.T;
       erg.hefeDeltaKg = (istZahl(o.hefeDeltaG) && istZahl(o.rezeptBasisKg) && o.rezeptBasisKg > 0)
         ? (o.hefeDeltaG / 1000) * erg.T / o.rezeptBasisKg : 0;
@@ -390,6 +437,93 @@
     if (istZahl(o.hefeKg)) erg.hefeKg = o.hefeKg;   // Nacht-Abweichung
     erg.status = alle ? 'fertig' : 'teilweise';
     return erg;
+  }
+
+  /* ---------- v0.12 (08.10.2026): Mehl-Regel, Langzeitteig, Vornacht, Reiter ----------
+     ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md (KC 13:07), Bauplan
+     SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md (freigegeben 13:26). */
+
+  /* Mehl-Regel: gepflegt wie die Wasserregel an der echten Menge
+     („bei 83 Broten 1,5 kg“), intern je kg Teig. Dieselbe Rechnung. */
+  function mehlRegelKgJeKg(kg, refKg) { return wasserRegelLiterJeKg(kg, refKg); }
+
+  /* Langzeitteig (Konzept Punkt 67): Merkmal langzeit am Teig. Vorrats-Teige
+     hängen nicht an backTage und sind ausgenommen. */
+  function istLangzeit(teig, produkte) {
+    return !!teig && teig.langzeit === true && !istVorratsTeig(teig.id, produkte);
+  }
+  /* Langzeitteige, die in der Nacht des Backtags „heute“ angesetzt werden:
+     ihr Brot wird am folgenden Backtag gebacken (wochentagMorgen). */
+  function langzeitTeigeFuer(teige, produkte, wochentagMorgen) {
+    return aktiv(teige).filter(function (t) {
+      return istLangzeit(t, produkte) && produkteDesTeigs(t.id, produkte, wochentagMorgen).length > 0;
+    }).sort(sortName);
+  }
+  /* Teige, für die heute Sauer und Vorstufen für den Backtag geplant werden:
+     die des Backtags OHNE Langzeitteige — die werden eine Nacht vorher
+     gemacht (Bauplan §2.2/§2.3). Ohne Langzeitteig = teigeDesTages. */
+  function planTeige(teige, produkte, wochentag, folge, vorrat) {
+    return teigeDesTages(teige, produkte, wochentag, folge, vorrat).filter(function (t) { return !istLangzeit(t, produkte); });
+  }
+  /* Langzeit-Hefe je kg Teig in Gramm aus dem Sommer-/Winterwert („15 g auf
+     90 kg“). Ergebnis: { gJeKg, jahreszeit } oder { fehlt: 'jahreszeit' |
+     'sommer' | 'winter' } — dann nimmt die Seite den Rezeptwert ohne Tabelle. */
+  function langzeitHefe(teigwerte, jahreszeit) {
+    if (jahreszeit !== 'sommer' && jahreszeit !== 'winter') return { fehlt: 'jahreszeit', gJeKg: null };
+    var tw = teigwerte || {}, gr = jahreszeit === 'sommer' ? 'Sommer' : 'Winter';
+    var g = tw['langzeitHefe' + gr + 'G'], kg = tw['langzeitHefe' + gr + 'BeiKg'];
+    if (!istZahl(g) || g < 0 || !istZahl(kg) || kg <= 0) return { fehlt: jahreszeit, gJeKg: null, jahreszeit: jahreszeit };
+    return { gJeKg: g / kg, jahreszeit: jahreszeit };
+  }
+  /* Gramm für die Anzeige: ganze Gramm, unter 10 g eine Nachkommastelle. */
+  function grammText(g) {
+    if (!istZahl(g)) return '–';
+    var z = Math.round(g * 10) / 10;
+    return (z < 10 ? deZahl(z, 1) : String(Math.round(g))) + ' g';
+  }
+  /* Anzahl je Brot eines Langzeitteigs in der Nacht des Ansetzens:
+     gespeichert (langzeit der Nacht) vor der Prognose für morgen.
+     Ergebnis je Brot: { anzahl, prognose, gespeichert } (undefined = fehlt). */
+  function langzeitZahlen(produkteListe, langzeitNacht, prognoseMorgen) {
+    var lz = langzeitNacht || {}, pr = prognoseMorgen || {}, aus = {};
+    (produkteListe || []).forEach(function (p) {
+      var lk = p.legacyKey, g = istZahl(lz[lk]) ? lz[lk] : undefined, q = istZahl(pr[lk]) ? pr[lk] : undefined;
+      aus[lk] = { anzahl: g !== undefined ? g : q, prognose: q, gespeichert: g !== undefined };
+    });
+    return aus;
+  }
+  /* Am Backtag: für wie viele Brote wurde in der Vornacht angesetzt?
+     Gespeicherte Zahl der Vornacht vor der Prognose für heute (= gestern
+     vorbelegt). null, wenn es für kein Brot eine Zahl gibt. */
+  function vornachtLangzeit(produkteListe, langzeitGestern, prognoseHeute) {
+    var z = langzeitZahlen(produkteListe, langzeitGestern, prognoseHeute);
+    var lks = Object.keys(z).filter(function (lk) { return istZahl(z[lk].anzahl); });
+    if (!lks.length) return null;
+    return { anzahl: lks.reduce(function (s, lk) { return s + z[lk].anzahl; }, 0),
+      gespeichert: lks.every(function (lk) { return z[lk].gespeichert; }) };
+  }
+  /* Vornacht einer Vorstufe in Schritten (Konzept Punkt 68, Bauplan §2.4):
+     gespeicherte Wahl n oder, ohne Wahl, der Vorschlag aus der Prognose.
+     Ergebnis { n, kg, reichtBrote, gewaehlt } oder null. */
+  function vorstufeStufe(bedarfKg, schritt, jeBehaelter, broteAnzahl, wahl) {
+    var v = vorstufeSchritte(bedarfKg, schritt, jeBehaelter, broteAnzahl);
+    if (!v) return null;
+    var n = istZahl(wahl) && wahl >= 1 ? Math.round(wahl) : v.vorschlag;
+    var kg = n * v.schrittKg;
+    return { n: n, kg: kg, gewaehlt: istZahl(wahl) && wahl >= 1,
+      reichtBrote: istZahl(broteAnzahl) && broteAnzahl > 0 ? Math.floor(broteAnzahl * kg / bedarfKg + 1e-9) : null,
+      behaelter: behaelterAufteilung(n, jeBehaelter) };
+  }
+  /* Aufruf mit ?reiter=… (QR „Vorbereitungen“, Punkt 68). Unbekannt oder
+     fehlend → 'teige'; unbekannt meldet sich (die Seite schreibt es in die
+     Konsole, keine Fehlerleiste: ein vertippter Link ist kein Fehler der Nacht). */
+  var REITER = ['teige', 'vorbereitungen', 'einsammeln'];
+  function reiterAusAdresse(suche) {
+    var w = null;
+    try { w = new URLSearchParams(String(suche || '')).get('reiter'); } catch (e) { w = null; }
+    if (w === null || w === '') return { reiter: 'teige', unbekannt: null };
+    w = String(w).trim().toLowerCase();
+    return REITER.indexOf(w) !== -1 ? { reiter: w, unbekannt: null } : { reiter: 'teige', unbekannt: w };
   }
 
   /* Anzeige bei Chargen (02.10.2026, Sicherheitsregel): Vorn steht immer
@@ -918,7 +1052,7 @@
     return { kennung: '', neu: true, name: '', brote: {}, sauer: { antwort: null, kg: null },
       vorstufe: { ja: null, name: '', kg: null, zeilen: [], behaelter: '', jeBehaelter: null },
       schuettwasserL: null, hefe: { zutatId: hefeVorschlag(zutaten), kg: null }, zeilen: [],
-      hinweisOben: '', vorstufeHinweis: '', beiBedarf: [], sort: null };
+      hinweisOben: '', vorstufeHinweis: '', beiBedarf: [], sort: null, langzeit: false };
   }
   /* Bestand → Zustand. mengenDok (teigecke_rezeptmengen) nur mit Haken Rezepte;
      ohne ihn sind alle Mengen leer. */
@@ -951,6 +1085,7 @@
     z.vorstufe = vs;
     z.hinweisOben = String(t.hinweisOben || ''); z.vorstufeHinweis = String(t.vorstufeHinweis || '');
     z.beiBedarf = (t.beiBedarf || []).slice(); z.sort = istZahl(t.sort) ? t.sort : null;
+    z.langzeit = t.langzeit === true;
     /* Getippte Mengen (Rezeptmengen) überlagern, wenn vorhanden */
     var e = mengenDok && mengenDok.eingabe;
     if (e && typeof e === 'object') {
@@ -1034,6 +1169,9 @@
     d.vorstufeHinweis = String(z.vorstufeHinweis || '').trim();
     d.beiBedarf = (z.beiBedarf || []).slice();
     if (istZahl(z.sort)) d.sort = z.sort; else delete d.sort;
+    /* Langzeitteig (v0.12): „nein“ schreibt KEIN Feld — so bleibt ein Teig ohne
+       das Merkmal beim unveränderten Speichern wirklich unverändert. */
+    if (z.langzeit === true) d.langzeit = true; else delete d.langzeit;
     d.geloescht = false;
     return d;
   }
@@ -1127,7 +1265,7 @@
   function probeNacht(teigDok, teigwerteDok, lk, einwaageG, anzahl) {
     var tw = teigwerteDok || {};
     return rechneTeig({ posten: [{ lk: lk, anzahl: anzahl, einwaageG: einwaageG }], kesselrestKg: 0,
-      literJeKg: tw.wasserLiterJeKg, ohneSchuettwasser: !!teigDok.ohneSchuettwasser,
+      literJeKg: tw.wasserLiterJeKg, ohneSchuettwasser: !!teigDok.ohneSchuettwasser, mehlKgJeKg: tw.mehlKgJeKg,
       kesselMaxKg: istZahl(tw.kesselMaxKg) ? tw.kesselMaxKg : 190, hefeJeKg: teigDok.hefeJeKg, rezeptBasisKg: teigDok.rezeptBasisKg });
   }
 
@@ -1159,7 +1297,10 @@
     istRumpf: istRumpf, hefeVorschlag: hefeVorschlag, streckeLeer: streckeLeer, streckeAusBestand: streckeAusBestand,
     streckeSumme: streckeSumme, streckeWerte: streckeWerte, teigAusStrecke: teigAusStrecke, teigwerteAusStrecke: teigwerteAusStrecke,
     mengenAusStrecke: mengenAusStrecke, pruefeSchritt: pruefeSchritt, ausTeigAenderungen: ausTeigAenderungen, teile: teile,
-    broteSchaetzung: broteSchaetzung, probeNacht: probeNacht
+    broteSchaetzung: broteSchaetzung, probeNacht: probeNacht,
+    mehlRegelKgJeKg: mehlRegelKgJeKg, istLangzeit: istLangzeit, langzeitTeigeFuer: langzeitTeigeFuer, planTeige: planTeige,
+    langzeitHefe: langzeitHefe, grammText: grammText, langzeitZahlen: langzeitZahlen, vornachtLangzeit: vornachtLangzeit,
+    vorstufeStufe: vorstufeStufe, REITER: REITER, reiterAusAdresse: reiterAusAdresse
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_TEIGECKE_LOGIK = api;
