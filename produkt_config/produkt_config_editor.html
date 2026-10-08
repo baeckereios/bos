@@ -3,6 +3,26 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-08 · 06:03 · v-firestore-2c · Umbau (Teigecke Etappe 2, Schub 1)
+      ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teil D.
+      Der Batch-Bau aus speichereKarte (Sicherung + Produkt + Stand + 1) ist
+      nach ../bos_produkte_schreiben.js umgezogen, KOPIERT, nicht nachgebaut.
+      Grund: Die Seite „Teige & Rezepte“ schreibt ab Schub 2 das Feld ausTeig
+      an Broten und muss denselben Weg gehen (eine Mechanik, viele Aufrufer).
+      Der Editor ruft das Modul mit einem Produkt auf. Unverändert hier:
+      Vorab-Vergleich des Stands, Konfliktmeldung, Vorversionen, Meldungen,
+      Fehler erklären. Kein neues Feld, keine Regeländerung für Produkte.
+    2026-10-07 · 10:08 · v-firestore-2b · „Von wann ist der gespeicherte Stand?“ (Ulf 10:05)
+      Die Karte zeigt statt „Gespeicherter Stand.“ jetzt Datum, Uhrzeit, Art und
+      Konto des letzten Speicherns — gelesen aus der Sicherung, auf die
+      sicherungId zeigt (ein Lesevorgang je Karte, dann Zwischenspeicher der
+      Sitzung). Ohne sicherungId: „von vor dem 06.10.2026, ohne Zeitangabe“.
+      Keine neuen Felder am Produkt, keine Regeländerung.
+    2026-10-07 · 09:52 · v-firestore-2a · Korrektur (Ulf, 09:49: „Das rote verunsichert mich“)
+      Nach erfolgreichem Speichern blieb das alte Sammel-Kennzeichen `geaendert`
+      auf true stehen; render() meldete deshalb weiter rot „ungespeicherte
+      Änderungen“, obwohl alles gespeichert war (Banner war korrekt aus).
+      Jetzt: geaendert = (noch Karten mit Änderungen vorhanden).
     2026-10-06 · 08:58 · v-firestore-2 · Stufe 2: der Editor schreibt direkt
       SESSION_2026-10-06_PRODUKTE_AUS_FIRESTORE_STUFE2.md (KC 08:26, Ulf 08:40).
       Speichern je Produkt aus der Karte (Knopf 💾): EINE Batch = Sicherung der
@@ -372,6 +392,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_produkte.js"></script>
+<script src="../bos_produkte_schreiben.js"></script>
 
 <script>
 var COLLECTION = 'produkte'; // seit 05.10.2026 gemessen, nicht mehr Annahme (PRODUKTE_KOMPENDIUM.md §2a)
@@ -864,6 +885,33 @@ function zeigeKartenKnoepfe() {
   lo.disabled = quelle !== 'db';
   hw.textContent = quelle !== 'db' ? 'Aus Datei geladen — Speichern gesperrt (Sync-Tool).' : (neu ? 'Noch nicht in der Datenbank — Speichern legt es an.' : (dirty ? 'Geändert, noch nicht gespeichert.' : 'Gespeicherter Stand.'));
   document.getElementById('karteKonflikt').classList.add('hidden');
+  if (quelle === 'db' && !neu && !dirty) zeigeStandZeit(p.legacyKey, hw);
+}
+/* 07.10.2026 (Ulf): „Von wann ist der gespeicherte Stand?“ — die Zeit steckt in der
+   Sicherung, die beim letzten Speichern entstand (sicherungId am Produkt). Ein
+   Lesevorgang je Karte, danach aus dem Zwischenspeicher dieser Sitzung. */
+var standZeitCache = {};
+var AKTION_TEXT = { anlegen: 'angelegt', aendern: 'geändert', archivieren: 'als gelöscht markiert', wiederherstellen: 'zurückgeholt', einspielen: 'eingespielt (Sync-Tool)' };
+function standZeitText(x) {
+  var d = new Date(x.ms); var pad = function (n) { return String(n).padStart(2, '0'); };
+  return 'Gespeicherter Stand vom ' + pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' Uhr · ' + (AKTION_TEXT[x.aktion] || x.aktion) + ' · ' + x.konto;
+}
+async function zeigeStandZeit(key, el) {
+  var roh = serverRoh[key]; var sid = roh && roh.sicherungId;
+  if (!sid) { el.textContent = 'Gespeicherter Stand (von vor dem 06.10.2026, ohne Zeitangabe).'; return; }
+  try {
+    if (!standZeitCache[sid]) {
+      var snap = await db.collection(SICH_COLLECTION).doc(sid).get({ source: 'server' });
+      if (!snap.exists) { el.textContent = 'Gespeicherter Stand (Sicherung ' + sid + ' nicht gefunden).'; return; }
+      var x = snap.data();
+      standZeitCache[sid] = { ms: x.ts && x.ts.toMillis ? x.ts.toMillis() : 0, konto: x.konto || '–', aktion: x.aktion || '–' };
+    }
+    /* nur schreiben, wenn die Karte noch dasselbe Produkt zeigt */
+    if (daten[karteIdx] && daten[karteIdx].legacyKey === key && !geaenderteKarten[key]) el.textContent = standZeitText(standZeitCache[sid]);
+  } catch (err) {
+    console.error('[Produkt-Config] Stand-Zeit:', err);
+    el.textContent = 'Gespeicherter Stand (Zeit nicht lesbar: ' + fehlerText(err) + ')';
+  }
 }
 
 function aendere(idx, feld, wert) {
@@ -1002,7 +1050,7 @@ async function speichereKarte(idx, aktion) {
   var p = daten[idx]; if (!p) return;
   var key = p.legacyKey;
   if (quelle !== 'db') { status('⚠ Aus Datei geladen — Speichern gesperrt. ↻ Neu laden aus der Datenbank.', 'err'); return; }
-  if (!window.BOS_PRODUKTE || !window.db || !window.firebase) { status('⚠ Datenbank nicht geladen (bos_firebase_config.js / bos_produkte.js fehlt?)', 'err'); return; }
+  if (!window.BOS_PRODUKTE || !window.BOS_PRODUKTE_SCHREIBEN || !window.db || !window.firebase) { status('⚠ Datenbank nicht geladen (bos_firebase_config.js / bos_produkte.js / bos_produkte_schreiben.js fehlt?)', 'err'); return; }
   var kennung = kennungJetzt();
   if (!kennung) { status('⚠ Keine Kennung — bist du angemeldet?', 'err'); return; }
   var roh = serverRoh[key] || null;
@@ -1017,23 +1065,22 @@ async function speichereKarte(idx, aktion) {
     var serverStand = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : null;
     if (serverStand !== geladenerStand) { zeigeKonflikt(idx, serverStand); fertig(); return; }
 
-    var sichRef = db.collection(SICH_COLLECTION).doc();
     var wirdGeloescht = aktion === 'archivieren' || (aktion === 'wiederherstellen' && p.__geloescht === true);
     delete p.__geloescht;
     var inhalt = ohneDbFelder(p);
     inhalt.reihenfolge = roh && typeof roh.reihenfolge === 'number' ? roh.reihenfolge : naechsteReihenfolge(serverRoh);
-    inhalt.sicherungId = sichRef.id;
     if (wirdGeloescht) inhalt.geloescht = true;
-    var ts = firebase.firestore.FieldValue.serverTimestamp();
-    var neuerStand = (geladenerStand === null ? 0 : geladenerStand) + 1;
-    var batch = db.batch();
-    batch.set(sichRef, { collection: COLLECTION, dokId: key, aktion: aktion, vorher: roh, konto: kennung, ts: ts });
-    batch.set(db.collection(COLLECTION).doc(key), inhalt);
-    var standDaten = { nummer: neuerStand, geaendertAm: ts, geaendertVon: kennung };
-    if (standSnap.exists) batch.update(standRef, standDaten); else batch.set(standRef, standDaten);
-    await batch.commit();
+    /* Schreiben (Sicherung + Produkt + Stand + 1 in EINER Batch) über das gemeinsame
+       Modul (08.10.2026). Es setzt inhalt.sicherungId und gibt Fehler der Datenbank
+       unverändert weiter; erklaereAblehnung unten deutet sie wie bisher. */
+    var erg = await window.BOS_PRODUKTE_SCHREIBEN.schreibe({
+      kennung: kennung, geladenerStand: geladenerStand, standExistiert: standSnap.exists,
+      eintraege: [{ key: key, inhalt: inhalt, vorher: roh, aktion: aktion }]
+    });
+    var neuerStand = erg.neuerStand;
 
     serverRoh[key] = inhalt;
+    standZeitCache[erg.sicherungIds[key]] = { ms: Date.now(), konto: kennung, aktion: aktion };   /* Gerätezeit, bis die Karte neu geöffnet wird */
     geladenerStand = neuerStand;
     delete geaenderteKarten[key];
     if (inhalt.geloescht === true) {
@@ -1046,6 +1093,7 @@ async function speichereKarte(idx, aktion) {
     }
     document.getElementById('quelleName').textContent = 'Datenbank (Stand-Zettel Nr. ' + neuerStand + ')';
     var n = Object.keys(geaenderteKarten).length;
+    geaendert = n > 0;   /* 07.10.: altes Sammel-Kennzeichen mitführen, sonst meldet render() weiter rot „ungespeichert“ */
     document.getElementById('saveBanner').style.display = n ? 'block' : 'none';
     if (n) markiereGeaendert();
     render(); fertig();

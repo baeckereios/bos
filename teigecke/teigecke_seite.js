@@ -35,6 +35,11 @@
      #editFehler #editInfo #editKnoepfe
 
    CHANGELOG
+     2026-10-08 · 08:22 · v0.2 · Ergänzung (Etappe 2, Schub 2)
+       Neu, nur angehängt: schreibeMehrere(auftraege) — mehrere Dokumente,
+       jedes mit eigener Sicherung, in EINEM Batch (Rezept-Strecke: Teig +
+       Teigwerte + Rezeptmengen). Gleiches Muster wie schreibe(); die 25
+       aus der Nachtseite kopierten Funktionen sind unverändert.
      2026-10-03 · 04:42 · v0.1 · Erstfassung (Auszug aus der Nachtseite)
        Neu gegenüber der Quelle nur: SEITE_TEXTE (Liste der Pflicht-Texte),
        schreibeNeuEindeutig() — Anlegen unter einem festen Dokumentnamen,
@@ -366,4 +371,26 @@ async function schreibeNeuEindeutig(col, kandidat, hoechstens) {
   }
   const e = new Error('Keine freie Nummer gefunden (alle Versuche belegt)'); e.code = 'belegt';
   throw e;
+}
+
+/* ===== NEU 08.10.2026 (Etappe 2): mehrere Dokumente in EINEM Batch =====
+   auftraege: [{ col, id, daten, aktion, vorher }]. Jedes Dokument bekommt seine
+   eigene Sicherung (RK §10 A2 verlangt eine je Dokument). Vorab für jede
+   Collection die Sperre wie bei schreibe() (Haken, Verbindung, Übertragung).
+   Alles oder nichts: lehnt die Regel eines ab, wird keines geschrieben. */
+async function schreibeMehrere(auftraege) {
+  (auftraege || []).forEach(function (a) {
+    const sperre = schreibSperre(a.col, false);
+    if (sperre) { const e = new Error(sperre.text); e.code = sperre.code; e.collection = a.col; throw e; }
+  });
+  const db = window.db;
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  (auftraege || []).forEach(function (a) {
+    const sichRef = db.collection(COL.sicherungen).doc();
+    const zielRef = a.id ? db.collection(a.col).doc(a.id) : db.collection(a.col).doc();
+    batch.set(sichRef, { collection: a.col, dokId: zielRef.id, aktion: a.aktion, vorher: ohneId(a.vorher), konto: S.kennung, ts: ts });
+    batch.set(zielRef, Object.assign(nurErlaubteFelder(a.col, a.daten), { sicherungId: sichRef.id, geaendertVon: S.kennung, geaendertAm: ts }));
+  });
+  await mitZeitlimit(batch.commit());
 }

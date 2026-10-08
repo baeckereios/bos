@@ -159,7 +159,7 @@ window.BOS_APPS = [
     type: 'hub',
     roles: ['admin', 'backstube', 'produktionsleitung']
     // NEU 03.10.2026, Hub „Teigecke“ (Muster Druckzentrale). Kinder:
-    // teigecke_nacht, teigecke_orte; „Teige & Rezepte“ folgt in Etappe 2.
+    // teigecke_nacht, teigecke_orte, teigecke_rezepte (seit 08.10.2026).
     // Siehe SESSION_2026-10-03_TEIGECKE_ORTE_HUB_BAU.md. Rollen = die der
     // bisherigen Einzelkachel „Teigecke Nacht“.
   },
@@ -199,6 +199,26 @@ window.BOS_APPS = [
     // über den QR-Code der Schilder (…/teigecke_orte.html?ort=B01).
     // Lesen: jeder mit Konto. Schreiben: Haken teigeckePflege (RK §10/§14).
     // Details: teigecke/TEIGECKE_ORTE_DOKU.md.
+  },
+  {
+    id: 'teigecke_rezepte',
+    bereich: 'produktion',
+    name: 'Teige & Rezepte',
+    icon: '📜',
+    color: '#8b5a2b',
+    url: 'teigecke/teigecke_rezepte.html',
+    direkt: 'anmeldung',
+    status: 'live',
+    hub: 'teigecke',
+    roles: ['admin', 'backstube', 'produktionsleitung']
+    // NEU 08.10.2026 (Teigecke Etappe 2, Schub 2): Teige anlegen und Rezepte
+    // über eine Anlege-Strecke eintippen (vorher Teig-Formular der Nachtseite).
+    // Rollen = Sichtbarkeit der Kachel, dieselben drei wie die Geschwister.
+    // Lesen: jeder mit Konto. Schreiben: Haken teigeckeRezepte (Rezept und
+    // Rezeptmengen), teigeckeTeige (Einwaagen), teigeckePflege (neue Zutat);
+    // Brote umhängen (Feld ausTeig) nur Rolle admin (RK §16, §18). Die
+    // Registry kennt keine Haken: den Stift zeigt die Seite selbst nur mit
+    // Haken (Bauplan F13). Details: teigecke/TEIGECKE_REZEPTE_DOKU.md.
   },
   {
     id: 'fahrer',

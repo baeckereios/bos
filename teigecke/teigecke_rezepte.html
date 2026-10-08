@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: teigecke/teigecke_rezepte.html — Teigecke · Teige & Rezepte (Anlege-Strecke)
+  Doku:  teigecke/TEIGECKE_REZEPTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit „Orte“)
+  CHANGELOG
+    2026-10-08 · 08:22 · v0.1 · Erstfassung (Teigecke Etappe 2, Schub 2)
+      ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teile A–D,
+      Bauplan SESSION_2026-10-07_TEIGECKE_REZEPTE_BAU.md (freigegeben).
+      Liste aller Teige (Marken „Rumpf“ und „ohne Brot“), Kasten „Brote ohne
+      Teig“ (nur Anzeige), kleine Karte für den Sauerteig. Anlege-Strecke in
+      fünf Schritten: Name · Brote mit Einwaage · Sauer und Vorstufe · Hauptteig
+      (Schüttwasser, Hefe, Zeilen nach Gruppe) · Zusammenfassung mit
+      Proberechnung. Speichern in zwei Schritten: erst das Rezept (Teig +
+      Einwaagen + Rezeptmengen, ein Vorgang), dann die Brote (Feld ausTeig am
+      Produkt, über ../bos_produkte_schreiben.js). Rezeptmengen (geheim, RK §18)
+      lädt die Seite nur mit dem Haken Rezepte und nur in den Arbeitsspeicher.
+      Von der Nachtseite hierher kopiert (nicht nachgebaut): Startdaten
+      einlesen, Teig-Archiv mit Wiederherstellen.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Teige &amp; Rezepte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="teigecke_seite.css">
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge wie teigecke_orte.html
+     (Checkliste §2a, bos_standalone_login.js-Kopf). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'teigecke_rezepte';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_produkte.js"></script>
+<script src="../bos_produkte_schreiben.js"></script>
+<script src="teigecke_logik.js"></script>
+
+<div class="kopfbereich">
+<header>
+    <div class="kopf-titel">
+      <h1 class="bos-title" data-i18n="titel">Teige &amp; Rezepte</h1>
+      <div class="backtag"><a class="link-btn" href="teigecke_nacht.html" data-i18n="zur_nacht">‹ Teigecke Nacht</a></div>
+    </div>
+    <div class="kopf-knoepfe">
+      <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+    </div>
+  </header>
+</div>
+
+<div id="verbindungLeiste" role="status" hidden></div>
+<div id="regelLeiste" class="hinweis rot" role="alert" hidden></div>
+
+<div id="fehlerLeiste" role="alert" hidden>
+  <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main>
+  <div id="ladeStatus" class="status" data-i18n="lade">Lade Daten …</div>
+  <div id="ansichtListe"></div>
+  <div id="ansichtStrecke" hidden></div>
+</main>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="editSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="editTitel"></h2>
+    <div id="editInhalt"></div>
+    <div id="editFehler" class="sheet-fehler" role="alert"></div>
+    <div id="editInfo" class="sheet-info"></div>
+    <div class="sheet-knoepfe" id="editKnoepfe"></div>
+  </div>
+</div>
+
+<input type="file" id="importDatei" accept=".json,application/json" hidden>
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Teigecke · Teige & Rezepte — Seiten-Kopf: was teigecke_seite.js erwartet.
+   KEINE Daten im Code: keine Zutaten-, Teig-, Mengen- oder Rezeptwerte
+   (Repo ist öffentlich). Rezepte kommen aus Firestore; die getippten
+   Mengen liegen in teigecke_rezeptmengen und nur dort (RK §18).
+   ================================================================== */
+const L = window.BOS_TEIGECKE_LOGIK;
+const COL = {
+  orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', teigwerte: 'teigecke_teigwerte',
+  rezeptmengen: 'teigecke_rezeptmengen', sicherungen: 'teigecke_sicherungen'
+};
+/* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§14/§18).
+   test_teigecke.js vergleicht beides automatisch. Teige: dieselbe Liste wie
+   bisher auf der Nachtseite. Zutaten: dieselbe wie auf „Orte“ (hier nur
+   „＋ neue Zutat“ aus der Strecke). */
+const FELDER = {
+  teigecke_teige: ['name', 'istSauerteig', 'mitSauer', 'ohneSchuettwasser', 'hinweisOben', 'zutaten', 'vorstufe',
+    'vorstufeZutaten', 'vorstufeHinweis', 'beiBedarf', 'sauerJeKg', 'hefeJeKg', 'vorstufeJeKg', 'anstellgutAnteil',
+    'rezeptBasisKg', 'sort', 'geloescht',
+    'vorstufeSchritt', 'vorstufeSchritteJeBehaelter', 'vorstufeBehaelter',
+    'winbackFeld', 'winbackName', 'vorstufeWinbackFeld', 'vorstufeWinbackName'],
+  teigecke_teigwerte: ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter', 'tabelle', 'einwaage',
+    'kesselMaxKg', 'kesselrestKg'],
+  teigecke_rezeptmengen: ['eingabe'],
+  teigecke_zutaten: ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'gruppe', 'geloescht']
+};
+/* Welcher Haken darf welche Collection schreiben (Konzept §6.1a, RK §18). */
+const HAKEN_FUER = {
+  teigecke_teige: 'rezepte', teigecke_rezeptmengen: 'rezepte',
+  teigecke_teigwerte: 'teige', teigecke_zutaten: 'wagen'
+};
+const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* Rezeptmengen und Feld gruppe (RK §18) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-07_teigecke_rezepte.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const VORSTUFEN_VORSCHLAG = ['Quellstück', 'Brühstück', 'Kochstück', 'Vorteig'];
+const PROBE_BROTE = 60;   /* Proberechnung in der Zusammenfassung (Anweisung §4 B5) */
+const SCHRITTE = 5;
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  /* Pflicht-Texte des Gerüsts (SEITE_TEXTE) */
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Drei mögliche Gründe: (1) Dir fehlt der passende Haken (🧺 Wagen & Zutaten, 🥣 Teige, 📜 Rezepte) bzw. für die Brote die Rolle admin. (2) Du bist mit dem Generalschlüssel 👑 angemeldet — der schreibt in der Teigecke nie. (3) Die Regeln sind älter als diese Seite (die Seite schickt Felder, die die alte Regel nicht kennt) — Regelstand in der Firebase-Konsole prüfen.',
+  err_perm_regel_alt: 'Wahrscheinlich Grund (3): Beim Laden passte der Regelstand nicht zur Seite. ',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_zeit: 'Keine Antwort vom Server nach {s} s — vermutlich kein Netz. Die Änderung kann noch nachträglich ankommen: später neu laden und nachsehen.',
+  err_unbehandelt: 'Unerwarteter Fehler',
+  err_laden: 'Laden „{was}“',
+  err_konto: 'Konto lesen (Haken und Rolle)',
+  err_speichern: 'Speichern',
+  err_gegenlesen: 'Gegenlesen nach abgelehntem Speichern',
+  err_haken_fehlt: 'Dafür fehlt dir der passende Haken in der Kontenverwaltung (🧺 Wagen & Zutaten, 🥣 Teige oder 📜 Rezepte).',
+  offline_pflege: 'Ohne Verbindung wird nichts dauerhaft geändert.',
+  warte_uebertragung: 'Die letzte Änderung wird noch übertragen — bitte kurz warten.',
+  offline_stand: '📴 Ohne Verbindung — Stand von {zeit}. Ändern geht erst wieder mit Netz.',
+  ausstehend: '⏳ Änderungen werden übertragen …',
+  regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Speichern und das Laden der Rezeptmengen können deshalb abgelehnt werden. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  konflikt: 'Inzwischen von {wer} geändert, neu geladen, bitte erneut speichern.',
+  v_pflicht: '„{feld}“ fehlt.',
+  v_zu_lang: '„{feld}“ ist zu lang (höchstens {max} Zeichen).',
+  f_keine_zutaten: 'Noch keine Zutaten im Stamm — erst auf der Seite „Orte“ Zutaten anlegen.',
+  /* Seite */
+  titel: 'Teige & Rezepte', zur_nacht: '‹ Teigecke Nacht', lade: 'Lade Daten …', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
+  schliessen: 'Schließen', abbrechen: 'Abbrechen', speichern: 'Speichern', gespeichert: '✓ Gespeichert',
+  archivieren: 'Archivieren', archiviert: '✓ Archiviert', wiederherstellen: '↩ Wiederherstellen', wiederhergestellt: '✓ Wiederhergestellt',
+  archiv_zeigen: 'Archiv zeigen', archiv_verbergen: 'Archiv verbergen', archiv_leer: 'Nichts archiviert.',
+  kein_konto: 'Keine Anmeldung erkannt — Pflege nicht möglich. Anzeigen geht trotzdem.',
+  produkte_spiegel: 'Produktliste vom Gerät (Stand {zeit})',
+  unbekannt: 'unbekannt',
+  v_name_doppelt: '„{wert}“ gibt es schon.',
+  v_name_doppelt_archiv: '„{wert}“ gibt es schon im Archiv. Auf der Seite „Orte“ unten im Archiv wiederherstellen, statt neu anlegen.',
+  v_zwei_sauerteige: 'Es gibt schon einen Sauerteig: „{name}“.',
+  v_anstellgut: 'Anstellgut-Anteil muss über 0 und unter 1 liegen (z. B. 0,09).',
+  haken_teige: '🥣 Teige', haken_rezepte: '📜 Rezepte',
+  /* Liste */
+  nur_lesen: 'Du siehst die Teige, kannst aber nichts ändern: Dafür braucht dein Konto den Haken 📜 Rezepte.',
+  neu_teig: '＋ Neuer Teig', startdaten: '📂 Startdaten einlesen',
+  liste_titel: 'Teige ({n})', liste_leer: 'Noch kein Teig angelegt. Mit „＋ Neuer Teig“ den ersten anlegen.',
+  marke_rumpf: 'Rumpf, noch keine Rezeptwerte', marke_ohne_brot: 'ohne Brot',
+  teig_keine_produkte: 'noch kein Brot zugeordnet',
+  brote_ohne_teig_titel: 'Brote ohne Teig ({n})',
+  brote_ohne_teig_text: 'Nur zur Übersicht, keine Mahnung. Manche Brote haben bewusst keinen eigenen Teig.',
+  brote_fehlender_teig: 'Zeigen auf einen Teig, den es nicht (mehr) gibt:', brote_ganz_ohne: 'Kategorie Brot, ganz ohne Teig:',
+  sauer_karte: '🫙 Sauerteig', sauer_anstellgut: 'Anstellgut-Anteil: {wert}', sauer_anstellgut_fehlt: 'Anstellgut-Anteil: noch nicht eingetragen',
+  sauer_hinweis: 'Hinweis: {text}', sauer_bei_bedarf: 'Nur bei Bedarf: {liste}', sauer_kein: 'Es gibt noch keinen Sauerteig (Systemteig). Er kommt mit den Startdaten.',
+  e_titel_sauer: 'Sauerteig bearbeiten', f_name: 'Name', f_anstellgut: 'Anstellgut-Anteil', f_anstellgut_hilfe: 'Anteil Anstellgut je kg Sauer, z. B. 0,09. Daraus rechnet die Nacht die Mindestmenge beim Ansetzen.',
+  f_hinweis_oben: 'Hinweis ganz oben (optional)', f_hinweis_oben_hilfe: 'Erscheint nachts in der Karte ganz oben, z. B. „Zuerst Schaumsauer ansetzen“.',
+  f_bei_bedarf: 'Nur bei Bedarf', f_bei_bedarf_hilfe: 'Hat ein Zuhause, gehört aber nicht jede Nacht in die Einsammelliste (z. B. nur zum Auffrischen).',
+  /* Strecke */
+  s_titel_neu: 'Neuer Teig', s_titel: 'Rezept: {name}', s_abbrechen: '✕ Abbrechen', s_zurueck: '‹ Zurück', s_weiter: 'Weiter ›', s_zur_liste: 'Fertig — zur Liste',
+  s_schritt_1: 'Name', s_schritt_2: 'Brote', s_schritt_3: 'Sauer & Vorstufe', s_schritt_4: 'Hauptteig', s_schritt_5: 'Zusammenfassung',
+  s_summe_bisher: 'Summe bisher: {kg}', s_summe_unvollstaendig: '· Mengen unvollständig, die Werte je kg bleiben, wie sie sind',
+  s_summe_leer: 'Noch keine Menge eingetippt.',
+  s_verwerfen_titel: 'Eingabe verwerfen?', s_verwerfen_text: 'Du hast in der Strecke etwas eingetippt, das noch nicht gespeichert ist. Es steht nur auf diesem Bildschirm und ist weg, wenn du jetzt gehst.',
+  s_verwerfen_ja: 'Verwerfen', s_verwerfen_nein: 'Weiter bearbeiten',
+  s_err_mengen: 'Rezeptmengen laden',
+  s_mengen_nicht_ladbar: 'Ohne die gespeicherten Mengen öffnet die Strecke nicht — sonst sähe ein Rezept leer aus, das es nicht ist. Grund steht oben in der Fehlerleiste.',
+  /* Schritt 1 */
+  s1_frage: 'Wie heißt der Teig?', s1_hilfe: 'So, wie er in der Backstube heißt. Er steht nachts in der Liste.',
+  s1_kennung_neu: 'wird zu „{k}“', s1_wartende_brote: ' — darauf zeigen schon: {liste} (in Schritt 2 angehakt)', s1_kennung_fest: 'Kennung „{k}“ — bleibt für immer (die Brote zeigen darauf).',
+  s1_kennung_hilfe: 'Die Kennung bildet BOS aus dem Namen. Nach dem ersten Speichern bleibt sie fest, auch wenn du den Namen später änderst.',
+  v_name_fehlt: 'Bitte einen Namen eintippen.', v_name_lang: 'Der Name ist zu lang (höchstens 60 Zeichen).',
+  v_kennung_ungueltig: 'Aus diesem Namen lässt sich keine Kennung bilden (mindestens zwei Buchstaben oder Ziffern).',
+  v_kennung_belegt: 'Die Kennung „{k}“ gibt es schon (auch archivierte zählen). Bitte den Namen etwas anders wählen.',
+  v_name_gleich: 'Einen Teig „{name}“ gibt es schon. Bitte den Namen unterscheidbar machen.',
+  /* Schritt 2 */
+  s2_frage: 'Welche Brote werden aus diesem Teig gemacht?', s2_hilfe: 'Anhaken und je Brot die Einwaage in g eintragen — das Teiggewicht, nicht das Ausbackgewicht.',
+  s2_einwaage: 'Einwaage (g)', s2_haengt_an: 'hängt an „{teig}“ — hier anhaken zieht es um', s2_haengt_an_fehlend: 'zeigt auf „{teig}“ (gibt es nicht) — hier anhaken zieht es um',
+  s2_einwaage_uebernommen: 'Einwaage vom bisherigen Teig übernommen — bitte prüfen.',
+  s2_suche: 'Anderes Produkt suchen', s2_suche_platz: 'Name tippen …', s2_suche_nichts: 'Nichts gefunden.', s2_suche_mehr: 'Weitere Treffer: Suche genauer fassen.',
+  s2_ohne_brot: 'Ohne Brot speichern geht. Aber: Ohne Brot rechnet die Nacht diesen Teig nicht.',
+  s2_ohne_admin: 'Brote umhängen darf nur ein Konto mit der Rolle admin (wie im Produkt-Editor). Du siehst die Haken nur; die Einwaagen der Brote, die schon an diesem Teig hängen, kannst du pflegen.',
+  s2_ohne_teige: 'Einwaagen speichert nur, wer den Haken 🥣 Teige hat. Ohne ihn wird nur das Rezept gespeichert.',
+  s2_keine_brote: 'Es gibt keine Produkte der Kategorie Brot. Andere Produkte findest du über die Suche.',
+  v_einwaage: 'Einwaage für „{name}“ muss eine Zahl über 0 g sein.',
+  /* Schritt 3 */
+  s3_sauer_frage: 'Sauerteig im Teig?', ja: 'ja', nein: 'nein',
+  s3_sauer_unbekannt: 'Bisher steht hier „unbekannt“ — die Nacht rechnet den Sauer für diesen Teig nicht. Mit ja oder nein beantworten.',
+  s3_sauer_kg: 'Sauer im Rezept (kg)', s3_sauer_kg_hilfe: 'Wie viel kg Sauer im ganzen Rezept stehen. Leer lassen, wenn du die Mengen nicht eintippst.',
+  s3_vorstufe_frage: 'Vorteig, Brühstück oder Quellstück?',
+  s3_vorstufe_name: 'Name der Vorstufe', s3_vorstufe_kg: 'Davon im Rezept (kg)', s3_vorstufe_kg_hilfe: 'Wie viel kg der fertigen Vorstufe in den Teig kommen.',
+  s3_schritt: 'Ein Schritt — was kommt hinein?', s3_schritt_hilfe: 'Eine Portion, so wie sie angesetzt wird, z. B. 3 kg Schrot und 9 L Wasser. Die Nacht zeigt dann die passenden Anzahlen zur Wahl.',
+  s3_behaelter: 'Behälter (Name)', s3_behaelter_platz: 'Behälter', s3_je_behaelter: 'Schritte je Behälter höchstens', s3_je_behaelter_hilfe: 'Leer = ohne Grenze.',
+  v_sauer_frage: 'Bitte beantworten: Sauerteig im Teig — ja oder nein?', v_sauer_kg: 'Sauer im Rezept muss eine Zahl über 0 kg sein (oder leer).',
+  v_vorstufe_frage: 'Bitte beantworten: gibt es eine Vorstufe — ja oder nein?', v_vorstufe_name: 'Die Vorstufe braucht einen Namen.',
+  v_vorstufe_kg: 'Vorstufe im Rezept muss eine Zahl über 0 kg sein (oder leer).', v_je_behaelter: 'Schritte je Behälter: eine ganze Zahl ab 1 (oder leer).',
+  v_vorstufe_zeile: 'Zeile {n} der Vorstufe: Menge muss eine Zahl über 0 sein (oder leer).',
+  /* Schritt 4 */
+  s4_frage: 'Hauptteig', s4_hilfe: 'Alle Mengen des ganzen Rezepts, so wie sie im Rezept stehen. 1 L zählt wie 1 kg.',
+  s4_schuettwasser: 'Schüttwasser (L)', s4_schuettwasser_hilfe: 'Leer oder 0 = dieser Teig hat kein Schüttwasser. Die Wasserregel (wie viel nachts weniger) pflegst du weiter in der Nachtseite.',
+  s4_hefe: 'Hefe', s4_hefe_hilfe: 'Leer = ohne Hefe.', s4_zeilen: 'Weitere Zutaten', s4_zeile_plus: '＋ Zeile', s4_zeile_weg: 'Zeile entfernen',
+  s4_menge: 'Menge', s4_silo: 'Silo — zählt in der Summe, steht nie auf der Einsammelliste',
+  s_zutat_waehlen: '— Zutat wählen —', s_wasser: 'Wasser', s_neue_zutat: '＋ neue Zutat …', s_neue_zutat_ohne: '＋ neue Zutat (braucht 🧺 Wagen & Zutaten)',
+  v_schuettwasser: 'Schüttwasser muss eine Zahl ab 0 sein (oder leer).', v_hefe_kg: 'Hefe muss eine Zahl über 0 kg sein (oder leer).',
+  v_zeile: 'Zeile {n}: Menge muss eine Zahl über 0 sein (oder leer).',
+  v_zeile_ohne_zutat: 'Zeile {n}: Menge ohne Zutat — bitte die Zutat wählen oder die Zeile entfernen.',
+  v_zeile_ohne_zutat_vs: 'Vorstufe, Zeile {n}: Menge ohne Zutat — bitte „Wasser“ oder eine Zutat wählen.',
+  v_hefe_ohne_zutat: 'Hefe: Menge ohne Zutat — bitte die Hefe-Zutat wählen.',
+  /* Neue Zutat */
+  nz_titel: 'Neue Zutat', nz_gruppe: 'Gruppe', nz_hilfe: 'Speichert sofort, mit Sicherung. Das Zuhause gibst du ihr auf der Seite „Orte“.',
+  nz_fertig: '✓ „{name}“ angelegt',
+  gruppe_mehle: 'Mehle & Schrote', gruppe_koerner: 'Körner & Saaten', gruppe_fluessig: 'Flüssiges', gruppe_salz_backmittel: 'Salz & Backmittel',
+  gruppe_vorstufen: 'Vorstufen & Anstellgut', gruppe_kuehlung: 'Kühlung', gruppe_silo: 'Silo (WinBack dosiert)', gruppe_sonstiges: 'Sonstiges',
+  /* Schritt 5 */
+  s5_summe: 'Teigsumme', s5_summe_unvollstaendig: 'Mengen unvollständig — die Werte je kg bleiben, wie sie sind.',
+  s5_summe_unvollstaendig_neu: 'Mengen unvollständig — ohne vollständige Mengen hat der Teig keine Werte je kg, und die Nacht rechnet keine Hefe.',
+  s5_nur_hefe: 'Nur die Hefe eingetippt: Hefe je kg wird auf die bisherige Rezeptbasis ({kg}) gerechnet, alles andere bleibt.',
+  s5_je_kg: 'Je kg Teig', s5_hefe: 'Hefe {wert} kg', s5_sauer: 'Sauer {wert} kg', s5_vorstufe: '{name} {wert} kg', s5_keine_werte: 'noch keine Werte je kg',
+  s5_mit_wasser: 'mit Schüttwasser', s5_ohne_wasser: 'ohne Schüttwasser', s5_keine_regel: '(noch keine Wasserregel — die pflegst du in der Nachtseite)',
+  s5_brote: 'Brote', s5_brot_schaetzung: '{name}: ergibt {kg} Teig ≈ {n} Brote à {g} g', s5_brot_ohne_einwaage: '{name}: Einwaage fehlt', s5_brot_nur_einwaage: '{name}: Einwaage {g} g',
+  s5_keine_brote: 'Kein Brot angehakt — die Nacht rechnet diesen Teig nicht.',
+  s5_am_brot: 'Am Produkt wird geändert (Feld „Aus Teig“)', s5_brot_um: '{name}: „{von}“ → „{nach}“', s5_brot_neu: '{name}: → „{nach}“', s5_brot_weg: '{name}: „{von}“ entfernt',
+  s5_brot_nichts: 'Nichts — alle Brote hängen schon richtig.',
+  s5_probe: 'Proberechnung wie in der Nacht', s5_probe_zeile: 'Bei {n} × {name} ({g} g): {d} Teig · {t} in WinBack · Hefe {h}',
+  s5_probe_ohne_hefe: 'Hefe: noch kein Rezeptwert', s5_probe_keine: 'Keine Proberechnung: kein angehaktes Brot mit Einwaage.',
+  s5_silo: 'Aus dem Silo (zählen mit, nicht auf der Einsammelliste): {liste}',
+  s5_was: 'Was gespeichert wird', s5_teig_neu: 'Rezept: neu', s5_teig_aendern: 'Rezept: geändert', s5_teig_gleich: 'Rezept: unverändert',
+  s5_ein_aendern: 'Einwaagen: geändert', s5_ein_gleich: 'Einwaagen: unverändert', s5_ein_ohne_haken: 'Einwaagen: geändert, aber NICHT gespeichert — dir fehlt der Haken 🥣 Teige',
+  s5_mengen_aendern: 'Rezeptmengen: geändert (nur mit 📜 Rezepte lesbar)', s5_mengen_gleich: 'Rezeptmengen: unverändert', s5_mengen_keine: 'Rezeptmengen: keine eingetippt',
+  s5_brote_aendern: 'Brote: {n} Änderung(en)', s5_brote_gleich: 'Brote: unverändert', s5_brote_ohne_rolle: 'Brote: {n} Änderung(en), aber NICHT gespeichert — dafür braucht dein Konto die Rolle admin',
+  s5_sonstiges: 'Hinweise & Sonstiges', s5_vorstufe_hinweis: 'Hinweis zur Vorstufe (optional)', s5_sort: 'Reihenfolge (optional)', s5_sort_hilfe: 'Kleinere Zahl = weiter vorn, wenn keine Abwiegefolge gepflegt ist.',
+  s5_archivieren: 'Teig archivieren …', s5_speichern: '💾 Speichern',
+  v_sort: 'Reihenfolge muss eine Zahl sein.',
+  /* Speichern */
+  sp_rezept: '1 · Rezept', sp_brote: '2 · Brote', sp_laeuft: 'speichere …', sp_ok: '✓ gespeichert', sp_nichts: '✓ nichts zu ändern',
+  sp_wiederholen: 'Nur diesen Schritt wiederholen', sp_wartet: 'wartet auf Schritt 1',
+  sp_ohne_rolle: 'übersprungen: Brote umhängen braucht die Rolle admin. Das Rezept ist gespeichert.',
+  sp_teigwerte_ohne: 'Einwaagen nicht gespeichert: dir fehlt der Haken 🥣 Teige.',
+  sp_brote_teil: '{i} von {n} Broten umgehängt, dann Fehler. Wiederholen liest alles frisch und macht nur den Rest.',
+  sp_brote_ok: '✓ {n} Brot(e) umgehängt · Stand {stand}',
+  sp_brote_perm: 'Wenn „Keine Berechtigung“: Rolle admin fehlt, oder jemand hat gerade im Produkt-Editor gespeichert (Stand-Zettel). Wiederholen liest alles frisch.',
+  sp_konflikt_behalten: 'Meine Eingabe behalten und speichern', sp_konflikt_neu: 'Frisch öffnen (Eingabe verwerfen)',
+  sp_konflikt: 'Inzwischen von {wer} geändert. Deine Eingabe steht noch hier. Entweder frisch öffnen (deine Eingabe ist dann weg) oder deine Eingabe auf den frischen Stand speichern (die Änderung von {wer} an diesem Rezept wird dann überschrieben).',
+  sp_fertig: '✓ Alles gespeichert',
+  /* Archivieren */
+  ar_titel: '„{name}“ archivieren?', ar_text: 'Der Teig verschwindet aus der Liste und aus der Nacht. Gelöscht wird nichts: Unten im Archiv lässt er sich wiederherstellen.',
+  sperre_teig: 'Archivieren geht nicht: Diese Brote zeigen noch auf den Teig: {liste}. Erst in Schritt 2 abhaken und speichern.',
+  /* Startdaten (kopiert von der Nachtseite) */
+  import_titel: 'Startdaten einlesen', import_json: 'Die Datei ist kein gültiges JSON: {msg}',
+  import_fehler_titel: 'Fehler — so wird nichts übernommen:', import_hinweise_titel: 'Hinweise:', import_nichts: 'Nichts Neues in der Datei.',
+  import_los: 'Übernehmen ({n} Einträge)', import_laeuft: 'Schreibe {i} von {n} …', import_fertig: '✓ Übernommen: {n} Einträge, jeder mit eigener Sicherung.',
+  import_abbruch: 'Abgebrochen bei Eintrag {i} von {n}. Alles davor ist gespeichert. Erneutes Einlesen überspringt Vorhandenes.',
+  import_haken_fehlen: 'Für diese Datei fehlen dir die Haken: {liste}. Es wird nichts geschrieben.',
+  import_einwaagen_titel: 'Einwaagen bitte prüfen (noch nicht bestätigt):', einwaage_fehlt_kurz: 'Einwaage fehlt',
+  import_zusammenfassung: 'Neu: {teige} Teige, {werte}× Teigwerte (Einwaagen). Schon vorhanden (wird übersprungen): {vorhanden}.',
+  import_zutaten_erst: 'Die Datei enthält {n} Zutat(en), die es noch nicht gibt. Zutaten liest die Seite „Orte“ ein (Hub „Teigecke“ → Orte → „Zutaten einlesen“, Haken 🧺). Danach diese Datei hier noch einmal einlesen.',
+  import_orte_nicht: 'Die Datei enthält {n} Ort(e). Orte werden nicht eingelesen, sondern auf der Seite „Orte“ von Hand angelegt.'
+};
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, haken: { wagen: false, teige: false, rezepte: false }, rolle: null,
+  ansicht: 'liste', zeigeArchiv: false,
+  orte: [], zutaten: [], teige: [], teigwerte: {}, rezeptmengen: [],
+  produkte: [], produkteOk: false, produkteAusSpiegel: null,
+  geladen: false,
+  verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
+  regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
+  strecke: null              // offene Strecke, nur im Arbeitsspeicher (keine Rezeptmengen auf dem Gerät)
+};
+let abos = [];
+</script>
+<script src="teigecke_seite.js"></script>
+<script>
+'use strict';
+/* ==================================================================
+   Teigecke · Teige & Rezepte — Seitenlogik. Gerüst: teigecke_seite.js.
+   Rechnen: teigecke_logik.js (Strecke ab v0.11, mit node testbar).
+   ================================================================== */
+/* ---------- Kurzwege ---------- */
+const tm = function () { return L.nachId(S.teige); };
+const zm = function () { return L.nachId(S.zutaten); };
+const pm = function () { return L.produktMap(S.produkte); };
+function produktName(k) { const p = pm()[k]; return p ? p.name : k; }
+function teigName(k) { const x = tm()[k]; return x ? x.name : k; }
+function sauerteig() { return L.aktiv(S.teige).filter(function (x) { return x.istSauerteig; })[0] || null; }
+function istAdmin() { return S.rolle === 'admin'; }
+function darfRezepte() { return S.haken.rezepte && online(); }
+function fmt(x, stellen) { return L.istZahl(x) ? x.toFixed(stellen).replace('.', ',') : '–'; }
+function fmtKg(x) { return fmt(x, 1) + ' kg'; }
+function zahlText(x) { return L.istZahl(x) ? String(x).replace('.', ',') : ''; }
+/* Werte je kg: kleine Zahlen, deshalb mehr Stellen (0,01375). */
+function fmtJeKg(x) { return L.istZahl(x) ? String(Math.round(x * 100000) / 100000).replace('.', ',') : '–'; }
+
+/* ---------- Laden: Produkte (bos_produkte.js), Konto mit Rolle ----------
+   ladeProdukte: kopiert aus teigecke_nacht.html (Stand 07.10.2026), ohne
+   das Entfernen des alten Spiegels (den gab es auf dieser Seite nie). */
+async function ladeProdukte() {
+  try {
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    S.produkte = e.liste; S.produkteOk = true;
+    S.produkteAusSpiegel = (e.quelle === 'geraetekopie') ? (e.kopieZeit || e.stand) : null;
+    if (e.quelle === 'geraetekopie' && e.grund) zeigeFehler(t('err_laden', { was: 'Produktliste' }), e.grund);
+  } catch (err) {
+    zeigeFehler(t('err_laden', { was: 'Produktliste' }), err);
+    S.produkte = []; S.produkteOk = false;
+  }
+}
+/* Rolle für das Umhängen der Brote (Regel: produkte nur mit Rolle admin, RK §16).
+   Das Gerüst liest nur die Haken; die Rolle steht im selben Konto-Dokument. */
+async function ladeRolle() {
+  S.rolle = null;
+  if (!S.kennung) return;
+  try {
+    const konto = await window.BOS_ACCOUNTS.ladeKonto(window.db, S.kennung);
+    S.rolle = (konto && konto.role) || null;
+  } catch (err) { zeigeFehler(t('err_konto'), err); }
+}
+function abonniereStamm() {
+  abos.forEach(function (ab) { ab(); });
+  abos = [
+    aboCollection('orte', function (a) { S.orte = a; }),          /* nur für „Startdaten einlesen“ (kopiert) */
+    aboCollection('zutaten', function (a) { S.zutaten = a; }),
+    aboCollection('teige', function (a) { S.teige = a; }),
+    aboCollection('teigwerte', function (a) { S.teigwerte = L.nachId(a); })
+  ];
+  /* Rezeptmengen werden NICHT abonniert: Sie kommen nur beim Öffnen eines
+     Rezepts (Haken Rezepte), einzeln, und bleiben im Arbeitsspeicher. */
+}
+async function start() {
+  wendeI18nAn();
+  renderHilfe();
+  if (!window.db || !window.BOS_AUTH_READY) {
+    zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt'));
+    return;
+  }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; }
+  catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); return; }
+  S.kennung = (nutzer && nutzer.email) ? nutzer.email.split('@')[0] : null;
+  if (!S.kennung) toast(t('kein_konto'));
+  await Promise.all([ladeProdukte(), ladeKonto(), ladeRolle()]);
+  abonniereStamm();
+  S.geladen = true;
+  document.getElementById('ladeStatus').hidden = true;
+  render();
+  if (S.kennung) pruefeRegelstand();
+}
+window.addEventListener('online', planeRender);
+window.addEventListener('offline', planeRender);
+/* Ungespeicherte Eingabe in der Strecke: der Browser fragt nach. */
+window.addEventListener('beforeunload', function (e) {
+  if (S.ansicht === 'strecke' && S.strecke && S.strecke.geaendert) { e.preventDefault(); e.returnValue = ''; }
+});
+async function neuLaden() { render(); }
+function oeffneNachCol(col, id) {
+  if (col !== COL.teige) return;
+  const x = tm()[id];
+  if (editZustand && editZustand.typ === 'archiv-teig') oeffneArchivFrage();
+  else if (x && x.istSauerteig) oeffneSauer(id);
+}
+
+/* ---------- Rendern ---------- */
+function render() {
+  if (!S.geladen) return;
+  renderVerbindung();
+  document.getElementById('ansichtListe').hidden = S.ansicht !== 'liste';
+  document.getElementById('ansichtStrecke').hidden = S.ansicht !== 'strecke';
+  if (S.ansicht === 'strecke') { aktualisiereLauf(); return; }   /* die Strecke zeichnet sich nur selbst neu (Eingaben bleiben) */
+  if (fokusIn(document.querySelector('main'))) { renderAufgeschoben = true; return; }
+  renderListe();
+}
+function teigZeileHTML(x) {
+  const brote = L.produkteDesTeigs(x.id, S.produkte);
+  const marken = (L.istRumpf(x) ? '<span class="badge rot">' + esc(t('marke_rumpf')) + '</span> ' : '') +
+    (S.produkteOk && !brote.length ? '<span class="badge">' + esc(t('marke_ohne_brot')) + '</span>' : '');
+  const inhalt = '<span class="lz-name"><b>' + esc(x.name) + ' <span class="badge">' + esc(x.id) + '</span></b>' +
+    '<small>' + esc(brote.map(function (p) { return p.name; }).join(', ') || t('teig_keine_produkte')) + '</small>' +
+    (marken ? '<small>' + marken + '</small>' : '') + '</span>';
+  if (!darfRezepte()) return '<div class="liste-zeile-rahmen"><div class="liste-zeile rz-zeile rz-nur-lesen">' + inhalt + '</div></div>';
+  return '<div class="liste-zeile-rahmen"><button type="button" class="liste-zeile rz-zeile" data-aktion="strecke-oeffnen" data-id="' + esc(x.id) + '">' + inhalt +
+    '<span class="rz-stift" aria-hidden="true">✎</span></button></div>';
+}
+function broteOhneTeigHTML() {
+  if (!S.produkteOk) return '';
+  const b = L.broteOhneTeig(S.produkte, S.teige);
+  const n = b.fehlenderTeig.length + b.ohneTeig.length;
+  if (!n) return '';
+  let html = '<details class="hinweis baustelle" id="broteOhneTeig"><summary>' + esc(t('brote_ohne_teig_titel', { n: n })) + '</summary><div>' +
+    '<p class="klein">' + esc(t('brote_ohne_teig_text')) + '</p>';
+  if (b.fehlenderTeig.length) html += '<p><b>' + esc(t('brote_fehlender_teig')) + '</b> ' + esc(b.fehlenderTeig.map(function (p) { return p.name + ' → ' + p.ausTeig; }).join(', ')) + '</p>';
+  if (b.ohneTeig.length) html += '<p><b>' + esc(t('brote_ganz_ohne')) + '</b> ' + esc(b.ohneTeig.map(function (p) { return p.name; }).join(', ')) + '</p>';
+  return html + '</div></details>';
+}
+function sauerKarteHTML() {
+  const st = sauerteig();
+  if (!st) return '<div class="karte"><div class="karte-kopf"><div><h3>' + esc(t('sauer_karte')) + '</h3><div class="karte-unter">' + esc(t('sauer_kein')) + '</div></div></div></div>';
+  const zeilen = [L.istZahl(st.anstellgutAnteil) ? t('sauer_anstellgut', { wert: zahlText(st.anstellgutAnteil) }) : t('sauer_anstellgut_fehlt')];
+  if (st.hinweisOben) zeilen.push(t('sauer_hinweis', { text: st.hinweisOben }));
+  if ((st.beiBedarf || []).length) zeilen.push(t('sauer_bei_bedarf', { liste: st.beiBedarf.map(zutatName).join(', ') }));
+  return '<div class="karte rz-sauer"><div class="karte-kopf"><div><h3>' + esc(t('sauer_karte')) + ' · ' + esc(st.name) + ' <span class="badge">' + esc(st.id) + '</span></h3>' +
+    zeilen.map(function (z) { return '<div class="karte-unter">' + esc(z) + '</div>'; }).join('') + '</div>' +
+    (darfRezepte() ? '<div class="karte-knoepfe"><button type="button" class="bos-btn" data-aktion="sauer-bearbeiten" data-id="' + esc(st.id) + '" aria-label="' + esc(t('e_titel_sauer')) + '">✎</button></div>' : '') +
+    '</div></div>';
+}
+function zutatName(zid) { const z = zm()[zid]; return z ? z.name : zid; }
+function renderListe() {
+  const el = document.getElementById('ansichtListe');
+  let html = '';
+  if (S.kennung && !S.haken.rezepte) html += '<div class="hinweis blau">' + esc(t('nur_lesen')) + '</div>';
+  if ((S.haken.rezepte || S.haken.teige) && online()) {
+    html += '<div class="pflege-leiste">' +
+      (S.haken.rezepte ? '<button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-teig">' + esc(t('neu_teig')) + '</button>' : '') +
+      '<button type="button" class="bos-btn" data-aktion="startdaten">' + esc(t('startdaten')) + '</button></div>';
+  } else if ((S.haken.rezepte || S.haken.teige) && !online()) html += '<p class="klein">' + esc(t('offline_pflege')) + '</p>';
+  html += broteOhneTeigHTML();
+  html += sauerKarteHTML();
+  const teige = L.aktiv(S.teige).filter(function (x) { return !x.istSauerteig; })
+    .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  html += '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('liste_titel', { n: teige.length })) + '</h2></div>' +
+    (teige.length ? '<div class="teig-liste">' + teige.map(teigZeileHTML).join('') + '</div>' : '<p class="status">' + esc(t('liste_leer')) + '</p>') + '</section>';
+  if (darfRezepte()) html += archivHTML('teige');
+  el.innerHTML = html;
+}
+
+/* ---------- Archiv — kopiert aus teigecke_nacht.html (archivHTML, teigKarteHTML) ---------- */
+function archivHTML(name) {
+  const arch = (S[name] || []).filter(function (x) { return x.geloescht; });
+  let html = '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-umschalten">' + esc(t(S.zeigeArchiv ? 'archiv_verbergen' : 'archiv_zeigen')) + ' (' + esc(COL[name]) + ': ' + arch.length + ')</button></div>';
+  if (!S.zeigeArchiv) return html;
+  if (!arch.length) return html + '<p class="status">' + esc(t('archiv_leer')) + '</p>';
+  return html + arch.map(function (x) {
+    if (name === 'teige') return teigKarteHTML(x, true);
+    return '<div class="karte archiviert"><div class="karte-kopf"><div><h3>' + esc(x.name) + '</h3></div><div class="karte-knoepfe">' +
+      '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="zutaten" data-id="' + esc(x.id) + '">' + esc(t('wiederherstellen')) + '</button></div></div></div>';
+  }).join('');
+}
+function teigKarteHTML(teig, archiv) {
+  const brote = L.produkteDesTeigs(teig.id, S.produkte).map(function (p) { return p.name; }).join(', ');
+  const knopf = archiv
+    ? '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="teige" data-id="' + esc(teig.id) + '">' + esc(t('wiederherstellen')) + '</button>'
+    : '<button type="button" class="bos-btn" data-aktion="strecke-oeffnen" data-id="' + esc(teig.id) + '">✎</button>';
+  return '<div class="karte' + (archiv ? ' archiviert' : '') + '"><div class="karte-kopf"><div><h3>' + esc(teig.name) + ' <span class="badge">' + esc(teig.id) + '</span></h3>' +
+    '<div class="karte-unter">' + esc(brote || t('teig_keine_produkte')) + '</div></div><div class="karte-knoepfe">' + knopf + '</div></div></div>';
+}
+/* stelleWiederHer: kopiert aus teigecke_nacht.html; err_perm → err_haken_fehlt wie auf „Orte“. */
+async function stelleWiederHer(name, id) {
+  const dok = L.nachId(S[name])[id];
+  if (!dok) return;
+  if (!S.haken[HAKEN_FUER[COL[name]]]) { zeigeFehler(t('wiederherstellen'), { message: t('err_haken_fehlt') }); return; }
+  let fehler = '';
+  if (L.namensKonflikt(S[name], dok.name, id)) fehler = t('v_name_doppelt', { wert: dok.name });
+  if (!fehler && name === 'teige' && dok.istSauerteig && sauerteig()) fehler = t('v_zwei_sauerteige', { name: sauerteig().name });
+  if (fehler) { zeigeFehler(t('wiederherstellen'), { message: fehler }); return; }
+  try {
+    await schreibe(COL[name], id, Object.assign({}, dok, { geloescht: false }), 'wiederherstellen', dok);
+    toast(t('wiederhergestellt'));
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(COL[name], id, dok);
+      if (konflikt) { console.error('[Teigecke] Wiederherstellen abgelehnt: veralteter Stand', err); zeigeFehler(t('wiederherstellen'), { message: konflikt }); return; }
+    }
+    zeigeFehler(t('err_speichern'), err);
+  }
+}
+
+/* ---------- Sauerteig: kleine eigene Karte, nicht die Strecke ---------- */
+function oeffneSauer(id) {
+  const x = tm()[id];
+  if (!x) return;
+  editZustand = { typ: 'sauer', id: id, auswahl: { beiBedarf: new Set(x.beiBedarf || []) } };
+  const zutaten = L.aktiv(S.zutaten).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  const eintraege = zutaten.map(function (y) { return { id: y.id, text: y.name, an: editZustand.auswahl.beiBedarf.has(y.id) }; });
+  editZustand.auswahl.beiBedarf.forEach(function (zid) { if (!zm()[zid] || zm()[zid].geloescht) eintraege.push({ id: zid, text: t('unbekannt') + ' (' + zid + ')', an: true, warn: true }); });
+  oeffneEdit(t('e_titel_sauer'),
+    feldHTML(t('f_name'), eingabe('fName', x.name, 'maxlength="60"')) +
+    feldHTML(t('f_anstellgut'), eingabe('fAnstellgut', zahlText(x.anstellgutAnteil), 'inputmode="decimal"'), t('f_anstellgut_hilfe')) +
+    feldHTML(t('f_hinweis_oben'), eingabe('fHinweisOben', x.hinweisOben, 'maxlength="200"'), t('f_hinweis_oben_hilfe')) +
+    feldHTML(t('f_bei_bedarf'), chipAuswahlHTML('beiBedarf', eintraege), t('f_bei_bedarf_hilfe')),
+    [{ aktion: 'sauer-speichern', text: t('speichern'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+async function speichereSauer() {
+  const z = editZustand;
+  if (!z || z.typ !== 'sauer') return;
+  const alt = tm()[z.id];
+  if (!alt) return;
+  const name = wert('fName');
+  let fehler = pruefeText(t('f_name'), name, 60);
+  if (!fehler && L.namensKonflikt(S.teige, name, z.id)) fehler = t('v_name_doppelt', { wert: name });
+  const ag = parseZahl(wert('fAnstellgut'));
+  if (!fehler && ag !== null && !(L.istZahl(ag) && ag > 0 && ag < 1)) fehler = t('v_anstellgut');
+  if (fehler) { editFehler(fehler); return; }
+  const daten = Object.assign({}, alt, { name: name, hinweisOben: wert('fHinweisOben'), beiBedarf: Array.from(z.auswahl.beiBedarf) });
+  if (ag === null) delete daten.anstellgutAnteil; else daten.anstellgutAnteil = ag;
+  await fuehreSchreibenAus(COL.teige, z.id, daten, 'aendern', alt, t('gespeichert'));
+}
+
+/* ==================================================================
+   DIE STRECKE (Anweisung §4 B). Zustand nur im Arbeitsspeicher:
+   S.strecke = { z, schritt, max, geaendert, mengenAlt, sp, konflikt }
+   z = Zustand aus teigecke_logik.js (streckeLeer / streckeAusBestand).
+   ================================================================== */
+async function oeffneStrecke(id) {
+  if (!S.haken.rezepte) { zeigeFehler(t('titel'), { message: t('nur_lesen') }); return; }
+  let mengen = null;
+  if (id) {
+    const teig = tm()[id];
+    if (!teig) return;
+    /* Rezeptmengen: einzeln, frisch vom Server, nur in den Arbeitsspeicher. */
+    try {
+      const snap = await window.db.collection(COL.rezeptmengen).doc(id).get({ source: 'server' });
+      mengen = snap.exists ? Object.assign({ id: snap.id }, snap.data()) : null;
+    } catch (err) {
+      zeigeFehler(t('s_err_mengen'), err);
+      toast(t('s_mengen_nicht_ladbar'));
+      return;
+    }
+  }
+  const z = id ? L.streckeAusBestand(tm()[id], S.teigwerte[id] || null, mengen, S.produkte, S.zutaten) : L.streckeLeer(S.zutaten);
+  S.strecke = { z: z, schritt: 1, max: 1, geaendert: false, mengenAlt: mengen, sp: null, konflikt: '', fehler: [], uebernommen: {} };
+  S.rezeptmengen = mengen ? [mengen] : [];
+  S.ansicht = 'strecke';
+  zeichneStrecke();
+  render();
+  window.scrollTo(0, 0);
+}
+function schliesseStrecke() {
+  S.strecke = null; S.rezeptmengen = [];      /* Mengen aus dem Arbeitsspeicher räumen */
+  S.ansicht = 'liste';
+  document.getElementById('ansichtStrecke').innerHTML = '';
+  render();
+  window.scrollTo(0, 0);
+}
+function frageVerlassen() {
+  if (!S.strecke || !S.strecke.geaendert) { schliesseStrecke(); return; }
+  editZustand = { typ: 'verlassen' };
+  oeffneEdit(t('s_verwerfen_titel'), '<p class="sheet-info">' + esc(t('s_verwerfen_text')) + '</p>',
+    [{ aktion: 'verwerfen', text: t('s_verwerfen_ja'), klasse: 'gefahr' }, { aktion: 'abbrechen', text: t('s_verwerfen_nein') }]);
+}
+function speichertGerade() { return !!(S.strecke && S.strecke.sp && (S.strecke.sp.rezept === 'laeuft' || S.strecke.sp.brote === 'laeuft')); }
+
+/* Fehlerkennung aus L.pruefeSchritt → Text */
+function fehlerTexte(kennungen) {
+  const z = S.strecke.z;
+  return kennungen.map(function (f) {
+    const teil = f.split(':'), n = Number(teil[1]) + 1;
+    switch (teil[0]) {
+      case 'name_fehlt': return t('v_name_fehlt');
+      case 'name_lang': return t('v_name_lang');
+      case 'kennung_ungueltig': return t('v_kennung_ungueltig');
+      case 'kennung_belegt': return t('v_kennung_belegt', { k: L.kennungAus(z.name) });
+      case 'name_doppelt': return t('v_name_gleich', { name: String(z.name).trim() });
+      case 'einwaage': return t('v_einwaage', { name: produktName(teil[1]) });
+      case 'sauer_frage': return t('v_sauer_frage');
+      case 'sauer_kg': return t('v_sauer_kg');
+      case 'vorstufe_frage': return t('v_vorstufe_frage');
+      case 'vorstufe_name': return t('v_vorstufe_name');
+      case 'vorstufe_kg': return t('v_vorstufe_kg');
+      case 'vorstufe_je_behaelter': return t('v_je_behaelter');
+      case 'vorstufe_zeile': return t('v_vorstufe_zeile', { n: n });
+      case 'schuettwasser': return t('v_schuettwasser');
+      case 'hefe_kg': return t('v_hefe_kg');
+      case 'zeile': return t('v_zeile', { n: n });
+      default: return f;
+    }
+  });
+}
+/* Vorwärts nur über geprüfte Schritte; zurück immer, ohne Verlust. */
+function geheZu(ziel) {
+  const st = S.strecke;
+  if (!st || speichertGerade()) return;
+  ziel = Math.max(1, Math.min(SCHRITTE, ziel));
+  if (ziel > st.schritt) {
+    for (let s = st.schritt; s < ziel; s++) {
+      const f = fehlerTexte(L.pruefeSchritt(st.z, s, { teige: S.teige })).concat(zusatzFehler(s));
+      if (f.length) { st.schritt = s; st.fehler = f; zeichneStrecke(); return; }
+    }
+  }
+  st.schritt = ziel; st.max = Math.max(st.max, ziel); st.fehler = [];
+  if (ziel >= 2) wartendeAnhaken();
+  zeichneStrecke();
+  window.scrollTo(0, 0);
+}
+/* Ergänzend zur Logik: eine Menge ohne Zutat zählt nirgends mit — lieber fragen. */
+function zusatzFehler(schritt) {
+  const z = S.strecke.z, f = [];
+  if (schritt === 3 && z.vorstufe.ja === true) z.vorstufe.zeilen.forEach(function (r, i) { if (!r.zutatId && r.menge !== null) f.push(t('v_zeile_ohne_zutat_vs', { n: i + 1 })); });
+  if (schritt === 4) {
+    if (z.hefe.kg !== null && !z.hefe.zutatId) f.push(t('v_hefe_ohne_zutat'));
+    z.zeilen.forEach(function (r, i) { if (!r.zutatId && r.menge !== null) f.push(t('v_zeile_ohne_zutat', { n: i + 1 })); });
+    const v = sortFehler(); if (v) f.push(v);
+  }
+  return f;
+}
+function sortFehler() { const s = S.strecke.z.sort; return (s !== null && !L.istZahl(s)) ? t('v_sort') : ''; }
+
+function zeichneStrecke() {
+  const st = S.strecke, z = st.z;
+  const el = document.getElementById('ansichtStrecke');
+  const titel = z.neu ? t('s_titel_neu') : t('s_titel', { name: teigName(z.kennung) });
+  const leiste = '<ol class="rz-schritte">' + [1, 2, 3, 4, 5].map(function (n) {
+    const zustand = n === st.schritt ? 'aktiv' : (n <= st.max ? 'besucht' : '');
+    return '<li><button type="button" class="rz-schritt ' + zustand + '" data-aktion="schritt" data-n="' + n + '"' + (n === st.schritt ? ' aria-current="step"' : '') + '>' +
+      '<span class="rz-nr">' + n + '</span><span class="rz-wort">' + esc(t('s_schritt_' + n)) + '</span></button></li>';
+  }).join('') + '</ol>';
+  const koerper = [null, schritt1HTML, schritt2HTML, schritt3HTML, schritt4HTML, schritt5HTML][st.schritt]();
+  const fehler = st.fehler.length ? '<div class="hinweis rot" id="streckeFehler" role="alert">' + st.fehler.map(esc).join('<br>') + '</div>' : '<div id="streckeFehler" hidden></div>';
+  const nav = '<div class="rz-nav">' +
+    (st.schritt > 1 ? '<button type="button" class="bos-btn" data-aktion="schritt-zurueck">' + esc(t('s_zurueck')) + '</button>' : '<span></span>') +
+    (st.schritt < SCHRITTE ? '<button type="button" class="bos-btn bos-btn--amber" data-aktion="schritt-weiter">' + esc(t('s_weiter')) + '</button>' : '') + '</div>';
+  el.innerHTML = '<div class="rz-kopf"><h2 class="bos-title">' + esc(titel) + '</h2>' +
+    '<button type="button" class="link-btn" data-aktion="strecke-abbrechen">' + esc(t('s_abbrechen')) + '</button></div>' +
+    leiste + fehler + '<div class="rz-koerper">' + koerper + '</div>' +
+    '<div class="rz-lauf" id="rzLauf" role="status"></div>' + nav;
+  aktualisiereLauf();
+}
+/* Laufleiste „Summe bisher“ ab Schritt 3 — ohne neu zu zeichnen. */
+function aktualisiereLauf() {
+  const el = document.getElementById('rzLauf');
+  if (!el || !S.strecke) return;
+  const z = S.strecke.z;
+  if (S.strecke.schritt < 3) { el.hidden = true; return; }
+  const s = L.streckeSumme(z);
+  el.hidden = false;
+  el.textContent = s.hatMengen ? t('s_summe_bisher', { kg: fmtKg(s.kg) }) + (s.vollstaendig ? '' : ' ' + t('s_summe_unvollstaendig')) : t('s_summe_leer');
+}
+
+/* ---- Bausteine ---- */
+function zahlFeld(pfad, wertZahl, extra) {
+  return '<input class="bos-input rz-zahl" data-z="' + pfad + '" data-art="zahl" inputmode="decimal" value="' + esc(zahlText(wertZahl)) + '" ' + (extra || '') + '>';
+}
+function textFeld(pfad, text, extra) {
+  return '<input class="bos-input" data-z="' + pfad + '" data-art="text" value="' + esc(text == null ? '' : text) + '" ' + (extra || '') + '>';
+}
+function jaNein(aktion, wertJa) {
+  return '<div class="umschalter rz-janein" role="group">' + [[true, 'ja'], [false, 'nein']].map(function (o) {
+    return '<button type="button" data-aktion="' + aktion + '" data-wert="' + o[0] + '" aria-pressed="' + (wertJa === o[0]) + '">' + esc(t(o[1])) + '</button>';
+  }).join('') + '</div>';
+}
+/* Zutatenauswahl, vorsortiert nach Gruppe (Anweisung §4 C). „＋ neue Zutat“ steht
+   direkt in der Auswahl (ohne Haken 🧺 grau, mit Grund). */
+function zutatAuswahl(attr, gewaehlt, mitWasser) {
+  const aktive = L.nachId(L.aktiv(S.zutaten));
+  let html = '<select class="bos-input rz-zutat" ' + attr + '><option value="">' + esc(t('s_zutat_waehlen')) + '</option>';
+  if (mitWasser) html += '<option value="' + L.WASSER_ID + '"' + (gewaehlt === L.WASSER_ID ? ' selected' : '') + '>' + esc(t('s_wasser')) + '</option>';
+  L.zutatenNachGruppe(S.zutaten).forEach(function (g) {
+    html += '<optgroup label="' + esc(t('gruppe_' + g.gruppe)) + '">' + g.zutaten.map(function (x) {
+      return '<option value="' + esc(x.id) + '"' + (x.id === gewaehlt ? ' selected' : '') + '>' + esc(x.name) + '</option>';
+    }).join('') + '</optgroup>';
+  });
+  if (gewaehlt && gewaehlt !== L.WASSER_ID && !aktive[gewaehlt]) html += '<option value="' + esc(gewaehlt) + '" selected>' + esc(t('unbekannt') + ' (' + gewaehlt + ')') + '</option>';
+  const darf = S.haken.wagen && online();
+  html += '<option value="__neu__"' + (darf ? '' : ' disabled') + '>' + esc(t(S.haken.wagen ? 's_neue_zutat' : 's_neue_zutat_ohne')) + '</option>';
+  return html + '</select>';
+}
+function einheitAuswahl(attr, einheit) {
+  return '<select class="bos-input rz-einheit" ' + attr + '>' + ['kg', 'L'].map(function (e) {
+    return '<option value="' + e + '"' + (einheit === e ? ' selected' : '') + '>' + e + '</option>';
+  }).join('') + '</select>';
+}
+function siloHinweis(zid) { const x = zm()[zid]; return x && L.istSilo(x) ? '<div class="klein rz-silo">' + esc(t('s4_silo')) + '</div>' : ''; }
+
+/* ---- Schritt 1: Name ---- */
+/* Brote, deren ausTeig schon auf diese (noch nicht angelegte) Kennung zeigt — z. B. die
+   sechs Rumpf-Brote aus der Produkt-Config (Punkt 51). Sie gehören zu diesem Teig. */
+function wartendeBrote(kennung) { return kennung ? S.produkte.filter(function (p) { return p.ausTeig === kennung; }) : []; }
+function kennungText(z) {
+  if (!z.neu) return t('s1_kennung_fest', { k: z.kennung });
+  const k = L.kennungAus(z.name), w = wartendeBrote(k);
+  return t('s1_kennung_neu', { k: k || '…' }) + (w.length ? t('s1_wartende_brote', { liste: w.map(function (p) { return p.name; }).join(', ') }) : '');
+}
+/* Beim Schritt in die Brote (neuer Teig): wartende Brote anhaken. Ändert sich der Name,
+   fallen die vorher automatisch angehakten wieder heraus, solange niemand sie angefasst hat. */
+function wartendeAnhaken() {
+  const st = S.strecke, z = st.z;
+  if (!z.neu) return;
+  const k = L.kennungAus(z.name);
+  if (st.autoKennung === k) return;
+  Object.keys(z.brote).forEach(function (lk) { if (z.brote[lk].auto) delete z.brote[lk]; });
+  wartendeBrote(k).forEach(function (p) { if (!z.brote[p.legacyKey]) z.brote[p.legacyKey] = { an: true, einwaageG: null, auto: true }; });
+  st.autoKennung = k;
+}
+function schritt1HTML() {
+  const z = S.strecke.z;
+  return feldHTML(t('s1_frage'), textFeld('name', z.name, 'maxlength="60" autocomplete="off" id="rzName"'), t('s1_hilfe')) +
+    '<div class="feld"><div class="kennung-vorschau rz-kennung" id="rzKennung">' + esc(kennungText(z)) + '</div>' +
+    '<div class="feld-hilfe">' + esc(t('s1_kennung_hilfe')) + '</div></div>';
+}
+/* ---- Schritt 2: Brote ---- */
+function brotZeileHTML(p) {
+  const z = S.strecke.z, b = z.brote[p.legacyKey] || { an: false, einwaageG: null };
+  const kennung = z.neu ? L.kennungAus(z.name) : z.kennung;
+  const hierAngehaengt = !!kennung && p.ausTeig === kennung;   /* auch: wartende Brote eines neuen Teigs */
+  let unter = '';
+  if (p.ausTeig && p.ausTeig !== kennung) unter = tm()[p.ausTeig] && !tm()[p.ausTeig].geloescht ? t('s2_haengt_an', { teig: teigName(p.ausTeig) }) : t('s2_haengt_an_fehlend', { teig: p.ausTeig });
+  const darfHaken = istAdmin();
+  const darfEinwaage = b.an && (darfHaken || hierAngehaengt);
+  return '<div class="rz-brot' + (b.an ? ' an' : '') + '">' +
+    '<button type="button" class="vorrat-haken rz-brot-haken" data-aktion="brot-an" data-lk="' + esc(p.legacyKey) + '" aria-pressed="' + !!b.an + '"' + (darfHaken ? '' : ' disabled') + '>' +
+      '<span class="vh-kasten" aria-hidden="true">' + (b.an ? '✓' : '') + '</span><span class="rz-brot-name">' + esc(p.name) +
+      (unter ? '<small>' + esc(unter) + '</small>' : '') + (S.strecke.uebernommen[p.legacyKey] ? '<small>' + esc(t('s2_einwaage_uebernommen')) + '</small>' : '') + '</span></button>' +
+    (b.an ? '<label class="rz-einwaage"><span class="klein">' + esc(t('s2_einwaage')) + '</span>' +
+      '<input class="bos-input rz-zahl" data-brot="' + esc(p.legacyKey) + '" inputmode="numeric" value="' + esc(zahlText(b.einwaageG)) + '"' + (darfEinwaage ? '' : ' disabled') + '></label>' : '') +
+    '</div>';
+}
+function schritt2HTML() {
+  const z = S.strecke.z;
+  const brote = L.teigeckeBrote(S.produkte).slice();
+  const drin = {}; brote.forEach(function (p) { drin[p.legacyKey] = true; });
+  /* Brote aus der Suche oder anderer Kategorie, die schon in der Strecke stehen */
+  Object.keys(z.brote).forEach(function (lk) { const p = pm()[lk]; if (p && !drin[lk]) { brote.push(p); drin[lk] = true; } });
+  brote.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  let html = '<p class="rz-frage">' + esc(t('s2_frage')) + '</p><p class="feld-hilfe">' + esc(t('s2_hilfe')) + '</p>';
+  if (!istAdmin()) html += '<div class="hinweis blau">' + esc(t('s2_ohne_admin')) + '</div>';
+  if (!S.haken.teige) html += '<div class="hinweis">' + esc(t('s2_ohne_teige')) + '</div>';
+  if (!S.produkteOk) html += '<div class="hinweis rot">' + esc(t('err_laden', { was: 'Produktliste' })) + '</div>';
+  html += brote.length ? '<div class="rz-brote">' + brote.map(brotZeileHTML).join('') + '</div>' : '<p class="status">' + esc(t('s2_keine_brote')) + '</p>';
+  if (istAdmin()) {
+    html += '<div class="feld rz-suche"><label class="bos-label" for="rzSuche">' + esc(t('s2_suche')) + '</label>' +
+      '<input class="bos-input" id="rzSuche" autocomplete="off" placeholder="' + esc(t('s2_suche_platz')) + '"><div id="rzTreffer" class="chips"></div></div>';
+  }
+  if (!Object.keys(z.brote).some(function (lk) { return z.brote[lk].an; })) html += '<div class="hinweis">' + esc(t('s2_ohne_brot')) + '</div>';
+  return html;
+}
+function zeigeTreffer(text) {
+  const el = document.getElementById('rzTreffer');
+  if (!el) return;
+  const n = L.norm(text);
+  if (n.length < 2) { el.innerHTML = ''; return; }
+  const z = S.strecke.z;
+  const treffer = S.produkte.filter(function (p) { return p.kategorie !== 'Brot' && !(z.brote[p.legacyKey] && z.brote[p.legacyKey].an) && L.norm(p.name).indexOf(n) !== -1; });
+  el.innerHTML = treffer.length ? treffer.slice(0, 12).map(function (p) {
+    return '<button type="button" class="chip" data-aktion="brot-an" data-lk="' + esc(p.legacyKey) + '">＋ ' + esc(p.name) + (p.kategorie ? ' · ' + esc(p.kategorie) : '') + '</button>';
+  }).join('') + (treffer.length > 12 ? '<span class="klein">' + esc(t('s2_suche_mehr')) + '</span>' : '') : '<span class="klein">' + esc(t('s2_suche_nichts')) + '</span>';
+}
+function brotUmschalten(lk) {
+  const z = S.strecke.z;
+  if (!istAdmin()) return;
+  const p = pm()[lk];
+  const b = z.brote[lk];
+  if (b) delete b.auto;
+  if (b && b.an) { b.an = false; }
+  else {
+    let g = b && L.istZahl(b.einwaageG) ? b.einwaageG : null;
+    /* Einwaage vom bisherigen Teig übernehmen (dasselbe Brot wiegt gleich viel) — sichtbar markiert */
+    if (g === null && p && p.ausTeig && S.teigwerte[p.ausTeig] && S.teigwerte[p.ausTeig].einwaage && L.istZahl(S.teigwerte[p.ausTeig].einwaage[lk])) {
+      g = S.teigwerte[p.ausTeig].einwaage[lk]; S.strecke.uebernommen[lk] = true;
+    }
+    z.brote[lk] = { an: true, einwaageG: g };
+  }
+  S.strecke.geaendert = true;
+  zeichneStrecke();
+}
+/* ---- Schritt 3: Sauer und Vorstufe ---- */
+function schritt3HTML() {
+  const z = S.strecke.z, v = z.vorstufe;
+  let html = feldHTML(t('s3_sauer_frage'), jaNein('sauer-antwort', z.sauer.antwort));
+  if (z.sauer.antwort === null && !z.neu) html += '<div class="hinweis">' + esc(t('s3_sauer_unbekannt')) + '</div>';
+  if (z.sauer.antwort === true) html += feldHTML(t('s3_sauer_kg'), zahlFeld('sauer.kg', z.sauer.kg), t('s3_sauer_kg_hilfe'));
+  html += feldHTML(t('s3_vorstufe_frage'), jaNein('vorstufe-antwort', v.ja));
+  if (v.ja === true) {
+    html += '<div class="rz-vorstufe">' +
+      feldHTML(t('s3_vorstufe_name'), textFeld('vorstufe.name', v.name, 'maxlength="40" list="vorstufenListe"') +
+        '<datalist id="vorstufenListe">' + VORSTUFEN_VORSCHLAG.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>') +
+      feldHTML(t('s3_vorstufe_kg'), zahlFeld('vorstufe.kg', v.kg), t('s3_vorstufe_kg_hilfe')) +
+      '<div class="feld"><label class="bos-label">' + esc(t('s3_schritt')) + '</label>' +
+      v.zeilen.map(function (r, i) { return zeileHTML('vorstufe', r, i, true); }).join('') +
+      '<button type="button" class="bos-btn" data-aktion="zeile-plus" data-art="vorstufe">' + esc(t('s4_zeile_plus')) + '</button>' +
+      '<div class="feld-hilfe">' + esc(t('s3_schritt_hilfe')) + '</div></div>' +
+      '<div class="feld-zeile rz-zwei">' + feldHTML(t('s3_behaelter'), textFeld('vorstufe.behaelter', v.behaelter, 'maxlength="40" placeholder="' + esc(t('s3_behaelter_platz')) + '"')) +
+      feldHTML(t('s3_je_behaelter'), zahlFeld('vorstufe.jeBehaelter', v.jeBehaelter, 'inputmode="numeric"'), t('s3_je_behaelter_hilfe')) + '</div></div>';
+  }
+  return html;
+}
+/* Eine Zeile „Zutat ▾ · Menge · kg/L · ✕“ (Hauptteig oder Vorstufe). */
+function zeileHTML(art, r, i, mitWasser) {
+  const attr = function (sp) { return 'data-zeile="' + art + '" data-i="' + i + '" data-sp="' + sp + '"'; };
+  return '<div class="rz-zeile-eingabe">' + zutatAuswahl(attr('zutatId'), r.zutatId, mitWasser) +
+    '<input class="bos-input rz-zahl" ' + attr('menge') + ' inputmode="decimal" placeholder="' + esc(t('s4_menge')) + '" value="' + esc(zahlText(r.menge)) + '">' +
+    einheitAuswahl(attr('einheit'), r.einheit) +
+    '<button type="button" class="bos-btn rz-weg" data-aktion="zeile-weg" data-art="' + art + '" data-i="' + i + '" aria-label="' + esc(t('s4_zeile_weg')) + '">✕</button>' +
+    siloHinweis(r.zutatId) + '</div>';
+}
+/* ---- Schritt 4: Hauptteig ---- */
+function schritt4HTML() {
+  const z = S.strecke.z;
+  return '<p class="rz-frage">' + esc(t('s4_frage')) + '</p><p class="feld-hilfe">' + esc(t('s4_hilfe')) + '</p>' +
+    feldHTML(t('s4_schuettwasser'), zahlFeld('schuettwasserL', z.schuettwasserL), t('s4_schuettwasser_hilfe')) +
+    '<div class="feld"><label class="bos-label">' + esc(t('s4_hefe')) + '</label><div class="rz-zeile-eingabe rz-hefe">' +
+      zutatAuswahl('data-z="hefe.zutatId" data-art="auswahl"', z.hefe.zutatId, false) + zahlFeld('hefe.kg', z.hefe.kg, 'placeholder="kg"') + '<span class="rz-einheit-fest">kg</span></div>' +
+      '<div class="feld-hilfe">' + esc(t('s4_hefe_hilfe')) + '</div></div>' +
+    '<div class="feld"><label class="bos-label">' + esc(t('s4_zeilen')) + '</label>' +
+      z.zeilen.map(function (r, i) { return zeileHTML('haupt', r, i, false); }).join('') +
+      '<button type="button" class="bos-btn" data-aktion="zeile-plus" data-art="haupt">' + esc(t('s4_zeile_plus')) + '</button></div>';
+}
+/* ---- Schritt 5: Zusammenfassung ---- */
+/* Was beim Speichern geschrieben würde — dieselbe Rechnung für Anzeige und Speichern. */
+function plan() {
+  const st = S.strecke, z = st.z;
+  const kennung = z.neu ? L.kennungAus(z.name) : z.kennung;
+  const altTeig = z.neu ? null : (tm()[kennung] || null);
+  const altTw = S.teigwerte[kennung] || null;
+  const altM = st.mengenAlt;
+  const zk = Object.assign({}, z, { kennung: kennung });
+  const teig = L.teigAusStrecke(zk, altTeig, S.zutaten);
+  const tw = L.teigwerteAusStrecke(zk, altTw, S.produkte);
+  let m = L.mengenAusStrecke(zk);
+  if (!m && altM) m = { eingabe: {} };   /* alle Mengen gelöscht: auch das ist eine Änderung */
+  /* Brote: Vorschau aus der Produktliste (gespeichert wird frisch vom Server, Teil D) */
+  const brote = [];
+  Object.keys(z.brote).forEach(function (lk) {
+    const p = pm()[lk], b = z.brote[lk];
+    if (!p) return;
+    if (b.an && p.ausTeig !== kennung) brote.push({ lk: lk, von: p.ausTeig || '', nach: kennung });
+    else if (!b.an && p.ausTeig === kennung) brote.push({ lk: lk, von: kennung, nach: '' });
+  });
+  return {
+    kennung: kennung, teig: teig, altTeig: altTeig, tw: tw, altTw: altTw, m: m, altM: altM, brote: brote,
+    teigAendern: !altTeig || !L.dokGleich(teig, altTeig),
+    twAendern: !!tw && (!altTw || !L.dokGleich(tw, altTw)),
+    mAendern: !!m && (!altM || !L.dokGleich(m, altM))
+  };
+}
+function schritt5HTML() {
+  const st = S.strecke, z = st.z, p = plan(), s = L.streckeSumme(z);
+  const li = function (text, klasse) { return '<li' + (klasse ? ' class="' + klasse + '"' : '') + '>' + esc(text) + '</li>'; };
+  let html = '<ul class="info-liste">';
+  /* Summe */
+  if (s.vollstaendig) html += li(t('s5_summe') + ': ' + fmtKg(s.kg), 'ergebnis');
+  else {
+    if (s.hatMengen) html += li(t('s_summe_bisher', { kg: fmtKg(s.kg) }));
+    html += li(z.neu || !p.altTeig ? t('s5_summe_unvollstaendig_neu') : t('s5_summe_unvollstaendig'), 'rot');
+    if (s.nurHefe && p.altTeig && L.istZahl(p.altTeig.rezeptBasisKg)) html += li(t('s5_nur_hefe', { kg: fmtKg(p.altTeig.rezeptBasisKg) }));
+  }
+  /* Je kg */
+  const jeKg = [];
+  if (L.istZahl(p.teig.hefeJeKg)) jeKg.push(t('s5_hefe', { wert: fmtJeKg(p.teig.hefeJeKg) }));
+  if (L.istZahl(p.teig.sauerJeKg)) jeKg.push(t('s5_sauer', { wert: fmtJeKg(p.teig.sauerJeKg) }));
+  if (L.istZahl(p.teig.vorstufeJeKg)) jeKg.push(t('s5_vorstufe', { name: p.teig.vorstufe || '', wert: fmtJeKg(p.teig.vorstufeJeKg) }));
+  html += li(t('s5_je_kg') + ': ' + (jeKg.length ? jeKg.join(' · ') : t('s5_keine_werte')));
+  const tw = p.tw || p.altTw || {};
+  html += li((p.teig.ohneSchuettwasser ? t('s5_ohne_wasser') : t('s5_mit_wasser')) + (!p.teig.ohneSchuettwasser && !L.istZahl(tw.wasserLiterJeKg) ? ' ' + t('s5_keine_regel') : ''));
+  /* Silo */
+  const silo = z.zeilen.filter(function (r) { const x = zm()[r.zutatId]; return x && L.istSilo(x); }).map(function (r) { return zutatName(r.zutatId); });
+  if (silo.length) html += li(t('s5_silo', { liste: silo.join(', ') }));
+  html += '</ul>';
+  /* Brote */
+  const schaetzung = L.broteSchaetzung(L.istZahl(p.teig.rezeptBasisKg) ? p.teig.rezeptBasisKg : null, z.brote);
+  const an = Object.keys(z.brote).filter(function (lk) { return z.brote[lk].an; });
+  html += '<div class="unterkopf">' + esc(t('s5_brote')) + '</div><ul class="info-liste">';
+  if (!an.length) html += li(t('s5_keine_brote'), 'rot');
+  an.forEach(function (lk) {
+    const e = schaetzung.filter(function (x) { return x.lk === lk; })[0];
+    if (!e) html += li(t('s5_brot_ohne_einwaage', { name: produktName(lk) }), 'rot');
+    else if (!L.istZahl(e.brote)) html += li(t('s5_brot_nur_einwaage', { name: produktName(lk), g: Math.round(e.einwaageG) }));
+    else html += li(t('s5_brot_schaetzung', { name: produktName(lk), kg: fmtKg(p.teig.rezeptBasisKg), n: L.istZahl(e.brote) ? Math.floor(e.brote) : '–', g: Math.round(e.einwaageG) }));
+  });
+  html += '</ul><div class="unterkopf">' + esc(t('s5_am_brot')) + '</div><ul class="info-liste">';
+  if (!p.brote.length) html += li(t('s5_brot_nichts'));
+  p.brote.forEach(function (b) {
+    if (!b.nach) html += li(t('s5_brot_weg', { name: produktName(b.lk), von: teigName(b.von) }));
+    else if (b.von) html += li(t('s5_brot_um', { name: produktName(b.lk), von: teigName(b.von), nach: String(z.name).trim() || b.nach }));
+    else html += li(t('s5_brot_neu', { name: produktName(b.lk), nach: String(z.name).trim() || b.nach }));
+  });
+  html += '</ul>';
+  /* Proberechnung mit denselben Funktionen wie die Nacht */
+  html += '<div class="unterkopf">' + esc(t('s5_probe')) + '</div><ul class="info-liste">';
+  const probe = an.filter(function (lk) { return L.istZahl(z.brote[lk].einwaageG) && z.brote[lk].einwaageG > 0; });
+  if (!probe.length) html += li(t('s5_probe_keine'));
+  probe.forEach(function (lk) {
+    const g = z.brote[lk].einwaageG;
+    const r = L.probeNacht(p.teig, tw, lk, g, PROBE_BROTE);
+    html += li(t('s5_probe_zeile', { n: PROBE_BROTE, name: produktName(lk), g: Math.round(g), d: fmtKg(r.D), t: fmtKg(r.T),
+      h: L.istZahl(r.hefeKg) ? fmt(r.hefeKg, 2) + ' kg' : t('s5_probe_ohne_hefe') }));
+  });
+  html += '</ul>';
+  /* Was gespeichert wird */
+  html += '<div class="unterkopf">' + esc(t('s5_was')) + '</div><ul class="info-liste" id="rzWas">' + wasHTML(p) + '</ul>';
+  html += sonstigesHTML();
+  html += speichernHTML();
+  return html;
+}
+function wasHTML(p) {
+  const li = function (text, klasse) { return '<li' + (klasse ? ' class="' + klasse + '"' : '') + '>' + esc(text) + '</li>'; };
+  const nBrote = p.brote.length;
+  return li(!p.altTeig ? t('s5_teig_neu') : p.teigAendern ? t('s5_teig_aendern') : t('s5_teig_gleich')) +
+    li(!p.twAendern ? t('s5_ein_gleich') : S.haken.teige ? t('s5_ein_aendern') : t('s5_ein_ohne_haken'), p.twAendern && !S.haken.teige ? 'rot' : '') +
+    li(!p.m ? t('s5_mengen_keine') : p.mAendern ? t('s5_mengen_aendern') : t('s5_mengen_gleich')) +
+    li(!nBrote ? t('s5_brote_gleich') : istAdmin() ? t('s5_brote_aendern', { n: nBrote }) : t('s5_brote_ohne_rolle', { n: nBrote }), nBrote && !istAdmin() ? 'rot' : '');
+}
+/* Hinweise & Sonstiges (F6) */
+function sonstigesHTML() {
+  const st = S.strecke, z = st.z;
+  const zutaten = L.aktiv(S.zutaten).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  const bb = {}; (z.beiBedarf || []).forEach(function (x) { bb[x] = true; });
+  const chips = zutaten.map(function (y) { return { id: y.id, text: y.name, an: !!bb[y.id] }; });
+  (z.beiBedarf || []).forEach(function (zid) { if (!zm()[zid] || zm()[zid].geloescht) chips.push({ id: zid, text: t('unbekannt') + ' (' + zid + ')', an: true, warn: true }); });
+  return '<details class="rz-sonstiges"' + (st.sonstigesOffen ? ' open' : '') + ' id="rzSonstiges"><summary>' + esc(t('s5_sonstiges')) + '</summary>' +
+    feldHTML(t('f_hinweis_oben'), textFeld('hinweisOben', z.hinweisOben, 'maxlength="200"'), t('f_hinweis_oben_hilfe')) +
+    (z.vorstufe.ja === true ? feldHTML(t('s5_vorstufe_hinweis'), textFeld('vorstufeHinweis', z.vorstufeHinweis, 'maxlength="120"')) : '') +
+    feldHTML(t('f_bei_bedarf'), chipAuswahlHTML('beiBedarf', chips).replace(/data-aktion="chip"/g, 'data-aktion="bei-bedarf"'), t('f_bei_bedarf_hilfe')) +
+    feldHTML(t('s5_sort'), zahlFeld('sort', z.sort, 'inputmode="numeric"'), t('s5_sort_hilfe')) +
+    (!z.neu ? '<button type="button" class="bos-btn gefahr" data-aktion="teig-archivieren">' + esc(t('s5_archivieren')) + '</button>' : '') +
+    '</details>';
+}
+function speichernFertig() {
+  const sp = S.strecke.sp;
+  return !!sp && (sp.rezept === 'ok' || sp.rezept === 'nichts') && (sp.brote === 'ok' || sp.brote === 'nichts' || sp.brote === 'uebersprungen');
+}
+function speichernHTML() {
+  const st = S.strecke;
+  return '<div id="rzSpeichernBereich"><div class="rz-speichern">' + (speichernFertig() && !st.geaendert
+    ? '<button type="button" class="bos-btn bos-btn--amber" data-aktion="strecke-fertig">' + esc(t('s_zur_liste')) + '</button>'
+    : '<button type="button" class="bos-btn bos-btn--amber rz-speichern-btn" data-aktion="strecke-speichern"' + (speichertGerade() || !darfRezepte() ? ' disabled' : '') + '>' + esc(t('s5_speichern')) + '</button>') +
+    (!online() ? '<span class="klein">' + esc(t('offline_pflege')) + '</span>' : '') + '</div>' + speicherStatusHTML() + '</div>';
+}
+/* Nach einer Eingabe in Schritt 5: „Was gespeichert wird“ und Knopf nachziehen, ohne die Felder neu zu zeichnen. */
+function aktualisiereZusammenfassung() {
+  if (!S.strecke || S.strecke.schritt !== SCHRITTE) return;
+  const w = document.getElementById('rzWas'); if (w) w.innerHTML = wasHTML(plan());
+  const b = document.getElementById('rzSpeichernBereich'); if (b) b.outerHTML = speichernHTML();
+}
+function speicherStatusHTML() {
+  const st = S.strecke;
+  if (!st.sp) return '';
+  const zeile = function (titel, zustand, text, aktion) {
+    const zeichen = { laeuft: t('sp_laeuft'), ok: t('sp_ok'), nichts: t('sp_nichts'), wartet: t('sp_wartet'), uebersprungen: '–', fehler: '⚠' }[zustand] || '';
+    return '<div class="rz-sp ' + zustand + '"><div class="rz-sp-kopf"><b>' + esc(titel) + '</b> <span>' + esc(zeichen) + '</span></div>' +
+      (text ? '<div class="rz-sp-text">' + esc(text) + '</div>' : '') +
+      (zustand === 'fehler' && aktion ? '<button type="button" class="bos-btn" data-aktion="' + aktion + '">' + esc(t('sp_wiederholen')) + '</button>' : '') + '</div>';
+  };
+  let html = '<div class="rz-sp-block" id="rzSpeicherStatus" role="status">' +
+    zeile(t('sp_rezept'), st.sp.rezept, st.sp.rezeptText, 'wdh-rezept') +
+    zeile(t('sp_brote'), st.sp.brote, st.sp.broteText, 'wdh-brote');
+  if (st.konflikt) {
+    html += '<div class="hinweis rot">' + esc(st.konflikt) + '</div><div class="pflege-leiste">' +
+      '<button type="button" class="bos-btn bos-btn--amber" data-aktion="konflikt-behalten">' + esc(t('sp_konflikt_behalten')) + '</button>' +
+      '<button type="button" class="bos-btn" data-aktion="konflikt-neu">' + esc(t('sp_konflikt_neu')) + '</button></div>';
+  }
+  return html + '</div>';
+}
+
+/* ---------- Eingaben in der Strecke (ohne neu zu zeichnen) ---------- */
+function setzePfad(pfad, w) {
+  const z = S.strecke.z, teile = pfad.split('.');
+  let o = z;
+  for (let i = 0; i < teile.length - 1; i++) o = o[teile[i]];
+  o[teile[teile.length - 1]] = w;
+}
+/* '' → null, sonst Zahl; ungültig bleibt NaN (die Schrittprüfung meldet es). */
+function zahlAus(text) { const n = parseZahl(text); return n; }
+function eingabeStrecke(el) {
+  const st = S.strecke;
+  if (!st) return;
+  if (el.hasAttribute('data-z')) {
+    const pfad = el.getAttribute('data-z'), art = el.getAttribute('data-art');
+    if (art === 'auswahl') return;   /* über change */
+    setzePfad(pfad, art === 'zahl' ? zahlAus(el.value) : el.value);
+    if (pfad === 'name') {
+      const k = document.getElementById('rzKennung');
+      if (k && st.z.neu) k.textContent = kennungText(st.z);
+    }
+  } else if (el.hasAttribute('data-brot')) {
+    const b = st.z.brote[el.getAttribute('data-brot')];
+    if (b) { b.einwaageG = zahlAus(el.value); delete b.auto; delete st.uebernommen[el.getAttribute('data-brot')]; }
+  } else if (el.hasAttribute('data-zeile') && el.getAttribute('data-sp') === 'menge') {
+    zeilenListe(el.getAttribute('data-zeile'))[Number(el.getAttribute('data-i'))].menge = zahlAus(el.value);
+  } else if (el.id === 'rzSuche') { zeigeTreffer(el.value); return; }
+  else return;
+  st.geaendert = true;
+  aktualisiereLauf();
+  aktualisiereZusammenfassung();
+}
+function zeilenListe(art) { return art === 'vorstufe' ? S.strecke.z.vorstufe.zeilen : S.strecke.z.zeilen; }
+/* Auswahlfelder (Zutat, Einheit). „＋ neue Zutat“ öffnet das Blatt. */
+function auswahlStrecke(el) {
+  const st = S.strecke;
+  if (!st) return;
+  let ziel = null;   /* { setze(id) } */
+  if (el.getAttribute('data-z') === 'hefe.zutatId') ziel = { alt: st.z.hefe.zutatId, setze: function (id) { st.z.hefe.zutatId = id; } };
+  else if (el.hasAttribute('data-zeile')) {
+    const r = zeilenListe(el.getAttribute('data-zeile'))[Number(el.getAttribute('data-i'))];
+    if (el.getAttribute('data-sp') === 'einheit') { r.einheit = el.value === 'L' ? 'L' : 'kg'; st.geaendert = true; return; }
+    ziel = { alt: r.zutatId, setze: function (id) {
+      r.zutatId = id;
+      if ('name' in r) r.name = id === L.WASSER_ID ? t('s_wasser') : (zm()[id] ? zm()[id].name : '');
+    } };
+  }
+  if (!ziel) return;
+  if (el.value === '__neu__') { el.value = ziel.alt || ''; oeffneNeueZutat(ziel); return; }
+  ziel.setze(el.value);
+  st.geaendert = true;
+  zeichneStrecke();   /* Silo-Hinweis, Summe */
+}
+
+/* ---------- „＋ neue Zutat“ direkt aus der Auswahl (Anweisung §4 C) ---------- */
+function oeffneNeueZutat(ziel) {
+  editZustand = { typ: 'neuzutat', ziel: ziel };
+  oeffneEdit(t('nz_titel'),
+    feldHTML(t('f_name'), eingabe('fName', '', 'maxlength="60" autocomplete="off"')) +
+    feldHTML(t('nz_gruppe'), '<select class="bos-input" id="fGruppe">' + L.GRUPPEN.map(function (g) {
+      return '<option value="' + g + '"' + (g === L.GRUPPE_VORGABE ? ' selected' : '') + '>' + esc(t('gruppe_' + g)) + '</option>';
+    }).join('') + '</select>', t('nz_hilfe')),
+    [{ aktion: 'neuzutat-speichern', text: t('speichern'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+  const f = document.getElementById('fName'); if (f) f.focus();
+}
+async function speichereNeueZutat() {
+  const z = editZustand;
+  if (!z || z.typ !== 'neuzutat') return;
+  const name = wert('fName'), gruppe = wert('fGruppe');
+  let fehler = pruefeText(t('f_name'), name, 60);
+  if (!fehler && L.namensKonflikt(S.zutaten, name, null)) fehler = t('v_name_doppelt', { wert: name });
+  /* auch gegen archivierte (namensKonflikt sieht nur aktive) */
+  if (!fehler && S.zutaten.some(function (x) { return x.geloescht && L.norm(x.name) === L.norm(name); })) fehler = t('v_name_doppelt_archiv', { wert: name });
+  if (fehler) { editFehler(fehler); return; }
+  const daten = { name: name, ortId: '', gebindeEinheit: '', geloescht: false };
+  if (L.GRUPPEN.indexOf(gruppe) !== -1) daten.gruppe = gruppe;
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  document.getElementById('editInfo').textContent = '…';
+  try {
+    const id = await schreibe(COL.zutaten, null, daten, 'anlegen', null);
+    /* sofort in der Auswahl, auch bevor der Live-Abruf nachzieht */
+    if (!S.zutaten.some(function (x) { return x.id === id; })) S.zutaten = S.zutaten.concat([Object.assign({ id: id }, daten)]);
+    z.ziel.setze(id);
+    if (S.strecke) S.strecke.geaendert = true;
+    schliesseEdit();
+    toast(t('nz_fertig', { name: name }));
+    if (S.strecke) zeichneStrecke();
+  } catch (err) {
+    document.getElementById('editInfo').textContent = '';
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(t('err_speichern'), err);
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
+}
+
+/* ==================================================================
+   SPEICHERN — zwei Schritte (Anweisung §4 B „Speichern“, Bauplan §5)
+   1 Rezept: EIN Vorgang aus Teig + Teigwerte (nur einwaage) + Rezeptmengen,
+     je mit Sicherung (schreibeMehrere). Unverändertes = kein Schreiben.
+   2 Brote: Produkte und Stand frisch vom Server, nur Feld ausTeig, über
+     ../bos_produkte_schreiben.js (höchstens 10 je Vorgang).
+   Ein Fehler am Brot reißt das Rezept nicht mit. Ohne gelungenes Rezept
+   werden keine Brote umgehängt (ein neuer Teig muss erst da sein).
+   ================================================================== */
+async function speichereStrecke() {
+  const st = S.strecke;
+  if (!st || speichertGerade()) return;
+  for (let s = 1; s <= 4; s++) {
+    const f = fehlerTexte(L.pruefeSchritt(st.z, s, { teige: S.teige })).concat(zusatzFehler(s));
+    if (f.length) { st.schritt = s; st.fehler = f; zeichneStrecke(); return; }
+  }
+  st.konflikt = '';
+  st.sp = { rezept: 'laeuft', rezeptText: '', brote: 'wartet', broteText: '' };
+  zeichneStrecke();
+  const ok = await schrittRezept();
+  if (ok) await schrittBrote();
+}
+async function schrittRezept() {
+  const st = S.strecke;
+  st.sp.rezept = 'laeuft'; st.sp.rezeptText = ''; st.konflikt = '';
+  zeichneStrecke();
+  const p = plan();
+  const auftraege = [];
+  if (p.teigAendern) auftraege.push({ col: COL.teige, id: p.kennung, daten: p.teig, aktion: p.altTeig ? 'aendern' : 'anlegen', vorher: p.altTeig });
+  const hinweise = [];
+  if (p.twAendern) {
+    if (S.haken.teige) auftraege.push({ col: COL.teigwerte, id: p.kennung, daten: p.tw, aktion: p.altTw ? 'aendern' : 'anlegen', vorher: p.altTw });
+    else hinweise.push(t('sp_teigwerte_ohne'));
+  }
+  if (p.mAendern) auftraege.push({ col: COL.rezeptmengen, id: p.kennung, daten: p.m, aktion: p.altM ? 'aendern' : 'anlegen', vorher: p.altM });
+  if (!auftraege.length) {
+    st.sp.rezept = 'nichts'; st.sp.rezeptText = hinweise.join(' ');
+    nachRezept(p.kennung);
+    return true;
+  }
+  try {
+    await schreibeMehrere(auftraege);
+    st.sp.rezept = 'ok'; st.sp.rezeptText = hinweise.join(' ');
+    /* Neue Grundlage für ein weiteres Speichern: Mengen frisch (mit Sicherung), Teig und Teigwerte kommen live. */
+    if (p.mAendern) await ladeMengenNeu(p.kennung);
+    nachRezept(p.kennung);
+    return true;
+  } catch (err) {
+    st.sp.rezept = 'fehler';
+    if (err && err.code === 'permission-denied') {
+      for (const a of auftraege) {
+        const k = a.col === COL.rezeptmengen ? await konfliktMengen(a.id, a.vorher) : ((await konfliktText(a.col, a.id, a.vorher)) ? werHat(a.col, a.id) : null);
+        if (k) { st.konflikt = t('sp_konflikt', { wer: k }); break; }
+      }
+    }
+    st.sp.rezeptText = fehlerText(t('err_speichern'), err);
+    if (!st.konflikt) zeigeFehler(t('sp_rezept'), err);
+    else console.error('[Teigecke] Rezept abgelehnt: veralteter Stand', err);
+    zeichneStrecke();
+    return false;
+  }
+}
+/* Nach gelungenem Rezept: ein neuer Teig hat jetzt seine feste Kennung. */
+function nachRezept(kennung) {
+  const z = S.strecke.z;
+  if (z.neu) { z.neu = false; z.kennung = kennung; }
+  zeichneStrecke();
+}
+async function ladeMengenNeu(kennung) {
+  try {
+    const snap = await window.db.collection(COL.rezeptmengen).doc(kennung).get({ source: 'server' });
+    S.strecke.mengenAlt = snap.exists ? Object.assign({ id: snap.id }, snap.data()) : null;
+  } catch (err) { zeigeFehler(t('s_err_mengen'), err); }
+}
+/* Wer hat zuletzt geändert? konfliktText (Gerüst) hat den frischen Stand schon in S übernommen. */
+function werHat(col, id) {
+  const dok = col === COL.teigwerte ? S.teigwerte[id] : L.nachId(S.teige)[id];
+  return (dok && dok.geaendertVon) || '?';
+}
+/* Konflikt bei den Rezeptmengen: wie konfliktText (Gerüst), aber die Mengen
+   liegen nicht in S, sondern in der Strecke. Liefert den Namen oder null. */
+async function konfliktMengen(id, vorher) {
+  if (!vorher) return null;
+  let frisch = null;
+  try {
+    const snap = await window.db.collection(COL.rezeptmengen).doc(id).get({ source: 'server' });
+    frisch = snap.exists ? Object.assign({ id: snap.id }, snap.data()) : null;
+  } catch (err) { zeigeFehler(t('err_gegenlesen'), err); return null; }
+  if (!L.istVeraltet(vorher, frisch)) return null;
+  S.strecke.mengenAlt = frisch;
+  return (frisch && frisch.geaendertVon) || '?';
+}
+async function schrittBrote() {
+  const st = S.strecke, z = st.z;
+  const kennung = z.kennung;
+  if (!plan().brote.length && !Object.keys(z.brote).length) { st.sp.brote = 'nichts'; fertigPruefen(); return; }
+  if (!istAdmin()) {
+    st.sp.brote = plan().brote.length ? 'uebersprungen' : 'nichts';
+    st.sp.broteText = plan().brote.length ? t('sp_ohne_rolle') : '';
+    fertigPruefen(); return;
+  }
+  st.sp.brote = 'laeuft'; st.sp.broteText = '';
+  zeichneStrecke();
+  let erledigt = 0, gesamt = 0;
+  try {
+    if (!window.BOS_PRODUKTE || !window.BOS_PRODUKTE_SCHREIBEN) throw new Error('bos_produkte.js / bos_produkte_schreiben.js nicht geladen');
+    /* frisch vom Server, nie die Gerätekopie (Anweisung §4 D) */
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true, frisch: true });
+    const aenderungen = L.ausTeigAenderungen(kennung, z.brote, e.liste);
+    gesamt = aenderungen.length;
+    if (!gesamt) { st.sp.brote = 'nichts'; await ladeProdukte(); fertigPruefen(); return; }
+    const standRef = window.db.collection(window.BOS_PRODUKTE_SCHREIBEN.STAND_COLLECTION).doc(window.BOS_PRODUKTE_SCHREIBEN.STAND_DOK);
+    const standSnap = await standRef.get({ source: 'server' });
+    let stand = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : null;
+    let existiert = standSnap.exists;
+    for (const teil of L.teile(aenderungen, window.BOS_PRODUKTE_SCHREIBEN.HOECHSTENS_JE_VORGANG)) {
+      const erg = await mitZeitlimit(window.BOS_PRODUKTE_SCHREIBEN.schreibe({ kennung: S.kennung, geladenerStand: stand, standExistiert: existiert, eintraege: teil }));
+      stand = erg.neuerStand; existiert = true; erledigt += teil.length;
+    }
+    st.sp.brote = 'ok'; st.sp.broteText = t('sp_brote_ok', { n: erledigt, stand: stand });
+    await ladeProdukte();    /* der Stand ist gestiegen: neue Liste holen */
+    fertigPruefen();
+  } catch (err) {
+    st.sp.brote = 'fehler';
+    const teil = erledigt ? t('sp_brote_teil', { i: erledigt, n: gesamt }) + ' ' : '';
+    st.sp.broteText = teil + (window.BOS_PRODUKTE && err && err.meldung ? window.BOS_PRODUKTE.fehlerText(err) : fehlerText(t('err_speichern'), err)) +
+      (err && err.code === 'permission-denied' ? ' · ' + t('sp_brote_perm') : '');
+    zeigeFehler(t('sp_brote'), err);
+    if (erledigt) await ladeProdukte();
+    zeichneStrecke();
+  }
+}
+function fertigPruefen() {
+  const st = S.strecke;
+  if (speichernFertig()) { st.geaendert = false; toast(t('sp_fertig')); }
+  zeichneStrecke();
+}
+
+/* ---------- Teig archivieren (aus „Hinweise & Sonstiges“) ---------- */
+function oeffneArchivFrage() {
+  const st = S.strecke;
+  if (!st || st.z.neu) return;
+  const teig = tm()[st.z.kennung];
+  if (!teig) return;
+  editZustand = { typ: 'archiv-teig', id: teig.id };
+  oeffneEdit(t('ar_titel', { name: teig.name }), '<p class="sheet-info">' + esc(t('ar_text')) + '</p>',
+    [{ aktion: 'archiv-ja', text: t('archivieren'), klasse: 'gefahr' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+/* archiviereEdit: Teig-Zweig kopiert aus teigecke_nacht.html. */
+async function archiviereTeig() {
+  const z = editZustand;
+  if (!z || z.typ !== 'archiv-teig') return;
+  const brote = L.produkteDesTeigs(z.id, S.produkte);
+  if (brote.length) { editFehler(t('sperre_teig', { liste: brote.map(function (p) { return p.name; }).join(', ') })); return; }
+  const teig = tm()[z.id];
+  await fuehreSchreibenAus(COL.teige, z.id, Object.assign({}, teig, { geloescht: true }), 'archivieren', teig, t('archiviert'));
+  if (document.getElementById('editSheet').hidden) schliesseStrecke();   /* gelungen: Blatt zu → zurück zur Liste */
+}
+
+/* ---------- Startdaten — kopiert aus teigecke_nacht.html (Stand 07.10.2026) ---------- */
+let importZustand = null;
+function starteImport() { const i = document.getElementById('importDatei'); i.value = ''; i.click(); }
+document.getElementById('importDatei').addEventListener('change', function (e) {
+  const datei = e.target.files && e.target.files[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onerror = function () { zeigeFehler(t('import_titel'), leser.error || new Error('Datei nicht lesbar')); };
+  leser.onload = function () {
+    let json;
+    try { json = JSON.parse(leser.result); }
+    catch (err) { oeffneEdit(t('import_titel'), '<p class="sheet-fehler">' + esc(t('import_json', { msg: err.message })) + '</p>', [{ aktion: 'abbrechen', text: t('schliessen') }]); return; }
+    const ergebnis = L.importPlan(json, { orte: S.orte, zutaten: S.zutaten, teige: S.teige }, S.produkte);
+    const plan = ergebnis.plan;
+    const neu = function (liste) { return liste.filter(function (x) { return x.aktion === 'neu'; }); };
+    const teigwerte = neu(plan.teige).filter(function (x) { return L.teigwerteDokument(x.daten) && !S.teigwerte[x.daten.kennung]; });
+    const anzahl = neu(plan.teige).length + teigwerte.length;
+    const vorhanden = plan.teige.length - neu(plan.teige).length;
+    /* Orte und Zutaten liest diese Seite nicht ein (03.10.2026). Neue Zutaten
+       in der Datei: erst auf „Orte“ einlesen, sonst fehlen sie den Teigen. */
+    if (neu(plan.zutaten).length) ergebnis.fehler.push(t('import_zutaten_erst', { n: neu(plan.zutaten).length }));
+    if (neu(plan.orte).length) ergebnis.hinweise.push(t('import_orte_nicht', { n: neu(plan.orte).length }));
+    /* Jeder Teil braucht seinen Haken — fehlt einer, wird gar nichts geschrieben. */
+    const fehlend = [];
+    if (neu(plan.teige).length && !S.haken.rezepte) fehlend.push(t('haken_rezepte'));
+    if (teigwerte.length && !S.haken.teige) fehlend.push(t('haken_teige'));
+    if (fehlend.length) ergebnis.fehler.push(t('import_haken_fehlen', { liste: fehlend.join(', ') }));
+    importZustand = { plan: plan, anzahl: anzahl };
+    let html = '<p class="sheet-info">' + esc(t('import_zusammenfassung', { teige: neu(plan.teige).length, werte: teigwerte.length, vorhanden: vorhanden })) + '</p>';
+    if (ergebnis.fehler.length) html += '<p class="sheet-fehler">' + esc(t('import_fehler_titel')) + '</p><ul class="import-liste">' + ergebnis.fehler.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    if (ergebnis.einwaagen.length) {
+      html += '<p class="sheet-info"><strong>' + esc(t('import_einwaagen_titel')) + '</strong></p><table class="einwaage-tabelle">' + ergebnis.einwaagen.map(function (e) {
+        return '<tr><td>' + esc(e.teig) + '</td><td>' + esc(e.produkt) + '</td><td class="' + (e.gramm === null ? 'rot' : '') + '">' + (e.gramm === null ? esc(t('einwaage_fehlt_kurz')) : e.gramm + ' g') + '</td></tr>';
+      }).join('') + '</table>';
+    }
+    if (ergebnis.hinweise.length) html += '<p class="sheet-info">' + esc(t('import_hinweise_titel')) + '</p><ul class="import-liste">' + ergebnis.hinweise.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    const knoepfe = [];
+    if (!ergebnis.fehler.length && anzahl > 0) knoepfe.push({ aktion: 'import-los', text: t('import_los', { n: anzahl }), klasse: 'bos-btn--amber' });
+    else if (!ergebnis.fehler.length) html += '<p class="sheet-info">' + esc(t('import_nichts')) + '</p>';
+    knoepfe.push({ aktion: 'abbrechen', text: t('abbrechen') });
+    oeffneEdit(t('import_titel'), html, knoepfe);
+  };
+  leser.readAsText(datei);
+});
+async function fuehreImportAus() {
+  if (!importZustand) return;
+  const plan = importZustand.plan, n = importZustand.anzahl;
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  const info = document.getElementById('editInfo');
+  const zutatId = {};
+  L.aktiv(S.zutaten).forEach(function (z) { zutatId[L.norm(z.name)] = z.id; });
+  let i = 0;
+  const schritt = function () { i++; info.textContent = t('import_laeuft', { i: i, n: n }); };
+  try {
+    /* Eins nach dem anderen, jedes mit eigener Sicherung: bleibt unter der
+       Zugriffsgrenze der Regel und ist bei Abbruch wiederholbar. */
+    for (const e of plan.teige) { if (e.aktion !== 'neu') continue; schritt();
+      await schreibe(COL.teige, e.daten.kennung, L.teigDokument(e.daten, zutatId), 'anlegen', null, true); }
+    for (const e of plan.teige) {
+      const w = e.aktion === 'neu' ? L.teigwerteDokument(e.daten) : null;
+      if (!w || S.teigwerte[e.daten.kennung]) continue;
+      schritt();
+      await schreibe(COL.teigwerte, e.daten.kennung, w, 'anlegen', null, true);
+    }
+    info.textContent = t('import_fertig', { n: n });
+    importZustand = null;
+    document.getElementById('editKnoepfe').innerHTML = '<button type="button" class="bos-btn" data-aktion="abbrechen">' + esc(t('schliessen')) + '</button>';
+  } catch (err) {
+    info.textContent = t('import_abbruch', { i: i, n: n });
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(t('import_titel'), err);
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-aktion'), id = el.getAttribute('data-id');
+  const st = S.strecke;
+  switch (a) {
+    /* Liste */
+    case 'neu-teig': oeffneStrecke(null); break;
+    case 'strecke-oeffnen': oeffneStrecke(id); break;
+    case 'sauer-bearbeiten': oeffneSauer(id); break;
+    case 'sauer-speichern': speichereSauer(); break;
+    case 'archiv-umschalten': S.zeigeArchiv = !S.zeigeArchiv; render(); break;
+    case 'wiederherstellen': stelleWiederHer(el.getAttribute('data-col'), id); break;
+    case 'startdaten': starteImport(); break;
+    case 'import-los': fuehreImportAus(); break;
+    /* Strecke */
+    case 'strecke-abbrechen': if (!speichertGerade()) frageVerlassen(); break;
+    case 'verwerfen': schliesseEdit(); schliesseStrecke(); break;
+    case 'strecke-fertig': schliesseStrecke(); break;
+    case 'schritt': geheZu(Number(el.getAttribute('data-n'))); break;
+    case 'schritt-weiter': if (st) geheZu(st.schritt + 1); break;
+    case 'schritt-zurueck': if (st) geheZu(st.schritt - 1); break;
+    case 'brot-an': if (st) { brotUmschalten(el.getAttribute('data-lk')); } break;
+    case 'sauer-antwort': if (st) { st.z.sauer.antwort = el.getAttribute('data-wert') === 'true'; st.geaendert = true; zeichneStrecke(); } break;
+    case 'vorstufe-antwort': if (st) {
+      st.z.vorstufe.ja = el.getAttribute('data-wert') === 'true';
+      if (st.z.vorstufe.ja && !st.z.vorstufe.zeilen.length) st.z.vorstufe.zeilen.push({ zutatId: '', name: '', menge: null, einheit: 'kg' });
+      st.geaendert = true; zeichneStrecke();
+    } break;
+    case 'zeile-plus': if (st) {
+      const art = el.getAttribute('data-art');
+      zeilenListe(art).push(art === 'vorstufe' ? { zutatId: '', name: '', menge: null, einheit: 'kg' } : { zutatId: '', menge: null, einheit: 'kg' });
+      st.geaendert = true; zeichneStrecke();
+    } break;
+    case 'zeile-weg': if (st) { zeilenListe(el.getAttribute('data-art')).splice(Number(el.getAttribute('data-i')), 1); st.geaendert = true; zeichneStrecke(); } break;
+    case 'bei-bedarf': if (st) {
+      const liste = st.z.beiBedarf, i = liste.indexOf(id);
+      if (i === -1) liste.push(id); else liste.splice(i, 1);
+      el.setAttribute('aria-pressed', i === -1 ? 'true' : 'false'); st.geaendert = true;
+      aktualisiereZusammenfassung();
+    } break;
+    case 'teig-archivieren': oeffneArchivFrage(); break;
+    case 'archiv-ja': archiviereTeig(); break;
+    case 'strecke-speichern': speichereStrecke(); break;
+    case 'wdh-rezept': if (st && !speichertGerade()) schrittRezept().then(function (ok) { if (ok && st.sp.brote !== 'ok') return schrittBrote(); }); break;
+    case 'wdh-brote': if (st && !speichertGerade()) schrittBrote(); break;
+    case 'konflikt-behalten': if (st) { st.konflikt = ''; speichereStrecke(); } break;
+    case 'konflikt-neu': if (st) { const k = st.z.kennung; st.geaendert = false; schliesseStrecke(); oeffneStrecke(k); } break;
+    /* Blätter */
+    case 'neuzutat-speichern': speichereNeueZutat(); break;
+    case 'chip': {
+      if (!editZustand || !editZustand.auswahl) break;
+      const menge = editZustand.auswahl[el.getAttribute('data-feld')];
+      if (menge.has(id)) menge.delete(id); else menge.add(id);
+      el.setAttribute('aria-pressed', menge.has(id) ? 'true' : 'false');
+      break;
+    }
+    case 'abbrechen': schliesseEdit(); break;
+  }
+});
+document.addEventListener('input', function (e) {
+  if (S.ansicht === 'strecke' && e.target && document.getElementById('ansichtStrecke').contains(e.target) && e.target.tagName === 'INPUT') eingabeStrecke(e.target);
+});
+document.addEventListener('change', function (e) {
+  if (S.ansicht === 'strecke' && e.target && e.target.tagName === 'SELECT' && document.getElementById('ansichtStrecke').contains(e.target)) auswahlStrecke(e.target);
+});
+document.addEventListener('toggle', function (e) {
+  if (e.target && e.target.id === 'rzSonstiges' && S.strecke) S.strecke.sonstigesOffen = e.target.open;
+}, true);
+document.addEventListener('keydown', function (e) {
+  /* Eingabetaste im Feld = Weiter (wie die Karte der Nacht), nicht in der Suche */
+  if (e.key !== 'Enter' || S.ansicht !== 'strecke' || !S.strecke || !e.target || e.target.tagName !== 'INPUT' || e.target.id === 'rzSuche') return;
+  if (!document.getElementById('ansichtStrecke').contains(e.target)) return;
+  e.preventDefault();
+  if (S.strecke.schritt < SCHRITTE) geheZu(S.strecke.schritt + 1);
+});
+document.getElementById('editSheet').addEventListener('click', function (e) { if (e.target === this) schliesseEdit(); });
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in TEIGECKE_REZEPTE_DOKU.md) ---------- */
+const helpData = {
+  title: 'Teige & Rezepte — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'Hier legst du Teige an und tippst ihre Rezepte ein. Die Seite fragt, was ein Bäcker weiß: wie der Teig heißt, welche Brote daraus werden, ob Sauer oder eine Vorstufe hineinkommt und was im Hauptteig steht. Daraus rechnet BOS die Werte je kg Teig, mit denen die Nacht arbeitet. Nachts schaust du in „Teigecke Nacht“, nicht hier.' },
+    { heading: 'Die Liste', text: 'Oben steht der Sauerteig in einer eigenen kleinen Karte, darunter alle Teige mit ihren Broten. „Rumpf, noch keine Rezeptwerte“ heißt: Der Teig hat noch keine Hefe je kg und keine Zutaten — die Nacht kann ihn nicht rechnen. „ohne Brot“ heißt: Kein Produkt zeigt auf diesen Teig. Der eingeklappte Kasten „Brote ohne Teig“ ist nur eine Übersicht, keine Mahnung; manche Brote haben bewusst keinen eigenen Teig.' },
+    { heading: 'Ein Rezept eintippen: die Strecke', text: 'Teig antippen oder „＋ Neuer Teig“. Die Strecke hat fünf Schritte: Name, Brote, Sauer & Vorstufe, Hauptteig, Zusammenfassung. Mit „Weiter“ und „Zurück“ (oder den Nummern oben) gehst du vor und zurück, ohne dass etwas verloren geht. Gespeichert wird erst am Ende. Ab Schritt 3 steht unten „Summe bisher“. Was du eintippst, steht nur auf diesem Bildschirm — gehst du vorher weg, fragt die Seite nach.' },
+    { heading: 'Schritt 1 und 2: Name und Brote', text: 'Unter dem Namen siehst du die Kennung, die BOS daraus bildet (aus „Kürbis-Käse Kruste“ wird „kuerbis_kaese_kruste“). Nach dem ersten Speichern bleibt sie fest. Zeigen schon Brote auf diese Kennung (weil sie im Produkt-Editor schon diesem Teig zugeordnet sind), steht das unter dem Namen, und in Schritt 2 sind sie schon angehakt. In Schritt 2 hakst du die Brote an, die aus dem Teig gemacht werden — vorn alle Brote, über das Suchfeld alles andere — und trägst je Brot die Einwaage in g ein: das Teiggewicht, nicht das Ausbackgewicht. Hängt ein Brot schon an einem anderen Teig, steht das darunter; anhaken zieht es um. Ohne Brot darfst du speichern, aber dann rechnet die Nacht den Teig nicht. Brote umhängen darf nur ein Konto mit der Rolle admin, wie im Produkt-Editor.' },
+    { heading: 'Schritt 3: Sauer und Vorstufe', text: 'Sauerteig im Teig? Bei ja trägst du ein, wie viel kg Sauer im Rezept stehen. Vorteig, Brühstück oder Quellstück? Bei ja: Name, wie viel kg davon in den Teig kommen, und ein Schritt so, wie er angesetzt wird, als Zeilen (z. B. 3 kg Schrot und 9 L Wasser). „Wasser“ steht fest in der Auswahl. Dazu der Behälter und wie viele Schritte höchstens in einen Behälter passen (leer = ohne Grenze). Die Nacht zeigt daraus die passenden Anzahlen zur Wahl.' },
+    { heading: 'Schritt 4: Hauptteig', text: 'Oben zwei feste Zeilen: Schüttwasser in L (leer oder 0 = dieser Teig hat kein Schüttwasser) und Hefe (Zutat wählen, kg eintragen; leer = ohne Hefe). Darunter die übrigen Zutaten als Zeilen: Zutat wählen, Menge, kg oder L. Die Auswahl ist nach Gruppen sortiert. Fehlt eine Zutat, legst du sie direkt in der Auswahl mit „＋ neue Zutat“ an (Name und Gruppe; braucht den Haken 🧺 Wagen & Zutaten). Zutaten der Gruppe Silo zählen in der Summe mit, stehen aber nie auf der Einsammelliste.' },
+    { heading: 'Schritt 5: Zusammenfassung', text: 'Hier steht die Teigsumme, Hefe, Sauer und Vorstufe je kg Teig, ob der Teig Schüttwasser hat, je Brot „ergibt … kg Teig ≈ … Brote“ (nur zur Info) und was am Brot geändert wird. Die Proberechnung zeigt, was die Nacht bei 60 Broten sagen würde — mit denselben Rechnungen wie nachts. Unter „Hinweise & Sonstiges“ pflegst du den Hinweis oben in der Karte, den Hinweis zur Vorstufe, „nur bei Bedarf“, die Reihenfolge und das Archivieren.' },
+    { heading: 'Speichern in zwei Schritten', text: 'Erst das Rezept (Teig, Einwaagen und Mengen in einem Rutsch), dann die Brote. Jeder Schritt sagt selbst, ob es geklappt hat, mit der echten Meldung, wenn nicht, und lässt sich einzeln wiederholen. Klappt das Rezept und nur das Umhängen der Brote nicht, bleibt das Rezept gespeichert. Was sich nicht geändert hat, wird nicht geschrieben.' },
+    { heading: 'Ein altes Rezept ohne Mengen', text: 'Teige aus den Startdaten haben Werte je kg, aber keine eingetippten Mengen. Öffnest du so einen Teig und tippst keine Mengen, bleiben alle Werte je kg genau, wie sie sind („Mengen unvollständig“). Erst wenn alle Mengen dastehen, rechnet BOS neu. Tippst du nur die Hefe, wird nur die Hefe je kg auf die bisherige Rezeptbasis umgerechnet.' },
+    { heading: 'Was nicht hier gepflegt wird', text: 'Die Wasserregel (wie viel Wasser nachts weniger), die Tabelle nach Außentemperatur und den Kessel pflegst du weiter in „Teigecke Nacht“ unter „Anpassen“. Orte, Zuhause und Gruppe einer Zutat auf der Seite „Orte“. Neue Produkte legst du im Produkt-Editor an — die Strecke legt keine Produkte an.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf die Liste jeder mit Konto. Rezepte eintippen und die Mengen sehen darf nur, wer den Haken 📜 Rezepte hat — die Mengen sind geheim und werden nur dann geladen. Einwaagen speichert der Haken 🥣 Teige, neue Zutaten der Haken 🧺 Wagen & Zutaten, Brote umhängen die Rolle admin. Fehlt etwas, sagt die Seite, was.' },
+    { heading: 'Startdaten und Archiv', text: '„Startdaten einlesen“ liest Teige und Einwaagen aus der Startdaten-Datei ein (die liegt nur bei Ulf, nie im Programmordner). Was es schon gibt, wird übersprungen. Archivierte Teige stehen unten im Archiv und lassen sich wiederherstellen. Einen Teig archivieren kannst du erst, wenn kein Brot mehr auf ihn zeigt.' },
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten und beim Speichern direkt am Schritt, mit der echten Meldung des Systems. „Keine Berechtigung“ hat drei mögliche Gründe: Dir fehlt der Haken oder die Rolle, du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt hier nie), oder die Firestore-Regeln sind älter als die Seite — dann steht oben ein roter Hinweis mit der Regeldatei. „Inzwischen von … geändert“ heißt: jemand war schneller; du entscheidest, ob du frisch öffnest oder deine Eingabe speicherst. Ohne Netz lässt sich hier nichts ändern.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.title;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.sections.map(function (s) {
+    return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>';
+  }).join('');
+}
+document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = false; });
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

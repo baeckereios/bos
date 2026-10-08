@@ -3,7 +3,7 @@
    ================================================================
    Einbindung:  <script src="teigecke_logik.js"></script>
    Stellt bereit: window.BOS_TEIGECKE_LOGIK
-   Test:        node test_teigecke.js   (im Projekt-Wurzelordner)
+   Test:        node test_teigecke.js --repo=<Projektordner>   (Prüfwerkzeug, liegt seit dem Online-Gang außerhalb des Repos)
 
    Warum eine eigene Datei: alles, was hier steht, lässt sich ohne
    Browser prüfen (Backtag, Vorauswahl, Einsammelliste, Löschschutz,
@@ -15,6 +15,23 @@
    bewusst Platzhalter.
 
    CHANGELOG
+     2026-10-08 · 08:22 · v0.11 · Feature (Etappe 2, Schub 2: Rezept-Strecke)
+       ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16) Teil B/D.
+       Nur ergänzt: streckeLeer, streckeAusBestand, streckeSumme,
+       streckeWerte, teigAusStrecke, teigwerteAusStrecke, mengenAusStrecke,
+       pruefeSchritt, ausTeigAenderungen, teile, dokGleich, teigeckeBrote,
+       broteOhneTeig, istRumpf, hefeVorschlag, broteSchaetzung, probeNacht.
+       Grundregel: Werte je kg, rezeptBasisKg und ohneSchuettwasser werden
+       nur neu gerechnet, wenn alle Mengen da sind; sonst bleiben sie, wie
+       sie sind (Gegenprobe: Bestand → Strecke → Dokument = Bestand).
+     2026-10-08 · 06:03 · v0.10 · Feature (Etappe 2, Schub 1: Gruppe an der Zutat)
+       ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC, 21:16, konsolidiert),
+       Bauplan SESSION_2026-10-07_TEIGECKE_REZEPTE_BAU.md (freigegeben).
+       Nur ergänzt, nichts Bestehendes geändert: GRUPPEN (feste Kennungen,
+       die Wörter stehen in den Seitentexten), GRUPPE_VORGABE, GRUPPE_SILO,
+       gruppeVon (ohne oder mit unbekanntem Feld = „sonstiges“), istSilo,
+       zutatenNachGruppe, trenneSilo. Silo-Zutaten dosiert WinBack; sie
+       brauchen kein Zuhause und gehören nie auf die Einsammelliste.
      2026-10-03 · 14:47 · v0.9 · Refactor (QR-Teil zieht in die Wurzel)
        ANWEISUNG_2026-10-03_NFC_QR_ZENTRALE_STUFE1.md (KC, 11:51).
        istLokal und qrSvg sind nach ../bos_qr.js umgezogen (dort kopiert,
@@ -812,6 +829,308 @@
      für ein Schild, das die ganze Seite füllt, muss das weg. */
   var SCHILD_DRUCK_CSS = '#bos-print-root{padding:0;}.bos-pa-body{font-size:12pt;line-height:normal;word-break:normal;}';
 
+  /* ================================================================
+     GRUPPEN DER ZUTATEN (Etappe 2, 07./08.10.2026) — für die Vorsortierung
+     in der Rezept-Strecke. Nur Kennungen: die Wörter dazu stehen in den
+     Seitentexten (i18n). Reihenfolge = Reihenfolge in der Auswahl.
+     ================================================================ */
+  var GRUPPEN = ['mehle', 'koerner', 'fluessig', 'salz_backmittel', 'vorstufen', 'kuehlung', 'silo', 'sonstiges'];
+  var GRUPPE_VORGABE = 'sonstiges';
+  var GRUPPE_SILO = 'silo';
+  /* Ohne Feld (die 33 Zutaten vom 28.09.) oder mit unbekannter Kennung: „sonstiges“. */
+  function gruppeVon(z) { return (z && GRUPPEN.indexOf(z.gruppe) !== -1) ? z.gruppe : GRUPPE_VORGABE; }
+  function istSilo(z) { return gruppeVon(z) === GRUPPE_SILO; }
+  /* Aktive Zutaten nach Gruppe, in der Reihenfolge von GRUPPEN, je Gruppe nach
+     Name; leere Gruppen fehlen. [{ gruppe, zutaten: [...] }] */
+  function zutatenNachGruppe(zutaten) {
+    var nach = {};
+    aktiv(zutaten).forEach(function (z) { (nach[gruppeVon(z)] = nach[gruppeVon(z)] || []).push(z); });
+    return GRUPPEN.filter(function (g) { return nach[g]; }).map(function (g) {
+      return { gruppe: g, zutaten: nach[g].sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); }) };
+    });
+  }
+  /* Liste in Silo und Rest teilen, Reihenfolge bleibt (Orte-Seite: Silo-Zutaten
+     stehen nicht unter „Noch ohne Zuhause“). */
+  function trenneSilo(liste) {
+    var e = { silo: [], rest: [] };
+    (liste || []).forEach(function (z) { (istSilo(z) ? e.silo : e.rest).push(z); });
+    return e;
+  }
+
+  /* ================================================================
+     REZEPT-STRECKE (Etappe 2, Schub 2, 08.10.2026) — reine Funktionen.
+     Die Strecke füllt dieselben Felder wie Startdaten und altes Formular:
+     teigecke_teige (je kg Teig, Zutaten-Kennungen), teigecke_teigwerte
+     (nur einwaage), teigecke_rezeptmengen (die getippten Mengen, geheim,
+     RK §18). Die Nachtseite liest nur die ersten beiden.
+     Zustand z = {
+       kennung, neu, name,
+       brote: { legacyKey: { an, einwaageG } },
+       sauer: { antwort: true|false|null, kg },
+       vorstufe: { ja: true|false|null, name, kg, zeilen: [{ zutatId, name, menge, einheit }], behaelter, jeBehaelter },
+       schuettwasserL, hefe: { zutatId, kg },
+       zeilen: [{ zutatId, menge, einheit }],      // Hauptteig, frei
+       hinweisOben, vorstufeHinweis, beiBedarf: [], sort }
+     Wasser in der Vorstufe: zutatId 'wasser' (feste Auswahl, keine Stammzutat).
+     1 L = 1 kg (Konzept, wie in der Abschrift).
+     ================================================================ */
+  var WASSER_ID = 'wasser';
+  var HERKUNFT = ['id', 'sicherungId', 'geaendertVon', 'geaendertAm'];
+  function kopieOhne(dok, felder) {
+    var k = JSON.parse(JSON.stringify(dok || {}));
+    (felder || []).forEach(function (f) { delete k[f]; });
+    return k;
+  }
+  function kanonisch(x) {
+    if (Array.isArray(x)) return x.map(kanonisch);
+    if (x && typeof x === 'object') { var o = {}; Object.keys(x).sort().forEach(function (k) { o[k] = kanonisch(x[k]); }); return o; }
+    return x;
+  }
+  /* Gleich bis auf Herkunft und Sicherung (für „unverändert = nicht schreiben“). */
+  function dokGleich(a, b) { return JSON.stringify(kanonisch(kopieOhne(a, HERKUNFT))) === JSON.stringify(kanonisch(kopieOhne(b, HERKUNFT))); }
+  function positiv(x) { return istZahl(x) && x > 0; }
+  /* Reihenfolge der alten Liste behalten, Neues hinten anhängen, Weggefallenes raus. */
+  function reihenfolgeBehalten(alt, neu) {
+    var drin = {}; neu.forEach(function (x) { drin[x] = true; });
+    var erg = (alt || []).filter(function (x, i, a) { return drin[x] && a.indexOf(x) === i; });
+    neu.forEach(function (x) { if (erg.indexOf(x) === -1) erg.push(x); });
+    return erg;
+  }
+
+  /* Brote der Teigecke: Kategorie Brot (Ulf, 07.10.: alle Brote sind Nachtschicht). */
+  function teigeckeBrote(produkte) { return (produkte || []).filter(function (p) { return p && !p.geloescht && p.kategorie === 'Brot'; }); }
+  /* Kasten „Brote ohne Teig“ (nur Anzeige, keine Mahnung). */
+  function broteOhneTeig(produkte, teige) {
+    return { fehlenderTeig: unbekannterTeig((produkte || []).filter(function (p) { return p && !p.geloescht; }), teige),
+      ohneTeig: teigeckeBrote(produkte).filter(function (p) { return !p.ausTeig; }) };
+  }
+  /* Rumpf: noch keine Rezeptwerte (kein hefeJeKg und keine Zutaten), nicht der Sauer. */
+  function istRumpf(t) { return !!t && !t.istSauerteig && !istZahl(t.hefeJeKg) && !(t.zutaten || []).length; }
+  /* Vorschlag für die feste Zeile „Hefe“: die Zutat, in deren Namen „Hefe“ steht
+     (kürzester Name zuerst). BOS kennt keine Zutatennamen (Bauplan F8). */
+  function hefeVorschlag(zutaten) {
+    var k = aktiv(zutaten).filter(function (z) { return /hefe/i.test(String(z.name || '')) && !istSilo(z); })
+      .sort(function (a, b) { return String(a.name).length - String(b.name).length || String(a.name).localeCompare(String(b.name), 'de'); });
+    return k.length ? k[0].id : '';
+  }
+
+  function streckeLeer(zutaten) {
+    return { kennung: '', neu: true, name: '', brote: {}, sauer: { antwort: null, kg: null },
+      vorstufe: { ja: null, name: '', kg: null, zeilen: [], behaelter: '', jeBehaelter: null },
+      schuettwasserL: null, hefe: { zutatId: hefeVorschlag(zutaten), kg: null }, zeilen: [],
+      hinweisOben: '', vorstufeHinweis: '', beiBedarf: [], sort: null };
+  }
+  /* Bestand → Zustand. mengenDok (teigecke_rezeptmengen) nur mit Haken Rezepte;
+     ohne ihn sind alle Mengen leer. */
+  function streckeAusBestand(teig, teigwerte, mengenDok, produkte, zutaten) {
+    var zm = nachId(zutaten), t = teig || {};
+    var z = streckeLeer(zutaten);
+    z.kennung = t.id; z.neu = false; z.name = String(t.name || '');
+    var ein = (teigwerte && teigwerte.einwaage) || {};
+    produkteDesTeigs(t.id, produkte).forEach(function (p) {
+      z.brote[p.legacyKey] = { an: true, einwaageG: istZahl(ein[p.legacyKey]) ? ein[p.legacyKey] : null };
+    });
+    z.sauer.antwort = typeof t.mitSauer === 'boolean' ? t.mitSauer : null;
+    /* Hefe: die Zutat des Teigs mit „Hefe“ im Namen */
+    var zut = (t.zutaten || []).slice();
+    var hefeId = zut.filter(function (id) { return zm[id] && /hefe/i.test(String(zm[id].name || '')); })[0] || '';
+    z.hefe = { zutatId: hefeId, kg: null };
+    z.zeilen = zut.filter(function (id) { return id !== hefeId; }).map(function (id) { return { zutatId: id, menge: null, einheit: 'kg' }; });
+    /* Vorstufe: Schritt (Mengen und Namen) + Zutaten-Kennungen */
+    var vs = { ja: !!String(t.vorstufe || '').trim(), name: String(t.vorstufe || ''), kg: null, zeilen: [],
+      behaelter: String(t.vorstufeBehaelter || ''), jeBehaelter: istZahl(t.vorstufeSchritteJeBehaelter) ? t.vorstufeSchritteJeBehaelter : null };
+    var gefunden = {};
+    (istSchritt(t.vorstufeSchritt) ? t.vorstufeSchritt : []).forEach(function (s) {
+      var id = norm(s.name) === 'wasser' ? WASSER_ID : ((aktiv(zutaten).filter(function (x) { return norm(x.name) === norm(s.name); })[0] || {}).id || '');
+      if (id && id !== WASSER_ID) gefunden[id] = true;
+      vs.zeilen.push({ zutatId: id, name: s.name, menge: s.menge, einheit: s.einheit });
+    });
+    (t.vorstufeZutaten || []).forEach(function (id) {
+      if (!gefunden[id]) vs.zeilen.push({ zutatId: id, name: zm[id] ? zm[id].name : id, menge: null, einheit: 'kg' });
+    });
+    z.vorstufe = vs;
+    z.hinweisOben = String(t.hinweisOben || ''); z.vorstufeHinweis = String(t.vorstufeHinweis || '');
+    z.beiBedarf = (t.beiBedarf || []).slice(); z.sort = istZahl(t.sort) ? t.sort : null;
+    /* Getippte Mengen (Rezeptmengen) überlagern, wenn vorhanden */
+    var e = mengenDok && mengenDok.eingabe;
+    if (e && typeof e === 'object') {
+      if (istZahl(e.schuettwasserL)) z.schuettwasserL = e.schuettwasserL;
+      if (e.hefe && typeof e.hefe === 'object') z.hefe = { zutatId: String(e.hefe.zutatId || ''), kg: istZahl(e.hefe.kg) ? e.hefe.kg : null };
+      if (Array.isArray(e.zeilen)) z.zeilen = e.zeilen.map(function (r) { return { zutatId: String(r.zutatId || ''), menge: istZahl(r.menge) ? r.menge : null, einheit: r.einheit === 'L' ? 'L' : 'kg' }; });
+      if (istZahl(e.sauerKg)) z.sauer.kg = e.sauerKg;
+      if (e.vorstufe && typeof e.vorstufe === 'object') {
+        if (istZahl(e.vorstufe.kg)) z.vorstufe.kg = e.vorstufe.kg;
+        if (Array.isArray(e.vorstufe.zeilen)) z.vorstufe.zeilen = e.vorstufe.zeilen.map(function (r) { return { zutatId: String(r.zutatId || ''), name: String(r.name || ''), menge: istZahl(r.menge) ? r.menge : null, einheit: r.einheit === 'L' ? 'L' : 'kg' }; });
+      }
+    }
+    return z;
+  }
+
+  /* Summe aller Posten (1 L = 1 kg) und ob alles beisammen ist. */
+  function streckeSumme(z) {
+    var kg = 0, fehlt = [], mengen = 0;
+    var dazu = function (x) { if (positiv(x)) { kg += x; mengen++; } };
+    if (z.sauer.antwort === true) { dazu(z.sauer.kg); if (!positiv(z.sauer.kg)) fehlt.push('sauer'); }
+    if (z.vorstufe.ja === true) { dazu(z.vorstufe.kg); if (!positiv(z.vorstufe.kg)) fehlt.push('vorstufe'); }
+    dazu(z.schuettwasserL);
+    dazu(z.hefe.kg);
+    (z.zeilen || []).forEach(function (r, i) { if (!r.zutatId) return; dazu(r.menge); if (!positiv(r.menge)) fehlt.push('zeile' + i); });
+    return { kg: kg, vollstaendig: kg > 0 && !fehlt.length, fehlt: fehlt, hatMengen: mengen > 0, nurHefe: mengen === 1 && positiv(z.hefe.kg) };
+  }
+  /* Werte je kg Teig — nur, wenn alles beisammen ist; sonst null (= nichts ändern). */
+  function streckeWerte(z) {
+    var s = streckeSumme(z);
+    if (!s.vollstaendig) return null;
+    return { rezeptBasisKg: s.kg,
+      hefeJeKg: positiv(z.hefe.kg) ? z.hefe.kg / s.kg : null,
+      sauerJeKg: z.sauer.antwort === true ? z.sauer.kg / s.kg : null,
+      vorstufeJeKg: z.vorstufe.ja === true ? z.vorstufe.kg / s.kg : null,
+      ohneSchuettwasser: !positiv(z.schuettwasserL) };
+  }
+
+  /* Zustand → Teig-Dokument (ohne Herkunft und Sicherung, die setzt die Seite).
+     Unbekannte Felder des Bestands (winback…, istSauerteig, anstellgutAnteil)
+     bleiben stehen. */
+  function teigAusStrecke(z, altTeig, zutaten) {
+    var zm = nachId(zutaten);
+    var d = altTeig ? kopieOhne(altTeig, HERKUNFT) : { istSauerteig: false, ohneSchuettwasser: false, geloescht: false };
+    d.name = String(z.name || '').trim();
+    var hand = (z.zeilen || []).filter(function (r) { return r.zutatId && !(zm[r.zutatId] && istSilo(zm[r.zutatId])); }).map(function (r) { return r.zutatId; });
+    var altZut = (altTeig && altTeig.zutaten) || [];
+    if (z.hefe.zutatId && (positiv(z.hefe.kg) || (z.hefe.kg === null && altZut.indexOf(z.hefe.zutatId) !== -1))) hand.push(z.hefe.zutatId);
+    d.zutaten = reihenfolgeBehalten(altZut, hand.filter(function (x, i, a) { return a.indexOf(x) === i; }));
+    var v = z.vorstufe;
+    if (v.ja === true) {
+      d.vorstufe = String(v.name || '').trim();
+      var vid = (v.zeilen || []).filter(function (r) { return r.zutatId && r.zutatId !== WASSER_ID && !(zm[r.zutatId] && istSilo(zm[r.zutatId])); }).map(function (r) { return r.zutatId; });
+      d.vorstufeZutaten = reihenfolgeBehalten((altTeig && altTeig.vorstufeZutaten) || [], vid.filter(function (x, i, a) { return a.indexOf(x) === i; }));
+      var zeilen = (v.zeilen || []).filter(function (r) { return r.zutatId || String(r.name || '').trim(); });
+      if (zeilen.length && zeilen.every(function (r) { return positiv(r.menge); })) {
+        d.vorstufeSchritt = zeilen.map(function (r) {
+          var name = r.zutatId === WASSER_ID ? 'Wasser' : (String(r.name || '').trim() || (zm[r.zutatId] ? zm[r.zutatId].name : ''));
+          return { menge: r.menge, einheit: r.einheit === 'L' ? 'L' : 'kg', name: name };
+        });
+      } else if (!(altTeig && istSchritt(altTeig.vorstufeSchritt))) delete d.vorstufeSchritt;
+      if (String(v.behaelter || '').trim()) d.vorstufeBehaelter = String(v.behaelter).trim(); else delete d.vorstufeBehaelter;
+      if (istZahl(v.jeBehaelter) && v.jeBehaelter >= 1) d.vorstufeSchritteJeBehaelter = v.jeBehaelter; else delete d.vorstufeSchritteJeBehaelter;
+    } else {
+      d.vorstufe = ''; d.vorstufeZutaten = [];
+      ['vorstufeSchritt', 'vorstufeSchritteJeBehaelter', 'vorstufeBehaelter', 'vorstufeJeKg'].forEach(function (f) { delete d[f]; });
+    }
+    if (z.sauer.antwort === true || z.sauer.antwort === false) d.mitSauer = z.sauer.antwort; else delete d.mitSauer;
+    var w = streckeWerte(z);
+    if (w) {
+      d.rezeptBasisKg = w.rezeptBasisKg; d.ohneSchuettwasser = w.ohneSchuettwasser;
+      ['hefeJeKg', 'sauerJeKg', 'vorstufeJeKg'].forEach(function (f) { if (w[f] === null) delete d[f]; else d[f] = w[f]; });
+    } else {
+      if (z.sauer.antwort === false) delete d.sauerJeKg;
+      /* Nur die Hefe getippt, Rest leer (Bestand ohne Mengen): Hefe je kg auf die
+         bekannte Rezeptbasis — so lässt sich die Hefe nachziehen, ohne das ganze
+         Rezept neu zu tippen. Alles andere bleibt (Anweisung §4 G: „mit
+         eingetippter Hefe ändert sich genau hefeJeKg“). */
+      if (streckeSumme(z).nurHefe && altTeig && positiv(altTeig.rezeptBasisKg)) d.hefeJeKg = z.hefe.kg / altTeig.rezeptBasisKg;
+    }
+    d.hinweisOben = String(z.hinweisOben || '').trim();
+    d.vorstufeHinweis = String(z.vorstufeHinweis || '').trim();
+    d.beiBedarf = (z.beiBedarf || []).slice();
+    if (istZahl(z.sort)) d.sort = z.sort; else delete d.sort;
+    d.geloescht = false;
+    return d;
+  }
+  /* Teigwerte: nur das Feld einwaage. null = es gibt nichts zu speichern. */
+  function teigwerteAusStrecke(z, altTw, produkte) {
+    var d = altTw ? kopieOhne(altTw, HERKUNFT) : {};
+    var e = Object.assign({}, d.einwaage || {});
+    var pm = produktMap(produkte);
+    Object.keys(z.brote || {}).forEach(function (lk) {
+      var b = z.brote[lk];
+      if (b.an && positiv(b.einwaageG)) e[lk] = b.einwaageG;
+      else if (!b.an && pm[lk] && pm[lk].ausTeig === z.kennung) delete e[lk];
+    });
+    if (Object.keys(e).length) d.einwaage = e; else delete d.einwaage;
+    return (!altTw && !Object.keys(d).length) ? null : d;
+  }
+  /* Rezeptmengen (geheim): die getippten Mengen. null = keine einzige Menge getippt. */
+  function mengenAusStrecke(z) {
+    if (!streckeSumme(z).hatMengen) return null;
+    var zahl = function (x) { return istZahl(x) ? x : null; };
+    return { eingabe: {
+      schuettwasserL: zahl(z.schuettwasserL),
+      hefe: { zutatId: String(z.hefe.zutatId || ''), kg: zahl(z.hefe.kg) },
+      zeilen: (z.zeilen || []).filter(function (r) { return r.zutatId; }).map(function (r) { return { zutatId: r.zutatId, menge: zahl(r.menge), einheit: r.einheit === 'L' ? 'L' : 'kg' }; }),
+      sauerKg: z.sauer.antwort === true ? zahl(z.sauer.kg) : null,
+      vorstufe: z.vorstufe.ja === true ? { kg: zahl(z.vorstufe.kg), zeilen: (z.vorstufe.zeilen || []).map(function (r) { return { zutatId: String(r.zutatId || ''), name: String(r.name || ''), menge: zahl(r.menge), einheit: r.einheit === 'L' ? 'L' : 'kg' }; }) } : null
+    } };
+  }
+
+  /* Prüfung je Schritt der Strecke. ctx = { teige (mit Archiv), schritt }. Liefert Fehlerkennungen. */
+  function pruefeSchritt(z, schritt, ctx) {
+    var f = [], teige = (ctx && ctx.teige) || [];
+    var name = String(z.name || '').trim();
+    if (schritt === 1) {
+      if (!name) f.push('name_fehlt');
+      else if (name.length > 60) f.push('name_lang');
+      if (z.neu) {
+        var k = kennungAus(name);
+        if (name && !KENNUNG_MUSTER.test(k)) f.push('kennung_ungueltig');
+        else if (teige.some(function (t) { return t.id === k; })) f.push('kennung_belegt');
+      }
+      if (name && teige.some(function (t) { return t.id !== z.kennung && norm(t.name) === norm(name); })) f.push('name_doppelt');
+    }
+    if (schritt === 2) Object.keys(z.brote || {}).forEach(function (lk) { var b = z.brote[lk]; if (b.an && b.einwaageG !== null && !positiv(b.einwaageG)) f.push('einwaage:' + lk); });
+    if (schritt === 3) {
+      if (z.neu && z.sauer.antwort === null) f.push('sauer_frage');
+      if (z.sauer.antwort === true && z.sauer.kg !== null && !positiv(z.sauer.kg)) f.push('sauer_kg');
+      if (z.neu && z.vorstufe.ja === null) f.push('vorstufe_frage');
+      if (z.vorstufe.ja === true) {
+        if (!String(z.vorstufe.name || '').trim()) f.push('vorstufe_name');
+        if (z.vorstufe.kg !== null && !positiv(z.vorstufe.kg)) f.push('vorstufe_kg');
+        if (z.vorstufe.jeBehaelter !== null && !(istZahl(z.vorstufe.jeBehaelter) && z.vorstufe.jeBehaelter >= 1 && Math.floor(z.vorstufe.jeBehaelter) === z.vorstufe.jeBehaelter)) f.push('vorstufe_je_behaelter');
+        (z.vorstufe.zeilen || []).forEach(function (r, i) { if (r.menge !== null && !positiv(r.menge)) f.push('vorstufe_zeile:' + i); });
+      }
+    }
+    if (schritt === 4) {
+      if (z.schuettwasserL !== null && !(istZahl(z.schuettwasserL) && z.schuettwasserL >= 0)) f.push('schuettwasser');
+      if (z.hefe.kg !== null && !positiv(z.hefe.kg)) f.push('hefe_kg');
+      (z.zeilen || []).forEach(function (r, i) { if (r.menge !== null && !positiv(r.menge)) f.push('zeile:' + i); });
+    }
+    return f;
+  }
+
+  /* Brote umhängen: Änderungen am Feld ausTeig, aus den rohen Serverdokumenten
+     ([{ id, daten }], Sicht 'roh' von bos_produkte.js). Nur Brote, die in der
+     Strecke vorkommen; nur ausTeig wird geändert. Ergebnis passt zu
+     BOS_PRODUKTE_SCHREIBEN.schreibe (eintraege). */
+  function ausTeigAenderungen(kennung, brote, roh) {
+    var erg = [];
+    (roh || []).forEach(function (r) {
+      var b = (brote || {})[r.id], d = r.daten || {};
+      if (!b || d.geloescht === true) return;
+      if (b.an && d.ausTeig !== kennung) {
+        var neu = JSON.parse(JSON.stringify(d)); neu.ausTeig = kennung;
+        erg.push({ key: r.id, inhalt: neu, vorher: d, aktion: 'aendern' });
+      } else if (!b.an && d.ausTeig === kennung) {
+        var weg = JSON.parse(JSON.stringify(d)); delete weg.ausTeig;
+        erg.push({ key: r.id, inhalt: weg, vorher: d, aktion: 'aendern' });
+      }
+    });
+    return erg;
+  }
+  function teile(liste, n) { var e = []; for (var i = 0; i < (liste || []).length; i += n) e.push(liste.slice(i, i + n)); return e; }
+
+  /* Zusammenfassung: „ergibt x kg Teig ≈ y Brote à Einwaage“ (nur Anzeige). */
+  function broteSchaetzung(summeKg, brote) {
+    return Object.keys(brote || {}).filter(function (lk) { return brote[lk].an && positiv(brote[lk].einwaageG); })
+      .map(function (lk) { return { lk: lk, einwaageG: brote[lk].einwaageG, brote: positiv(summeKg) ? summeKg * 1000 / brote[lk].einwaageG : null }; });
+  }
+  /* Proberechnung mit denselben Funktionen wie die Nachtseite: N Brote eines Brots. */
+  function probeNacht(teigDok, teigwerteDok, lk, einwaageG, anzahl) {
+    var tw = teigwerteDok || {};
+    return rechneTeig({ posten: [{ lk: lk, anzahl: anzahl, einwaageG: einwaageG }], kesselrestKg: 0,
+      literJeKg: tw.wasserLiterJeKg, ohneSchuettwasser: !!teigDok.ohneSchuettwasser,
+      kesselMaxKg: istZahl(tw.kesselMaxKg) ? tw.kesselMaxKg : 190, hefeJeKg: teigDok.hefeJeKg, rezeptBasisKg: teigDok.rezeptBasisKg });
+  }
+
   var api = {
     UMSCHALT_STUNDE: UMSCHALT_STUNDE, EINHEITEN: EINHEITEN, KENNUNG_MUSTER: KENNUNG_MUSTER, SAUER_VORGABE: SAUER_VORGABE,
     backtag: backtag, naechsterTag: naechsterTag, datumStr: datumStr,
@@ -833,7 +1152,14 @@
     KENNUNG_ORT: KENNUNG_ORT, bereichGueltig: bereichGueltig, kennungZerlegen: kennungZerlegen, kennungBilden: kennungBilden,
     ortIdAus: ortIdAus, naechsteNummer: naechsteNummer, BEREICH_VORGABEN: BEREICH_VORGABEN, bereichsListe: bereichsListe,
     sucheOrt: sucheOrt, kennungVergleich: kennungVergleich, zutatenInSchildFolge: zutatenInSchildFolge,
-    schildFolgeBereinigt: schildFolgeBereinigt, gebindeText: gebindeText
+    schildFolgeBereinigt: schildFolgeBereinigt, gebindeText: gebindeText,
+    GRUPPEN: GRUPPEN, GRUPPE_VORGABE: GRUPPE_VORGABE, GRUPPE_SILO: GRUPPE_SILO,
+    gruppeVon: gruppeVon, istSilo: istSilo, zutatenNachGruppe: zutatenNachGruppe, trenneSilo: trenneSilo,
+    WASSER_ID: WASSER_ID, HERKUNFT: HERKUNFT, dokGleich: dokGleich, teigeckeBrote: teigeckeBrote, broteOhneTeig: broteOhneTeig,
+    istRumpf: istRumpf, hefeVorschlag: hefeVorschlag, streckeLeer: streckeLeer, streckeAusBestand: streckeAusBestand,
+    streckeSumme: streckeSumme, streckeWerte: streckeWerte, teigAusStrecke: teigAusStrecke, teigwerteAusStrecke: teigwerteAusStrecke,
+    mengenAusStrecke: mengenAusStrecke, pruefeSchritt: pruefeSchritt, ausTeigAenderungen: ausTeigAenderungen, teile: teile,
+    broteSchaetzung: broteSchaetzung, probeNacht: probeNacht
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_TEIGECKE_LOGIK = api;

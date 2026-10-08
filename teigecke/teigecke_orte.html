@@ -5,6 +5,17 @@
   Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
   CHANGELOG
+    2026-10-08 · 06:03 · v0.3 · Feature (Etappe 2, Schub 1: Gruppe an der Zutat)
+      ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teil C.
+      „Zutat bearbeiten“ hat ein viertes Feld „Gruppe“ (für die Vorsortierung
+      in der Rezept-Strecke). Zutaten der Gruppe Silo (WinBack dosiert)
+      brauchen kein Zuhause: Sie stehen nicht unter „Noch ohne Zuhause“ und
+      nicht in „Zutaten hierher holen“, sondern in einer eigenen kleinen
+      Karte. FELDER um gruppe ergänzt (sonst ginge das Feld beim Speichern
+      verloren). Regelstand-Fassung teigecke-rezepte-2026-10-07 (Regel
+      firestore_regeln_2026-10-07_teigecke_rezepte.rules, RK §18). Die 33
+      vorhandenen Zutaten werden nicht umgeschrieben; ohne Feld gilt
+      „Sonstiges“.
     2026-10-03 · 14:47 · v0.2 · Refactor (QR-Teil zieht in die Wurzel)
       ANWEISUNG_2026-10-03_NFC_QR_ZENTRALE_STUFE1.md (KC, 11:51).
       Adresse und QR kommen aus ../bos_qr.js und ../qrcode.min.js, keine
@@ -131,13 +142,13 @@ const COL = { orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigec
    test_teigecke.js vergleicht beides automatisch. */
 const FELDER = {
   teigecke_orte: ['kennung', 'name', 'art', 'beschreibung', 'sort', 'bereich', 'bereichName', 'schildFolge', 'geloescht'],
-  teigecke_zutaten: ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'geloescht']
+  teigecke_zutaten: ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'gruppe', 'geloescht']
 };
 const HAKEN_FUER = {
   teigecke_orte: 'wagen', teigecke_zutaten: 'wagen'
 };
-const REGEL_FASSUNG = 'teigecke-orte-2026-10-03';
-const REGEL_DATEI = 'firestore_regeln_2026-10-04_nfc_sammelblatt.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege; seit 04.10.2026 RK §15) */
+const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* seit 08.10.2026: die Seite schreibt das Feld gruppe (RK §18) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-07_teigecke_rezepte.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 /* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
    Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
 try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }
@@ -185,6 +196,12 @@ const I18N_DE = {
   f_gebinde: 'Gebinde (optional)',
   f_gebinde_hilfe: 'Größe des Sacks/Eimers, z. B. 25 und kg. Nur zur Anzeige; wird später für den Verbrauch in Gebinden gebraucht.',
   f_einheit_leer: '—',
+  f_gruppe: 'Gruppe',
+  f_gruppe_hilfe: 'Sortiert die Auswahl in der Rezept-Strecke. „Silo“ heißt: dosiert WinBack, braucht kein Zuhause und steht nie auf der Einsammelliste.',
+  gruppe_mehle: 'Mehle & Schrote', gruppe_koerner: 'Körner & Saaten', gruppe_fluessig: 'Flüssiges', gruppe_salz_backmittel: 'Salz & Backmittel',
+  gruppe_vorstufen: 'Vorstufen & Anstellgut', gruppe_kuehlung: 'Kühlung', gruppe_silo: 'Silo (WinBack dosiert)', gruppe_sonstiges: 'Sonstiges',
+  silo_karte: '🏭 Aus dem Silo',
+  silo_karte_text: 'Dosiert WinBack, kein Zuhause nötig. Steht nie auf der Einsammelliste.',
   v_name_doppelt: '„{wert}“ gibt es schon.',
   v_sort: 'Reihenfolge muss eine Zahl sein.',
   v_gebinde: 'Gebindegröße muss eine Zahl über 0 sein.',
@@ -459,10 +476,17 @@ function renderOrte() {
   }
   if (S.pflegeModus && S.haken.wagen && !online()) html += '<span class="klein">' + esc(t('offline_pflege')) + '</span>';
   html += '</div>';
-  if (inhalt._ohne.length) {
-    html += '<div class="karte"><div class="karte-kopf"><div><span class="ort-kennung" style="color:var(--bos-text-faint);font-size:var(--bos-font-lg,1.15rem)">' + esc(t('ohne_zuhause')) + ' (' + inhalt._ohne.length + ')</span>' +
+  /* Silo-Zutaten (Gruppe Silo) brauchen kein Zuhause: eigene kleine Karte (08.10.2026). */
+  const ohne = L.trenneSilo(inhalt._ohne);
+  if (ohne.rest.length) {
+    html += '<div class="karte"><div class="karte-kopf"><div><span class="ort-kennung" style="color:var(--bos-text-faint);font-size:var(--bos-font-lg,1.15rem)">' + esc(t('ohne_zuhause')) + ' (' + ohne.rest.length + ')</span>' +
       '<div class="karte-unter">' + esc(t(orte.length ? 'ohne_zuhause_karte' : 'ohne_zuhause_erst_ort')) + '</div></div></div><ul class="liste">' +
-      inhalt._ohne.map(zutatZeileHTML).join('') + '</ul></div>';
+      ohne.rest.map(zutatZeileHTML).join('') + '</ul></div>';
+  }
+  if (ohne.silo.length) {
+    html += '<div class="karte"><div class="karte-kopf"><div><span class="ort-kennung" style="color:var(--bos-text-faint);font-size:var(--bos-font-lg,1.15rem)">' + esc(t('silo_karte')) + ' (' + ohne.silo.length + ')</span>' +
+      '<div class="karte-unter">' + esc(t('silo_karte_text')) + '</div></div></div><ul class="liste">' +
+      ohne.silo.map(zutatZeileHTML).join('') + '</ul></div>';
   }
   if (!orte.length) html += '<p class="status">' + esc(t('orte_leer')) + '</p>';
   bereiche.filter(function (b) { return orte.some(function (o) { return o.bereich === b.bereich || (L.kennungZerlegen(o.kennung) || {}).bereich === b.bereich; }); }).forEach(function (b) {
@@ -566,7 +590,10 @@ function oeffneZutat(id) {
     feldHTML(t('f_name'), eingabe('fName', z.name, 'maxlength="60"')) +
     feldHTML(t('f_zuhause'), '<select class="bos-input" id="fOrt">' + optionen + '</select>') +
     feldHTML(t('f_gebinde'), '<div class="feld-zeile">' + eingabe('fGebinde', typeof z.gebindeGroesse === 'number' ? z.gebindeGroesse : '', 'inputmode="decimal"') +
-      '<select class="bos-input" id="fEinheit" style="max-width:110px">' + einheiten + '</select></div>', t('f_gebinde_hilfe')),
+      '<select class="bos-input" id="fEinheit" style="max-width:110px">' + einheiten + '</select></div>', t('f_gebinde_hilfe')) +
+    feldHTML(t('f_gruppe'), '<select class="bos-input" id="fGruppe">' + L.GRUPPEN.map(function (g) {
+      return '<option value="' + g + '"' + (L.gruppeVon(z) === g ? ' selected' : '') + '>' + esc(t('gruppe_' + g)) + '</option>';
+    }).join('') + '</select>', t('f_gruppe_hilfe')),
     [{ aktion: 'speichern', text: t('speichern'), klasse: 'bos-btn--amber' }].concat(id ? [{ aktion: 'archivieren', text: t('archivieren'), klasse: 'gefahr' }] : []).concat([{ aktion: 'abbrechen', text: t('abbrechen') }]));
 }
 
@@ -576,12 +603,13 @@ async function speichereEdit() {
   if (!z) return;
   if (z.typ === 'ort') return speichereOrt();
   if (z.typ !== 'zutat') return;
-  const name = wert('fName'), ortId = wert('fOrt'), gebText = wert('fGebinde'), einheit = wert('fEinheit');
+  const name = wert('fName'), ortId = wert('fOrt'), gebText = wert('fGebinde'), einheit = wert('fEinheit'), gruppe = wert('fGruppe');
   let fehler = pruefeText(t('f_name'), name, 60);
   if (!fehler && L.namensKonflikt(S.zutaten, name, z.id)) fehler = t('v_name_doppelt', { wert: name });
   let geb;
   if (!fehler && gebText) { geb = parseZahl(gebText); if (!(geb > 0)) fehler = t('v_gebinde'); }
   const daten = { name: name, ortId: ortId, gebindeEinheit: einheit, geloescht: false };
+  if (L.GRUPPEN.indexOf(gruppe) !== -1) daten.gruppe = gruppe;
   if (L.istZahl(geb) && geb > 0) daten.gebindeGroesse = geb;
   if (fehler) { editFehler(fehler); return; }
   const vorher = z.id ? (zm()[z.id] || null) : null;
@@ -693,6 +721,7 @@ function oeffneHolen(ortId) {
   if (!ort) return;
   editZustand = { typ: 'holen', id: ortId, auswahl: { holen: new Set() } };
   const inhalt = L.ortInhalt(S.orte, S.zutaten);
+  inhalt._ohne = L.trenneSilo(inhalt._ohne).rest;   /* Silo-Zutaten brauchen kein Zuhause (08.10.2026) */
   const andere = L.aktiv(S.zutaten).filter(function (x) { return x.ortId && x.ortId !== ortId && om()[x.ortId] && !om()[x.ortId].geloescht; })
     .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
   oeffneEdit(t('holen_titel', { kennung: ort.kennung }),
@@ -930,6 +959,7 @@ const helpData = {
     { heading: 'Was ist eine Kennung?', text: 'Jeder Ort hat eine Kennung aus einem Buchstaben und einer Nummer, zum Beispiel B01. Der Buchstabe ist der Bereich (B = Backstube, K = Kühlung …), die Nummer zählt BOS von selbst hoch: B01, B02, B03. Einmal B01, immer B01 — die Kennung bleibt bei ihrem Ort, egal was sich an seinem Inhalt ändert. Fällt ein Ort weg, bleibt seine Nummer leer; ein neuer Ort bekommt immer die nächste Nummer am Ende.' },
     { heading: 'Einen Ort anlegen', text: 'Oben „✎ Pflegen“ einschalten, dann „＋ Ort“. Bereich wählen oder mit „neuer Bereich“ einen Buchstaben und ein Wort dazu festlegen. Die Kennung siehst du als Vorschau, tippen kannst du sie nicht. Name, Beschreibung und „Reihenfolge im Gang“ sind freiwillig. „Reihenfolge im Gang“ sortiert die Orte nachts in der Einsammelliste: kleinere Zahl = weiter vorn.' },
     { heading: 'Zutaten ein Zuhause geben', text: 'Oben steht „Noch ohne Zuhause“ mit allen Zutaten, die noch nirgends wohnen. Am schnellsten geht es am Ort selbst: „＋ Zutaten hierher“, alle antippen, die dorthin gehören, „Hierher holen“. Einzelne Zutaten änderst du durch Antippen (Name, Zuhause, Gebinde). Neue Zutaten legst du mit „＋ Zutat“ an oder liest sie mit „Zutaten einlesen“ aus der Startdaten-Datei ein.' },
+    { heading: 'Gruppe einer Zutat', text: 'In „Zutat bearbeiten“ steht als viertes Feld die Gruppe (Mehle & Schrote, Körner & Saaten, Flüssiges, Salz & Backmittel, Vorstufen & Anstellgut, Kühlung, Silo, Sonstiges). Sie sortiert die Auswahl, wenn du ein Rezept eintippst. Ohne Angabe gilt „Sonstiges“. Zutaten der Gruppe Silo dosiert WinBack: Sie brauchen kein Zuhause und stehen deshalb nicht unter „Noch ohne Zuhause“, sondern in der Karte „Aus dem Silo“.' },
     { heading: 'Reihenfolge auf dem Schild', text: 'Mit „↕ Reihenfolge“ schiebst du die Zutaten eines Orts mit den Pfeilen ▲▼ in die Reihenfolge, in der sie auf dem Schild stehen sollen. Ohne eigene Reihenfolge stehen sie alphabetisch. Das hat nichts mit der „Reihenfolge im Gang“ zu tun.' },
     { heading: 'Schilder drucken', text: '„🖨 Schild“ druckt das Schild eines Orts, „Alle Schilder drucken“ alle hintereinander: DIN A4 quer, ein Ort je Blatt. Links groß die Kennung, rechts die Zutaten mit Gebinde, unten links ein QR-Code (solange BäckereiOS noch nicht online ist: ein leeres Feld). Die Schrift wird so groß gewählt, wie es auf das Blatt passt. Passt es gar nicht, sagt die Seite das vor dem Druck. Im Druckdialog auf „Querformat“ achten.' },
     { heading: 'Der QR-Code', text: 'Wer den QR-Code mit dem Handy scannt, landet nach der Anmeldung direkt auf der Karte dieses Orts: Zutat ändern, Schild neu drucken, fertig. Du kannst eine Kennung auch oben ins Suchfeld tippen. Solange BäckereiOS noch nicht online ist, druckt die Seite das Schild ohne Code: an seiner Stelle bleibt ein leeres Feld. Die Seite sagt das oben und beim Drucken. Nach dem Online-Gang die Schilder einmal neu drucken, dann ist der Code drauf.' },

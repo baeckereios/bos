@@ -61,6 +61,8 @@
    wie die Nachbarn im selben Hub). Backstube und Konditorei ergänzt. */
 /* NEU 03.10.2026 (14:47): nfc_qr_zentrale nur bei admin, wie das roles-Feld der
    Registry (Registry = Rechte-Matrix, test_nfc_qr.js). */
+/* NEU 08.10.2026: Kind teigecke_rezepte („Teige & Rezepte“) bei denselben drei
+   Rollen wie teigecke_orte (Registry = Rechte-Matrix, test_teigecke.js Teil 8). */
 /* NEU 03.10.2026: Hub teigecke und Kind teigecke_orte bei denselben drei
    Rollen wie teigecke_nacht (Registry = Rechte-Matrix, test_teigecke.js Teil 8). */
 /* NEU 28.09.2026 (10:33): teigecke_nacht bei backstube, produktionsleitung
@@ -91,7 +93,8 @@ window.BOS_PERMISSIONS = {
     "druckzentrale_absetz": true,
     "teigecke": true,
     "teigecke_nacht": true,
-    "teigecke_orte": true
+    "teigecke_orte": true,
+    "teigecke_rezepte": true
   },
   "konditorei": {
     "freezer": true,
@@ -150,7 +153,8 @@ window.BOS_PERMISSIONS = {
     "aufgaben_verwaltung": true,
     "teigecke": true,
     "teigecke_nacht": true,
-    "teigecke_orte": true
+    "teigecke_orte": true,
+    "teigecke_rezepte": true
   },
   "admin": {
     "settings": true,
@@ -197,6 +201,7 @@ window.BOS_PERMISSIONS = {
     "teigecke": true,
     "teigecke_nacht": true,
     "teigecke_orte": true,
+    "teigecke_rezepte": true,
     "nfc_qr_zentrale": true
   }
 };

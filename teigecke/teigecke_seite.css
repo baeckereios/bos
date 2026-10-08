@@ -5,7 +5,10 @@
    Teil 1: wörtlich der <style>-Block aus teigecke_nacht.html v0.8
    (02.10.2026, 10:30). Die Nachtseite behält ihren eigenen Block bis
    Etappe 2 (KC, 03.10.2026). Teil 2: Ergänzungen für „Orte“.
+   Teil 3: Seite „Teige & Rezepte“ mit der Anlege-Strecke.
    CHANGELOG
+     2026-10-08 · 08:22 · v0.2 · Teil 3 angehängt (Etappe 2, Schub 2)
+       Nur neue Klassen mit Vorsilbe rz- (Teil 1 und 2 unverändert).
      2026-10-03 · 04:42 · v0.1 · Erstfassung
    ================================================================ */
 /* ===== Teil 1 — aus teigecke_nacht.html ===== */
@@ -396,3 +399,92 @@
   .kennung-vorschau { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 2.4rem; color: var(--bos-amber); line-height: 1; }
   .hol-liste { max-height: 50vh; overflow: auto; }
   #schildMessung { position: absolute; left: -99999px; top: 0; visibility: hidden; pointer-events: none; }
+
+/* ===== Teil 3 — Teige & Rezepte, Anlege-Strecke (08.10.2026) ===== */
+  /* Liste: Name links, Stift rechts (statt der vier Spalten der Nacht) */
+  .liste-zeile.rz-zeile { grid-template-columns: 1fr auto; }
+  .rz-nur-lesen { cursor: default; }
+  .rz-nur-lesen:hover { background: transparent; }
+  .rz-stift { font-size: 1.15rem; color: var(--bos-amber-bright); padding: 0 4px; }
+  .rz-sauer h3 { font-size: var(--bos-font-md, .95rem); }
+
+  /* Kopf und Schrittleiste */
+  .rz-kopf { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: var(--bos-space-xs, 9px); }
+  .rz-kopf h2 { margin: 0; font-size: var(--bos-font-xl, 1.3rem); min-width: 0; overflow-wrap: anywhere; }
+  .rz-schritte { list-style: none; display: flex; gap: 4px; margin: 0 0 var(--bos-space-sm, 14px); padding: 0; }
+  .rz-schritte li { flex: 1 1 0; min-width: 0; }
+  .rz-schritt {
+    width: 100%; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); background: var(--bos-surface);
+    color: var(--bos-text-faint); font-family: var(--bos-font-label); cursor: pointer; padding: 4px 2px;
+  }
+  .rz-schritt .rz-nr { font-weight: 800; font-size: 1.05rem; }
+  .rz-schritt .rz-wort { font-size: var(--bos-font-2xs, .62rem); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .rz-schritt.besucht { color: var(--bos-text-dim); border-color: var(--bos-amber); }
+  .rz-schritt.aktiv { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  @media (max-width: 480px) { .rz-schritt .rz-wort { display: none; } .rz-schritt { min-height: 44px; } }
+
+  .rz-koerper { min-height: 120px; }
+  .rz-frage { font-size: var(--bos-font-lg, 1.15rem); font-weight: 700; margin: 0 0 4px; }
+  .rz-kennung { font-size: 1.4rem; overflow-wrap: anywhere; }
+  .rz-janein { margin-left: 0; }
+  .rz-janein button { min-height: 48px; min-width: 80px; }
+
+  /* Laufleiste „Summe bisher“ und Vor/Zurück: unten festgeklebt */
+  .rz-lauf {
+    position: sticky; bottom: 64px; z-index: 5; margin-top: var(--bos-space-sm, 14px);
+    background: var(--bos-surface-raised); border: 1px solid var(--bos-amber); border-radius: var(--bos-radius-sm);
+    padding: 8px 14px; font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-amber-bright);
+  }
+  .rz-nav {
+    position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: space-between; gap: 10px;
+    background: var(--bos-bg); padding: 8px 0; margin-top: 6px;
+  }
+  .rz-nav .bos-btn { min-height: var(--tk-tap); min-width: 140px; font-size: var(--bos-font-lg, 1.15rem); }
+
+  /* Brote */
+  .rz-brote { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--bos-space-sm, 14px); }
+  .rz-brot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rz-brot-haken { flex: 1 1 260px; justify-content: flex-start; text-align: left; min-height: 52px; border-radius: var(--bos-radius-sm); }
+  .rz-brot-haken:disabled { cursor: default; opacity: .75; }
+  .rz-brot-name { display: flex; flex-direction: column; gap: 2px; }
+  .rz-brot-name small { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .rz-einwaage { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+  .rz-einwaage .bos-input { width: 120px; min-height: 48px; }
+  .rz-suche #rzTreffer { margin-top: 6px; }
+
+  /* Zeilen „Zutat ▾ · Menge · kg/L · ✕“ */
+  .rz-zeile-eingabe { display: grid; grid-template-columns: minmax(0, 1fr) 110px 76px 48px; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .rz-zeile-eingabe .bos-input { min-height: 48px; width: 100%; min-width: 0; }
+  .rz-zeile-eingabe .rz-silo { grid-column: 1 / -1; margin-top: -2px; }
+  .rz-hefe { grid-template-columns: minmax(0, 1fr) 110px 76px; }
+  .rz-einheit-fest { font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-text-dim); }
+  .rz-weg { min-height: 48px; padding: 0; }
+  .rz-zahl { font-variant-numeric: tabular-nums; }
+  .rz-vorstufe { border-left: 3px solid var(--bos-amber); padding-left: 12px; margin-bottom: var(--bos-space-sm, 14px); }
+  .rz-zwei > .feld { flex: 1 1 0; min-width: 0; }
+  @media (max-width: 520px) {
+    /* Handy: Zutat über die ganze Breite (lange Namen), darunter Menge · Einheit · ✕ */
+    .rz-zeile-eingabe { grid-template-columns: minmax(0, 1fr) 72px 48px; padding-bottom: 6px; border-bottom: 1px dashed var(--bos-border); }
+    .rz-zeile-eingabe .rz-zutat { grid-column: 1 / -1; }
+    .rz-hefe { grid-template-columns: minmax(0, 1fr) 40px; border-bottom: none; }
+    .rz-zwei { flex-direction: column; gap: 0; }
+  }
+
+  /* Zusammenfassung und Speichern */
+  .rz-sonstiges { border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-md); padding: 10px 14px; margin: var(--bos-space-sm, 14px) 0; }
+  .rz-sonstiges > summary { cursor: pointer; font-weight: 700; min-height: 36px; display: flex; align-items: center; }
+  .rz-sonstiges[open] > summary { margin-bottom: 10px; }
+  .rz-speichern { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: var(--bos-space-md, 18px) 0 var(--bos-space-sm, 14px); }
+  .rz-speichern .bos-btn { min-height: var(--tk-tap); min-width: 200px; font-size: var(--bos-font-lg, 1.15rem); }
+  .rz-sp-block { display: flex; flex-direction: column; gap: 8px; }
+  .rz-sp { border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); padding: 10px 14px; background: var(--bos-surface); }
+  .rz-sp.ok, .rz-sp.nichts { border-color: var(--bos-green); }
+  .rz-sp.fehler { border-color: var(--bos-red); }
+  .rz-sp.uebersprungen, .rz-sp.wartet { border-style: dashed; color: var(--bos-text-dim); }
+  .rz-sp-kopf { display: flex; justify-content: space-between; gap: 10px; }
+  .rz-sp.ok .rz-sp-kopf span, .rz-sp.nichts .rz-sp-kopf span { color: var(--bos-green); font-weight: 700; }
+  .rz-sp.fehler .rz-sp-kopf span { color: var(--bos-red); font-weight: 700; }
+  .rz-sp-text { font-size: var(--bos-font-sm, .82rem); margin-top: 4px; line-height: 1.5; word-break: break-word; }
+  .rz-sp.fehler .rz-sp-text { color: var(--bos-red); }
+  .rz-sp .bos-btn { margin-top: 8px; min-height: 48px; }
