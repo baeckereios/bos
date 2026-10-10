@@ -1,6 +1,8 @@
 /* ================================================================
    BäckereiOS · Satellite — Standalone-Login
    ================================================================
+   10.10.2026 (Reparaturanfrage Stufe 1): pruefeZugriff() gibt
+   profil.kontoHaken als vierten Parameter an BOS_ACCESS.can().
    STAND 19.09.2026: Der Login-Teil ist stillgelegt. Das Modul prüft
    weiterhin den Zugriff, wenn ein Profil vorliegt (PFAD 1) — es
    ERSETZT auf diesen Seiten bos_access_guard.js, siehe unten. Liegt
@@ -112,7 +114,9 @@
   function pruefeZugriff(profil) {
     var role = profil ? profil.role : null;
     var overrides = profil ? profil.kontoOverrides : null;
-    return window.BOS_ACCESS ? window.BOS_ACCESS.can(window.BOS_APP_ID, role, overrides) : true;
+    // 10.10.2026: Haken des Kontos für Haken-Seiten (bos_access.js, Registry-Feld haken).
+    var haken = profil ? profil.kontoHaken : null;
+    return window.BOS_ACCESS ? window.BOS_ACCESS.can(window.BOS_APP_ID, role, overrides, haken) : true;
   }
 
   /* Sperre und Warnstreifen kommen seit dem 19.09.2026 aus

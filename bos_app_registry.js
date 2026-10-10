@@ -72,6 +72,17 @@
               ändert, macht den Test rot — die Adresse darf auf Schildern
               und Chips stehen. Schon gedruckt: alte Adresse stehen lassen
               und weiterleiten. Noch nichts aufgehängt: Datei anpassen.
+     haken  — NEU (10.10.2026, Reparaturanfrage). optional. Liste von
+              Feldnamen im Konto-Dokument (bos_accounts), z. B.
+              ['reparaturLesen', 'reparaturMelden', 'reparaturBearbeiten'].
+              Ist das Feld gesetzt, entscheidet bos_access.js NICHT über die
+              Rollen-Matrix, sondern darüber, ob das Konto einen dieser Haken
+              trägt (Profilfeld kontoHaken). Ein solcher Eintrag braucht
+              weder roles noch eine Zeile in bos_permissions.js und fällt
+              nie auf offen zurück. Er erscheint deshalb auch nicht im
+              Reiter „Zugriffe“ der Kontenverwaltung — die Haken stehen dort
+              in den Stammdaten. Die Datenbank-Regel muss dieselben Haken
+              prüfen, sonst ist die Kachel ein Schild ohne Schloss.
    ================================================================ */
 
 window.BOS_APPS = [
@@ -385,6 +396,24 @@ window.BOS_APPS = [
     direkt: 'anmeldung',
     status: 'live',
     roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
+  },
+  {
+    id: 'reparaturanfrage',
+    // NEU 10.10.2026, Reparaturanfrage Stufe 1. Kaputtes melden, der
+    // Hausmeister setzt gesehen/repariert, kurzer Chat darunter.
+    // KEIN roles-Feld und KEINE Zeile in bos_permissions.js: die Kachel hängt
+    // am Feld haken — trägt das Konto einen dieser Haken, ist sie da, sonst
+    // nicht (bos_access.js, nie fail-open). Die Datenbank prüft dieselben
+    // Haken (RK §20). Haken setzt Ulf je Person in der Kontenverwaltung.
+    // Details: reparaturanfrage/REPARATURANFRAGE_DOKU.md.
+    bereich: 'allgemein',
+    name: 'Reparaturanfrage',
+    icon: '🔧',
+    color: '#5b7c99',
+    url: 'reparaturanfrage/reparaturanfrage.html',
+    direkt: 'anmeldung',
+    status: 'live',
+    haken: ['reparaturLesen', 'reparaturMelden', 'reparaturBearbeiten']
   },
   {
     id: 'konten_verwaltung',

@@ -30,6 +30,15 @@
         gesetzt wird.
       Keine Änderung an Datenmodell und Regeln. Siehe
       2026-10-04_KONTEN_BESCHRIFTEN_FEHLER.md.
+    2026-10-10 · 09:33 · v-Reparatur-1 · Feature (Reparaturanfrage Stufe 1)
+      Konto-Karte, Stammdaten: eigene Gruppe „🔧 Reparaturanfrage“ direkt
+      unter den Teigecke-Haken, drei Haken (Mitlesen & antworten / Melden /
+      Bearbeiten), gespeichert in derselben Sammelaktion. Bei Ort-Konten ein
+      Hinweis: Melden nur für Personen (Ulf, 10.10.). Die Reparaturanfrage
+      steht bewusst NICHT im Reiter „Zugriffe“ und nicht in „Rollen &
+      Rechte“: sie hat keine Matrix-Zeile, die Kachel hängt am Haken
+      (Registry-Feld haken, bos_access.js). Siehe
+      SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md.
     2026-09-29 · 19:45 · v-Teigecke-2 · Feature
       Konto-Karte, Stammdaten: drei Teigecke-Haken statt einem.
       „🧺 Wagen & Zutaten pflegen“ (Feld teigeckePflege, bisher „Teigecke
@@ -734,7 +743,10 @@ function initBearbeitung() {
       taskboardAbhaken: !!k.taskboardAbhaken, // NEU 05.09.2026, Taskboard-Feature
       teigeckePflege: !!k.teigeckePflege,     // NEU 28.09.2026, Teigecke Stufe 1
       teigeckeTeige: !!k.teigeckeTeige,       // NEU 29.09.2026, Teigecke Stufe 2
-      teigeckeRezepte: !!k.teigeckeRezepte    // NEU 29.09.2026, Teigecke Stufe 2
+      teigeckeRezepte: !!k.teigeckeRezepte,   // NEU 29.09.2026, Teigecke Stufe 2
+      reparaturLesen: !!k.reparaturLesen,         // NEU 10.10.2026, Reparaturanfrage Stufe 1
+      reparaturMelden: !!k.reparaturMelden,       // NEU 10.10.2026
+      reparaturBearbeiten: !!k.reparaturBearbeiten // NEU 10.10.2026
     };
   });
 }
@@ -932,7 +944,8 @@ var KONTO_KARTEN_TABS = [
         '<div class="detail-section full">' +
           '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckeRezepte ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckeRezepte\', this.checked)">' +
           '<span class="cb-label">📜 Rezepte pflegen — Zutatenliste je Teig, Vorstufe, Sauer/Hefe/Vorstufe je kg (Datenbank prüft alle drei Haken)</span></label>' +
-        '</div>'
+        '</div>' +
+        reparaturHakenHTML(k, b)
       );
     }
   },
@@ -1038,6 +1051,35 @@ function toggleKontoAbhaken(checked) {
 // NEU 28.09.2026, Teigecke Stufe 1 — gleiche Mechanik wie der Taskboard-Haken.
 // Seit 29.09.2026 für alle drei Teigecke-Haken (Feldname als Parameter).
 var TEIGECKE_HAKEN = ['teigeckePflege', 'teigeckeTeige', 'teigeckeRezepte'];
+
+// NEU 10.10.2026, Reparaturanfrage Stufe 1 — eigene, abgetrennte Gruppe
+// direkt unter den Teigecke-Haken (Ulf, 10.10.2026). Gleiche Mechanik:
+// Haken in bearbeitung[], gespeichert in derselben Sammelaktion. Jeder der
+// drei öffnet die Kachel (Registry-Feld haken); die Datenbank prüft alle
+// drei getrennt (RK §20). Je Person, keine Rollen-Vorgabe (Ulf, 08:38).
+var REPARATUR_HAKEN = [
+  { feld: 'reparaturLesen', text: 'Mitlesen & antworten — sieht Posteingang und Verlauf, darf im Chat schreiben' },
+  { feld: 'reparaturMelden', text: 'Melden — darf Anfragen stellen (schließt Mitlesen ein)' },
+  { feld: 'reparaturBearbeiten', text: 'Bearbeiten — Hausmeister: setzt gesehen/repariert, Fenster, Dringlichkeit (schließt Mitlesen ein; Datenbank prüft alle drei Haken)' }
+];
+function reparaturHakenHTML(k, b) {
+  // Ulf, 10.10.2026, 09:13: Melden nur für Personen-Konten — hier nur ein Hinweis, keine Sperre.
+  var ortHinweis = (k && k.art === 'ort')
+    ? '<div class="readonly-wert" style="margin-top:6px;">Ort-Konto: „Melden“ ist nur für Personen gedacht — beim Hausmeister soll immer eine Person als Absender stehen.</div>'
+    : '';
+  return '<div class="detail-section full"><div class="detail-feld"><label>🔧 Reparaturanfrage</label>' +
+    REPARATUR_HAKEN.map(function (h) {
+      return '<label class="checkbox-feld"><input type="checkbox" ' + (b[h.feld] ? 'checked' : '') +
+        ' onchange="toggleKontoReparatur(\'' + h.feld + '\', this.checked)">' +
+        '<span class="cb-label">' + esc(h.text) + '</span></label>';
+    }).join('') + ortHinweis + '</div></div>';
+}
+function toggleKontoReparatur(feld, checked) {
+  var erlaubt = REPARATUR_HAKEN.some(function (h) { return h.feld === feld; });
+  if (!kontoKarteId || !erlaubt) return;
+  bearbeitung[kontoKarteId][feld] = checked;
+  markiereGeaendert();
+}
 function toggleKontoTeigecke(feld, checked) {
   if (!kontoKarteId || TEIGECKE_HAKEN.indexOf(feld) === -1) return;
   bearbeitung[kontoKarteId][feld] = checked;
@@ -1789,6 +1831,16 @@ function tatsaechlichSpeichern() {
     }
     if (!!b.teigeckeRezepte !== !!k.teigeckeRezepte) {
       aufgaben.push(window.BOS_ACCOUNTS.setzeTeigeckeRezepteRecht(window.db, k.id, b.teigeckeRezepte));
+    }
+    // NEU 10.10.2026, Reparaturanfrage Stufe 1: drei Haken, selbe Sammelaktion
+    if (!!b.reparaturLesen !== !!k.reparaturLesen) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeReparaturLesenRecht(window.db, k.id, b.reparaturLesen));
+    }
+    if (!!b.reparaturMelden !== !!k.reparaturMelden) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeReparaturMeldenRecht(window.db, k.id, b.reparaturMelden));
+    }
+    if (!!b.reparaturBearbeiten !== !!k.reparaturBearbeiten) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeReparaturBearbeitenRecht(window.db, k.id, b.reparaturBearbeiten));
     }
   });
   return Promise.all(aufgaben);

@@ -1,6 +1,12 @@
 <!--
   backstore.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-10 · v0.2 · Feature (Reparaturanfrage Stufe 1)
+    Haken-Seiten (Registry-Feld haken): can() bekommt profile.kontoHaken als
+    vierten Parameter; gesperrt steht „Haken fehlt · Freigabe einzeln je
+    Person — Ulf fragen“ statt „Rolle fehlt · Benötigt:“ mit leerer Liste.
+    Hilfe um einen Absatz ergänzt. Siehe
+    SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md.
   2026-09-02 · v0.1 · Feature
     Erstversion. App-Katalog zum Installieren/Deinstallieren von
     Launcher-Kacheln. Konzept + Entscheidungen: siehe
@@ -271,9 +277,11 @@ function bsRoleLabel(roles) {
   return (roles || []).map(function (r) { return r.charAt(0).toUpperCase() + r.slice(1); }).join(', ');
 }
 
-function bsRenderCard(app, data, role, kontoOverrides) {
+function bsRenderCard(app, data, role, kontoOverrides, kontoHaken) {
   var installed = data.installed.indexOf(app.id) !== -1;
-  var erlaubt = window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, kontoOverrides) : true;
+  var erlaubt = window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, kontoOverrides, kontoHaken) : true;
+  // 10.10.2026: Haken-Seiten (Registry-Feld haken) hängen an einem Haken im Konto, nicht an der Rolle.
+  var hakenSeite = !!(app.haken && app.haken.length);
   var iconBg = bsHexToRgba(app.color, 0.20);
 
   var badges = '';
@@ -286,8 +294,13 @@ function bsRenderCard(app, data, role, kontoOverrides) {
   } else if (erlaubt) {
     btnHtml = '<button class="bs-card__btn bs-card__btn--install" data-action="install" data-id="' + app.id + '">Installieren</button>';
   } else {
-    btnHtml = '<button class="bs-card__btn bs-card__btn--locked" disabled>Rolle fehlt</button>';
-    roleHint = '<div class="bs-card__rolehint">Benötigt: ' + bsEscapeHtml(bsRoleLabel(app.roles)) + '</div>';
+    if (hakenSeite) {
+      btnHtml = '<button class="bs-card__btn bs-card__btn--locked" disabled>Haken fehlt</button>';
+      roleHint = '<div class="bs-card__rolehint">Freigabe einzeln je Person — Ulf fragen</div>';
+    } else {
+      btnHtml = '<button class="bs-card__btn bs-card__btn--locked" disabled>Rolle fehlt</button>';
+      roleHint = '<div class="bs-card__rolehint">Benötigt: ' + bsEscapeHtml(bsRoleLabel(app.roles)) + '</div>';
+    }
   }
 
   return '<div class="bs-card' + (!installed && !erlaubt ? ' bs-card--locked' : '') + '">' +
@@ -325,9 +338,10 @@ function bsRender() {
   var profile = window.BOS_PROFIL_LOOKUP.findeAktiv(state);
   var role = profile ? profile.role : null;
   var kontoOverrides = profile ? profile.kontoOverrides : null;
+  var kontoHaken = profile ? profile.kontoHaken : null;
 
   var apps = bsCatalogApps();
-  grid.innerHTML = apps.map(function (a) { return bsRenderCard(a, data, role, kontoOverrides); }).join('');
+  grid.innerHTML = apps.map(function (a) { return bsRenderCard(a, data, role, kontoOverrides, kontoHaken); }).join('');
   countEl.textContent = data.installed.length + ' von ' + apps.length + ' installiert';
 }
 
@@ -366,7 +380,8 @@ var BS_HILFE_SCHRITTE = [
   ['Wofür ist der BackStore?', 'Hier holst du dir die Apps auf deinen Desktop, die du wirklich brauchst — dein Desktop startet leer (bis auf den BackStore selbst) und füllt sich nur durch das, was du hier installierst.'],
   ['Installieren', 'Tippe bei einer App auf „Installieren" — sie erscheint danach auf deinem Desktop. Wo genau, sucht sich der Launcher automatisch aus.'],
   ['Deinstallieren', 'Tippe bei einer installierten App auf „✓ Installiert", um sie wieder zu entfernen. Es geht dabei nichts verloren — du kannst sie jederzeit hier erneut installieren.'],
-  ['„Rolle fehlt"', 'Manche Apps sind an eine bestimmte Rolle gebunden. Fehlt dir diese Rolle, siehst du die App trotzdem — so weißt du, was es gibt — kannst sie aber erst installieren, sobald der Admin dir die passende Rolle zuweist.']
+  ['„Rolle fehlt"', 'Manche Apps sind an eine bestimmte Rolle gebunden. Fehlt dir diese Rolle, siehst du die App trotzdem — so weißt du, was es gibt — kannst sie aber erst installieren, sobald der Admin dir die passende Rolle zuweist.'],
+  ['„Haken fehlt"', 'Ein paar Apps gibt Ulf einzeln je Person frei, unabhängig von der Rolle (zum Beispiel die Reparaturanfrage). Bekommst du den Haken, starte den Launcher einmal neu — dann lässt sich die App hier installieren.']
 ];
 function bsOeffneHilfe() {
   var inhalt = document.getElementById('bs-hilfe-inhalt');

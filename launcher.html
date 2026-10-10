@@ -19,6 +19,14 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-10 · 09:33 · v2.8 · Feature + Fix (Reparaturanfrage Stufe 1)
+      isVisibleForRole(): gibt das Profilfeld kontoHaken als vierten
+      Parameter an BOS_ACCESS.can() — Haken-Seiten (Registry-Feld haken)
+      erscheinen genau dann, wenn das Konto einen ihrer Haken trägt.
+      Fix: Startet der Launcher ohne Netz, trägt der Rückfall jetzt
+      freigeschaltet und kontoHaken mit. Vorher setzte aktualisiere() die
+      Rolle auf null und meldete fälschlich „Noch nicht freigeschaltet“
+      (seit 26.09.2026). Siehe SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md.
     2026-10-04 · 14:39 · v2.7 · Feature (Online-Gang)
       Kopf ergänzt um theme-color, Verweis auf manifest.webmanifest, App-
       Symbol (pwa/bos_icon_192.png) und robots noindex — gleicher Satz wie
@@ -967,7 +975,9 @@
     var p = getActiveProfile();
     var role = p ? p.role : null;
     var overrides = p ? p.kontoOverrides : null;
-    return window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, overrides) : true;
+    // 10.10.2026: vierter Parameter = Haken des Kontos (Haken-Seiten, bos_access.js).
+    var haken = p ? p.kontoHaken : null;
+    return window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, overrides, haken) : true;
   }
 
   /* ---------------- i18n für statische Markup-Elemente ---------------- */
@@ -2324,7 +2334,15 @@
               : ('Rolle konnte nicht geprüft werden und es liegt kein früherer Stand vor — '
                  + 'vorerst nur die allgemein offenen Kacheln. '
                  + ((fehler && fehler.message) || String(fehler))));
-            return warBekannt ? { name: eintrag.name, role: eintrag.role, overrides: eintrag.kontoOverrides } : null;
+            /* 10.10.2026 (Reparaturanfrage, Kompendium F17): Der Rückfall trägt
+               jetzt auch freigeschaltet und kontoHaken. Vorher fehlte
+               freigeschaltet — aktualisiere() setzte die Rolle deshalb auf
+               null und meldete ohne Netz fälschlich „Noch nicht
+               freigeschaltet“ (seit Schritt 2, 26.09.2026). warBekannt heißt:
+               eine Rolle war bekannt, und die gibt es nur mit Haken. */
+            return warBekannt ? { name: eintrag.name, role: eintrag.role, overrides: eintrag.kontoOverrides,
+                                  freigeschaltet: eintrag.freigeschaltet !== false,
+                                  kontoHaken: eintrag.kontoHaken || {} } : null;
           })
         : Promise.resolve(null);
 

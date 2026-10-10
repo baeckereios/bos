@@ -30,6 +30,11 @@
    Konten in der Kontenverwaltung den Haken tragen — sonst verliert das
    eigene Konto beim nächsten Anmelden seine Rolle.
 
+   10.10.2026 (Reparaturanfrage Stufe 1): aktualisiere() legt zusätzlich
+   kontoHaken an — alle true-Felder des Konto-Dokuments, nur bei
+   freigeschaltet, sonst {}. Gelesen von Launcher, Guard, Standalone-Login
+   und BackStore als vierter Parameter von BOS_ACCESS.can().
+
    EINE MECHANIK, ZWEI AUFRUFER:
      index.html   — nach der Anmeldung, bevor weitergeleitet wird
      launcher.html — beim Start, mit dem eigenen state-Objekt
@@ -50,6 +55,29 @@ window.BOS_KONTO_PROFIL = (function () {
 
   function profilIdAus(kennung) {
     return 'konto_' + kennung;
+  }
+
+  /* NEU 10.10.2026 (Reparaturanfrage Stufe 1): alle Felder des
+     Konto-Dokuments, die genau true sind — { reparaturMelden: true, … }.
+     Das ist der vierte Parameter von BOS_ACCESS.can() für Seiten mit
+     Registry-Feld haken. Bewusst KEINE feste Liste: ein neuer Haken (Lager
+     o. Ä.) soll nicht an einer zweiten Stelle nachgetragen werden müssen.
+     Nur Anzeige — das Schloss ist die Firestore-Regel. Stammt die Antwort
+     aus einem Rückfall (launcher.html ohne Netz), kommt dort bereits ein
+     fertiges kontoHaken-Objekt mit; dann wird es übernommen. */
+  function hakenAus(daten) {
+    if (daten && daten.kontoHaken && typeof daten.kontoHaken === 'object') {
+      var kopie = {};
+      Object.keys(daten.kontoHaken).forEach(function (k) {
+        if (daten.kontoHaken[k] === true) kopie[k] = true;
+      });
+      return kopie;
+    }
+    var h = {};
+    Object.keys(daten || {}).forEach(function (k) {
+      if (daten[k] === true) h[k] = true;
+    });
+    return h;
   }
 
   function rollenIcon(rolleId) {
@@ -96,11 +124,14 @@ window.BOS_KONTO_PROFIL = (function () {
       eintrag.freigeschaltet = (daten.freigeschaltet === true);
       eintrag.role = eintrag.freigeschaltet ? (daten.role || null) : null;
       eintrag.kontoOverrides = eintrag.freigeschaltet ? (daten.overrides || {}) : {};
+      // 10.10.2026 (Reparaturanfrage): Haken für Haken-Seiten, siehe hakenAus().
+      eintrag.kontoHaken = eintrag.freigeschaltet ? hakenAus(daten) : {};
     } else {
       // Kennung ohne Konto-Dokument: Grundkonto, keine Rolle.
       eintrag.name = kennung;
       eintrag.role = null;
       eintrag.kontoOverrides = {};
+      eintrag.kontoHaken = {};
       eintrag.kontoVorhanden = false;
       eintrag.freigeschaltet = false;
     }
@@ -181,6 +212,7 @@ window.BOS_KONTO_PROFIL = (function () {
     kennungAus: kennungAus,
     profilIdAus: profilIdAus,
     aktualisiere: aktualisiere,
+    hakenAus: hakenAus,
     stelleSicher: stelleSicher
   };
 })();

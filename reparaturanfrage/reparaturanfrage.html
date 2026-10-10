@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: reparaturanfrage/reparaturanfrage.html — Reparaturanfrage
+  Doku:  reparaturanfrage/REPARATURANFRAGE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Mechanik: ../bos_meldungen.js (window.BOS_MELDUNGEN) — diese Seite liest und
+         schreibt NUR über die Melde-Datei, nie direkt in Firestore.
+  ZWECK: Kaputtes melden, der Hausmeister sieht es gesammelt (Posteingang
+         rot/gelb/grün mit Wort), setzt gesehen/repariert, nennt ein
+         Reparaturfenster; darunter ein kurzer Chat für Rückfragen.
+  ZUGANG: nur über Haken je Konto (Kontenverwaltung, Stammdaten,
+         „🔧 Reparaturanfrage“): Mitlesen & antworten · Melden · Bearbeiten.
+         Die Kachel hängt am Registry-Feld haken (bos_access.js), das Schloss
+         ist die Firestore-Regel (RK §20).
+  AUFRUF: direkt (Lesezeichen, QR) möglich. ?geraet=Etagenofen öffnet gleich
+         das Meldeformular mit vorbelegtem Gerät (für die späteren
+         QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
+  KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
+  CHANGELOG
+    2026-10-10 · 09:33 · v0.1 · Erstfassung (Reparaturanfrage Stufe 1)
+      ANWEISUNG_2026-10-10_REPARATURANFRAGE_STUFE1.md (KC 08:53), Bauplan
+      SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md (Freigabe KC 09:12).
+      Posteingang (offen live, grüne Woche live, Archiv seitenweise auf
+      Knopfdruck), geöffnete Anfrage mit Schrittleiste, Zeitleiste und Chat,
+      Meldeformular mit Tatsachenfrage ohne Vorauswahl, Regelstand-Probe
+      reparatur-2026-10-10. Ohne Fotos, Push, Klingel, Lager, Filialen.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Reparaturanfrage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --ra-tap: max(52px, var(--bos-tap-min, 44px));
+    --ra-rot: var(--bos-red, #d6584a);
+    --ra-gelb: #d9a521;
+    --ra-gruen: var(--bos-green, #4caf7d);
+  }
+  html[data-theme="light"] { --ra-gelb: #9a7406; }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; padding-bottom: 80px; background: var(--bos-bg); color: var(--bos-text); font-family: var(--bos-font-body); -webkit-tap-highlight-color: transparent; }
+
+  header { background: var(--bos-surface); border-bottom: 1px solid var(--bos-border); padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px); position: sticky; top: 0; z-index: 20; }
+  .kopf-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); }
+  .kopf-titel { flex: 1 1 0; min-width: 0; }
+  header h1 { margin: 0; font-size: var(--bos-font-xl, 1.3rem); }
+  .eyebrow { font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: var(--bos-font-xs, .72rem); color: var(--bos-amber); }
+  .wer { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); margin-top: 2px; }
+  .abzeichen { display: inline-block; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 1px 8px; margin-left: 4px; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-2xs, .66rem); letter-spacing: .04em; text-transform: uppercase; color: var(--bos-text-dim); }
+  .kopf-knoepfe { display: flex; gap: var(--bos-space-2xs, 6px); align-items: center; }
+  .rund-btn { min-width: var(--ra-tap); min-height: var(--ra-tap); font-size: 1.2rem; }
+  .bos-btn { min-height: 44px; }
+  .bos-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  .leiste { margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0; border-radius: var(--bos-radius-sm); padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); font-size: var(--bos-font-sm, .82rem); line-height: 1.5; background: var(--bos-surface); border-left: 4px solid var(--bos-amber); }
+  .leiste.rot { border-left-color: var(--ra-rot); }
+  #fehlerLeiste { border: 1px solid var(--ra-rot); border-left-width: 4px; }
+  #fehlerLeiste ul { margin: 4px 0 0; padding-left: 18px; }
+  #fehlerLeiste li { word-break: break-word; margin-bottom: 4px; }
+  #fehlerLeiste a { color: var(--bos-amber-bright); font-weight: 700; word-break: break-all; }
+  .fehler-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+  .klein { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .link-btn { background: none; border: none; color: var(--bos-amber-bright); font-family: var(--bos-font-label); font-weight: 700; cursor: pointer; padding: 8px 4px; min-height: 44px; font-size: var(--bos-font-sm, .82rem); }
+
+  main { padding: var(--bos-space-md, 18px); max-width: 860px; margin: 0 auto; }
+  .status { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); padding: var(--bos-space-sm, 14px) 0; }
+  .kasten { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); padding: var(--bos-space-md, 18px); line-height: 1.55; }
+  .kasten.rot { border-color: var(--ra-rot); }
+  section.block { margin-top: var(--bos-space-lg, 22px); }
+  .block-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: var(--bos-space-xs, 9px); }
+  .block-kopf h2 { margin: 0; font-size: var(--bos-font-lg, 1.15rem); font-family: var(--bos-font-display); }
+  .leer { color: var(--bos-text-faint); font-size: var(--bos-font-sm, .82rem); padding: var(--bos-space-xs, 9px) 0; }
+
+  /* Posteingang: eine Zeile je Anfrage, Farbe IMMER mit Wort (Ulf, 08:00) */
+  .zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); width: 100%; text-align: left; min-height: var(--ra-tap); padding: 10px 12px; margin-bottom: 6px; background: var(--bos-surface); color: var(--bos-text); border: 1px solid var(--bos-border); border-left: 6px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); cursor: pointer; font: inherit; }
+  .zeile:hover { border-color: var(--bos-amber); }
+  .zeile.st-gemeldet { border-left-color: var(--ra-rot); }
+  .zeile.st-gesehen { border-left-color: var(--ra-gelb); }
+  .zeile.st-repariert { border-left-color: var(--ra-gruen); }
+  .z-haupt { flex: 1 1 auto; min-width: 0; }
+  .z-titel { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .z-unter { display: block; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); margin-top: 2px; }
+  .statuswort { flex: none; font-family: var(--bos-font-label); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; font-size: var(--bos-font-xs, .72rem); padding: 3px 9px; border-radius: 999px; border: 2px solid currentColor; }
+  .statuswort.st-gemeldet { color: var(--ra-rot); }
+  .statuswort.st-gesehen { color: var(--ra-gelb); }
+  .statuswort.st-repariert { color: var(--ra-gruen); }
+  .dringend { flex: none; font-family: var(--bos-font-label); font-weight: 800; text-transform: uppercase; font-size: var(--bos-font-2xs, .66rem); letter-spacing: .05em; color: #fff; background: var(--ra-rot); border-radius: 4px; padding: 2px 6px; }
+
+  /* geöffnete Anfrage */
+  .zurueck { margin-bottom: var(--bos-space-xs, 9px); }
+  .anfrage-text { font-size: var(--bos-font-lg, 1.1rem); white-space: pre-wrap; word-break: break-word; margin: 6px 0 10px; }
+  .eckdaten { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: var(--bos-font-sm, .85rem); }
+  .eckdaten dt { color: var(--bos-text-dim); }
+  .eckdaten dd { margin: 0; }
+  .schritte { display: flex; gap: 0; margin: var(--bos-space-md, 18px) 0 var(--bos-space-sm, 12px); }
+  .schritt { flex: 1 1 0; text-align: center; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-xs, .72rem); text-transform: uppercase; letter-spacing: .04em; color: var(--bos-text-faint); position: relative; padding-top: 22px; }
+  .schritt::before { content: ''; position: absolute; top: 4px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--bos-border-strong); background: var(--bos-bg); }
+  .schritt::after { content: ''; position: absolute; top: 11px; left: calc(50% + 9px); right: calc(-50% + 9px); height: 2px; background: var(--bos-border-strong); }
+  .schritt:last-child::after { display: none; }
+  .schritt.erreicht { color: var(--bos-text); }
+  .schritt.erreicht.st-gemeldet::before { background: var(--ra-rot); border-color: var(--ra-rot); }
+  .schritt.erreicht.st-gesehen::before { background: var(--ra-gelb); border-color: var(--ra-gelb); }
+  .schritt.erreicht.st-repariert::before { background: var(--ra-gruen); border-color: var(--ra-gruen); }
+  .schritt.uebersprungen { text-decoration: line-through; }
+  .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--bos-space-sm, 12px) 0; }
+  .feld { margin-bottom: var(--bos-space-sm, 12px); }
+  .feld label { display: block; margin-bottom: 4px; }
+  .zeitleiste { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--bos-border-strong); }
+  .zeitleiste li { position: relative; padding: 0 0 10px 10px; font-size: var(--bos-font-sm, .85rem); line-height: 1.45; }
+  .zeitleiste li::before { content: ''; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--bos-text-faint); }
+  .zeitleiste .wann { color: var(--bos-text-dim); font-size: var(--bos-font-xs, .72rem); display: block; }
+  .zeitleiste .grund { color: var(--bos-text-dim); }
+  .chat { display: flex; flex-direction: column; gap: 8px; }
+  .blase { max-width: 85%; background: var(--bos-surface-raised); border: 1px solid var(--bos-border); border-radius: 12px; padding: 8px 12px; white-space: pre-wrap; word-break: break-word; }
+  .blase.meine { align-self: flex-end; border-color: var(--bos-amber); }
+  .blase .wann { display: block; font-size: var(--bos-font-2xs, .66rem); color: var(--bos-text-dim); margin-bottom: 2px; }
+  textarea.bos-input { min-height: 90px; resize: vertical; }
+  .zaehler { text-align: right; }
+  .wahl { display: flex; gap: 8px; flex-wrap: wrap; }
+  .wahl .bos-btn[aria-pressed="true"] { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  .warnhinweis { border-left: 4px solid var(--ra-gelb); background: var(--bos-surface); padding: 8px 12px; border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm, .82rem); margin-bottom: var(--bos-space-sm, 12px); }
+
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 50; display: flex; align-items: flex-end; }
+  .sheet { background: var(--bos-surface); border-top: 1px solid var(--bos-border); border-radius: 18px 18px 0 0; padding: var(--bos-space-lg, 22px) var(--bos-space-md, 20px) calc(24px + env(safe-area-inset-bottom)); width: 100%; max-width: 640px; margin: 0 auto; max-height: 80vh; overflow-y: auto; }
+  .sheet h2 { font-family: var(--bos-font-display); margin: 0 0 12px; }
+  .sheet h3 { font-size: var(--bos-font-md, .95rem); margin: 14px 0 4px; }
+  .sheet p { color: var(--bos-text-dim); line-height: 1.55; margin: 0 0 8px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--bos-surface-raised); border: 1px solid var(--bos-amber); color: var(--bos-text); padding: 10px 16px; border-radius: 10px; z-index: 60; max-width: 90vw; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge nach Checkliste §2a und
+     bos_standalone_login.js-Kopf. Direkt aufrufbar (Lesezeichen, QR-Code). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'reparaturanfrage';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_meldungen.js"></script>
+
+<header>
+  <div class="kopf-zeile">
+    <div class="kopf-titel">
+      <div class="eyebrow" data-i18n="eyebrow">Hausmeister</div>
+      <h1 class="bos-title" data-i18n="titel">Reparaturanfrage</h1>
+      <div class="wer" id="werZeile"></div>
+    </div>
+    <div class="kopf-knoepfe">
+      <button type="button" class="bos-btn bos-btn--amber" id="meldenBtn" hidden data-i18n="melden_knopf">＋ Melden</button>
+      <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+    </div>
+  </div>
+</header>
+
+<div id="verbindungLeiste" class="leiste" role="status" hidden></div>
+<div id="regelLeiste" class="leiste rot" role="alert" hidden></div>
+<div id="hinweisLeiste" class="leiste" role="status" hidden></div>
+<div id="fehlerLeiste" class="leiste rot" role="alert" hidden>
+  <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main id="main">
+  <div class="status" id="ladeStatus" data-i18n="lade">Einen Moment …</div>
+</main>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hilfeTitel">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen" style="width:100%;margin-top:12px;">Schließen</button>
+  </div>
+</div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Reparaturanfrage — Seite. Alles Lesen und Schreiben über
+   window.BOS_MELDUNGEN (../bos_meldungen.js). KEINE Daten im Code.
+   ================================================================== */
+const M = window.BOS_MELDUNGEN;
+const KANAL = 'hausmeister';
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  eyebrow: 'Hausmeister',
+  titel: 'Reparaturanfrage',
+  lade: 'Einen Moment …',
+  melden_knopf: '＋ Melden',
+  schliessen: 'Schließen',
+  ausblenden: 'ausblenden',
+  fehler_titel: '⚠ Fehler',
+  du_als: 'Du schreibst als: {name}',
+  haken_lesen: 'Mitlesen', haken_melden: 'Melden', haken_bearbeiten: 'Bearbeiten',
+  kein_haken: 'Kein Haken für die Reparaturanfrage — Ulf fragen. Er setzt ihn in der Kontenverwaltung; danach den Launcher einmal neu starten.',
+  nicht_frei: 'Dein Konto ist noch nicht freigeschaltet — Ulf Bescheid geben.',
+  offen_titel: 'Offen',
+  offen_leer: 'Nichts offen. 🎉',
+  gruen_titel: 'Repariert (letzte 7 Tage)',
+  gruen_leer: 'In den letzten sieben Tagen nichts repariert.',
+  archiv_titel: 'Archiv',
+  archiv_zeigen: 'Archiv zeigen',
+  archiv_verbergen: 'Archiv verbergen',
+  archiv_mehr: 'Mehr laden',
+  archiv_leer: 'Im Archiv liegt noch nichts.',
+  archiv_hinweis: 'Im Archiv kann man nur lesen. Geht etwas wieder kaputt: neue Anfrage.',
+  st_gemeldet: 'gemeldet', st_gesehen: 'gesehen', st_repariert: 'repariert',
+  dringend: 'dringend',
+  bis: 'bis {datum}',
+  von_alter: '{wer} · {alter}',
+  zurueck: '‹ Posteingang',
+  weiterarbeiten: 'Weiterarbeiten',
+  wa_ja: 'ja', wa_eingeschraenkt: 'eingeschränkt', wa_nein: 'nein',
+  geraet: 'Gerät', gemeldet_von: 'Gemeldet von', gemeldet_am: 'Gemeldet', fenster: 'Reparaturfenster',
+  dringlichkeit: 'Dringlichkeit', kein_fenster: 'noch keins', normal: 'normal',
+  verlauf_titel: 'Verlauf',
+  chat_titel: 'Rückfragen',
+  chat_leer: 'Noch keine Nachricht.',
+  chat_zu: 'Diese Anfrage liegt im Archiv — der Chat ist zu.',
+  chat_platzhalter: 'Kurze Nachricht, Rückfrage oder „läuft wieder“',
+  senden: 'Senden',
+  k_gesehen: '👀 Gesehen',
+  k_repariert: '✓ Repariert',
+  k_zurueck: '↩ „Repariert“ zurücknehmen (noch bis {datum})',
+  k_dringend: '❗ Als dringend markieren',
+  k_normal: 'Auf „normal“ zurück',
+  fenster_setzen: 'Fenster setzen',
+  fenster_verschieben: 'Fenster verschieben',
+  fenster_entfernen: 'Fenster entfernen',
+  fenster_grund: 'Grund (beim Verschieben Pflicht)',
+  fenster_datum: 'Bis wann voraussichtlich?',
+  e_gemeldet: 'gemeldet',
+  e_status: 'Status: {vorher} → {nachher}',
+  e_fenster_neu: 'Fenster: bis {nachher}',
+  e_fenster_verschoben: 'Fenster verschoben: {vorher} → {nachher}',
+  e_fenster_weg: 'Fenster entfernt (war {vorher})',
+  e_dringlichkeit: 'Dringlichkeit: {vorher} → {nachher}',
+  m_titel: 'Was ist kaputt?',
+  m_text_platzhalter: 'z. B. Tür vom Etagenofen schließt nicht richtig',
+  m_frage: 'Kann weitergearbeitet werden?',
+  m_geraet: 'Gerät (wenn bekannt)',
+  m_geraet_platzhalter: 'frei tippen, z. B. Kneter 2',
+  m_warn: 'Nur Betriebsmeldungen — nichts Vertrauliches, keine Personen.',
+  m_schon: 'Schon gemeldet? Das ist gerade offen:',
+  m_senden: 'Anfrage senden',
+  m_abbrechen: 'Abbrechen',
+  m_fehlt: 'Noch offen: {was}',
+  m_fehlt_text: 'was kaputt ist', m_fehlt_wahl: 'die Frage „Weiterarbeiten?“',
+  gesendet: '✓ Anfrage gesendet',
+  gespeichert: '✓ Gespeichert',
+  gesehen_auto: '✓ Gesendet — und auf „gesehen“ gesetzt',
+  nicht_gefunden: 'Diese Anfrage ist gerade nicht in der Liste (vielleicht im Archiv).',
+  offline: '📴 Ohne Verbindung — Stand vom Gerät. Was du jetzt sendest, geht raus, sobald Netz da ist.',
+  ausstehend: '⏳ Wird übertragen …',
+  regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Lesen und Schreiben können abgelehnt werden. Bitte die Regeldatei {datei} einsetzen.',
+  geraet_hinweis: 'Gerät aus dem Code: {geraet}',
+  geraet_ohne_melden: 'Der Code nennt das Gerät „{geraet}“ — melden darfst du aber nicht (Haken „Melden“ fehlt).',
+  index_link: 'Index anlegen',
+  zeichen: '{n}/{max}',
+  err_laden: 'Laden „{was}“',
+  err_unbehandelt: 'Unerwarteter Fehler'
+};
+function t(schluessel, werte) {
+  let s = I18N_DE[schluessel];
+  if (s === undefined) s = schluessel;
+  if (werte) Object.keys(werte).forEach(function (k) { s = s.split('{' + k + '}').join(String(werte[k])); });
+  return s;
+}
+document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
+
+/* ---------- Hilfe (identisch mit REPARATURANFRAGE_DOKU.md, Abschnitt Nutzer-Hilfe) ---------- */
+const helpData = {
+  titel: 'Reparaturanfrage — so geht’s',
+  abschnitte: [
+    ['Wofür?', 'Hier landet alles, was kaputt ist, an einer Stelle beim Hausmeister — und jeder mit Zugang sieht, ob es schon gemeldet ist und wie weit es ist.'],
+    ['Die Farben', 'Rot „gemeldet“: noch niemand hat reagiert. Gelb „gesehen“: der Hausmeister weiß Bescheid. Grün „repariert“: erledigt. Die Farbe steht immer mit dem Wort dabei. Grünes rutscht nach sieben Tagen ins Archiv.'],
+    ['Melden', 'Erst nachsehen, ob es schon in der Liste steht. Dann „＋ Melden“: kurz schreiben, was kaputt ist, und antippen, ob weitergearbeitet werden kann (ja, eingeschränkt, nein). Wie dringend es ist, entscheidet der Hausmeister. Nur Betriebsmeldungen — nichts Vertrauliches, keine Personen. Ein Notfall gehört ans Telefon, nicht in die App.'],
+    ['Antippen', 'Oben siehst du, wie weit die Anfrage ist, darunter den Verlauf mit Name und Uhrzeit, ganz unten die Rückfragen. Jeder mit Zugang darf antworten — so bleibt keine Frage hängen, wenn jemand frei hat. Kurz halten.'],
+    ['Für den Hausmeister', '„Gesehen“, „Repariert“ (geht auch direkt von Rot), Reparaturfenster setzen oder verschieben (beim Verschieben mit Grund), „dringend“ markieren. Eine Antwort im Chat auf eine rote Anfrage setzt sie automatisch auf „gesehen“. Ein „Repariert“ aus Versehen lässt sich bis zum Archivtag zurücknehmen.'],
+    ['Geht wieder kaputt?', 'Dann eine neue Anfrage. Die alte bleibt, wie sie war.'],
+    ['Wer darf was?', 'Ulf setzt je Person einen Haken: Mitlesen & antworten, Melden, Bearbeiten. Ohne Haken siehst du die Seite nicht. Nach einem neuen Haken den Launcher einmal neu starten.'],
+    ['Wenn etwas schiefgeht', 'Fehler stehen oben rot mit der Meldung der Datenbank. „Index anlegen“ erscheint höchstens beim allerersten Öffnen — das ist Ulfs Sache. Ohne Netz zeigt die Seite den letzten Stand; Gesendetes geht raus, sobald Netz da ist.']
+  ]
+};
+function oeffneHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.titel;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.abschnitte.map(function (a) {
+    return '<h3>' + esc(a[0]) + '</h3><p>' + esc(a[1]) + '</p>';
+  }).join('');
+  document.getElementById('hilfeSheet').hidden = false;
+}
+document.getElementById('hilfeBtn').addEventListener('click', oeffneHilfe);
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+/* ---------- Werkzeuge ---------- */
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+let toastUhr = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastUhr);
+  toastUhr = setTimeout(function () { el.hidden = true; }, 4200);
+}
+
+/* ---------- Fehler auf den Bildschirm (Projektregel, Checkliste §7a) ---------- */
+function zeigeFehler(was, err) {
+  console.error('[Reparaturanfrage]', was, err);
+  const e = (err && err.art) ? err : M.einordnen(err);
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + esc(was) + ':</b> ' + esc(e.meldung || e.message || String(err)) +
+    (e.original ? ' <span class="klein">(' + esc(e.original) + ')</span>' : '') +
+    (e.link ? '<br><a href="' + esc(e.link) + '" target="_blank" rel="noopener">' + esc(t('index_link')) + ' ↗</a>' : '');
+  document.getElementById('fehlerListe').appendChild(li);
+  document.getElementById('fehlerLeiste').hidden = false;
+}
+document.getElementById('fehlerZuBtn').addEventListener('click', function () {
+  document.getElementById('fehlerLeiste').hidden = true;
+  document.getElementById('fehlerListe').innerHTML = '';
+});
+window.onerror = function (msg, quelle, zeile, spalte, err) {
+  zeigeFehler(t('err_unbehandelt'), err || new Error(String(msg) + ' (' + (quelle || '') + ':' + (zeile || '') + ')'));
+};
+window.addEventListener('unhandledrejection', function (ev) { zeigeFehler(t('err_unbehandelt'), ev.reason); });
+
+/* ---------- Zustand ---------- */
+const S = {
+  ich: null,
+  offen: [], gruen: [], archiv: [], archivLetzter: null, archivMehr: false, archivAn: false,
+  verbindung: { offen: {}, gruen: {} },
+  ansicht: 'liste',      // 'liste' | 'anfrage' | 'melden'
+  offeneId: null,
+  verlauf: [], verlaufAbo: null,
+  melden: { text: '', geraet: '', weiterarbeiten: null },
+  arbeitet: false,
+  geraetAusCode: ''
+};
+
+function wort(status) { return M.woerterbuch(KANAL)[status] || status; }
+function statusMarke(status) {
+  return '<span class="statuswort st-' + esc(status) + '">' + esc(wort(status)) + '</span>';
+}
+function alleKoepfe() { return S.offen.concat(S.gruen, S.archiv); }
+function findeKopf(id) {
+  const liste = alleKoepfe();
+  for (let i = 0; i < liste.length; i++) if (liste[i].id === id) return liste[i];
+  return null;
+}
+function titelVon(k) {
+  if (k.geraet) return k.geraet + ' — ' + k.text;
+  return k.text;
+}
+
+/* ---------- Zeichnen ---------- */
+/* Live-Daten zeichnen neu. Tippt jemand gerade (Fokus in einem Feld der
+   Seite), wird das Neuzeichnen bis zum Verlassen des Feldes aufgeschoben —
+   sonst springt der Cursor weg (Muster teigecke_seite.js). */
+let aufgeschoben = false;
+function tipptGerade() {
+  const a = document.activeElement;
+  const main = document.getElementById('main');
+  return !!(a && main.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+}
+document.addEventListener('focusout', function () {
+  setTimeout(function () { if (aufgeschoben && !tipptGerade()) { aufgeschoben = false; render(true); } }, 0);
+});
+function render(erzwingen) {
+  renderVerbindung();
+  const main = document.getElementById('main');
+  if (!S.ich) return;
+  if (!erzwingen && tipptGerade()) { aufgeschoben = true; return; }
+  aufgeschoben = false;
+  if (!S.ich.rechte.lesen) {
+    main.innerHTML = '<div class="kasten rot">' + esc(S.ich.freigeschaltet ? t('kein_haken') : t('nicht_frei')) + '</div>';
+    return;
+  }
+  if (S.ansicht === 'melden') return renderMelden(main);
+  if (S.ansicht === 'anfrage') return renderAnfrage(main);
+  renderListe(main);
+}
+
+function zeileHTML(k) {
+  const jetzt = Date.now();
+  const unter = [esc(k.vonName || k.von || '')];
+  if (k.status === 'repariert') unter.push(esc(wort('repariert') + ' ' + M.uhrText(k.repariertAm)));
+  else unter.push(esc(M.alterText(k.erstellt, jetzt)));
+  if (k.fenster && k.status !== 'repariert') unter.push('🕒 ' + esc(t('bis', { datum: M.fensterText(k.fenster) })));
+  return '<button type="button" class="zeile st-' + esc(k.status) + '" data-oeffnen="' + esc(k.id) + '">' +
+    '<span class="z-haupt"><span class="z-titel">' + esc(titelVon(k)) + '</span>' +
+    '<span class="z-unter">' + unter.join(' · ') + '</span></span>' +
+    (k.dringlichkeit === 'dringend' ? '<span class="dringend">' + esc(t('dringend')) + '</span>' : '') +
+    statusMarke(k.status) + '</button>';
+}
+
+function renderListe(main) {
+  const offen = M.sortiere(S.offen);
+  const gruen = M.sortiere(S.gruen.filter(function (k) { return !M.imArchiv(k); }));
+  let html = '<section class="block"><div class="block-kopf"><h2>' + esc(t('offen_titel')) + '</h2><span class="klein">' + offen.length + '</span></div>' +
+    (offen.length ? offen.map(zeileHTML).join('') : '<div class="leer">' + esc(t('offen_leer')) + '</div>') + '</section>';
+  html += '<section class="block"><div class="block-kopf"><h2>' + esc(t('gruen_titel')) + '</h2><span class="klein">' + gruen.length + '</span></div>' +
+    (gruen.length ? gruen.map(zeileHTML).join('') : '<div class="leer">' + esc(t('gruen_leer')) + '</div>') + '</section>';
+  html += '<section class="block"><div class="block-kopf"><h2>' + esc(t('archiv_titel')) + '</h2>' +
+    '<button type="button" class="link-btn" id="archivBtn">' + esc(S.archivAn ? t('archiv_verbergen') : t('archiv_zeigen')) + '</button></div>';
+  if (S.archivAn) {
+    html += '<div class="klein">' + esc(t('archiv_hinweis')) + '</div>' +
+      (S.archiv.length ? S.archiv.map(zeileHTML).join('') : '<div class="leer">' + esc(t('archiv_leer')) + '</div>') +
+      (S.archivMehr ? '<button type="button" class="bos-btn" id="archivMehrBtn">' + esc(t('archiv_mehr')) + '</button>' : '');
+  }
+  html += '</section>';
+  main.innerHTML = html;
+  const ab = document.getElementById('archivBtn');
+  if (ab) ab.addEventListener('click', schalteArchiv);
+  const mb = document.getElementById('archivMehrBtn');
+  if (mb) mb.addEventListener('click', ladeArchivSeite);
+}
+
+function schritteHTML(k) {
+  const st = k.status;
+  const gesehenErreicht = st === 'gesehen' || (st === 'repariert' && S.verlauf.some(function (e) { return e.art === 'status' && e.nachher === 'gesehen'; }));
+  const gesehenUebersprungen = st === 'repariert' && !gesehenErreicht;
+  return '<div class="schritte" aria-label="Fortschritt">' +
+    '<div class="schritt erreicht st-gemeldet">' + esc(wort('gemeldet')) + '</div>' +
+    '<div class="schritt st-gesehen' + (gesehenErreicht ? ' erreicht' : '') + (gesehenUebersprungen ? ' uebersprungen' : '') + '">' + esc(wort('gesehen')) + '</div>' +
+    '<div class="schritt st-repariert' + (st === 'repariert' ? ' erreicht' : '') + '">' + esc(wort('repariert')) + '</div></div>';
+}
+
+function eintragText(e) {
+  if (e.art === 'status') return t('e_status', { vorher: wort(e.vorher), nachher: wort(e.nachher) });
+  if (e.art === 'dringlichkeit') return t('e_dringlichkeit', { vorher: e.vorher, nachher: e.nachher });
+  if (e.art === 'fenster') {
+    if (!e.vorher) return t('e_fenster_neu', { nachher: M.fensterText(e.nachher) });
+    if (!e.nachher) return t('e_fenster_weg', { vorher: M.fensterText(e.vorher) });
+    return t('e_fenster_verschoben', { vorher: M.fensterText(e.vorher), nachher: M.fensterText(e.nachher) });
+  }
+  return e.art;
+}
+
+function renderAnfrage(main) {
+  const k = findeKopf(S.offeneId);
+  if (!k) {
+    main.innerHTML = '<button type="button" class="link-btn zurueck" data-zurueck="1">' + esc(t('zurueck')) + '</button><div class="kasten">' + esc(t('nicht_gefunden')) + '</div>';
+    return verbindeZurueck();
+  }
+  const r = S.ich.rechte;
+  const archiv = M.imArchiv(k);
+  const archivAb = M.archivAb(k);
+  const wa = { ja: t('wa_ja'), eingeschraenkt: t('wa_eingeschraenkt'), nein: t('wa_nein') }[k.weiterarbeiten] || k.weiterarbeiten;
+  let html = '<button type="button" class="link-btn zurueck" data-zurueck="1">' + esc(t('zurueck')) + '</button>' +
+    '<div class="kasten">' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + statusMarke(k.status) +
+      (k.dringlichkeit === 'dringend' ? '<span class="dringend">' + esc(t('dringend')) + '</span>' : '') + '</div>' +
+    '<div class="anfrage-text">' + esc(k.text) + '</div>' +
+    '<dl class="eckdaten">' +
+      (k.geraet ? '<dt>' + esc(t('geraet')) + '</dt><dd>' + esc(k.geraet) + '</dd>' : '') +
+      '<dt>' + esc(t('gemeldet_von')) + '</dt><dd>' + esc(k.vonName || k.von) + '</dd>' +
+      '<dt>' + esc(t('gemeldet_am')) + '</dt><dd>' + esc(M.uhrText(k.erstellt)) + '</dd>' +
+      '<dt>' + esc(t('weiterarbeiten')) + '</dt><dd>' + esc(wa) + '</dd>' +
+      '<dt>' + esc(t('dringlichkeit')) + '</dt><dd>' + esc(k.dringlichkeit === 'dringend' ? t('dringend') : t('normal')) + '</dd>' +
+      '<dt>' + esc(t('fenster')) + '</dt><dd>' + esc(k.fenster ? t('bis', { datum: M.fensterText(k.fenster) }) : t('kein_fenster')) + '</dd>' +
+    '</dl>' + schritteHTML(k);
+
+  if (r.bearbeiten && !archiv) {
+    html += '<div class="knopfreihe">';
+    if (k.status === 'gemeldet') html += '<button type="button" class="bos-btn" data-status="gesehen">' + esc(t('k_gesehen')) + '</button>';
+    if (k.status !== 'repariert') html += '<button type="button" class="bos-btn bos-btn--amber" data-status="repariert">' + esc(t('k_repariert')) + '</button>';
+    if (k.status === 'repariert' && archivAb) html += '<button type="button" class="bos-btn" data-status="gesehen">' + esc(t('k_zurueck', { datum: M.uhrText(archivAb) })) + '</button>';
+    html += '<button type="button" class="bos-btn" id="dringBtn">' + esc(k.dringlichkeit === 'dringend' ? t('k_normal') : t('k_dringend')) + '</button>';
+    html += '</div>';
+    if (k.status !== 'repariert') {
+      html += '<div class="feld"><label class="bos-label" for="fensterDatum">' + esc(t('fenster_datum')) + '</label>' +
+        '<input type="date" class="bos-input" id="fensterDatum" min="' + esc(M.heute()) + '" value="' + esc(k.fenster || '') + '"></div>' +
+        '<div class="feld"><label class="bos-label" for="fensterGrund">' + esc(t('fenster_grund')) + '</label>' +
+        '<input type="text" class="bos-input" id="fensterGrund" maxlength="' + M.GRENZEN.grund + '"></div>' +
+        '<div class="knopfreihe"><button type="button" class="bos-btn" id="fensterBtn">' + esc(k.fenster ? t('fenster_verschieben') : t('fenster_setzen')) + '</button>' +
+        (k.fenster ? '<button type="button" class="bos-btn bos-btn--ghost" id="fensterWegBtn">' + esc(t('fenster_entfernen')) + '</button>' : '') + '</div>';
+    }
+  }
+  html += '</div>';
+
+  // Zeitleiste: Kopf („gemeldet“) + alle Einträge außer Nachrichten
+  const ereignisse = S.verlauf.filter(function (e) { return e.art !== 'nachricht'; });
+  html += '<section class="block"><div class="block-kopf"><h2>' + esc(t('verlauf_titel')) + '</h2></div><ul class="zeitleiste">' +
+    '<li><span class="wann">' + esc(M.uhrText(k.erstellt)) + ' · ' + esc(k.vonName || k.von) + '</span>' + esc(t('e_gemeldet')) + '</li>' +
+    ereignisse.map(function (e) {
+      return '<li><span class="wann">' + esc(M.uhrText(e.ts)) + ' · ' + esc(e.vonName || e.von) + '</span>' + esc(eintragText(e)) +
+        (e.grund ? ' <span class="grund">— ' + esc(e.grund) + '</span>' : '') + '</li>';
+    }).join('') + '</ul></section>';
+
+  // Chat
+  const nachrichten = S.verlauf.filter(function (e) { return e.art === 'nachricht'; });
+  html += '<section class="block"><div class="block-kopf"><h2>' + esc(t('chat_titel')) + '</h2></div><div class="chat">' +
+    (nachrichten.length ? nachrichten.map(function (e) {
+      return '<div class="blase' + (e.von === S.ich.kennung ? ' meine' : '') + '"><span class="wann">' + esc(e.vonName || e.von) + ' · ' + esc(M.uhrText(e.ts)) + '</span>' + esc(e.text) + '</div>';
+    }).join('') : '<div class="leer">' + esc(t('chat_leer')) + '</div>') + '</div>';
+  if (archiv) {
+    html += '<div class="leer">' + esc(t('chat_zu')) + '</div>';
+  } else {
+    html += '<div class="feld" style="margin-top:12px;"><textarea class="bos-input" id="chatText" maxlength="' + M.GRENZEN.nachricht + '" placeholder="' + esc(t('chat_platzhalter')) + '"></textarea>' +
+      '<div class="klein zaehler" id="chatZaehler">' + esc(t('zeichen', { n: 0, max: M.GRENZEN.nachricht })) + '</div>' +
+      '<button type="button" class="bos-btn bos-btn--amber" id="chatBtn">' + esc(t('senden')) + '</button></div>';
+  }
+  html += '</section>';
+
+  // Eingaben über das Neuzeichnen retten (Live-Daten zeichnen neu)
+  const alt = { chat: wert('chatText'), datum: wert('fensterDatum'), grund: wert('fensterGrund') };
+  main.innerHTML = html;
+  if (alt.chat !== null) setzeWert('chatText', alt.chat);
+  if (alt.datum !== null) setzeWert('fensterDatum', alt.datum);
+  if (alt.grund !== null) setzeWert('fensterGrund', alt.grund);
+  verbindeZurueck();
+  main.querySelectorAll('[data-status]').forEach(function (b) {
+    b.addEventListener('click', function () { aktion(function () { return M.status(k, b.getAttribute('data-status')); }); });
+  });
+  const db = document.getElementById('dringBtn');
+  if (db) db.addEventListener('click', function () { aktion(function () { return M.dringlichkeit(k, k.dringlichkeit === 'dringend' ? 'normal' : 'dringend'); }); });
+  const fb = document.getElementById('fensterBtn');
+  if (fb) fb.addEventListener('click', function () {
+    aktion(function () { return M.fenster(k, wert('fensterDatum') || '', wert('fensterGrund') || ''); }, function () { setzeWert('fensterGrund', ''); });
+  });
+  const fw = document.getElementById('fensterWegBtn');
+  if (fw) fw.addEventListener('click', function () {
+    aktion(function () { return M.fenster(k, '', wert('fensterGrund') || ''); }, function () { setzeWert('fensterGrund', ''); setzeWert('fensterDatum', ''); });
+  });
+  const ct = document.getElementById('chatText');
+  if (ct) {
+    const zaehle = function () { document.getElementById('chatZaehler').textContent = t('zeichen', { n: ct.value.length, max: M.GRENZEN.nachricht }); };
+    ct.addEventListener('input', zaehle); zaehle();
+    document.getElementById('chatBtn').addEventListener('click', function () {
+      aktion(function () { return M.nachricht(k, ct.value); }, function (erg) {
+        setzeWert('chatText', ''); toast(erg && erg.gesehenGesetzt ? t('gesehen_auto') : t('gespeichert'));
+      }, true);
+    });
+  }
+}
+function wert(id) { const el = document.getElementById(id); return el ? el.value : null; }
+function setzeWert(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+function verbindeZurueck() {
+  document.querySelectorAll('[data-zurueck]').forEach(function (b) { b.addEventListener('click', zurListe); });
+}
+
+function renderMelden(main) {
+  const m = S.melden;
+  const offen = M.sortiere(S.offen);
+  const fehlt = [];
+  if (!M.sauber(m.text, 10000)) fehlt.push(t('m_fehlt_text'));
+  if (!m.weiterarbeiten) fehlt.push(t('m_fehlt_wahl'));
+  const wahl = ['ja', 'eingeschraenkt', 'nein'].map(function (w) {
+    return '<button type="button" class="bos-btn" data-wahl="' + w + '" aria-pressed="' + (m.weiterarbeiten === w) + '">' + esc(t('wa_' + w)) + '</button>';
+  }).join('');
+  main.innerHTML = '<button type="button" class="link-btn zurueck" data-zurueck="1">' + esc(t('zurueck')) + '</button>' +
+    '<section class="block" style="margin-top:0;"><div class="block-kopf"><h2>' + esc(t('m_schon')) + '</h2><span class="klein">' + offen.length + '</span></div>' +
+    (offen.length ? offen.map(zeileHTML).join('') : '<div class="leer">' + esc(t('offen_leer')) + '</div>') + '</section>' +
+    '<section class="block kasten">' +
+    '<div class="warnhinweis">' + esc(t('m_warn')) + '</div>' +
+    '<div class="feld"><label class="bos-label" for="mText">' + esc(t('m_titel')) + '</label>' +
+      '<textarea class="bos-input" id="mText" maxlength="' + M.GRENZEN.text + '" placeholder="' + esc(t('m_text_platzhalter')) + '"></textarea>' +
+      '<div class="klein zaehler" id="mZaehler"></div></div>' +
+    '<div class="feld"><span class="bos-label">' + esc(t('m_frage')) + '</span><div class="wahl" role="group" aria-label="' + esc(t('m_frage')) + '">' + wahl + '</div></div>' +
+    '<div class="feld"><label class="bos-label" for="mGeraet">' + esc(t('m_geraet')) + '</label>' +
+      '<input type="text" class="bos-input" id="mGeraet" maxlength="' + M.GRENZEN.geraet + '" placeholder="' + esc(t('m_geraet_platzhalter')) + '"></div>' +
+    '<div class="klein" id="mFehlt">' + (fehlt.length ? esc(t('m_fehlt', { was: fehlt.join(', ') })) : '') + '</div>' +
+    '<div class="knopfreihe"><button type="button" class="bos-btn bos-btn--amber" id="mSenden"' + (fehlt.length || S.arbeitet ? ' disabled' : '') + '>' + esc(t('m_senden')) + '</button>' +
+    '<button type="button" class="bos-btn bos-btn--ghost" data-zurueck="1">' + esc(t('m_abbrechen')) + '</button></div></section>';
+  setzeWert('mText', m.text);
+  setzeWert('mGeraet', m.geraet);
+  verbindeZurueck();
+  main.querySelectorAll('[data-oeffnen]').forEach(function (b) { b.addEventListener('click', function () { oeffne(b.getAttribute('data-oeffnen')); }); });
+  const zaehle = function () { document.getElementById('mZaehler').textContent = t('zeichen', { n: document.getElementById('mText').value.length, max: M.GRENZEN.text }); };
+  zaehle();
+  const pruefeKnopf = function () {
+    const f = [];
+    if (!M.sauber(m.text, 10000)) f.push(t('m_fehlt_text'));
+    if (!m.weiterarbeiten) f.push(t('m_fehlt_wahl'));
+    document.getElementById('mSenden').disabled = !!f.length || S.arbeitet;
+    document.getElementById('mFehlt').textContent = f.length ? t('m_fehlt', { was: f.join(', ') }) : '';
+  };
+  document.getElementById('mText').addEventListener('input', function () { m.text = this.value; zaehle(); pruefeKnopf(); });
+  document.getElementById('mGeraet').addEventListener('input', function () { m.geraet = this.value; });
+  main.querySelectorAll('[data-wahl]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      m.weiterarbeiten = b.getAttribute('data-wahl');
+      main.querySelectorAll('[data-wahl]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      pruefeKnopf();
+    });
+  });
+  document.getElementById('mSenden').addEventListener('click', function () {
+    aktion(function () { return M.anlegen({ kanal: KANAL, text: m.text, geraet: m.geraet, weiterarbeiten: m.weiterarbeiten }); },
+      function (id) {
+        S.melden = { text: '', geraet: '', weiterarbeiten: null };
+        toast(t('gesendet'));
+        oeffne(id);
+      }, true);
+  });
+}
+
+function renderVerbindung() {
+  const el = document.getElementById('verbindungLeiste');
+  const metas = [S.verbindung.offen, S.verbindung.gruen];
+  const teile = [];
+  if (navigator.onLine === false || metas.some(function (m) { return m.ausCache; })) teile.push(t('offline'));
+  if (metas.some(function (m) { return m.ausstehend; })) teile.push(t('ausstehend'));
+  el.textContent = teile.join(' · ');
+  el.hidden = !teile.length;
+}
+
+/* ---------- Handlungen ---------- */
+/* Einheitlich: Knöpfe sperren, ausführen, Fehler sichtbar, Erfolg melden. */
+function aktion(fn, danach, eigenerToast) {
+  if (S.arbeitet) return;
+  S.arbeitet = true;
+  document.querySelectorAll('#main button').forEach(function (b) { b.disabled = true; });
+  Promise.resolve().then(fn).then(function (erg) {
+    S.arbeitet = false;
+    if (!eigenerToast) toast(t('gespeichert'));
+    if (danach) danach(erg);
+    render(true);
+  }, function (err) {
+    S.arbeitet = false;
+    zeigeFehler(err && err.art === 'ungueltig' ? 'Eingabe' : 'Speichern', err);
+    render(true);
+  });
+}
+function oeffne(id) {
+  S.ansicht = 'anfrage';
+  S.offeneId = id;
+  S.verlauf = [];
+  if (S.verlaufAbo) S.verlaufAbo();
+  S.verlaufAbo = M.verlauf(id, function (liste) { S.verlauf = liste; render(); },
+    function (err) { zeigeFehler(t('err_laden', { was: 'Verlauf' }), err); });
+  render(true);
+  window.scrollTo(0, 0);
+}
+function zurListe() {
+  if (S.verlaufAbo) { S.verlaufAbo(); S.verlaufAbo = null; }
+  S.ansicht = 'liste'; S.offeneId = null; S.verlauf = [];
+  render(true);
+}
+function zumMelden() {
+  if (S.verlaufAbo) { S.verlaufAbo(); S.verlaufAbo = null; }
+  S.ansicht = 'melden';
+  render(true);
+  window.scrollTo(0, 0);
+}
+function schalteArchiv() {
+  S.archivAn = !S.archivAn;
+  if (S.archivAn && !S.archiv.length) return ladeArchivSeite();
+  render(true);
+}
+function ladeArchivSeite() {
+  return M.archivSeite(KANAL, S.archivLetzter).then(function (seite) {
+    S.archiv = S.archiv.concat(seite.liste);
+    S.archivLetzter = seite.letzter;
+    S.archivMehr = seite.mehr;
+    render();
+  }, function (err) { zeigeFehler(t('err_laden', { was: t('archiv_titel') }), err); });
+}
+document.getElementById('main').addEventListener('click', function (e) {
+  const b = e.target.closest('[data-oeffnen]');
+  if (b && S.ansicht === 'liste') oeffne(b.getAttribute('data-oeffnen'));
+});
+document.getElementById('meldenBtn').addEventListener('click', zumMelden);
+
+/* ---------- Start ---------- */
+function geraetAusAdresse() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return M.sauber(p.get('geraet') || '', M.GRENZEN.geraet);
+  } catch (e) { return ''; }
+}
+function start() {
+  if (!M) { zeigeFehler('Start', new Error('bos_meldungen.js ist nicht geladen.')); return; }
+  S.geraetAusCode = geraetAusAdresse();
+  M.pruefeRegelstand().then(function (stand) {
+    const el = document.getElementById('regelLeiste');
+    el.textContent = t('regel_alt', { fassung: M.REGEL_FASSUNG, datei: M.REGEL_DATEI });
+    el.hidden = stand !== 'alt';
+  });
+  M.ich().then(function (ich) {
+    S.ich = ich;
+    document.getElementById('ladeStatus') && document.getElementById('ladeStatus').remove();
+    const r = ich.rechte;
+    document.getElementById('werZeile').innerHTML = esc(t('du_als', { name: ich.name })) +
+      (r.lesen ? '<span class="abzeichen">' + esc(t('haken_lesen')) + '</span>' : '') +
+      (r.melden ? '<span class="abzeichen">' + esc(t('haken_melden')) + '</span>' : '') +
+      (r.bearbeiten ? '<span class="abzeichen">' + esc(t('haken_bearbeiten')) + '</span>' : '');
+    document.getElementById('meldenBtn').hidden = !r.melden;
+    (ich.warnungen || []).forEach(function (w) {
+      const h = document.getElementById('hinweisLeiste');
+      h.textContent = (h.textContent ? h.textContent + ' · ' : '') + w; h.hidden = false;
+    });
+    if (!r.lesen) { render(); return; }
+    M.offen(KANAL, function (liste, meta) { S.offen = liste; S.verbindung.offen = meta; render(); },
+      function (err) { zeigeFehler(t('err_laden', { was: t('offen_titel') }), err); });
+    M.grueneWoche(KANAL, function (liste, meta) { S.gruen = liste; S.verbindung.gruen = meta; render(); },
+      function (err) { zeigeFehler(t('err_laden', { was: t('gruen_titel') }), err); });
+    if (S.geraetAusCode) {
+      if (r.melden) { S.melden.geraet = S.geraetAusCode; zumMelden(); return; }
+      const h = document.getElementById('hinweisLeiste');
+      h.textContent = t('geraet_ohne_melden', { geraet: S.geraetAusCode }); h.hidden = false;
+    }
+    render();
+  }, function (err) {
+    const ls = document.getElementById('ladeStatus');
+    if (ls) ls.remove();
+    zeigeFehler('Konto lesen', err);
+  });
+  // Alter („seit 3 Tagen“) und Archivgrenze laufen weiter, auch ohne neue Daten.
+  setInterval(function () { render(); }, 60000);  // beim Tippen aufgeschoben, siehe render()
+}
+window.addEventListener('online', renderVerbindung);
+window.addEventListener('offline', renderVerbindung);
+start();
+</script>
+</body>
+</html>

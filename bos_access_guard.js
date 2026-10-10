@@ -53,6 +53,8 @@
    Pages) — kein eigener Sync-Mechanismus nötig.
 
    CHANGELOG
+     2026-10-10 · Reparaturanfrage Stufe 1 · Feature
+       profile.kontoHaken als vierter Parameter an BOS_ACCESS.can().
      2026-09-26 · Schritt 2 (Namens-Fundament, §11.5) · Feature
        Profil mit freigeschaltet === false (Konto da, Haken fehlt):
        Sperrseite „Noch nicht freigeschaltet“ statt der Rollen-Sperre; auf
@@ -75,11 +77,13 @@
   var profile = getActiveProfile();
   var role = profile ? profile.role : null;
   var overrides = profile ? profile.kontoOverrides : null;
+  // 10.10.2026: Haken des Kontos für Haken-Seiten (bos_access.js, Registry-Feld haken).
+  var haken = profile ? profile.kontoHaken : null;
   /* 31.08.2026: Prüfung (Rollen-Standard + Account-Override) liegt jetzt
      zentral in bos_access.js (BOS_ACCESS.can()) — hier nur noch der Aufruf.
      Fehlt BOS_ACCESS selbst (Script vergessen/Ladefehler), fail-open:
      ein Konfigurationsfehler soll nicht aussperren, gleiche Logik wie immer. */
-  var ok = window.BOS_ACCESS ? window.BOS_ACCESS.can(window.BOS_APP_ID, role, overrides) : true;
+  var ok = window.BOS_ACCESS ? window.BOS_ACCESS.can(window.BOS_APP_ID, role, overrides, haken) : true;
 
   /* Sperre und Warnstreifen liegen seit dem 19.09.2026 in
      bos_access.js — dieselben Funktionen benutzt

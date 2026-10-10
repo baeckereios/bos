@@ -1,6 +1,6 @@
 {
   "_hinweis": "Wächter-Datei der NFC-/QR-Zentrale. Hier stehen alle Adressen, die auf Schildern und NFC-Chips stehen dürfen: id und url aller Einträge aus bos_app_registry.js mit dem Feld direkt, dazu die festen Ziele 'BOS öffnen' und 'Teigecke · Vorbereitungen' (seit 08.10.2026). test_nfc_qr.js vergleicht diese Datei mit der Registry und wird bei jeder Abweichung rot. Diese Adresse darf auf Schildern stehen. Wenn schon gedruckt wurde: alte Adresse stehen lassen und weiterleiten. Wenn noch nichts hängt: Datei anpassen. Siehe nfc_qr/NFC_QR_ZENTRALE_DOKU.md.",
-  "_stand": "2026-10-08 14:17",
+  "_stand": "2026-10-10 09:33",
   "fest": {
     "bos_oeffnen": "launcher.html",
     "teigecke_vorbereitungen": "teigecke/teigecke_nacht.html?reiter=vorbereitungen"
@@ -16,6 +16,7 @@
     "wunschtag": "wunschtag/wunschtag.html",
     "urlaub_anfrage": "urlaub/urlaub_anfrage.html",
     "mein_konto": "mein_konto/mein_konto.html",
+    "reparaturanfrage": "reparaturanfrage/reparaturanfrage.html",
     "nfc_qr_zentrale": "nfc_qr/nfc_qr_zentrale.html",
     "taschenrechner": "taschenrechner/taschenrechner.html",
     "schnelldruck": "schnelldruck/schnelldruck.html",

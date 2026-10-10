@@ -25,8 +25,22 @@
 
    EINBINDUNG: nach bos_permissions.js, vor bos_access_guard.js.
 
+   HAKEN-SEITEN (seit 10.10.2026, Reparaturanfrage Stufe 1):
+     Trägt der Registry-Eintrag ein Feld haken: ['feldA', 'feldB', …],
+     entscheidet nach der Ausnahme NICHT die Rollen-Matrix, sondern ob das
+     Konto einen dieser Haken trägt. Ein solcher Eintrag gilt damit als
+     konfiguriert und fällt NIE auf offen zurück, auch ohne Zeile in
+     bos_permissions.js. Grund: Der Export „Rollen & Rechte“
+     (konten_verwaltung.html) schreibt nur true-Einträge; eine Matrix-Zeile
+     mit lauter false wäre beim nächsten Export verschwunden und die Seite
+     für jeden offen gewesen (Kompendium Reparaturanfrage F15).
+     Die Haken kommen als vierter Parameter: das Profilfeld kontoHaken
+     (bos_konto_profil.js), ein Objekt { feldname: true }.
+
    SCHNITTSTELLE:
-     can(appId, role, kontoOverrides) → true/false
+     can(appId, role, kontoOverrides, kontoHaken) → true/false
+       kontoHaken ist optional. Ohne ihn antwortet can() für jeden
+       Eintrag OHNE haken-Feld genau wie vor dem 10.10.2026.
      istGelistet(appId)               → steht der Satellit überhaupt in
                                         BOS_PERMISSIONS? (für Warnungen)
      zeigeSperre(profil)              → Sperrbildschirm, mit
@@ -35,6 +49,16 @@
                                         Fail-open; true = gewarnt
      wurzel()                         → Pfad zum Wurzelverzeichnis
    Die letzten drei seit 19.09.2026 — siehe Abschnitt ANZEIGE unten.
+
+   CHANGELOG
+     2026-10-10 · 09:33 · Reparaturanfrage Stufe 1 · Feature, rein additiv
+       can() mit optionalem viertem Parameter kontoHaken; Registry-Einträge
+       mit Feld haken entscheiden über die Haken des Kontos und fallen nie
+       auf offen zurück (siehe HAKEN-SEITEN oben). Sperrbildschirm sagt auf
+       Haken-Seiten „Kein Haken für …“. Ohne vierten Parameter antwortet
+       can() für alle Einträge ohne haken-Feld wie vorher (maschinell
+       verglichen, test_reparatur.js Teil 1).
+       Siehe SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md.
    ================================================================ */
 (function () {
   function istSatellitIrgendwoGelistet(appId, perms) {
@@ -49,10 +73,37 @@
     return false;
   }
 
-  function can(appId, role, kontoOverrides) {
+  /* Registry-Eintrag einer Haken-Seite (für den Sperrtext), sonst null. */
+  function hakenEintrag(appId) {
+    var apps = window.BOS_APPS || [];
+    for (var i = 0; i < apps.length; i++) {
+      if (apps[i] && apps[i].id === appId && apps[i].haken && apps[i].haken.length) return apps[i];
+    }
+    return null;
+  }
+
+  /* NEU 10.10.2026: Haken-Liste aus der Registry, oder null, wenn die Seite
+     nicht über Haken läuft (dann gilt alles wie bisher). */
+  function hakenListe(appId) {
+    var e = hakenEintrag(appId);
+    return e ? e.haken : null;
+  }
+
+  function hatEinenHaken(liste, kontoHaken) {
+    if (!kontoHaken || typeof kontoHaken !== 'object') return false;
+    for (var i = 0; i < liste.length; i++) {
+      if (kontoHaken[liste[i]] === true) return true;
+    }
+    return false;
+  }
+
+  function can(appId, role, kontoOverrides, kontoHaken) {
     if (kontoOverrides && kontoOverrides[appId] !== undefined) {
       return !!kontoOverrides[appId];
     }
+    // NEU 10.10.2026: Haken-Seite → nur die Haken zählen, nie fail-open.
+    var haken = hakenListe(appId);
+    if (haken) return hatEinenHaken(haken, kontoHaken);
     var perms = window.BOS_PERMISSIONS || null;
     if (!perms) return true; // bos_permissions.js fehlt/nicht geladen -> nicht aussperren
     if (!istSatellitIrgendwoGelistet(appId, perms)) return true; // unkonfiguriert -> fail-open
@@ -142,6 +193,16 @@
       : ('Deine Berechtigung ist auf diesem Gerät nicht bekannt. ' +
          'Das heißt nicht, dass sie fehlt' +
          (wer ? ' (angemeldet als ' + wer + ')' : '') + '.');
+
+    /* NEU 10.10.2026: Haken-Seiten (Registry-Feld haken) sagen, was fehlt.
+       Gilt auch ohne Rolle — eine Haken-Seite hängt nicht an der Rolle. */
+    var hakenApp = hakenEintrag(window.BOS_APP_ID);
+    if (hakenApp && profil && profil.kontoVorhanden !== false) {
+      geprueft = true;
+      text = 'Kein Haken für „' + (hakenApp.name || hakenApp.id) + '“' +
+        (wer ? ' (angemeldet als ' + wer + ')' : '') +
+        '. Ulf fragen — er setzt ihn in der Kontenverwaltung. Danach den Launcher einmal neu starten.';
+    }
 
     var knoepfe =
       (geprueft ? '' :

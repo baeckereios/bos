@@ -37,6 +37,9 @@
        teigeckePflege: boolean,   // NEU 28.09.2026 — Anzeige seit 29.09.: „🧺 Wagen & Zutaten pflegen“
        teigeckeTeige: boolean,    // NEU 29.09.2026 — „🥣 Teige pflegen“ (Wasserregel, Tabelle, Einwaagen, Kessel)
        teigeckeRezepte: boolean,  // NEU 29.09.2026 — „📜 Rezepte pflegen“ (Zutatenliste, Vorstufe, Werte je kg)
+       reparaturLesen: boolean,   // NEU 10.10.2026 — „Mitlesen & antworten“ (Posteingang, Verlauf, Chat)
+       reparaturMelden: boolean,  // NEU 10.10.2026 — „Melden“ (neue Anfrage; schließt Mitlesen ein)
+       reparaturBearbeiten: boolean, // NEU 10.10.2026 — „Bearbeiten“, Hausmeister (Status, Fenster, Dringlichkeit; schließt Mitlesen ein)
        erstelltAm: Firestore-Timestamp
      }
 
@@ -72,6 +75,14 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-10-10 · 09:33 · v-Reparatur-1 · Feature
+       Drei Haken der Reparaturanfrage: reparaturLesen, reparaturMelden,
+       reparaturBearbeiten, mit setzeReparaturLesenRecht(),
+       setzeReparaturMeldenRecht(), setzeReparaturBearbeitenRecht() nach dem
+       Muster der Teigecke. Die Firestore-Regel prüft jeden serverseitig
+       (reparaturHaken(), RK §20); ein Haken genügt auch für die Kachel
+       (Registry-Feld haken, bos_access.js). Siehe
+       SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md.
      2026-09-29 · 19:45 · v-Teigecke-2 · Feature
        Zwei weitere Teigecke-Haken: teigeckeTeige und teigeckeRezepte, mit
        setzeTeigeckeTeigeRecht() und setzeTeigeckeRezepteRecht() nach dem
@@ -334,6 +345,22 @@ window.BOS_ACCOUNTS = (function () {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ teigeckeRezepte: !!wert });
   }
 
+  /**
+   * NEU (10.10.2026, Reparaturanfrage Stufe 1). Admin-Funktionen wie die
+   * Teigecke-Setzer. Haken je Person, nicht nach Rolle (Ulf, 10.10.: „wer ist
+   * vertrauenswürdig genug“). Die Regel prüft alle drei serverseitig
+   * (reparaturHaken(), RK §20). Jeder der drei öffnet die Kachel.
+   */
+  async function setzeReparaturLesenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ reparaturLesen: !!wert });
+  }
+  async function setzeReparaturMeldenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ reparaturMelden: !!wert });
+  }
+  async function setzeReparaturBearbeitenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ reparaturBearbeiten: !!wert });
+  }
+
   /** Admin-Funktion, vorher adminReauth(passwort). Löscht das Konto unwiderruflich — kein Zurückholen. Schreibt über die isolierte Admin-App. */
   async function loescheKonto(db, schluessel) {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).delete();
@@ -384,6 +411,9 @@ window.BOS_ACCOUNTS = (function () {
     setzeTeigeckePflegeRecht: setzeTeigeckePflegeRecht,
     setzeTeigeckeTeigeRecht: setzeTeigeckeTeigeRecht,
     setzeTeigeckeRezepteRecht: setzeTeigeckeRezepteRecht,
+    setzeReparaturLesenRecht: setzeReparaturLesenRecht,
+    setzeReparaturMeldenRecht: setzeReparaturMeldenRecht,
+    setzeReparaturBearbeitenRecht: setzeReparaturBearbeitenRecht,
     loescheKonto: loescheKonto,
     ladeAlleKonten: ladeAlleKonten,
     adminReauth: adminReauth,
