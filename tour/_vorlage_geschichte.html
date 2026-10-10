@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neue Geschichte · BäckereiOS Einblick</title>
+<!--
+  VORLAGE für eine neue Geschichte der Demo-Tour.
+  1. Datei kopieren und umbenennen (z. B. wunschtag.html). Unterstrich am Anfang weglassen.
+  2. Titel, Untertitel und Szenen unten ausfüllen.
+  3. In tour.html (Übersicht) bei der passenden Kachel  status:'bereit', href:'wunschtag.html'  setzen.
+
+  Regeln (Doku 2026-10-09_DEMO_TOUR.md):
+  - Keine Bedienanleitung. Jede Szene beantwortet mindestens eine der fünf Fragen:
+    Was kann BäckereiOS? Wozu? Was will es erreichen? Stärken? Zukunftspläne?
+  - Nur erfundene Namen (Paul orange 'o', Pauline grün 'g', Karl blau 'b', Frühschicht koralle 'r').
+  - Keine echten Mengen oder Betriebszahlen (Seite ist öffentlich).
+  - Geplantes immer gestrichelt: geplant:true oben, F.stempel(...) in der Szene.
+  - Produktionsleitung neutral bis positiv zeigen.
+  - Bühne 360 × 250, Boden bei y = 212. Figur mit Kopf bei y = 118 steht auf dem Boden.
+
+  Bausteine in m(F): F.bg, F.fig, F.tab, F.paper, F.bub, F.schild, F.mitte, F.logo,
+  F.stempel, F.uhr, F.text, Farben/Stile F.INK, F.SOFT, F.S0, F.SF – siehe tour_figuren.js.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Neue Geschichte',
+  untertitel:'Ein Satz, worum es geht',
+  geplant:false,
+  // zurueck:{href:'produktionskette.html', name:'Die Produktionskette'},
+  // weiter:{href:'…', name:'…'},
+  szenen:[
+    {n:'Erste Szene', d:7000,
+     t:'Bildunterschrift: ein bis drei Sätze, erzählend.',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')
+         +F.schild(14,20,'Ort')
+         +F.fig(180,118,{hair:'tuft',c:'o'})
+         +F.bub(40,50,120,'Hallo!',170,100,.5);
+     }},
+    {n:'Ausblick', d:6500,
+     t:'Falls etwas noch geplant ist: ehrlich zeigen.',
+     m(F){
+       return F.bg('#FAEEDA')+F.stempel(180,125,'Etwas Neues','in Planung');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

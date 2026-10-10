@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaputt? Gemeldet. · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 5: Meldestation (in Planung)
+  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js.
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Kaputt? Gemeldet.',
+  untertitel:'Ein Draht zur Haustechnik – in Planung',
+  geplant:true,
+  zurueck:{href:'teigecke.html', name:'Nachts in der Teigecke'},
+  weiter:{href:'lager.html', name:'Das Lager weiß Bescheid'},
+  szenen:[
+    {n:'Da klemmt was', d:7000,
+     t:'Die Tür vom Etagenofen klemmt. Früher wurde das irgendwem erzählt und landete manchmal nie beim Haustechniker.',
+     m(F){
+       return F.bg('#FAECE7','#F5C4B3')
+         +`<g class="zittern" style="--d:.4s"><rect x="190" y="50" width="140" height="150" rx="6" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/>`
+         +[0,1,2].map(i=>`<rect x="204" y="${62+i*44}" width="112" height="34" rx="4" style="stroke:${F.INK};stroke-width:2;fill:#F1EFE8"/>`).join('')
+         +`<rect x="204" y="106" width="112" height="34" rx="4" style="stroke:#E24B4A;stroke-width:2.6;fill:#FCEBEB"/></g>`
+         +`<path class="pop" style="--d:.8s" d="M300 96 l8 -10 l-2 9 l8 -6" stroke="#E24B4A" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
+         +F.text(260,214+14,'Etagenofen',1,'middle')
+         +F.fig(100,124,{hair:'bun',c:'g',mund:'wow'})
+         +F.bub(14,44,140,'Die Tür klemmt!',96,104,.6);
+     }},
+    {n:'Gemeldet', d:7500,
+     t:'Am Ofen hängt ein QR-Code. Pauline hält ihr Gerät davor, und die Meldung für genau diesen Ofen ist schon geöffnet. Ein Satz dazu, abschicken, fertig.',
+     m(F){
+       let q='';[[0,0],[2,0],[0,2],[1,1],[2,2],[3,1],[1,3],[3,3]].forEach(([a,b])=>q+=`<rect x="${206+a*7}" y="${110+b*7}" width="6" height="6" fill="${F.INK}"/>`);
+       return F.bg('#FAECE7','#F5C4B3')
+         +`<rect x="190" y="50" width="140" height="150" rx="6" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/>`
+         +`<rect x="200" y="104" width="38" height="38" rx="3" style="${F.SF}"/>${q}`
+         +F.fig(120,124,{hair:'bun',c:'g',aR:[22,-6]})+F.tab(140,128)
+         +F.haken(166,118,1)
+         +F.paper(152,136,'fly','--d:1.4s;--dx:-150px;--dy:-110px');
+     }},
+    {n:'Beim Haustechniker', d:7500,
+     t:'Hannes von der Haustechnik sieht alle Meldungen an einem Ort, mit Gerät, Datum und Absender. Er hakt ab: gesehen.',
+     m(F){
+       return F.bg('#EEEDFE','#CECBF6')
+         +F.karte(150,34,190,120,'Meldungen',[
+            {t:'Etagenofen · Tür klemmt',fett:true},
+            {t:'heute · Backstube',farbe:F.SOFT},
+            '☑ gesehen'
+          ],'#CECBF6')
+         +F.fig(80,124,{hair:'tuft',c:'v',aR:[18,-2]})
+         +`<path d="M58 158 l-10 10 m4 -14 a6 6 0 1 0 8 8" style="${F.S0}"/>`
+         +F.haken(318,120,1);
+     }},
+    {n:'Alle sehen den Stand', d:8000,
+     t:'Hannes trägt ein, wann er repariert. In der Backstube sieht jeder: ist gemeldet, kommt am Donnerstag. Niemand meldet doppelt, niemand wartet ins Leere. Das ist noch in Planung.',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')
+         +F.karte(30,30,170,96,'Etagenofen',[{t:'☑ gesehen',farbe:'#3B6D11'},{t:'Reparatur: Donnerstag',fett:true}],'#C0DD97')
+         +F.fig(270,124,{hair:'cap',c:'b'})
+         +F.bub(214,52,122,'Schon gemeldet.',264,104,.6)
+         +F.stempel(116,180,'Meldestation','in Planung');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

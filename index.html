@@ -38,6 +38,14 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-10-10 · 06:4x · Demo-Tour · Feature
+      Großer Einstieg „Neu hier? Schau, dafür bin ich da.“ unter dem
+      Formular, führt zur öffentlichen Tour (tour/tour.html, ohne
+      Anmeldung, ohne Datenbank). Bewusst auffällig statt kleiner Link:
+      wer BOS nicht kennt, soll nicht suchen müssen (Ulf, 10.10.2026).
+      Platzhalter im Kennungsfeld „z. B. backstube01“ ersetzt durch
+      „deine Kennung“ — verriet öffentlich das Namensschema der Konten.
+      Siehe 2026-10-09_DEMO_TOUR.md.
     2026-10-04 · 14:39 · Online-Gang · Feature
       Kopf ergänzt um theme-color, Verweis auf manifest.webmanifest, App-
       Symbol (pwa/bos_icon_192.png als Favicon und Apple-Touch-Icon) und
@@ -265,6 +273,69 @@
     color: var(--bos-text-faint);
   }
 
+  /* --- Einstieg zur Demo-Tour ---------------------------------------
+     Bewusst groß und warm, kein Fußnoten-Link: Wer BOS nicht kennt,
+     soll sofort sehen, wofür es da ist (Ulf, 10.10.2026). Durchgezogener
+     Rand, weil die Tour fertig ist — gestrichelt heißt bei uns „in Planung“. */
+  .einblick {
+    display: flex;
+    align-items: center;
+    gap: var(--bos-space-sm);
+    margin-top: var(--bos-space-lg);
+    padding: var(--bos-space-sm) var(--bos-space-md);
+    background: var(--bos-amber-glow-soft);
+    border: 1px solid var(--bos-amber);
+    border-radius: var(--bos-radius-md);
+    color: var(--bos-text);
+    text-decoration: none;
+    transition: background var(--bos-transition-fast), transform var(--bos-transition-fast);
+  }
+  .einblick:hover { background: var(--bos-amber-glow); }
+  .einblick:active { transform: translateY(1px); }
+  .einblick:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: 3px; }
+
+  .einblick-symbol { flex: 0 0 52px; width: 52px; height: 52px; }
+  .einblick-symbol svg { width: 100%; height: 100%; overflow: visible; }
+  .einblick-symbol .kreis-sat {
+    transform-origin: 26px 26px;
+    animation: einblick-kreisen 7s linear infinite;
+  }
+  @keyframes einblick-kreisen { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .einblick-symbol .kreis-sat { animation: none; }
+  }
+
+  .einblick-text { flex: 1; min-width: 0; }
+  .einblick-neu {
+    display: block;
+    font-family: var(--bos-font-label);
+    font-size: var(--bos-font-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--bos-amber-bright);
+  }
+  .einblick-titel {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--bos-font-display);
+    font-weight: 600;
+    font-size: var(--bos-font-lg);
+    line-height: 1.2;
+  }
+  .einblick-unter {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--bos-font-sm);
+    color: var(--bos-text-dim);
+    line-height: 1.4;
+  }
+  .einblick-pfeil {
+    flex: 0 0 auto;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--bos-amber);
+  }
+
   /* --- Meldung: Fehler sichtbar, nicht in der Konsole -------------- */
   .meldung {
     margin-top: var(--bos-space-sm);
@@ -359,7 +430,7 @@
       <label for="kennung">Kennung</label>
       <input type="text" id="kennung" autocomplete="username"
              autocapitalize="none" autocorrect="off" spellcheck="false"
-             inputmode="email" placeholder="z.&nbsp;B. backstube01">
+             inputmode="email" placeholder="deine Kennung">
     </div>
 
     <div class="feld">
@@ -374,6 +445,28 @@
     </button>
 
     <div class="meldung" id="meldung" role="status" aria-live="polite"></div>
+
+    <!-- Einstieg zur öffentlichen Demo-Tour (tour/tour.html). Ohne
+         Anmeldung erreichbar, liest und schreibt keine Daten. -->
+    <a class="einblick" href="tour/tour.html">
+      <span class="einblick-symbol" aria-hidden="true">
+        <svg viewBox="0 0 52 52">
+          <ellipse cx="26" cy="26" rx="22" ry="22" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="2 4"/>
+          <circle cx="26" cy="26" r="9" fill="#d98e2b"/>
+          <g class="kreis-sat">
+            <circle cx="26" cy="4" r="4.5" fill="#5DCAA5"/>
+            <circle cx="45" cy="37" r="3.5" fill="#f3ead8"/>
+            <circle cx="7" cy="37" r="3.5" fill="#EF9F27"/>
+          </g>
+        </svg>
+      </span>
+      <span class="einblick-text">
+        <span class="einblick-neu">Neu hier?</span>
+        <span class="einblick-titel">Schau, dafür bin ich da.</span>
+        <span class="einblick-unter">Kurze Geschichten zeigen, was BäckereiOS kann – ohne Anmeldung.</span>
+      </span>
+      <span class="einblick-pfeil" aria-hidden="true">›</span>
+    </a>
 
     <p class="wechsel"><a href="?wechseln=1" id="wechselLink">Abmelden und andere Kennung verwenden</a></p>
   </main>

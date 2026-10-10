@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BäckereiOS · Satellit – Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Übersichtsseite tour/tour.html (Gerüst)
+  Stand: 10.10.2026 (Ideen-Chat, Doku 2026-10-09_DEMO_TOUR.md)
+  Öffentliche Seite: keine Anmeldung, keine Datenbank, keine Firebase-Einbindung.
+  Verlinkt von der Anmeldeseite (../index.html), erreichbar unter …/bos/tour/tour.html. Bewusst NICHT index.html: Verwechslungsgefahr mit der Anmeldeseite. Design angelehnt an den Bootscreen
+  (Sternenhimmel, Schriftzug, kreisende Satelliten), aber eigenständiger Code.
+
+  Kacheln: Liste KACHELN unten. Neue Geschichte = neuer Eintrag, kein neuer Code.
+    status 'bereit'  -> Kachel ist ein Link auf die Geschichten-Seite
+    status 'folgt'   -> Geschichte noch nicht gezeichnet, Kachel gedimmt
+    geplant: true    -> die FUNKTION ist in Planung -> gestrichelter Rahmen
+  Vernetzungskarte: Liste VERBINDUNGEN. laeuft:false = gestrichelt (geplant).
+  Stand der Verbindungen ist von Ulf noch nicht bestätigt (Doku, offener Punkt 10).
+-->
+<style>
+:root{
+  --bg:#110e0c; --bg2:#1d1814; --cream:#f3ead8; --muted:#a89c88;
+  --amber:#d98e2b; --line:#3a3129; --err-bg:#4a1b16; --err:#ffb4a8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--cream);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:inherit}
+.err{position:relative;z-index:2;background:var(--err-bg);color:var(--err);padding:10px 14px;
+  border-radius:10px;font-size:14px;margin:12px 16px}
+.err[hidden]{display:none}
+
+/* ---------- Kopf im Bootscreen-Stil ---------- */
+.hero{position:relative;overflow:hidden;padding:56px 16px 40px;text-align:center;
+  background:radial-gradient(ellipse at 50% 45%,#2a2119 0%,var(--bg) 70%)}
+#stars{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.orbit{position:relative;width:min(340px,92vw);height:150px;margin:0 auto}
+.orbit h1{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;margin:0;
+  font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:clamp(40px,12vw,56px);letter-spacing:-.01em}
+.orbit h1 em{color:var(--amber)}
+.sat{position:absolute;z-index:1;left:0;top:0;width:38px;height:38px;border-radius:50%;
+  background:#2a2119;border:1px solid #5a4632;display:flex;align-items:center;justify-content:center;font-size:18px;
+  offset-path:ellipse(46% 44% at 50% 50%);offset-rotate:0deg;animation:kreisen 26s linear infinite}
+@keyframes kreisen{from{offset-distance:0%}to{offset-distance:100%}}
+.title2{font-size:15px;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.slogan{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:19px;margin:0;color:var(--cream)}
+
+main{padding:0}
+/* Abschnitte: eigener Hintergrund, feine Linie, nummerierte Marke – gibt der Seite Rhythmus */
+.abschnitt{padding:56px 16px 64px;border-top:1px solid #2d251e}
+.abschnitt.b{background:#1b1612}
+.innen{max-width:760px;margin:0 auto}
+.kicker{text-align:center;color:var(--amber);font-size:12px;letter-spacing:.3em;text-transform:uppercase;margin:0 0 10px}
+.kicker::after{content:'';display:block;width:28px;height:1px;background:var(--amber);opacity:.6;margin:12px auto 0}
+.intro{max-width:540px;margin:18px auto 0;text-align:center;font-size:16px;line-height:1.7;color:#d9cfbd}
+.intro p{margin:0 0 14px}
+.intro strong{color:var(--amber);font-weight:600}
+
+h2{font-family:Georgia,"Times New Roman",serif;font-size:24px;margin:0 0 6px;text-align:center}
+.h2sub{color:var(--muted);font-size:14px;margin:0 0 16px;text-align:center}
+
+/* ---------- Vernetzungskarte ---------- */
+.karte{display:block;max-width:560px;margin:0 auto;padding:0;text-decoration:none}
+.karte svg{width:100%;height:auto;display:block}
+.legende{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:6px 2px 0}
+.legende span{display:inline-flex;align-items:center;gap:6px}
+.legende i{display:inline-block;width:26px;border-top:2px solid #5DCAA5}
+.legende i.g{border-top-color:#EF9F27}
+.legende i.g{border-top-style:dashed}
+
+/* ---------- Kachel-Raster ---------- */
+.raster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:480px){.raster{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:620px){.raster{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}}
+.kachel{position:relative;aspect-ratio:1/1;border-radius:14px;background:#FFFDF6;color:#2C2C2A;
+  text-decoration:none;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;
+  border:2px solid transparent;transition:transform .15s}
+a.kachel:hover,a.kachel:focus-visible{transform:translateY(-3px);outline:none;border-color:var(--amber)}
+.kachel .bild{position:absolute;inset:6px 0 50px 0;display:flex;align-items:center;justify-content:center}
+.kachel .bild svg{width:auto;height:72%;max-width:62%}
+.kachel .name{position:relative;background:rgba(255,253,246,.94);padding:6px 8px;font-size:12.5px;
+  font-weight:600;line-height:1.25}
+.kachel .marke{position:absolute;top:6px;right:6px;font-size:10px;letter-spacing:.04em;padding:2px 7px;
+  border-radius:999px;background:#2C2C2A;color:#FFFDF6}
+.kachel .spiel{position:absolute;left:8px;top:8px;width:30px;height:30px;border-radius:50%;
+  background:var(--amber);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.kachel .spiel svg{width:12px;height:12px;fill:#15100a;margin-left:2px}
+.kachel .name .los{display:block;font-weight:500;font-size:11px;color:#854F0B;margin-top:2px}
+a.kachel:hover .spiel,a.kachel:focus-visible .spiel{transform:scale(1.1)}
+.kachel .spiel{transition:transform .15s}
+.kachel.folgt{opacity:.55}
+.kachel.folgt .marke{background:#888780}
+.kachel.geplant{border:2px dashed #BA7517;background:#FAEEDA}
+.kachel.geplant .name{background:rgba(250,238,218,.94)}
+.kachel.geplant .marke{background:#BA7517}
+
+footer{color:var(--muted);font-size:13px;text-align:center;margin:0;padding:40px 16px 48px;line-height:1.7;border-top:1px solid #2d251e}
+footer a{color:var(--muted)}
+.zurueck{display:inline-block;margin-top:10px;text-decoration:none;border:1px solid var(--line);
+  padding:9px 16px;border-radius:999px;color:var(--cream)}
+.zurueck:hover,.zurueck:focus-visible{border-color:var(--muted)}
+
+@media (prefers-reduced-motion: reduce){
+  .sat{animation:none}
+  .karte .linie{animation:none!important;opacity:1!important}
+}
+.karte .linie{opacity:0;animation:einblenden .6s ease-out forwards}
+@keyframes einblenden{to{opacity:1}}
+</style>
+</head>
+<body>
+<div class="err" id="err" role="alert" hidden></div>
+
+<header class="hero">
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="orbit" id="orbit">
+    <h1>Bäckerei<em>OS</em></h1>
+  </div>
+  <p class="title2">· Satellit ·</p>
+  <p class="slogan">verbindet, was zusammengehört</p>
+</header>
+
+<main>
+ <section class="abschnitt">
+  <div class="innen">
+  <p class="kicker">01 · Die Idee</p>
+  <h2>Ein System, viele Satelliten</h2>
+  <div class="intro">
+    <p>BäckereiOS ist unser eigenes Betriebssystem für die Backstube: viele kleine Programme, die
+      <strong>Satelliten</strong>, kreisen um eine gemeinsame Mitte und tauschen dort ihre Informationen aus.</p>
+    <p>Das Ziel ist einfach: Was eine Station weiß, soll die nächste nicht mühsam herausfinden müssen.
+      Vom Froster bis zum Wochenplan, vom Büro bis in die Nachtschicht.
+      <strong>Jeder soll in jeder Schicht klarkommen.</strong></p>
+    <p>Die kleinen Geschichten hier zeigen, was heute schon läuft und wo die Reise hingeht.</p>
+  </div>
+  </div>
+ </section>
+
+ <section class="abschnitt b">
+  <div class="innen">
+  <p class="kicker">02 · Das Netz</p>
+  <h2>Alles hängt zusammen</h2>
+  <p class="h2sub">Die Vernetzung – das Herz von BäckereiOS</p>
+  <div class="karte" id="karte" role="img" aria-label="Karte der Verbindungen von BäckereiOS zu allen Bereichen"></div>
+  <div class="legende">
+    <span><i></i> läuft heute</span>
+    <span><i class="g"></i> in Planung</span>
+  </div>
+  </div>
+ </section>
+
+ <div id="gruppen"></div>
+</main>
+
+  <footer>
+    Bäckerei<b style="color:var(--amber)">OS</b> · Satellit<br>
+    Alle Personen in den Geschichten sind frei erfunden.<br>
+    <a class="zurueck" href="../index.html">‹ Zur Anmeldung</a>
+  </footer>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+function zeigeFehler(text,err){
+  console.error(text,err);
+  const box=$('err');
+  box.textContent=text+(err&&err.message?' — '+err.message:'');
+  box.hidden=false;
+}
+window.addEventListener('error',e=>zeigeFehler('Unerwarteter Fehler auf dieser Seite',e.error||{message:e.message}));
+const reduziert=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ================= Inhalte (hier pflegen) ================= */
+
+/* Satelliten im Kopf, wie im Bootscreen */
+const SATELLITEN=['🧮','🎚️','📡','🔄','☀️'];
+
+/* Vernetzungskarte. laeuft:false = gestrichelt. Stand noch von Ulf zu bestätigen. */
+const VERBINDUNGEN=[
+  {name:'Froster',        x:60,  y:60,  laeuft:true},
+  {name:'Stationen',      x:180, y:30,  laeuft:true},
+  {name:'Büro',           x:300, y:60,  laeuft:true},
+  {name:'Frühschicht',    x:308, y:150, laeuft:true},
+  {name:'Nachtschicht',   x:54,  y:150, laeuft:true},
+  {name:'Haustechnik',    x:60,  y:240, laeuft:false},
+  {name:'Lager',          x:150, y:272, laeuft:false},
+  {name:'Fahrer',         x:225, y:272, laeuft:false},
+  {name:'Filialen',       x:300, y:240, laeuft:false}
+];
+
+/* Kachel-Gruppen. Reihenfolge = Anzeige. */
+const GRUPPEN=[
+  {marke:'03 · Heute', titel:'Was BäckereiOS heute kann', sub:'Läuft – jeden Tag, in echt. Kachel antippen, die Geschichte startet.', kacheln:[
+    {name:'Die Produktionskette', bild:'kette',   status:'bereit', href:'produktionskette.html'},
+    {name:'Der Wunschtag',        bild:'kalender',status:'bereit', href:'wunschtag.html'},
+    {name:'Krank – und nun?',     bild:'kreuz',   status:'bereit', href:'krank.html'},
+    {name:'Nachts in der Teigecke',bild:'mond',   status:'bereit', href:'teigecke.html'}
+  ]},
+  {marke:'04 · Morgen', titel:'Wo es hinwill', sub:'Gestrichelt heißt bei uns: in Planung. Auch hier: antippen und zuschauen.', kacheln:[
+    {name:'Teigmengen auf dem Plan', bild:'waage',    status:'folgt', geplant:true},
+    {name:'Kaputt? Gemeldet.',       bild:'schluessel',status:'bereit', href:'meldestation.html', geplant:true},
+    {name:'Das Lager weiß Bescheid', bild:'tor',      status:'bereit', href:'lager.html', geplant:true},
+    {name:'Filialen im Netz',        bild:'haus',     status:'folgt', geplant:true}
+  ]}
+];
+
+/* Kleine Kachel-Bilder (einfache Linien, Stil der Geschichten) */
+const INK='#2C2C2A';
+const S=`stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
+const BILDER={
+  kette:`<svg viewBox="0 0 100 100"><rect x="10" y="38" width="24" height="24" rx="5" ${S} fill="#B5D4F4"/><rect x="66" y="38" width="24" height="24" rx="5" ${S} fill="#C0DD97"/><circle cx="50" cy="50" r="9" ${S} fill="#9FE1CB"/><path d="M34 50h7M59 50h7" ${S}/></svg>`,
+  kalender:`<svg viewBox="0 0 100 100"><rect x="16" y="22" width="68" height="62" rx="8" ${S} fill="#FFFFFF"/><path d="M16 40h68M34 14v14M66 14v14" ${S}/><circle cx="62" cy="62" r="9" fill="#EF9F27"/></svg>`,
+  kreuz:`<svg viewBox="0 0 100 100"><rect x="18" y="18" width="64" height="64" rx="14" ${S} fill="#F5C4B3"/><path d="M50 34v32M34 50h32" ${S}/></svg>`,
+  mond:`<svg viewBox="0 0 100 100"><path d="M64 18a34 34 0 1 0 18 52a28 28 0 0 1-18-52z" ${S} fill="#FAC775"/></svg>`,
+  waage:`<svg viewBox="0 0 100 100"><path d="M50 18v60M26 78h48M22 34h56" ${S}/><path d="M22 34l-10 22h20zM78 34l-10 22h20z" ${S} fill="#FAC775"/></svg>`,
+  schluessel:`<svg viewBox="0 0 100 100"><circle cx="34" cy="38" r="16" ${S} fill="#FFFFFF"/><path d="M45 49l32 32M64 68l8-8M71 75l8-8" ${S}/></svg>`,
+  tor:`<svg viewBox="0 0 100 100"><path d="M16 84V34l34-16l34 16v50" ${S} fill="#FFFFFF"/><rect x="28" y="46" width="44" height="38" ${S} fill="#D3D1C7"/><path d="M28 56h44M28 66h44" ${S}/><rect x="40" y="26" width="20" height="12" rx="2" ${S} fill="#9FE1CB"/></svg>`,
+  haus:`<svg viewBox="0 0 100 100"><path d="M18 48L50 20l32 28v34H18z" ${S} fill="#FFFFFF"/><rect x="42" y="58" width="16" height="24" ${S} fill="#F5C4B3"/></svg>`
+};
+
+/* ================= Aufbau ================= */
+
+function sterne(){
+  const c=$('stars'),ctx=c.getContext('2d');
+  function zeichnen(){
+    const r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;
+    c.width=r.width*d;c.height=r.height*d;ctx.scale(d,d);
+    const n=Math.round(r.width*r.height/2600);
+    for(let k=0;k<n;k++){
+      const x=Math.random()*r.width,y=Math.random()*r.height,s=Math.random();
+      ctx.fillStyle=s>.85?'rgba(217,142,43,.75)':'rgba(243,234,216,'+(.25+s*.6)+')';
+      ctx.beginPath();ctx.arc(x,y,s>.9?1.6:0.9,0,Math.PI*2);ctx.fill();
+    }
+  }
+  zeichnen();
+}
+
+function satelliten(){
+  const o=$('orbit');
+  SATELLITEN.forEach((sym,k)=>{
+    const d=document.createElement('div');
+    d.className='sat';d.textContent=sym;d.setAttribute('aria-hidden','true');
+    d.style.animationDelay=(-k*26/SATELLITEN.length)+'s';
+    if(!CSS.supports||!CSS.supports('offset-path','ellipse(40% 40% at 50% 50%)')){
+      /* Rückfall für Browser ohne offset-path: feste Positionen auf dem Kreis */
+      const w=k/SATELLITEN.length*Math.PI*2;
+      d.style.animation='none';
+      d.style.left='calc(50% + '+Math.cos(w)*44+'% - 19px)';
+      d.style.top='calc(50% + '+Math.sin(w)*42+'% - 19px)';
+    }
+    o.appendChild(d);
+  });
+}
+
+function karte(){
+  const cx=180,cy=150;
+  let s='<svg viewBox="0 0 360 300">';
+  /* Nachthimmel-Look wie der Kopf: kein heller Block, dunkle Kapseln mit leuchtendem Rand */
+  const LAEUFT={linie:'#5DCAA5',rand:'#5DCAA5',fuell:'#16231e',schrift:'#9FE1CB'};
+  const GEPLANT={linie:'#EF9F27',rand:'#BA7517',fuell:'#241b12',schrift:'#FAC775'};
+  s+=`<ellipse cx="${cx}" cy="${cy}" rx="80" ry="46" fill="none" stroke="#5a4632" stroke-width="1.2" stroke-dasharray="2 6"/>`;
+  VERBINDUNGEN.forEach((v,k)=>{
+    const del=reduziert?0:(.3+k*.25);
+    const f=v.laeuft?LAEUFT:GEPLANT;
+    s+=`<line class="linie" style="animation-delay:${del}s" x1="${cx}" y1="${cy}" x2="${v.x}" y2="${v.y}" stroke="${f.linie}" stroke-opacity=".8" stroke-width="1.8" stroke-linecap="round" ${v.laeuft?'':'stroke-dasharray="5 6"'}/>`;
+  });
+  VERBINDUNGEN.forEach(v=>{
+    const w=v.name.length*7+18;
+    const f=v.laeuft?LAEUFT:GEPLANT;
+    s+=`<rect x="${v.x-w/2}" y="${v.y-13}" width="${w}" height="26" rx="13" fill="${f.fuell}" stroke="${f.rand}" stroke-width="1.4" ${v.laeuft?'':'stroke-dasharray="4 3"'}/>`;
+    s+=`<text x="${v.x}" y="${v.y+4.5}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="${f.schrift}">${v.name}</text>`;
+  });
+  s+=`<rect x="${cx-62}" y="${cy-24}" width="124" height="48" rx="24" fill="#211b16" stroke="#d98e2b" stroke-width="1.6"/>`;
+  s+=`<text x="${cx}" y="${cy+7}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="19"><tspan fill="#f3ead8">Bäckerei</tspan><tspan fill="#d98e2b" font-style="italic">OS</tspan></text>`;
+  s+='</svg>';
+  $('karte').innerHTML=s;
+}
+
+function kacheln(){
+  const ziel=$('gruppen');
+  GRUPPEN.forEach((g,n)=>{
+    const sec=document.createElement('section');
+    sec.className='abschnitt'+(n%2?' b':'');
+    const innen=document.createElement('div');innen.className='innen';sec.appendChild(innen);
+    if(g.marke){const m=document.createElement('p');m.className='kicker';m.textContent=g.marke;innen.appendChild(m);}
+    const h=document.createElement('h2');h.textContent=g.titel;innen.appendChild(h);
+    const p=document.createElement('p');p.className='h2sub';p.textContent=g.sub;innen.appendChild(p);
+    const r=document.createElement('div');r.className='raster';
+    g.kacheln.forEach(k=>{
+      const bereit=k.status==='bereit'&&k.href;
+      const el=document.createElement(bereit?'a':'div');
+      el.className='kachel'+(bereit?'':' folgt')+(k.geplant?' geplant':'');
+      if(bereit)el.href=k.href;
+      else el.setAttribute('aria-label',k.name+' – Geschichte folgt');
+      const marke=k.geplant?'in Planung':(bereit?'':'folgt');
+      el.innerHTML=`<div class="bild">${BILDER[k.bild]||''}</div>`
+        +(bereit?`<span class="spiel" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2 1v10l9-5z"/></svg></span>`:'')
+        +(marke?`<span class="marke">${marke}</span>`:'')
+        +`<div class="name"></div>`;
+      const nm=el.querySelector('.name');
+      nm.textContent=k.name;
+      if(bereit){const l=document.createElement('span');l.className='los';l.textContent='Ansehen ›';nm.appendChild(l);
+        el.setAttribute('aria-label',k.name+' – Geschichte ansehen');}
+      else{const l=document.createElement('span');l.className='los';l.style.color='#5F5E5A';l.textContent='Geschichte folgt';nm.appendChild(l);}
+      r.appendChild(el);
+    });
+    innen.appendChild(r);
+    ziel.appendChild(sec);
+  });
+}
+
+[['Sternenhimmel',sterne],['Satelliten',satelliten],['Vernetzungskarte',karte],['Kacheln',kacheln]]
+  .forEach(([name,fn])=>{try{fn();}catch(err){zeigeFehler(name+' konnte nicht aufgebaut werden',err);}});
+})();
+</script>
+</body>
+</html>

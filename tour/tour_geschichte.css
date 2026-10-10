@@ -1,0 +1,75 @@
+/*
+  BäckereiOS · Satellit – Demo-Tour
+  Gemeinsames Aussehen aller Geschichten-Seiten.
+  Stand: 10.10.2026 (Grundgerüst, Doku 2026-10-09_DEMO_TOUR.md)
+*/
+:root{
+  --bg:#16120f; --bg2:#211b16; --cream:#f3ead8; --muted:#a89c88;
+  --amber:#d98e2b; --line:#3a3129; --err-bg:#4a1b16; --err:#ffb4a8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--cream);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#2a2018 0%,var(--bg) 60%)}
+.wrap{max-width:720px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:12px;margin:4px 0 20px}
+.back{color:var(--muted);text-decoration:none;font-size:14px;border:1px solid var(--line);
+  padding:8px 14px;border-radius:999px}
+.back:hover,.back:focus-visible{color:var(--cream);border-color:var(--muted)}
+.brand{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:18px;margin-left:auto}
+.brand em{color:var(--amber)}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:28px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 18px;font-size:15px}
+svg.stage{width:100%;height:auto;display:block;border-radius:14px;
+  box-shadow:0 10px 40px rgba(0,0,0,.45);cursor:pointer}
+.laufband{height:3px;margin:8px 6px 0;background:var(--line);border-radius:2px;overflow:hidden}
+.laufband i{display:block;height:100%;width:0;background:var(--amber)}
+.chip{display:inline-block;margin:16px 0 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  padding:4px 12px;border-radius:999px;background:rgba(217,142,43,.15);color:var(--amber)}
+.chip.geplant{border:1px dashed var(--amber)}
+.cap{font-size:17px;line-height:1.6;min-height:6.6em;margin:8px 0 12px}
+.err{background:var(--err-bg);color:var(--err);padding:10px 12px;border-radius:10px;font-size:14px;margin:8px 0}
+.err[hidden]{display:none}
+.ctrl{display:flex;align-items:center;gap:8px}
+.ctrl button{background:var(--bg2);color:var(--cream);border:1px solid var(--line);border-radius:999px;
+  height:44px;min-width:44px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.ctrl button:hover,.ctrl button:focus-visible{border-color:var(--muted)}
+.ctrl button svg{width:18px;height:18px;fill:currentColor}
+.dots{flex:1;display:flex;justify-content:center;gap:6px}
+.dots span{width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .3s}
+.dots span.on{background:var(--amber)}
+.weiter{display:flex;justify-content:space-between;gap:10px;margin:28px 0 0}
+.weiter a{flex:1;color:var(--muted);text-decoration:none;font-size:14px;border:1px solid var(--line);
+  border-radius:12px;padding:10px 12px}
+.weiter a:hover,.weiter a:focus-visible{color:var(--cream);border-color:var(--muted)}
+.weiter a.rechts{text-align:right}
+.weiter b{display:block;color:var(--cream);font-weight:600;margin-top:2px}
+footer{color:var(--muted);font-size:13px;margin:32px 0 8px;text-align:center}
+footer em{font-family:Georgia,serif}
+
+/* Szenen-Animationen (von tour_figuren.js genutzt) */
+#sc{transition:opacity .14s}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .4s ease-out var(--d,.5s) both}
+.fly{animation:fly 1.2s ease-in-out var(--d,0s) both}
+.stay{animation:stay 1.2s ease-in-out var(--d,0s) both}
+.up{animation:up 1.8s ease-out var(--d,.3s) both}
+.hoch{animation:hoch 1.8s ease-in-out var(--d,.4s) both}
+.fahren{animation:fahren 6s linear var(--d,0s) infinite}
+.zittern{transform-box:fill-box;transform-origin:center;animation:zittern .25s linear var(--d,0s) 6}
+.stamp{transform-box:fill-box;transform-origin:center;animation:stamp .5s ease-out var(--d,.8s) both}
+.hand{transform-box:view-box;transform-origin:var(--ox,180px) var(--oy,50px);animation:spin 1.6s linear infinite}
+@keyframes pop{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+@keyframes fly{0%{opacity:0;transform:translate(0,0)}10%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+@keyframes stay{0%{opacity:0;transform:translate(0,0)}10%{opacity:1}100%{opacity:1;transform:translate(var(--dx),var(--dy))}}
+@keyframes up{from{transform:translateY(62px)}to{transform:translateY(0)}}
+@keyframes stamp{0%{opacity:0;transform:scale(1.8)}70%{opacity:1;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes hoch{from{transform:translateY(0)}to{transform:translateY(var(--h,-80px))}}
+@keyframes fahren{from{transform:translateX(0)}to{transform:translateX(-120px)}}
+@keyframes zittern{0%,100%{transform:rotate(0)}25%{transform:rotate(-3deg)}75%{transform:rotate(3deg)}}
+@media (prefers-reduced-motion: reduce){
+  .fahren,.zittern{animation:none!important}
+  .pop,.fly,.stay,.up,.hoch,.stamp{animation-duration:.01ms!important;animation-delay:0s!important}
+  .hand{animation:none}
+  #sc{transition:none}
+}

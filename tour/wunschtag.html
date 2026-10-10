@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Der Wunschtag · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 2: Der Wunschtag
+  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js.
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Der Wunschtag',
+  untertitel:'Ein freier Tag – fair geplant',
+  zurueck:{href:'produktionskette.html', name:'Die Produktionskette'},
+  weiter:{href:'krank.html', name:'Krank – und nun?'},
+  szenen:[
+    {n:'Ein Samstag mit Freunden', d:7000,
+     t:'Paul hat etwas vor: Seine Freunde wollen am Samstag in drei Wochen los. Früher hätte er einen Zettel geschrieben oder im Büro gefragt und gehofft, dass es jemand behält.',
+     m(F){
+       let k='';const tage=['Mo','Di','Mi','Do','Fr','Sa'];
+       tage.forEach((t,i)=>{const x=222+i*20;k+=F.text(x,136,t,1,'middle');
+         if(t==='Sa')k+=`<circle class="pop" style="--d:1.2s" cx="${x}" cy="${132}" r="10" fill="none" stroke="#D85A30" stroke-width="2.2"/>`;});
+       return F.bg('#FAEEDA','#FAC775')
+         +`<rect x="208" y="94" width="128" height="58" rx="6" style="${F.SF}"/><rect x="208" y="94" width="128" height="18" rx="6" fill="#F5C4B3" stroke="${F.INK}" stroke-width="2.2"/>`
+         +F.text(272,107,'in drei Wochen',1,'middle')+k
+         +F.fig(110,124,{hair:'tuft',c:'o'})
+         +F.bub(22,40,186,'Samstag mit den Jungs?',118,104,.6);
+     }},
+    {n:'Wunsch abgeben', d:7500,
+     t:'Paul öffnet den Wunschtag und wählt Woche und Tag. Ein Wunsch ist unverbindlich, eine Begründung freiwillig. Wer es wirklich braucht, setzt den Haken „Erhöhte Priorität“, ohne erklären zu müssen, warum.',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')
+         +F.fig(70,124,{hair:'tuft',c:'o',aL:[10,14],aR:[-2,16]})+F.tab(57,154)
+         +F.karte(134,30,196,150,'Wunschtag',[
+            'Woche: in drei Wochen',
+            {t:'Tag: Samstag',fett:true},
+            '☐ Erhöhte Priorität',
+            {t:'Absenden ›',farbe:'#0F6E56',fett:true},
+            {t:'Frist: Donnerstag, 12 Uhr',farbe:F.SOFT}
+          ],'#FAC775')
+         +F.haken(306,124,1.2)
+         +F.paper(232,124,'fly','--d:1.6s;--dx:120px;--dy:-110px');
+     }},
+    {n:'Im Büro', d:7000,
+     t:'Die Produktionsleitung sieht alle Wünsche der Woche auf einen Blick, nach Person sortiert. Kein Zettel geht verloren, und wer es eilig hatte, ist markiert.',
+     m(F){
+       return F.bg('#EEEDFE','#CECBF6')+F.schild(14,14,'Büro')
+         +F.karte(150,34,190,118,'Wunschtage dieser Woche',[
+            'Paul · Samstag',
+            'Pauline · Montag',
+            {t:'Karl · Freitag  ★',fett:true}
+          ],'#CECBF6')
+         +`<rect x="140" y="160" width="210" height="10" rx="3" style="stroke:${F.INK};stroke-width:2;fill:#D3D1C7"/>`
+         +F.fig(80,124,{c:'n',brille:true,aR:[18,4]})
+         +F.bub(14,52,128,'Alles beisammen.',70,100,.8);
+     }},
+    {n:'Plan auf Knopfdruck', d:7500,
+     t:'Ein Knopfdruck, und BäckereiOS rechnet Varianten für die Woche: mit den Wünschen, den freien Tagen und den Stationen. Entscheiden tut weiter ein Mensch, die Produktionsleitung sucht sich die passende aus.',
+     m(F){
+       let v='';[0,1,2].forEach(i=>{const x=150+i*66,best=i===1;
+         v+=`<g class="pop" style="--d:${.4+i*.35}s"><rect x="${x}" y="${50}" width="56" height="74" rx="4" style="stroke:${best?'#BA7517':F.INK};stroke-width:${best?3:2};fill:#FFFFFF"/>`
+           +F.text(x+28,66,'Variante '+(i+1),1,'middle')
+           +`<path d="M${x+8} ${78}h40M${x+8} ${90}h40M${x+8} ${102}h28" style="stroke:${F.SOFT};stroke-width:1.4"/></g>`;});
+       return F.bg('#EEEDFE','#CECBF6')+v
+         +F.fig(80,124,{c:'n',brille:true,aR:[22,-6]})
+         +F.bub(160,150,150,'Die nehme ich.',100,140,1.8);
+     }},
+    {n:'Zweimal bestätigt', d:7000,
+     t:'Damit nichts aus Versehen passiert, gibt es zwei Schritte: erst „für den offiziellen Plan vorschlagen“, dann „offiziell annehmen“. Erst dann sehen ihn alle.',
+     m(F){
+       let l='';for(let y=74;y<=176;y+=16)l+=`<path d="M128 ${y} h${92+(y%3)*8}" style="stroke:${F.SOFT};stroke-width:1.4"/>`;
+       const st=(cx,cy,t,d,c1,c2)=>`<g class="stamp" style="--d:${d}s"><g transform="rotate(-8 ${cx} ${cy})"><rect x="${cx-62}" y="${cy-16}" width="124" height="32" rx="6" fill="${c1}" stroke="${c2}" stroke-width="2.2"/>`
+         +`<text x="${cx}" y="${cy+5}" text-anchor="middle" style="fill:${c2};font-size:13px;font-weight:600;${F.FONT}">${t}</text></g></g>`;
+       return F.bg('#EAF3DE')
+         +`<rect x="112" y="24" width="136" height="200" rx="3" style="${F.SF}"/>`
+         +`<text x="180" y="52" text-anchor="middle" style="fill:${F.INK};font-size:14px;font-weight:600;${F.FONT}">Wochenplan</text>${l}`
+         +st(180,110,'1 · vorgeschlagen',.5,'#FAEEDA','#854F0B')
+         +st(180,168,'2 · offiziell',1.6,'#EAF3DE','#3B6D11');
+     }},
+    {n:'Samstag frei', d:7500,
+     t:'Paul sieht im offiziellen Plan: Samstag ist frei. Und es geht fair zu, denn BäckereiOS merkt sich im Ausgleichskonto, wer wie oft seinen Wunschtag bekommen hat.',
+     m(F){
+       return F.bg('#FAEEDA','#FAC775')
+         +F.fig(120,118,{hair:'tuft',c:'o',aL:[-14,-16],aR:[14,-16],mund:'wow'})
+         +F.karte(200,60,140,92,'Offizieller Plan',[{t:'Samstag: frei',fett:true,hinter:'#C0DD97'},'Ausgleichskonto ✓'],'#C0DD97')
+         +F.bub(30,30,140,'Samstag frei!',112,86,.6);
+     }}
+  ]
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Das Lager weiß Bescheid · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 6: Lager-Monitor (in Planung)
+  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js.
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Das Lager weiß Bescheid',
+  untertitel:'Von der Backstube zum Lager – in Planung',
+  geplant:true,
+  zurueck:{href:'meldestation.html', name:'Kaputt? Gemeldet.'},
+  szenen:[
+    {n:'Bleche fehlen', d:7000,
+     t:'In der Backstube gehen die Bleche aus. Das Lager liegt eine Straße weiter. Heute schreibt man dafür eine Nachricht aufs Handy und hofft, dass sie jemand liest.',
+     m(F){
+       let b='';for(let i=0;i<3;i++)b+=`<rect x="226" y="${186-i*6}" width="80" height="5" rx="1" fill="#B4B2A9" stroke="${F.INK}" stroke-width="1.2"/>`;
+       return F.bg('#FAEEDA','#FAC775')+F.schild(14,14,'Backstube')
+         +`<rect x="210" y="104" width="112" height="108" rx="4" style="stroke:${F.INK};stroke-width:2.2;fill:none"/><path d="M210 140 h112 M210 176 h112" style="stroke:${F.INK};stroke-width:1.6"/>`+b
+         +F.fig(110,124,{hair:'cap',c:'b',mund:'sorge',aR:[20,-2]})+F.tab(128,124)
+         +F.bub(144,44,190,'Uns gehen die Bleche aus.',120,104,.6)
+         +F.paper(140,132,'fly','--d:1.6s;--dx:200px;--dy:-120px');
+     }},
+    {n:'Unterwegs', d:7000,
+     t:'Fred ist gerade auf seiner Filialtour. Die unterbricht niemand, um im Lager etwas zu holen. Muss er auch nicht.',
+     m(F){
+       let s='';for(let i=0;i<8;i++)s+=`<rect x="${i*60}" y="222" width="30" height="4" fill="#FFFFFF"/>`;
+       return F.bg('#E6F1FB','#B4B2A9')+`<g class="fahren">${s}</g>`
+         /* Kastenwagen von der Seite, fährt nach rechts */
+         +`<rect x="52" y="82" width="170" height="104" rx="6" style="stroke:${F.INK};stroke-width:2.2;fill:#FFFFFF"/>`
+         +`<path d="M64 98 h146" stroke="#F4C0D1" stroke-width="6" stroke-linecap="round"/>`
+         +F.text(137,146,'Filialtour',1,'middle')
+         +`<path d="M226 186 V112 h40 q8 0 12 8 l16 30 q3 6 3 12 v24 z" style="stroke:${F.INK};stroke-width:2.2;fill:#F4C0D1"/>`
+         +`<path d="M234 120 h30 q4 0 6 4 l12 22 h-48 z" fill="#E6F1FB" stroke="${F.INK}" stroke-width="2"/>`
+         +`<circle cx="252" cy="134" r="8" style="${F.SF}"/><path d="M248 136 q4 4 8 0" style="${F.S0};stroke-width:1.6"/>`
+         +`<rect x="288" y="164" width="9" height="8" rx="2" fill="#FAC775" stroke="${F.INK}" stroke-width="1.6"/>`
+         +`<rect x="48" y="184" width="252" height="10" rx="4" fill="#5F5E5A" stroke="${F.INK}" stroke-width="2"/>`
+         +[96,256].map(x=>`<circle cx="${x}" cy="198" r="15" style="stroke:${F.INK};stroke-width:2.2;fill:#444441"/><circle cx="${x}" cy="198" r="5" fill="#D3D1C7"/>`).join('')
+         +F.bub(204,30,128,'Erst die Tour.',256,124,.6);
+     }},
+    {n:'Zurück im Lager', d:7500,
+     t:'Nach jeder Tour kommt Fred ins Lager, um die Retouren abzuladen. Das Rolltor geht hoch.',
+     m(F){
+       let k='';[0,1,2].forEach(i=>k+=`<rect x="${70+i*28}" y="${190-i*0}" width="24" height="20" rx="2" fill="#FAC775" stroke="${F.INK}" stroke-width="1.6"/>`);
+       k+=`<rect x="84" y="170" width="24" height="20" rx="2" fill="#FAC775" stroke="${F.INK}" stroke-width="1.6"/>`;
+       return F.bg('#F1EFE8','#D3D1C7')+F.schild(14,14,'Lager')
+         +`<path d="M150 212 V60 l90 -30 l90 30 V212" style="stroke:${F.INK};stroke-width:2.2;fill:#FFFFFF"/>`
+         +`<rect x="176" y="90" width="128" height="122" fill="#5F5E5A" stroke="${F.INK}" stroke-width="2"/>`
+         +`<clipPath id="torclip"><rect x="176" y="90" width="128" height="122"/></clipPath>`
+         +`<g clip-path="url(#torclip)"><g class="hoch" style="--d:.5s;--h:-118px">`
+         +[0,1,2,3,4,5].map(i=>`<rect x="176" y="${90+i*20.3}" width="128" height="20.3" fill="#D3D1C7" stroke="${F.INK}" stroke-width="1.4"/>`).join('')
+         +`</g></g>`+k
+         +F.text(96,240,'Retouren',1,'middle')
+         +F.fig(40,124,{hair:'tuft',c:'p'});
+     }},
+    {n:'Ein Blick auf den Monitor', d:8000,
+     t:'Drinnen hängt ein Monitor, auf dem BäckereiOS mit einem eigenen Konto läuft. Er zeigt nur, was Backstube und Konditorei gerade brauchen. Freds Blick fällt darauf: „Ach, das wird drüben gebraucht.“',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')
+         +`<rect x="176" y="30" width="160" height="106" rx="8" style="stroke:${F.INK};stroke-width:2.6;fill:#2C2C2A"/>`
+         +`<rect x="186" y="40" width="140" height="86" rx="4" fill="#FFFDF6"/>`
+         +F.text(256,58,'Wird gebraucht',0,'middle')
+         +`<g class="pop" style="--d:.6s"><rect x="194" y="66" width="124" height="22" rx="4" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.6"/>`+F.text(202,82,'Backstube: Bleche',0)+`</g>`
+         +`<g class="pop" style="--d:.9s"><rect x="194" y="94" width="124" height="22" rx="4" fill="#FBEAF0" stroke="#993556" stroke-width="1.6"/>`+F.text(202,110,'Konditorei: Mehl',0)+`</g>`
+         +`<path d="M256 136 v20 M236 158 h40" style="${F.S0}"/>`
+         +F.fig(90,124,{hair:'tuft',c:'p',mund:'wow'})
+         +F.bub(124,172,226,'Ach, das wird drüben gebraucht!',104,150,1.4);
+     }},
+    {n:'Gleich mitgenommen', d:8000,
+     t:'Fred nimmt die Bleche auf dem Weg einfach mit. Kein Anruf, keine Nachricht, keine Extrafahrt. Der Lager-Monitor ist noch in Planung.',
+     m(F){
+       let b='';for(let i=0;i<5;i++)b+=`<rect x="134" y="${150-i*6}" width="60" height="5" rx="1" fill="#B4B2A9" stroke="${F.INK}" stroke-width="1.2"/>`;
+       return F.bg('#EAF3DE','#C0DD97')
+         +F.fig(110,124,{hair:'tuft',c:'p',aR:[22,10]})+b
+         +F.bub(190,40,140,'Bring ich mit!',130,100,.6)
+         +F.stempel(266,170,'Lager-Monitor','in Planung');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

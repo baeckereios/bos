@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Die Produktionskette · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 1: Die Produktionskette
+  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js.
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Die Produktionskette',
+  untertitel:'Vom Froster bis zum Wochenplan',
+  weiter:{href:'wunschtag.html', name:'Der Wunschtag'},
+  szenen:[
+    {n:'Im Froster', d:7000,
+     t:'Früh am Morgen steht Paul im Froster. Er geht die Regale entlang und zählt, was von jedem Produkt noch da ist. Statt auf einem Zettel, der irgendwo liegen bleibt, landen seine Zahlen gleich im System.',
+     m(F){
+       let b='';const cols=['#FAC775','#F5C4B3','#C0DD97','#B5D4F4'];
+       [80,130,180].forEach((y,r)=>{
+         [228,256,284,312].forEach((x,k)=>{if((x+y)%3)b+=`<rect x="${x}" y="${y-18}" width="22" height="18" rx="2" style="stroke:${F.INK};stroke-width:1.8;fill:${cols[(k+r)%4]}"/>`;});
+         b+=`<line x1="220" y1="${y}" x2="342" y2="${y}" style="${F.S0}"/>`;
+       });
+       return F.bg('#E6F1FB','#B5D4F4')+F.schild(14,20,'Froster')
+         +`<line x1="220" y1="45" x2="220" y2="212" style="${F.S0}"/><line x1="342" y1="45" x2="342" y2="212" style="${F.S0}"/>${b}`
+         +`<text x="40" y="160" style="fill:#378ADD;font-size:14px">*</text><text x="190" y="60" style="fill:#378ADD;font-size:14px">*</text><text x="80" y="200" style="fill:#378ADD;font-size:14px">*</text>`
+         +`<rect x="160" y="138" width="20" height="26" rx="2" style="${F.SF}"/><path d="M164 146 h12 M164 152 h12 M164 158 h8" style="stroke:${F.INK};stroke-width:1.2"/>`
+         +F.fig(140,118,{hair:'tuft',c:'o',aR:[18,12]})
+         +F.bub(28,56,92,'17, 18, 19 …',128,100,.6);
+     }},
+    {n:'Eingetippt', d:6500,
+     t:'Paul tippt seine Zahlen in die Inventur von BäckereiOS. Ein paar Fingertipps, dann ist der Bestand gespeichert und für alle sichtbar, die damit arbeiten.',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')+F.fig(150,110,{hair:'tuft',c:'o',aL:[10,14],aR:[-2,16]})+F.tab(137,140)
+         +`<path class="pop" style="--d:.4s" d="M145 149 l4 4 l8 -8" stroke="#3B6D11" stroke-width="2.6" fill="none" stroke-linecap="round"/>`
+         +F.paper(150,149,'fly','--d:.9s;--dx:190px;--dy:-125px')
+         +F.bub(205,150,130,'Inventur: fertig.',176,152,.5);
+     }},
+    {n:'BäckereiOS verteilt', d:6500,
+     t:'BäckereiOS gibt den Bestand sofort an jede Station weiter: Brötchenstraße, Rondo und Frühschicht. Niemand muss nachfragen, anrufen oder Zettel suchen.',
+     m(F){
+       return F.bg('#E1F5EE')+F.mitte(180,125)
+         +F.text(14,104,'Inventur',1)+F.text(350,30,'Brötchenstraße',1,'end')
+         +F.text(350,112,'Rondo',1,'end')+F.text(350,232,'Frühschicht',1,'end')
+         +F.paper(30,125,'fly','--d:.1s;--dx:140px;--dy:0px')
+         +F.paper(252,125,'stay','--d:1.4s;--dx:60px;--dy:-75px')
+         +F.paper(252,125,'stay','--d:1.7s;--dx:60px;--dy:10px')
+         +F.paper(252,125,'stay','--d:2s;--dx:60px;--dy:85px');
+     }},
+    {n:'An der Brötchenstraße', d:7000,
+     t:'Pauline arbeitet an der Brötchenstraße. Auf ihrem Tablet sieht sie, was im Froster knapp wird, und weiß sofort, was sie diese Woche noch produzieren muss.',
+     m(F){
+       let r='',w='';
+       for(let x=35;x<=215;x+=30)r+=`<circle cx="${x}" cy="171" r="4" style="${F.S0}"/>`;
+       [50,92,134,176].forEach(x=>w+=`<ellipse cx="${x}" cy="157" rx="11" ry="6" style="stroke:${F.INK};stroke-width:2;fill:#FAC775"/>`);
+       return F.bg('#FAEEDA','#FAC775')+F.text(125,135,'Brötchenstraße',1,'middle')
+         +`<rect x="20" y="164" width="210" height="14" rx="7" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/>${r}${w}`
+         +`<line x1="60" y1="178" x2="60" y2="212" style="${F.S0}"/><line x1="190" y1="178" x2="190" y2="212" style="${F.S0}"/>`
+         +F.fig(292,112,{hair:'bun',c:'g',aL:[-14,10],aR:[2,16],mund:'wow'})+F.tab(266,138)
+         +F.bub(112,40,150,'Aha! Das fehlt noch.',274,94,.7);
+     }},
+    {n:'Planung abgeben', d:7500,
+     t:'Jede Station plant selbst: Pauline an der Brötchenstraße, Karl an der Rondo und Fritz aus der Frühschicht geben ihre Produktionsplanung in BäckereiOS ab. Bis zu einer festen Frist, damit alles rechtzeitig zusammenkommt.',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')+F.mitte(180,42)+F.uhr(318,42,'')
+         +F.text(318,80,'Frist',1,'middle')
+         +[[70,'bun','g','Pauline','Brötchenstraße'],[180,'cap','b','Karl','Rondo'],[290,'tuft','r','Fritz','Frühschicht']].map(([x,h,c,n,st],k)=>
+            F.fig(x,124,{hair:h,c,aL:[6,14],aR:[-6,14]})+F.tab(x-13,158)
+            +F.text(x,228,n,0,'middle')+F.text(x,243,st,1,'middle')
+            +F.paper(x,166,'fly',`--d:${.6+k*.8}s;--dx:${180-x}px;--dy:-120px`)).join('');
+     }},
+    {n:'Der Wochenplan', d:7000,
+     t:'Die Frist ist vorbei. BäckereiOS fasst alle Planungen zusammen, und aus dem Drucker kommt der Plan für die ganze Woche. Easy, oder?',
+     m(F){
+       return F.bg('#EAF3DE','#C0DD97')
+         +`<g class="up" style="--d:.4s"><rect x="148" y="58" width="64" height="80" rx="2" style="${F.SF}"/>`
+         +F.text(180,76,'Wochenplan',1,'middle')
+         +`<path d="M156 88 h48 M156 100 h48 M156 112 h36" style="stroke:${F.SOFT};stroke-width:1.4"/></g>`
+         +`<rect x="118" y="120" width="124" height="52" rx="10" style="stroke:${F.INK};stroke-width:2.2;fill:#F1EFE8"/><line x1="140" y1="128" x2="220" y2="128" style="${F.S0}"/><circle cx="226" cy="158" r="4" fill="#639922"/>`
+         +`<rect x="130" y="172" width="100" height="40" rx="2" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/>`
+         +F.fig(55,118,{hair:'tuft',c:'o'})+F.fig(308,118,{hair:'bun',c:'g',aR:[12,-16]})
+         +F.bub(228,36,116,'Easy, oder?',300,96,2);
+     }},
+    {n:'Wie es weitergeht', d:6500,
+     t:'Und BäckereiOS wächst weiter: Bald stehen auch die richtigen Teigmengen direkt mit auf dem Plan. Gestrichelt heißt bei uns immer: in Planung.',
+     m(F){
+       let l='';for(let y=74;y<=186;y+=16)l+=`<path d="M118 ${y} h${110+(y%3)*8}" style="stroke:${F.SOFT};stroke-width:1.4"/>`;
+       return F.bg('#FAEEDA')
+         +`<rect x="100" y="22" width="160" height="206" rx="3" style="${F.SF}"/>`
+         +`<text x="180" y="52" text-anchor="middle" style="fill:${F.INK};font-size:15px;font-weight:600;font-family:system-ui,sans-serif">Wochenplan</text>${l}`
+         +F.stempel(180,172,'Teigmengen','in Planung');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

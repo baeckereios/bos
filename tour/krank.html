@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Krank – und nun? · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 3: Krankmeldung
+  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js.
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Krank – und nun?',
+  untertitel:'Wenn morgens plötzlich jemand fehlt',
+  zurueck:{href:'wunschtag.html', name:'Der Wunschtag'},
+  weiter:{href:'teigecke.html', name:'Nachts in der Teigecke'},
+  szenen:[
+    {n:'Früh am Morgen', d:7000,
+     t:'Mittwochmorgen. Karl liegt flach und meldet sich bei der Produktionsleitung krank. Der Wochenplan ist längst raus, und morgen fehlt nun jemand.',
+     m(F){
+       return F.bg('#E6F1FB','#B5D4F4')
+         +`<rect x="60" y="150" width="220" height="40" rx="8" style="stroke:${F.INK};stroke-width:2.2;fill:#FFFFFF"/>`
+         +`<rect x="60" y="130" width="54" height="30" rx="10" style="stroke:${F.INK};stroke-width:2.2;fill:#FFFFFF"/>`
+         +`<path d="M100 150 h180 v18 a10 10 0 0 1 -10 10 h-170 z" fill="#B5D4F4" stroke="${F.INK}" stroke-width="2.2"/>`
+         +`<line x1="60" y1="190" x2="60" y2="212" style="${F.S0}"/><line x1="280" y1="190" x2="280" y2="212" style="${F.S0}"/>`
+         +`<g transform="translate(-6,10)"><circle cx="92" cy="130" r="17" style="${F.SF}"/>`
+         +`<path d="M77 124 Q92 102 107 124 Z" style="stroke:${F.INK};stroke-width:2.2;fill:#B5D4F4"/>`
+         +`<ellipse cx="87" cy="130" rx="1.7" ry="2.7" fill="${F.INK}"/><ellipse cx="97" cy="130" rx="1.7" ry="2.7" fill="${F.INK}"/>`
+         +`<path d="M85 142 Q92 136 99 142" style="${F.S0}"/><line x1="100" y1="141" x2="114" y2="135" stroke="#E24B4A" stroke-width="3" stroke-linecap="round"/></g>`
+         +F.bub(140,46,190,'Ich schaff’s heute nicht …',110,120,.7);
+     }},
+    {n:'Eine Lücke im Plan', d:7000,
+     t:'Im Büro zeigt der Plan sofort, wo es hakt: Donnerstag an der Rondo ist leer.',
+     m(F){
+       const tage=['Mo','Di','Mi','Do','Fr','Sa'];let g='';
+       tage.forEach((t,i)=>{const x=150+i*32;g+=F.text(x+14,58,t,1,'middle');
+         [0,1,2].forEach(r=>{const y=66+r*30,leer=(t==='Do'&&r===1);
+           g+=leer?`<rect class="zittern" x="${x}" y="${y}" width="28" height="24" rx="4" style="fill:#FCEBEB;stroke:#E24B4A;stroke-width:2;stroke-dasharray:4 3"/><text x="${x+14}" y="${y+17}" text-anchor="middle" style="fill:#A32D2D;font-size:13px;font-weight:600">?</text>`
+                  :`<rect x="${x}" y="${y}" width="28" height="24" rx="4" fill="${['#FAC775','#B5D4F4','#C0DD97'][r]}" stroke="${F.INK}" stroke-width="1.5"/>`;});});
+       return F.bg('#EEEDFE','#CECBF6')+F.schild(14,14,'Büro')+g
+         +F.text(146,174,'Rondo ist die mittlere Reihe',1)
+         +F.fig(70,124,{c:'n',brille:true,mund:'sorge'})
+         +F.bub(12,48,128,'Donnerstag fehlt …',66,104,.8);
+     }},
+    {n:'Der Krankmelder', d:8000,
+     t:'Die Produktionsleitung öffnet den Krankmelder. BäckereiOS füllt die Lücke und lässt dabei alle anderen Tage so, wie sie schon verkündet sind. Wer möchte, kann auch komplett neu sortieren lassen.',
+     m(F){
+       const tage=['Mo','Di','Mi','Do','Fr','Sa'];let g='';
+       tage.forEach((t,i)=>{const x=150+i*32;g+=F.text(x+14,58,t,1,'middle');
+         [0,1,2].forEach(r=>{const y=66+r*30,neu=(t==='Do'&&r===1);
+           g+=neu?`<rect class="pop" style="--d:1.4s" x="${x}" y="${y}" width="28" height="24" rx="4" fill="#C0DD97" stroke="#3B6D11" stroke-width="2.4"/>`
+                 :`<rect x="${x}" y="${y}" width="28" height="24" rx="4" fill="${['#FAC775','#B5D4F4','#C0DD97'][r]}" stroke="${F.INK}" stroke-width="1.5"/>`;});});
+       return F.bg('#E1F5EE')+g
+         +`<g class="pop" style="--d:.5s"><rect x="150" y="166" width="188" height="30" rx="15" fill="#9FE1CB" stroke="#0F6E56" stroke-width="2"/>`
+         +`<text x="244" y="186" text-anchor="middle" style="fill:#085041;font-size:12px;font-weight:600;${F.FONT}">Minimal verändert</text></g>`
+         +F.fig(70,124,{c:'n',brille:true,aR:[20,-2]})
+         ;
+     }},
+    {n:'Kurz nachfragen', d:7500,
+     t:'Erst speichern, noch nicht veröffentlichen. So bleibt Zeit für eine kurze Gedenkpause und ein Wort mit der Kollegin, die einspringen soll.',
+     m(F){
+       return F.bg('#F1EFE8','#D3D1C7')
+         +F.fig(90,124,{c:'n',brille:true,aR:[16,6]})
+         +F.fig(270,124,{hair:'bun',c:'g'})
+         +F.bub(20,40,156,'Kannst du Donnerstag?',90,100,.5)
+         +F.bub(214,62,96,'Klar!',262,100,1.8);
+     }},
+    {n:'Alle wissen Bescheid', d:7500,
+     t:'Jetzt wird veröffentlicht, und der neue Plan steht sofort bei allen. Springt jemand an einem eigentlich freien Tag ein, merkt BäckereiOS sich das, damit es später fair ausgeglichen werden kann.',
+     m(F){
+       return F.bg('#EAF3DE','#C0DD97')+F.mitte(180,56)
+         +[[70,'bun','g'],[180,'tuft','o'],[290,'tuft','r']].map(([x,h,c],k)=>
+            F.fig(x,124,{hair:h,c})+F.paper(180,80,'stay',`--d:${.4+k*.35}s;--dx:${x-180+18}px;--dy:60px`)).join('');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

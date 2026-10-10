@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nachts in der Teigecke · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 4: Nachts in der Teigecke
+  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js.
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Nachts in der Teigecke',
+  untertitel:'Wie ein Neuer sicher durch die Nacht kommt',
+  zurueck:{href:'krank.html', name:'Krank – und nun?'},
+  weiter:{href:'meldestation.html', name:'Kaputt? Gemeldet.'},
+  szenen:[
+    {n:'Allein in der Teigecke', d:7000,
+     t:'Nacht in der Backstube. Ben ist Azubi und steht heute zum ersten Mal allein in der Teigecke. Viele Teige, wenig Erfahrung.',
+     m(F){
+       return F.bg('#EEEDFE','#CECBF6')
+         +`<path d="M318 26a16 16 0 1 0 10 28a13 13 0 0 1 -10 -28z" fill="#FAC775" stroke="${F.INK}" stroke-width="2"/>`
+         +F.text(280,40,'*',1)+F.text(250,64,'*',1)
+         +`<path d="M206 150 h92 l-8 50 h-76 z" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/><ellipse cx="252" cy="150" rx="46" ry="8" style="stroke:${F.INK};stroke-width:2.2;fill:#F1EFE8"/>`
+         +F.text(252,226,'Kessel',1,'middle')
+         +F.fig(110,124,{c:'t',mund:'sorge'})
+         +F.bub(14,48,186,'Oh je … so viele Teige!',106,104,.7);
+     }},
+    {n:'Brotzahlen rein', d:8000,
+     t:'Ben tippt ein, wie viele Brote heute gebraucht werden. BäckereiOS rechnet den Rest: die Zahl für den Rezeptcomputer, dazu Wasser, Hefe und wie viele Kessel. Kein Kopfrechnen um drei Uhr nachts.',
+     m(F){
+       const k=(x,y,t,d)=>`<g class="pop" style="--d:${d}s"><rect x="${x}" y="${y}" width="86" height="34" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2"/>`
+         +`<text x="${x+43}" y="${y+22}" text-anchor="middle" style="fill:#085041;font-size:12px;font-weight:600;${F.FONT}">${t} ✓</text></g>`;
+       return F.bg('#F1EFE8','#D3D1C7')
+         +F.fig(60,124,{c:'t',aL:[10,14],aR:[-2,16]})+F.tab(47,154)
+         +F.karte(118,24,108,72,'Korbbrot',['Brote: ▢▢▢'],'#9FE1CB')
+         +`<path class="pop" style="--d:.8s" d="M232 60 h14 l-5 -5 m5 5 l-5 5" style="${F.S0}"/>`
+         +k(254,24,'Teigmenge',1.2)+k(254,66,'Wasser',1.5)+k(254,108,'Hefe',1.8)+k(254,150,'Kessel',2.1);
+     }},
+    {n:'Alles hat ein Zuhause', d:8000,
+     t:'Jede Zutat hat ihren festen Platz: auf einem beschrifteten Wagen oder in der Kühlung. Die Einsammelliste sagt Ben, wo er was findet. Kein Suchen, kein Fragen.',
+     m(F){
+       /* Sack: steht auf dem Wagen, oben zugebunden */
+       const sack=(x,c)=>`<path d="M${x-11} 186 q-2 -14 1 -22 q1 -5 4 -7 l-1 -4 h14 l-1 4 q3 2 4 7 q3 8 1 22 z" fill="${c}" stroke="${F.INK}" stroke-width="1.8" stroke-linejoin="round"/>`
+         +`<path d="M${x-5} 157 h10" stroke="${F.INK}" stroke-width="1.8" stroke-linecap="round"/><path d="M${x-6} 172 h12" stroke="${F.SOFT}" stroke-width="1.2" stroke-linecap="round"/>`;
+       const wagen=(x,an,name)=>`<rect x="${x}" y="186" width="74" height="8" rx="2" style="stroke:${an?'#0F6E56':F.INK};stroke-width:${an?2.6:2};fill:${an?'#9FE1CB':'#D3D1C7'}"/>`
+         +`<circle cx="${x+12}" cy="202" r="6" style="${F.SF}"/><circle cx="${x+62}" cy="202" r="6" style="${F.SF}"/>`
+         +sack(x+14,'#F1EFE8')+sack(x+37,'#FAEEDA')+sack(x+60,'#F1EFE8')
+         +F.text(x+37,142,name,1,'middle');
+       return F.bg('#FAEEDA','#FAC775')
+         +wagen(124,false,'Wagen 1')+wagen(206,true,'Wagen 2')
+         +`<rect class="pop" style="--d:1s" x="200" y="128" width="86" height="86" rx="8" fill="none" stroke="#1D9E75" stroke-width="2.4" stroke-dasharray="5 4"/>`
+         +`<rect x="296" y="96" width="54" height="116" rx="5" style="stroke:${F.INK};stroke-width:2.2;fill:#E6F1FB"/>`
+         +`<path d="M296 136 h54" style="stroke:${F.INK};stroke-width:1.6"/><path d="M342 112 v12 M342 146 v14" style="stroke:${F.INK};stroke-width:2.4;stroke-linecap:round"/>`
+         +`<path d="M314 112 v14 M308 115 l12 8 M320 115 l-12 8" stroke="#378ADD" stroke-width="1.8" stroke-linecap="round"/>`
+         +F.text(323,88,'Kühlung',1,'middle')
+         +F.fig(64,124,{c:'t',aR:[22,-4]})
+         +F.bub(8,40,150,'Wagen 2, Mitte!',64,100,1.3);
+     }},
+    {n:'Was die Erfahrenen wissen', d:8000,
+     t:'Mehr Wasser abziehen, Mehl von Hand dazugeben: Solche Kniffe der erfahrenen Kollegen stehen jetzt direkt am Teig. Was früher nur im Kopf von Paul war, hat Ben heute vor sich.',
+     m(F){
+       const note=(x,y,t,d)=>`<g class="pop" style="--d:${d}s"><rect x="${x}" y="${y}" width="104" height="30" rx="4" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.8"/>`
+         +`<text x="${x+52}" y="${y+19}" text-anchor="middle" style="fill:#633806;font-size:11px;${F.FONT}">${t}</text></g>`;
+       return F.bg('#E1F5EE')+F.mitte(180,125)
+         +F.fig(48,118,{hair:'tuft',c:'o'})+F.fig(312,118,{c:'t',mund:'wow'})
+         +note(14,30,'Tipp: Wasser ab',.3)+note(14,66,'Tipp: Mehl dazu',.6)
+         +F.paper(70,60,'fly','--d:1s;--dx:100px;--dy:60px')
+         +F.paper(230,125,'stay','--d:2s;--dx:66px;--dy:-30px');
+     }},
+    {n:'Läuft', d:7500,
+     t:'Ben hat seine Nacht gut geschafft und muss niemanden anrufen. Genau dafür ist BäckereiOS da: Jeder soll in jeder Schicht klarkommen.',
+     m(F){
+       return F.bg('#EEEDFE','#CECBF6')
+         +`<path d="M318 26a16 16 0 1 0 10 28a13 13 0 0 1 -10 -28z" fill="#FAC775" stroke="${F.INK}" stroke-width="2"/>`
+         +`<path d="M206 150 h92 l-8 50 h-76 z" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/><ellipse cx="252" cy="150" rx="46" ry="10" style="stroke:${F.INK};stroke-width:2.2;fill:#FAEEDA"/>`
+         +`<path d="M226 148 q12 -16 26 0 q14 -16 26 0" style="stroke:${F.INK};stroke-width:2;fill:#FAEEDA"/>`
+         +F.fig(110,118,{c:'t',aL:[-14,-16],aR:[14,-16]})
+         +F.bub(20,40,96,'Läuft!',104,98,.6);
+     }}
+  ]
+});
+</script>
+</body>
+</html>
