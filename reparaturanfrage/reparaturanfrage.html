@@ -17,6 +17,28 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-10-11 · 10:27 · v0.3 · Feature (Nachtrag 3, Ulf 11.10. 10:21/10:23)
+      ANWEISUNG_2026-10-11_REPARATURANFRAGE_NACHTRAG3.md (KC 10:24).
+      - A: Die Zeile „‹ Posteingang“ über den Reitern entfällt. Links in der
+        Reiterleiste ein Knopf „‹“ (48 × 48, kein Reiter, durch einen Strich
+        abgesetzt, aria-label/title „Zurück zum Posteingang“).
+      - B: Zurück-Taste des Handys/Browsers. Öffnen einer Anfrage und Melden
+        legen je EINEN Verlaufseintrag an ({ ra: 'anfrage', id } bzw.
+        { ra: 'melden' }); popstate führt zum Posteingang. „‹“, „‹ Posteingang“
+        und „Abbrechen“ nehmen den eigenen Eintrag zurück (history.back()),
+        statt einen neuen anzulegen. Reiterwechsel legt keinen an.
+        Direkteinstieg ?geraet= legt keinen an (Melden ist dann die
+        Grundansicht, Zurück verlässt die Seite — mit getipptem Text erst
+        nach der Browser-Rückfrage „Seite verlassen?“). Nach Neuladen wird die
+        Ansicht aus dem Eintrag wiederhergestellt. Ungesendeter Text
+        (Rückfrage, Fenster-Grund, Melden-Text) → Rückfrage „verwerfen?“,
+        bei „nein“ bleibt alles stehen (Eintrag wird neu angelegt).
+        Im Launcher-Fenster: wird das Fenster bei offener Anfrage
+        geschlossen, nimmt die Seite ihren Eintrag im pagehide zurück (über
+        einen Timer im Launcher, der nur feuert, wenn das Fenster wirklich
+        entfernt ist) — sonst verschluckte der tote Eintrag einen Druck.
+      - C: Seitentitel unter 380 px kleiner (stieß an „＋ Melden“).
+      - Hilfe nachgezogen. Keine Regeländerung, bos_meldungen.js unverändert.
     2026-10-11 · 09:37 · v0.2 · Feature (Nachtrag 2, E23–E25, Ulf 11.10.)
       ANWEISUNG_2026-10-11_REPARATURANFRAGE_NACHTRAG2.md (KC 09:26).
       - Geöffnete Anfrage mit Reitern „Anfrage“ · „Rückfragen“ · „Verlauf“.
@@ -138,12 +160,17 @@
   .statuswort.st-repariert { color: var(--ra-gruen); }
   .dringend { flex: none; font-family: var(--bos-font-label); font-weight: 800; text-transform: uppercase; font-size: var(--bos-font-2xs, .66rem); letter-spacing: .05em; color: #fff; background: var(--ra-rot); border-radius: 4px; padding: 2px 6px; }
 
-  /* geöffnete Anfrage — Reiter (Nachtrag 2). Aktiv = Unterstrich UND Farbe. */
-  .reiter { display: flex; gap: 4px; border-bottom: 1px solid var(--bos-border); margin: 0 0 var(--bos-space-sm, 14px); }
-  .reiter button { flex: 1 1 0; min-height: 48px; padding: 6px 4px; background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -1px; color: var(--bos-text-dim); font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: var(--bos-font-sm, .82rem); cursor: pointer; }
+  /* geöffnete Anfrage — Reiter (Nachtrag 2). Aktiv = Unterstrich UND Farbe.
+     Nachtrag 3 (A): links der Zurück-Knopf „‹“, durch einen Strich abgesetzt.
+     Er steht AUSSERHALB der tablist — er ist kein Reiter. */
+  .reiter-leiste { display: flex; align-items: stretch; border-bottom: 1px solid var(--bos-border); margin: 0 0 var(--bos-space-sm, 14px); }
+  .zurueck-knopf { flex: 0 0 48px; min-width: 44px; min-height: 48px; display: flex; align-items: center; justify-content: center; background: none; border: none; border-right: 1px solid var(--bos-border-strong); margin: 8px 4px 8px 0; padding: 0; color: var(--bos-amber-bright); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+  .zurueck-knopf:focus-visible { outline: 2px solid var(--bos-amber); outline-offset: -2px; }
+  .reiter { flex: 1 1 auto; min-width: 0; display: flex; gap: 2px; }
+  .reiter button { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 6px 2px; background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -1px; color: var(--bos-text-dim); font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: var(--bos-font-sm, .82rem); cursor: pointer; }
   .reiter button[aria-selected="true"] { color: var(--bos-text); border-bottom-color: var(--bos-amber); }
   .reiter button:focus-visible { outline: 2px solid var(--bos-amber); outline-offset: -2px; }
-  .reiter .punkt { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bos-amber); color: #1a1208; font-size: var(--bos-font-xs, .72rem); letter-spacing: 0; }
+  .reiter .punkt { display: inline-block; white-space: nowrap; margin-left: 4px; padding: 0 7px; border-radius: 999px; background: var(--bos-amber); color: #1a1208; font-size: var(--bos-font-xs, .72rem); letter-spacing: 0; }
   .zurueck { margin-bottom: var(--bos-space-xs, 9px); }
   .anfrage-text { font-size: var(--bos-font-lg, 1.1rem); white-space: pre-wrap; word-break: break-word; margin: 6px 0 10px; }
   .eckdaten { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: var(--bos-font-sm, .85rem); }
@@ -186,6 +213,13 @@
   #toast[hidden] { display: none !important; }
   #toastText { white-space: nowrap; }
   #toastKnopf { min-height: 44px; }
+  /* Nachtrag 3 (C): am schmalen Handy stieß der Titel an „＋ Melden“; die
+     Reiter brauchen dort weniger Sperrung, damit „Rückfragen ● 2“ ganz steht. */
+  @media (max-width: 380px) {
+    header h1 { font-size: 1.05rem; }
+    .kopf-zeile { gap: 8px; }
+    .reiter button { letter-spacing: .01em; font-size: .74rem; }
+  }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -331,6 +365,8 @@ const I18N_DE = {
   s_gesehen: '👀 gesehen', s_repariert: '✓ repariert', s_aria: '{was}: {titel}',
   t_repariert: '✓ repariert —', t_zuruecknehmen: 'zurücknehmen', t_zurueck_ok: '↩ Zurückgenommen — wieder „gesehen“',
   neu_was: 'Kennzeichen „neu“',
+  zurueck_aria: 'Zurück zum Posteingang',
+  verwerfen_frage: 'Ungesendeten Text verwerfen?\n\nOK = verwerfen und zurück · Abbrechen = hierbleiben, der Text bleibt stehen.',
   merk_aus: 'Gerätespeicher nicht nutzbar — die Kennzeichen „neu“ sind auf diesem Gerät aus, sonst geht alles. Grund: {grund}',
   merk_kaputt: 'Der Gerätespeicher für „neu“ war beschädigt und ist neu angelegt — alles Bisherige gilt als gelesen. Grund: {grund}',
   err_laden: 'Laden „{was}“',
@@ -351,7 +387,7 @@ const helpData = {
     ['Wofür?', 'Hier landet alles, was kaputt ist, an einer Stelle beim Hausmeister — und jeder mit Zugang sieht, ob es schon gemeldet ist und wie weit es ist.'],
     ['Die Farben', 'Rot „gemeldet“: noch niemand hat reagiert. Gelb „gesehen“: der Hausmeister weiß Bescheid. Grün „repariert“: erledigt. Die Farbe steht immer mit dem Wort dabei. Grünes rutscht nach sieben Tagen ins Archiv.'],
     ['Melden', 'Erst nachsehen, ob es schon in der Liste steht. Dann „＋ Melden“: kurz schreiben, was kaputt ist, und antippen, ob weitergearbeitet werden kann (ja, eingeschränkt, nein). Wie dringend es ist, entscheidet der Hausmeister. Nur Betriebsmeldungen — nichts Vertrauliches, keine Personen. Ein Notfall gehört ans Telefon, nicht in die App.'],
-    ['Antippen', 'Eine Anfrage öffnet immer auf dem Reiter „Anfrage“: wie weit sie ist, was kaputt ist, das Reparaturfenster. Daneben die Reiter „Rückfragen“ (der kurze Chat) und „Verlauf“ (wer hat wann was geändert). Was du gerade tippst, bleibt stehen, auch wenn du den Reiter wechselst. Jeder mit Zugang darf antworten — so bleibt keine Frage hängen, wenn jemand frei hat. Kurz halten.'],
+    ['Antippen', 'Eine Anfrage öffnet immer auf dem Reiter „Anfrage“: wie weit sie ist, was kaputt ist, das Reparaturfenster. Daneben die Reiter „Rückfragen“ (der kurze Chat) und „Verlauf“ (wer hat wann was geändert). Was du gerade tippst, bleibt stehen, auch wenn du den Reiter wechselst. Zurück in die Liste geht mit „‹“ links neben den Reitern oder mit der Zurück-Taste des Handys; steht noch ungesendeter Text da, fragt die Seite vorher. Jeder mit Zugang darf antworten — so bleibt keine Frage hängen, wenn jemand frei hat. Kurz halten.'],
     ['Was heißt „neu“?', '„💬 neu“ in der Liste: Jemand anderes hat eine Rückfrage geschrieben, seit du die Anfrage zuletzt geöffnet hast. „● neu“: Jemand anderes hat sonst etwas geändert oder die Anfrage ist neu. Deine eigenen Sachen zählen nie. Öffnest du die Anfrage, ist das Kennzeichen weg. Am Reiter „Rückfragen“ zeigt ein Punkt mit Zahl, wie viele Nachrichten neu sind. Was du schon gelesen hast, merkt sich nur dieses Gerät — auf dem Handy und am Tablet kann es also verschieden aussehen. Beim allerersten Öffnen auf einem Gerät gilt alles Bisherige als gelesen.'],
     ['Für den Hausmeister', 'In der Liste unter „Offen“ stehen die Knöpfe gleich an der Zeile: bei Rot „👀 gesehen“ und „✓ repariert“, bei Gelb „✓ repariert“ — ohne die Anfrage zu öffnen. Nach „repariert“ erscheint unten kurz „zurücknehmen“; danach geht Zurücknehmen in der geöffneten Anfrage bis zum Archivtag. In der Anfrage selbst: „Gesehen“, „Repariert“ (geht auch direkt von Rot), Reparaturfenster setzen oder verschieben (beim Verschieben mit Grund), „dringend“ markieren. Eine Antwort im Chat auf eine rote Anfrage setzt sie automatisch auf „gesehen“.'],
     ['Geht wieder kaputt?', 'Dann eine neue Anfrage. Die alte bleibt, wie sie war.'],
@@ -717,12 +753,14 @@ function renderAnfrage(main) {
   function flaeche(name, inhalt) {
     return '<div role="tabpanel" id="flaeche-' + name + '" data-flaeche="' + name + '" aria-labelledby="reiter-' + name + '"' + (S.tab === name ? '' : ' hidden') + '>' + inhalt + '</div>';
   }
-  let html = '<button type="button" class="link-btn zurueck" data-zurueck="1">' + esc(t('zurueck')) + '</button>' +
+  // Nachtrag 3 (A): „‹“ links in der Leiste, NICHT in der tablist (kein Reiter)
+  let html = '<div class="reiter-leiste">' +
+    '<button type="button" class="zurueck-knopf" data-zurueck="1" aria-label="' + esc(t('zurueck_aria')) + '" title="' + esc(t('zurueck_aria')) + '">‹</button>' +
     '<div class="reiter" role="tablist">' +
       reiterKnopf('anfrage', esc(t('reiter_anfrage'))) +
       reiterKnopf('rueckfragen', esc(t('reiter_rueck')), '<span class="punkt" id="rueckPunkt" aria-label="' + esc(t('reiter_punkt_aria', { n: n })) + '"' + (n ? '' : ' hidden') + '>' + esc(t('reiter_punkt', { n: n })) + '</span>') +
       reiterKnopf('verlauf', esc(t('reiter_verlauf'))) +
-    '</div>';
+    '</div></div>';
   let anfrageHtml = '<div class="kasten">' +
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + statusMarke(k.status) +
       (k.dringlichkeit === 'dringend' ? '<span class="dringend">' + esc(t('dringend')) + '</span>' : '') + '</div>' +
@@ -843,7 +881,7 @@ function zeigeReiter(name) {
 function wert(id) { const el = document.getElementById(id); return el ? el.value : null; }
 function setzeWert(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
 function verbindeZurueck() {
-  document.querySelectorAll('[data-zurueck]').forEach(function (b) { b.addEventListener('click', zurListe); });
+  document.querySelectorAll('[data-zurueck]').forEach(function (b) { b.addEventListener('click', zurueckZurListe); });
 }
 
 function renderMelden(main) {
@@ -896,7 +934,7 @@ function renderMelden(main) {
       function (id) {
         S.melden = { text: '', geraet: '', weiterarbeiten: null };
         toast(t('gesendet'));
-        oeffne(id);
+        oeffne(id);   // ersetzt den Melden-Eintrag (Zurück → Posteingang)
       }, true);
   });
 }
@@ -928,7 +966,8 @@ function aktion(fn, danach, eigenerToast) {
     render(true);
   });
 }
-function oeffne(id) {
+function oeffne(id, opt) {
+  if (!(opt && opt.ohneEintrag)) eintragSetzen({ ra: 'anfrage', id: id });
   S.ansicht = 'anfrage';
   S.offeneId = id;
   S.verlauf = [];
@@ -970,12 +1009,92 @@ function zurListe() {
   S.ansicht = 'liste'; S.offeneId = null; S.verlauf = [];
   render(true);
 }
-function zumMelden() {
+function zumMelden(opt) {
+  if (!(opt && opt.ohneEintrag)) eintragSetzen({ ra: 'melden' });
   if (S.verlaufAbo) { S.verlaufAbo(); S.verlaufAbo = null; }
   S.ansicht = 'melden';
   render(true);
   window.scrollTo(0, 0);
 }
+/* ---------- Zurück-Taste (Nachtrag 3, Teil B) ----------
+   Öffnen und Melden legen je EINEN Verlaufseintrag an; die Zurück-Taste
+   (popstate) führt zum Posteingang. „‹“, „‹ Posteingang“ und „Abbrechen“
+   nehmen den eigenen Eintrag zurück (history.back()) — so wächst der
+   Verlauf beim Hin und Her nicht. Im Posteingang gibt es keinen eigenen
+   Eintrag: Zurück verlässt die Seite wie bisher (keine Falle). Läuft die
+   Seite im Launcher-Fenster (<iframe>), liegen die Einträge im Verlauf des
+   ganzen Tabs; die Zurück-Taste kommt trotzdem hier als popstate an
+   (Probe B1). */
+const VERLAUF = { bestaetigt: 0 };   // Zeitpunkt der Bestätigung durch „‹“/„Abbrechen“ (gilt 3 s)
+function eigenerEintrag() {
+  try { return !!(history.state && history.state.ra); } catch (e) { return false; }
+}
+/* Aus einer eigenen Ansicht in die nächste (Melden → gesendete Anfrage):
+   ersetzen statt stapeln, damit EIN Druck auf Zurück reicht. */
+function eintragSetzen(zustand) {
+  try {
+    if (eigenerEintrag()) history.replaceState(zustand, '');
+    else history.pushState(zustand, '');
+  } catch (e) { console.error('[Reparaturanfrage] Verlauf nicht nutzbar:', e); }
+}
+/* Poka-Yoke: steht noch etwas Getipptes da, das nicht gesendet ist? */
+function ungesendet() {
+  if (S.ansicht === 'anfrage') return !!(String(wert('chatText') || '').trim() || String(wert('fensterGrund') || '').trim());
+  if (S.ansicht === 'melden') return !!(String(S.melden.text || '').trim() || (String(S.melden.geraet || '').trim() && S.melden.geraet !== S.geraetAusCode));
+  return false;
+}
+function verwerfen() {
+  if (S.ansicht === 'melden') S.melden = { text: '', geraet: S.geraetAusCode || '', weiterarbeiten: null };
+}
+/* Knopf „‹“, „‹ Posteingang“, „Abbrechen“. */
+function zurueckZurListe() {
+  if (ungesendet() && !window.confirm(t('verwerfen_frage'))) return;
+  verwerfen();
+  if (eigenerEintrag()) { VERLAUF.bestaetigt = Date.now(); history.back(); return; }  // popstate zeichnet
+  zurListe();
+}
+window.addEventListener('popstate', function (ev) {
+  const st = ev.state;
+  const bestaetigt = Date.now() - VERLAUF.bestaetigt < 3000;
+  VERLAUF.bestaetigt = 0;
+  // Vorwärts-Taste: zurück in die Ansicht des Eintrags, ohne neuen anzulegen
+  if (st && st.ra === 'anfrage' && st.id) { oeffne(st.id, { ohneEintrag: true }); return; }
+  if (st && st.ra === 'melden') { zumMelden({ ohneEintrag: true }); return; }
+  if (S.ansicht === 'liste') return;
+  if (!bestaetigt && ungesendet() && !window.confirm(t('verwerfen_frage'))) {
+    // „nein“: den Eintrag wieder anlegen — Ansicht und Text bleiben stehen
+    try { history.pushState(S.ansicht === 'anfrage' ? { ra: 'anfrage', id: S.offeneId } : { ra: 'melden' }, ''); } catch (e) {}
+    return;
+  }
+  if (!bestaetigt) verwerfen();
+  zurListe();
+});
+/* Verlässt die Zurück-Taste die Seite ganz (kein eigener Eintrag — z. B.
+   Direkteinstieg ?geraet=, oder Tab schließen) und steht ungesendeter Text
+   da: die Browser-Rückfrage „Seite verlassen?“. Nur dann — sonst nie. */
+window.addEventListener('beforeunload', function (ev) {
+  if (!ungesendet()) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
+/* Launcher-Fenster geschlossen, während der eigene Eintrag der aktuelle ist:
+   Ohne Gegenmittel bliebe ein toter Eintrag im Verlauf des Tabs, und der
+   erste Druck auf Zurück täte nichts (Probe B1, Fall 2). Darum hier den
+   Eintrag zurücknehmen — über einen Timer IM LAUNCHER: Code dieses
+   Fensters läuft nach dem Entfernen nicht mehr (B1: sofortiges back() und
+   ein Funktions-Timer wirken nicht, ein Text-Timer im Launcher schon). Der
+   Timer prüft zuerst, ob das Fenster wirklich aus dem Launcher entfernt
+   ist; navigiert der Launcher selbst weg, stirbt der Timer mit ihm. Fremder
+   oder gesperrter Gastgeber: dann bleibt es beim verschluckten Druck. */
+window.addEventListener('pagehide', function () {
+  try {
+    if (window.top === window || !eigenerEintrag() || !window.frameElement) return;
+    const oben = window.top;
+    oben.__bosRaFenster = window.frameElement;
+    oben.setTimeout('try { if (window.__bosRaFenster && !window.__bosRaFenster.isConnected) history.back(); } finally { window.__bosRaFenster = null; }', 0);
+  } catch (e) { /* kein Zugriff auf den Gastgeber */ }
+});
+
 function schalteArchiv() {
   S.archivAn = !S.archivAn;
   if (S.archivAn && !S.archiv.length) return ladeArchivSeite();
@@ -1032,8 +1151,17 @@ function start() {
       function (err) { zeigeFehler(t('err_laden', { was: t('offen_titel') }), err); });
     M.grueneWoche(KANAL, function (liste, meta) { S.gruen = liste; S.verbindung.gruen = meta; S.listenDa.gruen = true; syncLetzte(); pflegeMerk(); render(); },
       function (err) { zeigeFehler(t('err_laden', { was: t('gruen_titel') }), err); });
+    // Nach Neuladen: die Ansicht aus dem eigenen Eintrag wiederherstellen
+    // (sonst stünde die Liste da, und der erste Druck auf Zurück täte nichts).
+    if (eigenerEintrag()) {
+      const st = history.state;
+      if (st.ra === 'anfrage' && st.id) { oeffne(st.id, { ohneEintrag: true }); return; }
+      if (st.ra === 'melden' && r.melden) { if (S.geraetAusCode) S.melden.geraet = S.geraetAusCode; zumMelden({ ohneEintrag: true }); return; }
+    }
     if (S.geraetAusCode) {
-      if (r.melden) { S.melden.geraet = S.geraetAusCode; zumMelden(); return; }
+      // Direkteinstieg (QR-Kärtchen): Melden ist die Grundansicht, KEIN
+      // eigener Eintrag — Zurück verlässt die Seite (Bau-Doku N3, Bauplan B).
+      if (r.melden) { S.melden.geraet = S.geraetAusCode; zumMelden({ ohneEintrag: true }); return; }
       const h = document.getElementById('hinweisLeiste');
       h.textContent = t('geraet_ohne_melden', { geraet: S.geraetAusCode }); h.hidden = false;
     }
