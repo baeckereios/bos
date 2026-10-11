@@ -68,7 +68,24 @@
 
    Datum nie über toISOString() (UTC-Falle zwischen 0 und 2 Uhr).
 
+   „NEU“ (Nachtrag 2, 11.10.2026, E23/E24): Die Seite merkt sich je Gerät,
+   bis wann sie eine Anfrage gelesen hat (Gerätespeicher, Sache der Seite).
+   Diese Datei liefert dazu nur Lesen und Rechnen, KEIN neues Feld:
+     neuesterEintrag(id, cb, fehlerCb)  Live: der jüngste Verlaufseintrag
+                          (orderBy ts desc, limit 1) — eine Rückfrage ändert
+                          den Kopf nicht, deshalb reicht geaendertAm nicht.
+                          Ein Eintrag, der noch zum Server unterwegs ist,
+                          kommt mit ts = null.
+     neuMarke(kopf, letzter, merk, kennung, standard)  reine Rechnung:
+                          null oder { art: 'nachricht'|'sonst', ts }.
+
    CHANGELOG
+     2026-10-11 · 09:37 · v0.2 · Feature (Reparaturanfrage, Nachtrag 2)
+       neuesterEintrag() und neuMarke() für die Markierung „neu“; verlauf()
+       liefert je Eintrag ausstehend (true, solange er zum Server unterwegs
+       ist); status() gibt { letzterEintrag } zurück (für „zurücknehmen“
+       aus dem Posteingang ohne veralteten Kopf). Keine neuen Felder, keine
+       Regeländerung.
      2026-10-10 · 09:33 · v0.1 · Erstfassung (Reparaturanfrage Stufe 1)
    ================================================================ */
 window.BOS_MELDUNGEN = (function () {
@@ -229,6 +246,34 @@ window.BOS_MELDUNGEN = (function () {
     if (!w) throw fehler('ungueltig', 'Unbekannter Kanal „' + kanal + '“.');
     return { gemeldet: w.gemeldet, gesehen: w.gesehen, repariert: w.repariert };
   }
+  /* „Neu“ (Nachtrag 2, E24): gibt es etwas VON JEMAND ANDEREM, das jünger
+     ist als der gemerkte Lesezeitpunkt? Kandidaten: die Anfrage selbst
+     (neue fremde Anfrage), der jüngste Verlaufseintrag, und der zuletzt
+     gemerkte fremde Eintrag (merk.f — bleibt stehen, wenn danach ein
+     EIGENER Eintrag kam, z. B. „repariert“ aus dem Posteingang).
+       merk     { g: gelesen bis (ms), f: fremd zuletzt (ms), fa: dessen Art } oder undefined
+       standard Lesezeitpunkt, wenn merk.g fehlt
+     Rückgabe null oder { art: 'nachricht'|'sonst', ts } — der jüngste
+     fremde Kandidat bestimmt die Art. Eigene Einträge machen nie „neu“,
+     Einträge ohne Serverzeit (unterwegs) auch nicht. */
+  function neuMarke(kopf, letzter, merk, kennung, standard) {
+    var g = (merk && typeof merk.g === 'number') ? merk.g : standard;
+    if (typeof g !== 'number') return null;
+    var kand = [];
+    if (kopf && kopf.von && kopf.von !== kennung) {
+      var e = ms(kopf.erstellt);
+      if (e !== null && e > g) kand.push({ ts: e, art: 'anfrage' });
+    }
+    if (letzter && !letzter.ausstehend && letzter.von && letzter.von !== kennung) {
+      var t = ms(letzter.ts);
+      if (t !== null && t > g) kand.push({ ts: t, art: letzter.art });
+    }
+    if (merk && typeof merk.f === 'number' && merk.f > g) kand.push({ ts: merk.f, art: merk.fa || '' });
+    if (!kand.length) return null;
+    kand.sort(function (a, b) { return b.ts - a.ts; });
+    return { art: kand[0].art === 'nachricht' ? 'nachricht' : 'sonst', ts: kand[0].ts };
+  }
+
   function rechteAus(haken, kanal) {
     var h = HAKEN[kanal || 'hausmeister'];
     haken = haken || {};
@@ -376,7 +421,32 @@ window.BOS_MELDUNGEN = (function () {
     }, function (err) { throw einordnen(err); });
   }
   function verlauf(id, cb, fehlerCb) {
-    return abo(datenbank().collection('meldungen').doc(id).collection('verlauf').orderBy('ts'), cb, fehlerCb);
+    return datenbank().collection('meldungen').doc(id).collection('verlauf').orderBy('ts')
+      .onSnapshot({ includeMetadataChanges: true }, function (snap) {
+        var a = [];
+        snap.forEach(function (d) {
+          a.push(Object.assign({ id: d.id }, d.data({ serverTimestamps: 'estimate' }),
+            { ausstehend: !!(d.metadata && d.metadata.hasPendingWrites) }));
+        });
+        cb(a, { ausCache: !!(snap.metadata && snap.metadata.fromCache), ausstehend: !!(snap.metadata && snap.metadata.hasPendingWrites) });
+      }, function (err) { if (fehlerCb) fehlerCb(einordnen(err)); });
+  }
+  /* Nachtrag 2: der jüngste Verlaufseintrag einer Anfrage, live. Eine
+     Einzelfeld-Sortierung braucht keinen eigenen Index; die Leseregel
+     verlauf erlaubt es jedem mit Mitlesen-Haken. cb(eintrag|null).
+     ts kommt OHNE Schätzung: Unterwegs ist ts = null (zählt nicht als neu). */
+  function neuesterEintrag(id, cb, fehlerCb) {
+    return datenbank().collection('meldungen').doc(id).collection('verlauf').orderBy('ts', 'desc').limit(1)
+      .onSnapshot({ includeMetadataChanges: true }, function (snap) {
+        var e = null;
+        snap.forEach(function (d) {
+          if (e) return;
+          var x = d.data({ serverTimestamps: 'none' }) || {};
+          var ausstehend = !!(d.metadata && d.metadata.hasPendingWrites);
+          e = { id: d.id, art: x.art, von: x.von, ts: ausstehend ? null : (x.ts === undefined ? null : x.ts), ausstehend: ausstehend };
+        });
+        cb(e);
+      }, function (err) { if (fehlerCb) fehlerCb(einordnen(err)); });
   }
 
   /* ---------------- Schreiben ---------------- */
@@ -443,8 +513,10 @@ window.BOS_MELDUNGEN = (function () {
       if (STATUS.indexOf(neu) === -1) throw fehler('ungueltig', 'Unbekannter Status „' + neu + '“.');
       if (!erlaubterSchritt(kopf.status, neu)) throw fehler('ungueltig', 'Von „' + kopf.status + '“ nach „' + neu + '“ geht nicht.');
       var batch = datenbank().batch();
-      aenderungInBatch(batch, i, kopf, 'status', neu, grund);
-      return senden(batch, kopf, 'bearbeiten');
+      var eintrag = aenderungInBatch(batch, i, kopf, 'status', neu, grund);
+      // Nachtrag 2: der neue letzterEintrag geht an die Seite zurück
+      // („zurücknehmen“ aus dem Posteingang, bevor die Liste nachgezogen hat).
+      return senden(batch, kopf, 'bearbeiten').then(function () { return { letzterEintrag: eintrag }; });
     });
   }
   function fenster(kopf, datum, grund) {
@@ -503,6 +575,7 @@ window.BOS_MELDUNGEN = (function () {
     grueneWoche: grueneWoche,
     archivSeite: archivSeite,
     verlauf: verlauf,
+    neuesterEintrag: neuesterEintrag,
     anlegen: anlegen,
     status: status,
     fenster: fenster,
@@ -510,6 +583,7 @@ window.BOS_MELDUNGEN = (function () {
     nachricht: nachricht,
     // reine Rechnung (für die Seite und die Tests)
     rechteAus: rechteAus,
+    neuMarke: neuMarke,
     erlaubterSchritt: erlaubterSchritt,
     imArchiv: imArchiv,
     archivAb: archivAb,
