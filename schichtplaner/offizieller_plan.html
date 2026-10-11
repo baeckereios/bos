@@ -330,6 +330,12 @@
       bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei.
       Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
       Beschreibung > „P07 · kein Name hinterlegt“).
+    2026-10-10 · 22:06 · #59 „gehört in den Schichtplan“ · Feature
+      Lädt weiter ALLE Personen (BOS_NAMEN.personenAlle), damit gespeicherte
+      Pläne jede Zeile lesbar behalten — wie bei aktiv:false. Der Nachtrag
+      (beide berechneTagKorrektur-Aufrufe) bekommt nur personenImPlan():
+      Eine Person „nicht im Schichtplan“ kann nie als Ersatz oder
+      „Anwesend“ in einen Nachtrag rutschen.
 -->
 
 <script>
@@ -544,11 +550,17 @@
   function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
   // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
   function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
-  // Personen UND Namensliste zusammen laden; liefert wie vorher den
-  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  // Personen UND Namensliste zusammen laden (bos_namen.js). Hier bewusst
+  // ALLE Personen (#59, 10.10.2026): Ein gespeicherter Plan muss jede Zeile
+  // weiter mit Namen zeigen, auch wenn die Person inzwischen „nicht im
+  // Schichtplan“ steht — genau wie bei aktiv:false. Der Nachtrag rechnet
+  // dagegen nur mit personenImPlan() (siehe berechneNachtrag).
   function personenUndNamen() {
-    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
-      .then(function (r) { return r[0]; });
+    return window.BOS_NAMEN.personenAlle(window.db);
+  }
+  // Die Personen, mit denen gerechnet werden darf (#59).
+  function personenImPlan() {
+    return window.BOS_NAMEN.nurImSchichtplan(personenListe);
   }
 
   // Ausgelagert 16.09.2026 (T-75): hellOderDunkel/hexZuRgba/farbStil
@@ -1026,8 +1038,8 @@
       var bosKontoIdIndex = window.BOS_AUSGLEICHSKONTO_BERECHNUNG.baueBosKontoIdIndex(personenListe);
       var wunschtagIndex = window.BOS_AUSGLEICHSKONTO_BERECHNUNG.baueWunschtagIndex(kontext.wunschtagEvents, bosKontoIdIndex);
       var ereignisseFuerAufruf = baueEreignisseFuerNachtrag(k.plan, k.personId, k.datum, wunschtagIndex);
-      var ergMinimal = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(k.planTag, k.personId, personenListe, positionenListe, ereignisseFuerAufruf, 'minimal');
-      var ergNeu = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(k.planTag, k.personId, personenListe, positionenListe, ereignisseFuerAufruf, 'neu');
+      var ergMinimal = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(k.planTag, k.personId, personenImPlan(), positionenListe, ereignisseFuerAufruf, 'minimal');
+      var ergNeu = window.BOS_KRANKMELDER_BERECHNUNG.berechneTagKorrektur(k.planTag, k.personId, personenImPlan(), positionenListe, ereignisseFuerAufruf, 'neu');
       nachtragZustand[kandidatId] = { ergebnisse: { minimal: ergMinimal, neu: ergNeu }, gewaehlt: null };
       if (btn) { btn.disabled = false; btn.textContent = 'Neu berechnen'; }
       renderNachtragErgebnis(kandidatId);

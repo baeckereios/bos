@@ -111,6 +111,12 @@
       bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei.
       Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
       Beschreibung > „P07 · kein Name hinterlegt“).
+    2026-10-10 · 22:06 · #59 „gehört in den Schichtplan“ · Feature
+      personenUndNamen() lädt über BOS_NAMEN.personenFuerPlanung():
+      Personen mit imSchichtplan:false stehen in keiner Auswahl der
+      Dienstplan-Reihenfolge. Steht eine von ihnen schon in einer
+      gespeicherten Reihenfolge, bleibt sie dort sichtbar mit „(inaktiv
+      oder nicht im Schichtplan)“ statt „(nicht mehr aktiv)“.
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -656,11 +662,12 @@
   function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
   // K-9: Nummer als Zahl (P9 < P10 < P100); fremde IDs ans Ende.
   function nummerZahl(id) { var m = /^P(\d+)$/.exec(id); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; }
-  // Personen UND Namensliste zusammen laden; liefert wie vorher den
-  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  // Personen UND Namensliste zusammen laden (bos_namen.js). Seit 10.10.2026
+  // (#59) OHNE die Personen „nicht im Schichtplan“ (imSchichtplan: false):
+  // Sie stehen in keiner Auswahl und kommen in keine Rechnung. Liefert ein
+  // Snapshot-Imitat (forEach, docs, size, empty) mit den echten Dokumenten.
   function personenUndNamen() {
-    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
-      .then(function (r) { return r[0]; });
+    return window.BOS_NAMEN.personenFuerPlanung(window.db);
   }
 
 
@@ -670,7 +677,7 @@
       html += '<option value="' + p.id + '"' + (p.id === ausgewaehlt ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
     });
     if (ausgewaehlt && !personenListe.find(function (p) { return p.id === ausgewaehlt; })) {
-      html += '<option value="' + ausgewaehlt + '" selected>' + escHtml(auswahlName(ausgewaehlt)) + ' (nicht mehr aktiv)</option>';
+      html += '<option value="' + ausgewaehlt + '" selected>' + escHtml(auswahlName(ausgewaehlt)) + ' (inaktiv oder nicht im Schichtplan)</option>';
     }
     return html;
   }

@@ -1,5 +1,7 @@
 /* ================================================================
    MODUL: bos_namen.js — die EINE Namensfunktion (Namens-Fundament, Schritt 5)
+          und seit 10.10.2026 auch die EINE Personen-Ladefunktion der
+          Planung (Baustelle #59, „gehört in den Schichtplan“)
    ----------------------------------------------------------------
    Ersetzt neun Kopien von anzeigeName() in den Planungsseiten. Jede Seite
    lädt die Namensliste (Firestore 'namen', ein Dokument je Nummer:
@@ -31,8 +33,34 @@
      status()             { geladen, fehler, anzahl, quelle }
      fehlerZeigen(el?)    Grund sichtbar in el oder als Streifen oben
 
+   PERSONEN FÜR DIE PLANUNG (#59, 10.10.2026)
+     Jede Person hat das Feld imSchichtplan (boolean). FEHLT es, gilt
+     „im Plan“ — so bleiben alle Bestandspersonen ohne Schreibvorgang
+     unverändert. false = die Person ist da (Konto, Reparaturanfrage …),
+     wird aber nie eingeteilt (Hausmeister, Fahrer, Verkauf, Büro).
+     Das ist KEIN Ersatz für aktiv: aktiv:false heißt „ausgeschieden,
+     nur noch nicht gelöscht“ (Ulf, 10.10. 09:47).
+     imSchichtplan(person)    true, außer person.imSchichtplan === false.
+                              Die EINZIGE Stelle, die das definiert.
+     nurImSchichtplan(liste)  neue Liste ohne die Personen „nicht im Plan“
+     personenFuerPlanung(db)  Promise: lädt personen UND die Namensliste
+                              zusammen und liefert ein Snapshot-Imitat
+                              OHNE die Personen „nicht im Plan“.
+                              Imitat: forEach(fn), docs, size, empty —
+                              die Einträge sind die echten Firestore-
+                              Dokumente (doc.id, doc.data(), doc.ref …).
+                              Alle acht Planungsseiten laden NUR hierüber;
+                              ein Wächter-Test in der Prüfsuite verlangt das.
+     personenAlle(db)         dasselbe ohne Filter. Nur für den offiziellen
+                              Plan (gespeicherte Pläne bleiben lesbar, der
+                              Nachtrag filtert selbst mit nurImSchichtplan)
+                              und den Personen-Editor.
+     Die Rechenmodule (rechenmodul.js, freie_tage_verteilung.js …) kennen
+     das Feld nicht. Wer nicht in der Liste steht, kommt in keine Rechnung.
+
    ZUGRIFFE: eine Abfrage db.collection('namen').get() je Seite — kein
-   Lesen je Nummer. Regel: namen liest jeder mit Konto (hatKonto()).
+   Lesen je Nummer. personenFuerPlanung/personenAlle: dazu eine Abfrage
+   db.collection('personen').get() je Aufruf (wie vorher auf den Seiten). Regel: namen liest jeder mit Konto (hatKonto()).
    Nichts wird im Gerätespeicher abgelegt.
 
    CHANGELOG
@@ -42,6 +70,10 @@
        entfernt. Neu: räumt EINMALIG den Browserspeicher-Schlüssel
        bos_lokal_personen ab (dort lagen Vor- und Nachnamen aus der
        lokalen Datei), mit Konsolenvermerk; ist er nicht da, passiert nichts.
+     2026-10-10 · v1.2 · Feature (Baustelle #59, „gehört in den Schichtplan“)
+       imSchichtplan, nurImSchichtplan, personenFuerPlanung, personenAlle.
+       Ersetzt den Inhalt der acht wortgleichen personenUndNamen()-Kopien
+       der Planungsseiten. anzeige/auswahl/laden unverändert.
    ================================================================ */
 (function () {
   'use strict';
@@ -162,6 +194,45 @@
     return '— ohne Nummer und Konto';
   }
 
+  /* ---- Personen für die Planung (#59) ---- */
+  function imSchichtplan(person) {
+    return !!person && person.imSchichtplan !== false;
+  }
+
+  function nurImSchichtplan(liste) {
+    return (liste || []).filter(imSchichtplan);
+  }
+
+  // Snapshot-Imitat: bedient alles, was die Planungsseiten am Personen-
+  // Snapshot benutzen (Stand 10.10.: nur forEach mit doc.id/doc.data()),
+  // dazu docs, size, empty wie beim echten QuerySnapshot. Die Dokumente
+  // selbst sind die echten — nichts wird kopiert oder umgebaut.
+  function snapshotAus(docs) {
+    return {
+      docs: docs,
+      size: docs.length,
+      empty: docs.length === 0,
+      forEach: function (fn, dies) { docs.forEach(function (d) { fn.call(dies, d); }); }
+    };
+  }
+
+  function personenLaden(db, filtern) {
+    var d = db || window.db;
+    if (!d || typeof d.collection !== 'function') {
+      // abgelehnt statt geworfen: die Seiten zeigen den Grund in ihrem catch
+      return Promise.reject(new Error('Personen nicht lesbar: keine Firestore-Verbindung (window.db fehlt — bos_firebase_config.js geladen?)'));
+    }
+    return Promise.all([d.collection('personen').get(), laden(d)]).then(function (r) {
+      var alle = [];
+      r[0].forEach(function (doc) { alle.push(doc); });
+      if (!filtern) return snapshotAus(alle);
+      return snapshotAus(alle.filter(function (doc) { return imSchichtplan(doc.data() || {}); }));
+    });
+  }
+
+  function personenFuerPlanung(db) { return personenLaden(db, true); }
+  function personenAlle(db) { return personenLaden(db, false); }
+
   lokalenSpeicherRaeumen();
 
   window.BOS_NAMEN = {
@@ -170,6 +241,10 @@
     auswahl: auswahl,
     anzeigeEinreichung: anzeigeEinreichung,
     status: status,
-    fehlerZeigen: fehlerZeigen
+    fehlerZeigen: fehlerZeigen,
+    imSchichtplan: imSchichtplan,
+    nurImSchichtplan: nurImSchichtplan,
+    personenFuerPlanung: personenFuerPlanung,
+    personenAlle: personenAlle
   };
 })();

@@ -149,6 +149,11 @@
       bos_lokal_daten.js mehr, kein eigenes Lesen der lokalen Datei und keinen Knopf „Namen laden“.
       Namen kommen allein aus der Namensliste (bos_namen.js: Rufname >
       Beschreibung > „P07 · kein Name hinterlegt“).
+    2026-10-10 · 22:06 · #59 „gehört in den Schichtplan“ · Feature
+      personenUndNamen() lädt über BOS_NAMEN.personenFuerPlanung():
+      Personen mit imSchichtplan:false stehen in keiner Auswahl. Eine schon
+      eingetragene erscheint mit „(inaktiv oder nicht im Schichtplan)“
+      statt „(inaktiv)“ und wird nicht still geleert.
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -348,11 +353,12 @@
   function anzeigeName(id) { return window.BOS_NAMEN.anzeige(id); }
   // Auswahllisten (NE-7): "Rufname (Beschreibung)", wenn verschieden.
   function auswahlName(id) { return window.BOS_NAMEN.auswahl(id); }
-  // Personen UND Namensliste zusammen laden; liefert wie vorher den
-  // personen-Snapshot. Die Namensliste lädt nur einmal je Seite.
+  // Personen UND Namensliste zusammen laden (bos_namen.js). Seit 10.10.2026
+  // (#59) OHNE die Personen „nicht im Schichtplan“ (imSchichtplan: false):
+  // Sie stehen in keiner Auswahl und kommen in keine Rechnung. Liefert ein
+  // Snapshot-Imitat (forEach, docs, size, empty) mit den echten Dokumenten.
   function personenUndNamen() {
-    return Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)])
-      .then(function (r) { return r[0]; });
+    return window.BOS_NAMEN.personenFuerPlanung(window.db);
   }
 
   function aktualisiereStatusZeile(text) {
@@ -403,9 +409,10 @@
       html += '<option value="' + p.id + '"' + (p.id === ausgewaehlt ? ' selected' : '') + '>' + escHtml(auswahlName(p.id)) + '</option>';
     });
     // Falls die ausgewählte ID aus irgendeinem Grund nicht (mehr) in der aktiven Liste steht
-    // (z. B. inzwischen inaktiv gesetzt) -- trotzdem anzeigen, nicht stillschweigend leeren.
+    // (z. B. inzwischen inaktiv gesetzt oder seit #59 „nicht im Schichtplan“) -- trotzdem
+    // anzeigen, nicht stillschweigend leeren.
     if (ausgewaehlt && !aktivePersonen.find(function (p) { return p.id === ausgewaehlt; })) {
-      html += '<option value="' + ausgewaehlt + '" selected>' + escHtml(auswahlName(ausgewaehlt)) + ' (inaktiv)</option>';
+      html += '<option value="' + ausgewaehlt + '" selected>' + escHtml(auswahlName(ausgewaehlt)) + ' (inaktiv oder nicht im Schichtplan)</option>';
     }
     return html;
   }

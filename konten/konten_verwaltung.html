@@ -7,6 +7,17 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-10 · 22:06 · v-Schichtplan-59 · Feature (#59 „gehört in den Schichtplan“)
+      Pflichtfrage „Steht diese Person im Schichtplan?“ auf BEIDEN Wegen, auf
+      denen eine Person entsteht: Beschriften „neue Person“ und „+ Neue
+      Person“ im Reiter „Namen“. Zwei Knöpfe ohne Vorauswahl; der Anlegen-
+      Knopf bleibt grau, bis gewählt ist (planWahlen, planFrageHTML,
+      planWahl). Hinweis: „Ja für Backstube und Konditorei. Nein für alle,
+      die nie eingeteilt werden — Hausmeister, Fahrer, Verkauf, Büro.“
+      Beide tx.set schreiben imSchichtplan: true|false ausdrücklich;
+      legeNeuePersonAn() lehnt ohne boolean ab. Rückfrage nennt die Wahl.
+      Bei „vorhandene Person“ und „Ort“ keine Frage, nichts geschrieben.
+      Hilfe-Abschnitt dazu. Keine Regeländerung.
     2026-10-04 · 16:12 · v-Beschriften-Weg · Umbau (Bedien-Falle, Ulf 04.10.)
       Anlass: Ulf wollte online den Rohling backstube04 beschriften, fand
       den Block nicht, wählte stattdessen „Verknüpfte Person“ — damit galt
@@ -30,6 +41,11 @@
         gesetzt wird.
       Keine Änderung an Datenmodell und Regeln. Siehe
       2026-10-04_KONTEN_BESCHRIFTEN_FEHLER.md.
+    2026-10-10 · 10:43 · v-Reparatur-1a · Fix (Reparaturanfrage, Nachtrag 1, F21)
+      Haken-Kästchen im Reiter „Stammdaten“ alle gleich groß (24 × 24):
+      .checkbox-feld input bekommt min-height: 0 und flex-shrink: 0; die
+      Reparatur-Gruppe liegt nicht mehr in .detail-feld (eigene Überschrift
+      .haken-gruppe-titel, Ort-Hinweis .haken-gruppe-hinweis). Sonst nichts.
     2026-10-10 · 09:33 · v-Reparatur-1 · Feature (Reparaturanfrage Stufe 1)
       Konto-Karte, Stammdaten: eigene Gruppe „🔧 Reparaturanfrage“ direkt
       unter den Teigecke-Haken, drei Haken (Mitlesen & antworten / Melden /
@@ -325,7 +341,19 @@
   .detail-feld .readonly-wert { font-size: var(--bos-font-md, .95rem); color: var(--bos-text); padding: var(--bos-space-2xs, .6em) 0; }
   .detail-feld input, .detail-feld select { min-height: var(--bos-tap-min, 44px); }
   .checkbox-feld { display: flex !important; flex-direction: row !important; align-items: center; gap: var(--bos-space-sm, 12px); padding: var(--bos-space-2xs, 4px) 0; }
-  .checkbox-feld input[type="checkbox"] { width: 24px; height: 24px; }
+  /* 10.10.2026 (Nachtrag 1, F21): min-height 0 gegen die 44px aus .detail-feld input,
+     flex-shrink 0, damit langer Text das Kästchen nicht schmal drückt (wie .zugriff-zeile). */
+  .checkbox-feld input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; flex-shrink: 0; }
+  .haken-gruppe-titel { font-size: var(--bos-font-xs, .72rem); letter-spacing: .05em; text-transform: uppercase; color: var(--bos-amber); font-weight: 700; margin-bottom: var(--bos-space-2xs, 6px); }
+  .haken-gruppe-hinweis { font-size: var(--bos-font-sm, .85rem); color: var(--bos-text-dim); margin-top: var(--bos-space-2xs, 6px); }
+  /* #59 Pflichtfrage „Steht diese Person im Schichtplan?“ — zwei Knöpfe, keine Vorauswahl */
+  .plan-frage { margin-top: 8px; }
+  .plan-frage-titel { font-size: var(--bos-font-sm, .85rem); font-weight: 700; margin-bottom: 6px; }
+  .plan-knoepfe { display: flex; gap: 8px; flex-wrap: wrap; }
+  .plan-knopf { flex: 1 1 150px; text-transform: none; letter-spacing: 0; min-height: 44px; }
+  .plan-knopf[aria-pressed="true"] { background: var(--bos-amber); border-color: var(--bos-amber); color: #1a1208; }
+  .plan-hinweis { font-size: var(--bos-font-sm, .85rem); color: var(--bos-text-dim); margin-top: 6px; }
+  .knopf-wartet:disabled { opacity: .45; cursor: not-allowed; transform: none; }
   .checkbox-feld .cb-label { font-size: var(--bos-font-md, .92rem); color: var(--bos-text); text-transform: none; letter-spacing: 0; font-weight: 400; }
 
   .bereich-gruppe { margin-bottom: var(--bos-space-md, 20px); }
@@ -420,9 +448,10 @@
       </p>
       <div class="namen-kopf">
         <input type="text" id="neuPersonBeschreibung" class="bos-input" maxlength="30" placeholder="Neue Person: Beschreibung, z. B. Jörg">
-        <button class="bos-btn" id="neuPersonBtn">+ Neue Person</button>
+        <button class="bos-btn knopf-wartet" id="neuPersonBtn" disabled>+ Neue Person</button>
         <button class="bos-btn bos-btn--amber" id="namenSpeichernBtn">Namen speichern</button>
       </div>
+      <div id="neuPersonPlan" style="margin:0 0 10px;"></div>
       <p id="namenStatus" style="font-size:.82rem; color:var(--bos-text-dim); margin:0 0 8px;"></p>
       <p id="namenErr" class="status-err hidden"></p>
       <div class="namen-tabelle-wrap"><div id="namenListe"></div></div>
@@ -568,6 +597,10 @@ var helpData = {
     {
       heading: "Wie lege ich ein neues Konto an?",
       text: "Oben „Neue Konten vorbereiten“: Bereich und Anzahl wählen, „Kennungen vorschlagen“. Die Seite nimmt die nächsten Nummern aus dem Kontenzähler — eine Kennung wird nie ein zweites Mal vergeben, auch keine gelöschte. Die Adressen legst du in der Firebase-Konsole mit einem Wegwerf-Passwort an und bestätigst hier. Danach steht der Rohling unter „Rohlinge“ und wird dort beschriftet. Sonderfälle außerhalb eines Musters (ein einzelnes Konto mit ganz eigener Kennung) laufen über die Firebase-Konsole: Login UND Dokument von Hand anlegen — und vorher prüfen, dass die Kennung nie vergeben war."
+    },
+    {
+      heading: "„Steht diese Person im Schichtplan?“ — was soll ich wählen?",
+      text: "Die Frage kommt bei jeder NEUEN Person: beim Beschriften mit „neue Person“ und bei „+ Neue Person“ im Reiter „Namen“. Es gibt keine Vorauswahl, „Beschriften“ bzw. „+ Neue Person“ bleibt grau, bis du gewählt hast. Ja für Backstube und Konditorei. Nein für alle, die nie eingeteilt werden — Hausmeister, Fahrer, Verkauf, Büro. Mit „nein“ fehlt die Person in Entwürfen, Rotation, Bankkonto, Sonntagsplan und allen Auswahllisten der Planung; Konto, Reparaturanfrage und alles andere funktionieren wie bei jeder Person. Später umstellen geht im Personen-Editor (Schalter „Steht im Schichtplan“). Beim Verknüpfen einer vorhandenen Person wird nichts gefragt und nichts geändert."
     },
     {
       heading: "Wie funktioniert der Konten-Tab?",
@@ -1065,9 +1098,12 @@ var REPARATUR_HAKEN = [
 function reparaturHakenHTML(k, b) {
   // Ulf, 10.10.2026, 09:13: Melden nur für Personen-Konten — hier nur ein Hinweis, keine Sperre.
   var ortHinweis = (k && k.art === 'ort')
-    ? '<div class="readonly-wert" style="margin-top:6px;">Ort-Konto: „Melden“ ist nur für Personen gedacht — beim Hausmeister soll immer eine Person als Absender stehen.</div>'
+    ? '<div class="haken-gruppe-hinweis">Ort-Konto: „Melden“ ist nur für Personen gedacht — beim Hausmeister soll immer eine Person als Absender stehen.</div>'
     : '';
-  return '<div class="detail-section full"><div class="detail-feld"><label>🔧 Reparaturanfrage</label>' +
+  // Nachtrag 1 (10.10.2026): Überschrift als eigene Zeile, die Kästchen liegen NICHT mehr in
+  // .detail-feld (dort machte min-height: 44px sie größer als die übrigen Haken). Abgetrennt
+  // bleibt die Gruppe durch ihren eigenen .detail-section-Block (Trennlinie) und die Überschrift.
+  return '<div class="detail-section full"><div><div class="haken-gruppe-titel">🔧 Reparaturanfrage</div>' +
     REPARATUR_HAKEN.map(function (h) {
       return '<label class="checkbox-feld"><input type="checkbox" ' + (b[h.feld] ? 'checked' : '') +
         ' onchange="toggleKontoReparatur(\'' + h.feld + '\', this.checked)">' +
@@ -1355,6 +1391,51 @@ document.getElementById('musterAnlegenBtn').addEventListener('click', function (
   }).then(function () { btn.disabled = false; });
 });
 
+// ---- #59 (10.10.2026): Pflichtfrage „Steht diese Person im Schichtplan?“ ----
+// Gilt für BEIDE Wege, auf denen eine Person entsteht: Beschriften „neue
+// Person“ und „+ Neue Person“ im Reiter „Namen“. Zwei Knöpfe, KEINE
+// Vorauswahl (Poka-Yoke): Ein Vorgabewert würde aus einer sichtbaren Lücke
+// eine unsichtbare Falschangabe machen. Der Anlegen-Knopf bleibt grau, bis
+// gewählt ist. Das Ergebnis wird als imSchichtplan: true|false IMMER
+// ausdrücklich geschrieben. Bei „vorhandene Person verknüpfen“ wird nichts
+// gefragt und nichts geschrieben.
+var planWahlen = {};   // { 'b-<kontoId>' | 'neuPerson': true|false }
+function planFrageHTML(schluessel) {
+  var w = planWahlen[schluessel];
+  function knopf(wert, text) {
+    return '<button type="button" class="bos-btn plan-knopf" data-plan="' + schluessel + '" data-wert="' + wert + '" aria-pressed="' + (w === wert) + '"' +
+      ' onclick="planWahl(\'' + schluessel + '\', ' + wert + ')">' + text + '</button>';
+  }
+  return '<div class="plan-frage"><div class="plan-frage-titel">Steht diese Person im Schichtplan?</div>' +
+    '<div class="plan-knoepfe">' + knopf(true, 'im Schichtplan') + knopf(false, 'nicht im Schichtplan') + '</div>' +
+    '<div class="plan-hinweis">Ja für Backstube und Konditorei. Nein für alle, die nie eingeteilt werden — Hausmeister, Fahrer, Verkauf, Büro.</div></div>';
+}
+function planGewaehlt(schluessel) { return typeof planWahlen[schluessel] === 'boolean'; }
+function planWahl(schluessel, wert) {
+  planWahlen[schluessel] = wert === true;
+  document.querySelectorAll('[data-plan="' + schluessel + '"]').forEach(function (b) {
+    b.setAttribute('aria-pressed', String(b.getAttribute('data-wert') === String(wert === true)));
+  });
+  // ein stehengebliebener Hinweis „Bitte wählen …“ ist mit der Wahl erledigt
+  var hinweis = schluessel === 'neuPerson' ? document.getElementById('namenErr') : document.getElementById('bStatus-' + schluessel.slice(2));
+  if (hinweis && /im Schichtplan — ja oder nein/.test(hinweis.textContent)) {
+    hinweis.textContent = '';
+    if (schluessel === 'neuPerson') hinweis.classList.add('hidden');
+  }
+  if (schluessel === 'neuPerson') neuPersonKnopfAktualisieren();
+  else if (schluessel.indexOf('b-') === 0) beschriftenKnopfAktualisieren(schluessel.slice(2));
+}
+function beschriftenBereit(kontoId, art) { return art !== 'b' || planGewaehlt('b-' + kontoId); }
+function beschriftenKnopfAktualisieren(kontoId) {
+  var knopf = document.getElementById('bKnopf-' + kontoId), artEl = document.getElementById('bArt-' + kontoId);
+  if (knopf && artEl) knopf.disabled = !beschriftenBereit(kontoId, artEl.value);
+}
+function neuPersonKnopfAktualisieren() {
+  var knopf = document.getElementById('neuPersonBtn');
+  if (knopf) knopf.disabled = !!namenLadefehler || !planGewaehlt('neuPerson');
+}
+function planText(wert) { return wert ? 'im Schichtplan' : 'NICHT im Schichtplan'; }
+
 // ---- Beschriften (12.2): (a) vorhandene Person, (b) neue Person, (c) Ort ----
 function beschriftenHTML(k) {
   if (!istRohling(k)) return '';
@@ -1371,8 +1452,10 @@ function beschriftenHTML(k) {
     '<select id="bPerson-' + k.id + '"' + (startArt === 'a' ? '' : ' class="hidden"') + ' style="margin-top:6px;"><option value="">— Person wählen —</option>' +
       freiePersonen.map(function (p) { return '<option value="' + p.id + '">' + esc(anzeigeNamePerson(p.id)) + ' (' + p.id + ')</option>'; }).join('') + '</select>' +
     '<input type="text" id="bText-' + k.id + '" class="bos-input' + (startArt === 'a' ? ' hidden' : '') + '" maxlength="30" style="margin-top:6px;" placeholder="Beschreibung, z. B. Jörg">' +
+    '<div id="bPlan-' + k.id + '"' + (startArt === 'b' ? '' : ' class="hidden"') + '>' + planFrageHTML('b-' + k.id) + '</div>' +
     '<select id="bRolle-' + k.id + '" style="margin-top:6px;">' + rollenOptionsHTML(vorschlagRolle) + '</select>' +
-    '<button type="button" class="bos-btn bos-btn--amber" style="margin-top:8px;" onclick="beschriftenKlick(\'' + k.id + '\')">Beschriften und freischalten</button>' +
+    '<button type="button" id="bKnopf-' + k.id + '" class="bos-btn bos-btn--amber knopf-wartet" style="margin-top:8px;" onclick="beschriftenKlick(\'' + k.id + '\')"' +
+      (beschriftenBereit(k.id, startArt) ? '' : ' disabled') + '>Beschriften und freischalten</button>' +
     '<div id="bStatus-' + k.id + '" style="font-size:.78rem; margin-top:6px;"></div>' +
   '</div></div>';
 }
@@ -1382,6 +1465,8 @@ function beschriftenArtWechsel(kontoId) {
   var t = document.getElementById('bText-' + kontoId);
   t.classList.toggle('hidden', art === 'a');
   t.placeholder = art === 'c' ? 'Name des Orts, z. B. Wandtablet Rondo' : 'Beschreibung, z. B. Jörg';
+  document.getElementById('bPlan-' + kontoId).classList.toggle('hidden', art !== 'b');
+  beschriftenKnopfAktualisieren(kontoId);
 }
 function beschriftenStatus(kontoId, text, fehler) {
   var el = document.getElementById('bStatus-' + kontoId);
@@ -1398,6 +1483,9 @@ function beschriftenKlick(kontoId) {
   var personId = document.getElementById('bPerson-' + kontoId).value;
   if (!rolle) { beschriftenStatus(kontoId, 'Bitte eine Rolle wählen — ohne Rolle kein Haken.', true); return; }
   if (art === 'a' && !personId) { beschriftenStatus(kontoId, 'Bitte eine Person wählen.', true); return; }
+  // #59: der Knopf ist ohne Wahl grau — diese Prüfung ist das zweite Schloss
+  if (art === 'b' && !planGewaehlt('b-' + kontoId)) { beschriftenStatus(kontoId, 'Bitte wählen: Steht diese Person im Schichtplan — ja oder nein?', true); return; }
+  var imPlan = art === 'b' ? planWahlen['b-' + kontoId] : null;
   if (art !== 'a' && !text) { beschriftenStatus(kontoId, art === 'c' ? 'Bitte den Namen des Orts eingeben.' : 'Bitte eine Beschreibung eingeben.', true); return; }
   if (text.length > NAMEN_MAX) { beschriftenStatus(kontoId, 'Höchstens ' + NAMEN_MAX + ' Zeichen.', true); return; }
   if (art === 'a' && !(alleNamen[personId] && String(alleNamen[personId].beschreibung || '').trim())) {
@@ -1407,7 +1495,7 @@ function beschriftenKlick(kontoId) {
     var doppelB = namensDoppel(text, null, null);
     if (doppelB.length && !confirm(doppelWarnung(doppelB.map(function (t) { return '„' + text + '“ = ' + t; })))) return;
   }
-  var wer = art === 'a' ? anzeigeNamePerson(personId) + ' (' + personId + ')' : (art === 'b' ? 'neue Person „' + text + '“' : 'Ort „' + text + '“');
+  var wer = art === 'a' ? anzeigeNamePerson(personId) + ' (' + personId + ')' : (art === 'b' ? 'neue Person „' + text + '“, ' + planText(imPlan) : 'Ort „' + text + '“');
   if (!confirm('Rohling ' + kontoId + ' beschriften: ' + wer + ', Rolle ' + (roleName(rolle) || rolle) + ', und freischalten?')) return;
   var adminDb = window.BOS_ACCOUNTS.adminFirestore();
   var kRef = adminDb.collection('bos_accounts').doc(kontoId);
@@ -1442,7 +1530,8 @@ function beschriftenKlick(kontoId) {
           if (p.exists) throw new Error('Die Nummer ' + id + ' gibt es schon — nichts geändert.');
           tx.set(pRef, { status: 'mitarbeiter', abteilung: 'baeckerei', teilbereich: null, stammschicht: null,
             aktiv: true, einsatzfaehig: true, keinRotierenderFreierTag: false, maxSonntageProMonat: null,
-            bosKontoId: kontoId, arbeitstage: null, freieTagOptionen: null, gesperrteSchichten: null });
+            bosKontoId: kontoId, arbeitstage: null, freieTagOptionen: null, gesperrteSchichten: null,
+            imSchichtplan: imPlan });
           tx.set(adminDb.collection('namen').doc(id), { beschreibung: text, rufname: '' });
           tx.set(zaehlerRef, { hoechste: n });
           tx.update(kRef, { role: rolle, art: 'person', freigeschaltet: true });
@@ -1454,6 +1543,7 @@ function beschriftenKlick(kontoId) {
     arbeit = kRef.update({ name: text, role: rolle, art: 'ort', freigeschaltet: true }).then(function () { return null; });
   }
   arbeit.then(function (pid) {
+    delete planWahlen['b-' + kontoId];
     return ladeAllesUndRender().then(function () {
       oeffneKontoKarte(kontoId); waehleKontoKartenTab('konto');
       beschriftenStatus(kontoId, '✓ ' + kontoId + ' beschriftet' + (pid ? ' (' + pid + ')' : ' (Ort)') + ' und freigeschaltet. Jetzt das Zugangsblatt drucken.');
@@ -1969,7 +2059,7 @@ function renderNamen() {
   // Ohne lesbare Namensliste wäre jede Eingabe ein „neuer“ Eintrag über
   // womöglich vorhandene — deshalb dann nichts bedienbar, nur der Grund.
   document.getElementById('namenSpeichernBtn').disabled = !!namenLadefehler;
-  document.getElementById('neuPersonBtn').disabled = !!namenLadefehler;
+  neuPersonKnopfAktualisieren();   // #59: gesperrt bei Ladefehler ODER ohne Schichtplan-Wahl
   if (namenLadefehler) {
     err.textContent = 'Namensliste konnte nicht geladen werden: ' + ((namenLadefehler.code ? namenLadefehler.code + ' — ' : '') + (namenLadefehler.message || String(namenLadefehler))) +
       ' — ist der Regelblock „namen“ veröffentlicht? Speichern und „+ Neue Person“ sind gesperrt, die Konten bleiben bedienbar.';
@@ -2178,7 +2268,9 @@ function hoechsteBekannteNummer() {
 // Person + Namenseintrag + Zähler in einem Zug. Die Web-SDK-Transaktion
 // liest nur Einzeldokumente — die höchste vorhandene Nummer kommt deshalb
 // aus der geladenen Liste; Zähler und Existenzprüfung fangen Abweichungen.
-function legeNeuePersonAn(beschreibung) {
+function legeNeuePersonAn(beschreibung, imSchichtplan) {
+  // #59: ohne ausdrückliche Wahl keine Person
+  if (typeof imSchichtplan !== 'boolean') return Promise.reject(new Error('Steht die Person im Schichtplan? Bitte „im Schichtplan“ oder „nicht im Schichtplan“ wählen.'));
   var adminDb = window.BOS_ACCOUNTS.adminFirestore();
   var zaehlerRef = adminDb.collection('einstellungen').doc('personen_nummern');
   var bekannt = hoechsteBekannteNummer();
@@ -2194,7 +2286,8 @@ function legeNeuePersonAn(beschreibung) {
         tx.set(personRef, {
           status: 'mitarbeiter', abteilung: 'baeckerei', teilbereich: null, stammschicht: null,
           aktiv: true, einsatzfaehig: true, keinRotierenderFreierTag: false, maxSonntageProMonat: null,
-          bosKontoId: null, arbeitstage: null, freieTagOptionen: null, gesperrteSchichten: null
+          bosKontoId: null, arbeitstage: null, freieTagOptionen: null, gesperrteSchichten: null,
+          imSchichtplan: imSchichtplan
         });
         tx.set(adminDb.collection('namen').doc(id), { beschreibung: beschreibung, rufname: '' });
         tx.set(zaehlerRef, { hoechste: n });
@@ -2204,19 +2297,26 @@ function legeNeuePersonAn(beschreibung) {
   });
 }
 
+document.getElementById('neuPersonPlan').innerHTML = planFrageHTML('neuPerson');
+neuPersonKnopfAktualisieren();
 document.getElementById('neuPersonBtn').addEventListener('click', function () {
   var e = document.getElementById('namenErr'); e.textContent = ''; e.classList.add('hidden');
   var feld = document.getElementById('neuPersonBeschreibung');
   var beschreibung = feld.value.trim();
   if (!beschreibung) { zeigeNamenFehler('Bitte zuerst eine Beschreibung eingeben (z. B. „Jörg“) — eine Person gibt es nur mit Namenseintrag.'); return; }
+  if (!planGewaehlt('neuPerson')) { zeigeNamenFehler('Bitte wählen: Steht die neue Person im Schichtplan — ja oder nein?'); return; }
+  var imPlan = planWahlen.neuPerson;
   if (beschreibung.length > NAMEN_MAX) { zeigeNamenFehler('Beschreibung länger als ' + NAMEN_MAX + ' Zeichen.'); return; }
   var doppelNeu = namensDoppel(beschreibung, null, null);
   if (doppelNeu.length && !confirm(doppelWarnung(doppelNeu.map(function (t) { return '„' + beschreibung + '“ = ' + t; })))) return;
   if (namenGeaendert && !confirm('Es gibt ungespeicherte Namen. Die neue Person anlegen lädt die Liste neu — die ungespeicherten Namen gehen verloren. Trotzdem?')) return;
-  if (!confirm('Neue Person „' + beschreibung + '“ anlegen?\n\nSie bekommt die nächste freie Nummer — für immer. Einsatzdaten danach im Personen-Editor.')) return;
+  if (!confirm('Neue Person „' + beschreibung + '“ anlegen, ' + planText(imPlan) + '?\n\nSie bekommt die nächste freie Nummer — für immer. Einsatzdaten danach im Personen-Editor.')) return;
   var btn = this; btn.disabled = true;
-  legeNeuePersonAn(beschreibung).then(function (id) {
+  legeNeuePersonAn(beschreibung, imPlan).then(function (id) {
     feld.value = '';
+    // nächste Person: wieder ohne Vorauswahl
+    delete planWahlen.neuPerson;
+    document.getElementById('neuPersonPlan').innerHTML = planFrageHTML('neuPerson');
     namenGeaendert = false;
     return ladeAllesUndRender().then(function () {
       document.getElementById('namenStatus').textContent = '✓ ' + id + ' „' + beschreibung + '“ angelegt — Einsatzdaten im Personen-Editor ergänzen. ' + document.getElementById('namenStatus').textContent;
@@ -2224,7 +2324,7 @@ document.getElementById('neuPersonBtn').addEventListener('click', function () {
   }).catch(function (f) {
     console.error('Konten-Verwaltung: Neue Person fehlgeschlagen', f);
     zeigeNamenFehler('Keine Person angelegt: ' + namenFehlertext(f));
-  }).then(function () { btn.disabled = false; });
+  }).then(function () { neuPersonKnopfAktualisieren(); });
 });
 
 // ==========================================================================

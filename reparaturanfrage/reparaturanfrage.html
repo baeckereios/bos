@@ -17,6 +17,10 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-10-10 · 10:43 · v0.1a · Fix (Nachtrag 1)
+      titelVon(): Gerät nur voranstellen, wenn der Text nicht schon damit
+      beginnt (ohne Groß/Klein, ohne Randleerzeichen). Geöffnete Anfrage
+      unverändert (Zeile „Gerät“).
     2026-10-10 · 09:33 · v0.1 · Erstfassung (Reparaturanfrage Stufe 1)
       ANWEISUNG_2026-10-10_REPARATURANFRAGE_STUFE1.md (KC 08:53), Bauplan
       SESSION_2026-10-10_REPARATURANFRAGE_STUFE1_BAU.md (Freigabe KC 09:12).
@@ -371,9 +375,14 @@ function findeKopf(id) {
   for (let i = 0; i < liste.length; i++) if (liste[i].id === id) return liste[i];
   return null;
 }
+/* Nachtrag 1 (10.10.2026): Das Gerät nur voranstellen, wenn der Text nicht schon
+   damit beginnt (ohne Groß/Klein, ohne Randleerzeichen) — sonst „Kneter 2 — Kneter 2 …“. */
 function titelVon(k) {
-  if (k.geraet) return k.geraet + ' — ' + k.text;
-  return k.text;
+  const geraet = String(k.geraet || '').trim();
+  const text = String(k.text || '');
+  if (!geraet) return text;
+  if (text.trim().toLocaleLowerCase('de').indexOf(geraet.toLocaleLowerCase('de')) === 0) return text;
+  return geraet + ' — ' + text;
 }
 
 /* ---------- Zeichnen ---------- */

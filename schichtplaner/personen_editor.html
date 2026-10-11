@@ -220,6 +220,12 @@
       dem Firestore-Schreiben (speichereLokalePerson, heuteLokalIso und die
       Teilerfolg-Meldung A-4 entfallen mit ihm — es gibt nur noch EINEN
       Schreibvorgang). Hilfetext: Namen kommen aus der Namensliste.
+    2026-10-10 · 22:06 · #59 „gehört in den Schichtplan“ · Feature
+      Schalter „Steht im Schichtplan“ (fehlendes Feld = an) mit Hinweis,
+      Kennzeichen „nicht im Plan“ in der Liste wie „Inaktiv“, Hilfe-
+      Abschnitt zum Unterschied. Speichern schreibt imSchichtplan NUR, wenn
+      sich der Wert gegenüber dem geladenen ändert. Laden über
+      BOS_NAMEN.personenAlle (alle Personen, wie vorher).
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -273,6 +279,7 @@
   .person-flag{ font-size: var(--bos-font-2xs,.66rem); font-family:var(--font-label); font-weight:800; text-transform:uppercase; padding:2px 6px; border-radius:6px; }
   .person-flag.kein-konto{background:rgba(214,88,74,.15); color:var(--danger);}
   .person-flag.inaktiv{background:var(--surface-2); color:var(--dim-2);}
+  .person-flag.nicht-im-plan{background:var(--surface-2); color:var(--dim-2);}
 
   .leer-hinweis, .lade-hinweis{ text-align:center; padding: var(--bos-space-lg,26px) var(--bos-space-md,16px); color:var(--dim); font-size: var(--bos-font-md,.92rem); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
 
@@ -409,6 +416,14 @@
 
     <div class="feld">
       <label class="checkbox-row" style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="fImSchichtplan" checked style="width:20px;height:20px;accent-color:var(--amber);">
+        <span>Steht im Schichtplan</span>
+      </label>
+      <p class="feld-hinweis" style="font-size:.76rem; color:var(--dim); margin-top:6px;">Aus für alle, die nie eingeteilt werden — Hausmeister, Fahrer, Verkauf, Büro. Die Person fehlt dann in Entwürfen, Rotation, Bankkonto, Sonntagsplan und allen Auswahllisten der Planung. Schon gespeicherte Pläne zeigen sie weiter. Backstube und Konditorei: an.</p>
+    </div>
+
+    <div class="feld">
+      <label class="checkbox-row" style="display:flex; align-items:center; gap:8px;">
         <input type="checkbox" id="fKeinRotierenderFreierTag" style="width:20px;height:20px;accent-color:var(--amber);">
         <span>Kein rotierender freier Tag nötig (arbeitet an allen markierten Tagen wirklich durch, z. B. wenige Stunden täglich)</span>
       </label>
@@ -435,6 +450,8 @@
     <p>Aus der Namensliste in der Kontenverwaltung (Reiter „Namen“): der Rufname, den sich jemand selbst gibt, sonst deine Beschreibung. Hier wird kein Name eingegeben oder gespeichert. Nachnamen gibt es im System nicht.</p>
     <h3>Wofür ist dann noch die Konto-Verknüpfung?</h3>
     <p>Sie sagt, welches Konto zu dieser Person gehört: Wunschtage werden darüber zugeordnet, und der Kollege sieht darüber seinen eigenen Kontostand. Deshalb ändert sie nur die Admin-Anmeldung, in der Kontenverwaltung. Hier ist sie nur zu sehen.</p>
+    <h3>„Steht im Schichtplan“ und „Aktiv“ — was ist der Unterschied?</h3>
+    <p>„Steht im Schichtplan“ aus: Die Person gehört zum Betrieb (Konto, Reparaturanfrage …), wird aber nie eingeteilt — Hausmeister, Fahrer, Verkauf, Büro. „Aktiv“ aus: Die Person ist ausgeschieden und nur noch nicht gelöscht. Beides nimmt die Person aus der Planung, meint aber etwas anderes. In der Liste steht dann „nicht im Plan“ bzw. „Inaktiv“. Ältere Personen ohne Angabe gelten als „im Schichtplan“.</p>
     <h3>Wo lege ich neue Personen an?</h3>
     <p>In der Kontenverwaltung, Reiter „Namen“ (Admin-Passwort). Eine neue Nummer ist eine neue Identität im System; Anlegen, Namen und Verknüpfen gibt es deshalb nur dort. Hier pflegst du die Einsatzdaten bestehender Personen — Schicht, Arbeitstage, Sperren.</p>
     <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
@@ -464,8 +481,9 @@
   function ladePersonen() {
     var liste = document.getElementById('personenListe');
     liste.innerHTML = '<div class="lade-hinweis">Lade …</div>';
-    Promise.all([window.db.collection('personen').get(), window.BOS_NAMEN.laden(window.db)]).then(function (r) {
-      var snap = r[0];
+    // #59: alle Personen, auch „nicht im Schichtplan“ — sonst ließe sich der
+    // Schalter nicht zurückstellen.
+    window.BOS_NAMEN.personenAlle(window.db).then(function (snap) {
       var eintraege = [];
       snap.forEach(function (doc) { eintraege.push(Object.assign({ id: doc.id }, doc.data())); });
       eintraege.sort(function (a, b) { return a.id.localeCompare(b.id); });
@@ -492,7 +510,8 @@
       var nameHtml = '';
       var flags = '';
       if (!p.bosKontoId) flags += '<span class="person-flag kein-konto">Kein Konto</span> ';
-      if (!p.aktiv) flags += '<span class="person-flag inaktiv">Inaktiv</span>';
+      if (!p.aktiv) flags += '<span class="person-flag inaktiv">Inaktiv</span> ';
+      if (!window.BOS_NAMEN.imSchichtplan(p)) flags += '<span class="person-flag nicht-im-plan">nicht im Plan</span>';
       return '<div class="person-zeile" data-id="' + p.id + '">' +
         '<div class="person-id">' + p.id + '</div>' +
         '<div class="person-info">' +
@@ -552,6 +571,8 @@
     setzeAuswahl('fTeilbereich', person && person.teilbereich, '');
     setzeAuswahl('fStammschicht', person && person.stammschicht, '');
     document.getElementById('fAktiv').checked = person ? !!person.aktiv : true;
+    // #59: fehlendes Feld = im Plan (BOS_NAMEN.imSchichtplan ist die eine Definition)
+    document.getElementById('fImSchichtplan').checked = person ? window.BOS_NAMEN.imSchichtplan(person) : true;
     document.getElementById('fKeinRotierenderFreierTag').checked = person ? !!person.keinRotierenderFreierTag : false;
     document.getElementById('fMaxSonntage').value = (person && person.maxSonntageProMonat != null) ? person.maxSonntageProMonat : '';
     setzeChips('fArbeitstage', person && person.arbeitstage ? person.arbeitstage : ['mo','di','mi','do','fr','sa','so'], 'tag');
@@ -615,6 +636,12 @@
       freieTagOptionen: freieTagOptionenAktiv.length ? freieTagOptionenAktiv : null,
       gesperrteSchichten: gesperrteSchichten.length ? gesperrteSchichten : null
     };
+
+    // #59: imSchichtplan nur schreiben, wenn sich der Wert ändert. Bestands-
+    // personen ohne Feld bekommen so keins, solange niemand den Schalter
+    // anfasst. Verglichen wird mit der Bedeutung (fehlt = im Plan).
+    var imPlanNeu = document.getElementById('fImSchichtplan').checked;
+    if (imPlanNeu !== window.BOS_NAMEN.imSchichtplan(bearbeitetePerson || {})) daten.imSchichtplan = imPlanNeu;
 
     var btn = document.getElementById('speichernBtn');
     btn.disabled = true; btn.textContent = 'Speichert …';
