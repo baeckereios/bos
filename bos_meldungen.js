@@ -79,7 +79,40 @@
      neuMarke(kopf, letzter, merk, kennung, standard)  reine Rechnung:
                           null oder { art: 'nachricht'|'sonst', ts }.
 
+   FOTOS (Stufe 2, 12.10.2026, Bau-Doku SESSION_2026-10-11_REPARATURANFRAGE_STUFE2_BAU.md):
+   Cloud Storage, Regeln speicher_regeln_2026-10-12_fotos.rules (RK, Abschnitt
+   Speicher). Braucht firebase-storage-compat.js (lädt nur die Reparaturanfrage);
+   fehlt es, gehen Fotos nicht, Text schon. KEIN neues Firestore-Feld:
+     meldungen/<anfrageId>/<eintrag>~<kennung>~<n>.jpg    n = 1..3
+       eintrag = 'anfrage' (Fotos der Meldung) oder Kennung des Verlaufseintrags
+     meldungen/<anfrageId>/geloescht~<anzahl>~<JJJJ-MM-TT> leerer Vermerk
+   Reihenfolge: Foto zuerst, Eintrag danach, mit vorab vergebener Kennung
+   (neueAnfrageId/neueEintragId). Angezeigt wird ein Foto nur, wenn die
+   Kennung im Namen der Absender des Eintrags ist (fotosFuer).
+   Abruf NIE über Download-Adressen (getDownloadURL), sondern mit Anmeldung
+   (fotoHolen: fetch mit ID-Token, die Regel prüft bei jedem Abruf; der
+   Speicher braucht dafür einmal CORS).
+   Verkleinern am Gerät: längste Kante 1600 (sonst 1280), JPEG ≤ 300 KB,
+   Drehung aus den Kameradaten übernommen, Kameradaten und Standort weg.
+   Fehlerarten zusätzlich:
+     'speicher_fehlt'     Foto-Modul nicht geladen
+     'speicher_aus'       Speicher nicht erreichbar / Bezahlkonto aus (402 …)
+     'speicher_regel_alt' abgelehnt, und die Speicher-Regelstand-Probe sagt: alt
+     'nicht_da'           Foto gibt es nicht (mehr)
+     'abruf'              Abruf scheiterte im Browser (kein Netz oder CORS)
+     'foto_lesen'         Foto lässt sich am Gerät nicht lesen/verkleinern
+     'abgebrochen'        Hochladen vom Nutzer abgebrochen (verworfen)
+
    CHANGELOG
+     2026-10-12 · 01:57 · v0.3 · Feature (Reparaturanfrage Stufe 2, Fotos)
+       Fotos: verkleinern, neueAnfrageId/neueEintragId, fotoHochladen (mit
+       Abbruch-Griff), fotosListen, fotosFuer, fotoHolen, fotosEinerAnfrage-
+       Loeschen, archivFotosAufraeumen (Fenster 7 + 90 Tage, 1 Std.
+       Uhr-Spielraum), pruefeSpeicherRegelstand, fotosVerfuegbar.
+       anlegen()/nachricht() nehmen eine vorab vergebene Kennung (opt. id /
+       eintragId) und prüfen bei Wiederholung zuerst Gerät, dann Server, ob
+       der Eintrag schon geschrieben ist. Ohne Kennung unverändert.
+       Firestore-Regel unverändert.
      2026-10-11 · 09:37 · v0.2 · Feature (Reparaturanfrage, Nachtrag 2)
        neuesterEintrag() und neuMarke() für die Markierung „neu“; verlauf()
        liefert je Eintrag ausstehend (true, solange er zum Server unterwegs
@@ -101,6 +134,7 @@ window.BOS_MELDUNGEN = (function () {
   var STATUS = ['gemeldet', 'gesehen', 'repariert'];
   var DRINGLICHKEIT = ['normal', 'dringend'];
   var WEITERARBEITEN = ['ja', 'eingeschraenkt', 'nein'];
+  var KENNUNG_RE = /^[A-Za-z0-9]{1,40}$/;   // Dokument-Kennungen (Firestore vergibt 20 Zeichen)
 
   /* Beschriftung je Kanal. Der Status ist bei allen Kanälen gleich, nur die
      Wörter unterscheiden sich (Ulf, 10.10.2026, 07:45). */
@@ -466,15 +500,38 @@ window.BOS_MELDUNGEN = (function () {
       if (WEITERARBEITEN.indexOf(eingabe.weiterarbeiten) === -1) throw fehler('ungueltig', 'Bitte antippen: Kann weitergearbeitet werden?');
       var geraet = sauber(eingabe.geraet, GRENZEN.geraet);
       var db = datenbank();
-      var ref = db.collection('meldungen').doc();
+      if (eingabe.id !== undefined && !KENNUNG_RE.test(String(eingabe.id))) throw fehler('ungueltig', 'Ungültige Kennung der Anfrage.');
+      var ref = eingabe.id ? db.collection('meldungen').doc(eingabe.id) : db.collection('meldungen').doc();
       var kopf = {
         kanal: kanal, text: text, geraet: geraet, weiterarbeiten: eingabe.weiterarbeiten,
         von: i.kennung, vonName: sauber(i.name, GRENZEN.name), erstellt: serverZeit(),
         status: 'gemeldet', dringlichkeit: 'normal', fenster: '', repariertAm: null,
         geaendertVon: i.kennung, geaendertAm: serverZeit(), letzterEintrag: ''
       };
-      return mitZeitlimit(ref.set(kopf)).then(function () { return ref.id; },
-        function (err) { return ursache(err, null, 'melden').then(function (e) { throw e; }); });
+      // Stufe 2: Wiederholung mit derselben Kennung (Fotos sind schon oben).
+      // Ist die Anfrage doch angekommen, nicht noch einmal schreiben — ein
+      // zweites set wäre beim Server eine Änderung, und die lehnt die Regel ab.
+      var schon = eingabe.id && eingabe.wiederholung ? schonGeschrieben(ref, i.kennung) : Promise.resolve(false);
+      return schon.then(function (da) {
+        if (da) return ref.id;
+        return mitZeitlimit(ref.set(kopf)).then(function () { return ref.id; },
+          function (err) { return ursache(err, null, 'melden').then(function (e) { throw e; }); });
+      });
+    });
+  }
+
+  /* Stufe 2, Wiederholung mit derselben Kennung: Ist der Eintrag schon
+     geschrieben? Erst auf dem Gerät — ein Schreibvorgang, der nach dem
+     Zeitlimit noch zum Server unterwegs ist, steht dort schon (dann NICHT
+     noch einmal schreiben, er kommt an) —, dann beim Server. Ist der Server
+     nicht erreichbar: noch einmal schreiben. Doppelt wird es dadurch nie,
+     die Kennung ist dieselbe; im ungünstigsten Fall lehnt die Regel das
+     zweite Schreiben ab, und die Seite zeigt den Grund. */
+  function schonGeschrieben(ref, kennung) {
+    function vonMir(snap) { return !!(snap && snap.exists && (snap.data() || {}).von === kennung); }
+    return ref.get({ source: 'cache' }).then(vonMir, function () { return false; }).then(function (geraet) {
+      if (geraet) return true;
+      return ref.get({ source: 'server' }).then(vonMir, function () { return false; });
     });
   }
 
@@ -546,20 +603,356 @@ window.BOS_MELDUNGEN = (function () {
   /* Nachricht. Mit Bearbeiten-Haken auf einer roten Anfrage: im selben
      Batch auf „gesehen“ (Ulf, 08:52 — wer antwortet, hat gesehen).
      Rückgabe: { gesehenGesetzt: true|false }. */
-  function nachricht(kopf, text) {
+  /* Stufe 2: opt.eintragId = vorab vergebene Kennung (Fotos liegen schon
+     darunter); opt.wiederholung = vorher prüfen, ob der Eintrag schon da ist. */
+  function nachricht(kopf, text, opt) {
+    opt = opt || {};
     return ich().then(function (i) {
       if (!i.rechte.lesen) throw fehler('kein_haken', 'Dafür fehlt dir ein Haken der Reparaturanfrage — Ulf fragen.');
       if (!kopf || !kopf.id) throw fehler('ungueltig', 'Keine Anfrage gewählt.');
       if (imArchiv(kopf)) throw fehler('archiviert', 'Diese Anfrage liegt im Archiv — der Chat ist zu.');
       var t = pruefeText(text, GRENZEN.nachricht, 'Die Nachricht ist leer.');
+      if (opt.eintragId !== undefined && !KENNUNG_RE.test(String(opt.eintragId))) throw fehler('ungueltig', 'Ungültige Kennung des Eintrags.');
       var db = datenbank();
-      var batch = db.batch();
-      var gesehen = i.rechte.bearbeiten && kopf.status === 'gemeldet';
-      if (gesehen) aenderungInBatch(batch, i, kopf, 'status', 'gesehen', 'Antwort im Chat');
-      batch.set(db.collection('meldungen').doc(kopf.id).collection('verlauf').doc(), {
-        art: 'nachricht', von: i.kennung, vonName: sauber(i.name, GRENZEN.name), ts: serverZeit(), text: t
+      var eRef = opt.eintragId ? db.collection('meldungen').doc(kopf.id).collection('verlauf').doc(opt.eintragId)
+                               : db.collection('meldungen').doc(kopf.id).collection('verlauf').doc();
+      var schon = opt.eintragId && opt.wiederholung ? schonGeschrieben(eRef, i.kennung) : Promise.resolve(false);
+      return schon.then(function (da) {
+        if (da) return { gesehenGesetzt: false, schonDa: true };
+        var batch = db.batch();
+        var gesehen = i.rechte.bearbeiten && kopf.status === 'gemeldet';
+        if (gesehen) aenderungInBatch(batch, i, kopf, 'status', 'gesehen', 'Antwort im Chat');
+        batch.set(eRef, {
+          art: 'nachricht', von: i.kennung, vonName: sauber(i.name, GRENZEN.name), ts: serverZeit(), text: t
+        });
+        return senden(batch, kopf, 'lesen').then(function () { return { gesehenGesetzt: gesehen }; });
       });
-      return senden(batch, kopf, 'lesen').then(function () { return { gesehenGesetzt: gesehen }; });
+    });
+  }
+
+  /* ================================================================
+     FOTOS (Stufe 2)
+     ================================================================ */
+  var SPEICHER_FASSUNG = 'speicher-2026-10-12';
+  var SPEICHER_DATEI = 'speicher_regeln_2026-10-12_fotos.rules';
+  var FOTO = {
+    max: 3,
+    kanten: [1600, 1280],         // erst 1600 px, reicht das nicht: 1280 px
+    ziel: 300 * 1024,             // Richtwert (Anweisung §4)
+    qStart: 0.82, qMin: 0.5, qSchritt: 0.08,
+    hochladenMs: 60000,           // je Foto, dann Abbruch mit Grund
+    abrufMs: 30000,
+    regelMax: 600 * 1024          // Grenze der Speicher-Regel
+  };
+  var AUFRAEUM_TAGE = 90;        // = Lebensdauer-Regel am Speicher (Ulf, 12.10.)
+  var UHR_SPIELRAUM_MS = 60 * 60 * 1000;   // Aufräumen erst 1 Std. nach dem Archivtag (Geräteuhr vs. Serverzeit)
+  var FOTO_RE = /^([A-Za-z0-9]{1,40})~([^~\/]{1,60})~([1-3])\.jpg$/;
+  var VERMERK_RE = /^geloescht~([1-9][0-9]?)~(20[0-9]{2}-[01][0-9]-[0-3][0-9])$/;
+
+  function speicher() {
+    if (!window.firebase || typeof firebase.storage !== 'function') {
+      throw fehler('speicher_fehlt', 'Das Foto-Modul ist nicht geladen (firebase-storage-compat.js) — Fotos gehen gerade nicht, Text schon. Seite neu laden; bleibt es, Ulf Bescheid geben.');
+    }
+    var sp = firebase.storage();
+    if (!speicher.eingestellt) {
+      speicher.eingestellt = true;
+      // Ohne Netz nicht zwei Minuten still warten (Standard des SDK), sondern mit Grund aufhören.
+      try { sp.setMaxOperationRetryTime(20000); sp.setMaxUploadRetryTime(FOTO.hochladenMs); } catch (e) { /* ältere Fassung */ }
+    }
+    return sp;
+  }
+  function fotosVerfuegbar() {
+    try { speicher(); return { ok: true }; } catch (e) { return { ok: false, grund: e }; }
+  }
+  function neueAnfrageId() { return datenbank().collection('meldungen').doc().id; }
+  function neueEintragId(anfrageId) { return datenbank().collection('meldungen').doc(anfrageId).collection('verlauf').doc().id; }
+
+  /* Speicher-Antwort einordnen, ohne Nachfragen. */
+  function speicherEinordnen(err) {
+    if (err && err.art) return err;
+    var code = String((err && err.code) || '');
+    var status = err && typeof err.status === 'number' ? err.status : 0;
+    var text = String((err && err.message) || '') + ' ' + String((err && err.customData && err.customData.serverResponse) || (err && err.serverResponse) || '');
+    if (status === 402 || /\b402\b/.test(text) || code === 'storage/quota-exceeded' || code === 'storage/bucket-not-found' || code === 'storage/project-not-found') {
+      return fehler('speicher_aus', 'Der Foto-Speicher ist nicht erreichbar oder das Bezahlkonto ist aus — Ulf Bescheid geben. Text geht weiter.', err);
+    }
+    if (code === 'storage/unauthorized') return fehler('keine_berechtigung', 'Der Foto-Speicher hat abgelehnt.', err);
+    if (code === 'storage/unauthenticated') return fehler('nicht_angemeldet', 'Nicht angemeldet — bitte an der Tür anmelden.', err);
+    if (code === 'storage/retry-limit-exceeded') return fehler('kein_netz', 'Keine Verbindung zum Foto-Speicher (WLAN?).', err);
+    if (code === 'storage/object-not-found') return fehler('nicht_da', 'Das Foto gibt es nicht (mehr).', err);
+    return fehler('fehler', 'Unerwarteter Fehler beim Foto-Speicher.', err);
+  }
+  /* Regelstand-Probe Speicher: Abfrage einer Datei, die es nicht gibt.
+     404 = diese Regeln stehen ('passt'), 403 = alte Regeln ('alt').
+     'fehlt' = Modul nicht geladen, 'aus' = Speicher/Bezahlkonto. */
+  function pruefeSpeicherRegelstand() {
+    var ref;
+    try { ref = speicher().ref('bos_regelstand/' + SPEICHER_FASSUNG); } catch (e) { return Promise.resolve('fehlt'); }
+    return ref.getMetadata().then(function () { return 'passt'; }, function (err) {
+      var c = err && err.code;
+      if (c === 'storage/object-not-found') return 'passt';
+      if (c === 'storage/unauthorized') return 'alt';
+      return speicherEinordnen(err).art === 'speicher_aus' ? 'aus' : 'unbekannt';
+    });
+  }
+  /* Warum hat der Speicher „nein“ gesagt? Erst Regelstand, dann Haken. */
+  function ursacheSpeicher(err, braucht) {
+    var e = speicherEinordnen(err);
+    if (e.art !== 'keine_berechtigung') return Promise.resolve(e);
+    return pruefeSpeicherRegelstand().then(function (stand) {
+      if (stand === 'alt') {
+        return fehler('speicher_regel_alt', 'Die Speicher-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „' + SPEICHER_FASSUNG +
+          '“). Bitte die Regeldatei ' + SPEICHER_DATEI + ' im Storage einsetzen. Stehen sie schon: Speicher bzw. Bezahlkonto prüfen.', err, { regelDatei: SPEICHER_DATEI });
+      }
+      if (stand === 'aus') return fehler('speicher_aus', 'Der Foto-Speicher ist nicht erreichbar oder das Bezahlkonto ist aus — Ulf Bescheid geben. Text geht weiter.', err);
+      return ich(true).then(function (i) {
+        if (braucht && !i.rechte[braucht]) {
+          var name = { lesen: 'Mitlesen & antworten', melden: 'Melden', bearbeiten: 'Bearbeiten' }[braucht];
+          return fehler('kein_haken', 'Dafür fehlt dir der Haken „' + name + '“ (Reparaturanfrage) — Ulf fragen.', err);
+        }
+        return fehler('keine_berechtigung', 'Der Foto-Speicher hat abgelehnt. Mögliche Gründe: die Anfrage ist inzwischen im Archiv, das Foto gibt es schon, oder Speicher bzw. Bezahlkonto ist aus — sonst Ulf Bescheid geben.', err);
+      });
+    }).catch(function () { return e; });
+  }
+
+  /* ---------- Verkleinern am Gerät ----------
+     Liest das Foto mit der Drehung aus den Kameradaten (Hochformat bleibt
+     hoch), zeichnet es neu und speichert ein neues JPEG. Das neue JPEG
+     enthält KEINE Kameradaten und KEINEN Standort (Beweis: Bau-Doku §2.6). */
+  function bildLesen(datei) {
+    return createImageBitmap(datei, { imageOrientation: 'from-image' }).catch(function (err) {
+      // Ältere Browser kennen die Option nicht (TypeError) — Chrome dreht seit
+      // Fassung 81 ohnehin nach den Kameradaten.
+      if (err && err.name === 'TypeError') return createImageBitmap(datei);
+      throw err;
+    });
+  }
+  function zuBlob(c, q) {
+    return new Promise(function (ja, nein) {
+      c.toBlob(function (b) { if (b) ja(b); else nein(new Error('canvas.toBlob lieferte nichts')); }, 'image/jpeg', q);
+    });
+  }
+  function verkleinern(datei) {
+    return Promise.resolve().then(function () {
+      if (!datei) throw fehler('ungueltig', 'Kein Foto gewählt.');
+      if (datei.type && !/^image\//.test(datei.type)) throw fehler('ungueltig', 'Das ist kein Foto (' + datei.type + ').');
+      if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') {
+        throw fehler('foto_lesen', 'Dieses Gerät kann Fotos nicht verkleinern (createImageBitmap fehlt) — bitte ohne Foto senden.');
+      }
+      return bildLesen(datei).catch(function (err) {
+        throw fehler('foto_lesen', 'Das Foto lässt sich nicht lesen (' + (datei.type || 'unbekannte Art') +
+          '). Fotos im HEIC-Format (iPhone) gehen im Browser oft nicht — in den Kamera-Einstellungen „Maximale Kompatibilität“ wählen.', err);
+      });
+    }).then(function (bmp) {
+      var versuche = [];
+      function malen(quelle, b, h, kante) {
+        var s = Math.min(1, kante / Math.max(b, h));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(b * s));
+        c.height = Math.max(1, Math.round(h * s));
+        var g = c.getContext('2d');
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';   // Schilder und Risse bleiben lesbar
+        g.drawImage(quelle, 0, 0, c.width, c.height);
+        return c;
+      }
+      // Das volle Handyfoto (12–50 MP) nur EINMAL im Speicher: gleich auf
+      // die größte Stufe zeichnen und freigeben; kleinere Stufen entstehen
+      // aus dieser Zeichenfläche (alte Handys, Gegenprüfung 12.10.).
+      var gross = malen(bmp, bmp.width, bmp.height, FOTO.kanten[0]);
+      try { bmp.close(); } catch (e) { /* egal */ }
+      function stufe(ki) {
+        var c = ki === 0 ? gross : malen(gross, gross.width, gross.height, FOTO.kanten[ki]);
+        function versuch(q) {
+          return zuBlob(c, q).then(function (blob) {
+            versuche.push({ kante: FOTO.kanten[ki], q: Math.round(q * 100) / 100, bytes: blob.size });
+            if (blob.size <= FOTO.ziel) return { blob: blob, breite: c.width, hoehe: c.height, qualitaet: q };
+            if (q - FOTO.qSchritt >= FOTO.qMin - 1e-9) return versuch(q - FOTO.qSchritt);
+            if (ki + 1 < FOTO.kanten.length) return stufe(ki + 1);
+            // Kleinste Stufe noch über dem Richtwert: nehmen, solange die Regel es erlaubt.
+            if (blob.size <= FOTO.regelMax) return { blob: blob, breite: c.width, hoehe: c.height, qualitaet: q, ueberRichtwert: true };
+            throw fehler('foto_lesen', 'Das Foto bleibt auch verkleinert zu groß (' + Math.round(blob.size / 1024) + ' KB).');
+          });
+        }
+        return versuch(FOTO.qStart);
+      }
+      return stufe(0).then(function (r) {
+        r.versuche = versuche; r.bytes = r.blob.size;
+        return r;
+      });
+    });
+  }
+
+  function fotoName(eintrag, kennung, n) { return eintrag + '~' + kennung + '~' + n + '.jpg'; }
+  function pfadPruefen(anfrageId, eintrag, n) {
+    if (!KENNUNG_RE.test(String(anfrageId))) throw fehler('ungueltig', 'Ungültige Kennung der Anfrage.');
+    if (!KENNUNG_RE.test(String(eintrag))) throw fehler('ungueltig', 'Ungültige Kennung des Eintrags.');
+    if ([1, 2, 3].indexOf(n) === -1) throw fehler('ungueltig', 'Höchstens 3 Fotos je Eintrag.');
+  }
+
+  /* Ein Foto hochladen. eintrag = 'anfrage' oder Kennung des Verlaufseintrags.
+     fortschritt(0..1) wahlweise. Je Foto Zeitlimit FOTO.hochladenMs.
+     steuer (wahlweise): bekommt steuer.abbrechen() — die Seite bricht damit
+     ab, wenn der Nutzer verwirft (Fehlerart 'abgebrochen'). */
+  function fotoHochladen(anfrageId, eintrag, n, blob, fortschritt, steuer) {
+    return ich().then(function (i) {
+      pfadPruefen(anfrageId, eintrag, n);
+      if (!/^[^~\/]{1,60}$/.test(i.kennung)) throw fehler('ungueltig', 'Deine Kennung passt nicht in einen Dateinamen — Ulf Bescheid geben.');
+      if (!blob || !blob.size) throw fehler('ungueltig', 'Das Foto ist leer.');
+      if (blob.size > FOTO.regelMax) throw fehler('ungueltig', 'Das Foto ist zu groß (' + Math.round(blob.size / 1024) + ' KB, höchstens ' + Math.round(FOTO.regelMax / 1024) + ' KB).');
+      var sp = speicher();
+      var pfad = 'meldungen/' + anfrageId + '/' + fotoName(eintrag, i.kennung, n);
+      return new Promise(function (ja, nein) {
+        var task = sp.ref(pfad).put(blob, { contentType: 'image/jpeg' });
+        var abgebrochen = false, vomNutzer = false;
+        var uhr = setTimeout(function () { abgebrochen = true; try { task.cancel(); } catch (e) { /* egal */ } }, FOTO.hochladenMs);
+        if (steuer) steuer.abbrechen = function () { vomNutzer = true; clearTimeout(uhr); try { task.cancel(); } catch (e) { /* egal */ } };
+        task.on('state_changed', function (s) {
+          if (fortschritt && s && s.totalBytes) { try { fortschritt(s.bytesTransferred / s.totalBytes); } catch (e) { /* Anzeige */ } }
+        }, function (err) {
+          clearTimeout(uhr);
+          if (vomNutzer) return nein(fehler('abgebrochen', 'Hochladen abgebrochen.', err));
+          nein(abgebrochen ? fehler('zeitlimit', 'Foto ' + n + ' nach ' + Math.round(FOTO.hochladenMs / 1000) + ' s noch nicht oben — Netz zu langsam oder weg.', err) : err);
+        }, function () { clearTimeout(uhr); ja(pfad); });
+      }).catch(function (err) {
+        return ursacheSpeicher(err, eintrag === 'anfrage' ? 'melden' : 'lesen').then(function (e) { throw e; });
+      });
+    });
+  }
+
+  /* Alle Dateien einer Anfrage, EINMAL aufgelistet. Rückgabe
+     { fotos: [{ pfad, name, eintrag, kennung, n }], vermerk: { anzahl, datum } | null }. */
+  function fotosAusNamen(namen, basis) {
+    var fotos = [], vermerk = null;
+    namen.forEach(function (name) {
+      var m = FOTO_RE.exec(name);
+      if (m) { fotos.push({ pfad: basis + '/' + name, name: name, eintrag: m[1], kennung: m[2], n: Number(m[3]) }); return; }
+      var v = VERMERK_RE.exec(name);
+      if (v && (!vermerk || v[2] > vermerk.datum)) vermerk = { anzahl: Number(v[1]), datum: v[2], name: name };
+    });
+    fotos.sort(function (a, b) { return a.eintrag < b.eintrag ? -1 : a.eintrag > b.eintrag ? 1 : a.n - b.n; });
+    return { fotos: fotos, vermerk: vermerk };
+  }
+  function fotosListen(anfrageId) {
+    return Promise.resolve().then(function () {
+      if (!KENNUNG_RE.test(String(anfrageId))) throw fehler('ungueltig', 'Ungültige Kennung der Anfrage.');
+      var basis = 'meldungen/' + anfrageId;
+      return speicher().ref(basis).listAll().then(function (res) {
+        return fotosAusNamen((res.items || []).map(function (r) { return r.name; }), basis);
+      }, function (err) { return ursacheSpeicher(err, 'lesen').then(function (e) { throw e; }); });
+    });
+  }
+  /* Anzeige-Filter (Bauplan §2.1): nur Fotos, deren Kennung im Namen der
+     Absender des Eintrags ist. Ein Foto, das jemand in einen fremden Eintrag
+     legt, erscheint nie. Höchstens eins je Nummer, höchstens drei. */
+  function fotosFuer(liste, eintrag, von) {
+    var gesehen = {};
+    return (liste || []).filter(function (f) {
+      if (f.eintrag !== eintrag || !von || f.kennung !== von || gesehen[f.n]) return false;
+      gesehen[f.n] = true;
+      return true;
+    }).sort(function (a, b) { return a.n - b.n; }).slice(0, FOTO.max);
+  }
+
+  /* Foto mit Anmeldung holen — wie getBlob im modularen SDK. Die Regel
+     prüft bei JEDEM Abruf. Braucht CORS am Speicher (Handgriff 6). */
+  function kurzeAntwort(text) {
+    try { var j = JSON.parse(text); if (j && j.error) return (j.error.code ? j.error.code + ' ' : '') + (j.error.message || ''); } catch (e) { /* kein JSON */ }
+    return String(text || '').slice(0, 200);
+  }
+  function fotoHolen(pfad) {
+    return Promise.resolve().then(function () {
+      var sp = speicher();
+      var nutzer = firebase.auth && firebase.auth().currentUser;
+      if (!nutzer || typeof nutzer.getIdToken !== 'function') throw fehler('nicht_angemeldet', 'Nicht angemeldet — bitte an der Tür anmelden.');
+      var bucket = sp.ref().bucket;
+      return nutzer.getIdToken().then(function (token) {
+        var url = 'https://firebasestorage.googleapis.com/v0/b/' + encodeURIComponent(bucket) + '/o/' + encodeURIComponent(pfad) + '?alt=media';
+        var steuer = typeof AbortController === 'function' ? new AbortController() : null;
+        var uhr = setTimeout(function () { if (steuer) steuer.abort(); }, FOTO.abrufMs);
+        return fetch(url, { headers: { Authorization: 'Firebase ' + token }, signal: steuer ? steuer.signal : undefined, credentials: 'omit' })
+          .then(function (antwort) {
+            clearTimeout(uhr);
+            if (antwort.ok) return antwort.blob();
+            return antwort.text().catch(function () { return ''; }).then(function (text) {
+              var original = { code: 'http-' + antwort.status, message: kurzeAntwort(text) || antwort.statusText || '' };
+              if (antwort.status === 404) throw fehler('nicht_da', 'Das Foto gibt es nicht (mehr).', original);
+              if (antwort.status === 402) throw fehler('speicher_aus', 'Der Foto-Speicher ist nicht erreichbar oder das Bezahlkonto ist aus — Ulf Bescheid geben.', original);
+              if (antwort.status === 401) throw fehler('nicht_angemeldet', 'Nicht angemeldet — bitte an der Tür anmelden.', original);
+              if (antwort.status === 429) throw fehler('kontingent', 'Zu viele Abrufe — kurz warten.', original);
+              if (antwort.status === 403) {
+                return ursacheSpeicher(fehler('keine_berechtigung', 'Der Foto-Speicher hat abgelehnt.', original), 'lesen').then(function (e) {
+                  if (e.art === 'keine_berechtigung') e.meldung = e.message = 'Der Foto-Speicher hat abgelehnt (403). Speicher nicht erreichbar oder Bezahlkonto aus — Ulf Bescheid geben.';
+                  throw e;
+                });
+              }
+              throw fehler('fehler', 'Der Foto-Speicher antwortet mit ' + antwort.status + '.', original);
+            });
+          }, function (err) {
+            clearTimeout(uhr);
+            if (err && err.name === 'AbortError') throw fehler('zeitlimit', 'Foto nach ' + Math.round(FOTO.abrufMs / 1000) + ' s nicht geladen — Netz zu langsam oder weg.', err);
+            throw fehler('abruf', 'Foto nicht abrufbar. Ohne Netz geht das nicht; mit Netz fehlt vermutlich die Freigabe dieser Seite am Speicher (CORS, Ulfs Handgriff 6).', err);
+          });
+      });
+    });
+  }
+
+  /* ---------- Löschen beim Archiv (E12) ----------
+     Nur mit Bearbeiten-Haken; die Speicher-Regel erlaubt es erst, wenn die
+     Anfrage im Archiv ist (repariertAm + 7 Tage, Serverzeit). Erst der
+     Vermerk „n Fotos, gelöscht am …“, dann die Fotos — bricht es mittendrin
+     ab, stimmt die Zahl trotzdem, und beim nächsten Mal wird nur weiter
+     gelöscht. */
+  function vermerkAnlegen(anfrageId, anzahl) {
+    var name = 'geloescht~' + Math.max(1, Math.min(99, anzahl)) + '~' + heute();
+    return speicher().ref('meldungen/' + anfrageId + '/' + name).put(new Blob([]), { contentType: 'application/octet-stream' })
+      .then(function () { return { anzahl: anzahl, datum: heute(), name: name }; });
+  }
+  function fotosEinerAnfrageLoeschen(anfrageId) {
+    return fotosListen(anfrageId).then(function (l) {
+      if (!l.fotos.length) return { id: anfrageId, geloescht: 0, vermerk: l.vermerk };
+      var schritt = l.vermerk ? Promise.resolve(l.vermerk)
+        : vermerkAnlegen(anfrageId, l.fotos.length).catch(function (err) { return ursacheSpeicher(err, 'bearbeiten').then(function (e) { throw e; }); });
+      return schritt.then(function (v) {
+        var sp = speicher();
+        return Promise.all(l.fotos.map(function (f) {
+          return sp.ref(f.pfad).delete().catch(function (err) {
+            if (err && err.code === 'storage/object-not-found') return null;   // schon weg (anderes Gerät)
+            return ursacheSpeicher(err, 'bearbeiten').then(function (e) { throw e; });
+          });
+        })).then(function () { return { id: anfrageId, geloescht: l.fotos.length, vermerk: v }; });
+      });
+    });
+  }
+  /* Beim Öffnen der Seite (nur Bearbeiten-Haken): Anfragen, die in den
+     letzten AUFRAEUM_TAGE (90) Tagen ins Archiv gerutscht sind, aufräumen —
+     so lange, wie die Lebensdauer-Regel am Speicher (90 Tage) ohnehin
+     reicht; danach gibt es nichts mehr zu löschen. erledigt(id) und
+     merke(id) kommen von der Seite (Gerätespeicher), damit eine Anfrage
+     nicht bei jedem Öffnen neu aufgelistet wird. Einzelfehler sammeln,
+     nicht abbrechen. */
+  function archivFotosAufraeumen(erledigt, merke, jetzt) {
+    return ich().then(function (i) {
+      if (!i.rechte.bearbeiten) return { geprueft: 0, geloescht: 0, fehler: [] };
+      speicher();
+      var t = jetzt === undefined ? Date.now() : ms(jetzt);
+      var q = datenbank().collection('meldungen').where('kanal', '==', 'hausmeister').where('status', '==', 'repariert')
+        .where('repariertAm', '<', grenzeArchiv(t - UHR_SPIELRAUM_MS))   // Geräteuhr kann vorgehen, die Regel rechnet mit Serverzeit
+        .where('repariertAm', '>=', firebase.firestore.Timestamp.fromMillis(t - (ARCHIV_TAGE + AUFRAEUM_TAGE) * TAG_MS))
+        .orderBy('repariertAm', 'desc');
+      return q.get().then(function (snap) {
+        var ids = [];
+        snap.forEach(function (d) { if (!erledigt || !erledigt(d.id)) ids.push(d.id); });
+        var erg = { geprueft: ids.length, geloescht: 0, fehler: [], ids: [] };
+        return ids.reduce(function (kette, id) {
+          return kette.then(function () {
+            return fotosEinerAnfrageLoeschen(id).then(function (r) {
+              erg.geloescht += r.geloescht; erg.ids.push(id);
+              if (merke) merke(id);
+            }, function (err) { erg.fehler.push({ id: id, fehler: err }); });
+          });
+        }, Promise.resolve()).then(function () { return erg; });
+      }, function (err) { throw einordnen(err); });
     });
   }
 
@@ -581,6 +974,23 @@ window.BOS_MELDUNGEN = (function () {
     fenster: fenster,
     dringlichkeit: dringlichkeit,
     nachricht: nachricht,
+    // Fotos (Stufe 2)
+    SPEICHER_FASSUNG: SPEICHER_FASSUNG,
+    SPEICHER_DATEI: SPEICHER_DATEI,
+    FOTO: FOTO,
+    fotosVerfuegbar: fotosVerfuegbar,
+    pruefeSpeicherRegelstand: pruefeSpeicherRegelstand,
+    neueAnfrageId: neueAnfrageId,
+    neueEintragId: neueEintragId,
+    verkleinern: verkleinern,
+    fotoHochladen: fotoHochladen,
+    fotosListen: fotosListen,
+    fotoHolen: fotoHolen,
+    fotosEinerAnfrageLoeschen: fotosEinerAnfrageLoeschen,
+    archivFotosAufraeumen: archivFotosAufraeumen,
+    fotosFuer: fotosFuer,
+    fotosAusNamen: fotosAusNamen,
+    speicherEinordnen: speicherEinordnen,
     // reine Rechnung (für die Seite und die Tests)
     rechteAus: rechteAus,
     neuMarke: neuMarke,

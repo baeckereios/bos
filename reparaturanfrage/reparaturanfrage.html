@@ -17,6 +17,36 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-10-12 · 01:57 · v0.4 · Feature (Stufe 2: Fotos, Freigabe KC 12.10. 00:53)
+      ANWEISUNG_2026-10-11_REPARATURANFRAGE_STUFE2.md, Bauplan/Bau-Doku
+      SESSION_2026-10-11_REPARATURANFRAGE_STUFE2_BAU.md.
+      - Lädt zusätzlich firebase-storage-compat.js (nur diese Seite).
+      - Melden und Rückfrage: „📷 Foto“ mit „Nur das Gerät fotografieren.“,
+        bis zu 3, Kamera oder Galerie, Vorschau mit „entfernen“. Verkleinert
+        am Gerät (BOS_MELDUNGEN.verkleinern), Standort und Kameradaten weg.
+      - Senden mit Fotos: Fotos zuerst, Eintrag danach mit vorab vergebener
+        Kennung; Fortschritt und bei Fehlern der echte Grund mit Knöpfen
+        Nochmal · Ohne die fehlenden senden · Ohne Fotos senden · Senden abbrechen.
+        Ohne Netz: „Ohne Fotos senden?“. Ohne Foto läuft alles wie bisher.
+        Rückfrage nur mit Foto: Text „📷“.
+      - Anzeige: Fotos der Meldung im Reiter „Anfrage“, Fotos einer Rückfrage
+        in ihrer Blase — nur vom Absender des Eintrags. Abruf mit Anmeldung,
+        nie über Download-Adressen. Lädt eins nicht: der Grund statt Bild.
+        Neue Rückfrage live → neu auflisten.
+      - Großansicht (Antippen), ✕ oder Zurück-Taste schließt NUR das Foto
+        (eigener Verlaufseintrag { ra: 'bild' }); „💾 Speichern“ nur mit
+        Haken Bearbeiten. Launcher-Fenster: pagehide nimmt beide Einträge zurück.
+      - Archiv: „📷 n Fotos, gelöscht am …“ in Zeile und Anfrage. Ein Konto mit
+        Bearbeiten löscht beim Öffnen der Seite die Fotos frisch archivierter
+        Anfragen (Gerätespeicher bos_reparatur_fotos_geraeumt_v1 merkt Erledigtes).
+      - Leiste bei alten Speicher-Regeln / fehlendem Foto-Modul / Speicher aus.
+      - „Ungesendet“ zählt gewählte Fotos (Zurück-Taste, Seite verlassen).
+        Verwerfen bricht ein laufendes Hochladen ab; solange der Eintrag nach
+        den Fotos geschrieben wird, bleibt die Seite stehen („Wird gerade
+        gesendet“). „Nochmal“ nach gescheitertem Foto = neuer Anlauf mit
+        neuer Kennung. Fotos werden nacheinander verkleinert, nur sichtbare
+        geladen (höchstens 3 gleichzeitig). Gegenprüfung 12.10.
+      - Hilfe nachgezogen. Firestore-Regel unverändert.
     2026-10-11 · 10:27 · v0.3 · Feature (Nachtrag 3, Ulf 11.10. 10:21/10:23)
       ANWEISUNG_2026-10-11_REPARATURANFRAGE_NACHTRAG3.md (KC 10:24).
       - A: Die Zeile „‹ Posteingang“ über den Reitern entfällt. Links in der
@@ -94,6 +124,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Stufe 2: Foto-Speicher, NUR auf dieser Seite (Bauplan §2.5). Fehlt es, gehen Fotos nicht, Text schon. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <style>
   :root {
     --ra-tap: max(52px, var(--bos-tap-min, 44px));
@@ -220,6 +252,30 @@
     .kopf-zeile { gap: 8px; }
     .reiter button { letter-spacing: .01em; font-size: .74rem; }
   }
+  /* Stufe 2: Fotos */
+  .foto-feld { margin: 8px 0 12px; }
+  .foto-knopfzeile { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .foto-pflicht { font-weight: 700; font-size: var(--bos-font-sm, .82rem); color: var(--bos-amber-bright); }
+  .vorschau-reihe { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .vorschau { width: 86px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: var(--bos-font-xs, .72rem); }
+  .vorschau img { width: 86px; height: 86px; object-fit: cover; border-radius: 8px; border: 1px solid var(--bos-border-strong); display: block; }
+  .vorschau.kaputt { width: 100%; align-items: flex-start; border-left: 4px solid var(--ra-rot); padding-left: 8px; }
+  .v-stand { color: var(--bos-text-dim); text-align: center; word-break: break-word; }
+  .vorschau.kaputt .v-stand { text-align: left; }
+  .sende-stand { margin-top: 10px; padding: 8px 12px; border-left: 4px solid var(--bos-amber); background: var(--bos-surface-raised); border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm, .82rem); word-break: break-word; }
+  .sende-stand.rot { border-left-color: var(--ra-rot); }
+  .sende-stand .knopfreihe { margin-bottom: 0; }
+  .fotos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; white-space: normal; }
+  .foto-mini { width: 88px; height: 88px; padding: 0; border: 1px solid var(--bos-border-strong); border-radius: 8px; background: var(--bos-surface-raised); overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--bos-text-dim); font-size: var(--bos-font-xs, .72rem); }
+  .foto-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .foto-mini:focus-visible { outline: 2px solid var(--bos-amber); outline-offset: 2px; }
+  .foto-fehler { flex: 1 1 100%; border-left: 4px solid var(--ra-rot); background: var(--bos-surface); padding: 6px 10px; border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm, .82rem); word-break: break-word; white-space: normal; }
+  .foto-info { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim); margin: 6px 0; white-space: normal; }
+  .z-fotos { display: block; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); margin-top: 2px; }
+  .bild-gross { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.94); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .bild-gross img { max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; }
+  .bild-knoepfe { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .bild-knoepfe .bos-btn { min-height: 48px; min-width: 120px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -253,6 +309,7 @@
 
 <div id="verbindungLeiste" class="leiste" role="status" hidden></div>
 <div id="regelLeiste" class="leiste rot" role="alert" hidden></div>
+<div id="speicherLeiste" class="leiste rot" role="alert" hidden></div>
 <div id="hinweisLeiste" class="leiste" role="status" hidden></div>
 <div id="fehlerLeiste" class="leiste rot" role="alert" hidden>
   <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
@@ -269,6 +326,15 @@
     <h2 id="hilfeTitel"></h2>
     <div id="hilfeInhalt"></div>
     <button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen" style="width:100%;margin-top:12px;">Schließen</button>
+  </div>
+</div>
+<!-- Stufe 2: Fotoauswahl AUSSERHALB von #main (sonst hielte tipptGerade() das Neuzeichnen an) -->
+<input type="file" id="fotoWahl" accept="image/*" multiple hidden>
+<div id="bildGross" class="bild-gross" role="dialog" aria-modal="true" aria-label="Foto groß" hidden>
+  <img id="bildGrossImg" alt="">
+  <div class="bild-knoepfe">
+    <a id="bildSpeichern" class="bos-btn bos-btn--amber" hidden data-i18n="bild_speichern">💾 Speichern</a>
+    <button type="button" class="bos-btn" id="bildZu" data-i18n="bild_zu">✕ Schließen</button>
   </div>
 </div>
 <div id="toast" role="status" hidden><span id="toastText"></span><button type="button" class="bos-btn bos-btn--amber" id="toastKnopf" hidden></button></div>
@@ -370,7 +436,41 @@ const I18N_DE = {
   merk_aus: 'Gerätespeicher nicht nutzbar — die Kennzeichen „neu“ sind auf diesem Gerät aus, sonst geht alles. Grund: {grund}',
   merk_kaputt: 'Der Gerätespeicher für „neu“ war beschädigt und ist neu angelegt — alles Bisherige gilt als gelesen. Grund: {grund}',
   err_laden: 'Laden „{was}“',
-  err_unbehandelt: 'Unerwarteter Fehler'
+  err_unbehandelt: 'Unerwarteter Fehler',
+  // Stufe 2: Fotos
+  foto_knopf: '📷 Foto ({n}/{max})',
+  foto_pflicht: 'Nur das Gerät fotografieren.',
+  foto_aus: 'Fotos gehen gerade nicht: {grund}',
+  foto_entfernen: 'entfernen',
+  foto_kb: '{kb} KB',
+  foto_verkleinern: 'wird verkleinert …',
+  foto_kaputt: 'Foto nicht nutzbar: {grund}',
+  foto_max: 'Höchstens 3 Fotos — {n} weggelassen.',
+  foto_warte: 'Fotos werden noch verkleinert — gleich nochmal tippen.',
+  foto_oben: '✓ oben',
+  foto_fehler_kurz: '⚠ nicht oben',
+  foto_laedt: 'lädt …',
+  foto_aria: 'Foto {n} groß ansehen',
+  foto_nicht_ladbar: 'Foto {n} nicht ladbar: {grund}',
+  fotos_laden: 'Fotos werden geladen …',
+  fotos_nicht_abrufbar: 'Fotos nicht abrufbar: {grund}',
+  fotos_nochmal: 'Nochmal',
+  fotos_weg: '📷 {anzahl}, gelöscht am {datum}',
+  fotos_da_archiv: '📷 {anzahl} — werden gelöscht',
+  fotos_wird_geloescht: 'Diese Anfrage liegt im Archiv — ihre Fotos werden gelöscht, sobald der Hausmeister die Seite öffnet.',
+  s_hochladen: 'Foto {i} von {n} wird hochgeladen … {p} %',
+  s_eintrag: 'Wird gesendet …',
+  s_foto_fehler: 'Foto {n} nicht hochgeladen: {grund}',
+  s_eintrag_fehler: 'Fotos sind oben, die Nachricht nicht: {grund}',
+  s_offline: 'Ohne Netz gehen keine Fotos hoch. Ohne Fotos senden?',
+  s_nochmal: 'Nochmal', s_ohne_fehlende: 'Ohne die fehlenden senden', s_ohne_fotos: 'Ohne Fotos senden', s_abbrechen: 'Senden abbrechen',
+  rueck_nur_foto: '📷',
+  senden_laeuft: 'Wird gerade gesendet — einen Moment.',
+  bild_zu: '✕ Schließen', bild_speichern: '💾 Speichern',
+  speicher_alt: '⚠ Die Speicher-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Fotos können abgelehnt werden, Text geht. Bitte die Regeldatei {datei} im Storage einsetzen.',
+  speicher_aus: '⚠ Der Foto-Speicher ist nicht erreichbar oder das Bezahlkonto ist aus — Fotos gehen gerade nicht, Text schon. Ulf Bescheid geben.',
+  err_aufraeumen: 'Fotos im Archiv löschen',
+  err_fotos: 'Fotos'
 };
 function t(schluessel, werte) {
   let s = I18N_DE[schluessel];
@@ -388,11 +488,12 @@ const helpData = {
     ['Die Farben', 'Rot „gemeldet“: noch niemand hat reagiert. Gelb „gesehen“: der Hausmeister weiß Bescheid. Grün „repariert“: erledigt. Die Farbe steht immer mit dem Wort dabei. Grünes rutscht nach sieben Tagen ins Archiv.'],
     ['Melden', 'Erst nachsehen, ob es schon in der Liste steht. Dann „＋ Melden“: kurz schreiben, was kaputt ist, und antippen, ob weitergearbeitet werden kann (ja, eingeschränkt, nein). Wie dringend es ist, entscheidet der Hausmeister. Nur Betriebsmeldungen — nichts Vertrauliches, keine Personen. Ein Notfall gehört ans Telefon, nicht in die App.'],
     ['Antippen', 'Eine Anfrage öffnet immer auf dem Reiter „Anfrage“: wie weit sie ist, was kaputt ist, das Reparaturfenster. Daneben die Reiter „Rückfragen“ (der kurze Chat) und „Verlauf“ (wer hat wann was geändert). Was du gerade tippst, bleibt stehen, auch wenn du den Reiter wechselst. Zurück in die Liste geht mit „‹“ links neben den Reitern oder mit der Zurück-Taste des Handys; steht noch ungesendeter Text da, fragt die Seite vorher. Jeder mit Zugang darf antworten — so bleibt keine Frage hängen, wenn jemand frei hat. Kurz halten.'],
+    ['Fotos', 'Beim Melden und bei jeder Rückfrage gehen bis zu 3 Fotos mit — aus der Kamera oder der Galerie. Nur das Gerät fotografieren, keine Personen. Vor dem Senden siehst du die Vorschau und kannst ein Foto wieder entfernen. Die Fotos werden auf dem Handy verkleinert; Standort und Kameradaten kommen dabei weg. Antippen macht ein Foto groß, zurück geht es mit ✕ oder der Zurück-Taste. Klappt ein Foto nicht, steht der Grund da — die Nachricht kann auch ohne Foto raus. Fotos brauchen Netz. Rutscht eine Anfrage ins Archiv (sieben Tage nach „repariert“), werden ihre Fotos gelöscht; dort steht dann „📷 3 Fotos, gelöscht am …“.'],
     ['Was heißt „neu“?', '„💬 neu“ in der Liste: Jemand anderes hat eine Rückfrage geschrieben, seit du die Anfrage zuletzt geöffnet hast. „● neu“: Jemand anderes hat sonst etwas geändert oder die Anfrage ist neu. Deine eigenen Sachen zählen nie. Öffnest du die Anfrage, ist das Kennzeichen weg. Am Reiter „Rückfragen“ zeigt ein Punkt mit Zahl, wie viele Nachrichten neu sind. Was du schon gelesen hast, merkt sich nur dieses Gerät — auf dem Handy und am Tablet kann es also verschieden aussehen. Beim allerersten Öffnen auf einem Gerät gilt alles Bisherige als gelesen.'],
-    ['Für den Hausmeister', 'In der Liste unter „Offen“ stehen die Knöpfe gleich an der Zeile: bei Rot „👀 gesehen“ und „✓ repariert“, bei Gelb „✓ repariert“ — ohne die Anfrage zu öffnen. Nach „repariert“ erscheint unten kurz „zurücknehmen“; danach geht Zurücknehmen in der geöffneten Anfrage bis zum Archivtag. In der Anfrage selbst: „Gesehen“, „Repariert“ (geht auch direkt von Rot), Reparaturfenster setzen oder verschieben (beim Verschieben mit Grund), „dringend“ markieren. Eine Antwort im Chat auf eine rote Anfrage setzt sie automatisch auf „gesehen“.'],
+    ['Für den Hausmeister', 'In der Liste unter „Offen“ stehen die Knöpfe gleich an der Zeile: bei Rot „👀 gesehen“ und „✓ repariert“, bei Gelb „✓ repariert“ — ohne die Anfrage zu öffnen. Nach „repariert“ erscheint unten kurz „zurücknehmen“; danach geht Zurücknehmen in der geöffneten Anfrage bis zum Archivtag. In der Anfrage selbst: „Gesehen“, „Repariert“ (geht auch direkt von Rot), Reparaturfenster setzen oder verschieben (beim Verschieben mit Grund), „dringend“ markieren. Eine Antwort im Chat auf eine rote Anfrage setzt sie automatisch auf „gesehen“. Fotos speichern: Foto antippen, dann „💾 Speichern“ — es landet auf dem Handy unter „Downloads“. Das geht nur, bis die Anfrage im Archiv ist; danach löscht deine Seite die Fotos beim nächsten Öffnen.'],
     ['Geht wieder kaputt?', 'Dann eine neue Anfrage. Die alte bleibt, wie sie war.'],
     ['Wer darf was?', 'Ulf setzt je Person einen Haken: Mitlesen & antworten, Melden, Bearbeiten. Ohne Haken siehst du die Seite nicht. Nach einem neuen Haken den Launcher einmal neu starten.'],
-    ['Wenn etwas schiefgeht', 'Fehler stehen oben rot mit der Meldung der Datenbank. „Index anlegen“ erscheint höchstens beim allerersten Öffnen — das ist Ulfs Sache. Ohne Netz zeigt die Seite den letzten Stand; Gesendetes geht raus, sobald Netz da ist.']
+    ['Wenn etwas schiefgeht', 'Fehler stehen oben rot mit der Meldung der Datenbank. „Index anlegen“ erscheint höchstens beim allerersten Öffnen — das ist Ulfs Sache. Ohne Netz zeigt die Seite den letzten Stand; Gesendetes geht raus, sobald Netz da ist. Fotos zeigen ihren Fehler direkt am Foto; steht oben „Speicher-Regeln“ oder „Foto-Speicher“, ist das Ulfs Sache — Text geht trotzdem.']
   ]
 };
 function oeffneHilfe() {
@@ -471,7 +572,16 @@ const S = {
   listenDa: { offen: false, gruen: false }, aufgeraeumt: false, letzteFehler: false,
   melden: { text: '', geraet: '', weiterarbeiten: null },
   arbeitet: false,
-  geraetAusCode: ''
+  geraetAusCode: '',
+  // Stufe 2: Fotos
+  fotoModul: { ok: false },                  // M.fotosVerfuegbar() beim Start
+  fotos: { melden: [], rueck: [] },          // gewählte, noch nicht gesendete Fotos
+  fotosRueckId: null,                        // zu welcher Anfrage die Rückfrage-Fotos gehören
+  fotoHinweis: { melden: '', rueck: '' },
+  senden: { melden: null, rueck: null },     // laufendes/gescheitertes Senden mit Fotos
+  fotoListe: null,                           // { id, stand, fotos, vermerk, fehler, bekannt, gen, laeuft, gestartet }
+  archivFotos: {},                           // id → { stand, anzahl, vermerk, fehler }
+  speicherStand: null                        // Ergebnis der Speicher-Regelstand-Probe
 };
 
 function wort(status) { return M.woerterbuch(KANAL)[status] || status; }
@@ -680,6 +790,7 @@ function zeileHTML(k, opt) {
       (neu ? '<span class="neu-marke" data-neu="' + esc(neu.art) + '" title="' + esc(t(neu.art === 'nachricht' ? 'neu_nachricht_aria' : 'neu_sonst_aria')) + '">' +
         esc(t(neu.art === 'nachricht' ? 'neu_nachricht' : 'neu_sonst')) + '</span>' : '') +
       (k.dringlichkeit === 'dringend' ? '<span class="dringend">' + esc(t('dringend')) + '</span>' : '') + '</span>' : '') +
+    (opt.archiv ? archivFotoZeile(k.id) : '') +
     '</span>' + statusMarke(k.status) + '</button>';
   if (opt.schnell && (k.status === 'gemeldet' || k.status === 'gesehen')) {
     html += '<div class="z-schnell">';
@@ -702,7 +813,7 @@ function renderListe(main) {
     '<button type="button" class="link-btn" id="archivBtn">' + esc(S.archivAn ? t('archiv_verbergen') : t('archiv_zeigen')) + '</button></div>';
   if (S.archivAn) {
     html += '<div class="klein">' + esc(t('archiv_hinweis')) + '</div>' +
-      (S.archiv.length ? S.archiv.map(function (k) { return zeileHTML(k); }).join('') : '<div class="leer">' + esc(t('archiv_leer')) + '</div>') +
+      (S.archiv.length ? S.archiv.map(function (k) { return zeileHTML(k, { archiv: true }); }).join('') : '<div class="leer">' + esc(t('archiv_leer')) + '</div>') +
       (S.archivMehr ? '<button type="button" class="bos-btn" id="archivMehrBtn">' + esc(t('archiv_mehr')) + '</button>' : '');
   }
   html += '</section>';
@@ -711,6 +822,7 @@ function renderListe(main) {
   if (ab) ab.addEventListener('click', schalteArchiv);
   const mb = document.getElementById('archivMehrBtn');
   if (mb) mb.addEventListener('click', ladeArchivSeite);
+  if (S.archivAn) ladeArchivFotos();
 }
 
 function schritteHTML(k) {
@@ -765,6 +877,7 @@ function renderAnfrage(main) {
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + statusMarke(k.status) +
       (k.dringlichkeit === 'dringend' ? '<span class="dringend">' + esc(t('dringend')) + '</span>' : '') + '</div>' +
     '<div class="anfrage-text">' + esc(k.text) + '</div>' +
+    anfrageFotosHTML(k, archiv) +
     '<dl class="eckdaten">' +
       (k.geraet ? '<dt>' + esc(t('geraet')) + '</dt><dd>' + esc(k.geraet) + '</dd>' : '') +
       '<dt>' + esc(t('gemeldet_von')) + '</dt><dd>' + esc(k.vonName || k.von) + '</dd>' +
@@ -806,14 +919,16 @@ function renderAnfrage(main) {
   const nachrichten = S.verlauf.filter(function (e) { return e.art === 'nachricht'; });
   let chatHtml = '<div class="chat">' +
     (nachrichten.length ? nachrichten.map(function (e) {
-      return '<div class="blase' + (e.von === S.ich.kennung ? ' meine' : '') + '"><span class="wann">' + esc(e.vonName || e.von) + ' · ' + esc(M.uhrText(e.ts)) + '</span>' + esc(e.text) + '</div>';
+      return '<div class="blase' + (e.von === S.ich.kennung ? ' meine' : '') + '"><span class="wann">' + esc(e.vonName || e.von) + ' · ' + esc(M.uhrText(e.ts)) + '</span>' + esc(e.text) +
+        fotoBlock(eintragFotos(e.id, e.von)) + '</div>';
     }).join('') : '<div class="leer">' + esc(t('chat_leer')) + '</div>') + '</div>';
   if (archiv) {
     chatHtml += '<div class="leer">' + esc(t('chat_zu')) + '</div>';
   } else {
     chatHtml += '<div class="feld" style="margin-top:12px;"><textarea class="bos-input" id="chatText" maxlength="' + M.GRENZEN.nachricht + '" placeholder="' + esc(t('chat_platzhalter')) + '"></textarea>' +
       '<div class="klein zaehler" id="chatZaehler">' + esc(t('zeichen', { n: 0, max: M.GRENZEN.nachricht })) + '</div>' +
-      '<button type="button" class="bos-btn bos-btn--amber" id="chatBtn">' + esc(t('senden')) + '</button></div>';
+      fotoFeldHTML('rueck') +
+      '<button type="button" class="bos-btn bos-btn--amber" id="chatBtn"' + (S.arbeitet ? ' disabled' : '') + '>' + esc(t('senden')) + '</button></div>';
   }
   html += flaeche('rueckfragen', chatHtml) + flaeche('verlauf', verlaufHtml);
 
@@ -845,11 +960,11 @@ function renderAnfrage(main) {
     const zaehle = function () { document.getElementById('chatZaehler').textContent = t('zeichen', { n: ct.value.length, max: M.GRENZEN.nachricht }); };
     ct.addEventListener('input', zaehle); zaehle();
     document.getElementById('chatBtn').addEventListener('click', function () {
-      aktion(function () { return M.nachricht(k, ct.value); }, function (erg) {
-        setzeWert('chatText', ''); toast(erg && erg.gesehenGesetzt ? t('gesehen_auto') : t('gespeichert'));
-      }, true);
+      if (S.fotos.rueck.length) { sendeMitFotos('rueck', 'normal'); return; }
+      sendeNurText('rueck');
     });
   }
+  ladeBilder();
 }
 /* ---------- Reiter (Nachtrag 2, E23) ---------- */
 /* Fremde Nachrichten, jünger als der Lesezeitpunkt VOR dem Öffnen. Auf dem
@@ -876,6 +991,7 @@ function zeigeReiter(name) {
   document.querySelectorAll('[data-reiter]').forEach(function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-reiter') === name)); });
   document.querySelectorAll('[data-flaeche]').forEach(function (f) { f.hidden = f.getAttribute('data-flaeche') !== name; });
   aktualisiereReiterPunkt();
+  ladeBilder();   // Stufe 2: Fotos des jetzt sichtbaren Reiters
 }
 
 function wert(id) { const el = document.getElementById(id); return el ? el.value : null; }
@@ -904,6 +1020,7 @@ function renderMelden(main) {
     '<div class="feld"><span class="bos-label">' + esc(t('m_frage')) + '</span><div class="wahl" role="group" aria-label="' + esc(t('m_frage')) + '">' + wahl + '</div></div>' +
     '<div class="feld"><label class="bos-label" for="mGeraet">' + esc(t('m_geraet')) + '</label>' +
       '<input type="text" class="bos-input" id="mGeraet" maxlength="' + M.GRENZEN.geraet + '" placeholder="' + esc(t('m_geraet_platzhalter')) + '"></div>' +
+    fotoFeldHTML('melden') +
     '<div class="klein" id="mFehlt">' + (fehlt.length ? esc(t('m_fehlt', { was: fehlt.join(', ') })) : '') + '</div>' +
     '<div class="knopfreihe"><button type="button" class="bos-btn bos-btn--amber" id="mSenden"' + (fehlt.length || S.arbeitet ? ' disabled' : '') + '>' + esc(t('m_senden')) + '</button>' +
     '<button type="button" class="bos-btn bos-btn--ghost" data-zurueck="1">' + esc(t('m_abbrechen')) + '</button></div></section>';
@@ -930,12 +1047,8 @@ function renderMelden(main) {
     });
   });
   document.getElementById('mSenden').addEventListener('click', function () {
-    aktion(function () { return M.anlegen({ kanal: KANAL, text: m.text, geraet: m.geraet, weiterarbeiten: m.weiterarbeiten }); },
-      function (id) {
-        S.melden = { text: '', geraet: '', weiterarbeiten: null };
-        toast(t('gesendet'));
-        oeffne(id);   // ersetzt den Melden-Eintrag (Zurück → Posteingang)
-      }, true);
+    if (S.fotos.melden.length) { sendeMitFotos('melden', 'normal'); return; }
+    sendeNurText('melden');
   });
 }
 
@@ -952,7 +1065,7 @@ function renderVerbindung() {
 /* ---------- Handlungen ---------- */
 /* Einheitlich: Knöpfe sperren, ausführen, Fehler sichtbar, Erfolg melden. */
 function aktion(fn, danach, eigenerToast) {
-  if (S.arbeitet) return;
+  if (S.arbeitet) { if (fotoSendenLaeuft()) toast(t('senden_laeuft')); return; }
   S.arbeitet = true;
   document.querySelectorAll('#main button').forEach(function (b) { b.disabled = true; });
   Promise.resolve().then(fn).then(function (erg) {
@@ -974,13 +1087,24 @@ function oeffne(id, opt) {
   S.tab = 'anfrage';                       // E23: öffnet IMMER auf „Anfrage“
   S.rueckBasis = gelesenBis(id);           // Zeitpunkt VOR dem Öffnen (Punkt am Reiter)
   pflegeMerk();                            // Öffnen = gelesen (Kennzeichen weg)
+  // Stufe 2: Rückfrage-Fotos gehören zu genau einer Anfrage; Fotoliste neu
+  if (S.fotosRueckId !== id) fotosLeeren('rueck');
+  S.fotosRueckId = id;
+  S.fotoListe = { id: id, stand: 'laedt', fotos: [], vermerk: null, fehler: null, bekannt: {}, gen: 0, laeuft: false, gestartet: false };
   if (S.verlaufAbo) S.verlaufAbo();
   S.verlaufAbo = M.verlauf(id, function (liste) {
     S.verlauf = liste;
     pflegeMerk();
     aktualisiereReiterPunkt();
+    // Erst mit dem ersten Verlauf auflisten: alles, was jetzt im Verlauf
+    // steht, hat seine Fotos schon oben (Foto zuerst). Spätere Einträge → neu auflisten.
+    if (S.fotoListe && S.fotoListe.id === id && !S.fotoListe.gestartet) fotoListeLaden(id);
+    else pruefeNeueEintraege();
     render();
-  }, function (err) { zeigeFehler(t('err_laden', { was: 'Verlauf' }), err); });
+  }, function (err) {
+    zeigeFehler(t('err_laden', { was: 'Verlauf' }), err);
+    if (S.fotoListe && S.fotoListe.id === id && !S.fotoListe.gestartet) fotoListeLaden(id);
+  });
   render(true);
   window.scrollTo(0, 0);
 }
@@ -1006,6 +1130,8 @@ function zuruecknehmen(id, vorher, erg) {
 }
 function zurListe() {
   if (S.verlaufAbo) { S.verlaufAbo(); S.verlaufAbo = null; }
+  schliesseGrossIntern();
+  S.fotoListe = null;
   S.ansicht = 'liste'; S.offeneId = null; S.verlauf = [];
   render(true);
 }
@@ -1025,7 +1151,7 @@ function zumMelden(opt) {
    Seite im Launcher-Fenster (<iframe>), liegen die Einträge im Verlauf des
    ganzen Tabs; die Zurück-Taste kommt trotzdem hier als popstate an
    (Probe B1). */
-const VERLAUF = { bestaetigt: 0 };   // Zeitpunkt der Bestätigung durch „‹“/„Abbrechen“ (gilt 3 s)
+const VERLAUF = { bestaetigt: 0, bildZu: false };   // bildZu: ✕ hat die Großansicht schon geschlossen, das folgende popstate schlucken   // Zeitpunkt der Bestätigung durch „‹“/„Abbrechen“ (gilt 3 s)
 function eigenerEintrag() {
   try { return !!(history.state && history.state.ra); } catch (e) { return false; }
 }
@@ -1039,28 +1165,40 @@ function eintragSetzen(zustand) {
 }
 /* Poka-Yoke: steht noch etwas Getipptes da, das nicht gesendet ist? */
 function ungesendet() {
-  if (S.ansicht === 'anfrage') return !!(String(wert('chatText') || '').trim() || String(wert('fensterGrund') || '').trim());
-  if (S.ansicht === 'melden') return !!(String(S.melden.text || '').trim() || (String(S.melden.geraet || '').trim() && S.melden.geraet !== S.geraetAusCode));
+  if (S.ansicht === 'anfrage') return !!(String(wert('chatText') || '').trim() || String(wert('fensterGrund') || '').trim() || S.fotos.rueck.length);
+  if (S.ansicht === 'melden') return !!(String(S.melden.text || '').trim() || (String(S.melden.geraet || '').trim() && S.melden.geraet !== S.geraetAusCode) || S.fotos.melden.length);
   return false;
 }
 function verwerfen() {
-  if (S.ansicht === 'melden') S.melden = { text: '', geraet: S.geraetAusCode || '', weiterarbeiten: null };
+  if (S.ansicht === 'melden') { S.melden = { text: '', geraet: S.geraetAusCode || '', weiterarbeiten: null }; fotosLeeren('melden'); }
+  if (S.ansicht === 'anfrage') fotosLeeren('rueck');
 }
 /* Knopf „‹“, „‹ Posteingang“, „Abbrechen“. */
 function zurueckZurListe() {
+  if (eintragUnterwegs()) { toast(t('senden_laeuft')); return; }
   if (ungesendet() && !window.confirm(t('verwerfen_frage'))) return;
   verwerfen();
   if (eigenerEintrag()) { VERLAUF.bestaetigt = Date.now(); history.back(); return; }  // popstate zeichnet
   zurListe();
 }
 window.addEventListener('popstate', function (ev) {
+  // Stufe 2: Zurück schließt zuerst NUR die Großansicht (ihr eigener Eintrag ist weg)
+  if (VERLAUF.bildZu) { VERLAUF.bildZu = false; return; }          // ✕ hat schon geschlossen
+  if (!document.getElementById('bildGross').hidden) { schliesseGrossIntern(); return; }
   const st = ev.state;
+  if (st && st.ra === 'bild') { try { history.back(); } catch (e) {} return; }   // Vorwärts-Taste auf den Foto-Eintrag: überspringen
   const bestaetigt = Date.now() - VERLAUF.bestaetigt < 3000;
   VERLAUF.bestaetigt = 0;
   // Vorwärts-Taste: zurück in die Ansicht des Eintrags, ohne neuen anzulegen
   if (st && st.ra === 'anfrage' && st.id) { oeffne(st.id, { ohneEintrag: true }); return; }
   if (st && st.ra === 'melden') { zumMelden({ ohneEintrag: true }); return; }
   if (S.ansicht === 'liste') return;
+  if (eintragUnterwegs()) {
+    // Der Eintrag wird gerade geschrieben: Eintrag wieder anlegen, hierbleiben
+    try { history.pushState(S.ansicht === 'anfrage' ? { ra: 'anfrage', id: S.offeneId } : { ra: 'melden' }, ''); } catch (e) {}
+    toast(t('senden_laeuft'));
+    return;
+  }
   if (!bestaetigt && ungesendet() && !window.confirm(t('verwerfen_frage'))) {
     // „nein“: den Eintrag wieder anlegen — Ansicht und Text bleiben stehen
     try { history.pushState(S.ansicht === 'anfrage' ? { ra: 'anfrage', id: S.offeneId } : { ra: 'melden' }, ''); } catch (e) {}
@@ -1091,7 +1229,9 @@ window.addEventListener('pagehide', function () {
     if (window.top === window || !eigenerEintrag() || !window.frameElement) return;
     const oben = window.top;
     oben.__bosRaFenster = window.frameElement;
-    oben.setTimeout('try { if (window.__bosRaFenster && !window.__bosRaFenster.isConnected) history.back(); } finally { window.__bosRaFenster = null; }', 0);
+    // Stufe 2: bei offener Großansicht liegen ZWEI eigene Einträge oben (Anfrage + Foto)
+    const schritte = (history.state && history.state.ra === 'bild') ? 2 : 1;
+    oben.setTimeout('try { if (window.__bosRaFenster && !window.__bosRaFenster.isConnected) history.go(-' + schritte + '); } finally { window.__bosRaFenster = null; }', 0);
   } catch (e) { /* kein Zugriff auf den Gastgeber */ }
 });
 
@@ -1117,6 +1257,488 @@ document.getElementById('main').addEventListener('click', function (e) {
 });
 document.getElementById('meldenBtn').addEventListener('click', zumMelden);
 
+/* ==================================================================
+   FOTOS (Stufe 2) — Auswahl, Senden, Anzeige, Großansicht, Archiv.
+   Alles Speicherarbeit über BOS_MELDUNGEN; hier nur Bedienung.
+   ================================================================== */
+let speicherBereit = Promise.resolve('unbekannt');   // Speicher-Regelstand-Probe (start)
+const BILDER = {};                                   // pfad → { stand: 'laedt'|'da'|'fehler', url, fehler }
+let fotoZiel = null;                                 // 'melden' | 'rueck' — für die Dateiauswahl
+const RAEUM_SCHLUESSEL = 'bos_reparatur_fotos_geraeumt_v1';
+
+function anzahlFotos(n) { return n === 1 ? '1 Foto' : n + ' Fotos'; }
+function fotoGrund(err) {
+  if (!err) return '';
+  const e = err.art ? err : M.einordnen(err);
+  return (e.meldung || e.message || String(err)) + (e.original ? ' (' + e.original + ')' : '');
+}
+function fotosLeeren(art) {
+  const z = S.senden[art];
+  if (z && z.steuer && typeof z.steuer.abbrechen === 'function') { try { z.steuer.abbrechen(); } catch (e) { /* egal */ } }
+  S.fotos[art].forEach(function (f) { if (f.url) { try { URL.revokeObjectURL(f.url); } catch (e) { /* egal */ } } });
+  S.fotos[art] = [];
+  S.senden[art] = null;
+  S.fotoHinweis[art] = '';
+}
+
+/* ---------- Auswahl und Vorschau ---------- */
+function sendeStandHTML(art) {
+  const z = S.senden[art];
+  if (!z || !z.phase) return '';
+  let text = '';
+  let knoepfe = [];
+  if (z.phase === 'fotos') text = t('s_hochladen', { i: z.i, n: z.n, p: z.p || 0 });
+  else if (z.phase === 'eintrag') text = t('s_eintrag');
+  else if (z.phase === 'fehler_foto') {
+    text = t('s_foto_fehler', { n: z.fotoNr, grund: fotoGrund(z.fehler) });
+    knoepfe = ['nochmal'];
+    if (S.fotos[art].some(function (f) { return f.stand === 'oben'; })) knoepfe.push('ohne_fehlende');
+    knoepfe.push('ohne_fotos', 'abbrechen');
+  } else if (z.phase === 'fehler_eintrag') {
+    text = t('s_eintrag_fehler', { grund: fotoGrund(z.fehler) });
+    // nur „Nochmal“ (gleiche Kennung): ein neuer Anlauf mit neuer Kennung könnte
+    // eine zweite Anfrage erzeugen, wenn die erste doch noch ankommt
+    knoepfe = ['nochmal'];
+  } else if (z.phase === 'offline') {
+    text = t('s_offline');
+    knoepfe = ['ohne_fotos', 'nochmal', 'abbrechen'];
+  }
+  const rot = z.phase === 'fehler_foto' || z.phase === 'fehler_eintrag' || z.phase === 'offline';
+  return '<div class="sende-stand' + (rot ? ' rot' : '') + '" id="sendeStand-' + art + '" role="' + (rot ? 'alert' : 'status') + '">' +
+    '<span id="sendeText-' + art + '">' + esc(text) + '</span>' +
+    (knoepfe.length ? '<div class="knopfreihe">' + knoepfe.map(function (k) {
+      const klasse = k === 'nochmal' ? ' bos-btn--amber' : (k === 'abbrechen' ? ' bos-btn--ghost' : '');
+      return '<button type="button" class="bos-btn' + klasse + '" data-sende="' + k + '" data-art="' + art + '">' + esc(t('s_' + k)) + '</button>';
+    }).join('') + '</div>' : '') + '</div>';
+}
+function fotoStandText(f) {
+  if (f.stand === 'verkleinern') return t('foto_verkleinern');
+  if (f.stand === 'kaputt') return t('foto_kaputt', { grund: fotoGrund(f.fehler) });
+  if (f.stand === 'laedt') return Math.round((f.fortschritt || 0) * 100) + ' %';
+  if (f.stand === 'oben') return t('foto_oben');
+  if (f.stand === 'fehler') return t('foto_fehler_kurz');
+  return t('foto_kb', { kb: Math.max(1, Math.round((f.bytes || 0) / 1024)) });
+}
+function fotoFeldHTML(art) {
+  const liste = S.fotos[art];
+  let html = '<div class="foto-feld" id="fotoFeld-' + art + '">';
+  if (!S.fotoModul.ok) return html + '<div class="klein">' + esc(t('foto_aus', { grund: fotoGrund(S.fotoModul.grund) })) + '</div></div>';
+  const gesperrt = !!S.senden[art] || S.arbeitet;
+  html += '<div class="foto-knopfzeile"><button type="button" class="bos-btn" data-foto-wahl="' + art + '"' +
+    (liste.length >= M.FOTO.max || gesperrt ? ' disabled' : '') + '>' + esc(t('foto_knopf', { n: liste.length, max: M.FOTO.max })) + '</button>' +
+    '<span class="foto-pflicht">' + esc(t('foto_pflicht')) + '</span></div>';
+  if (liste.length) {
+    html += '<div class="vorschau-reihe">' + liste.map(function (f, i) {
+      return '<div class="vorschau' + (f.stand === 'kaputt' ? ' kaputt' : '') + '" data-vorschau="' + i + '">' +
+        (f.url ? '<img src="' + esc(f.url) + '" alt="">' : '') +
+        '<span class="v-stand" id="vStand-' + art + '-' + i + '">' + esc(fotoStandText(f)) + '</span>' +
+        (gesperrt ? '' : '<button type="button" class="link-btn" data-foto-weg="' + art + '" data-index="' + i + '">' + esc(t('foto_entfernen')) + '</button>') +
+        '</div>';
+    }).join('') + '</div>';
+  }
+  if (S.fotoHinweis[art]) html += '<div class="klein">' + esc(S.fotoHinweis[art]) + '</div>';
+  return html + sendeStandHTML(art) + '</div>';
+}
+/* Nur das Fotofeld neu — ohne die Seite neu zu zeichnen (Getipptes bleibt, Fokus bleibt). */
+/* Schreibt gerade ein Eintrag (nach den Fotos)? Dann nicht weg — sonst
+   käme er an, obwohl verworfen (Gegenprüfung 12.10.). Kurz: höchstens das
+   Zeitlimit der Datenbank. */
+function eintragUnterwegs() {
+  return ['melden', 'rueck'].some(function (a) { return S.senden[a] && S.senden[a].phase === 'eintrag'; });
+}
+function fotoSendenLaeuft() {
+  return ['melden', 'rueck'].some(function (a) { return S.senden[a] && (S.senden[a].phase === 'fotos' || S.senden[a].phase === 'eintrag'); });
+}
+function zeichneFotoFeld(art) {
+  const el = document.getElementById('fotoFeld-' + art);
+  if (el) el.outerHTML = fotoFeldHTML(art);
+}
+function fotoEntfernen(art, i) {
+  const f = S.fotos[art][i];
+  if (!f || S.senden[art] || S.arbeitet) return;
+  if (f.url) { try { URL.revokeObjectURL(f.url); } catch (e) { /* egal */ } }
+  S.fotos[art].splice(i, 1);
+  S.fotoHinweis[art] = '';
+  zeichneFotoFeld(art);
+}
+document.getElementById('fotoWahl').addEventListener('change', function () {
+  const art = fotoZiel;
+  const dateien = Array.prototype.slice.call(this.files || []);
+  this.value = '';
+  if (!art || !dateien.length) return;
+  if (art === 'rueck') {
+    if (S.ansicht !== 'anfrage' || !S.offeneId) return;
+    if (S.fotosRueckId !== S.offeneId) { fotosLeeren('rueck'); S.fotosRueckId = S.offeneId; }
+  } else if (S.ansicht !== 'melden') return;
+  const frei = M.FOTO.max - S.fotos[art].length;
+  S.fotoHinweis[art] = dateien.length > frei ? t('foto_max', { n: dateien.length - Math.max(0, frei) }) : '';
+  // nacheinander verkleinern, nicht gleichzeitig: ein volles Handyfoto belegt
+  // im Speicher 50–200 MB, drei auf einmal überfordern alte Handys
+  let kette = Promise.resolve();
+  dateien.slice(0, Math.max(0, frei)).forEach(function (d) {
+    const f = { stand: 'verkleinern', bytes: 0, url: null, blob: null, n: 0, fehler: null };
+    S.fotos[art].push(f);
+    kette = kette.then(function () {
+      if (S.fotos[art].indexOf(f) === -1) return null;      // inzwischen entfernt/verworfen
+      return M.verkleinern(d).then(function (r) {
+        if (S.fotos[art].indexOf(f) === -1) return;
+        f.blob = r.blob; f.bytes = r.bytes; f.url = URL.createObjectURL(r.blob); f.stand = 'bereit';
+        zeichneFotoFeld(art);
+      }, function (err) {
+        console.error('[Reparaturanfrage] Foto verkleinern:', err);
+        if (S.fotos[art].indexOf(f) === -1) return;
+        f.stand = 'kaputt'; f.fehler = err;
+        zeichneFotoFeld(art);
+      });
+    });
+  });
+  zeichneFotoFeld(art);
+});
+
+/* ---------- Senden ----------
+   Ohne Foto: genau der Weg aus Stufe 1 (sendeNurText). Mit Foto: Fotos
+   zuerst (je eins, mit Fortschritt), dann der Eintrag mit der vorab
+   vergebenen Kennung. Scheitert etwas: der echte Grund und Knöpfe. */
+function sendeNurText(art) {
+  if (art === 'melden') {
+    const m = S.melden;
+    aktion(function () { return M.anlegen({ kanal: KANAL, text: m.text, geraet: m.geraet, weiterarbeiten: m.weiterarbeiten }); },
+      function (id) {
+        S.melden = { text: '', geraet: '', weiterarbeiten: null };
+        fotosLeeren('melden');
+        toast(t('gesendet'));
+        oeffne(id);   // ersetzt den Melden-Eintrag (Zurück → Posteingang)
+      }, true);
+    return;
+  }
+  const k = findeKopf(S.offeneId);
+  if (!k) { zeigeFehler('Speichern', new Error(t('nicht_gefunden'))); return; }
+  aktion(function () { return M.nachricht(k, wert('chatText') || ''); }, function (erg) {
+    setzeWert('chatText', ''); fotosLeeren('rueck');
+    toast(erg && erg.gesehenGesetzt ? t('gesehen_auto') : t('gespeichert'));
+  }, true);
+}
+function zuSenden(art, modus) {
+  const liste = S.fotos[art];
+  if (modus === 'ohne_fotos') return [];
+  if (modus === 'ohne_fehlende') return liste.filter(function (f) { return f.stand === 'oben'; });
+  return liste.filter(function (f) { return f.blob && f.stand !== 'kaputt'; });
+}
+async function sendeMitFotos(art, modus) {
+  if (S.arbeitet) return;
+  const liste = S.fotos[art];
+  if (liste.some(function (f) { return f.stand === 'verkleinern'; })) { toast(t('foto_warte')); return; }
+  const fotos = zuSenden(art, modus);
+  if (!fotos.length) {
+    // „Ohne Fotos senden“ (oder alle unbrauchbar): Weg aus Stufe 1, NEUE Kennung —
+    // schon hochgeladene Fotos gehören damit zu keinem Eintrag und erscheinen nie.
+    S.senden[art] = null;
+    liste.forEach(function (f) { if (f.stand !== 'kaputt') { f.stand = f.blob ? 'bereit' : f.stand; f.n = 0; } });
+    sendeNurText(art);
+    return;
+  }
+  let kopf = null;
+  let text = '';
+  if (art === 'rueck') {
+    kopf = findeKopf(S.offeneId);
+    if (!kopf) { zeigeFehler('Speichern', new Error(t('nicht_gefunden'))); return; }
+    text = String(wert('chatText') || '');
+    if (M.sauber(text, 100000).length > M.GRENZEN.nachricht) { zeigeFehler('Eingabe', new Error('Zu lang: höchstens ' + M.GRENZEN.nachricht + ' Zeichen.')); return; }
+  }
+  let z = S.senden[art];
+  if (!z) {
+    try {
+      if (art === 'melden') { const id = M.neueAnfrageId(); z = { anfrageId: id, eintrag: 'anfrage', versuche: 0, steuer: {} }; }
+      else { const eid = M.neueEintragId(kopf.id); z = { anfrageId: kopf.id, eintrag: eid, versuche: 0, steuer: {} }; }
+    } catch (err) { zeigeFehler('Senden', err); return; }
+    S.senden[art] = z;
+  }
+  const offen = fotos.filter(function (f) { return f.stand !== 'oben'; });
+  if (offen.length && navigator.onLine === false) { z.phase = 'offline'; render(true); return; }
+  // Nummern 1–3 fest vergeben (bleiben bei „Nochmal“ gleich)
+  const belegt = {};
+  fotos.forEach(function (f) { if (f.n) belegt[f.n] = true; });
+  fotos.forEach(function (f) {
+    if (f.n) return;
+    for (let n = 1; n <= M.FOTO.max; n++) if (!belegt[n]) { f.n = n; belegt[n] = true; return; }
+  });
+  S.arbeitet = true;
+  let aktuell = null;
+  try {
+    for (let i = 0; i < offen.length; i++) {
+      aktuell = offen[i];
+      z.phase = 'fotos'; z.i = i + 1; z.n = offen.length; z.p = 0;
+      aktuell.stand = 'laedt'; aktuell.fortschritt = 0;
+      render(true);
+      const f = aktuell, nr = i + 1;
+      await M.fotoHochladen(z.anfrageId, z.eintrag, f.n, f.blob, function (p) {
+        if (S.senden[art] !== z) return;
+        z.p = Math.round(p * 100); f.fortschritt = p;
+        const st = document.getElementById('sendeText-' + art);
+        if (st) st.textContent = t('s_hochladen', { i: nr, n: offen.length, p: z.p });
+        const v = document.getElementById('vStand-' + art + '-' + S.fotos[art].indexOf(f));
+        if (v) v.textContent = fotoStandText(f);
+      }, z.steuer);
+      if (S.senden[art] !== z) { S.arbeitet = false; render(true); return; }   // inzwischen verworfen
+      f.stand = 'oben';
+    }
+  } catch (err) {
+    console.error('[Reparaturanfrage] Foto hochladen:', err);
+    S.arbeitet = false;
+    if (S.senden[art] !== z) { render(true); return; }               // verworfen: Knöpfe wieder frei
+    if (aktuell) aktuell.stand = 'fehler';
+    z.phase = 'fehler_foto'; z.fehler = err; z.fotoNr = aktuell ? aktuell.n : '?';
+    render(true);
+    return;
+  }
+  z.phase = 'eintrag';
+  render(true);
+  let erg;
+  try {
+    if (art === 'melden') {
+      const m = S.melden;
+      erg = await M.anlegen({ kanal: KANAL, text: m.text, geraet: m.geraet, weiterarbeiten: m.weiterarbeiten, id: z.anfrageId, wiederholung: z.versuche > 0 });
+    } else {
+      const frisch = findeKopf(z.anfrageId) || kopf;
+      erg = await M.nachricht(frisch, M.sauber(text, 100000) ? text : t('rueck_nur_foto'), { eintragId: z.eintrag, wiederholung: z.versuche > 0 });
+    }
+  } catch (err) {
+    console.error('[Reparaturanfrage] Eintrag nach Fotos:', err);
+    S.arbeitet = false;
+    if (S.senden[art] !== z) { render(true); return; }
+    z.versuche++;
+    z.phase = 'fehler_eintrag'; z.fehler = err;
+    render(true);
+    return;
+  }
+  S.arbeitet = false;
+  if (S.senden[art] !== z) { render(true); return; }
+  fotosLeeren(art);
+  if (art === 'melden') {
+    S.melden = { text: '', geraet: '', weiterarbeiten: null };
+    toast(t('gesendet'));
+    oeffne(erg);   // ersetzt den Melden-Eintrag (Zurück → Posteingang)
+    return;
+  }
+  setzeWert('chatText', '');
+  toast(erg && erg.gesehenGesetzt ? t('gesehen_auto') : t('gespeichert'));
+  render(true);
+}
+function sendeKnopf(art, was) {
+  if (S.arbeitet) return;
+  if (was === 'nochmal') {
+    const z = S.senden[art];
+    if (z && z.phase === 'fehler_foto') {
+      // Nach einem gescheiterten Foto NEU anfangen (neue Kennung, alle Fotos
+      // noch einmal): War das Foto in Wahrheit schon oben (Antwort verloren),
+      // ließe die Regel denselben Namen nie wieder zu (kein Überschreiben).
+      // Was liegen bleibt, gehört zu keinem Eintrag und erscheint nie.
+      S.senden[art] = null;
+      S.fotos[art].forEach(function (f) { if (f.blob && f.stand !== 'kaputt') { f.stand = 'bereit'; f.n = 0; } });
+    }
+    sendeMitFotos(art, 'normal'); return;
+  }
+  if (was === 'ohne_fehlende') { sendeMitFotos(art, 'ohne_fehlende'); return; }
+  if (was === 'ohne_fotos') { sendeMitFotos(art, 'ohne_fotos'); return; }
+  // Abbrechen: Auswahl bleibt, das nächste Senden fängt neu an (neue Kennung)
+  S.senden[art] = null;
+  S.fotos[art].forEach(function (f) { if (f.blob && f.stand !== 'kaputt') { f.stand = 'bereit'; f.n = 0; } });
+  render(true);
+}
+
+/* ---------- Anzeige ---------- */
+function fotoListeLaden(id) {
+  const L = S.fotoListe;
+  if (!L || L.id !== id) return;
+  L.gestartet = true;
+  if (!S.fotoModul.ok) { L.stand = 'aus'; return; }
+  L.gen += 1;
+  const gen = L.gen;
+  L.bekannt = {};
+  S.verlauf.forEach(function (e) { if (e.art === 'nachricht') L.bekannt[e.id] = true; });
+  L.laeuft = true;
+  M.fotosListen(id).then(function (r) {
+    if (S.fotoListe !== L || L.gen !== gen) return;
+    L.stand = 'da'; L.fotos = r.fotos; L.vermerk = r.vermerk; L.fehler = null; L.laeuft = false;
+    planeRender();
+    pruefeNeueEintraege();
+  }, function (err) {
+    console.error('[Reparaturanfrage] Fotos auflisten:', err);
+    if (S.fotoListe !== L || L.gen !== gen) return;
+    L.stand = 'fehler'; L.fehler = err; L.laeuft = false;
+    planeRender();
+  });
+}
+/* Neue Rückfrage live: ihre Fotos sind schon oben (Foto zuerst) → neu auflisten. */
+function pruefeNeueEintraege() {
+  const L = S.fotoListe;
+  if (!L || L.id !== S.offeneId || !L.gestartet || L.laeuft || L.stand !== 'da') return;
+  const neu = S.verlauf.some(function (e) { return e.art === 'nachricht' && !L.bekannt[e.id]; });
+  if (!neu) return;
+  clearTimeout(L.uhr);
+  L.uhr = setTimeout(function () { if (S.fotoListe === L) fotoListeLaden(L.id); }, 250);
+}
+function eintragFotos(eintrag, von) {
+  const L = S.fotoListe;
+  if (!L || L.id !== S.offeneId || !L.fotos.length) return [];
+  return M.fotosFuer(L.fotos, eintrag, von);
+}
+function fotoHTML(f) {
+  const b = BILDER[f.pfad];
+  if (b && b.stand === 'fehler') {
+    return '<div class="foto-fehler" role="alert" data-foto-pfad="' + esc(f.pfad) + '" data-nr="' + f.n + '">' + esc(t('foto_nicht_ladbar', { n: f.n, grund: fotoGrund(b.fehler) })) +
+      ' <button type="button" class="link-btn" data-foto-neu="' + esc(f.pfad) + '">' + esc(t('fotos_nochmal')) + '</button></div>';
+  }
+  return '<button type="button" class="foto-mini" data-foto="' + esc(f.pfad) + '" data-foto-pfad="' + esc(f.pfad) + '" data-nr="' + f.n + '" aria-label="' + esc(t('foto_aria', { n: f.n })) + '">' +
+    (b && b.stand === 'da' ? '<img src="' + esc(b.url) + '" alt="">' : '<span>' + esc(t('foto_laedt')) + '</span>') + '</button>';
+}
+function fotoBlock(fotos) {
+  if (!fotos.length) return '';
+  return '<div class="fotos">' + fotos.map(fotoHTML).join('') + '</div>';
+}
+/* Reiter „Anfrage“: Fotos der Meldung (nur vom Melder), Ladezustand, Archiv-Vermerk. */
+function anfrageFotosHTML(k, archiv) {
+  if (!S.fotoModul.ok) return '';
+  const L = S.fotoListe;
+  if (!L || L.id !== k.id) return '';
+  if (L.stand === 'fehler') {
+    return '<div class="foto-fehler" role="alert">' + esc(t('fotos_nicht_abrufbar', { grund: fotoGrund(L.fehler) })) +
+      ' <button type="button" class="link-btn" data-fotos-neu="1">' + esc(t('fotos_nochmal')) + '</button></div>';
+  }
+  if (L.stand !== 'da') return L.gestartet ? '<div class="foto-info">' + esc(t('fotos_laden')) + '</div>' : '';
+  let html = fotoBlock(M.fotosFuer(L.fotos, 'anfrage', k.von));
+  if (archiv && L.vermerk) html += '<div class="foto-info">' + esc(t('fotos_weg', { anzahl: anzahlFotos(L.vermerk.anzahl), datum: M.fensterText(L.vermerk.datum) })) + '</div>';
+  if (archiv && L.fotos.length) html += '<div class="foto-info">' + esc(t('fotos_wird_geloescht')) + '</div>';
+  return html;
+}
+function bildFlaecheAktualisieren(pfad) {
+  document.querySelectorAll('[data-foto-pfad]').forEach(function (el) {
+    if (el.getAttribute('data-foto-pfad') !== pfad) return;
+    el.outerHTML = fotoHTML({ pfad: pfad, n: Number(el.getAttribute('data-nr')) || 0 });
+  });
+}
+/* Holt jedes sichtbare Foto einmal (mit Anmeldung) und merkt es für die Sitzung. */
+/* Nur sichtbare Fotos (aktiver Reiter), höchstens 3 gleichzeitig — jeder
+   Abruf kostet zwei Lesevorgänge der Regel (Gegenprüfung 12.10.). */
+const BILD_WARTESCHLANGE = [];
+let bilderUnterwegs = 0;
+function ladeBilder() {
+  document.querySelectorAll('[data-foto]').forEach(function (el) {
+    const pfad = el.getAttribute('data-foto');
+    if (BILDER[pfad] || el.offsetParent === null) return;
+    BILDER[pfad] = { stand: 'laedt' };
+    BILD_WARTESCHLANGE.push(pfad);
+  });
+  bildNaechstes();
+}
+function bildNaechstes() {
+  while (bilderUnterwegs < 3 && BILD_WARTESCHLANGE.length) {
+    const pfad = BILD_WARTESCHLANGE.shift();
+    const b = BILDER[pfad];
+    bilderUnterwegs++;
+    M.fotoHolen(pfad).then(function (blob) {
+      b.stand = 'da'; b.url = URL.createObjectURL(blob);
+    }, function (err) {
+      console.error('[Reparaturanfrage] Foto laden:', pfad, err);
+      b.stand = 'fehler'; b.fehler = err;
+    }).then(function () {
+      bilderUnterwegs--;
+      bildFlaecheAktualisieren(pfad);
+      bildNaechstes();
+    });
+  }
+}
+
+/* ---------- Großansicht ---------- */
+function zeigeGross(pfad, nr) {
+  const b = BILDER[pfad];
+  if (!b || b.stand !== 'da') return;
+  const el = document.getElementById('bildGross');
+  document.getElementById('bildGrossImg').src = b.url;
+  const sp = document.getElementById('bildSpeichern');
+  if (S.ich && S.ich.rechte.bearbeiten) {
+    sp.href = b.url;
+    sp.setAttribute('download', 'reparaturfoto_' + M.heute() + '_' + (nr || 1) + '.jpg');
+    sp.hidden = false;
+  } else { sp.hidden = true; sp.removeAttribute('href'); }
+  el.hidden = false;
+  // eigener Eintrag: die Zurück-Taste schließt NUR das Foto
+  try { history.pushState({ ra: 'bild', id: S.offeneId }, ''); } catch (e) { console.error('[Reparaturanfrage] Verlauf nicht nutzbar:', e); }
+  document.getElementById('bildZu').focus();
+}
+function schliesseGrossIntern() {
+  const el = document.getElementById('bildGross');
+  if (el.hidden) return;
+  el.hidden = true;
+  document.getElementById('bildGrossImg').removeAttribute('src');
+}
+function schliesseGross() {
+  if (document.getElementById('bildGross').hidden) return;          // doppelt getippt / Escape gehalten
+  schliesseGrossIntern();                                           // sofort zu — ein zweites Tippen trifft nichts mehr
+  if (history.state && history.state.ra === 'bild') { VERLAUF.bildZu = true; history.back(); }
+}
+document.getElementById('bildZu').addEventListener('click', schliesseGross);
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !document.getElementById('bildGross').hidden) schliesseGross(); });
+
+/* ---------- Klicks im Hauptbereich (Fotos) ---------- */
+document.getElementById('main').addEventListener('click', function (e) {
+  const w = e.target.closest('[data-foto-wahl]');
+  if (w) { if (!w.disabled) { fotoZiel = w.getAttribute('data-foto-wahl'); document.getElementById('fotoWahl').click(); } return; }
+  const weg = e.target.closest('[data-foto-weg]');
+  if (weg) { fotoEntfernen(weg.getAttribute('data-foto-weg'), Number(weg.getAttribute('data-index'))); return; }
+  const sk = e.target.closest('[data-sende]');
+  if (sk) { if (!sk.disabled) sendeKnopf(sk.getAttribute('data-art'), sk.getAttribute('data-sende')); return; }
+  const neu = e.target.closest('[data-foto-neu]');
+  if (neu) { const pfad = neu.getAttribute('data-foto-neu'); delete BILDER[pfad]; bildFlaecheAktualisieren(pfad); ladeBilder(); return; }
+  if (e.target.closest('[data-fotos-neu]')) { if (S.fotoListe) { S.fotoListe.stand = 'laedt'; fotoListeLaden(S.fotoListe.id); render(true); } return; }
+  const g = e.target.closest('[data-foto]');
+  if (g) zeigeGross(g.getAttribute('data-foto'), g.getAttribute('data-nr'));
+});
+
+/* ---------- Archiv ---------- */
+function archivFotoZeile(id) {
+  const a = S.archivFotos[id];
+  if (!a || a.stand === 'laedt') return '';
+  if (a.stand === 'fehler') return '<span class="z-fotos">📷 ' + esc(t('fotos_nicht_abrufbar', { grund: fotoGrund(a.fehler) })) + '</span>';
+  if (a.anzahl) return '<span class="z-fotos">' + esc(t('fotos_da_archiv', { anzahl: anzahlFotos(a.anzahl) })) + '</span>';
+  if (a.vermerk) return '<span class="z-fotos">' + esc(t('fotos_weg', { anzahl: anzahlFotos(a.vermerk.anzahl), datum: M.fensterText(a.vermerk.datum) })) + '</span>';
+  return '';
+}
+/* Je Archiv-Zeile einmal auflisten (nur wenn das Archiv offen ist). */
+function ladeArchivFotos() {
+  if (!S.fotoModul.ok || !S.archivAn) return;
+  S.archiv.forEach(function (k) {
+    if (S.archivFotos[k.id]) return;
+    const a = S.archivFotos[k.id] = { stand: 'laedt' };
+    M.fotosListen(k.id).then(function (r) {
+      a.stand = 'da'; a.anzahl = r.fotos.length; a.vermerk = r.vermerk;
+      planeRender();
+    }, function (err) {
+      console.error('[Reparaturanfrage] Archiv-Fotos:', k.id, err);
+      a.stand = 'fehler'; a.fehler = err;
+      planeRender();
+    });
+  });
+}
+/* Löschen beim Archiv (E12): ein Konto mit Bearbeiten räumt beim Öffnen auf.
+   Gerätespeicher merkt erledigte Anfragen (100 Tage), damit sie nicht jedes
+   Mal neu aufgelistet werden. Gesperrter Gerätespeicher: es wird eben jedes
+   Mal aufgelistet — kostet Bruchteile eines Cents, schadet nicht. */
+function raeumeArchivFotos(stand) {
+  if (stand !== 'passt' || !S.fotoModul.ok || !S.ich || !S.ich.rechte.bearbeiten) return;
+  let d = {};
+  try { const roh = window.localStorage.getItem(RAEUM_SCHLUESSEL); const x = roh ? JSON.parse(roh) : {}; if (x && typeof x === 'object' && !Array.isArray(x)) d = x; } catch (e) { d = {}; }
+  const jetzt = Date.now();
+  Object.keys(d).forEach(function (id) { if (!(jetzt - d[id] < 100 * 24 * 3600e3)) delete d[id]; });   // länger als das Fenster (7 + 90 Tage)
+  M.archivFotosAufraeumen(function (id) { return !!d[id]; }, function (id) {
+    d[id] = Date.now();
+    try { window.localStorage.setItem(RAEUM_SCHLUESSEL, JSON.stringify(d)); } catch (e) { /* siehe oben */ }
+  }).then(function (erg) {
+    erg.fehler.forEach(function (f) { zeigeFehler(t('err_aufraeumen'), f.fehler); });
+    if (erg.geloescht) { S.archivFotos = {}; if (S.fotoListe) fotoListeLaden(S.fotoListe.id); planeRender(); }
+  }, function (err) { zeigeFehler(t('err_aufraeumen'), err); });
+}
+
 /* ---------- Start ---------- */
 function geraetAusAdresse() {
   try {
@@ -1127,6 +1749,17 @@ function geraetAusAdresse() {
 function start() {
   if (!M) { zeigeFehler('Start', new Error('bos_meldungen.js ist nicht geladen.')); return; }
   S.geraetAusCode = geraetAusAdresse();
+  S.fotoModul = M.fotosVerfuegbar();
+  speicherBereit = M.pruefeSpeicherRegelstand().then(function (stand) {
+    S.speicherStand = stand;
+    const el = document.getElementById('speicherLeiste');
+    let text = '';
+    if (stand === 'alt') text = t('speicher_alt', { fassung: M.SPEICHER_FASSUNG, datei: M.SPEICHER_DATEI });
+    else if (stand === 'aus') text = t('speicher_aus');
+    else if (stand === 'fehlt') text = '⚠ ' + t('foto_aus', { grund: fotoGrund(S.fotoModul.grund) });
+    el.textContent = text; el.hidden = !text;
+    return stand;
+  }, function (err) { console.error('[Reparaturanfrage] Speicher-Probe:', err); return 'unbekannt'; });
   M.pruefeRegelstand().then(function (stand) {
     const el = document.getElementById('regelLeiste');
     el.textContent = t('regel_alt', { fassung: M.REGEL_FASSUNG, datei: M.REGEL_DATEI });
@@ -1146,6 +1779,7 @@ function start() {
       h.textContent = (h.textContent ? h.textContent + ' · ' : '') + w; h.hidden = false;
     });
     if (!r.lesen) { render(); return; }
+    speicherBereit.then(raeumeArchivFotos);   // Stufe 2: nur Bearbeiten, nur wenn die Speicher-Regeln stehen
     merkLaden();   // Nachtrag 2: „neu“ — scheitert der Gerätespeicher, läuft die Seite ohne Kennzeichen weiter
     M.offen(KANAL, function (liste, meta) { S.offen = liste; S.verbindung.offen = meta; S.listenDa.offen = true; syncLetzte(); pflegeMerk(); render(); },
       function (err) { zeigeFehler(t('err_laden', { was: t('offen_titel') }), err); });
@@ -1155,6 +1789,9 @@ function start() {
     // (sonst stünde die Liste da, und der erste Druck auf Zurück täte nichts).
     if (eigenerEintrag()) {
       const st = history.state;
+      // Stufe 2: Neuladen bei offener Großansicht → einen Schritt zurück auf den
+      // Anfrage-Eintrag (popstate öffnet die Anfrage) — kein zweiter Anfrage-Eintrag
+      if (st.ra === 'bild') { try { history.back(); } catch (e) {} return; }
       if (st.ra === 'anfrage' && st.id) { oeffne(st.id, { ohneEintrag: true }); return; }
       if (st.ra === 'melden' && r.melden) { if (S.geraetAusCode) S.melden.geraet = S.geraetAusCode; zumMelden({ ohneEintrag: true }); return; }
     }
