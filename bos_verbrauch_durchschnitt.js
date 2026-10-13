@@ -21,6 +21,8 @@
  * Zeitkontext-Referenzdatei muss vor dieser Datei geladen sein:
  *   <script src="../bos_zeitkontext_referenz.js"></script>
  *   <script src="../bos_firebase_config.js"></script>
+ *   <script src="../bos_produkte.js"></script>   (seit 13.10.2026 Pflicht
+ *        für holeWochenbedarf/holeDurchschnitt mit Produkt — Einheiten)
  *   <script src="../bos_verbrauch_durchschnitt.js"></script>
  *
  * ZIEL-ABLAGEORT: baeckereios/bos_verbrauch_durchschnitt.js (Root-Ebene,
@@ -101,6 +103,33 @@
  *   die Abfrage still scheitern lassen (vom catch abgefangen, kein
  *   sichtbarer Fehler, Ergebnis in jedem Fall []). Sortierung jetzt
  *   clientseitig nach dem Abruf.
+ * 13.10.2026 · 12:08 — EINHEITEN (Baustelle #64, SESSION_2026-10-13_
+ *   EINHEITEN_BAU.md, Freigabe Kontroll-Chat 11:48). holeDurchschnitt()/
+ *   holeWochenbedarf() nehmen als letzten Parameter das Produkt und liefern
+ *   in dessen Einheit, mit `einheit` in der Antwort. Behebt die Doppel-
+ *   teilung an den Stationen (Mitschrift lag schon in Trägern, die Station
+ *   teilte trotzdem) und die Teilung bei Stück-Produkten. Ohne Produkt
+ *   unverändert roh (alte Aufrufer). holeManuelleWerte(), holeOffizielle-
+ *   Werte(), pruefeAusreisser() unverändert. Siehe Abschnitt EINHEITEN.
+ *
+ * EINHEITEN (Stand 13.10.2026, Baustelle #64):
+ *   Regel: jede Bedarfszahl verlässt diesen Host in der `einheit` des
+ *   Produkts (Träger: Blech, Diele, Lochblech … — oder Stück). Die Aufrufer
+ *   rechnen nichts mehr um. Die Einheiten-Logik selbst (Stück oder Träger,
+ *   welcher, Stück ↔ Träger) steht in bos_produkte.js (BOS_PRODUKTE.einheit),
+ *   hier wird nur entschieden, in welcher Einheit ein Topf vorliegt:
+ *     offiziell (Backzettel)  Stück (Schlüssel <x>_stueck) → in den Träger
+ *                             teilen; Schlüssel auf _bleche: schon Träger
+ *     manuell (Mitschrift)    schon Produkt-Einheit → nichts
+ *     Froster-Bestand         Träger, berührt dieser Host nicht
+ *   Stück-Produkte werden nie umgerechnet. Fehlt `einheit`, wird wie bis
+ *   13.10. gerechnet (Träger mit stueckProBlech) — Übergang, der Editor
+ *   zeigt die Lücke.
+ *   ~~ALT (31.08.–13.10.2026): „Verbrauch ist intern durchgehend in STÜCK,
+ *   die Aufrufer rechnen über stueckProBlech in Bleche um“ (schnellrechner.
+ *   html, Kommentar 01.09.).~~ Stimmte nur für den Backzettel. Die Mitschrift
+ *   speichert seit 29.08. bei Umschalter-Produkten in Trägern; die Stationen
+ *   teilten sie trotzdem noch einmal (10 Bleche → 0,5 Blech).
  *
  * EINSTELLUNGEN-AUFLÖSUNG (Stand 29.08.2026):
  * holeEinstellungen(datentopf) löst die Berechnungs-Einstellungen nach
@@ -151,9 +180,10 @@
  * Mo=0…So=6. Dafür neu: holeDurchschnitt() (ein Wochentag) und
  * holeWochenbedarf() (alle sieben, fertiges needs[]-Array). Beide reine
  * Getter über holeManuelleWerte() — keine eigene Filter-/Modus-Logik,
- * keine Dopplung der Einstellungen-Auflösung. Noch nicht erledigt: der
- * eigentliche Aufrufer (Planer/Stationsseiten), der holeWochenbedarf()
- * tatsächlich vor einem BOS_KETTE.berechne()-Aufruf nutzt.
+ * keine Dopplung der Einstellungen-Auflösung. [Stand 13.10.2026: Aufrufer
+ * sind die vier Stationsseiten und der Schnellrechner; sie reichen needs[]
+ * an BOS_KETTE.berechne() weiter. bos_produktionskette.js ruft diesen Host
+ * selbst nicht auf.]
  *
  * NICHT verdrahtet: bos_hamster.js dockt weiterhin nicht hier an — das
  * war nie der richtige Ort (Hamster-Eskalation gehört in die Kette selbst,
@@ -457,24 +487,82 @@ window.BOS_VERBRAUCH = {
    * @param {'manuell'|'offiziell'} [datentopf]  Neu 31.08.2026. Default
    *   'manuell' — bestehende Aufrufer (bos_produktionskette.js) bleiben
    *   dadurch unverändert kompatibel, ohne diesen Parameter je zu kennen.
-   * @returns {Promise<{durchschnitt: number, anzahl: number, verlaesslich: boolean}>}
+   *   [13.10.2026: bos_produktionskette.js ruft diesen Host gar nicht auf;
+   *   Aufrufer sind die vier Stationen und der Schnellrechner.]
+   * @param {object} [produkt]  Neu 13.10.2026 (#64): das Produkt aus
+   *   BOS_PRODUKTE.lade() (gebraucht: einheit, stueckProBlech). Mit Produkt
+   *   kommt `durchschnitt` in der EINHEIT DES PRODUKTS (siehe
+   *   _inProduktEinheit), dazu `durchschnittRoh` (im Topf, unverändert) und
+   *   `einheit` (BOS_PRODUKTE.einheit). Ohne Produkt: roh wie bisher.
+   * @returns {Promise<{durchschnitt: number, anzahl: number, verlaesslich: boolean, durchschnittRoh?: number, einheit?: object}>}
    */
-  async holeDurchschnitt(db, legacyKey, wochentag, einstellungen, datentopf) {
+  async holeDurchschnitt(db, legacyKey, wochentag, einstellungen, datentopf, produkt) {
     const effektiverDatentopf = datentopf || 'manuell';
+    // 13.10.2026 (#64): Einheit VOR dem Lesen klären — fehlt bos_produkte.js,
+    // soll der Aufrufer einen sichtbaren Fehler bekommen, keine rohe Zahl.
+    const einheit = produkt ? this._einheitInfo(produkt) : null;
     const effektiveEinstellungen = einstellungen || await this.holeEinstellungen(effektiverDatentopf);
     const werte = effektiverDatentopf === 'offiziell'
       ? await this.holeOffizielleWerte(db, legacyKey, wochentag, effektiveEinstellungen)
       : await this.holeManuelleWerte(db, legacyKey, wochentag, effektiveEinstellungen);
 
     if (werte.length === 0) {
-      return { durchschnitt: 0, anzahl: 0, verlaesslich: false };
+      return produkt
+        ? { durchschnitt: 0, durchschnittRoh: 0, anzahl: 0, verlaesslich: false, einheit }
+        : { durchschnitt: 0, anzahl: 0, verlaesslich: false };
     }
     const durchschnitt = werte.reduce((summe, w) => summe + w, 0) / werte.length;
-    return {
+    const ergebnis = {
       durchschnitt,
       anzahl: werte.length,
       verlaesslich: werte.length >= effektiveEinstellungen.minStichprobe
     };
+    if (!produkt) return ergebnis; // alter Aufruf: unverändert roh (siehe Kopf, EINHEITEN)
+    ergebnis.durchschnittRoh = durchschnitt;
+    ergebnis.durchschnitt = this._inProduktEinheit(durchschnitt, effektiverDatentopf, legacyKey, produkt, false);
+    ergebnis.einheit = einheit;
+    return ergebnis;
+  },
+
+  /**
+   * EINHEITEN (13.10.2026, #64): Die Einheiten-Logik selbst steht in
+   * bos_produkte.js (BOS_PRODUKTE.einheit), nicht hier — eine Stelle für
+   * Host, Stationen, Schnellrechner, Mitschrift und Editor.
+   * Wirft, wenn bos_produkte.js nicht geladen ist (lieber ein sichtbarer
+   * Fehler an der Station als eine Zahl in unbekannter Einheit).
+   */
+  _einheitInfo(produkt) {
+    const P = (typeof window !== 'undefined' && window.BOS_PRODUKTE) || null;
+    if (!P || typeof P.einheit !== 'function') {
+      throw new Error('Einheiten: bos_produkte.js ist nicht (oder in einer alten Fassung) geladen — Seite neu laden. Ohne die Einheit rechnet der Bedarf nicht.');
+    }
+    return P.einheit(produkt);
+  },
+
+  /**
+   * Bringt einen Tagesschnitt aus einem Datentopf in die Einheit des Produkts.
+   * Topf-Tabelle (Anweisung 13.10., §3; Bauplan §3.3–§3.5):
+   *   offiziell (Backzettel) liegt in STÜCK vor, wenn legacyKey auf "_stueck"
+   *     endet (Normalfall: produkte['<x>_stueck']); endet er auf "_bleche",
+   *     liest holeOffizielleWerte() die BOS1-Blechzahl, die schon im Träger liegt.
+   *   manuell (Mitschrift) liegt schon in der Produkt-Einheit vor
+   *     (verbrauch_manuell.html speichert bei Umschalter-Produkten in Trägern).
+   *   Stück-Produkte: nie umrechnen.
+   * runden = true (needs[]): auf GANZE STÜCK gerundet, dann in die Einheit.
+   *   Backzettel/_stueck: Math.round(Schnitt) / faktor — byte-gleich zu den
+   *   Stationen bis 13.10. (dort: round im Host, Teilung in der Station).
+   *   Mitschrift/Träger: Math.round(Schnitt × faktor) / faktor — sonst würden
+   *   aus 2,4 Dielen am Tag 2 (eine Woche: zwei Dielen zu wenig).
+   */
+  _inProduktEinheit(schnitt, datentopf, legacyKey, produkt, runden) {
+    const P = window.BOS_PRODUKTE;
+    const liegtInStueck = datentopf === 'offiziell' && !/_bleche$/.test(String(legacyKey || ''));
+    if (liegtInStueck) {
+      return P.stueckInEinheit(runden ? Math.round(schnitt) : schnitt, produkt);
+    }
+    // liegt schon in der Produkt-Einheit (Mitschrift, BOS1-Blechzahl)
+    if (!runden) return schnitt;
+    return P.stueckInEinheit(Math.round(P.einheitInStueck(schnitt, produkt)), produkt);
   },
 
   /**
@@ -490,23 +578,42 @@ window.BOS_VERBRAUCH = {
    * @param {string} legacyKey
    * @param {object} [einstellungen]  Wie bei holeDurchschnitt().
    * @param {'manuell'|'offiziell'} [datentopf]  Neu 31.08.2026, Default 'manuell'.
-   * @returns {Promise<{needs: number[], verlaesslich: boolean[]}>}
-   *   needs: sieben Durchschnittswerte, Mo=0…So=6.
+   * @param {object} [produkt]  Neu 13.10.2026 (#64), wie bei holeDurchschnitt().
+   *   Die Aufrufer (Stationen, Schnellrechner) geben es immer mit und prüfen,
+   *   dass `einheit` in der Antwort steht (sonst ist der Host veraltet).
+   * @returns {Promise<{needs: number[], verlaesslich: boolean[], einheit: object|null}>}
+   *   needs: sieben Durchschnittswerte, Mo=0…So=6 — mit Produkt in der
+   *     EINHEIT DES PRODUKTS, auf ganze Stück gerundet (Bauplan §3.4);
+   *     ohne Produkt wie bis 13.10.: Math.round im Topf, einheit: null.
+   *   einheit: BOS_PRODUKTE.einheit(produkt) — art, kurz, lang, faktor …
    *   verlaesslich: parallel dazu, ob je Tag die Mindeststichprobe erreicht wurde —
    *   der Aufrufer entscheidet selbst, ob er bei false trotzdem rechnet oder warnt.
    */
-  async holeWochenbedarf(db, legacyKey, einstellungen, datentopf) {
+  async holeWochenbedarf(db, legacyKey, einstellungen, datentopf, produkt) {
     const effektiverDatentopf = datentopf || 'manuell';
+    const einheit = produkt ? this._einheitInfo(produkt) : null; // wirft sichtbar, s. _einheitInfo()
     const effektiveEinstellungen = einstellungen || await this.holeEinstellungen(effektiverDatentopf);
     const WT_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
     const ergebnisse = await Promise.all(
-      WT_LANG.map(tag => this.holeDurchschnitt(db, legacyKey, tag, effektiveEinstellungen, effektiverDatentopf))
+      WT_LANG.map(tag => this.holeDurchschnitt(db, legacyKey, tag, effektiveEinstellungen, effektiverDatentopf, produkt))
     );
 
+    if (!produkt) {
+      // Alter Aufruf ohne Produkt (z. B. eine noch zwischengespeicherte alte
+      // Seite): Ergebnis wie bis 13.10., roh im Topf. einheit: null sagt
+      // „unbekannt“ — neue Aufrufer prüfen darauf und rechnen dann nicht.
+      console.warn('BOS_VERBRAUCH.holeWochenbedarf: ohne Produkt aufgerufen (' + legacyKey + ') — liefere roh wie vor dem 13.10.2026, Einheit unbekannt.');
+      return {
+        needs: ergebnisse.map(e => Math.round(e.durchschnitt)),
+        verlaesslich: ergebnisse.map(e => e.verlaesslich),
+        einheit: null
+      };
+    }
     return {
-      needs: ergebnisse.map(e => Math.round(e.durchschnitt)),
-      verlaesslich: ergebnisse.map(e => e.verlaesslich)
+      needs: ergebnisse.map(e => this._inProduktEinheit(e.durchschnittRoh, effektiverDatentopf, legacyKey, produkt, true)),
+      verlaesslich: ergebnisse.map(e => e.verlaesslich),
+      einheit
     };
   },
 

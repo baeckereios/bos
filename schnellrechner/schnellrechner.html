@@ -1,6 +1,21 @@
 <!--
   schnellrechner.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-13 · 12:10 · v0.21 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48)
+    Der Bedarf kommt fertig in der Einheit des Produkts aus
+    BOS_VERBRAUCH.holeWochenbedarf() (Produkt wird mitgegeben; fehlt
+    `einheit` in der Antwort, ist der Rechen-Host veraltet → sichtbarer
+    Fehler). srEinheitFaktor() entfällt: Bestand und Fehlmenge werden nicht
+    mehr × Stück pro Träger hochgerechnet, die Anzeige nicht mehr geteilt —
+    die Kette rechnet jetzt in der Einheit des Produkts, genau wie die vier
+    Stationen. Behebt: Mitschrift-Werte (schon in Trägern) wurden geteilt;
+    „Stück“/„stück“ wurde wie ein Blech behandelt (nur „stueck“ erkannt);
+    Produkte ohne Einheit standen als „stück“ da, gerechnet in Blechen.
+    Bekannte, freigegebene Abweichung bei „Offiziell“ (Bauplan §5.1): an
+    Hamster-Tagen rundet die Kette jetzt auf ganze Träger statt ganze Stück
+    (Math.ceil in bos_produktionskette.js) — das ist die Zahl der Station.
+    Einheiten-Text aus BOS_PRODUKTE.einheit().lang.
+    SESSION_2026-10-13_EINHEITEN_BAU.md
   2026-10-05 · 08:34 · v0.20 · Umbau (Produkte aus Firestore, Stufe 1)
     srLadeProdukte() liest die Produktliste über ../bos_produkte.js aus
     Firestore statt per fetch aus produkt_config.json. Filter
@@ -724,6 +739,8 @@ const FIXES_FENSTER_ENDE = tageBisSonntagDieseWoche + 7;
 async function srLadeProdukte() {
   try {
     if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    // 13.10.2026 (#64): Einheiten kommen aus bos_produkte.js — alte Fassung im Zwischenspeicher?
+    if (typeof window.BOS_PRODUKTE.einheit !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
     const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
     produktConfig = ergebnis.liste.filter(p => p.schnellrechnerRelevant === true);
     const hinweis = window.BOS_PRODUKTE.hinweisText(ergebnis);
@@ -803,8 +820,17 @@ function srFehlmengeUmschalten(checked) {
 }
 
 // ── Frosterbestand: Interpreter aus bos_froster.js ─────────────────────
-// ── Einheiten-Umrechnung Stück ↔ Produkt-Einheit ────────────────────────
-// ANNAHME (01.09.2026, nach mehreren Bugs diese Session lieber explizit
+// ── Einheiten ──────────────────────────────────────────────────────────
+// SEIT 13.10.2026 (Baustelle #64): Hier wird NICHTS mehr umgerechnet. Der
+// Bedarf kommt fertig in der Einheit des Produkts aus BOS_VERBRAUCH.
+// holeWochenbedarf() (Produkt wird mitgegeben, Umrechnung an EINER Stelle:
+// bos_verbrauch_durchschnitt.js mit der Einheiten-Logik aus bos_produkte.js).
+// Bestand und Fehlmenge gibt der Nutzer in derselben Einheit ein, die Kette
+// rechnet darin, die Anzeige zeigt sie unverändert. Stück ist neutral.
+// Regel: Konzept _ideen/2026-10-13_RICHTWERT_VERBRAUCH.md §5.3.
+//
+// GESCHICHTE (durchgestrichen, gilt nicht mehr):
+// ~~ANNAHME (01.09.2026, nach mehreren Bugs diese Session lieber explizit
 // benannt statt still vorausgesetzt): legacyKey endet für alle bisher
 // getesteten Produkte auf "_stueck" (hasenberger_stueck, kaesebroetchen_
 // stueck, kornknacker_stueck, bestätigt gegen echte produkt_config.json).
@@ -828,13 +854,13 @@ function srFehlmengeUmschalten(checked) {
 // Aufräumen entfernt, Feldname aber nicht angepasst) — keine tatsächliche
 // Einheitsangabe mehr. srEinheitFaktor() wird deshalb ab sofort NICHT
 // mehr auf den Frosterbestand angewendet (siehe srSyncBestand()), nur
-// noch auf Verbrauch/Kette wie schon bisher.
-function srEinheitFaktor() {
-  const f = aktuellesProdukt?.stueckProBlech;
-  return (typeof f === 'number' && f > 0 && aktuellesProdukt?.einheit !== 'stueck') ? f : 1;
-}
+// noch auf Verbrauch/Kette wie schon bisher.~~
+// 13.10.2026: Auch „Verbrauch ist in Stück“ stimmte nur für den Backzettel
+// (verbrauch_offiziell). Die Mitschrift (verbrauch_manuell) speichert seit
+// 29.08. bei Umschalter-Produkten in Trägern und wurde hier trotzdem geteilt.
+// srEinheitFaktor() ist entfernt.
 function srEinheitLabel() {
-  return (aktuellesProdukt?.einheit || 'stück');
+  return aktuellesProdukt ? window.BOS_PRODUKTE.einheit(aktuellesProdukt).lang : '';
 }
 
 async function srSyncBestand() {
@@ -1003,14 +1029,13 @@ function srProduktGewechselt() {
 // ── Kette aufrufen und Ergebnis rendern ────────────────────────────
 async function srBerechne() {
   if (!aktuellesProdukt || frosterFertig === null) return;
-  // Eingaben kommen jetzt in Produkt-Einheit (Bleche) vom Nutzer — die
-  // Kette rechnet intern in Stück (siehe srEinheitFaktor()-Kommentar),
-  // deshalb hier hoch multipliziert, unten beim Rendern wieder runter.
-  const einheitFaktor = srEinheitFaktor();
+  // Eingaben kommen in der Einheit des Produkts vom Nutzer, der Bedarf
+  // ebenso vom Rechen-Host — die Kette rechnet seit 13.10.2026 direkt darin
+  // (wie die Stationen), keine Umrechnung mehr hier.
   const bestandEingabe = parseFloat(document.getElementById('sr-bestand-input').value) || 0;
   const fehlmengeEingabe = parseFloat(document.getElementById('sr-fehlmenge-input').value) || 0;
-  const bestand = bestandEingabe * einheitFaktor;
-  const fehlmenge = fehlmengeEingabe * einheitFaktor;
+  const bestand = bestandEingabe;
+  const fehlmenge = fehlmengeEingabe;
 
   try {
     await window.BOS_AUTH_READY;
@@ -1018,7 +1043,12 @@ async function srBerechne() {
     // (holeOffizielleWerte() ergänzt, siehe dortiges Änderungsprotokoll) —
     // kein lokaler Nullstand mehr nötig, echte Daten für beide Fälle.
     const einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
-    const wochenbedarf = await window.BOS_VERBRAUCH.holeWochenbedarf(window.db, aktuellesProdukt.legacyKey, einstellungen, datentopf);
+    const wochenbedarf = await window.BOS_VERBRAUCH.holeWochenbedarf(window.db, aktuellesProdukt.legacyKey, einstellungen, datentopf, aktuellesProdukt);
+    // 13.10.2026: Versionsschutz — ohne `einheit` liefert ein alter,
+    // zwischengespeicherter Rechen-Host roh (Backzettel in Stück).
+    if (!wochenbedarf || !wochenbedarf.einheit) {
+      throw new Error('Rechen-Modul veraltet (bos_verbrauch_durchschnitt.js liefert keine Einheit) — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.');
+    }
 
     let tagesTypen = {};
     try {
@@ -1054,7 +1084,7 @@ async function srBerechne() {
     });
 
     letztesErgebnis = ergebnis;
-    srRenderErgebnis(ergebnis, bestandEingabe, (frosterFertig && fehlmengeEingabe > 0) ? fehlmengeEingabe : 0, wochenbedarf.verlaesslich, einheitFaktor);
+    srRenderErgebnis(ergebnis, bestandEingabe, (frosterFertig && fehlmengeEingabe > 0) ? fehlmengeEingabe : 0, wochenbedarf.verlaesslich);
   } catch (fehler) {
     console.error('Schnellrechner: Berechnung fehlgeschlagen.', fehler);
     document.getElementById('sr-ergebnis-leer').style.display = 'block';
@@ -1067,7 +1097,7 @@ async function srBerechne() {
   }
 }
 
-function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verlaesslich, einheitFaktor) {
+function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verlaesslich) {
   document.getElementById('sr-ergebnis-leer').style.display = 'none';
   document.getElementById('sr-ergebnis-inhalt').style.display = 'block';
 
@@ -1094,13 +1124,14 @@ function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verla
     warnungBox.style.display = 'none';
   }
 
-  // BOS_KETTE rechnet intern in Stück — für die Anzeige hier konsequent
-  // durch einheitFaktor geteilt (siehe srEinheitFaktor()-Kommentar).
-  // anfangsbestandBleche/fehlmengeBleche kommen schon in Bleche rein (waren
-  // vor dem Kette-Aufruf mit dem Faktor hochgerechnet worden), deshalb hier
-  // NICHT nochmal umrechnen — nur die Stück-Rückgabewerte der Kette.
-  const einheit = srEinheitLabel();
-  const rund1 = x => Math.round((x / einheitFaktor) * 10) / 10;
+  // Seit 13.10.2026 rechnet BOS_KETTE in der Einheit des Produkts (Bedarf,
+  // Bestand und Fehlmenge kommen schon darin) — für die Anzeige nur noch auf
+  // eine Nachkommastelle gerundet, nicht mehr umgerechnet. (Bis 13.10.:
+  // Kette in Stück, hier ÷ Faktor.) anfangsbestandBleche/fehlmengeBleche
+  // heißen aus Geschichte so, sind aber in der Einheit des Produkts.
+  // Einheit ist Freitext aus der Produktliste → für das HTML unten entschärft.
+  const einheit = String(srEinheitLabel()).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const rund1 = x => Math.round(x * 10) / 10;
 
   // Fehlmenge fließt rechnerisch korrekt ein (BOS_KETTE zieht sie intern
   // vom Startbestand ab, siehe kette[0].bestand) — hier bewusst als EIGENE
@@ -1110,7 +1141,7 @@ function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verla
   // Aufgerundet (nicht nur gerundet) — man kann kein halbes Blech backen.
   const hauptwert = Math.max(0, Math.ceil(rund1(ergebnis.gesamtVerbrauch) + fehlmengeBleche - anfangsbestandBleche));
   document.getElementById('sr-res-val').textContent = hauptwert;
-  document.getElementById('sr-res-unit').textContent = einheit.toUpperCase();
+  document.getElementById('sr-res-unit').textContent = srEinheitLabel().toUpperCase();
 
   let html = `<tr><td>Gesamtverbrauch</td><td style="text-align:right;">${rund1(ergebnis.gesamtVerbrauch)} ${einheit}</td></tr>`;
   if (fehlmengeBleche > 0) {

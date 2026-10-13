@@ -72,7 +72,25 @@
 
    Datum nie über toISOString() (UTC-Falle zwischen 0 und 2 Uhr).
 
+   Einheiten (seit 13.10.2026, Baustelle #64) — die EINE Stelle für
+   „Stück oder Träger, welcher Träger, Stück ↔ Träger“, reine Logik ohne
+   Datenbank:
+     BOS_PRODUKTE.einheit(produkt) → { art: 'stueck'|'traeger'|'fehlt',
+        traeger, kurz ('Stk.', 'Bl.', 'Dl.', 'LoBl.' …), lang ('Stück',
+        'Bleche', 'Rote Dielen' …), einzahl ('Blech', 'Diele' …), faktor,
+        hatFaktor }
+     BOS_PRODUKTE.stueckInEinheit(stueck, produkt), .einheitInStueck(menge, produkt)
+     BOS_PRODUKTE.einheitGleich(a, b)
+   Nutzer: bos_verbrauch_durchschnitt.js, Stationen, Übersicht,
+   Schnellrechner, Mitschrift, Editor. Teigecke noch mit eigener Logik
+   (Umzug später, SESSION_2026-10-13_EINHEITEN_BAU.md §2.6).
+
    CHANGELOG
+     2026-10-13 · 12:06 · v0.3 · Einheiten (Baustelle #64)
+       Neu: einheit(), stueckInEinheit(), einheitInStueck(), einheitGleich(),
+       EINHEIT_NEUTRAL. Rein additiv, keine Firestore-Änderung, Laden und
+       Sichten unverändert. Kurzformen nach Ulf (13.10., 12:04).
+       SESSION_2026-10-13_EINHEITEN_BAU.md (Freigabe Kontroll-Chat 11:48).
      2026-10-06 · v0.2 · Stufe 2 (KC-Freigabe S2, 08:26)
        sicherungId gehört wie reihenfolge/geloescht der Datenbank und wird aus
        den Sichten 'aktive' und 'alle' entfernt (DB_FELDER) — sonst landete das
@@ -213,6 +231,80 @@
       else if (d.daten.legacyKey !== d.id) w.push(t('warn_id', { id: d.id, key: d.daten.legacyKey }));
     });
     return w;
+  }
+
+  /* ---------- Einheiten: die eine Stelle (seit 13.10.2026, Baustelle #64) ----------
+     Regel (Konzept 2026-10-13_RICHTWERT_VERBRAUCH.md §5.3, Ulf 07:45–07:51):
+       1. Der Träger ist die Zähl- und Planungseinheit, je Produkt genau einer.
+          `einheit` sagt, welcher (Blech, Lochblech, Diele …) — oder Stück.
+       2. Stück ist neutral: keine Umrechnung, stueckProBlech spielt keine Rolle.
+       3. Stück ist die gemeinsame Währung (nur beim Zusammenzählen, z. B. Teig).
+       4. Jede Bedarfszahl verlässt bos_verbrauch_durchschnitt.js in der
+          `einheit` des Produkts. Die Aufrufer rechnen nicht mehr um.
+       5. `einheit` ist Pflicht; fehlt sie, meldet das der Editor.
+     Übergang, solange `einheit` fehlt: gerechnet wird wie ein Träger mit
+     stueckProBlech (so rechneten die Stationen bisher; der Backzettel bleibt
+     damit byte-gleich). art 'fehlt' bleibt unterscheidbar, damit Mitschrift
+     und Editor die Lücke zeigen können — die Station zeigt nichts davon.
+     Neutral: 'stueck'/'stück' in jeder Schreibweise, getrimmt. Jeder andere
+     nicht leere Wert ist ein Träger.
+     Wer sonst durch stueckProBlech teilt oder damit malnimmt, wird vom
+     Wächter (_PRUEF_einheiten_waechter.js) gemeldet. */
+  var EINHEIT_NEUTRAL = ['stueck', 'stück'];
+  /* Kurzformen an der Station (Ulf, 13.10.2026, 12:04). */
+  var EINHEIT_KURZ_FEST = { lochblech: 'LoBl.', kuchenblech: 'KuBl.', schlawinerblech: 'SchlaBl.' };
+
+  function grossAnfang(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function einheitKurz(text) {
+    var k = text.toLowerCase().replace(/bleche$/, 'blech');
+    if (k === 'blech') return 'Bl.';
+    if (k.indexOf('diele') !== -1) return 'Dl.';
+    if (EINHEIT_KURZ_FEST[k]) return EINHEIT_KURZ_FEST[k];
+    if (/blech$/.test(k)) return grossAnfang(k.slice(0, 2)) + 'Bl.';
+    return grossAnfang(text.slice(0, 4)) + '.';
+  }
+  function einheitEinzahl(text) {
+    var s = text;
+    if (/^bleche?$/i.test(s)) return 'Blech';
+    if (/dielen$/i.test(s)) s = s.slice(0, -1);
+    else if (/bleche$/i.test(s)) s = s.slice(0, -1);
+    return grossAnfang(s);
+  }
+  /* produkt: Objekt mit `einheit` und `stueckProBlech` (z. B. aus lade()).
+     Liefert, wie gezählt, umgerechnet und angezeigt wird. */
+  function einheit(produkt) {
+    var p = produkt || {};
+    var roh = (typeof p.einheit === 'string') ? p.einheit.trim() : '';
+    var spb = Number(p.stueckProBlech);
+    var hatFaktor = spb > 0 && isFinite(spb);
+    if (roh && EINHEIT_NEUTRAL.indexOf(roh.toLowerCase()) !== -1) {
+      return { art: 'stueck', traeger: null, kurz: 'Stk.', lang: 'Stück', einzahl: 'Stück', faktor: 1, hatFaktor: hatFaktor };
+    }
+    if (!roh) {
+      return { art: 'fehlt', traeger: null, kurz: 'Bl.', lang: 'Bleche', einzahl: 'Träger', faktor: hatFaktor ? spb : 1, hatFaktor: hatFaktor };
+    }
+    return {
+      art: 'traeger', traeger: roh, kurz: einheitKurz(roh),
+      lang: /^bleche?$/i.test(roh) ? 'Bleche' : grossAnfang(roh),
+      einzahl: einheitEinzahl(roh), faktor: hatFaktor ? spb : 1, hatFaktor: hatFaktor
+    };
+  }
+  /* Stück → Einheit des Produkts (bei Stück unverändert). */
+  function stueckInEinheit(stueck, produkt) {
+    var e = einheit(produkt);
+    return e.art === 'stueck' ? stueck : stueck / e.faktor;
+  }
+  /* Einheit des Produkts → Stück (bei Stück unverändert). */
+  function einheitInStueck(menge, produkt) {
+    var e = einheit(produkt);
+    return e.art === 'stueck' ? menge : menge * e.faktor;
+  }
+  /* Bedeuten zwei einheit-Werte dasselbe? ('stueck' = 'Stück', ' bleche ' = 'Bleche') */
+  function einheitGleich(a, b) {
+    var ea = einheit({ einheit: a }), eb = einheit({ einheit: b });
+    if (ea.art !== eb.art) return false;
+    if (ea.art !== 'traeger') return true;
+    return ea.traeger.toLowerCase() === eb.traeger.toLowerCase();
   }
 
   /* ---------- Die Mechanik, mit austauschbarer Umgebung (Tests) ---------- */
@@ -428,7 +520,10 @@
       KOPIE_KEY: KOPIE_KEY, REGEL_FASSUNG: REGEL_FASSUNG, REGEL_DATEI: REGEL_DATEI, DB_FELDER: DB_FELDER,
       ZEITLIMIT_MS: zeitlimitMs, ZEITNETZ_MS: zeitnetzMs,
       /* reine Logik, auch für den Sync-Export */
-      sicht: sicht, vergleich: vergleich, warnungenFuer: warnungenFuer, mitZeitlimit: mitZeitlimit
+      sicht: sicht, vergleich: vergleich, warnungenFuer: warnungenFuer, mitZeitlimit: mitZeitlimit,
+      /* Einheiten, die eine Stelle (13.10.2026, #64) */
+      einheit: einheit, stueckInEinheit: stueckInEinheit, einheitInStueck: einheitInStueck,
+      einheitGleich: einheitGleich, EINHEIT_NEUTRAL: EINHEIT_NEUTRAL.slice()
     };
   }
 

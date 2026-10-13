@@ -51,13 +51,13 @@
     },
 
     "einheit": {
-      "bezeichnung": "Mengeneinheit",
-      "status": "bestätigt (28.08.) — Feld am 28.08. von Zwei-Werte-Checkbox auf Freitext mit Vorschlägen umgestellt",
+      "bezeichnung": "Einheit (Träger oder Stück)",
+      "status": "bestätigt (28.08.: Freitext mit Vorschlägen); Bedeutung neu gefasst 13.10.2026 (Baustelle #64): Träger, Stück neutral, Pflicht",
       "typ": "string (Freitext mit Autocomplete-Vorschlägen, bewusst KEIN geschlossenes enum)",
-      "werte": ["stueck", "bleche", "Lochblech", "rote Diele", "blaue Diele", "Kuchenblech", "Schlawinerblech"],
-      "beschreibung": "In welcher Einheit ein Produkt gezählt wird. Ulf nutzt in der Praxis deutlich mehr als zwei Einheiten (verschiedene Blech- und Dielentypen). Entscheidung vom 28.08.2026: Statt einer festen Liste bekommt das Feld ein Textfeld mit Autocomplete-Vorschlägen aus den oben genannten, bereits bekannten Werten — neue, bisher unbekannte Einheiten lassen sich trotzdem jederzeit frei eintippen. Bewusst KEINE geschlossene Kategorien-/Regel-Verwaltung gebaut (wäre hypothetische Abstraktion gewesen) — nur dafür gesorgt, dass echte Werte nicht mehr auf zwei Buckets gezwungen und dabei verfälscht werden. Geprüft (28.08., Quellcode lag jetzt vor): froster_inventur.html las dieses Feld bisher komplett NICHT — jede Zeile zeigte unabhängig vom Wert hart codiert 'Bl.' an. Am 28.08. korrigiert, zeigt jetzt den echten Wert (Fallback 'bleche', wenn das Feld fehlt).",
+      "werte": ["stueck", "bleche", "Lochblech", "Diele", "rote Diele", "blaue Diele", "Kuchenblech", "Schlawinerblech"],
+      "beschreibung": "Worin ein Produkt gezählt und geplant wird. Das ist entweder ein TRÄGER (Blech, Diele, Lochblech, Kuchenblech, Schlawinerblech …) oder STÜCK. Regel seit 13.10.2026: (1) Der Träger ist die Zähl- und Planungseinheit, je Produkt genau einer — alle Bedarfszahlen an den Stationen, im Schnellrechner und in der Mitschrift stehen darin. (2) Stück ist neutral: Es wird nichts umgerechnet, „Stück pro Träger“ spielt keine Rolle. Als Stück gilt nur „stueck“ bzw. „Stück“ (Groß-/Kleinschreibung egal); jeder andere Text ist ein Träger, auch „Stk“. (3) Brote laufen in Stück, auch aus der Kastenform (Ulf 13.10.: Verbünde aus 3, 4 oder 8 Formen werden nicht als Einheit geplant). Brötchen werden in Dielen gerechnet. (4) Pflicht: Fehlt die Einheit, zeigt der Editor das als Lücke (Knopf „Nur ohne Einheit“), die Mitschrift schreibt „Einheit fehlt in der Produktliste“, und gerechnet wird vorerst wie mit einem Träger (Blech) — so rechnete BOS bis 13.10. Wechselt die Einheit eines gespeicherten Produkts, stehen Froster-Bestand und Mitschrift noch in der alten Einheit (Hinweis im Editor). Die Logik steht an einer Stelle: bos_produkte.js (BOS_PRODUKTE.einheit). An der Station steht eine Kurzform: Stk., Bl., Dl., LoBl., KuBl., SchlaBl.; unbekannte …blech: zwei Buchstaben + „Bl.“; sonst vier Buchstaben + Punkt; fehlt: Bl. (Ulf, 13.10.2026). Geschichte: Am 28.08. von einer Zwei-Werte-Checkbox auf Freitext umgestellt, weil es mehr als zwei Einheiten gibt; froster_inventur.html zeigt den Wert seitdem an (Rückfall 'bleche').",
       "beispiel": "rote Diele",
-      "genutztVon": ["froster_inventur.html (Umfang unbestätigt)", "verbrauch_manuell.html (nur Anzeige)", "produkt_config_editor.html"]
+      "genutztVon": ["bos_produkte.js (Einheiten-Logik)", "bos_verbrauch_durchschnitt.js (Bedarf in der Einheit des Produkts)", "produktionsplaner/station_*.html und uebersicht.html (Anzeige)", "schnellrechner.html", "verbrauch_manuell.html (Anzeige, Umschalter)", "froster_inventur.html (Anzeige)", "teigecke_nacht.html (eigene Logik, Umzug offen)", "produkt_config_editor.html"]
     },
 
     "ausTeig": {
@@ -79,12 +79,12 @@
     },
 
     "stueckProBlech": {
-      "bezeichnung": "Stück pro Blech",
-      "status": "bestätigt",
+      "bezeichnung": "Stück pro Träger",
+      "status": "bestätigt; Bedeutung neu gefasst 13.10.2026 (Baustelle #64)",
       "typ": "number",
-      "beschreibung": "Wie viele Stück eines Produkts auf ein Blech passen. Hieß im Altsystem 'charge' — wurde umbenannt, weil der alte Name leicht mit 'batchSize' (heute produktionsSchritt) verwechselt wurde, obwohl beide Felder fachlich nichts miteinander zu tun haben. Aktuell nur bei Hasenpfötchen befüllt (12), bei allen anderen 86 Produkten noch offen.",
+      "beschreibung": "Wie viele Stück eines Produkts auf EINEN Träger passen — auf das Blech, die Diele, das Lochblech …, je nachdem, was in „Einheit“ steht. Im Editor heißt das Feld deshalb „Stück pro Träger“ und zeigt den Träger dazu (z. B. „Stück pro Diele“). Gebraucht wird die Zahl, um Stück in Träger umzurechnen: den Backzettel (liegt in Stück vor) im Rechen-Host und die Stück-Eingabe in der Mitschrift. Bei Stück-Produkten spielt sie keine Rolle (Feld ausgegraut, Wert bleibt erhalten). Fehlt sie bei einem Träger, zählt der Editor das als Lücke. Warum der Name in der Datenbank „stueckProBlech“ bleibt: Alle Produktdokumente, ihre Sicherungen und die Sync-Datei tragen diesen Namen; ein Umbenennen hieße alle Daten umziehen, ohne dass sich an der Rechnung etwas ändert. Hieß im Altsystem 'charge' — umbenannt, weil der Name leicht mit 'batchSize' (heute produktionsSchritt) verwechselt wurde. Laut produkt_config.json vom 29.08.2026 bei allen 87 Produkten gesetzt (der frühere Satz, die Zahl sei nur bei einem Produkt befüllt, ist überholt).",
       "beispiel": "20",
-      "genutztVon": ["künftige Kettenberechnung"]
+      "genutztVon": ["bos_produkte.js (Einheiten-Logik)", "bos_verbrauch_durchschnitt.js (über bos_produkte.js)", "verbrauch_manuell.html (Stück-Eingabe, über bos_produkte.js)", "teigecke (eigene Logik)", "produkt_config_editor.html"]
     },
 
     "produktionsSchritt": {

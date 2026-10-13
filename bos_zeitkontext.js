@@ -37,7 +37,17 @@
  *                      User bestimmt werden, wenn Firestore keine
  *                      Infos hergibt" (Ulf, 29.08.2026).
  *   3. Datei/Boden   — für offen/grund: System-Standard-Referenz
- *                      (bos_zeitkontext_referenz.js). Für hamsterStufe
+ *                      (bos_zeitkontext_referenz.js). GESCHLOSSEN IST AUF
+ *                      DIESER EBENE NUR EIN FEIERTAG (seit 13.10.2026,
+ *                      Ulf 13:28: „In den Ferien wird ganz normal
+ *                      gearbeitet.“). Schulferien sind offen, `grund`
+ *                      trägt dann nur den Ferien-Namen als Information.
+ *                      Betriebsurlaub gibt es nicht (Ulf 14:03). Wer einen
+ *                      Tag schließen will, nutzt den Zeitkontext-Editor
+ *                      (Ebene 1 oder 2). Ein Feiertag ohne Eintrag gilt
+ *                      weiter als geschlossen; geöffnet wird er über die
+ *                      Feiertage-Kachel im SchichtPlaner bzw. den
+ *                      Zeitkontext-Editor. Für hamsterStufe
  *                      gibt es KEINEN Datei-Boden — mangels Admin-/
  *                      Nutzer-Eintrag ist der Boden schlicht Stufe 0
  *                      (kein Hamster). Ein "Standard-Hamster" ergibt
@@ -73,6 +83,19 @@
  * Bewusst ein eigener, separater Key (nicht in bos_launcher_state_v2
  * selbst) — Launcher-Zustand und fachlicher Zeitkontext sind zwei
  * verschiedene Dinge, sollen nicht vermischt werden.
+ *
+ * ÄNDERUNGSPROTOKOLL:
+ * 13.10.2026 · 14:14 — Baustelle #66 (ANWEISUNG_2026-10-13_FERIEN_OFFEN.md,
+ *   Kontroll-Chat 14:04; Fund N1 aus SESSION_2026-10-13_EINHEITEN_BAU.md):
+ *   _holeReferenz() setzte jeden Tag, den BOS_IST_BESONDERER_TAG() kennt,
+ *   auf offen:false — also auch alle Schulferien. Die Produktionskette
+ *   machte daraus „zu“: an den Stationen und im Schnellrechner Bedarf 0,
+ *   Tage gesperrt, in der Teigecke „geschlossen (Herbstferien …)“. Jetzt
+ *   ist auf der Datei-Ebene nur noch typ 'feiertag' geschlossen. Ebene 1
+ *   (Firestore) und 2 (Gerät) gehen weiter vor. BOS_IST_BESONDERER_TAG()
+ *   und bos_zeitkontext_referenz.js unverändert (weitere Leser: Verbrauchs-
+ *   Durchschnitt, Mitschrift, SchichtPlaner, Wunschtag, Ausgleichskonto).
+ *   SESSION_2026-10-13_FERIEN_OFFEN_BAU.md
  *
  * GRACEFUL DEGRADATION durchgängig: Jede Ebene, die nicht lesbar ist
  * (Firestore-Fehler, kaputtes localStorage, fehlende Referenzdatei),
@@ -210,16 +233,22 @@ window.BOS_ZEITKONTEXT = {
 
   /**
    * Ebene 3 — Datei/Boden. Für offen/grund: System-Standard aus
-   * bos_zeitkontext_referenz.js (Feiertage/Ferien). Für hamsterStufe
-   * gibt es keinen Datei-Boden — Standard ist Stufe 0 (kein Hamster),
-   * siehe Header. Fehlt die Referenzdatei (nicht eingebunden), gilt
-   * der Tag als offen — graceful degradation, kein Absturz.
+   * bos_zeitkontext_referenz.js. Geschlossen ist hier NUR ein Feiertag
+   * (typ 'feiertag'); Schulferien und alles andere sind offen, `grund`
+   * nennt dann nur den Namen (reine Information, kein „zu“). Seit
+   * 13.10.2026, siehe Header. Betriebsurlaub gibt es nicht (Ulf 14:03) —
+   * wer einen Tag schließen will, nutzt den Zeitkontext-Editor.
+   * Für hamsterStufe gibt es keinen Datei-Boden — Standard ist Stufe 0
+   * (kein Hamster), siehe Header. Fehlt die Referenzdatei (nicht
+   * eingebunden), gilt der Tag als offen — graceful degradation.
+   * ~~Bis 13.10.2026: offen = (kein besonderer Tag) — Ferien waren „zu“.~~
    */
   _holeReferenz(datumStr) {
     const besonders = window.BOS_IST_BESONDERER_TAG?.(datumStr) ?? null;
+    const istFeiertag = !!besonders && besonders.typ === 'feiertag';
 
     return {
-      offen: besonders === null,
+      offen: !istFeiertag,
       grund: besonders?.name ?? null,
       hamsterStufe: 0
     };

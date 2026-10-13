@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-13 · 12:10 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Druck-Wochenübersicht zeigt hinter Produktion, Endlager und Nachtrag die Einheit des Produkts (BOS_PRODUKTE.einheit().kurz) statt fest „Bl.“ — die Stationen planen seit #64 in der Einheit des Produkts (Brot in Stück). Produkt nicht in der Liste (gelöscht, Liste nicht geladen) → „Bl.“ wie bisher. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Nachtrag-Auswahl liest über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
@@ -167,6 +168,7 @@ var WOCHE_ISO = isoDatum(wochenMo);
 var STAND = {}; // station -> zuletzt eingereichte Doku
 var NACHTRAEGE = []; // in der Planungswoche eingetragene Nachträge, chronologisch
 var PRODUKTE_NACH_STATION = {}; // station -> [{legacyKey, name}], nur nfcSeite:true
+var PRODUKT_JE_KEY = {}; // 13.10.2026 (#64): legacyKey -> Produkt, für die Einheit im Druck
 
 function setStatus(cls, text) {
   var el = document.getElementById('brain-status');
@@ -261,6 +263,7 @@ async function ladeProduktDropdown() {
     if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
     var produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
     var configData = produktErgebnis.liste;
+    configData.forEach(function (p) { if (p && p.legacyKey) PRODUKT_JE_KEY[p.legacyKey] = p; });
     var produktHinweis = window.BOS_PRODUKTE.hinweisText(produktErgebnis);
     if (produktHinweis) window.BOS_PRODUKTE.zeigeMeldung(produktHinweis, 'hinweis');
     var proTag = configData.filter(function (p) { return p.nfcSeite === true && p.legacyKey; });
@@ -375,6 +378,15 @@ function aktuellerProfilName() {
   } catch (e) { return null; }
 }
 
+// 13.10.2026 (#64): Kurzform der Einheit (Stk., Bl., Dl. …) für einen
+// Schlüssel. Unbekanntes Produkt → „Bl.“ wie vor dem 13.10. Entschärft,
+// weil `einheit` Freitext ist.
+function einheitKurzFuer(lk) {
+  var p = PRODUKT_JE_KEY[lk];
+  var k = (p && window.BOS_PRODUKTE && window.BOS_PRODUKTE.einheit) ? window.BOS_PRODUKTE.einheit(p).kurz : 'Bl.';
+  return String(k).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+
 function druckWoche() {
   var teile = [];
   STATIONEN.forEach(function (s) {
@@ -387,7 +399,8 @@ function druckWoche() {
     teile.push('<table class="pp-druck-tabelle"><thead><tr><th>Produkt</th><th>Produktion gesamt</th><th>Endlager</th></tr></thead><tbody>');
     Object.keys(d.produkte || {}).forEach(function (lk) {
       var p = d.produkte[lk];
-      teile.push('<tr><td>' + p.name + '</td><td>' + p.gesamtProduktion + ' Bl.</td><td>' + p.endlager + ' Bl.</td></tr>');
+      var eh = einheitKurzFuer(lk);
+      teile.push('<tr><td>' + p.name + '</td><td>' + p.gesamtProduktion + ' ' + eh + '</td><td>' + p.endlager + ' ' + eh + '</td></tr>');
     });
     teile.push('</tbody></table>');
     teile.push('<p class="pp-druck-meta">Eingereicht von ' + (d.eingereichtVon || 'unbekannt') + '</p>');
@@ -403,7 +416,7 @@ function druckWoche() {
   } else {
     teile.push('<table class="pp-druck-tabelle"><thead><tr><th>Station</th><th>Produkt</th><th>Menge</th><th>Von</th></tr></thead><tbody>');
     NACHTRAEGE.forEach(function (n) {
-      teile.push('<tr><td>' + n.station + '</td><td>' + n.produktName + '</td><td>+' + n.menge + ' Bl.</td><td>' + (n.eingetragenVon || '—') + '</td></tr>');
+      teile.push('<tr><td>' + n.station + '</td><td>' + n.produktName + '</td><td>+' + n.menge + ' ' + einheitKurzFuer(n.legacyKey) + '</td><td>' + (n.eingetragenVon || '—') + '</td></tr>');
     });
     teile.push('</tbody></table>');
   }

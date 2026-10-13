@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-13 · 12:08 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Bedarf kommt fertig in der Einheit des Produkts aus bos_verbrauch_durchschnitt.js (Produkt wird mitgegeben; Antwort ohne `einheit` = Rechen-Modul veraltet → sichtbarer Fehler, keine Rechnung). Keine eigene Teilung durch stueckProBlech mehr (behebt Doppelteilung der Mitschrift und Teilung bei Stück-Produkten). Einheit aus BOS_PRODUKTE.einheit().kurz statt fest „Bl.“ (Stk., Bl., Dl., LoBl. …; fehlt → Bl.). Ladefehler und Einreichen zeigen err.message. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-06 · 07:29 · Nachtrag (Ulf): Statuszeile nennt nach dem Laden, woher die Produktliste kam („Liste vom Gerät/Server, Stand N“, aus bos_produkte.js quelle/standNummer); in der Ladephase danach heißt es „Bedarf und Frosterbestand werden geladen…“ statt irreführend „Produktdaten werden geladen…“ (B11 Nebenfund 1). SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar (zeigeProduktFehler), „keine freigegeben“ nur nach erfolgreichem Laden; Gerätekopie-Hinweis über BOS_PRODUKTE.zeigeMeldung. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
@@ -314,8 +315,9 @@ function fmtFull(d) {
 function offsetToDate(off) {
   var d = new Date(heute); d.setDate(heute.getDate() + off); return d;
 }
-// Anzeige-Rundung — die Kette rechnet intern mit Bleche-Nachkommastellen
-// (Stück-zu-Blech-Umrechnung, stueckProBlech), aber niemand soll einer
+// Anzeige-Rundung — die Kette rechnet in der Einheit des Produkts, bei
+// Trägern mit Nachkommastellen (Backzettel in Stück ÷ Stück pro Träger,
+// seit 13.10.2026 im Rechen-Host umgerechnet), aber niemand soll einer
 // Konditorin "12.9375 Bl." ansagen müssen. rd() für normale Anzeige,
 // rdAuf() für die Mindestmenge (lieber etwas mehr als zu knapp).
 function rd(n) { return Math.round(n || 0); }
@@ -340,9 +342,14 @@ var state = {};
 var PRODUKTE = [];
 var rebuildTimers = {};
 // DATEN: pro Produkt EINMAL geladen (needs/Bestand ändern sich nicht durch
-// UI-Interaktion). needs (Verbrauch) kommt aus BOS_VERBRAUCH intern in
-// Stück und wird hier auf Bleche umgerechnet (stueckProBlech). Bestand
-// (BOS_FROSTER) dagegen NICHT umrechnen — die Froster-Zählung erfasst
+// UI-Interaktion). needs (Verbrauch) kommt seit 13.10.2026 FERTIG in der
+// Einheit des Produkts aus BOS_VERBRAUCH (Produkt wird mitgegeben, Regel in
+// bos_produkte.js / bos_verbrauch_durchschnitt.js) — hier wird nichts mehr
+// umgerechnet. ~~Bis 13.10.: „needs kommt intern in Stück und wird hier auf
+// Bleche umgerechnet (stueckProBlech)“~~ — stimmte nur für den Backzettel;
+// die Mitschrift lag schon in Trägern und wurde doppelt geteilt, Stück-
+// Produkte wurden fälschlich geteilt (Baustelle #64). Bestand
+// (BOS_FROSTER) ebenfalls NICHT umrechnen — die Froster-Zählung erfasst
 // direkt in Bleche (bzw. der jeweiligen Einheit aus produkt_config.json),
 // nie in Stück. 06.09.2026 · Fix: vorher wurde Bestand fälschlich ebenfalls
 // durch stueckProBlech geteilt — Verwechslung, weil der alte legacyKey-Name
@@ -433,6 +440,12 @@ window.addEventListener('load', async function() {
     zeigeProduktFehler('Produktliste: bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
     return;
   }
+  // 13.10.2026 (#64): Einheiten kommen aus bos_produkte.js — alte Fassung im Zwischenspeicher?
+  if (typeof window.BOS_PRODUKTE.einheit !== 'function') {
+    setStatus('error', '⚠ Produktliste veraltet');
+    zeigeProduktFehler('Produktliste: bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    return;
+  }
   try {
     produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
     configData = produktErgebnis.liste;
@@ -453,7 +466,7 @@ window.addEventListener('load', async function() {
   // produzierte Ware). Siehe session_doku_rondo_nfcseite.md.
   PRODUKTE = configData
     .filter(function(cfg){ return cfg.station === STATION_CFG && cfg.legacyKey && cfg.nfcSeite === true; })
-    .map(function(cfg){ return { bosId: cfg.legacyKey, name: cfg.name, legacyKey: cfg.legacyKey, stueckProBlech: cfg.stueckProBlech || 1 }; });
+    .map(function(cfg){ return { bosId: cfg.legacyKey, name: cfg.name, legacyKey: cfg.legacyKey, produkt: cfg, einheit: window.BOS_PRODUKTE.einheit(cfg) }; });
 
   if (!PRODUKTE.length) {
     setStatus('error','⚠ Keine Produkte für diese Station freigegeben');
@@ -469,14 +482,13 @@ window.addEventListener('load', async function() {
     var einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
     var ladeVorgaenge = PRODUKTE.map(function(prod) {
       return Promise.all([
-        window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf),
+        window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf, prod.produkt),
         window.BOS_FROSTER.holeBestand(db, prod.legacyKey)
       ]).then(function(res) {
-        var wb = res[0], fb = res[1];
-        var faktor = prod.stueckProBlech > 0 ? prod.stueckProBlech : 1;
-        var bestandBleche = (fb.bestand || 0); // 06.09.2026 · Fix: Froster-Zaehlung ist bereits in Bleche, keine Stueck-Umrechnung
+        var wb = pruefeWochenbedarf(res[0]), fb = res[1];
+        var bestandBleche = (fb.bestand || 0); // 06.09.2026 · Fix: Froster-Zaehlung ist bereits im Traeger, keine Stueck-Umrechnung
         DATEN[prod.bosId] = {
-          needs: wb.needs.map(function(n){ return n / faktor; }),
+          needs: wb.needs, // 13.10.2026: fertig in der Einheit des Produkts
           verlaesslich: wb.verlaesslich,
           veraltet: fb.veraltet,
           gefunden: fb.gefunden,
@@ -493,7 +505,7 @@ window.addEventListener('load', async function() {
     await Promise.all(ladeVorgaenge);
   } catch (e) {
     console.warn('Produktionsplaner Rondo: Datenladung fehlgeschlagen', e);
-    setStatus('error', '⚠ Verbrauchs-/Frosterdaten konnten nicht geladen werden');
+    setStatus('error', '⚠ Verbrauchs-/Frosterdaten konnten nicht geladen werden: ' + fehlerGrund(e));
     return;
   }
 
@@ -508,13 +520,33 @@ async function ladeAlleWochenbedarfe() {
   var db = window.db;
   var einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
   await Promise.all(PRODUKTE.map(function(prod) {
-    return window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf).then(function(wb) {
-      var faktor = prod.stueckProBlech > 0 ? prod.stueckProBlech : 1;
+    return window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf, prod.produkt).then(function(res) {
+      var wb = pruefeWochenbedarf(res);
       if (!DATEN[prod.bosId]) DATEN[prod.bosId] = {};
-      DATEN[prod.bosId].needs = wb.needs.map(function(n){ return n / faktor; });
+      DATEN[prod.bosId].needs = wb.needs; // 13.10.2026: fertig in der Einheit des Produkts
       DATEN[prod.bosId].verlaesslich = wb.verlaesslich;
     });
   }));
+}
+
+// 13.10.2026 (#64): Versionsschutz. Ein neuer Rechen-Host sagt in `einheit`,
+// worin er liefert. Fehlt das, kommt die Antwort von einer alten, noch
+// zwischengespeicherten bos_verbrauch_durchschnitt.js — deren Zahlen lägen
+// roh im Topf (Backzettel in Stück). Dann lieber sichtbar abbrechen als
+// still falsch rechnen.
+function pruefeWochenbedarf(wb) {
+  if (!wb || !wb.einheit) {
+    throw new Error('Rechen-Modul veraltet (bos_verbrauch_durchschnitt.js liefert keine Einheit) — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.');
+  }
+  return wb;
+}
+// 13.10.2026: echte Fehlermeldung für die Oberfläche (Projektregel err.message).
+function fehlerGrund(e) {
+  return (e && e.message) ? e.message : String(e);
+}
+// Einheit kommt aus dem Freitext-Feld `einheit` — vor dem Einsetzen in HTML entschärfen.
+function escEinheit(s) {
+  return String(s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; });
 }
 
 async function setzeDatentopf(wert) {
@@ -529,7 +561,7 @@ async function setzeDatentopf(wert) {
     recalcAll();
   } catch (e) {
     console.warn('Produktionsplaner Rondo: Umschalten des Datentopfs fehlgeschlagen', e);
-    setStatus('error', '⚠ Bedarf konnte nicht neu geladen werden');
+    setStatus('error', '⚠ Bedarf konnte nicht neu geladen werden: ' + fehlerGrund(e));
   }
 }
 
@@ -582,6 +614,9 @@ function fehlertextMitLink(text) {
 function buildCard(bosId) {
   var prod = PRODUKTE.find(function(x){ return x.bosId === bosId; });
   if (!prod) return document.createElement('div');
+  // 13.10.2026 (#64): Einheit des Produkts statt fest „Bl.“ (Kurzform aus
+  // bos_produkte.js, Ulf 12:04: Stk., Bl., Dl., LoBl., KuBl., SchlaBl. …).
+  var eh = escEinheit(prod.einheit.kurz);
   var s = state[bosId];
   var datenEintrag = DATEN[bosId] || {};
   var startBest = s.startBestand;
@@ -602,14 +637,14 @@ function buildCard(bosId) {
   var statusTxt = 'Produktionstage und Ziel wählen', statusCls = '';
   if (s.zielOff !== null && !prodCount) statusTxt = 'Produktionstage wählen';
   else if (prodCount && s.zielOff === null) statusTxt = 'Zieldatum wählen';
-  else if (isOk)      { statusTxt = '✓ Kette vollständig gedeckt · Bestand: ' + startBest + ' Bl.'; statusCls = ' ok'; }
+  else if (isOk)      { statusTxt = '✓ Kette vollständig gedeckt · Bestand: ' + startBest + ' ' + eh; statusCls = ' ok'; }
   else if (hatLuecke) { statusTxt = '⚠ Lücke — Produktion erhöhen oder Tag hinzufügen'; statusCls = ' err'; }
   else if (hatKnapp)  { statusTxt = '◌ Bestand 0 an ' + result.warnungen.length + ' Tag' + (result.warnungen.length > 1 ? 'en' : '') + ' — Produktionstag nötig'; statusCls = ' knapp'; }
 
   // 06.09.2026 · Feature (Ulf: "ne Warnung wäre nett"): dasselbe Muster wie
   // in schnellrechner.html (srRenderErgebnis()) — verlaesslich[] sagt pro
   // Wochentag, ob die Mindeststichprobe erreicht wurde. Ohne diese Warnung
-  // sieht "0 Bl. nötig" identisch aus, egal ob echt geprüft oder schlicht
+  // sieht "0 Bl. nötig" (bzw. Stk./Dl. …) identisch aus, egal ob echt geprüft oder schlicht
   // keine Verbrauchsdaten vorhanden (z.B. Datenquelle ohne Erfassung).
   var verl = datenEintrag.verlaesslich;
   var alleUnzuverlaessig = !!(verl && verl.length > 0 && verl.every(function(v){ return v === false; }));
@@ -629,7 +664,7 @@ function buildCard(bosId) {
         + '<span class="bestand-label">❄️ Bestand</span>'
         + '<input class="bestand-input" type="number" min="0" value="' + startBest + '"'
         + ' oninput="onBestandInput(\'' + bosId + '\', this)">'
-        + '<span class="bestand-unit">Bl.</span>'
+        + '<span class="bestand-unit">' + eh + '</span>'
         + (bestandVeraltet ? '<span class="bestand-hint">' + (datenEintrag.fehlerText ? ('⚠ Abfrage fehlgeschlagen: ' + fehlertextMitLink(datenEintrag.fehlerText)) : (datenEintrag.gefunden ? 'älter als 24 Std. — bitte prüfen' : 'nie gezählt — bitte eintragen')) + '</span>' : '')
         + '</div>';
 
@@ -638,7 +673,7 @@ function buildCard(bosId) {
         + '<span class="bestand-label">➕ Fehlmenge</span>'
         + '<input class="bestand-input" type="number" min="0" value="' + (s.fehlmengeAbs || 0) + '"'
         + ' oninput="onFehlmengeInput(\'' + bosId + '\', this)">'
-        + '<span class="bestand-unit">Bl. zusätzlich nötig</span>'
+        + '<span class="bestand-unit">' + eh + ' zusätzlich nötig</span>'
         + '</div>';
 
   // ── PRODUKTIONSTAGE (Planungswoche, siehe wochenMo oben) ──
@@ -720,7 +755,7 @@ function buildCard(bosId) {
             + ' data-bid="' + bosId + '" data-off="' + off + '"'
             + ' oninput="onInput(\'' + bosId + '\',' + off + ',this)" onfocus="this.select()">'
             + '<div class="vday-footer">'
-            + '<span class="' + minCls + '">' + (unterMin ? '⚠ min ' + minBed : 'min ' + minBed) + ' Bl.</span>'
+            + '<span class="' + minCls + '">' + (unterMin ? '⚠ min ' + minBed : 'min ' + minBed) + ' ' + eh + '</span>'
             + '<button class="' + lockCls + '" onclick="toggleLock(\'' + bosId + '\',' + off + ')">' + lockIcon + '</button>'
             + '</div></div>';
     });
@@ -776,16 +811,16 @@ function buildCard(bosId) {
     html += '</div>';
 
     if (!result.warnungen.length) {
-      html += '<div class="warn-row ok">✓ Alle Tage gedeckt · Endlager: ' + rd(result.endlager) + ' Bl.</div>';
+      html += '<div class="warn-row ok">✓ Alle Tage gedeckt · Endlager: ' + rd(result.endlager) + ' ' + eh + '</div>';
     } else {
       result.warnungen.forEach(function(w) {
         html += '<div class="warn-row ' + (w.typ === 'luecke' ? 'luecke' : 'knapp') + '">'
-              + (w.typ === 'luecke' ? '⚠ Lücke ' + w.tag + ' ' + w.datum + ': ' + rdAuf(Math.abs(w.delta)) + ' Bl. fehlen' : '◌ ' + w.tag + ' ' + w.datum + ': Bestand 0 — nächster Produktionstag nötig')
+              + (w.typ === 'luecke' ? '⚠ Lücke ' + w.tag + ' ' + w.datum + ': ' + rdAuf(Math.abs(w.delta)) + ' ' + eh + ' fehlen' : '◌ ' + w.tag + ' ' + w.datum + ': Bestand 0 — nächster Produktionstag nötig')
               + '</div>';
       });
     }
     html += '<div class="card-footer">'
-          + '<div class="footer-sum">Produktion: <span>' + rd(result.gesamtProduktion) + '</span> Bl.</div>'
+          + '<div class="footer-sum">Produktion: <span>' + rd(result.gesamtProduktion) + '</span> ' + eh + '</div>'
           + '<button class="btn-reset" onclick="resetCard(\'' + bosId + '\')">↺ Reset</button>'
           + '</div>';
   }
@@ -912,6 +947,7 @@ function updateExportBar() {
   var cnt = document.getElementById('export-count');
   btn.className = 'btn-export' + (fertig === 0 ? ' disabled' : '');
   cnt.textContent = fertig + ' / ' + gesamt + ' Produkte mit Vorschlag';
+  cnt.style.color = '';
 }
 
 // ── EINREICHEN (ersetzt den alten WhatsApp-Export) ──────────
@@ -983,6 +1019,10 @@ async function planungEinreichen() {
     console.warn('Produktionsplaner Rondo: Einreichen fehlgeschlagen', fehler);
     btn.textContent = '⚠ Fehlgeschlagen — nochmal tippen';
     btn.disabled = false;
+    // 13.10.2026: echter Grund sichtbar unter dem Knopf (Projektregel err.message)
+    var cnt = document.getElementById('export-count');
+    cnt.textContent = '⚠ ' + fehlerGrund(fehler);
+    cnt.style.color = 'var(--bos-red)';
   }
 }
 
@@ -996,7 +1036,7 @@ const PP_HILFE_SCHRITTE = [
   ['Bestand und Fehlmenge — der Unterschied', '"Bestand" ist, was gerade tatsächlich da ist — automatisch aus der letzten Froster-Zählung übernommen, wenn die jünger als 24 Stunden ist. Siehst du einen roten Rahmen und "nie gezählt" oder "älter als 24 Std.", trägst du den aktuellen Bestand von Hand ein. "Fehlmenge" ist etwas anderes: ein zusätzlicher Sofortbedarf OBEN DRAUF, der über den normalen Verbrauch hinausgeht — z. B. eine spontane Kundenbestellung. Ersetzt den Bestand nicht, kommt einfach dazu.'],
   ['Schritt 1: Produktionstage wählen', 'Oben unter "Produktionstage" wählst du, an welchen Tagen der kommenden Planungswoche produziert wird. Bereits vergangene Tage sind grau und nicht wählbar, geschlossene Tage ebenso.'],
   ['Schritt 2: Ziel setzen', 'Darunter unter "Bis wann reicht der Bestand?" wählst du dein Zieldatum in der Woche danach — der Tag, für den die ganze Rechnung aufgeht. Je weiter er entfernt ist, desto mehr muss vorher produziert werden.'],
-  ['Vorschlag lesen', 'Die große Zahl ist automatisch berechnet und direkt editierbar — antippen und Wert ändern reicht. Darunter steht "min X Bl." — das ist die Mindestmenge, die für die Kette bis zum nächsten Produktionstag oder Ziel nötig ist. Wird sie unterschritten, färbt sich die Karte rot.'],
+  ['Vorschlag lesen', 'Die große Zahl ist automatisch berechnet und direkt editierbar — antippen und Wert ändern reicht. Darunter steht "min X" mit der Einheit des Produkts (z. B. Bl., Dl., Stk.) — das ist die Mindestmenge, die für die Kette bis zum nächsten Produktionstag oder Ziel nötig ist. Wird sie unterschritten, färbt sich die Karte rot.'],
   ['Das Schloss-Symbol', '🔓 offen heißt: automatisch berechnet, ändert sich mit, wenn du an anderer Stelle etwas anpasst. Antippen sperrt (🔒) den gerade angezeigten Wert fest — er wird dann bei weiteren Änderungen NICHT mehr neu berechnet. Nochmal antippen löst die Sperre wieder, die Kette rechnet ab dann wieder automatisch für diesen Tag.'],
   ['Gleichmäßige Belastung', 'Checkbox direkt über dem Vorschlag, pro Produkt einzeln. Verteilt die benötigte Menge gleichmäßiger auf die gewählten Produktionstage, statt möglichst viel auf einen einzigen Tag zu packen.'],
   ['Kette prüfen', 'Der Bereich ist standardmäßig aufgeklappt und zeigt Tag für Tag: Verbrauch, Produktion und den Bestand davor/danach. "Lücke" heißt: an dem Tag reicht der Bestand nicht. "Knapp" heißt: heute reicht es noch, morgen nicht mehr ohne Nachschub.'],

@@ -3,6 +3,21 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-13 · 12:13 · v-einheiten-1 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48)
+      SESSION_2026-10-13_EINHEITEN_BAU.md. Einheiten-Logik aus ../bos_produkte.js
+      (BOS_PRODUKTE.einheit). Lücken sichtbar: Zeilen ohne `einheit` (und Träger
+      ohne „Stück pro Träger“) markiert, Spalte „— fehlt —“, Statuszeile zählt
+      sie, neuer Knopf „Nur ohne Einheit“ (über alle Kategorien) = Arbeitsliste.
+      Karte: `stueckProBlech` heißt „Stück pro {Träger}“ (z. B. „Stück pro
+      Diele“), bei Stück ausgegraut mit „bei Stück ohne Bedeutung“, Wert bleibt.
+      Auflage Kontroll-Chat: Wechselt bei einem gespeicherten Produkt die
+      Einheit (Träger ↔ Träger, Träger ↔ Stück), steht am Feld ein Hinweis
+      (Froster-Bestand und Mitschrift in alter Einheit). Nicht beim ersten
+      Eintragen einer fehlenden Einheit. Nur Hinweis, keine Sperre.
+      Platzhalter im Einheiten-Feld „fehlt — bitte eintragen“ statt „stueck“
+      (sah aus wie ein gesetzter Wert). Vorschlagsliste: feste Werte + „Diele“
+      + alle schon vorkommenden Werte, weiter Freitext (28.08.). Spaltenkopf
+      „Stk/Träger“. Speichern, Sicherung, Stand-Zettel und Regeln unverändert.
     2026-10-08 · 06:03 · v-firestore-2c · Umbau (Teigecke Etappe 2, Schub 1)
       ANWEISUNG_2026-10-07_TEIGECKE_REZEPTE_STRECKE.md (KC 21:16), Teil D.
       Der Batch-Bau aus speichereKarte (Sicherung + Produkt + Stand + 1) ist
@@ -161,6 +176,14 @@
   }
   .prod-tabelle tbody tr { border-bottom:1px solid var(--border); }
   .prod-tabelle tbody tr.fehlt-fz { background:rgba(224,101,95,.08); }
+  /* 13.10.2026 (#64): Einheit fehlt (oder Träger ohne Stück pro Träger) */
+  .prod-tabelle tbody tr.fehlt-einheit { background:rgba(192,122,16,.12); }
+  .prod-tabelle td .einheit-luecke { color:var(--amber); font-weight:700; }
+  .prod-tabelle td.spb-ohne-bedeutung { color:var(--dim); opacity:.55; }
+  .btn-outline.aktiv { border-color:var(--amber); color:var(--amber); background:rgba(192,122,16,.12); }
+  .einheit-hinweis { font-size:.75rem; line-height:1.35; margin-top:4px; color:var(--amber); }
+  .einheit-hinweis.rot { color:var(--red); }
+  .detail-feld input:disabled { opacity:.45; }
   .prod-tabelle td { padding:8px 6px; vertical-align:middle; font-size:.78rem; }
   .legacy-readonly { font-size:.65rem; color:var(--dim); font-family:monospace; }
 
@@ -324,6 +347,7 @@
   <input type="file" id="fileInput" accept=".json">
   <div class="sep"></div>
   <input type="text" id="suchfeld" placeholder="Suchen (alle Kategorien)…" oninput="render()">
+  <button class="btn btn-outline" id="nurOhneEinheitBtn" onclick="schalteNurOhneEinheit()" title="Arbeitsliste: Produkte, bei denen die Einheit (oder Stück pro Träger) fehlt — über alle Kategorien">Nur ohne Einheit</button>
   <div class="sep"></div>
   <button class="btn btn-amber" onclick="neuesProdukt()">＋ Produkt</button>
   <div class="sep"></div>
@@ -375,6 +399,7 @@
   </div>
 </div>
 
+<!-- 13.10.2026 (#64): wird in render() um „Diele“ und die schon vorkommenden Werte ergänzt (fuelleEinheitVorschlaege) -->
 <datalist id="einheitVorschlaege">
   <option value="stueck">
   <option value="bleche">
@@ -530,7 +555,8 @@ async function ladeVonFirestore() {
     render();
     var warn = (e.warnungen && e.warnungen.length) ? ' · ⚠ ' + e.warnungen.join(' ') : '';
     ladeNotfallZeile();
-    status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + warn, warn ? 'err' : 'ok');
+    var ohneEinheit = daten.filter(hatEinheitLuecke).length;   // 13.10.2026 (#64): Lücken gleich beim Laden nennen
+    status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit (Knopf „Nur ohne Einheit“)' : '') + warn, warn ? 'err' : 'ok');
   } catch (err) {
     console.error('[Produkt-Config] Laden:', err);
     status('⚠ ' + (window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(err) : err.message) + ' — Notfall-Kopie per Upload möglich', 'err');
@@ -605,11 +631,77 @@ var BT_IDX = [1,2,3,4,5,6,0];
 // Suche schlägt die Kategorie-Tabs: sobald gesucht wird, gilt die Suche
 // über ALLE Kategorien hinweg (sonst wirkt "keine Treffer" beim Tippen
 // verwirrend, wenn man gerade im falschen Tab steht).
+// ── Einheiten (13.10.2026, #64) — Logik aus ../bos_produkte.js ─────────
+var nurOhneEinheit = false;
+var EINHEIT_VORSCHLAEGE_FEST = ['stueck', 'bleche', 'Lochblech', 'Diele', 'rote Diele', 'blaue Diele', 'Kuchenblech', 'Schlawinerblech'];
+function einheitVon(p) {
+  return (window.BOS_PRODUKTE && window.BOS_PRODUKTE.einheit) ? window.BOS_PRODUKTE.einheit(p) : null;
+}
+// Lücke = Einheit fehlt, oder Träger ohne „Stück pro Träger“ (dann kann der
+// Backzettel nicht umgerechnet werden).
+function hatEinheitLuecke(p) {
+  var e = einheitVon(p);
+  return !!e && (e.art === 'fehlt' || (e.art === 'traeger' && !e.hatFaktor));
+}
+function schalteNurOhneEinheit() {
+  nurOhneEinheit = !nurOhneEinheit;
+  render();
+}
+function fuelleEinheitVorschlaege() {
+  var dl = document.getElementById('einheitVorschlaege');
+  if (!dl) return;
+  var gesehen = {}, liste = [];
+  EINHEIT_VORSCHLAEGE_FEST.concat(daten.map(function (p) { return (p && typeof p.einheit === 'string') ? p.einheit.trim() : ''; }))
+    .forEach(function (w) { if (w && !gesehen[w.toLowerCase()]) { gesehen[w.toLowerCase()] = true; liste.push(w); } });
+  dl.innerHTML = liste.map(function (w) { return '<option value="' + esc(w) + '">'; }).join('');
+}
+// Auflage Kontroll-Chat (13.10., 11:48): Wechsel der Einheit bei einem schon
+// gespeicherten Produkt → Hinweis am Feld. Verglichen wird mit dem Stand in der
+// Datenbank. Kein Hinweis beim ersten Eintragen einer fehlenden Einheit und bei
+// neuen Produkten; „stueck“ = „Stück“ gilt als gleich (einheitGleich).
+var EINHEIT_WECHSEL_TEXT = 'Froster-Bestand und Mitschrift dieses Produkts stehen noch in der alten Einheit. Nach dem Wechsel neu zählen, Stück pro Träger prüfen.';
+function einheitGewechselt(p) {
+  var roh = p && serverRoh[p.legacyKey];
+  if (!roh || !window.BOS_PRODUKTE || !window.BOS_PRODUKTE.einheitGleich) return false;
+  if (einheitVon(roh).art === 'fehlt') return false;
+  return !window.BOS_PRODUKTE.einheitGleich(roh.einheit, p.einheit);
+}
+function aendereEinheit(idx, wert) {
+  aendere(idx, 'einheit', wert);
+  if (karteIdx === idx) renderKarte();   // Beschriftung „Stück pro …“ und Hinweise neu
+  render();
+}
+function kfEinheit(p) {
+  var e = einheitVon(p) || { art: 'fehlt', einzahl: 'Träger' };
+  var html = '<div class="detail-feld"><label>Einheit ' + fhBtn('einheit') + '</label>' +
+    '<input type="text" list="einheitVorschlaege" value="' + esc(p.einheit || '') + '" placeholder="fehlt — bitte eintragen" onchange="aendereEinheit(karteIdx,this.value.trim()||null)">';
+  if (e.art === 'fehlt') html += '<div class="einheit-hinweis">Einheit fehlt: Stück, Blech, Diele … eintragen. Bis dahin rechnet BOS wie mit Blechen.</div>';
+  else if (e.art === 'traeger' && /^st(c?k|ü?ck|ueck)\.?$/i.test(e.traeger)) html += '<div class="einheit-hinweis">„' + esc(e.traeger) + '“ zählt als Träger, nicht als Stück. Für Stück bitte „Stück“ eintragen.</div>';
+  if (einheitGewechselt(p)) html += '<div class="einheit-hinweis rot" role="alert">⚠ ' + EINHEIT_WECHSEL_TEXT + '</div>';
+  return html + '</div>';
+}
+function kfStueckProTraeger(p) {
+  var e = einheitVon(p) || { art: 'fehlt', einzahl: 'Träger', hatFaktor: false };
+  var label = e.art === 'stueck' ? 'Stück pro Träger' : 'Stück pro ' + esc(e.einzahl);
+  var aus = e.art === 'stueck';
+  var html = '<div class="detail-feld"><label>' + label + ' ' + fhBtn('stueckProBlech') + '</label>' +
+    '<input type="number" value="' + (p.stueckProBlech ?? '') + '" placeholder="—"' + (aus ? ' disabled' : '') + ' ' +
+    'onchange="aendere(karteIdx,\'stueckProBlech\',this.value?parseInt(this.value):null); render()">';
+  if (aus) html += '<div class="einheit-hinweis" style="color:var(--dim)">bei Stück ohne Bedeutung</div>';
+  else if (e.art === 'traeger' && !e.hatFaktor) html += '<div class="einheit-hinweis">fehlt — ohne diese Zahl kann der Backzettel nicht umgerechnet werden</div>';
+  return html + '</div>';
+}
+
 function sichtbareIndizes() {
   var suche = document.getElementById('suchfeld').value.toLowerCase();
   var indizes = [];
   daten.forEach(function (p, i) {
-    if (suche) {
+    if (nurOhneEinheit) {
+      // Arbeitsliste: über alle Kategorien, zusätzlich mit der Suche kombinierbar
+      if (!hatEinheitLuecke(p)) return;
+      if (suche && ((p.name||'') + (p.artNr||'') + (p.legacyKey||'')).toLowerCase().indexOf(suche) === -1) return;
+      indizes.push(i);
+    } else if (suche) {
       if (((p.name||'') + (p.artNr||'') + (p.legacyKey||'')).toLowerCase().indexOf(suche) !== -1) indizes.push(i);
     } else if (p.kategorie === aktiveKat) {
       indizes.push(i);
@@ -630,23 +722,29 @@ function render() {
   document.getElementById('uploadZone').style.display = 'none';
 
   renderTabLeiste();
+  fuelleEinheitVorschlaege();   // 13.10.2026 (#64)
+  var nbtn = document.getElementById('nurOhneEinheitBtn');
+  if (nbtn) nbtn.classList.toggle('aktiv', nurOhneEinheit);
 
   var suche = document.getElementById('suchfeld').value;
   var indizes = sichtbareIndizes();
   var container = document.getElementById('tabellen');
 
   if (!indizes.length) {
-    container.innerHTML = '<div id="leerZustand">' + (suche ? 'Keine Treffer für „' + esc(suche) + '"' : 'Keine Produkte in dieser Kategorie') + '</div>';
+    container.innerHTML = '<div id="leerZustand">' + (nurOhneEinheit ? '✓ Bei allen Produkten' + (suche ? ' mit „' + esc(suche) + '“' : '') + ' ist die Einheit eingetragen.' : (suche ? 'Keine Treffer für „' + esc(suche) + '"' : 'Keine Produkte in dieser Kategorie')) + '</div>';
   } else {
     var zeilen = indizes.map(function (idx) {
       var p = daten[idx];
       var farbe = KAT_FARBEN[p.kategorie] || '#555';
+      var eInfo = einheitVon(p);   // 13.10.2026 (#64)
+      var luecke = hatEinheitLuecke(p);
       return (
-        '<tr class="klickbar' + (!p.frosterZustaendigkeit ? ' fehlt-fz' : '') + '" style="border-left:4px solid ' + farbe + '" onclick="oeffneKarte(' + idx + ')">' +
+        '<tr class="klickbar' + (!p.frosterZustaendigkeit ? ' fehlt-fz' : '') + (luecke ? ' fehlt-einheit' : '') + '" style="border-left:4px solid ' + farbe + '" onclick="oeffneKarte(' + idx + ')">' +
           '<td class="col-artnr">' + esc(p.artNr || '—') + '</td>' +
           '<td class="col-name">' + esc(p.name || '—') + '</td>' +
-          '<td class="col-spb">' + (p.stueckProBlech || '—') + '</td>' +
-          '<td class="col-einheit">' + esc(p.einheit || '—') + '</td>' +
+          '<td class="col-spb' + (eInfo && eInfo.art === 'stueck' ? ' spb-ohne-bedeutung' : '') + '"' + (eInfo && eInfo.art === 'stueck' ? ' title="bei Stück ohne Bedeutung"' : '') + '>' +
+            (p.stueckProBlech || (eInfo && eInfo.art === 'traeger' ? '<span class="einheit-luecke">— fehlt —</span>' : '—')) + '</td>' +
+          '<td class="col-einheit">' + (eInfo && eInfo.art === 'fehlt' ? '<span class="einheit-luecke">— fehlt —</span>' : esc(p.einheit || '—')) + '</td>' +
           '<td class="col-legacy"><span class="legacy-readonly">' + (p.legacyKey || '—') + '</span></td>' +
           '<td class="col-fz">' + esc(p.frosterZustaendigkeit || '— offen —') + '</td>' +
           '<td class="col-hinweis" style="color:var(--amber)">' + esc(p.hinweis || '—') + '</td>' +
@@ -659,7 +757,7 @@ function render() {
       '<table class="prod-tabelle">' +
         '<thead><tr>' +
           '<th class="col-artnr">ArtNr</th><th class="col-name">Bezeichnung</th>' +
-          '<th class="col-spb">Stk/Blech</th>' +
+          '<th class="col-spb">Stk/Träger <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'stueckProBlech\')" title="Was bedeutet das?">❓</button></th>' +
           '<th class="col-einheit">Einheit <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'einheit\')" title="Was bedeutet das?">❓</button></th>' +
           '<th class="col-legacy">legacyKey</th>' +
           '<th class="col-fz">Froster-Zust. <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'frosterZustaendigkeit\')" title="Was bedeutet das?">❓</button></th>' +
@@ -670,7 +768,8 @@ function render() {
   }
 
   var offen = daten.filter(function (p) { return !p.frosterZustaendigkeit; }).length;
-  status(daten.length + ' Produkte' + (offen ? ' · ' + offen + ' ohne Froster-Zuständigkeit' : '') + (geaendert ? ' · ungespeicherte Änderungen' : ''), geaendert ? 'err' : (offen ? '' : 'ok'));
+  var ohneEinheit = daten.filter(hatEinheitLuecke).length;   // 13.10.2026 (#64)
+  status(daten.length + ' Produkte' + (offen ? ' · ' + offen + ' ohne Froster-Zuständigkeit' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit' : '') + (geaendert ? ' · ungespeicherte Änderungen' : ''), geaendert ? 'err' : ((offen || ohneEinheit) ? '' : 'ok'));
 }
 
 // ── Kategorie-Tab-Leiste ──────────────────────────────────────────────
@@ -691,6 +790,7 @@ function renderTabLeiste() {
 
 function waehleTab(kat) {
   aktiveKat = kat;
+  nurOhneEinheit = false;   // 13.10.2026: Tab-Wahl verlässt die Arbeitsliste
   document.getElementById('suchfeld').value = '';
   render();
 }
@@ -788,9 +888,8 @@ var KARTEN_TABS = [
           kfSelect('station', 'Station', p.station, STATIONEN, '— Station wählen —') +
         '</div>' +
         '<div class="detail-section two">' +
-          kfNumber('stueckProBlech', 'Stück/Blech', p.stueckProBlech) +
-          '<div class="detail-feld"><label>Einheit ' + fhBtn('einheit') + '</label>' +
-            '<input type="text" list="einheitVorschlaege" value="' + esc(p.einheit || '') + '" placeholder="stueck" onchange="aendere(karteIdx,\'einheit\',this.value||null)"></div>' +
+          kfEinheit(p) +
+          kfStueckProTraeger(p) +
         '</div>' +
         '<div class="detail-section full">' + kfText('hinweis', 'Hinweis', p.hinweis) + '</div>' +
         '<div class="karte-legacy">legacyKey: ' + (p.legacyKey || '—') + ' — niemals änderbar</div>'
@@ -1297,6 +1396,10 @@ var helpData = {
     {
       heading: "Was passiert beim Löschen?",
       text: "Ein Produkt wird nie wirklich entfernt — es wird als gelöscht markiert, verschwindet aus der Liste, und sein Schlüssel bleibt gesperrt (an ihm hängen Verbrauchs- und Froster-Daten). Zurückholen geht über das Sync-Tool: dort die Sammel-Sicherung von vor dem Löschen als Datei herunterladen und wieder einspielen."
+    },
+    {
+      heading: "Was bedeuten „Einheit“ und „Stück pro Träger“?",
+      text: "„Einheit“ sagt, worin ein Produkt gezählt und geplant wird: entweder Stück (zum Beispiel alle Brote, auch aus der Kastenform) oder ein Träger — Blech, Diele, Lochblech, Kuchenblech … „Stück pro Träger“ sagt, wie viele Stück auf einen Träger passen (in der Karte steht der Träger dabei, z. B. „Stück pro Diele“). Bei Stück spielt die Zahl keine Rolle, das Feld ist dann ausgegraut. Fehlt die Einheit, rechnet BOS vorerst wie mit Blechen; der Knopf „Nur ohne Einheit“ zeigt alle Produkte, bei denen sie oder „Stück pro Träger“ noch fehlt. Wechselst du bei einem gespeicherten Produkt die Einheit, stehen Froster-Bestand und Mitschrift noch in der alten Einheit: danach neu zählen und „Stück pro Träger“ prüfen."
     },
     {
       heading: "Was bedeutet „Aus Teig“?",

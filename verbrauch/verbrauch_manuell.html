@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-13 · 12:11 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Speicherung unverändert (`menge` in der Einheit des Produkts, `erfasstAls`/`mengeRoh` wie bisher, Datenbank-Wert 'bleche' heißt „im Träger erfasst“). Neben jedem Feld steht eine Einheit aus BOS_PRODUKTE.einheit(); fehlt `einheit` in der Produktliste, steht dort „Einheit fehlt in der Produktliste“ (keine erfundene Einheit). Umschalter heißt „{Träger} | Stück“ (z. B. „Rote Dielen“ statt immer „Bleche“). istEinheitenUmschaltbar() und die Stück→Träger-Umrechnung nutzen die gemeinsame Stelle in bos_produkte.js. Ausreißer-Check unverändert. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler mit echter Meldung im Hinweisblock, „keine freigeschaltet“ nur nach erfolgreichem Laden. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
@@ -146,10 +147,20 @@
     width: 84px; font-family: var(--vm-font-body); font-size: var(--bos-font-lg, 17px); padding: var(--bos-space-xs, 8px); text-align: center;
     border-radius: 8px; border: 1px solid var(--vm-rand); background: var(--vm-oberflaeche-2); color: var(--vm-text);
   }
-  .produkt-einheit { color: var(--vm-text-schwach); font-size: var(--bos-font-sm, 14px); width: 40px; }
+  .produkt-einheit { color: var(--vm-text-schwach); font-size: var(--bos-font-sm, 14px); min-width: 40px; }
+  /* 13.10.2026 (#64): fehlt `einheit` in der Produktliste, steht statt einer
+     erfundenen Einheit dieser Hinweis neben dem Feld. */
+  .einheit-fehlt-hinweis {
+    font-family: var(--vm-font-label);
+    font-size: var(--bos-font-sm, 13px);
+    font-weight: 800;
+    color: var(--bos-amber, #c07a10);
+    line-height: 1.2;
+  }
 
-  /* Stück/Bleche-Umschalter: ersetzt den statischen .produkt-einheit-Span nur
-     bei Produkten mit umschaltbarer Einheit (einheit gesetzt und nicht "stueck"). */
+  /* Träger/Stück-Umschalter: ersetzt den statischen .produkt-einheit-Span nur
+     bei Produkten mit umschaltbarer Einheit (Träger mit Stück pro Träger,
+     BOS_PRODUKTE.einheit — seit 13.10.2026). */
   .produkt-zeile { flex-wrap: wrap; }
   .einheit-toggle {
     font-family: var(--vm-font-label);
@@ -438,8 +449,8 @@
     hilfeWofuerText: 'Hier wird schnell und ohne Foto oder KI eingetragen, wie viel von einzelnen Produkten an einem Tag verbraucht wurde. Das ist gedacht für den Fall, dass nur grob der Verbrauch von ein paar Produkten festgehalten werden soll – zum Beispiel um später ungefähr zu wissen, wie viele Bleche Hasenpfoten ein normaler Dienstag im Schnitt braucht. Es erscheinen nur Produkte, die dafür extra freigeschaltet wurden – nicht die komplette Produktliste.',
     hilfeAblaufTitel: 'Wie läuft die Eingabe ab?',
     hilfeAblaufText: 'Zuerst das Datum prüfen (steht meist schon auf heute). Danach muss aktiv gewählt werden, ob es ein normaler oder ein besonderer Tag ist – das Speichern ist erst danach möglich. Dann bei den gewünschten Produkten die Menge eintragen. Nicht ausgefüllte Produkte werden einfach übersprungen, es muss nicht jedes Produkt befüllt werden. Zum Schluss auf „Speichern" tippen.',
-    hilfeEinheitTitel: 'Was bedeutet der Bleche/Stück-Knopf?',
-    hilfeEinheitText: 'Bei manchen Produkten gibt es neben dem Zahlenfeld einen kleinen Knopf zum Umschalten zwischen „Bleche" und „Stück". Blechzählen ist immer eine Schätzung – wer die tatsächliche Stückzahl kennt, sollte lieber umschalten und die genaue Anzahl eintragen, das ist deutlich präziser. Die Seite rechnet im Hintergrund automatisch in Bleche um, damit die Zahlen mit der bisherigen Erfassung vergleichbar bleiben. Bei Produkten ohne diesen Knopf bleibt die Eingabe wie gewohnt.',
+    hilfeEinheitTitel: 'Was bedeutet der Knopf neben der Zahl (z. B. Bleche/Stück)?',
+    hilfeEinheitText: 'Neben jedem Feld steht, worin gezählt wird: Stück, Bleche, Dielen … Bei Produkten auf Blechen oder Dielen gibt es einen kleinen Knopf zum Umschalten zwischen dem Blech bzw. der Diele und „Stück". Blech- oder Dielenzählen ist immer eine Schätzung – wer die tatsächliche Stückzahl kennt, sollte lieber umschalten und die genaue Anzahl eintragen, das ist deutlich präziser. Die Seite rechnet im Hintergrund automatisch in Bleche bzw. Dielen um, damit die Zahlen mit der bisherigen Erfassung vergleichbar bleiben. Steht dort „Einheit fehlt in der Produktliste", ist für das Produkt noch nicht eingetragen, worin es gezählt wird – bitte Ulf Bescheid sagen.',
     hilfeBesondersTitel: 'Was bedeutet „besonderer Tag"?',
     hilfeBesondersText: 'Damit ist gemeint: Ferien, ein Feiertag, oder sonst ein Tag, der vom normalen Geschäft abweicht (zum Beispiel wegen einer Veranstaltung oder einer Baustelle vor der Tür). Diese Markierung wird zusammen mit den Zahlen gespeichert, damit spätere Auswertungen ungewöhnliche Tage nicht mit normalen Tagen vermischen. Es wird keine Notiz dazu verlangt – ein einfaches Ja oder Nein reicht.',
     hilfeAusreisserTitel: 'Was bedeutet die Warnung bei „Ungewöhnliche Werte"?',
@@ -643,10 +654,12 @@
    *    bei 2. stueckProBlech ist bei allen 87 Produkten gesetzt.
    * --------------------------------------------------------- */
   function istEinheitenUmschaltbar(produkt) {
-    const e = (produkt.einheit || '').trim().toLowerCase();
-    if (!e || e === 'stueck' || e === 'stück') return false;
-    if (!produkt.stueckProBlech) return false; // Sicherheitsnetz, keine Umrechnungsbasis ohne diesen Wert
-    return true;
+    // 13.10.2026 (#64): gemeinsame Einheiten-Logik (bos_produkte.js) statt
+    // eigener Prüfung. Umschalter bei jedem Träger mit „Stück pro Träger“;
+    // nicht bei Stück und nicht bei fehlender Einheit (dort steht der Hinweis).
+    // Ergibt dieselben Produkte wie die bisherige Prüfung (Bauplan §4 D).
+    const e = window.BOS_PRODUKTE.einheit(produkt);
+    return e.art === 'traeger' && e.hatFaktor;
   }
 
   /* -----------------------------------------------------------
@@ -659,6 +672,8 @@
     let alleProdukte = [];
     try {
       if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+      // 13.10.2026 (#64): Einheiten kommen aus bos_produkte.js — alte Fassung im Zwischenspeicher?
+      if (typeof window.BOS_PRODUKTE.einheit !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
       const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
       alleProdukte = ergebnis.liste;
       const hinweis = window.BOS_PRODUKTE.hinweisText(ergebnis);
@@ -706,16 +721,17 @@
       zeile.appendChild(name);
       zeile.appendChild(menge);
 
+      const einheitInfo = window.BOS_PRODUKTE.einheit(produkt); // 13.10.2026 (#64)
       if (istEinheitenUmschaltbar(produkt)) {
         zeile.dataset.umschaltbar = 'true';
-        zeile.dataset.stueckProBlech = produkt.stueckProBlech;
+        // Datenbank-Wert bleibt 'bleche' (= „im Träger erfasst“), angezeigt wird der Träger.
         zeile.dataset.einheitModus = 'bleche'; // Default: unverändertes Verhalten wie bisher
 
         const einheitToggle = document.createElement('button');
         einheitToggle.type = 'button';
         einheitToggle.className = 'einheit-toggle';
-        einheitToggle.textContent = 'Bleche';
-        einheitToggle.setAttribute('aria-label', 'Eingabe-Einheit umschalten für ' + (produkt.name || produkt.legacyKey) + ', aktuell Bleche');
+        einheitToggle.textContent = einheitInfo.lang;
+        einheitToggle.setAttribute('aria-label', 'Eingabe-Einheit umschalten für ' + (produkt.name || produkt.legacyKey) + ', aktuell ' + einheitInfo.lang);
 
         const ungenauHinweis = document.createElement('span');
         ungenauHinweis.className = 'einheit-ungenau-hinweis';
@@ -724,17 +740,23 @@
         einheitToggle.addEventListener('click', () => {
           const neuerModus = zeile.dataset.einheitModus === 'bleche' ? 'stueck' : 'bleche';
           zeile.dataset.einheitModus = neuerModus;
-          einheitToggle.textContent = neuerModus === 'bleche' ? 'Bleche' : 'Stück';
+          einheitToggle.textContent = neuerModus === 'bleche' ? einheitInfo.lang : 'Stück';
           einheitToggle.setAttribute('aria-label', 'Eingabe-Einheit umschalten für ' + (produkt.name || produkt.legacyKey) + ', aktuell ' + einheitToggle.textContent);
           ungenauHinweis.hidden = (neuerModus !== 'bleche') ? true : false;
         });
 
         zeile.appendChild(einheitToggle);
         zeile.appendChild(ungenauHinweis);
+      } else if (einheitInfo.art === 'fehlt') {
+        // 13.10.2026 (#64): keine Einheit erfinden — sichtbar sagen, dass sie fehlt.
+        const hinweis = document.createElement('span');
+        hinweis.className = 'einheit-fehlt-hinweis';
+        hinweis.textContent = 'Einheit fehlt in der Produktliste';
+        zeile.appendChild(hinweis);
       } else {
         const einheit = document.createElement('span');
         einheit.className = 'produkt-einheit';
-        einheit.textContent = produkt.einheit || '';
+        einheit.textContent = einheitInfo.lang;
         zeile.appendChild(einheit);
       }
 
@@ -773,8 +795,9 @@
       const einheitModus = umschaltbar ? (zeile.dataset.einheitModus || 'bleche') : null;
       let menge = mengeEingegeben;
       if (umschaltbar && einheitModus === 'stueck') {
-        const stueckProBlech = Number(zeile.dataset.stueckProBlech);
-        menge = stueckProBlech > 0 ? mengeEingegeben / stueckProBlech : mengeEingegeben;
+        // 13.10.2026 (#64): Stück → Träger über die gemeinsame Stelle (bos_produkte.js).
+        const produkt = zustand.produkte.find(p => p.legacyKey === zeile.dataset.legacyKey);
+        menge = window.BOS_PRODUKTE.stueckInEinheit(mengeEingegeben, produkt);
       }
 
       const eintrag = {
@@ -800,14 +823,22 @@
     return ergebnisse.filter(r => r.ergebnis.pruefungAktiv && r.ergebnis.auffaellig);
   }
 
+  // 13.10.2026 (#64): Einheit des Produkts statt immer „Bleche“; bei
+  // fehlender Einheit nur die Zahl. Ergebnis wird als Text eingesetzt.
+  function einheitTextFuer(legacyKey) {
+    const produkt = zustand.produkte.find(p => p.legacyKey === legacyKey);
+    const e = window.BOS_PRODUKTE.einheit(produkt);
+    return e.art === 'fehlt' ? '' : ' ' + e.lang;
+  }
   function formatiereEintragAnzeige(eintrag) {
+    const eh = einheitTextFuer(eintrag.legacyKey);
     if (eintrag.erfasstAls === 'stueck') {
-      return eintrag.mengeRoh + ' Stück (≈ ' + eintrag.menge.toFixed(2) + ' Bleche)';
+      return eintrag.mengeRoh + ' Stück (≈ ' + eintrag.menge.toFixed(2) + eh + ')';
     }
-    if (eintrag.erfasstAls === 'bleche') {
-      return eintrag.menge + ' Bleche';
-    }
-    return String(eintrag.menge); // unverändert wie bisher, kein Einheiten-Kontext bekannt
+    return String(eintrag.menge) + eh;
+  }
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
   function zeigeAusreisserModal(auffaelligeListe) {
@@ -819,7 +850,7 @@
       box.className = 'ausreisser-eintrag';
       const name = produkt ? (produkt.name || produkt.legacyKey) : eintrag.legacyKey;
       box.innerHTML = '<strong>' + name + '</strong>' +
-        'Eingegeben: ' + formatiereEintragAnzeige(eintrag) + ' · bisheriger Schnitt (' + ergebnis.anzahl + ' Werte): ' + ergebnis.durchschnitt.toFixed(1) + ' Bleche' +
+        'Eingegeben: ' + escHtml(formatiereEintragAnzeige(eintrag)) + ' · bisheriger Schnitt (' + ergebnis.anzahl + ' Werte): ' + ergebnis.durchschnitt.toFixed(1) + escHtml(einheitTextFuer(eintrag.legacyKey)) +
         '<button type="button" class="grundlage-link">' + t('grundlageAnzeigen') + '</button>';
       el.ausreisserListe.appendChild(box);
 
