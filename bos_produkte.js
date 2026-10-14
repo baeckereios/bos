@@ -81,11 +81,20 @@
         hatFaktor }
      BOS_PRODUKTE.stueckInEinheit(stueck, produkt), .einheitInStueck(menge, produkt)
      BOS_PRODUKTE.einheitGleich(a, b)
+     BOS_PRODUKTE.EINHEITEN_LISTE (Auswahlliste), .einheitListenEintrag(wert),
+        .einheitNorm(wert), .einheitIstKurzform(text)   (seit Nachtrag 1)
    Nutzer: bos_verbrauch_durchschnitt.js, Stationen, Übersicht,
    Schnellrechner, Mitschrift, Editor. Teigecke noch mit eigener Logik
    (Umzug später, SESSION_2026-10-13_EINHEITEN_BAU.md §2.6).
 
    CHANGELOG
+     2026-10-13 · 14:47 · v0.4 · Einheiten Nachtrag 1 (Auswahlliste)
+       ANWEISUNG_2026-10-13_EINHEITEN_NACHTRAG1.md (KC 14:45, Ulf 14:44).
+       Neu: EINHEITEN_LISTE (Stück, Blech, Lochblech, Kuchenblech,
+       Schlawinerblech, Rote Diele, Blaue Diele), einheitNorm(),
+       einheitListenEintrag(), einheitIstKurzform(). einheitGleich() vergleicht
+       Träger jetzt über die Normalform ('bleche' = 'Blech', 'Rote Dielen' =
+       'rote Diele'); vorher nur Groß/klein. Rechnung unverändert.
      2026-10-13 · 12:06 · v0.3 · Einheiten (Baustelle #64)
        Neu: einheit(), stueckInEinheit(), einheitInStueck(), einheitGleich(),
        EINHEIT_NEUTRAL. Rein additiv, keine Firestore-Änderung, Laden und
@@ -299,12 +308,40 @@
     var e = einheit(produkt);
     return e.art === 'stueck' ? menge : menge * e.faktor;
   }
-  /* Bedeuten zwei einheit-Werte dasselbe? ('stueck' = 'Stück', ' bleche ' = 'Bleche') */
+  /* Auswahlliste der Einheiten (Ulf, 13.10.2026, 14:44, „Passt so“) — EINE
+     Stelle für Editor, Richtwert (#63) und spätere Seiten. Gespeichert wird
+     der Listentext genau so. „Andere …“ (Freitext) bietet die Seite selbst an. */
+  var EINHEITEN_LISTE = ['Stück', 'Blech', 'Lochblech', 'Kuchenblech', 'Schlawinerblech', 'Rote Diele', 'Blaue Diele'];
+  /* Normalform zum Vergleichen: getrimmt, klein, Leerzeichen zusammengefasst,
+     Stück-Schreibweisen → 'stück', Mehrzahl …bleche → …blech, …dielen → …diele.
+     'bleche' = 'Blech', 'Rote Dielen' = 'rote Diele', 'stueck' = 'Stück'. */
+  function einheitNorm(wert) {
+    var s = (typeof wert === 'string' ? wert : '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!s) return '';
+    if (EINHEIT_NEUTRAL.indexOf(s) !== -1) return 'stück';
+    return s.replace(/bleche$/, 'blech').replace(/dielen$/, 'diele');
+  }
+  /* Welcher Listeneintrag entspricht diesem Wert? null, wenn keiner (oder leer). */
+  function einheitListenEintrag(wert) {
+    var n = einheitNorm(wert);
+    if (!n) return null;
+    for (var i = 0; i < EINHEITEN_LISTE.length; i++) if (einheitNorm(EINHEITEN_LISTE[i]) === n) return EINHEITEN_LISTE[i];
+    return null;
+  }
+  /* Ist der Text eine Stations-Kurzform (Stk., Bl., Dl., LoBl., KuBl., SchlaBl. — auch ohne Punkt)? */
+  function einheitIstKurzform(wert) {
+    var n = (typeof wert === 'string' ? wert : '').trim().toLowerCase().replace(/\.$/, '');
+    if (!n) return false;
+    var kurz = EINHEITEN_LISTE.map(function (e) { return einheit({ einheit: e }).kurz.toLowerCase().replace(/\.$/, ''); });
+    return kurz.indexOf(n) !== -1;
+  }
+  /* Bedeuten zwei einheit-Werte dasselbe? ('stueck' = 'Stück', 'bleche' = 'Blech',
+     'Rote Dielen' = 'rote Diele') — seit 13.10.2026 (Nachtrag 1) über die Normalform. */
   function einheitGleich(a, b) {
     var ea = einheit({ einheit: a }), eb = einheit({ einheit: b });
     if (ea.art !== eb.art) return false;
     if (ea.art !== 'traeger') return true;
-    return ea.traeger.toLowerCase() === eb.traeger.toLowerCase();
+    return einheitNorm(ea.traeger) === einheitNorm(eb.traeger);
   }
 
   /* ---------- Die Mechanik, mit austauschbarer Umgebung (Tests) ---------- */
@@ -523,7 +560,10 @@
       sicht: sicht, vergleich: vergleich, warnungenFuer: warnungenFuer, mitZeitlimit: mitZeitlimit,
       /* Einheiten, die eine Stelle (13.10.2026, #64) */
       einheit: einheit, stueckInEinheit: stueckInEinheit, einheitInStueck: einheitInStueck,
-      einheitGleich: einheitGleich, EINHEIT_NEUTRAL: EINHEIT_NEUTRAL.slice()
+      einheitGleich: einheitGleich, EINHEIT_NEUTRAL: EINHEIT_NEUTRAL.slice(),
+      /* Auswahlliste (13.10.2026, Nachtrag 1) */
+      EINHEITEN_LISTE: EINHEITEN_LISTE.slice(), einheitListenEintrag: einheitListenEintrag,
+      einheitNorm: einheitNorm, einheitIstKurzform: einheitIstKurzform
     };
   }
 

@@ -3,6 +3,20 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-13 · 14:48 · v-einheiten-2 · Nachtrag 1: Auswahlliste statt Freitext
+      ANWEISUNG_2026-10-13_EINHEITEN_NACHTRAG1.md (KC 14:45, Ulf 14:44 „Passt so“).
+      Anlass (Ulf 14:42): <datalist> klappt auf dem Android-Tablet nicht auf,
+      gleich beim ersten Produkt „KuBl“ statt „Kuchenblech“ getippt.
+      Einheit ist jetzt eine echte Auswahl aus BOS_PRODUKTE.EINHEITEN_LISTE
+      (Stück, Blech, Lochblech, Kuchenblech, Schlawinerblech, Rote Diele,
+      Blaue Diele) + „Andere …“ (Freitextfeld, Notfall); leer = „— fehlt,
+      bitte wählen —“ (zählt als Lücke). Bestehende Schreibweisen (stueck,
+      bleche, Rote Dielen, rote Diele, blaue Diele …) erscheinen als ihr
+      Listeneintrag; geschrieben wird der Listentext erst beim Speichern —
+      das gilt nicht als Wechsel. Wert außerhalb der Liste steht unter
+      „Andere …“ mit Hinweis; Stations-Kurzform (KuBl, Stk. …) mit eigenem
+      Hinweis. <datalist> und Vorschlags-Ergänzung entfernt. „＋ Produkt“
+      legt mit leerer Einheit an (Fund N2) und erscheint unter „Nur ohne Einheit“.
     2026-10-13 · 12:13 · v-einheiten-1 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48)
       SESSION_2026-10-13_EINHEITEN_BAU.md. Einheiten-Logik aus ../bos_produkte.js
       (BOS_PRODUKTE.einheit). Lücken sichtbar: Zeilen ohne `einheit` (und Träger
@@ -399,16 +413,6 @@
   </div>
 </div>
 
-<!-- 13.10.2026 (#64): wird in render() um „Diele“ und die schon vorkommenden Werte ergänzt (fuelleEinheitVorschlaege) -->
-<datalist id="einheitVorschlaege">
-  <option value="stueck">
-  <option value="bleche">
-  <option value="Lochblech">
-  <option value="rote Diele">
-  <option value="blaue Diele">
-  <option value="Kuchenblech">
-  <option value="Schlawinerblech">
-</datalist>
 
 <div id="saveBanner" onclick="oeffneErsteGeaenderte()">💾 Ungespeicherte Änderungen — in der Karte speichern</div>
 
@@ -539,6 +543,7 @@ async function ladeVonFirestore() {
     serverRoh = {};
     roh.liste.forEach(function (d) { serverRoh[d.id] = d.daten; });
     geladenerStand = (typeof e.standNummer === 'number') ? e.standNummer : null;
+    einheitAndereOffen = {};   // Nachtrag 1: offene „Andere …“-Felder gelten nur bis zum Neu-Laden
     quelle = 'db';
     geaenderteKarten = {};
     var arr = [], gel = {};
@@ -633,7 +638,10 @@ var BT_IDX = [1,2,3,4,5,6,0];
 // verwirrend, wenn man gerade im falschen Tab steht).
 // ── Einheiten (13.10.2026, #64) — Logik aus ../bos_produkte.js ─────────
 var nurOhneEinheit = false;
-var EINHEIT_VORSCHLAEGE_FEST = ['stueck', 'bleche', 'Lochblech', 'Diele', 'rote Diele', 'blaue Diele', 'Kuchenblech', 'Schlawinerblech'];
+// Nachtrag 1 (13.10.2026): Karten, bei denen „Andere …“ gewählt, aber noch
+// nichts eingetippt ist (Schlüssel → true). Ändert die Daten nicht.
+var einheitAndereOffen = {};
+var EINHEIT_ANDERE = '__andere__';
 function einheitVon(p) {
   return (window.BOS_PRODUKTE && window.BOS_PRODUKTE.einheit) ? window.BOS_PRODUKTE.einheit(p) : null;
 }
@@ -646,14 +654,6 @@ function hatEinheitLuecke(p) {
 function schalteNurOhneEinheit() {
   nurOhneEinheit = !nurOhneEinheit;
   render();
-}
-function fuelleEinheitVorschlaege() {
-  var dl = document.getElementById('einheitVorschlaege');
-  if (!dl) return;
-  var gesehen = {}, liste = [];
-  EINHEIT_VORSCHLAEGE_FEST.concat(daten.map(function (p) { return (p && typeof p.einheit === 'string') ? p.einheit.trim() : ''; }))
-    .forEach(function (w) { if (w && !gesehen[w.toLowerCase()]) { gesehen[w.toLowerCase()] = true; liste.push(w); } });
-  dl.innerHTML = liste.map(function (w) { return '<option value="' + esc(w) + '">'; }).join('');
 }
 // Auflage Kontroll-Chat (13.10., 11:48): Wechsel der Einheit bei einem schon
 // gespeicherten Produkt → Hinweis am Feld. Verglichen wird mit dem Stand in der
@@ -671,12 +671,51 @@ function aendereEinheit(idx, wert) {
   if (karteIdx === idx) renderKarte();   // Beschriftung „Stück pro …“ und Hinweise neu
   render();
 }
+// Nachtrag 1 (13.10.2026): Auswahl statt Freitext. Liste aus
+// BOS_PRODUKTE.EINHEITEN_LISTE; bestehende Schreibweisen werden ihrem
+// Listeneintrag zugeordnet (einheitListenEintrag), ohne die Daten zu ändern —
+// geschrieben wird der Listentext beim Speichern (speichereKarte).
+function waehleEinheit(idx, wert) {
+  var p = daten[idx]; if (!p) return;
+  if (wert === EINHEIT_ANDERE) {
+    einheitAndereOffen[p.legacyKey] = true;   // Freitextfeld zeigen, Daten unverändert
+    if (karteIdx === idx) renderKarte();
+    return;
+  }
+  delete einheitAndereOffen[p.legacyKey];
+  aendereEinheit(idx, wert || null);
+}
+function aendereEinheitFreitext(idx, text) {
+  var p = daten[idx]; if (!p) return;
+  var t = String(text || '').trim();
+  var eintrag = t && window.BOS_PRODUKTE && window.BOS_PRODUKTE.einheitListenEintrag ? window.BOS_PRODUKTE.einheitListenEintrag(t) : null;
+  if (eintrag) delete einheitAndereOffen[p.legacyKey];   // „blech“ getippt → gleich der Listeneintrag
+  aendereEinheit(idx, eintrag || t || null);
+}
 function kfEinheit(p) {
+  var P = window.BOS_PRODUKTE || {};
   var e = einheitVon(p) || { art: 'fehlt', einzahl: 'Träger' };
+  var liste = P.EINHEITEN_LISTE || [];
+  var roh = typeof p.einheit === 'string' ? p.einheit.trim() : '';
+  var eintrag = roh && P.einheitListenEintrag ? P.einheitListenEintrag(roh) : null;
+  var andere = (!!roh && !eintrag) || !!einheitAndereOffen[p.legacyKey];
+  var wahl = andere ? EINHEIT_ANDERE : (eintrag || '');
+  var opt = function (wert, text) { return '<option value="' + esc(wert) + '"' + (wert === wahl ? ' selected' : '') + '>' + esc(text) + '</option>'; };
   var html = '<div class="detail-feld"><label>Einheit ' + fhBtn('einheit') + '</label>' +
-    '<input type="text" list="einheitVorschlaege" value="' + esc(p.einheit || '') + '" placeholder="fehlt — bitte eintragen" onchange="aendereEinheit(karteIdx,this.value.trim()||null)">';
-  if (e.art === 'fehlt') html += '<div class="einheit-hinweis">Einheit fehlt: Stück, Blech, Diele … eintragen. Bis dahin rechnet BOS wie mit Blechen.</div>';
-  else if (e.art === 'traeger' && /^st(c?k|ü?ck|ueck)\.?$/i.test(e.traeger)) html += '<div class="einheit-hinweis">„' + esc(e.traeger) + '“ zählt als Träger, nicht als Stück. Für Stück bitte „Stück“ eintragen.</div>';
+    '<select id="kfEinheitWahl" onchange="waehleEinheit(karteIdx,this.value)">' +
+      opt('', '— fehlt, bitte wählen —') +
+      liste.map(function (w) { return opt(w, w); }).join('') +
+      opt(EINHEIT_ANDERE, 'Andere …') +
+    '</select>';
+  if (andere) {
+    html += '<input type="text" id="kfEinheitAndere" style="margin-top:6px" value="' + esc(eintrag ? '' : roh) + '" placeholder="eigene Einheit eintippen (Notfall)" onchange="aendereEinheitFreitext(karteIdx,this.value)">';
+  }
+  if (e.art === 'fehlt') html += '<div class="einheit-hinweis">Einheit fehlt: bitte aus der Liste wählen. Bis dahin rechnet BOS wie mit Blechen.</div>';
+  if (roh && !eintrag) {
+    html += '<div class="einheit-hinweis">Nicht in der Liste. Meintest du einen der Einträge oben?</div>';
+    if (P.einheitIstKurzform && P.einheitIstKurzform(roh)) html += '<div class="einheit-hinweis">Das ist die Abkürzung an der Station. Bitte den vollen Namen wählen.</div>';
+    if (e.art === 'traeger' && /^st(c?k|ü?ck|ueck)\.?$/i.test(e.traeger)) html += '<div class="einheit-hinweis">„' + esc(e.traeger) + '“ zählt als Träger, nicht als Stück. Für Stück bitte „Stück“ wählen.</div>';
+  }
   if (einheitGewechselt(p)) html += '<div class="einheit-hinweis rot" role="alert">⚠ ' + EINHEIT_WECHSEL_TEXT + '</div>';
   return html + '</div>';
 }
@@ -722,7 +761,6 @@ function render() {
   document.getElementById('uploadZone').style.display = 'none';
 
   renderTabLeiste();
-  fuelleEinheitVorschlaege();   // 13.10.2026 (#64)
   var nbtn = document.getElementById('nurOhneEinheitBtn');
   if (nbtn) nbtn.classList.toggle('aktiv', nurOhneEinheit);
 
@@ -1088,7 +1126,7 @@ function neuesProdukt() {
     station: null,
     stueckProBlech: null,
     produktionsSchritt: null,
-    einheit: 'stueck',
+    einheit: null,   /* 13.10.2026, Nachtrag 1 (Fund N2): bewusst leer → erscheint unter „Nur ohne Einheit“ */
     backTage: [],
     hinweis: null,
     frosterZustaendigkeit: '',
@@ -1167,6 +1205,10 @@ async function speichereKarte(idx, aktion) {
     var wirdGeloescht = aktion === 'archivieren' || (aktion === 'wiederherstellen' && p.__geloescht === true);
     delete p.__geloescht;
     var inhalt = ohneDbFelder(p);
+    /* Nachtrag 1 (13.10.2026): bestehende Schreibweise (bleche, Rote Dielen …)
+       wird beim Speichern zum Listentext (Blech, Rote Diele …) — kein Wechsel. */
+    var listenEh = window.BOS_PRODUKTE.einheitListenEintrag ? window.BOS_PRODUKTE.einheitListenEintrag(inhalt.einheit) : null;
+    if (listenEh && listenEh !== inhalt.einheit) { inhalt.einheit = listenEh; p.einheit = listenEh; }
     inhalt.reihenfolge = roh && typeof roh.reihenfolge === 'number' ? roh.reihenfolge : naechsteReihenfolge(serverRoh);
     if (wirdGeloescht) inhalt.geloescht = true;
     /* Schreiben (Sicherung + Produkt + Stand + 1 in EINER Batch) über das gemeinsame
@@ -1399,7 +1441,7 @@ var helpData = {
     },
     {
       heading: "Was bedeuten „Einheit“ und „Stück pro Träger“?",
-      text: "„Einheit“ sagt, worin ein Produkt gezählt und geplant wird: entweder Stück (zum Beispiel alle Brote, auch aus der Kastenform) oder ein Träger — Blech, Diele, Lochblech, Kuchenblech … „Stück pro Träger“ sagt, wie viele Stück auf einen Träger passen (in der Karte steht der Träger dabei, z. B. „Stück pro Diele“). Bei Stück spielt die Zahl keine Rolle, das Feld ist dann ausgegraut. Fehlt die Einheit, rechnet BOS vorerst wie mit Blechen; der Knopf „Nur ohne Einheit“ zeigt alle Produkte, bei denen sie oder „Stück pro Träger“ noch fehlt. Wechselst du bei einem gespeicherten Produkt die Einheit, stehen Froster-Bestand und Mitschrift noch in der alten Einheit: danach neu zählen und „Stück pro Träger“ prüfen."
+      text: "„Einheit“ sagt, worin ein Produkt gezählt und geplant wird: entweder Stück (zum Beispiel alle Brote, auch aus der Kastenform) oder ein Träger. Gewählt wird aus der Liste: Stück, Blech, Lochblech, Kuchenblech, Schlawinerblech, Rote Diele, Blaue Diele. „Andere …“ öffnet ein Textfeld, nur für den Notfall; die Abkürzungen der Station (KuBl., Dl. …) bitte nicht eintippen, sondern den vollen Namen wählen. Alte Schreibweisen (z. B. „bleche“) zeigt die Liste als ihren Eintrag, beim nächsten Speichern wird der Listentext geschrieben. „Stück pro Träger“ sagt, wie viele Stück auf einen Träger passen (in der Karte steht der Träger dabei, z. B. „Stück pro Diele“). Bei Stück spielt die Zahl keine Rolle, das Feld ist dann ausgegraut. Fehlt die Einheit, rechnet BOS vorerst wie mit Blechen; der Knopf „Nur ohne Einheit“ zeigt alle Produkte, bei denen sie oder „Stück pro Träger“ noch fehlt. Wechselst du bei einem gespeicherten Produkt die Einheit, stehen Froster-Bestand und Mitschrift noch in der alten Einheit: danach neu zählen und „Stück pro Träger“ prüfen."
     },
     {
       heading: "Was bedeutet „Aus Teig“?",

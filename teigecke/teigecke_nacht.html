@@ -4,6 +4,12 @@
   MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-10-13 · 14:49 · v0.12a · Einheiten Nachtrag 1 (eine Zeile, KC-Freigabe)
+      ANWEISUNG_2026-10-13_EINHEITEN_NACHTRAG1.md: Die Einheiten-Liste speichert
+      „Rote Diele“/„Blaue Diele“ (Einzahl). vorratFeldHTML() wählte das Wort
+      „Dielen“ nur bei „Dielen“ (Mehrzahl, groß) — jetzt ohne Groß-/Klein-
+      schreibung auf „diele“ geprüft. Nur das Wort am Umschalter, die Zahl
+      stimmte schon. Sonst unverändert (eigene Einheiten-Logik, Umzug später).
     2026-10-08 · 14:17 · v0.12 · Feature (Nachtrag Nachtseite)
       ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md (KC 13:07), Bauplan
       SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md (KC 13:26 frei).
@@ -1805,7 +1811,7 @@ function renderKarte(voll) {
 function vorratFeldHTML(r, p) {
   const prod = pm()[p.lk] || {};
   const spb = L.istZahl(prod.stueckProBlech) && prod.stueckProBlech > 1 ? prod.stueckProBlech : null;
-  const wort = String(prod.einheit || '').indexOf('Dielen') !== -1 ? t('vorrat_dielen') : t('vorrat_bleche');
+  const wort = /diele/i.test(String(prod.einheit || '')) ? t('vorrat_dielen') : t('vorrat_bleche');   /* 13.10.2026: auch „Rote Diele“ (Einzahl) */
   let einh = spb ? (S.vorratEinheit[p.lk] || 'bleche') : 'stueck';
   if (einh === 'bleche' && L.istZahl(p.anzahl) && p.anzahl % spb !== 0) einh = 'stueck';
   const wertText = L.istZahl(p.anzahl) ? String(einh === 'bleche' ? p.anzahl / spb : p.anzahl) : '';
