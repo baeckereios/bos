@@ -19,6 +19,17 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-15 · 07:58 · v2.9 · Fix (Baustelle #71, Geisterklick; ANWEISUNG_2026-10-15_HUB_GEISTERKLICK.md)
+      Ulf 15.10., 07:51: Ein Hub öffnete beim Antippen gleich eine seiner
+      Seiten mit. Grund: Die Kachel öffnet beim Loslassen (pointerup), der
+      Hub steht sofort maximiert da, und das danach vom Browser geschickte
+      click landet auf der Kind-Kachel, die jetzt unter dem Finger liegt.
+      Jetzt: Ein Antippen öffnet genau eine Sache. Öffnet der pointerup-
+      Handler etwas (launchApp, im Bearbeiten-Modus openEditModal), wird das
+      zugehörige click verschluckt (Capture-Phase am window). Jedes neue
+      pointerdown hebt die Sperre auf, sonst verfällt sie nach 1 s.
+      Hubs öffnen weiter maximiert, Long-Press und Drag unverändert.
+      Siehe SESSION_2026-10-15_HUB_GEISTERKLICK_BAU.md.
     2026-10-10 · 09:33 · v2.8 · Feature + Fix (Reparaturanfrage Stufe 1)
       isVisibleForRole(): gibt das Profilfeld kontoHaken als vierten
       Parameter an BOS_ACCESS.can() — Haken-Seiten (Registry-Feld haken)
@@ -1289,6 +1300,33 @@
     renderGrid();
   }
 
+  /* ---------------- Geisterklick-Sperre (15.10.2026, Baustelle #71) ----------------
+     Eine Kachel öffnet beim Loslassen (pointerup). ERST DANACH schickt der
+     Browser das click dieses Antippens — an das Element, das JETZT unter dem
+     Finger liegt. Ein Hub steht sofort maximiert da, darunter liegt eine
+     Kind-Kachel, und die öffnete gleich mit (Ulf 15.10., 07:51). Ebenso
+     Knöpfe im Einstellungs-Fenster oder im Bearbeiten-Dialog.
+     Grundsatz: Ein Antippen öffnet genau eine Sache. Das click, das zu einem
+     Antippen gehört, das schon etwas geöffnet hat, wird verschluckt.
+     - window, Capture-Phase: läuft vor allen anderen click-Zuhörern.
+     - Jedes neue pointerdown hebt die Sperre auf: ein echtes zweites
+       Antippen beginnt immer mit pointerdown, der Geisterklick nicht.
+     - Sicherheitsnetz: die Sperre verfällt nach 1 s.
+     - Ein click ohne Zeiger (Tastatur, e.detail === 0) wird nie verschluckt.
+     Klicks INNERHALB eines App-Fensters (<iframe>) erreichen dieses Dokument
+     nicht und sind davon unberührt. */
+  var geisterSperreBis = 0;
+  function sperreGeisterklick() { geisterSperreBis = Date.now() + 1000; }
+  window.addEventListener('pointerdown', function () { geisterSperreBis = 0; }, true);
+  window.addEventListener('click', function (e) {
+    if (!geisterSperreBis || e.detail === 0) return;
+    var greift = Date.now() < geisterSperreBis;
+    geisterSperreBis = 0;
+    if (!greift) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+
   /* ---------------- Tap / Long-Press / Drag — zentral über Pointer-Events ---------------- */
   var pointerTrack = null;
   document.addEventListener('pointerdown', function (e) {
@@ -1327,6 +1365,7 @@
     if (pointerTrack.dragStarted) {
       endDrag();
     } else if (!pointerTrack.longPressFired) {
+      sperreGeisterklick();   // 15.10.2026 (#71): das click dieses Antippens nicht weiterreichen
       if (editMode) openEditModal(pointerTrack.id); else launchApp(pointerTrack.id);
     }
     pointerTrack = null;
