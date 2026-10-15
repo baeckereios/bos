@@ -307,7 +307,7 @@ window.BOS_APPS = [
   {
     id: 'verbrauch_manuell',
     bereich: 'verbrauch',
-    name: 'Verbrauch (manuell)',
+    name: 'Verbrauch (Mitschrift)',
     icon: '📝',
     color: '#c07a10',
     url: 'verbrauch/verbrauch_manuell.html',

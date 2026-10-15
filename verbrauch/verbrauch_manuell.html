@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-15 · 07:17 · Wort „Mitschrift“ (Richtwert #63, Nachtrag 1, Ulf 15.10., 07:12): Seitentitel „Verbrauch – Mitschrift“ statt „Manuelle Erfassung“, Hinweis „keine Produkte“ in Bäckersprache (Haken „In der Mitschrift erfassen“ im Produkt-Editor). Dateiname, Adresse, App-ID und Datenbankwerte bleiben (NFC/QR zeigen auf die Adresse). SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-15 · 01:26 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Produktliste aus der Sicht 'laufend' — pausierte Produkte fehlen in der Erfassung; Fassungsprüfung mit sichtbarer Meldung. Erfassung selbst unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-13 · 12:11 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Speicherung unverändert (`menge` in der Einheit des Produkts, `erfasstAls`/`mengeRoh` wie bisher, Datenbank-Wert 'bleche' heißt „im Träger erfasst“). Neben jedem Feld steht eine Einheit aus BOS_PRODUKTE.einheit(); fehlt `einheit` in der Produktliste, steht dort „Einheit fehlt in der Produktliste“ (keine erfundene Einheit). Umschalter heißt „{Träger} | Stück“ (z. B. „Rote Dielen“ statt immer „Bleche“). istEinheitenUmschaltbar() und die Stück→Träger-Umrechnung nutzen die gemeinsame Stelle in bos_produkte.js. Ausreißer-Check unverändert. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler mit echter Meldung im Hinweisblock, „keine freigeschaltet“ nur nach erfolgreichem Laden. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
@@ -7,7 +8,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="robots" content="noindex, nofollow">
-<title>Verbrauch – Manuelle Erfassung · BäckereiOS</title>
+<title>Verbrauch – Mitschrift · BäckereiOS</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -433,13 +434,13 @@
    *    ohne die Seite neu schreiben zu müssen.
    * --------------------------------------------------------- */
   const I18N_DE = {
-    titel: 'Verbrauch – Manuelle Erfassung',
+    titel: 'Verbrauch – Mitschrift',
     keinZugriff: 'Kein Zugriff für deine Rolle. Diese Seite ist für Bäcker, Konditoren und Admin gedacht.',
     datumLabel: 'Datum',
     pokaYokeFrage: 'Ist heute ein normaler Tag oder ein besonderer Tag (Ferien, Feiertag, Ausnahme)?',
     pokaYokeNormal: 'Normaler Tag',
     pokaYokeBesonders: 'Ferien / besonderer Tag',
-    keineProdukte: 'Für die manuelle Erfassung sind aktuell keine Produkte freigeschaltet. Im Produkt-Config-Editor muss bei den gewünschten Produkten das Feld „manuelleErfassung": true gesetzt sein.',
+    keineProdukte: 'Für die Mitschrift ist noch kein Produkt freigegeben. Im Produkt-Editor beim Produkt den Haken „In der Mitschrift erfassen“ setzen (Reiter Einstellungen).',
     speichern: 'Speichern',
     ausreisserTitel: 'Ungewöhnliche Werte',
     ausreisserErklaerung: 'Diese Werte weichen deutlich vom bisherigen Schnitt für diesen Wochentag ab. Bitte kurz prüfen, bevor gespeichert wird.',

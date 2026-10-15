@@ -3,6 +3,21 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-15 · 07:40 · v-richtwert-1b · Nachtrag 2 (Ulf 15.10., 07:35/07:36; ANWEISUNG_2026-10-15_RICHTWERT_NACHTRAG2.md)
+      Haken „Aktiv“ samt ❓, Erklärsatz und Froster-Hinweis zieht aus dem
+      Reiter „Bedarf“ ganz nach oben in den Reiter „Stammdaten“ (über Name/
+      ArtNr) — er ist eine Grundeigenschaft. Logik unverändert (schalteAktiv,
+      Feld pausiert, Speichern). Neu: Etikett „pausiert“ im Kopf der Karte
+      (jeder Reiter, folgt dem Haken sofort, auch beim Blättern ‹ ›).
+      Hilfe: eigener Abschnitt „Was heißt der Haken „Aktiv“?“, Bedarf-Hilfe
+      beginnt mit „Zwei Dinge.“; „Wichtig zu wissen“: veralteter Löschen-Satz
+      (Download/Übernahme) ersetzt (Fund F16, Editor-Teil).
+    2026-10-15 · 07:17 · v-richtwert-1a · Nachtrag 1 (Ulf 15.10., 07:12; ANWEISUNG_2026-10-15_RICHTWERT_NACHTRAG1.md)
+      Haken „Für manuelle Verbrauchserfassung freigeben“ heißt „In der Mitschrift
+      erfassen“ (Feld manuelleErfassung unverändert). Hilfe „Was bedeutet ‚Aus
+      Teig‘?“: Satz „Die Teigecke liest die Zuordnung aus der Datei …“ gestrichen
+      (seit 05.10. falsch), ersetzt durch „Die Teigecke liest die Zuordnung aus
+      der Datenbank, sobald du speicherst.“ (Fund F14).
     2026-10-15 · 01:20 · v-richtwert-1 · Richtwert, Bedarfsquelle, Saison-Pause (Baustelle #63)
       SESSION_2026-10-14_RICHTWERT_BAU.md (Freigabe Kontroll-Chat 14.10., 19:19).
       Neuer Karten-Reiter „Bedarf“: Haken „Aktiv“ (aus = pausiert: true,
@@ -290,6 +305,8 @@
   .karte-titel { flex:1; text-align:center; overflow:hidden; min-width:0; }
   .karte-name { font-family:'Fraunces',serif; font-size:1.55rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .karte-key { font-size:.72rem; color:var(--dim); font-family:monospace; margin-top:4px; }
+  .karte-etikett:empty { display:none; }   /* 15.10.2026 (#63, Nachtrag 2) */
+  .karte-etikett .etikett { margin-left:0; margin-top:6px; }
   .karte-close { background:none; border:none; color:var(--dim); font-size:1.4rem; cursor:pointer; flex-shrink:0; padding:8px; }
   .karte-tabs { display:flex; gap:8px; padding:0 26px 18px; overflow-x:auto; flex-shrink:0; }
   .karte-tabs::-webkit-scrollbar { display:none; }
@@ -446,6 +463,7 @@
       <div class="karte-titel">
         <div class="karte-name" id="karteName">—</div>
         <div class="karte-key" id="karteKeyLabel">—</div>
+        <div class="karte-etikett" id="karteEtikett"></div>
       </div>
       <button class="karte-nav-btn" id="karteVorBtn" onclick="karteNav(1)" title="Nächstes Produkt">›</button>
       <button class="karte-close" onclick="schliesseKarte()" title="Schließen">✕</button>
@@ -953,24 +971,35 @@ function zeichneRichtwertHinweise(p) {
   if (el) el.innerHTML = richtwertHinweiseHTML(p);
 }
 
+// ── Karte: Haken „Aktiv“ (Reiter Stammdaten, ganz oben) ──
+/* 15.10.2026 (#63, Nachtrag 2, Ulf 07:35): vom Reiter „Bedarf“ hierher umgezogen,
+   unverändert — gleiche IDs (kfAktiv, kfFrosterHinweis), gleiche Logik (schalteAktiv).
+   Wie vorher nur mit neuer bos_produkte.js, sonst ein roter Hinweis an seiner Stelle. */
+function kfAktiv(p) {
+  if (!richtwertBereit()) {
+    return '<div class="detail-section full"><div class="einheit-hinweis rot" role="alert">⚠ Haken „Aktiv“ fehlt: bos_produkte.js ist in einer alten Fassung geladen (ohne Saison-Pause) — Seite neu laden (neue Fassung noch nicht online?).</div></div>';
+  }
+  var key = p.legacyKey;
+  var aktiv = !istPausiertP(p);
+  return '<div class="detail-section full"><div class="detail-feld checkbox-feld">' +
+    '<input type="checkbox" id="kfAktiv" ' + (aktiv ? 'checked' : '') + ' onchange="schalteAktiv(karteIdx,this.checked)">' +
+    '<label for="kfAktiv" class="cb-label">Aktiv ' + fhBtn('pausiert') + '</label></div>' +
+    '<div class="einheit-hinweis" style="color:var(--dim)">' + (aktiv ? 'Haken raus = Saison-Pause: das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster und Teigecke-Nacht. Alle Daten bleiben.' : 'Pausiert (Saison-Pause). Erscheint im Betrieb nirgends, alle Daten bleiben. Haken setzen holt es zurück.') + '</div>' +
+    '<div id="kfFrosterHinweis">' + frosterHinweisHTML(key) + '</div></div>';
+}
+
 // ── Karte: Reiter „Bedarf“ ──
 function kfBedarf(p) {
   if (!richtwertBereit()) {
     return '<div class="detail-section full"><div class="einheit-hinweis rot" role="alert">⚠ bos_produkte.js ist in einer alten Fassung geladen (ohne Richtwert) — Seite neu laden (neue Fassung noch nicht online?).</div></div>';
   }
   var P = P_(), key = p.legacyKey;
-  var aktiv = !istPausiertP(p);
   var q = quelleVon(p);
   var e = einheitVon(p) || { art: 'fehlt', lang: '' };
   var ohneEinheit = e.art === 'fehlt';
   var istRichtwert = q === 'richtwert';
   var html = '';
-  // Aktiv
-  html += '<div class="detail-section full"><div class="detail-feld checkbox-feld">' +
-    '<input type="checkbox" id="kfAktiv" ' + (aktiv ? 'checked' : '') + ' onchange="schalteAktiv(karteIdx,this.checked)">' +
-    '<label for="kfAktiv" class="cb-label">Aktiv ' + fhBtn('pausiert') + '</label></div>' +
-    '<div class="einheit-hinweis" style="color:var(--dim)">' + (aktiv ? 'Haken raus = Saison-Pause: das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster und Teigecke-Nacht. Alle Daten bleiben.' : 'Pausiert (Saison-Pause). Erscheint im Betrieb nirgends, alle Daten bleiben. Haken setzen holt es zurück.') + '</div>' +
-    '<div id="kfFrosterHinweis">' + frosterHinweisHTML(key) + '</div></div>';
+  // „Aktiv“ steht seit Nachtrag 2 (15.10.2026) im Reiter Stammdaten: kfAktiv()
   // Quelle
   var knopf = function (wert) {
     var gesperrt = wert === 'richtwert' && ohneEinheit;
@@ -1467,6 +1496,7 @@ var KARTEN_TABS = [
     id: 'stamm', label: 'Stammdaten',
     render: function (p) {
       return (
+        kfAktiv(p) +   // 15.10.2026 (#63, Nachtrag 2): Grundeigenschaft, ganz oben
         '<div class="detail-section two">' +
           '<div class="detail-feld"><label>Name ' + fhBtn('name') + '</label>' +
             '<input type="text" id="kfName" value="' + esc(p.name || '') + '" ' +
@@ -1503,7 +1533,7 @@ var KARTEN_TABS = [
     }
   },
   {
-    id: 'bedarf', label: 'Bedarf',   // 15.10.2026 (#63): Aktiv, Quelle, Richtwert
+    id: 'bedarf', label: 'Bedarf',   // 15.10.2026 (#63): Quelle, Richtwert (Aktiv seit Nachtrag 2 in Stammdaten)
     render: function (p) { return kfBedarf(p); }
   },
   {
@@ -1511,7 +1541,7 @@ var KARTEN_TABS = [
     render: function (p) {
       return (
         '<div class="detail-section full">' + kfSelect('frosterZustaendigkeit', 'Froster-Zuständigkeit', p.frosterZustaendigkeit, ['nein','baecker','konditoren','sonstige'], '— offen —') + '</div>' +
-        '<div class="detail-section full">' + kfCheckbox('manuelleErfassung', 'Für manuelle Verbrauchserfassung freigeben', p.manuelleErfassung) + '</div>' +
+        '<div class="detail-section full">' + kfCheckbox('manuelleErfassung', 'In der Mitschrift erfassen', p.manuelleErfassung) + '</div>' +
         '<div class="detail-section full">' + kfCheckbox('schnellrechnerRelevant', 'Schnellrechner relevant', p.schnellrechnerRelevant) + '</div>' +
         '<div class="detail-section full">' + kfCheckbox('nfcSeite', 'Auf Produktionsplaner anzeigen', p.nfcSeite) + '</div>'
       );
@@ -1556,6 +1586,7 @@ function renderKarte() {
   if (!p) return;
   document.getElementById('karteName').textContent = p.name || 'Unbenannt';
   document.getElementById('karteKeyLabel').textContent = p.legacyKey || '—';
+  document.getElementById('karteEtikett').innerHTML = istPausiertP(p) ? '<span class="etikett">pausiert</span>' : '';   // 15.10.2026 (#63, Nachtrag 2)
 
   var pos = karteListe.indexOf(karteIdx);
   document.getElementById('karteZurueckBtn').disabled = pos <= 0;
@@ -1981,7 +2012,7 @@ var helpData = {
     },
     {
       heading: "Wichtig zu wissen",
-      text: "Der Produkt-Schlüssel (legacyKey) lässt sich nirgends ändern — der muss immer gleich bleiben, damit alte Daten nicht durcheinanderkommen (steht unten im Stammdaten-Tab der Karte, nur zur Anzeige). Beim Anlegen mit „＋ Produkt“ fragt die Seite deshalb zuerst nach dem Namen: aus ihm entsteht der Schlüssel. Gibt es den Schlüssel schon, hängt die Seite eine Zahl an (…_2_stueck) und sagt das in der Statuszeile. Den Namen selbst kannst du danach jederzeit ändern, den Schlüssel nicht. Enthält eine geladene Liste zwei Produkte mit demselben Schlüssel, erscheint unter der Werkzeugleiste eine rote Warnung mit den betroffenen Schlüsseln. Löschen geht weiterhin über das ✕ in der Übersichtstabelle, nicht aus der Karte heraus — entfernt das Produkt nur aus der Liste in diesem Fenster; endgültig wird das erst durch den Download und die anschließende Übernahme."
+      text: "Der Produkt-Schlüssel (legacyKey) lässt sich nirgends ändern — der muss immer gleich bleiben, damit alte Daten nicht durcheinanderkommen (steht unten im Stammdaten-Tab der Karte, nur zur Anzeige). Beim Anlegen mit „＋ Produkt“ fragt die Seite deshalb zuerst nach dem Namen: aus ihm entsteht der Schlüssel. Gibt es den Schlüssel schon, hängt die Seite eine Zahl an (…_2_stueck) und sagt das in der Statuszeile. Den Namen selbst kannst du danach jederzeit ändern, den Schlüssel nicht. Enthält eine geladene Liste zwei Produkte mit demselben Schlüssel, erscheint unter der Werkzeugleiste eine rote Warnung mit den betroffenen Schlüsseln. Löschen geht mit „🗑 Löschen“ in der Karte oder dem ✕ in der Liste, gleich in der Datenbank und mit Sicherung — mehr unter „Was passiert beim Löschen?“."
     },
     {
       heading: "Was ist der Unterschied zwischen „Station\u201c und „Froster-Zuständigkeit\u201c?",
@@ -2008,8 +2039,12 @@ var helpData = {
       text: "„Einheit“ sagt, worin ein Produkt gezählt und geplant wird: entweder Stück (zum Beispiel alle Brote, auch aus der Kastenform) oder ein Träger. Gewählt wird aus der Liste: Stück, Blech, Lochblech, Kuchenblech, Schlawinerblech, Rote Diele, Blaue Diele. „Andere …“ öffnet ein Textfeld, nur für den Notfall; die Abkürzungen der Station (KuBl., Dl. …) bitte nicht eintippen, sondern den vollen Namen wählen. Alte Schreibweisen (z. B. „bleche“) zeigt die Liste als ihren Eintrag, beim nächsten Speichern wird der Listentext geschrieben. „Stück pro Träger“ sagt, wie viele Stück auf einen Träger passen (in der Karte steht der Träger dabei, z. B. „Stück pro Diele“). Bei Stück spielt die Zahl keine Rolle, das Feld ist dann ausgegraut. Fehlt die Einheit, rechnet BOS vorerst wie mit Blechen; der Knopf „Nur ohne Einheit“ zeigt alle Produkte, bei denen sie oder „Stück pro Träger“ noch fehlt. Wechselst du bei einem gespeicherten Produkt die Einheit, stehen Froster-Bestand und Mitschrift noch in der alten Einheit: danach neu zählen und „Stück pro Träger“ prüfen."
     },
     {
+      heading: "Was heißt der Haken „Aktiv“?",
+      text: "Er steht ganz oben im Reiter Stammdaten. Haken raus heißt Saison-Pause — das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster-Inventur und Teigecke-Nacht, alle Daten bleiben. Oben in der Karte steht dann in jedem Reiter „pausiert“, in der Liste steht es ausgegraut mit „pausiert“; „Pausierte ausblenden“ blendet es aus. Steht laut letzter Zählung noch etwas im Froster, sagt die Karte es dir (nur ein Hinweis). Haken wieder setzen holt es zurück. In der Datenbank steht es erst nach 💾 Speichern."
+    },
+    {
       heading: "Was steht im Reiter „Bedarf“?",
-      text: "Drei Dinge. „Aktiv“: Haken raus heißt Saison-Pause — das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster-Inventur und Teigecke-Nacht, alle Daten bleiben. In dieser Liste steht es dann ausgegraut mit „pausiert“; „Pausierte ausblenden“ blendet es aus. Steht laut letzter Zählung noch etwas im Froster, sagt die Karte es dir (nur ein Hinweis). „Woher kommt die Bedarfszahl?“: Richtwert, Backzettel oder Mitschrift. Damit rechnen Stationen und Schnellrechner bei diesem Produkt; ohne Wahl ist es die Mitschrift. Der „Richtwert“ ist deine eigene Zahl je Wochentag in der Einheit des Produkts (das Wort steht unter den Kästchen). Komma geht, leer ist nicht 0: leer heißt „keine Zahl“, und die Station warnt dort; 0 heißt „nichts“. Bei Stück nur ganze Zahlen. Tage, an denen das Produkt laut Backtagen nicht gebacken wird, sind grau und zählen als 0. Ohne Einheit lässt sich kein Richtwert eintragen. Ist eine andere Quelle gewählt, ruht der Richtwert grau, die Zahlen bleiben. „Aus Backzettel übernehmen“ zeigt die Backzettel-Zahlen und was sie überschreiben würden; erst „Übernehmen“ setzt sie ein, erst 💾 speichert. Wechselst du die Einheit, steht der Richtwert noch in der alten Einheit — neu eintragen oder aus dem Backzettel übernehmen."
+      text: "Zwei Dinge. „Woher kommt die Bedarfszahl?“: Richtwert, Backzettel oder Mitschrift. Damit rechnen Stationen und Schnellrechner bei diesem Produkt; ohne Wahl ist es die Mitschrift. Der „Richtwert“ ist deine eigene Zahl je Wochentag in der Einheit des Produkts (das Wort steht unter den Kästchen). Komma geht, leer ist nicht 0: leer heißt „keine Zahl“, und die Station warnt dort; 0 heißt „nichts“. Bei Stück nur ganze Zahlen. Tage, an denen das Produkt laut Backtagen nicht gebacken wird, sind grau und zählen als 0. Ohne Einheit lässt sich kein Richtwert eintragen. Ist eine andere Quelle gewählt, ruht der Richtwert grau, die Zahlen bleiben. „Aus Backzettel übernehmen“ zeigt die Backzettel-Zahlen und was sie überschreiben würden; erst „Übernehmen“ setzt sie ein, erst 💾 speichert. Wechselst du die Einheit, steht der Richtwert noch in der alten Einheit — neu eintragen oder aus dem Backzettel übernehmen."
     },
     {
       heading: "Was machen „Richtwerte aus Backzettel füllen“ und „Alle auf Mitschrift“?",
@@ -2017,7 +2052,7 @@ var helpData = {
     },
     {
       heading: "Was bedeutet „Aus Teig“?",
-      text: "Im Reiter Backinformationen wählst du, aus welchem Teig ein Brot gemacht wird (z. B. kleine und große Korbbrote und Zwiebelbrote aus dem Korbbrot-Teig). Die Auswahl kommt aus den Teigen der Teigecke. Ein Brot gehört zu höchstens einem Teig. Die Teigecke rechnet daraus nachts die Teigmenge. Wichtig: Die Teigecke liest die Zuordnung aus der Datei — eine Änderung wirkt erst, wenn die heruntergeladene produkt_config.json im System liegt. Lässt sich die Teigliste nicht laden, bleibt der bisherige Wert stehen und am Feld steht die Fehlermeldung."
+      text: "Im Reiter Backinformationen wählst du, aus welchem Teig ein Brot gemacht wird (z. B. kleine und große Korbbrote und Zwiebelbrote aus dem Korbbrot-Teig). Die Auswahl kommt aus den Teigen der Teigecke. Ein Brot gehört zu höchstens einem Teig. Die Teigecke rechnet daraus nachts die Teigmenge. Die Teigecke liest die Zuordnung aus der Datenbank, sobald du speicherst. Lässt sich die Teigliste nicht laden, bleibt der bisherige Wert stehen und am Feld steht die Fehlermeldung."
     }
   ]
 };

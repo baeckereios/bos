@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-15 · 07:17 · Wort „Mitschrift“ (Richtwert #63, Nachtrag 1, Ulf 15.10., 07:12): Leer-Hinweis „Verbrauch (Mitschrift)“, Hilfe „aus der Mitschrift“. Typ verbrauch_manuell und Logik unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“, mit gelöschten) statt fetch(produkt_config.json); Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
@@ -132,7 +133,7 @@
   </header>
 
   <p id="ladeHinweis" class="hinweis-block">Lädt …</p>
-  <p id="leerHinweis" class="hinweis-block" hidden>Noch keine „Verbrauch (manuell)“-Einträge in der Datenbank.</p>
+  <p id="leerHinweis" class="hinweis-block" hidden>Noch keine „Verbrauch (Mitschrift)“-Einträge in der Datenbank.</p>
 
   <section id="listenAnsicht">
     <div id="tagListe" class="tag-liste"></div>
@@ -176,7 +177,7 @@
     <div class="sheet">
       <div class="sheet-handle"></div>
       <h2>Hilfe zu dieser Seite</h2>
-      <div class="sec"><h3>Wofür ist diese Seite?</h3><p>Zum Nachsehen und Korrigieren einzelner Tage aus der manuellen Verbrauchserfassung — für den Fall, dass beim Eintragen ein Fehler passiert ist (falsche Zahl, falscher Tag) oder ein Testeintrag wieder raus muss.</p></div>
+      <div class="sec"><h3>Wofür ist diese Seite?</h3><p>Zum Nachsehen und Korrigieren einzelner Tage aus der Mitschrift — für den Fall, dass beim Eintragen ein Fehler passiert ist (falsche Zahl, falscher Tag) oder ein Testeintrag wieder raus muss.</p></div>
       <div class="sec"><h3>Warum eine extra Anmeldung beim Speichern/Löschen?</h3><p>Ansehen geht mit dem PIN wie bei den anderen Admin-Werkzeugen. Ändern oder Löschen ist der einzige Ort im System, an dem bereits erfasste Messwerte verschwinden oder sich rückwirkend ändern können — deshalb verlangt das eine gesonderte Anmeldung mit dem Admin-Passwort, getrennt vom PIN.</p></div>
       <div class="sec"><h3>Was heißt „Tag löschen“?</h3><p>Entfernt den kompletten Eintrag für diesen Tag unwiderruflich aus der Datenbank — alle darin enthaltenen Produktwerte sind danach weg. Für einzelne Produkte reicht das 🗑 neben der jeweiligen Zeile, ohne den ganzen Tag zu löschen.</p></div>
       <div class="sec"><h3>Was bedeutet „erfasst als Stück“?</h3><p>Manche Werte wurden ursprünglich in Stück eingetragen und automatisch in Bleche umgerechnet. Der Wert, der hier bearbeitet wird, ist immer der maßgebliche Bleche-Wert — der Stück-Rohwert daneben ist nur zur Information und wird beim Speichern nicht automatisch mit angepasst.</p></div>

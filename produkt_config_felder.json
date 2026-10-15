@@ -134,10 +134,10 @@
     },
 
     "manuelleErfassung": {
-      "bezeichnung": "Manuelle Verbrauchserfassung (Opt-in)",
+      "bezeichnung": "In der Mitschrift erfassen (Opt-in)",
       "status": "bestätigt, neu am 28.08.2026",
       "typ": "boolean",
-      "beschreibung": "Schaltet ein Produkt für die Schnellerfassung frei. Nur Produkte mit true erscheinen dort in der Eingabeliste — bewusstes Opt-in, damit die Liste kurz und schnell bleibt statt alle 87 Produkte zu zeigen. Standard bei neuen Produkten ist false bzw. gar nicht gesetzt.",
+      "beschreibung": "Schaltet ein Produkt für die Mitschrift frei (Seite „Verbrauch – Mitschrift“, im Editor der Haken „In der Mitschrift erfassen“; Bezeichnung seit 15.10.2026, vorher „Manuelle Verbrauchserfassung“). Nur Produkte mit true erscheinen dort in der Eingabeliste — bewusstes Opt-in, damit die Liste kurz und schnell bleibt statt alle 87 Produkte zu zeigen. Standard bei neuen Produkten ist false bzw. gar nicht gesetzt.",
       "beispiel": "true",
       "genutztVon": ["verbrauch_manuell.html"]
     },
@@ -207,7 +207,7 @@
       "bezeichnung": "Reihenfolge in der Liste (nur Datenbank)",
       "status": "neu 05.10.2026 (Produkte aus Firestore, Stufe 1)",
       "typ": "number (ganze Zahl, 0 = erstes Produkt)",
-      "beschreibung": "Firestore kennt keine Reihenfolge, die Datei schon — und sieben Seiten zeigen die Produkte in der Reihenfolge der Datei (Stationsseiten, Übersicht, Verbrauch manuell, Teigecke). Deshalb schreibt das Sync-Tool beim Einspielen je Produkt die Position in der Datei in dieses Feld, und bos_produkte.js sortiert danach. Produkte ohne das Feld kommen ans Ende, untereinander nach legacyKey. Das Feld steht NUR in der Datenbank: Editor-Download und Sync-Export schreiben es nicht in die Datei, beim Einspielen zählt allein die Position in der Datei. Im Editor nicht bearbeitbar.",
+      "beschreibung": "Firestore kennt keine Reihenfolge, die Datei schon — und sieben Seiten zeigen die Produkte in der Reihenfolge der Datei (Stationsseiten, Übersicht, Mitschrift, Teigecke). Deshalb schreibt das Sync-Tool beim Einspielen je Produkt die Position in der Datei in dieses Feld, und bos_produkte.js sortiert danach. Produkte ohne das Feld kommen ans Ende, untereinander nach legacyKey. Das Feld steht NUR in der Datenbank: Editor-Download und Sync-Export schreiben es nicht in die Datei, beim Einspielen zählt allein die Position in der Datei. Im Editor nicht bearbeitbar.",
       "beispiel": "0",
       "genutztVon": [
         "bos_produkte.js (Sortierung, Feld wird vor der Übergabe an die Seiten entfernt)",
