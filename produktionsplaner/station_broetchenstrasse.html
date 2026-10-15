@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-15 · 01:24 · Richtwert und Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Umschalter „Manuell | Offiziell“ entfernt — die Quelle steht je Produkt in der Produkt-Karte (BOS_PRODUKTE.bedarfsQuelle: Richtwert, Backzettel oder Mitschrift; ohne Feld Mitschrift = bisherige Voreinstellung). Einstellungen je Topf, einmal geladen. Liste aus Sicht 'laufend' (pausierte fehlen), mit Fassungsprüfung. Warnung ohne Quellennamen („Bedarfszahlen“, V2/B7). Einreichung trägt je Produkt bedarfsQuelle. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-13 · 12:08 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Bedarf kommt fertig in der Einheit des Produkts aus bos_verbrauch_durchschnitt.js (Produkt wird mitgegeben; Antwort ohne `einheit` = Rechen-Modul veraltet → sichtbarer Fehler, keine Rechnung). Keine eigene Teilung durch stueckProBlech mehr (behebt Doppelteilung der Mitschrift und Teilung bei Stück-Produkten). Einheit aus BOS_PRODUKTE.einheit().kurz statt fest „Bl.“ (Stk., Bl., Dl., LoBl. …; fehlt → Bl.). Ladefehler und Einreichen zeigen err.message. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-06 · 07:29 · Nachtrag (Ulf): Statuszeile nennt nach dem Laden, woher die Produktliste kam („Liste vom Gerät/Server, Stand N“, aus bos_produkte.js quelle/standNummer); in der Ladephase danach heißt es „Bedarf und Frosterbestand werden geladen…“ statt irreführend „Produktdaten werden geladen…“ (B11 Nebenfund 1). SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar (zeigeProduktFehler), „keine freigegeben“ nur nach erfolgreichem Laden; Gerätekopie-Hinweis über BOS_PRODUKTE.zeigeMeldung. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
@@ -42,10 +43,6 @@
   .settings-bar-inner { max-width:600px; margin:0 auto; display:flex; align-items:center; gap:10px; }
   .settings-label { display:flex; align-items:center; gap:7px; cursor:pointer; font-family:var(--bos-font-label); font-weight:900; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.8px; color:var(--bos-text-dim); }
   .settings-label input[type=checkbox] { width:15px; height:15px; accent-color:var(--bos-amber); }
-
-  .datentopf-group { display:flex; gap:8px; flex:1; }
-  .datentopf-btn { flex:1; padding:8px 6px; min-height:38px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .datentopf-btn.aktiv { border-color:var(--bos-amber); color:var(--bos-amber); background:rgba(192,122,16,0.12); }
 
   .container { max-width:600px; margin:0 auto; padding:12px; }
 
@@ -233,16 +230,6 @@
   </div>
 </div>
 
-<div class="settings-bar">
-  <div class="settings-bar-inner">
-    <span class="froster-label">Datenquelle</span>
-    <div class="datentopf-group">
-      <button class="datentopf-btn aktiv" id="dt-manuell" onclick="setzeDatentopf('manuell')">Manuell</button>
-      <button class="datentopf-btn" id="dt-offiziell" onclick="setzeDatentopf('offiziell')">Offiziell</button>
-    </div>
-  </div>
-</div>
-
 <div class="container" id="prod-container">
   <div style="text-align:center;padding:40px;font-family:var(--bos-font-label);font-weight:700;color:var(--bos-text-dim);">Wird geladen…</div>
 </div>
@@ -364,11 +351,17 @@ var DATEN = {};
 // Offset 16 (So der Folgewoche) reichen — 17 lässt denselben 1-Tag-Puffer
 // wie vorher. Ersetzt die alte wochenconfigMap.
 var TAGESTYPEN = {};
-// Datentopf: 'manuell' (laufende Erfassung) | 'offiziell' (migrierte
-// Altdaten, backmengen_db.json). Gleiches Muster wie schnellrechner.html —
-// beide liefern seit 31.08.2026 echte Daten über holeWochenbedarf(),
-// striktgetrennt, kein Vermischen (siehe bos_verbrauch_durchschnitt.js Kopf).
-var datentopf = 'manuell';
+// 15.10.2026 (#63): Kein Datentopf je Seite mehr. Jedes Produkt hat seine
+// Quelle (BOS_PRODUKTE.bedarfsQuelle: 'richtwert' | 'offiziell' | 'manuell',
+// ohne Feld 'manuell' = die bisherige Voreinstellung dieser Seite). Je Produkt
+// genau ein Topf, kein Vermischen (bos_verbrauch_durchschnitt.js Kopf).
+// Einstellungen je Topf werden einmal geholt und wiederverwendet.
+var einstellungenJeTopf = {};
+async function einstellungenFuer(topf) {
+  if (topf === 'richtwert') return null;   // der Richtwert hat keine Einstellungen
+  if (!einstellungenJeTopf[topf]) einstellungenJeTopf[topf] = await window.BOS_VERBRAUCH.holeEinstellungen(topf);
+  return einstellungenJeTopf[topf];
+}
 
 // Fehlmenge: Sofort-Zusatzbedarf oben drauf (z.B. beim Froster-Zählen
 // festgestellt: "brauche zusätzlich noch X schon für morgen"), pro Produkt,
@@ -441,13 +434,14 @@ window.addEventListener('load', async function() {
     return;
   }
   // 13.10.2026 (#64): Einheiten kommen aus bos_produkte.js — alte Fassung im Zwischenspeicher?
-  if (typeof window.BOS_PRODUKTE.einheit !== 'function') {
+  // 15.10.2026 (#63): Quelle je Produkt und Sicht 'laufend' — sonst ebenso alte Fassung.
+  if (typeof window.BOS_PRODUKTE.einheit !== 'function' || typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') {
     setStatus('error', '⚠ Produktliste veraltet');
-    zeigeProduktFehler('Produktliste: bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    zeigeProduktFehler('Produktliste: bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten oder ohne Bedarfsquelle) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
     return;
   }
   try {
-    produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'laufend' });   // 15.10.2026: ohne pausierte
     configData = produktErgebnis.liste;
   } catch (e) {
     console.error('[Stationsseite] Produktliste:', e);
@@ -466,7 +460,7 @@ window.addEventListener('load', async function() {
   // produzierte Ware). Siehe session_doku_rondo_nfcseite.md.
   PRODUKTE = configData
     .filter(function(cfg){ return cfg.station === STATION_CFG && cfg.legacyKey && cfg.nfcSeite === true; })
-    .map(function(cfg){ return { bosId: cfg.legacyKey, name: cfg.name, legacyKey: cfg.legacyKey, produkt: cfg, einheit: window.BOS_PRODUKTE.einheit(cfg) }; });
+    .map(function(cfg){ return { bosId: cfg.legacyKey, name: cfg.name, legacyKey: cfg.legacyKey, produkt: cfg, einheit: window.BOS_PRODUKTE.einheit(cfg), quelle: window.BOS_PRODUKTE.bedarfsQuelle(cfg) }; });
 
   if (!PRODUKTE.length) {
     setStatus('error','⚠ Keine Produkte für diese Station freigegeben');
@@ -479,10 +473,11 @@ window.addEventListener('load', async function() {
   });
 
   try {
-    var einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
     var ladeVorgaenge = PRODUKTE.map(function(prod) {
       return Promise.all([
-        window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf, prod.produkt),
+        einstellungenFuer(prod.quelle).then(function(einstellungen) {
+          return window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, prod.quelle, prod.produkt);
+        }),
         window.BOS_FROSTER.holeBestand(db, prod.legacyKey)
       ]).then(function(res) {
         var wb = pruefeWochenbedarf(res[0]), fb = res[1];
@@ -513,22 +508,6 @@ window.addEventListener('load', async function() {
   renderAll();
 });
 
-// Bedarf für alle Produkte neu laden (Erstladung nutzt denselben Weg über
-// den try-Block oben; hier nur der Umschalt-Fall — Bestand/Zeitkontext
-// bleiben unverändert, nur needs[] hängt vom Datentopf ab).
-async function ladeAlleWochenbedarfe() {
-  var db = window.db;
-  var einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
-  await Promise.all(PRODUKTE.map(function(prod) {
-    return window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, datentopf, prod.produkt).then(function(res) {
-      var wb = pruefeWochenbedarf(res);
-      if (!DATEN[prod.bosId]) DATEN[prod.bosId] = {};
-      DATEN[prod.bosId].needs = wb.needs; // 13.10.2026: fertig in der Einheit des Produkts
-      DATEN[prod.bosId].verlaesslich = wb.verlaesslich;
-    });
-  }));
-}
-
 // 13.10.2026 (#64): Versionsschutz. Ein neuer Rechen-Host sagt in `einheit`,
 // worin er liefert. Fehlt das, kommt die Antwort von einer alten, noch
 // zwischengespeicherten bos_verbrauch_durchschnitt.js — deren Zahlen lägen
@@ -547,22 +526,6 @@ function fehlerGrund(e) {
 // Einheit kommt aus dem Freitext-Feld `einheit` — vor dem Einsetzen in HTML entschärfen.
 function escEinheit(s) {
   return String(s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; });
-}
-
-async function setzeDatentopf(wert) {
-  if (wert === datentopf || !PRODUKTE.length) return;
-  datentopf = wert;
-  document.getElementById('dt-manuell').classList.toggle('aktiv', wert === 'manuell');
-  document.getElementById('dt-offiziell').classList.toggle('aktiv', wert === 'offiziell');
-  setStatus('loading', '⏳ Bedarf wird neu geladen…');
-  try {
-    await ladeAlleWochenbedarfe();
-    setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText);
-    recalcAll();
-  } catch (e) {
-    console.warn('Produktionsplaner Brötchenstraße: Umschalten des Datentopfs fehlgeschlagen', e);
-    setStatus('error', '⚠ Bedarf konnte nicht neu geladen werden: ' + fehlerGrund(e));
-  }
 }
 
 function renderAll() {
@@ -649,14 +612,14 @@ function buildCard(bosId) {
   var verl = datenEintrag.verlaesslich;
   var alleUnzuverlaessig = !!(verl && verl.length > 0 && verl.every(function(v){ return v === false; }));
   var teilweiseUnzuverlaessig = !alleUnzuverlaessig && !!(verl && verl.some(function(v){ return v === false; }));
-  var datentopfLabel = datentopf === 'offiziell' ? 'Offiziell' : 'Manuell';
+  // 15.10.2026 (V2, B7): ohne Quellennamen — an der Station steht nicht, woher die Zahl kommt.
 
   var html = '<div class="prod-name">' + prod.name + '</div>';
   html += '<div class="prod-status' + statusCls + '">' + statusTxt + '</div>';
   if (alleUnzuverlaessig) {
-    html += '<div class="verlaesslich-hint" style="color:var(--bos-red);">⚠️ Keine ausreichenden Verbrauchsdaten (' + datentopfLabel + ') — Ergebnis nicht verlässlich!</div>';
+    html += '<div class="verlaesslich-hint" style="color:var(--bos-red);">⚠️ Keine ausreichenden Bedarfszahlen — Ergebnis nicht verlässlich!</div>';
   } else if (teilweiseUnzuverlaessig) {
-    html += '<div class="verlaesslich-hint" style="color:var(--bos-amber);">◌ Für einzelne Wochentage wenig Vergleichswerte (' + datentopfLabel + ') — teilweise geschätzt.</div>';
+    html += '<div class="verlaesslich-hint" style="color:var(--bos-amber);">◌ Für einzelne Wochentage fehlen verlässliche Bedarfszahlen — teilweise geschätzt.</div>';
   }
 
   // ── BESTAND (editierbar, Warnung bei veraltet/nie gezählt) ──
@@ -990,7 +953,8 @@ async function planungEinreichen() {
       fehlmengeAbs: s.fehlmengeAbs || 0,
       gesamtProduktion: result ? rd(result.gesamtProduktion) : 0,
       endlager: result ? rd(result.endlager) : 0,
-      warnungen: result ? result.warnungen : []
+      warnungen: result ? result.warnungen : [],
+      bedarfsQuelle: prod.quelle   // 15.10.2026 (#63): womit gerechnet wurde (Datenbankwert)
     };
   });
   if (!mind1) return;
@@ -1040,7 +1004,7 @@ const PP_HILFE_SCHRITTE = [
   ['Das Schloss-Symbol', '🔓 offen heißt: automatisch berechnet, ändert sich mit, wenn du an anderer Stelle etwas anpasst. Antippen sperrt (🔒) den gerade angezeigten Wert fest — er wird dann bei weiteren Änderungen NICHT mehr neu berechnet. Nochmal antippen löst die Sperre wieder, die Kette rechnet ab dann wieder automatisch für diesen Tag.'],
   ['Gleichmäßige Belastung', 'Checkbox direkt über dem Vorschlag, pro Produkt einzeln. Verteilt die benötigte Menge gleichmäßiger auf die gewählten Produktionstage, statt möglichst viel auf einen einzigen Tag zu packen.'],
   ['Kette prüfen', 'Der Bereich ist standardmäßig aufgeklappt und zeigt Tag für Tag: Verbrauch, Produktion und den Bestand davor/danach. "Lücke" heißt: an dem Tag reicht der Bestand nicht. "Knapp" heißt: heute reicht es noch, morgen nicht mehr ohne Nachschub.'],
-  ['Datenquelle', 'Der Verbrauch pro Tag kommt entweder aus "Manuell" (händisch erfasste Werte) oder "Offiziell" (migrierte historische Zahlen). Betrifft alle Karten gleichzeitig.'],
+  ['Woher kommt die Bedarfszahl?', 'Für jedes Produkt ist in der Produkt-Karte festgelegt, womit gerechnet wird: Richtwert, Backzettel oder Mitschrift. Hier an der Station gibt es dafür keinen Schalter. Reichen die Zahlen an einzelnen Tagen nicht, steht an der Karte eine Warnung. Pausierte Produkte (Saison-Pause) erscheinen hier nicht.'],
   ['Froster fertig?', 'Ganz oben: ob der Froster für morgen schon vorbereitet ist. Beeinflusst, ob morgen als "durch Froster gedeckt" gilt oder normal mitgerechnet wird.'],
   ['Planung einreichen', 'Der Button unten wird aktiv, sobald mindestens ein Produkt einen Produktionstag und ein Ziel hat. Schickt die aktuelle Planung für diese Station in die zentrale Übersicht — mehrfaches Einreichen ist möglich, es zählt immer die letzte Einreichung.']
 ];

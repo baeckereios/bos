@@ -1,6 +1,14 @@
 <!--
   schnellrechner.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-15 · 01:26 · v0.22 · Richtwert und Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
+    Umschalter „Manuell | Offiziell“ entfernt: die Quelle steht je Produkt in
+    der Produkt-Karte (BOS_PRODUKTE.bedarfsQuelle — Richtwert, Backzettel oder
+    Mitschrift; ohne Feld Mitschrift = bisherige Voreinstellung). Klein unter
+    der Produktauswahl: „gerechnet mit: …“. Warnungen und Hilfe mit den neuen
+    Namen (Backzettel statt Offiziell, Mitschrift statt Manuell). Einstellungen
+    je Topf einmal geholt. Produktliste aus der Sicht 'laufend' (pausierte
+    fehlen), mit Fassungsprüfung. SESSION_2026-10-14_RICHTWERT_BAU.md
   2026-10-13 · 12:10 · v0.21 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48)
     Der Bedarf kommt fertig in der Einheit des Produkts aus
     BOS_VERBRAUCH.holeWochenbedarf() (Produkt wird mitgegeben; fehlt
@@ -454,21 +462,8 @@
   }
   input.sr-bestand-veraltet { border-color: var(--bos-red); }
 
-  /* ── Datentopf-Umschalter (manuell/offiziell) ──────────── */
-  .sr-datentopf-group { display: flex; gap: var(--bos-space-2xs, 8px); }
-  .sr-datentopf-btn {
-    flex: 1; padding: var(--bos-space-xs, 10px) var(--bos-space-2xs, 8px); border-radius: var(--bos-radius-sm);
-    min-height: var(--bos-tap-min, 44px);
-    border: 1.5px solid var(--bos-border-strong); background: var(--bos-bg-soft);
-    color: var(--bos-text-dim); font-weight: 800; font-size: var(--bos-font-sm, 0.82rem); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: var(--bos-space-2xs, 6px);
-  }
-  .sr-datentopf-btn.aktiv { border-color: var(--bos-amber); color: var(--bos-amber); background: color-mix(in srgb, var(--bos-amber) 12%, transparent); }
-  .sr-datentopf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .sr-datentopf-badge {
-    font-size: var(--bos-font-2xs, 0.62rem); font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
-    background: var(--bos-border-strong); color: var(--bos-text-dim); border-radius: 999px; padding: var(--bos-space-3xs, 2px) var(--bos-space-2xs, 6px);
-  }
+  /* 15.10.2026 (#63): Umschalter entfällt; Quelle klein unter der Produktauswahl */
+  .sr-quelle { margin-top: var(--bos-space-3xs, 4px); font-size: var(--bos-font-xs, 0.72rem); color: var(--bos-text-dim); }
 
   /* ── Datum-Dropdowns mit Verbindungs-Animation ─────────── */
   .sr-datum-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--bos-space-xs, 10px); }
@@ -620,20 +615,13 @@
         <select id="sr-prod-select" onchange="srProduktGewechselt()">
           <option value="">— Produkt wählen —</option>
         </select>
+        <div class="sr-quelle" id="sr-quelle-hint"></div>
         <div class="sr-bestand-row">
           <div id="sr-bestand-einheit-hint" class="sr-cache-hinweis" style="align-self:center;"></div>
           <input type="number" id="sr-bestand-input" placeholder="Bestand" oninput="srBerechne()">
         </div>
         <div class="sr-bestand-frisch" id="sr-bestand-frisch" style="display:none;"></div>
         <div class="sr-bestand-warn" id="sr-bestand-warn">⚠️ Zählung älter als 24 Std. oder nicht vorhanden — Bestand bitte manuell eintragen</div>
-      </div>
-
-      <div class="sr-section">
-        <div class="sr-label">Datenquelle (Verbrauch)</div>
-        <div class="sr-datentopf-group">
-          <button class="sr-datentopf-btn aktiv" id="sr-datentopf-manuell" onclick="srSetzeDatentopf('manuell')">Manuell</button>
-          <button class="sr-datentopf-btn" id="sr-datentopf-offiziell" onclick="srSetzeDatentopf('offiziell')" title="Zeigt noch keine echten Daten — die Erfassung dafür existiert im System noch nicht">Offiziell</button>
-        </div>
       </div>
 
       <div class="sr-section">
@@ -715,7 +703,16 @@ let heuteBosIdx = (heute.getDay() === 0) ? 6 : heute.getDay() - 1; // BOS Mo=0�
 let produktConfig = [];
 let aktuellesProdukt = null; // {legacyKey, name, einheit}
 let frosterFertig = null;    // true/false/null
-let datentopf = 'manuell';   // 'manuell' | 'offiziell' (offiziell noch deaktiviert, siehe srSetzeDatentopf)
+// 15.10.2026 (#63): kein Seiten-Datentopf mehr — die Quelle kommt je Produkt
+// aus BOS_PRODUKTE.bedarfsQuelle(). Einstellungen je Topf einmal geholt.
+const srEinstellungenJeTopf = {};
+async function srEinstellungenFuer(topf) {
+  if (topf === 'richtwert') return null;
+  if (!srEinstellungenJeTopf[topf]) srEinstellungenJeTopf[topf] = await window.BOS_VERBRAUCH.holeEinstellungen(topf);
+  return srEinstellungenJeTopf[topf];
+}
+function srQuelle() { return aktuellesProdukt ? window.BOS_PRODUKTE.bedarfsQuelle(aktuellesProdukt) : 'manuell'; }
+function srQuelleText() { return window.BOS_PRODUKTE.quelleText(srQuelle()); }
 let zielOffset = 3;
 let letztesErgebnis = null;
 let srSondertageOffen = false; // Default eingeklappt, siehe CSS-Kommentar zu .sr-sondertage-kopf
@@ -740,8 +737,8 @@ async function srLadeProdukte() {
   try {
     if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
     // 13.10.2026 (#64): Einheiten kommen aus bos_produkte.js — alte Fassung im Zwischenspeicher?
-    if (typeof window.BOS_PRODUKTE.einheit !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
-    const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    if (typeof window.BOS_PRODUKTE.einheit !== 'function' || typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten oder ohne Bedarfsquelle) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'laufend' });   // 15.10.2026: ohne pausierte
     produktConfig = ergebnis.liste.filter(p => p.schnellrechnerRelevant === true);
     const hinweis = window.BOS_PRODUKTE.hinweisText(ergebnis);
     if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
@@ -1000,20 +997,9 @@ function srAktualisiereSondertageBadge(cache) {
 
 // ── Datenquelle (manuell/offiziell) ─────────────────────────────────
 // Beide Datentöpfe liefern seit 31.08.2026 echte Daten über
-// BOS_VERBRAUCH.holeWochenbedarf(db, legacyKey, einstellungen, datentopf) —
-// holeOffizielleWerte() wurde dafür in bos_verbrauch_durchschnitt.js
-// ergänzt (anderes Dokumentschema als manuell, siehe dortiger Kopf-
-// Kommentar). Kein stilles Vermischen: jeder Datentopf fragt weiterhin nur
-// seinen eigenen Firestore-`type` ab. Datenknappheit wird nicht mehr
-// pauschal am Datentopf festgemacht, sondern am echten `verlaesslich[]`-
-// Signal pro Wochentag (siehe srRenderErgebnis) — betrifft "manuell" bei
-// Kaltstart-Produkten genauso wie "offiziell".
-function srSetzeDatentopf(wert) {
-  datentopf = wert;
-  document.getElementById('sr-datentopf-manuell').classList.toggle('aktiv', wert === 'manuell');
-  document.getElementById('sr-datentopf-offiziell').classList.toggle('aktiv', wert === 'offiziell');
-  srBerechne();
-}
+// 15.10.2026 (#63): Der Umschalter „Manuell | Offiziell“ (srSetzeDatentopf)
+// ist entfallen — die Quelle steht je Produkt in der Produkt-Karte. Kein
+// stilles Vermischen: je Produkt genau ein Topf (bos_verbrauch_durchschnitt.js).
 
 // ── Produktwechsel ──────────────────────────────────────────────────
 function srProduktGewechselt() {
@@ -1021,6 +1007,7 @@ function srProduktGewechselt() {
   aktuellesProdukt = produktConfig.find(p => p.legacyKey === key) || null;
   document.getElementById('sr-bestand-einheit-hint').textContent = aktuellesProdukt ? 'in ' + srEinheitLabel() : '';
   document.getElementById('sr-fehlmenge-einheit-hint').textContent = aktuellesProdukt ? '(in ' + srEinheitLabel() + ')' : '';
+  document.getElementById('sr-quelle-hint').textContent = aktuellesProdukt ? 'gerechnet mit: ' + srQuelleText() : '';   // 15.10.2026 (#63)
   document.getElementById('sr-ergebnis-inhalt').style.display = 'none';
   document.getElementById('sr-ergebnis-leer').style.display = 'block';
   if (aktuellesProdukt) srSyncBestand();
@@ -1042,8 +1029,9 @@ async function srBerechne() {
     // BOS_VERBRAUCH.holeWochenbedarf() kennt seit 31.08.2026 beide Datentöpfe
     // (holeOffizielleWerte() ergänzt, siehe dortiges Änderungsprotokoll) —
     // kein lokaler Nullstand mehr nötig, echte Daten für beide Fälle.
-    const einstellungen = await window.BOS_VERBRAUCH.holeEinstellungen(datentopf);
-    const wochenbedarf = await window.BOS_VERBRAUCH.holeWochenbedarf(window.db, aktuellesProdukt.legacyKey, einstellungen, datentopf, aktuellesProdukt);
+    const quelle = srQuelle();   // 15.10.2026 (#63): Quelle des Produkts
+    const einstellungen = await srEinstellungenFuer(quelle);
+    const wochenbedarf = await window.BOS_VERBRAUCH.holeWochenbedarf(window.db, aktuellesProdukt.legacyKey, einstellungen, quelle, aktuellesProdukt);
     // 13.10.2026: Versionsschutz — ohne `einheit` liefert ein alter,
     // zwischengespeicherter Rechen-Host roh (Backzettel in Stück).
     if (!wochenbedarf || !wochenbedarf.einheit) {
@@ -1114,12 +1102,12 @@ function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verla
     warnungBox.style.display = 'block';
     warnungBox.style.borderColor = 'var(--bos-red)'; warnungBox.style.color = 'var(--bos-red)';
     warnungBox.style.background = 'color-mix(in srgb, var(--bos-red) 12%, transparent)';
-    warnungBox.textContent = '⚠️ Keine ausreichenden Verbrauchsdaten (' + (datentopf === 'offiziell' ? 'Offiziell' : 'Manuell') + ') für dieses Produkt — Ergebnis nicht verlässlich!';
+    warnungBox.textContent = '⚠️ Keine ausreichenden Bedarfszahlen (' + srQuelleText() + ') für dieses Produkt — Ergebnis nicht verlässlich!';
   } else if (teilweiseUnzuverlaessig) {
     warnungBox.style.display = 'block';
     warnungBox.style.borderColor = 'var(--bos-amber)'; warnungBox.style.color = 'var(--bos-amber)';
     warnungBox.style.background = 'color-mix(in srgb, var(--bos-amber) 12%, transparent)';
-    warnungBox.textContent = '◌ Für einzelne Wochentage gibt es wenig Vergleichswerte (' + (datentopf === 'offiziell' ? 'Offiziell' : 'Manuell') + ') — Ergebnis ist teilweise eine Schätzung.';
+    warnungBox.textContent = '◌ Für einzelne Wochentage fehlen verlässliche Bedarfszahlen (' + srQuelleText() + ') — Ergebnis ist teilweise eine Schätzung.';
   } else {
     warnungBox.style.display = 'none';
   }
@@ -1178,7 +1166,7 @@ const SR_HILFE_SCHRITTE = [
   ['Wofür ist der Schnellrechner?', 'Er sagt dir für ein einzelnes Produkt, wie viel du bis zu einem bestimmten Tag produzieren musst — auf Basis des bisherigen Verbrauchs, deines aktuellen Frosterbestands und eventueller Sondertage.'],
   ['Schritt 1: Froster-Frage beantworten', 'Bevor irgendetwas anderes eingegeben werden kann, musst du beantworten: Ist der Froster für morgen schon fertig vorbereitet? Diese Antwort wird für 30 Minuten auf diesem Gerät gemerkt — tippe auf den grünen Haken oben, wenn du sie ändern willst. Danach musst du sie neu beantworten.'],
   ['Schritt 2: Produkt wählen', 'Der Bestand wird automatisch aus der letzten Froster-Zählung übernommen, wenn diese jünger als 24 Stunden ist. Siehst du einen roten Rahmen und eine Warnung, ist die Zählung zu alt oder existiert nicht — dann bitte den aktuellen Bestand von Hand eintragen. Alle Mengen (Bestand, Fehlmenge, Ergebnis) sind durchgehend in der Einheit des Produkts angegeben (meist Bleche), nicht in Stück — steht als kleiner Hinweis neben dem jeweiligen Feld.'],
-  ['Datenquelle (Verbrauch)', 'Der Verbrauch pro Tag kommt entweder aus "Manuell" (händisch im System erfasste Werte) oder aus "Offiziell" (migrierte historische Zahlen). Für welche Wochentage zu wenige Vergleichswerte vorliegen, siehst du an einer gelben oder roten Warnung über dem Ergebnis — das kann in beiden Datentöpfen passieren, nicht nur bei "Offiziell".'],
+  ['Woher kommt die Bedarfszahl?', 'Für jedes Produkt ist in der Produkt-Karte festgelegt, womit gerechnet wird: Richtwert (eine feste Zahl je Wochentag), Backzettel (die alten, übernommenen Backzettel-Zahlen) oder Mitschrift (die laufende Erfassung). Unter der Produktauswahl steht klein „gerechnet mit: …“. Für welche Wochentage die Zahlen nicht reichen, siehst du an einer gelben oder roten Warnung über dem Ergebnis. Pausierte Produkte (Saison-Pause) stehen nicht in der Auswahl.'],
   ['Schritt 3: Zieldatum wählen', 'Wähle rechts im Dropdown, bis zu welchem Tag der Bestand reichen soll. Je weiter der Tag entfernt ist, desto weiter füllt sich der Balken zwischen den beiden Datumsfeldern.'],
   ['Schritt 4: Fehlmenge (nur wenn Froster fertig)', 'Reicht der vorbereitete Froster-Bestand trotzdem nicht für morgen, hakst du das Kästchen an — dann erscheint ein Feld für die fehlende Menge, die zusätzlich eingerechnet wird. Ohne Haken bleibt das Feld verborgen.'],
   ['Schritt 5: Sondertage markieren (optional)', 'Der Bereich ist standardmäßig eingeklappt — ein Tipp auf die Überschrift öffnet ihn. Eine kleine Zahl neben „Sondertage" zeigt an, wie viele Tage aktuell markiert sind, auch wenn der Bereich zu ist. Aufgeklappt zeigt die Liste immer die nächsten zwei Wochen, unabhängig vom gewählten Zieldatum (der Zieltag ist mit 🎯 markiert) — die Box ist auf ein paar Zeilen begrenzt, restliche Tage per Scroll erreichbar. Über die Knöpfe "zu" und 🐹 kannst du einzelne Tage als geschlossen markieren oder eine Hamster-Stufe (erhöhter Bedarf, z. B. vor Feiertagen) setzen — gilt nur 30 Minuten auf diesem Gerät und ist unabhängig von der echten Hamster-Verwaltung im System. Ist dein Fenster breit genug (z. B. maximiertes Launcher-Fenster auf einem großen Bildschirm), erscheint diese Liste als eigenes Feld neben statt unter der Eingabe, dort immer ausgeklappt.'],

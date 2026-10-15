@@ -33,6 +33,11 @@
          nächste Schritt.
 
   CHANGELOG
+    2026-10-15 · 01:26 · v0.10 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
+      Produktliste aus der Sicht 'laufend': pausierte Produkte (Haken „Aktiv“
+      aus im Produkt-Editor) fehlen in der Zählung. Der Editor sagt beim
+      Pausieren, ob laut letzter Zählung noch etwas im Froster steht.
+      Fassungsprüfung mit sichtbarer Meldung. SESSION_2026-10-14_RICHTWERT_BAU.md
     2026-10-05 · 08:34 · v0.9 · Umbau (Produkte aus Firestore, Stufe 1)
       ladeConfigAuto() liest die Produktliste über ../bos_produkte.js aus
       Firestore statt per fetch aus produkt_config.json. Der Datei-Upload
@@ -678,7 +683,8 @@ document.getElementById('pkConfirm').addEventListener('click', function(){
    Datei die Gerätekopie, sonst steht hier die echte Fehlermeldung. */
 function ladeConfigAuto(){
   if (!window.BOS_PRODUKTE) { zeigeProduktFehler('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.'); return; }
-  window.BOS_PRODUKTE.lade({ sicht: 'aktive' })
+  if (typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') { zeigeProduktFehler('bos_produkte.js ist in einer alten Fassung geladen (ohne Saison-Pause) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.'); return; }   // 15.10.2026 (#63)
+  window.BOS_PRODUKTE.lade({ sicht: 'laufend' })   // 15.10.2026 (#63): ohne pausierte
     .then(function(e){
       var hinweis = window.BOS_PRODUKTE.hinweisText(e);
       if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');

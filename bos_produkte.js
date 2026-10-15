@@ -32,6 +32,10 @@
                `geloescht: true`. Für Seiten, die Namen zu alten Daten
                nachschlagen (Werkstatt, Verbrauch-Einstellungen) und für
                die Schlüsselprüfung im Editor.
+     'laufend' wie 'aktive', aber ohne pausierte Produkte (pausiert: true,
+               Saison-Pause, seit 15.10.2026). Für die Betriebsseiten:
+               Stationen, Übersicht (Nachtrag), Schnellrechner, Mitschrift,
+               Froster-Inventur und -Produktion, Teigecke Nacht.
      'roh'     Dokumente unverändert als { id, daten }. Nur Sync-Tool.
 
    Weitere Optionen:
@@ -87,7 +91,20 @@
    Schnellrechner, Mitschrift, Editor. Teigecke noch mit eigener Logik
    (Umzug später, SESSION_2026-10-13_EINHEITEN_BAU.md §2.6).
 
+   Bedarfsquelle, Richtwert, Saison-Pause (seit 15.10.2026, Baustelle #63):
+     BOS_PRODUKTE.bedarfsQuelle(p) → 'richtwert'|'offiziell'|'manuell' (fehlt → 'manuell')
+     BOS_PRODUKTE.quelleText(q) → 'Richtwert'|'Backzettel'|'Mitschrift'
+     BOS_PRODUKTE.istPausiert(p), .backtagIndizes(p) (Mo = 0, ohne Backtage alle true)
+     BOS_PRODUKTE.richtwertWerte(p), .richtwertPruefen(eingaben, p), .rundeRichtwert(x, p)
+
    CHANGELOG
+     2026-10-15 · 01:17 · v0.5 · Richtwert und Saison-Pause (Baustelle #63)
+       SESSION_2026-10-14_RICHTWERT_BAU.md (Freigabe Kontroll-Chat 14.10., 19:19).
+       Neu: Sicht 'laufend' (aktive ohne pausierte), bedarfsQuelle(), quelleText(),
+       istPausiert(), Backtag-Zählung (backtagIndizes, backtagWert, needsIndex),
+       Richtwert-Logik (richtwertWerte, richtwertPruefen, rundeRichtwert …).
+       Rein additiv: Laden, Gerätekopie, die Sichten 'aktive'/'alle'/'roh' und
+       REGEL_FASSUNG bleiben unverändert (Lesen braucht keine neue Regel).
      2026-10-13 · 14:47 · v0.4 · Einheiten Nachtrag 1 (Auswahlliste)
        ANWEISUNG_2026-10-13_EINHEITEN_NACHTRAG1.md (KC 14:45, Ulf 14:44).
        Neu: EINHEITEN_LISTE (Stück, Blech, Lochblech, Kuchenblech,
@@ -229,9 +246,13 @@
         return o;
       });
     }
-    return sortiert
+    var aktive = sortiert
       .filter(function (p) { return p.geloescht !== true; })
       .map(function (p) { return ohneFelder(p, DB_FELDER); });
+    /* 'laufend' (15.10.2026, #63): 'aktive' ohne Saison-Pause — für die
+       Betriebsseiten. 'aktive' selbst bleibt Wort für Wort (Export, Notfall-Kopie). */
+    if (name === 'laufend') return aktive.filter(function (p) { return p.pausiert !== true; });
+    return aktive;
   }
   function warnungenFuer(roh) {
     var w = [];
@@ -342,6 +363,106 @@
     if (ea.art !== eb.art) return false;
     if (ea.art !== 'traeger') return true;
     return einheitNorm(ea.traeger) === einheitNorm(eb.traeger);
+  }
+
+  /* ---------- Bedarfsquelle, Richtwert, Saison-Pause (seit 15.10.2026, #63) ----------
+     Reine Logik ohne Datenbank, die EINE Stelle für Host, Editor, Stationen,
+     Schnellrechner und Tests (SESSION_2026-10-14_RICHTWERT_BAU.md).
+     Felder am Produkt (Glossar produkt_config_felder.json):
+       bedarfsQuelle  'richtwert' | 'offiziell' | 'manuell'. Fehlt das Feld
+                      (oder ist der Wert unbekannt), gilt 'manuell' — das, womit
+                      die Stationen bis zum 15.10. von selbst rechneten.
+       richtwert      sieben Werte Mo = 0 … So = 6 (wie needs[]), je Zahl ≥ 0
+                      oder null (leer). Leer ≠ 0. In der Einheit des Produkts.
+       pausiert       true oder fehlt (Saison-Pause, Haken „Aktiv“ im Editor).
+     Datenbankwerte bleiben 'offiziell'/'manuell'; angezeigt wird QUELLEN_TEXT
+     (Ulf E2: Richtwert · Backzettel · Mitschrift).
+     Backtage (Ulf 14.10., 19:07/19:18): backTage zählt wie Date.getDay()
+     (0 = So), needs[] ab Montag (0 = Mo). Beide meinen den Tag, FÜR den
+     gebacken wird (Bauplan §10) — nur die Zählung ist verschoben:
+       needs-Index i  ↔  backTage-Wert (i + 1) % 7. */
+  var QUELLEN = ['richtwert', 'offiziell', 'manuell'];
+  var QUELLE_VORGABE = 'manuell';
+  var QUELLEN_TEXT = { richtwert: 'Richtwert', offiziell: 'Backzettel', manuell: 'Mitschrift' };
+  var WT_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  function bedarfsQuelle(produkt) {
+    var q = produkt && produkt.bedarfsQuelle;
+    return QUELLEN.indexOf(q) !== -1 ? q : QUELLE_VORGABE;
+  }
+  function quelleText(q) { return QUELLEN_TEXT[q] || QUELLEN_TEXT[QUELLE_VORGABE]; }
+  function istPausiert(produkt) { return !!produkt && produkt.pausiert === true; }
+  /* needs-Index (Mo = 0) → backTage-Wert (So = 0) und zurück. */
+  function backtagWert(index) { return (index + 1) % 7; }
+  function needsIndex(backtag) { return (backtag + 6) % 7; }
+  /* Gültige Backtage des Produkts (Zahlen 0–6), oder null = „alle Tage offen“:
+     Feld fehlt, ist keine Liste, ist leer oder enthält keine gültige Zahl
+     (Altlast Schlawiner-Kürzel bis 28.08.). Leere Liste = offen, sonst wäre
+     das Produkt an jedem Tag 0 und warnte nie (Bauplan §10). */
+  function backtagWerte(produkt) {
+    var b = produkt && produkt.backTage;
+    if (!Array.isArray(b)) return null;
+    var g = [];
+    b.forEach(function (x) { if (typeof x === 'number' && x >= 0 && x <= 6 && Math.floor(x) === x && g.indexOf(x) === -1) g.push(x); });
+    return g.length ? g : null;
+  }
+  /* Je needs-Index (Mo = 0 … So = 6): ist das ein Backtag? Ohne Backtage: alle true. */
+  function backtagIndizes(produkt) {
+    var g = backtagWerte(produkt), r = [];
+    for (var i = 0; i < 7; i++) r.push(g === null || g.indexOf(backtagWert(i)) !== -1);
+    return r;
+  }
+  /* Die sieben gespeicherten Richtwerte, bereinigt: Zahl ≥ 0 oder null. */
+  function richtwertWerte(produkt) {
+    var r = produkt && produkt.richtwert, w = [];
+    for (var i = 0; i < 7; i++) {
+      var x = Array.isArray(r) ? r[i] : null;
+      w.push(typeof x === 'number' && isFinite(x) && x >= 0 ? x : null);
+    }
+    return w;
+  }
+  function richtwertLeer(produkt) { return richtwertWerte(produkt).every(function (x) { return x === null; }); }
+  /* Leere Richtwert-Tage, die zählen: nur Backtage (Ulf 14.10.). */
+  function richtwertLueckenTage(produkt) {
+    var w = richtwertWerte(produkt), bt = backtagIndizes(produkt), t = [];
+    for (var i = 0; i < 7; i++) if (bt[i] && w[i] === null) t.push(WT_KURZ[i]);
+    return t;
+  }
+  /* Rundung in der Einheit des Produkts: Stück ganze Zahl, sonst eine Nachkommastelle. */
+  function rundeRichtwert(wert, produkt) {
+    if (typeof wert !== 'number' || !isFinite(wert)) return null;
+    return einheit(produkt).art === 'stueck' ? Math.round(wert) : Math.round(wert * 10) / 10;
+  }
+  /* Eingabe eines Kästchens → { ok, wert (Zahl|null), fehler }.
+     Komma oder Punkt; leer = null; negativ, keine Zahl oder bei Stück eine
+     Nachkommastelle = Fehler (nichts still gerundet); bei Trägern wird auf
+     eine Nachkommastelle gerundet (sichtbar, weil das Feld den Wert zeigt). */
+  function richtwertZahl(eingabe, produkt) {
+    if (eingabe === null || eingabe === undefined) return { ok: true, wert: null, fehler: '' };
+    if (typeof eingabe === 'number') eingabe = String(eingabe);
+    var t = String(eingabe).trim().replace(/\s+/g, '');
+    if (!t) return { ok: true, wert: null, fehler: '' };
+    if (!/^\d+([.,]\d*)?$|^[.,]\d+$/.test(t)) {
+      return { ok: false, wert: null, fehler: /^-/.test(t) ? 'keine negative Zahl' : '„' + String(eingabe).trim() + '“ ist keine Zahl' };
+    }
+    var z = Number(t.replace(',', '.'));
+    if (!isFinite(z)) return { ok: false, wert: null, fehler: '„' + String(eingabe).trim() + '“ ist keine Zahl' };
+    if (einheit(produkt).art === 'stueck' && Math.floor(z) !== z) return { ok: false, wert: null, fehler: 'bei Stück nur ganze Zahlen' };
+    return { ok: true, wert: rundeRichtwert(z, produkt), fehler: '' };
+  }
+  /* Sieben Eingaben → { ok, werte[7], fehler: ['Di: „1,5“ — bei Stück nur ganze Zahlen', …] }. */
+  function richtwertPruefen(liste, produkt) {
+    var werte = [], fehler = [];
+    for (var i = 0; i < 7; i++) {
+      var e = Array.isArray(liste) ? liste[i] : null;
+      var z = richtwertZahl(e, produkt);
+      werte.push(z.ok ? z.wert : null);
+      if (!z.ok) fehler.push(WT_KURZ[i] + ': „' + String(e).trim() + '“ — ' + z.fehler);
+    }
+    return { ok: fehler.length === 0, werte: werte, fehler: fehler };
+  }
+  /* Anzeige eines Werts mit Komma (leer bleibt leer). */
+  function richtwertText(wert) {
+    return typeof wert === 'number' && isFinite(wert) ? String(wert).replace('.', ',') : '';
   }
 
   /* ---------- Die Mechanik, mit austauschbarer Umgebung (Tests) ---------- */
@@ -493,7 +614,7 @@
     function lade(opt) {
       opt = opt || {};
       var name = opt.sicht || 'aktive';
-      if (['aktive', 'alle', 'roh'].indexOf(name) === -1) return Promise.reject(fehler('fehler', 'Unbekannte Sicht „' + name + '“'));
+      if (['aktive', 'alle', 'roh', 'laufend'].indexOf(name) === -1) return Promise.reject(fehler('fehler', 'Unbekannte Sicht „' + name + '“'));
       var nurServer = !!opt.nurServer;
       if (!laufend || opt.frisch || nurServer !== laufendNurServer) {
         laufendNurServer = nurServer;
@@ -563,7 +684,15 @@
       einheitGleich: einheitGleich, EINHEIT_NEUTRAL: EINHEIT_NEUTRAL.slice(),
       /* Auswahlliste (13.10.2026, Nachtrag 1) */
       EINHEITEN_LISTE: EINHEITEN_LISTE.slice(), einheitListenEintrag: einheitListenEintrag,
-      einheitNorm: einheitNorm, einheitIstKurzform: einheitIstKurzform
+      einheitNorm: einheitNorm, einheitIstKurzform: einheitIstKurzform,
+      /* Bedarfsquelle, Richtwert, Saison-Pause (15.10.2026, #63) */
+      bedarfsQuelle: bedarfsQuelle, quelleText: quelleText, istPausiert: istPausiert,
+      QUELLEN: QUELLEN.slice(), QUELLE_VORGABE: QUELLE_VORGABE, QUELLEN_TEXT: JSON.parse(JSON.stringify(QUELLEN_TEXT)),
+      WT_KURZ: WT_KURZ.slice(), backtagWert: backtagWert, needsIndex: needsIndex,
+      backtagWerte: backtagWerte, backtagIndizes: backtagIndizes,
+      richtwertWerte: richtwertWerte, richtwertLeer: richtwertLeer, richtwertLueckenTage: richtwertLueckenTage,
+      rundeRichtwert: rundeRichtwert, richtwertZahl: richtwertZahl, richtwertPruefen: richtwertPruefen,
+      richtwertText: richtwertText
     };
   }
 

@@ -161,6 +161,48 @@
     }
 ,
 
+    "bedarfsQuelle": {
+      "bezeichnung": "Quelle der Bedarfszahl",
+      "status": "neu 15.10.2026 (Baustelle #63, Richtwert)",
+      "typ": "string: 'richtwert' | 'offiziell' | 'manuell' — fehlt das Feld, gilt 'manuell'",
+      "werte": ["richtwert", "offiziell", "manuell"],
+      "beschreibung": "Woher Stationen und Schnellrechner die Bedarfszahl dieses Produkts nehmen. Angezeigt heißt es Richtwert (eigene Zahl je Wochentag, Feld richtwert), Backzettel (gespeichert als 'offiziell': die alten, importierten Backzettel-Zahlen) oder Mitschrift (gespeichert als 'manuell': die laufende Erfassung). Je Produkt genau eine Quelle, es wird nie gemischt. Die Stationen wählen die Quelle nicht mehr selbst (Ulf, 13.10.2026). Fehlt das Feld, rechnet alles mit der Mitschrift, wie die Stationen es bis zum 15.10. von selbst taten. Gewählt wird im Reiter Bedarf der Produkt-Karte; „Richtwerte aus Backzettel füllen“ setzt es auf Richtwert, „Alle auf Mitschrift“ auf Mitschrift.",
+      "beispiel": "richtwert",
+      "genutztVon": [
+        "bos_produkte.js (bedarfsQuelle(), quelleText())",
+        "bos_verbrauch_durchschnitt.js (Datentopf)",
+        "produktionsplaner/station_*.html, schnellrechner.html (rechnen damit; Einreichung trägt es je Produkt)",
+        "produkt_config_editor.html (Reiter Bedarf, Spalte Quelle, Sammel-Knöpfe)"
+      ]
+    },
+
+    "richtwert": {
+      "bezeichnung": "Richtwert je Wochentag",
+      "status": "neu 15.10.2026 (Baustelle #63)",
+      "typ": "Liste aus sieben Werten, Mo = 0 … So = 6 (wie die Bedarfszahlen, NICHT wie backTage), je Wert eine Zahl ≥ 0 oder null (leer). Fehlt das Feld, ist alles leer.",
+      "beschreibung": "Eine von Hand gesetzte Bedarfszahl je Wochentag, in der Einheit des Produkts (Feld einheit; bei Stück ganze Zahlen, sonst eine Nachkommastelle). Einmal aus dem Backzettel gefüllt, danach eigenständig. Leer ist nicht 0: leer heißt „keine Zahl“ (die Station warnt), 0 heißt „nichts“. Tage, die laut backTage keine Backtage sind, zählen beim Rechnen immer als 0 und sind im Editor grau; dort wird nichts gespeichert. Gerechnet wird nur damit, wenn bedarfsQuelle 'richtwert' ist — sonst ruht er. Ohne Einheit lässt er sich nicht eintragen.",
+      "beispiel": "[10, 10, 12, 0, null, 20, 0]",
+      "genutztVon": [
+        "bos_verbrauch_durchschnitt.js (Datentopf 'richtwert')",
+        "bos_produkte.js (richtwertWerte(), richtwertPruefen())",
+        "produkt_config_editor.html (Reiter Bedarf, „Richtwerte aus Backzettel füllen“)"
+      ]
+    },
+
+    "pausiert": {
+      "bezeichnung": "Saison-Pause (im Editor: Haken „Aktiv“)",
+      "status": "neu 15.10.2026 (Baustelle #63)",
+      "typ": "true oder fehlt (fehlt = läuft)",
+      "beschreibung": "Ein pausiertes Produkt verschwindet aus dem Betrieb: Stationen, Übersicht (Nachtrag), Schnellrechner, Mitschrift, Froster-Inventur, Froster-Produktion und Teigecke-Nacht. Alle Daten bleiben, im Editor steht es ausgegraut mit „pausiert“, auf der Seite Teige & Rezepte ebenso. Ein Teig verschwindet aus der Teigecke-Nacht von selbst, wenn keines seiner Produkte mehr läuft. Nicht dasselbe wie „gelöscht“: Export und Notfall-Kopie enthalten pausierte Produkte. Im Editor ist es der Haken „Aktiv“ (angezeigt umgekehrt); beim Pausieren eines Froster-Produkts sagt der Editor, ob laut letzter Zählung noch etwas im Froster steht.",
+      "beispiel": "true",
+      "genutztVon": [
+        "bos_produkte.js (Sicht 'laufend')",
+        "Betriebsseiten (siehe oben) über die Sicht 'laufend'",
+        "produkt_config_editor.html (Reiter Bedarf, Liste)",
+        "teigecke/teigecke_rezepte.html (Anzeige „pausiert“)"
+      ]
+    },
+
     "reihenfolge": {
       "bezeichnung": "Reihenfolge in der Liste (nur Datenbank)",
       "status": "neu 05.10.2026 (Produkte aus Firestore, Stufe 1)",

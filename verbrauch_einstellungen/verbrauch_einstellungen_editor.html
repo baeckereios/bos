@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-15 · 01:26 · Beschriftung (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Reiter heißen „Mitschrift“ (Datentopf manuell) und „Backzettel“ (Datentopf offiziell), Hilfe entsprechend und um den Richtwert ergänzt (der hat keine Einstellungen). Werte in Datenbank, Datei und Code unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“) statt fetch(produkt_config.json); „von N aktiven Produkten“ zählt nur aktive; Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
 <meta charset="UTF-8">
@@ -310,11 +311,11 @@
   </div>
 
   <div class="tab-leiste">
-    <button class="tab-btn aktiv" data-tab="manuell" type="button">Manuell</button>
-    <button class="tab-btn" data-tab="offiziell" type="button">Offiziell</button>
+    <button class="tab-btn aktiv" data-tab="manuell" type="button">Mitschrift</button>
+    <button class="tab-btn" data-tab="offiziell" type="button">Backzettel</button>
   </div>
 
-  <!-- Tab: Manuell / Offiziell — identischer Aufbau, per Datentopf-Template erzeugt -->
+  <!-- Tab: Mitschrift (manuell) / Backzettel (offiziell) — identischer Aufbau, per Datentopf-Template erzeugt -->
   <div class="tab-panel aktiv" id="tab-manuell" data-datentopf="manuell"></div>
   <div class="tab-panel" id="tab-offiziell" data-datentopf="offiziell"></div>
 
@@ -329,11 +330,12 @@
     <button id="hilfeSchliessen" class="icon-btn" aria-label="Schließen" type="button">✕</button>
     <h2>Hilfe: Verbrauch-Einstellungen</h2>
 
-    <h3>Wofür sind die Tabs "Manuell" und "Offiziell"?</h3>
-    <p>Es gibt zwei getrennte Quellen für Verbrauchsdaten: manuell eingetragene Werte und (künftig) offiziell
-    erfasste Werte aus einer automatisierten Erfassung. Beide werden nie miteinander vermischt — jede hat ihre
-    eigenen Einstellungen, damit man sie unabhängig voneinander anpassen kann. Der Tab "Offiziell" ist schon
-    vorbereitet, auch wenn die dazugehörige Erfassung noch nicht existiert.</p>
+    <h3>Wofür sind die Tabs "Mitschrift" und "Backzettel"?</h3>
+    <p>Es gibt zwei getrennte Quellen für Verbrauchsdaten: die Mitschrift (die laufende Erfassung im System) und
+    den Backzettel (die alten, übernommenen Backzettel-Zahlen). Beide werden nie miteinander vermischt — jede hat
+    ihre eigenen Einstellungen, damit man sie unabhängig voneinander anpassen kann. Welche Quelle für ein Produkt
+    gilt, steht in der Produkt-Karte (Reiter Bedarf). Die dritte Quelle, der Richtwert, ist eine feste Zahl je
+    Wochentag am Produkt und hat hier keine Einstellungen.</p>
 
     <h3>Was bedeutet "Stichprobe" vs. "Kontiguierlich"?</h3>
     <p><strong>Stichprobe</strong> nimmt eine feste Anzahl der letzten Werte für denselben Wochentag (z. B. die
@@ -408,7 +410,7 @@
   }
 
   /* -----------------------------------------------------------
-   * Datentopf-Tabs (Manuell/Offiziell) — identisches Formular,
+   * Datentopf-Tabs (Mitschrift = manuell / Backzettel = offiziell) — identisches Formular,
    * per Template für beide Datentöpfe erzeugt
    * --------------------------------------------------------- */
   function renderDatentopfTab(datentopf) {

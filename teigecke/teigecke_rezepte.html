@@ -5,6 +5,12 @@
   Doku:  teigecke/TEIGECKE_REZEPTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit „Orte“)
   CHANGELOG
+    2026-10-15 · 01:27 · v0.2a · Anzeige Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
+      Pausierte Brote (Feld pausiert am Produkt) bleiben auf dieser Pflegeseite
+      sichtbar — ausgegraut mit dem Etikett „pausiert“, ohne eigenen Schalter;
+      gepflegt wird die Pause nur in der Produkt-Karte (Ulf 14.10., U3: „sonst
+      muss ich an zwei Stellen pflegen“). Sicht bleibt 'aktive' (B5), Logik und
+      Schreibweg unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md
     2026-10-08 · 14:17 · v0.2 · Feature (Nachtrag Nachtseite, Langzeitteig)
       ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md Teil B, Bauplan
       SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md §4.2 (KC 13:26 frei).
@@ -194,7 +200,7 @@ const I18N_DE = {
   nur_lesen: 'Du siehst die Teige, kannst aber nichts ändern: Dafür braucht dein Konto den Haken 📜 Rezepte.',
   neu_teig: '＋ Neuer Teig', startdaten: '📂 Startdaten einlesen',
   liste_titel: 'Teige ({n})', liste_leer: 'Noch kein Teig angelegt. Mit „＋ Neuer Teig“ den ersten anlegen.',
-  marke_rumpf: 'Rumpf, noch keine Rezeptwerte', marke_ohne_brot: 'ohne Brot',
+  marke_rumpf: 'Rumpf, noch keine Rezeptwerte', marke_ohne_brot: 'ohne Brot', pausiert: 'pausiert',
   teig_keine_produkte: 'noch kein Brot zugeordnet',
   brote_ohne_teig_titel: 'Brote ohne Teig ({n})',
   brote_ohne_teig_text: 'Nur zur Übersicht, keine Mahnung. Manche Brote haben bewusst keinen eigenen Teig.',
@@ -424,12 +430,19 @@ function render() {
   if (fokusIn(document.querySelector('main'))) { renderAufgeschoben = true; return; }
   renderListe();
 }
+/* 15.10.2026 (#63, U3): Namen der Brote als HTML, pausierte ausgegraut mit Etikett. */
+function brotNameHTML(p) {
+  return p && p.pausiert === true
+    ? '<span style="opacity:.55">' + esc(p.name) + ' <span class="badge">' + esc(t('pausiert')) + '</span></span>'
+    : esc(p.name);
+}
+function broteNamenHTML(brote) { return brote.map(brotNameHTML).join(', '); }
 function teigZeileHTML(x) {
   const brote = L.produkteDesTeigs(x.id, S.produkte);
   const marken = (L.istRumpf(x) ? '<span class="badge rot">' + esc(t('marke_rumpf')) + '</span> ' : '') +
     (S.produkteOk && !brote.length ? '<span class="badge">' + esc(t('marke_ohne_brot')) + '</span>' : '');
   const inhalt = '<span class="lz-name"><b>' + esc(x.name) + ' <span class="badge">' + esc(x.id) + '</span></b>' +
-    '<small>' + esc(brote.map(function (p) { return p.name; }).join(', ') || t('teig_keine_produkte')) + '</small>' +
+    '<small>' + (brote.length ? broteNamenHTML(brote) : esc(t('teig_keine_produkte'))) + '</small>' +
     (marken ? '<small>' + marken + '</small>' : '') + '</span>';
   if (!darfRezepte()) return '<div class="liste-zeile-rahmen"><div class="liste-zeile rz-zeile rz-nur-lesen">' + inhalt + '</div></div>';
   return '<div class="liste-zeile-rahmen"><button type="button" class="liste-zeile rz-zeile" data-aktion="strecke-oeffnen" data-id="' + esc(x.id) + '">' + inhalt +
@@ -490,12 +503,12 @@ function archivHTML(name) {
   }).join('');
 }
 function teigKarteHTML(teig, archiv) {
-  const brote = L.produkteDesTeigs(teig.id, S.produkte).map(function (p) { return p.name; }).join(', ');
+  const brote = broteNamenHTML(L.produkteDesTeigs(teig.id, S.produkte));   /* 15.10.2026: HTML (pausierte ausgegraut) */
   const knopf = archiv
     ? '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-col="teige" data-id="' + esc(teig.id) + '">' + esc(t('wiederherstellen')) + '</button>'
     : '<button type="button" class="bos-btn" data-aktion="strecke-oeffnen" data-id="' + esc(teig.id) + '">✎</button>';
   return '<div class="karte' + (archiv ? ' archiviert' : '') + '"><div class="karte-kopf"><div><h3>' + esc(teig.name) + ' <span class="badge">' + esc(teig.id) + '</span></h3>' +
-    '<div class="karte-unter">' + esc(brote || t('teig_keine_produkte')) + '</div></div><div class="karte-knoepfe">' + knopf + '</div></div></div>';
+    '<div class="karte-unter">' + (brote || esc(t('teig_keine_produkte'))) + '</div></div><div class="karte-knoepfe">' + knopf + '</div></div></div>';
 }
 /* stelleWiederHer: kopiert aus teigecke_nacht.html; err_perm → err_haken_fehlt wie auf „Orte“. */
 async function stelleWiederHer(name, id) {
@@ -749,9 +762,10 @@ function brotZeileHTML(p) {
   if (p.ausTeig && p.ausTeig !== kennung) unter = tm()[p.ausTeig] && !tm()[p.ausTeig].geloescht ? t('s2_haengt_an', { teig: teigName(p.ausTeig) }) : t('s2_haengt_an_fehlend', { teig: p.ausTeig });
   const darfHaken = istAdmin();
   const darfEinwaage = b.an && (darfHaken || hierAngehaengt);
-  return '<div class="rz-brot' + (b.an ? ' an' : '') + '">' +
+  const pausiert = p.pausiert === true;   /* 15.10.2026 (#63, U3): ausgegraut mit Etikett */
+  return '<div class="rz-brot' + (b.an ? ' an' : '') + '"' + (pausiert ? ' style="opacity:.55"' : '') + '>' +
     '<button type="button" class="vorrat-haken rz-brot-haken" data-aktion="brot-an" data-lk="' + esc(p.legacyKey) + '" aria-pressed="' + !!b.an + '"' + (darfHaken ? '' : ' disabled') + '>' +
-      '<span class="vh-kasten" aria-hidden="true">' + (b.an ? '✓' : '') + '</span><span class="rz-brot-name">' + esc(p.name) +
+      '<span class="vh-kasten" aria-hidden="true">' + (b.an ? '✓' : '') + '</span><span class="rz-brot-name">' + esc(p.name) + (pausiert ? ' <span class="badge">' + esc(t('pausiert')) + '</span>' : '') +
       (unter ? '<small>' + esc(unter) + '</small>' : '') + (S.strecke.uebernommen[p.legacyKey] ? '<small>' + esc(t('s2_einwaage_uebernommen')) + '</small>' : '') + '</span></button>' +
     (b.an ? '<label class="rz-einwaage"><span class="klein">' + esc(t('s2_einwaage')) + '</span>' +
       '<input class="bos-input rz-zahl" data-brot="' + esc(p.legacyKey) + '" inputmode="numeric" value="' + esc(zahlText(b.einwaageG)) + '"' + (darfEinwaage ? '' : ' disabled') + '></label>' : '') +

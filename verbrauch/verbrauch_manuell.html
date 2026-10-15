@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-15 · 01:26 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Produktliste aus der Sicht 'laufend' — pausierte Produkte fehlen in der Erfassung; Fassungsprüfung mit sichtbarer Meldung. Erfassung selbst unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-13 · 12:11 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Speicherung unverändert (`menge` in der Einheit des Produkts, `erfasstAls`/`mengeRoh` wie bisher, Datenbank-Wert 'bleche' heißt „im Träger erfasst“). Neben jedem Feld steht eine Einheit aus BOS_PRODUKTE.einheit(); fehlt `einheit` in der Produktliste, steht dort „Einheit fehlt in der Produktliste“ (keine erfundene Einheit). Umschalter heißt „{Träger} | Stück“ (z. B. „Rote Dielen“ statt immer „Bleche“). istEinheitenUmschaltbar() und die Stück→Träger-Umrechnung nutzen die gemeinsame Stelle in bos_produkte.js. Ausreißer-Check unverändert. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Produktliste über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler mit echter Meldung im Hinweisblock, „keine freigeschaltet“ nur nach erfolgreichem Laden. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
@@ -674,7 +675,9 @@
       if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
       // 13.10.2026 (#64): Einheiten kommen aus bos_produkte.js — alte Fassung im Zwischenspeicher?
       if (typeof window.BOS_PRODUKTE.einheit !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Einheiten) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
-      const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+      // 15.10.2026 (#63): Sicht 'laufend' (ohne Saison-Pause) — alte Fassung im Zwischenspeicher?
+      if (typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Saison-Pause) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+      const ergebnis = await window.BOS_PRODUKTE.lade({ sicht: 'laufend' });
       alleProdukte = ergebnis.liste;
       const hinweis = window.BOS_PRODUKTE.hinweisText(ergebnis);
       if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');

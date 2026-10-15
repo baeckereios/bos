@@ -111,6 +111,20 @@
  *   teilte trotzdem) und die Teilung bei Stück-Produkten. Ohne Produkt
  *   unverändert roh (alte Aufrufer). holeManuelleWerte(), holeOffizielle-
  *   Werte(), pruefeAusreisser() unverändert. Siehe Abschnitt EINHEITEN.
+ * 15.10.2026 · 01:18 — RICHTWERT (Baustelle #63, SESSION_2026-10-14_
+ *   RICHTWERT_BAU.md, Freigabe Kontroll-Chat 14.10., 19:19). Dritter
+ *   Datentopf 'richtwert': liest NICHT aus bos_events, sondern aus dem
+ *   mitgegebenen Produkt (Feld richtwert, Mo = 0 … So = 6, schon in der
+ *   Einheit des Produkts — keine Umrechnung, keine Rundung). Nicht-Backtag
+ *   (Feld backTage) → 0, verlässlich; Backtag mit Wert → Wert, verlässlich;
+ *   Backtag leer → 0, NICHT verlässlich (die Warnung der Aufrufer greift).
+ *   Kein Mischen mit anderen Töpfen. holeWochenbedarf() liefert mit Produkt
+ *   zusätzlich anzahl[7] (Werte je Tag; additiv, das Füllen im Editor
+ *   unterscheidet damit „keine Backzettel-Zahl“ von „Schnitt 0“). Neu
+ *   durchgang(): solange er läuft, holt jede Abfrage (Topf + Wochentag) ihre
+ *   Dokumente nur einmal, und Lesefehler werden gesammelt und am Ende
+ *   geworfen statt still zu [] zu werden. Nur die Sammel-Knöpfe im Editor
+ *   nutzen ihn; ohne durchgang() ist alles wie vorher (#65 bleibt offen).
  *
  * EINHEITEN (Stand 13.10.2026, Baustelle #64):
  *   Regel: jede Bedarfszahl verlässt diesen Host in der `einheit` des
@@ -236,6 +250,72 @@ window.BOS_VERBRAUCH = {
   // deckt das grob mehr als ein Jahr an Historie ab.
   MAX_DOKUMENTE_SCAN: 400,
 
+  // 15.10.2026 (#63): laufender Durchgang (siehe durchgang()), sonst null.
+  _durchgang: null,
+  WT_LANG: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'],
+
+  /**
+   * Durchgang (15.10.2026, #63): führt `arbeit` aus; währenddessen liest jede
+   * Abfrage (Topf + Wochentag) ihre Dokumente nur EINMAL, alle Produkte werten
+   * dieselbe Antwort aus — dieselbe Auswertung, nur weniger Lesevorgänge. Ein
+   * Lesefehler wird gesammelt; nach der Arbeit wirft durchgang() ihn mit der
+   * echten Meldung (die einzelnen Funktionen liefern wie immer []). So wird
+   * aus einem Netzfehler nie still „kein Backzettel vorhanden“.
+   * @param {function(): Promise<any>} arbeit
+   * @returns {Promise<any>} das Ergebnis von `arbeit`
+   */
+  async durchgang(arbeit) {
+    if (this._durchgang) return arbeit();   // verschachtelt: derselbe Speicher
+    const dg = { abfragen: new Map(), fehler: [], abrufe: 0 };
+    this._durchgang = dg;
+    let ergebnis;
+    try {
+      ergebnis = await arbeit();
+    } finally {
+      this._durchgang = null;
+    }
+    if (dg.fehler.length) {
+      const e = dg.fehler[0];
+      const fehler = new Error('Lesefehler in der Datenbank: ' + ((e && e.message) || String(e)) + (dg.fehler.length > 1 ? ' (und ' + (dg.fehler.length - 1) + ' weitere)' : ''));
+      fehler.code = e && e.code;
+      fehler.original = e;
+      throw fehler;
+    }
+    return ergebnis;
+  },
+  /** Statistik des laufenden Durchgangs (für Tests): Zahl der echten Abrufe. */
+  durchgangAbrufe() { return this._durchgang ? this._durchgang.abrufe : null; },
+  _abfrage(schluessel, holen) {
+    const dg = this._durchgang;
+    if (!dg) return holen();
+    if (!dg.abfragen.has(schluessel)) {
+      dg.abrufe++;
+      const p = holen();
+      p.catch(fehler => { dg.fehler.push(fehler); });
+      dg.abfragen.set(schluessel, p);
+    }
+    return dg.abfragen.get(schluessel);
+  },
+
+  /**
+   * Richtwert eines Tages (15.10.2026, #63). i = needs-Index (Mo = 0).
+   * Wirft sichtbar, wenn bos_produkte.js fehlt oder zu alt ist.
+   */
+  _richtwertTag(produkt, i) {
+    const P = (typeof window !== 'undefined' && window.BOS_PRODUKTE) || null;
+    if (!P || typeof P.richtwertWerte !== 'function' || typeof P.backtagIndizes !== 'function') {
+      throw new Error('Richtwert: bos_produkte.js ist nicht (oder in einer alten Fassung) geladen — Seite neu laden.');
+    }
+    if (!P.backtagIndizes(produkt)[i]) return { wert: 0, verlaesslich: true, anzahl: 0, backtag: false };
+    const w = P.richtwertWerte(produkt)[i];
+    return w === null
+      ? { wert: 0, verlaesslich: false, anzahl: 0, backtag: true }
+      : { wert: w, verlaesslich: true, anzahl: 1, backtag: true };
+  },
+  _richtwertOhneProdukt(legacyKey) {
+    return new Error('Richtwert: ohne Produkt nicht rechenbar (' + legacyKey + ') — der Richtwert steht am Produkt. Seite neu laden; hilft das nicht: Ulf Bescheid sagen.');
+  },
+
   /**
    * Löst die effektiven Berechnungs-Einstellungen für einen Datentopf auf
    * (siehe Header, Abschnitt EINSTELLUNGEN-AUFLÖSUNG): Eigene lokale
@@ -333,12 +413,13 @@ window.BOS_VERBRAUCH = {
 
     const werte = [];
     try {
-      const snap = await db.collection('bos_events')
+      // 15.10.2026: im Durchgang nur einmal je Wochentag gelesen (siehe durchgang()).
+      const snap = await this._abfrage('manuell|' + wochentag, () => db.collection('bos_events')
         .where('type', '==', 'verbrauch_manuell')
         .where('wochentag', '==', wochentag)
         .orderBy('ts', 'desc')
         .limit(this.MAX_DOKUMENTE_SCAN)
-        .get();
+        .get());
 
       snap.forEach(doc => {
         // Im Stichprobe-Modus reicht's, sobald genug Werte gesammelt sind —
@@ -416,10 +497,11 @@ window.BOS_VERBRAUCH = {
       // unten, ohne sichtbaren Fehler, Ergebnis wäre in jedem Fall []
       // gewesen. Sortierung jetzt clientseitig, damit "neueste zuerst" für
       // stichprobeAnzahl weiterhin gilt.
-      const snap = await db.collection('bos_events')
+      // 15.10.2026: im Durchgang nur einmal gelesen (siehe durchgang()).
+      const snap = await this._abfrage('offiziell', () => db.collection('bos_events')
         .where('type', '==', 'verbrauch_offiziell')
         .limit(this.MAX_DOKUMENTE_SCAN)
-        .get();
+        .get());
 
       const docs = snap.docs
         .map(doc => doc.data())
@@ -498,6 +580,15 @@ window.BOS_VERBRAUCH = {
    */
   async holeDurchschnitt(db, legacyKey, wochentag, einstellungen, datentopf, produkt) {
     const effektiverDatentopf = datentopf || 'manuell';
+    // 15.10.2026 (#63): Richtwert steht am Produkt — kein Lesevorgang.
+    if (effektiverDatentopf === 'richtwert') {
+      if (!produkt) throw this._richtwertOhneProdukt(legacyKey);
+      const einheitR = this._einheitInfo(produkt);
+      const i = this.WT_LANG.indexOf(wochentag);
+      if (i === -1) throw new Error('Richtwert: unbekannter Wochentag „' + wochentag + '“.');
+      const t = this._richtwertTag(produkt, i);
+      return { durchschnitt: t.wert, durchschnittRoh: t.wert, anzahl: t.anzahl, verlaesslich: t.verlaesslich, einheit: einheitR };
+    }
     // 13.10.2026 (#64): Einheit VOR dem Lesen klären — fehlt bos_produkte.js,
     // soll der Aufrufer einen sichtbaren Fehler bekommen, keine rohe Zahl.
     const einheit = produkt ? this._einheitInfo(produkt) : null;
@@ -577,7 +668,8 @@ window.BOS_VERBRAUCH = {
    * @param {firebase.firestore.Firestore} db
    * @param {string} legacyKey
    * @param {object} [einstellungen]  Wie bei holeDurchschnitt().
-   * @param {'manuell'|'offiziell'} [datentopf]  Neu 31.08.2026, Default 'manuell'.
+   * @param {'manuell'|'offiziell'|'richtwert'} [datentopf]  Neu 31.08.2026, Default 'manuell'.
+   *   'richtwert' seit 15.10.2026 (#63): braucht das Produkt, liest nichts.
    * @param {object} [produkt]  Neu 13.10.2026 (#64), wie bei holeDurchschnitt().
    *   Die Aufrufer (Stationen, Schnellrechner) geben es immer mit und prüfen,
    *   dass `einheit` in der Antwort steht (sonst ist der Host veraltet).
@@ -591,6 +683,18 @@ window.BOS_VERBRAUCH = {
    */
   async holeWochenbedarf(db, legacyKey, einstellungen, datentopf, produkt) {
     const effektiverDatentopf = datentopf || 'manuell';
+    // 15.10.2026 (#63): Richtwert — aus dem Produkt, ohne Umrechnung und Rundung.
+    if (effektiverDatentopf === 'richtwert') {
+      if (!produkt) throw this._richtwertOhneProdukt(legacyKey);
+      const einheitR = this._einheitInfo(produkt);
+      const tage = [0, 1, 2, 3, 4, 5, 6].map(i => this._richtwertTag(produkt, i));
+      return {
+        needs: tage.map(t => t.wert),
+        verlaesslich: tage.map(t => t.verlaesslich),
+        einheit: einheitR,
+        anzahl: tage.map(t => t.anzahl)
+      };
+    }
     const einheit = produkt ? this._einheitInfo(produkt) : null; // wirft sichtbar, s. _einheitInfo()
     const effektiveEinstellungen = einstellungen || await this.holeEinstellungen(effektiverDatentopf);
     const WT_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -613,7 +717,8 @@ window.BOS_VERBRAUCH = {
     return {
       needs: ergebnisse.map(e => this._inProduktEinheit(e.durchschnittRoh, effektiverDatentopf, legacyKey, produkt, true)),
       verlaesslich: ergebnisse.map(e => e.verlaesslich),
-      einheit
+      einheit,
+      anzahl: ergebnisse.map(e => e.anzahl)   // 15.10.2026 (#63), additiv
     };
   },
 

@@ -3,6 +3,24 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-15 · 01:20 · v-richtwert-1 · Richtwert, Bedarfsquelle, Saison-Pause (Baustelle #63)
+      SESSION_2026-10-14_RICHTWERT_BAU.md (Freigabe Kontroll-Chat 14.10., 19:19).
+      Neuer Karten-Reiter „Bedarf“: Haken „Aktiv“ (aus = pausiert: true,
+      Saison-Pause; bei Froster-Produkten Hinweis mit dem letzten Bestand),
+      Quelle Richtwert · Backzettel · Mitschrift (Feld bedarfsQuelle, ohne Feld
+      gilt Mitschrift), Richtwert Mo–So in der Einheit des Produkts (Komma,
+      leer ≠ 0, Stück nur ganze Zahlen; Nicht-Backtage grau = 0), „Aus
+      Backzettel übernehmen“ mit Rückfrage. Ohne Einheit ist der Richtwert
+      gesperrt. Werkzeugleiste: „Richtwerte aus Backzettel füllen“ (nur leere
+      Richtwerte, nur Produkte mit Einheit, nur Backtage, Vorschau mit vier
+      Gruppen und Auffälligkeiten) und „Alle auf Mitschrift“ (reif = an jedem
+      Bedarf-Tag verlässliche Mitschrift). Beide: Regelstand vorab, frisch vom
+      Server, je Produkt ein Vorgang mit eigener Sicherung (B1), Fortschritt,
+      wiederholbar; Lesen im Durchgang des Rechen-Hosts (B3). Liste: Spalte
+      Quelle, pausierte ausgegraut, Knopf „Pausierte ausblenden“, Zähler
+      „mit leerem Richtwert-Tag“. Einheitswechsel bei vorhandenem Richtwert:
+      Hinweis (U5). Regelstand-Fassung richtwert-2026-10-14. Neu eingebunden:
+      bos_zeitkontext_referenz.js, bos_verbrauch_durchschnitt.js, bos_froster.js.
     2026-10-13 · 14:48 · v-einheiten-2 · Nachtrag 1: Auswahlliste statt Freitext
       ANWEISUNG_2026-10-13_EINHEITEN_NACHTRAG1.md (KC 14:45, Ulf 14:44 „Passt so“).
       Anlass (Ulf 14:42): <datalist> klappt auf dem Android-Tablet nicht auf,
@@ -325,6 +343,35 @@
     color:var(--text); font-size:.8rem; line-height:1.45;
   }
   #doppelWarnung code { color:var(--red); font-weight:700; }
+  /* 15.10.2026 (#63): Richtwert, Quelle, Saison-Pause */
+  .prod-tabelle tbody tr.pausiert td { opacity:.45; }
+  .etikett { display:inline-block; font-family:var(--font); font-size:.62rem; letter-spacing:.05em; text-transform:uppercase; border:1px solid var(--border); border-radius:999px; padding:1px 7px; color:var(--dim); margin-left:6px; vertical-align:middle; }
+  .col-quelle { width:110px; }
+  .quelle-luecke { color:var(--amber); }
+  .quelle-knoepfe { display:flex; gap:8px; flex-wrap:wrap; }
+  .quelle-knoepfe .bt-btn:disabled { opacity:.35; cursor:not-allowed; }
+  .rw-tabelle { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:end; }
+  .rw-tag { display:flex; flex-direction:column; gap:4px; text-align:center; }
+  .rw-tag span.rw-kopf { font-family:var(--font); font-size:.78rem; font-weight:700; color:var(--dim); }
+  .detail-feld .rw-tag input { padding:10px 2px; text-align:center; min-height:var(--bos-tap-min,44px); min-width:0; }
+  .rw-tag input.fehler { border-color:var(--red); color:var(--red); }
+  .rw-tag.kein-backtag input { opacity:.35; }
+  .rw-tag small { font-size:.62rem; color:var(--dim); min-height:.8rem; }
+  .rw-ruhend { opacity:.5; }
+  .rw-einheit { font-size:.85rem; color:var(--text); margin-top:6px; }
+  .bedarf-box { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:.82rem; line-height:1.45; }
+  .bedarf-box.rot { border-color:var(--red); }
+  .bedarf-box.bernstein { border-color:var(--amber); }
+  #sammelOverlay { align-items:center; justify-content:center; padding:18px; }
+  .sammel-sheet { background:var(--surface); width:100%; max-width:760px; max-height:86vh; display:flex; flex-direction:column; border-radius:18px; border:1px solid var(--border); box-shadow:0 20px 56px rgba(0,0,0,.6); }
+  .sammel-kopf { padding:18px 22px 8px; font-family:'Fraunces',serif; font-size:1.2rem; }
+  .sammel-inhalt { overflow-y:auto; padding:4px 22px 10px; font-size:.84rem; line-height:1.45; flex:1; }
+  .sammel-inhalt h3 { font-size:.9rem; color:var(--amber); margin:14px 0 4px; }
+  .sammel-inhalt ul { margin:0 0 0 18px; }
+  .sammel-fuss { padding:12px 22px 18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; border-top:1px solid var(--border); }
+  #sammelStatus { font-size:.8rem; flex-basis:100%; }
+  #sammelStatus.err { color:var(--red); }
+  #sammelStatus.ok { color:var(--green); }
 </style>
 </head>
 <body>
@@ -362,8 +409,12 @@
   <div class="sep"></div>
   <input type="text" id="suchfeld" placeholder="Suchen (alle Kategorien)…" oninput="render()">
   <button class="btn btn-outline" id="nurOhneEinheitBtn" onclick="schalteNurOhneEinheit()" title="Arbeitsliste: Produkte, bei denen die Einheit (oder Stück pro Träger) fehlt — über alle Kategorien">Nur ohne Einheit</button>
+  <button class="btn btn-outline" id="pausierteBtn" onclick="schaltePausierte()" title="Pausierte Produkte (Saison-Pause) in der Liste zeigen oder ausblenden">Pausierte ausblenden</button>
   <div class="sep"></div>
   <button class="btn btn-amber" onclick="neuesProdukt()">＋ Produkt</button>
+  <div class="sep"></div>
+  <button class="btn btn-outline" id="sammelFuellenBtn" onclick="sammelFuellenStart()" title="Leere Richtwerte einmal aus den Backzettel-Zahlen füllen — erst Vorschau, dann Bestätigung">Richtwerte aus Backzettel füllen</button>
+  <button class="btn btn-outline" id="sammelMitschriftBtn" onclick="sammelMitschriftStart()" title="Produkte mit genug Mitschrift auf die Quelle Mitschrift umstellen — erst Vorschau, dann Bestätigung">Alle auf Mitschrift</button>
   <div class="sep"></div>
   <button class="btn btn-outline" onclick="downloadJSON()">⬇ Datei</button>
   <span id="statusBar">—</span>
@@ -414,6 +465,19 @@
 </div>
 
 
+<!-- 15.10.2026 (#63): Vorschau und Fortschritt der Sammel-Knöpfe -->
+<div id="sammelOverlay" class="sheet-overlay hidden">
+  <div class="sammel-sheet" role="dialog" aria-labelledby="sammelTitel">
+    <div class="sammel-kopf" id="sammelTitel">—</div>
+    <div class="sammel-inhalt" id="sammelInhalt"></div>
+    <div class="sammel-fuss">
+      <button class="btn btn-amber" id="sammelLosBtn" onclick="sammelLos()">Los</button>
+      <button class="btn btn-outline" id="sammelZuBtn" onclick="sammelSchliessen()">Abbrechen</button>
+      <div id="sammelStatus" role="status"></div>
+    </div>
+  </div>
+</div>
+
 <div id="saveBanner" onclick="oeffneErsteGeaenderte()">💾 Ungespeicherte Änderungen — in der Karte speichern</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -422,6 +486,12 @@
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_produkte.js"></script>
 <script src="../bos_produkte_schreiben.js"></script>
+<!-- 15.10.2026 (#63): Backzettel/Mitschrift lesen wie an der Station (dieselben
+     Ausschlüsse: besondere Tage aus bos_zeitkontext_referenz.js), Froster-Bestand
+     für den Hinweis beim Pausieren -->
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_froster.js"></script>
 
 <script>
 var COLLECTION = 'produkte'; // seit 05.10.2026 gemessen, nicht mehr Annahme (PRODUKTE_KOMPENDIUM.md §2a)
@@ -448,8 +518,8 @@ var quelle = 'db';
 var geaenderteKarten = {};
 var SICH_COLLECTION = 'produkte_sicherungen';
 var STAND_COLLECTION = 'produkte_stand', STAND_DOK = 'aktuell';
-var REGEL_FASSUNG_EDITOR = 'produkte-sicherung-2026-10-06';
-var REGEL_DATEI_EDITOR = 'firestore_regeln_2026-10-06_produkte_sicherung.rules';
+var REGEL_FASSUNG_EDITOR = 'richtwert-2026-10-14';   /* 15.10.2026 (#63): neue Produktfelder bedarfsQuelle, richtwert, pausiert */
+var REGEL_DATEI_EDITOR = 'firestore_regeln_2026-10-14_richtwert.rules';
 var DB_FELDER = ['reihenfolge', 'geloescht', 'sicherungId'];
 var ERINNERUNG_TAGE = 30, ERINNERUNG_STAENDE = 5;
 
@@ -561,10 +631,13 @@ async function ladeVonFirestore() {
     var warn = (e.warnungen && e.warnungen.length) ? ' · ⚠ ' + e.warnungen.join(' ') : '';
     ladeNotfallZeile();
     var ohneEinheit = daten.filter(hatEinheitLuecke).length;   // 13.10.2026 (#64): Lücken gleich beim Laden nennen
-    status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit (Knopf „Nur ohne Einheit“)' : '') + warn, warn ? 'err' : 'ok');
+    richtwertRoh = {}; bzVorschlag = {}; frosterHinweis = {};   // 15.10.2026 (#63): gelten nur bis zum Neu-Laden
+    status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit (Knopf „Nur ohne Einheit“)' : '') + zaehlerRichtwert() + warn, warn ? 'err' : 'ok');
+    return true;
   } catch (err) {
     console.error('[Produkt-Config] Laden:', err);
     status('⚠ ' + (window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(err) : err.message) + ' — Notfall-Kopie per Upload möglich', 'err');
+    return false;
   }
 }
 
@@ -717,6 +790,9 @@ function kfEinheit(p) {
     if (e.art === 'traeger' && /^st(c?k|ü?ck|ueck)\.?$/i.test(e.traeger)) html += '<div class="einheit-hinweis">„' + esc(e.traeger) + '“ zählt als Träger, nicht als Stück. Für Stück bitte „Stück“ wählen.</div>';
   }
   if (einheitGewechselt(p)) html += '<div class="einheit-hinweis rot" role="alert">⚠ ' + EINHEIT_WECHSEL_TEXT + '</div>';
+  if (einheitGewechselt(p) && window.BOS_PRODUKTE && window.BOS_PRODUKTE.richtwertLeer && !window.BOS_PRODUKTE.richtwertLeer(p)) {
+    html += '<div class="einheit-hinweis rot" role="alert">⚠ ' + RICHTWERT_WECHSEL_TEXT + '</div>';   // 15.10.2026 (#63, U5)
+  }
   return html + '</div>';
 }
 function kfStueckProTraeger(p) {
@@ -735,6 +811,7 @@ function sichtbareIndizes() {
   var suche = document.getElementById('suchfeld').value.toLowerCase();
   var indizes = [];
   daten.forEach(function (p, i) {
+    if (pausierteAusblenden && istPausiertP(p)) return;   // 15.10.2026 (#63), B6
     if (nurOhneEinheit) {
       // Arbeitsliste: über alle Kategorien, zusätzlich mit der Suche kombinierbar
       if (!hatEinheitLuecke(p)) return;
@@ -747,6 +824,468 @@ function sichtbareIndizes() {
     }
   });
   return indizes;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Richtwert, Bedarfsquelle, Saison-Pause (15.10.2026, Baustelle #63)
+// SESSION_2026-10-14_RICHTWERT_BAU.md. Die Logik (Quelle, Backtage,
+// Eingabe prüfen, runden) steht in ../bos_produkte.js — hier nur Anzeige
+// und Schreiben. Datenbankwerte bleiben 'offiziell'/'manuell'.
+// ══════════════════════════════════════════════════════════════════════
+var pausierteAusblenden = false;
+/* Ungültige Eingaben je Produkt und Tag: key → { i: { text, fehler } }.
+   Sie bleiben sichtbar im Feld und sperren das Speichern (nichts still gerundet). */
+var richtwertRoh = {};
+/* Vorschlag aus dem Backzettel, wartet auf „Übernehmen“: key → Ergebnis von backzettelVorschlag(). */
+var bzVorschlag = {};
+/* Froster-Hinweis beim Pausieren: key → { art: 'laedt'|'ok'|'fehler', text } */
+var frosterHinweis = {};
+
+function P_() { return window.BOS_PRODUKTE; }
+function richtwertBereit() {
+  var P = P_();
+  return !!(P && typeof P.bedarfsQuelle === 'function' && typeof P.richtwertPruefen === 'function');
+}
+function quelleVon(p) { return richtwertBereit() ? P_().bedarfsQuelle(p) : 'manuell'; }
+function istPausiertP(p) { return !!p && p.pausiert === true; }
+function hatEinheitFuerRichtwert(p) { var e = einheitVon(p); return !!e && e.art !== 'fehlt'; }
+/* Leere Richtwert-Tage, die zählen (nur Backtage, nur bei Quelle Richtwert). */
+function richtwertLuecken(p) {
+  if (!richtwertBereit() || quelleVon(p) !== 'richtwert') return [];
+  return P_().richtwertLueckenTage(p);
+}
+function setzeRichtwert(p, werte) {
+  if (werte.every(function (x) { return x === null; })) delete p.richtwert;
+  else p.richtwert = werte.slice();
+}
+function schaltePausierte() { pausierteAusblenden = !pausierteAusblenden; render(); }
+
+// ── Karte: Haken „Aktiv“ ──
+function schalteAktiv(idx, aktiv) {
+  var p = daten[idx]; if (!p) return;
+  if (aktiv) { delete p.pausiert; delete frosterHinweis[p.legacyKey]; }
+  else { p.pausiert = true; pruefeFrosterBeimPausieren(p); }
+  markiereGeaendert(idx);
+  if (karteIdx === idx) renderKarte();
+}
+/* Steht noch etwas im Froster? Nur ein Hinweis, keine Sperre (Bauplan §2.5). */
+async function pruefeFrosterBeimPausieren(p) {
+  var key = p.legacyKey;
+  if (!p.frosterZustaendigkeit || p.frosterZustaendigkeit === 'nein') return;
+  if (!window.BOS_FROSTER || !window.db) { frosterHinweis[key] = { art: 'fehler', text: 'Froster-Bestand nicht prüfbar: bos_froster.js ist nicht geladen — Seite neu laden.' }; zeichneFrosterHinweis(key); return; }
+  frosterHinweis[key] = { art: 'laedt', text: 'Prüfe den Froster-Bestand …' };
+  zeichneFrosterHinweis(key);
+  try {
+    await window.BOS_AUTH_READY;
+    var b = await window.BOS_FROSTER.holeBestand(db, key);
+    var eh = einheitVon(p) || { kurz: 'Bl.' };
+    if (b.fehlerText) frosterHinweis[key] = { art: 'fehler', text: 'Froster-Bestand nicht lesbar: ' + b.fehlerText + ' — pausieren geht trotzdem.' };
+    else if (b.gefunden && typeof b.bestand === 'number' && b.bestand > 0) {
+      var d = b.ts ? new Date(b.ts) : null, pad = function (n) { return String(n).padStart(2, '0'); };
+      frosterHinweis[key] = { art: 'warn', text: 'Im Froster stehen laut letzter Zählung noch ' + String(b.bestand).replace('.', ',') + ' ' + eh.kurz +
+        (d ? ' (gezählt am ' + pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '., ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' Uhr)' : '') +
+        '. Pausiert verschwindet das Produkt aus der Inventur. Erst aufbrauchen?' };
+    } else frosterHinweis[key] = { art: 'ok', text: 'Froster: laut letzter Zählung nichts mehr da.' };
+  } catch (err) {
+    console.error('[Produkt-Config] Froster-Bestand:', err);
+    frosterHinweis[key] = { art: 'fehler', text: 'Froster-Bestand nicht lesbar: ' + fehlerText(err) + ' — pausieren geht trotzdem.' };
+  }
+  zeichneFrosterHinweis(key);
+}
+function frosterHinweisHTML(key) {
+  var h = frosterHinweis[key];
+  if (!h) return '';
+  var klasse = h.art === 'fehler' ? ' rot' : (h.art === 'warn' ? ' bernstein' : '');
+  return '<div class="bedarf-box' + klasse + '"' + (h.art === 'warn' || h.art === 'fehler' ? ' role="alert"' : '') + '>' + (h.art === 'warn' ? '⚠ ' : '') + esc(h.text) + '</div>';
+}
+function zeichneFrosterHinweis(key) {
+  var el = document.getElementById('kfFrosterHinweis');
+  if (el && daten[karteIdx] && daten[karteIdx].legacyKey === key) el.innerHTML = frosterHinweisHTML(key);
+}
+
+// ── Karte: Quelle ──
+function waehleQuelle(idx, q) {
+  var p = daten[idx]; if (!p) return;
+  if (q === 'richtwert' && !hatEinheitFuerRichtwert(p)) { status('⚠ Erst die Einheit wählen, dann den Richtwert eintragen.', 'err'); return; }
+  p.bedarfsQuelle = q;
+  markiereGeaendert(idx);
+  if (karteIdx === idx) renderKarte();
+}
+
+// ── Karte: Richtwert-Kästchen ──
+/* Kein Neuzeichnen der Karte beim Tippen (sonst springt der Fokus auf dem
+   Tablet weg): nur das Feld selbst und die Hinweiszeile werden aktualisiert. */
+function aendereRichtwert(idx, i, el) {
+  var p = daten[idx]; if (!p || !richtwertBereit()) return;
+  var P = P_(), key = p.legacyKey;
+  var z = P.richtwertZahl(el.value, p);
+  if (!richtwertRoh[key]) richtwertRoh[key] = {};
+  if (!z.ok) {
+    richtwertRoh[key][i] = { text: el.value, fehler: z.fehler };
+    el.classList.add('fehler'); el.title = z.fehler;
+  } else {
+    delete richtwertRoh[key][i];
+    var w = P.richtwertWerte(p); w[i] = z.wert; setzeRichtwert(p, w);
+    el.classList.remove('fehler'); el.title = '';
+    el.value = P.richtwertText(z.wert);
+  }
+  if (!Object.keys(richtwertRoh[key]).length) delete richtwertRoh[key];
+  markiereGeaendert(idx);
+  zeichneRichtwertHinweise(p);
+}
+function richtwertFehlerListe(p) {
+  var r = richtwertRoh[p.legacyKey]; if (!r) return [];
+  var WT = (P_() && P_().WT_KURZ) || BT_LABELS;
+  return Object.keys(r).sort().map(function (i) { return WT[i] + ': „' + String(r[i].text).trim() + '“ — ' + r[i].fehler; });
+}
+function richtwertHinweiseHTML(p) {
+  var h = '';
+  var f = richtwertFehlerListe(p);
+  if (f.length) h += '<div class="einheit-hinweis rot" role="alert">⚠ ' + esc(f.join(' · ')) + ' — so wird nicht gespeichert.</div>';
+  var l = richtwertLuecken(p);
+  if (l.length) h += '<div class="einheit-hinweis">Leer an: ' + esc(l.join(', ')) + '. Die Station warnt dort, bis eine Zahl steht (auch 0).</div>';
+  if (richtwertBereit() && einheitGewechselt(p) && !P_().richtwertLeer(p)) h += '<div class="einheit-hinweis rot" role="alert">⚠ ' + RICHTWERT_WECHSEL_TEXT + '</div>';
+  return h;
+}
+var RICHTWERT_WECHSEL_TEXT = 'Der Richtwert steht noch in der alten Einheit. Neu eintragen oder „Aus Backzettel übernehmen“.';
+function zeichneRichtwertHinweise(p) {
+  var el = document.getElementById('kfRichtwertHinweise');
+  if (el) el.innerHTML = richtwertHinweiseHTML(p);
+}
+
+// ── Karte: Reiter „Bedarf“ ──
+function kfBedarf(p) {
+  if (!richtwertBereit()) {
+    return '<div class="detail-section full"><div class="einheit-hinweis rot" role="alert">⚠ bos_produkte.js ist in einer alten Fassung geladen (ohne Richtwert) — Seite neu laden (neue Fassung noch nicht online?).</div></div>';
+  }
+  var P = P_(), key = p.legacyKey;
+  var aktiv = !istPausiertP(p);
+  var q = quelleVon(p);
+  var e = einheitVon(p) || { art: 'fehlt', lang: '' };
+  var ohneEinheit = e.art === 'fehlt';
+  var istRichtwert = q === 'richtwert';
+  var html = '';
+  // Aktiv
+  html += '<div class="detail-section full"><div class="detail-feld checkbox-feld">' +
+    '<input type="checkbox" id="kfAktiv" ' + (aktiv ? 'checked' : '') + ' onchange="schalteAktiv(karteIdx,this.checked)">' +
+    '<label for="kfAktiv" class="cb-label">Aktiv ' + fhBtn('pausiert') + '</label></div>' +
+    '<div class="einheit-hinweis" style="color:var(--dim)">' + (aktiv ? 'Haken raus = Saison-Pause: das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster und Teigecke-Nacht. Alle Daten bleiben.' : 'Pausiert (Saison-Pause). Erscheint im Betrieb nirgends, alle Daten bleiben. Haken setzen holt es zurück.') + '</div>' +
+    '<div id="kfFrosterHinweis">' + frosterHinweisHTML(key) + '</div></div>';
+  // Quelle
+  var knopf = function (wert) {
+    var gesperrt = wert === 'richtwert' && ohneEinheit;
+    return '<button type="button" class="bt-btn' + (q === wert ? ' aktiv' : '') + '" id="kfQuelle_' + wert + '"' + (gesperrt ? ' disabled title="Erst die Einheit wählen"' : '') +
+      ' onclick="waehleQuelle(karteIdx,\'' + wert + '\')">' + esc(P.quelleText(wert)) + '</button>';
+  };
+  html += '<div class="detail-section full"><div class="detail-feld"><label>Woher kommt die Bedarfszahl? ' + fhBtn('bedarfsQuelle') + '</label>' +
+    '<div class="quelle-knoepfe">' + knopf('richtwert') + knopf('offiziell') + knopf('manuell') + '</div>' +
+    (p.bedarfsQuelle === undefined ? '<div class="einheit-hinweis" style="color:var(--dim)">Mitschrift (Vorgabe, noch nicht gewählt)</div>' : '') +
+    '</div></div>';
+  // Richtwert
+  var w = P.richtwertWerte(p), bt = P.backtagIndizes(p), roh = richtwertRoh[key] || {};
+  var gesperrt = ohneEinheit || !istRichtwert;
+  var stueck = e.art === 'stueck';
+  var tage = P.WT_KURZ.map(function (tag, i) {
+    var backtag = bt[i];
+    var wert = roh[i] ? roh[i].text : P.richtwertText(w[i]);
+    var aus = gesperrt || !backtag;
+    return '<div class="rw-tag' + (backtag ? '' : ' kein-backtag') + '"><span class="rw-kopf">' + tag + '</span>' +
+      '<input type="text" id="kfRw' + i + '" class="' + (roh[i] ? 'fehler' : '') + '" inputmode="' + (stueck ? 'numeric' : 'decimal') + '" autocomplete="off"' +
+      ' value="' + esc(backtag ? wert : '') + '" placeholder="' + (backtag ? '' : '0') + '"' + (aus ? ' disabled' : '') +
+      (roh[i] ? ' title="' + esc(roh[i].fehler) + '"' : '') + ' onchange="aendereRichtwert(karteIdx,' + i + ',this)">' +
+      '<small>' + (backtag ? '' : 'kein Backtag') + '</small></div>';
+  }).join('');
+  html += '<div class="detail-section full"><div class="detail-feld"><label>Richtwert ' + fhBtn('richtwert') + '</label>' +
+    '<div class="rw-tabelle' + (!ohneEinheit && !istRichtwert ? ' rw-ruhend' : '') + '" id="kfRichtwert">' + tage + '</div>' +
+    '<div class="rw-einheit" id="kfRichtwertEinheit">' + (ohneEinheit ? '' : 'in ' + esc(e.lang) + (stueck ? ' (ganze Zahlen)' : ' (eine Nachkommastelle)')) + '</div>';
+  if (ohneEinheit) html += '<div class="einheit-hinweis" role="alert">Erst die Einheit wählen, dann den Richtwert eintragen.</div>';
+  else if (!istRichtwert) html += '<div class="einheit-hinweis" style="color:var(--dim)">Ruht: gerechnet wird mit ' + esc(P.quelleText(q)) + '. Die Zahlen bleiben stehen.</div>';
+  html += '<div id="kfRichtwertHinweise">' + richtwertHinweiseHTML(p) + '</div>';
+  if (!ohneEinheit && istRichtwert) {
+    html += '<div style="margin-top:10px"><button type="button" class="btn btn-outline" id="kfBackzettelBtn" onclick="richtwertAusBackzettel(karteIdx)">Aus Backzettel übernehmen</button></div>';
+  }
+  html += '<div id="kfBackzettelBox">' + backzettelBoxHTML(key) + '</div>';
+  html += '</div></div>';
+  return html;
+}
+
+// ── Backzettel → Richtwert (eine Rechnung für Karte und Sammel-Knopf) ──
+var einstellungenCache = {};
+async function einstellungenFuer(topf) {
+  if (!einstellungenCache[topf]) einstellungenCache[topf] = await window.BOS_VERBRAUCH.holeEinstellungen(topf);
+  return einstellungenCache[topf];
+}
+function pruefeRechenModul() {
+  if (!window.BOS_VERBRAUCH || typeof window.BOS_VERBRAUCH.durchgang !== 'function') {
+    throw new Error('Rechen-Modul nicht oder in einer alten Fassung geladen (bos_verbrauch_durchschnitt.js ohne Richtwert) — Seite neu laden.');
+  }
+}
+/* Ergebnis: { werte[7] (gerundet, null = nicht füllen), hatWerte, auffaellig: ['So 4', …], tageOhneZahl: ['Di', …] }.
+   Nur Backtage werden gefüllt; eine Backzettel-Zahl an einem Nicht-Backtag ist eine Auffälligkeit
+   (Ulf 14.10., 19:07). „Keine Zahl“ heißt: kein einziger Backzettel-Wert an diesem Wochentag (anzahl 0). */
+async function backzettelVorschlag(p) {
+  var P = P_();
+  var wb = await window.BOS_VERBRAUCH.holeWochenbedarf(db, p.legacyKey, await einstellungenFuer('offiziell'), 'offiziell', p);
+  if (!wb || !wb.einheit || !Array.isArray(wb.anzahl)) throw new Error('Rechen-Modul veraltet (bos_verbrauch_durchschnitt.js liefert keine Einheit oder Anzahl) — Seite neu laden.');
+  var bt = P.backtagIndizes(p), werte = [], auffaellig = [], ohne = [];
+  for (var i = 0; i < 7; i++) {
+    var hat = wb.anzahl[i] > 0;
+    var wert = hat ? P.rundeRichtwert(wb.needs[i], p) : null;
+    if (!bt[i]) { werte.push(null); if (hat && wert > 0) auffaellig.push(P.WT_KURZ[i] + ' ' + P.richtwertText(wert)); continue; }
+    werte.push(wert);
+    if (!hat) ohne.push(P.WT_KURZ[i]);
+  }
+  return { werte: werte, hatWerte: werte.some(function (x) { return x !== null; }), auffaellig: auffaellig, tageOhneZahl: ohne };
+}
+function werteText(werte) {
+  var P = P_();
+  return werte.map(function (x, i) { return P.WT_KURZ[i] + ' ' + (x === null ? '–' : P.richtwertText(x)); }).join(' · ');
+}
+async function richtwertAusBackzettel(idx) {
+  var p = daten[idx]; if (!p) return;
+  var key = p.legacyKey;
+  bzVorschlag[key] = { laedt: true };
+  zeichneBackzettelBox(key);
+  try {
+    pruefeRechenModul();
+    await window.BOS_AUTH_READY;
+    var v = await window.BOS_VERBRAUCH.durchgang(function () { return backzettelVorschlag(p); });
+    bzVorschlag[key] = v;
+  } catch (err) {
+    console.error('[Produkt-Config] Backzettel lesen:', err);
+    bzVorschlag[key] = { fehler: fehlerText(err) };
+  }
+  zeichneBackzettelBox(key);
+}
+function backzettelBoxHTML(key) {
+  var v = bzVorschlag[key]; if (!v) return '';
+  if (v.laedt) return '<div class="bedarf-box">Lese den Backzettel …</div>';
+  if (v.fehler) return '<div class="bedarf-box rot" role="alert">⚠ Backzettel nicht lesbar: ' + esc(v.fehler) + ' — nichts übernommen.</div>';
+  var P = P_(), p = daten[karteIdx];
+  var h = '<div class="bedarf-box bernstein">';
+  if (!v.hatWerte) h += 'Der Backzettel hat für dieses Produkt an keinem Backtag eine Zahl — nichts zu übernehmen.';
+  else {
+    var alt = p ? P.richtwertWerte(p) : [];
+    var aenderungen = v.werte.map(function (x, i) { return { i: i, alt: alt[i], neu: x }; }).filter(function (d) { return d.alt !== d.neu; });
+    h += '<b>Backzettel:</b> ' + esc(werteText(v.werte));
+    if (v.tageOhneZahl.length) h += '<br>Ohne Backzettel-Zahl (bleibt leer): ' + esc(v.tageOhneZahl.join(', '));
+    if (aenderungen.length && alt.some(function (x) { return x !== null; })) {
+      h += '<br><b>Überschreibt:</b> ' + esc(aenderungen.map(function (d) { return P.WT_KURZ[d.i] + ' ' + (d.alt === null ? 'leer' : P.richtwertText(d.alt)) + ' → ' + (d.neu === null ? 'leer' : P.richtwertText(d.neu)); }).join(' · '));
+    }
+    if (!aenderungen.length) h += '<br>Steht schon genau so im Richtwert.';
+  }
+  if (v.auffaellig.length) h += '<br>⚠ <b>Auffällig:</b> Backzettel-Zahl an einem Nicht-Backtag: ' + esc(v.auffaellig.join(', ')) + ' (wird nicht übernommen).';
+  h += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+    (v.hatWerte ? '<button type="button" class="btn btn-amber" onclick="uebernimmBackzettel(karteIdx)">Übernehmen</button>' : '') +
+    '<button type="button" class="btn btn-outline" onclick="verwirfBackzettel(karteIdx)">' + (v.hatWerte ? 'Abbrechen' : 'Schließen') + '</button></div>';
+  return h + '</div>';
+}
+function zeichneBackzettelBox(key) {
+  var el = document.getElementById('kfBackzettelBox');
+  if (el && daten[karteIdx] && daten[karteIdx].legacyKey === key) el.innerHTML = backzettelBoxHTML(key);
+}
+function uebernimmBackzettel(idx) {
+  var p = daten[idx]; if (!p) return;
+  var v = bzVorschlag[p.legacyKey]; if (!v || !v.werte) return;
+  setzeRichtwert(p, v.werte);
+  delete richtwertRoh[p.legacyKey];
+  delete bzVorschlag[p.legacyKey];
+  markiereGeaendert(idx);
+  renderKarte();
+  status('✓ Backzettel-Werte in die Karte übernommen — mit 💾 Speichern festhalten', 'ok');
+}
+function verwirfBackzettel(idx) {
+  var p = daten[idx]; if (!p) return;
+  delete bzVorschlag[p.legacyKey];
+  zeichneBackzettelBox(p.legacyKey);
+}
+
+// ── Sammel-Knöpfe (B1: je Produkt ein Vorgang mit eigener Sicherung) ──
+var sammel = null;   // { art: 'fuellen'|'mitschrift', liste: [{ key, name, aendern(inhalt) }], laeuft }
+function sammelStatus(text, klasse) { var el = document.getElementById('sammelStatus'); el.textContent = text; el.className = klasse || ''; }
+function sammelOeffnen(titel) {
+  document.getElementById('sammelTitel').textContent = titel;
+  document.getElementById('sammelInhalt').innerHTML = '<p>Bereite die Vorschau vor …</p>';
+  document.getElementById('sammelLosBtn').classList.add('hidden');
+  document.getElementById('sammelZuBtn').textContent = 'Abbrechen';
+  document.getElementById('sammelZuBtn').disabled = false;
+  sammelStatus('');
+  document.getElementById('sammelOverlay').classList.remove('hidden');
+}
+function sammelSchliessen() {
+  if (sammel && sammel.laeuft) return;
+  sammel = null;
+  document.getElementById('sammelOverlay').classList.add('hidden');
+}
+/* Vor jeder Vorschau: nur aus der Datenbank, keine ungespeicherten Änderungen,
+   Regelstand passt, Liste frisch vom Server. Wirft mit lesbarer Meldung. */
+async function sammelVorbereiten() {
+  if (quelle !== 'db') throw new Error('Aus Datei geladen — die Sammel-Knöpfe schreiben nur in die Datenbank. ↻ Neu laden.');
+  if (Object.keys(geaenderteKarten).length) throw new Error('Erst die ungespeicherten Änderungen speichern (Banner unten) oder ↻ Neu laden.');
+  if (!richtwertBereit()) throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Richtwert) — Seite neu laden.');
+  if (!window.BOS_PRODUKTE_SCHREIBEN || !window.db) throw new Error('Datenbank nicht geladen (bos_firebase_config.js / bos_produkte_schreiben.js fehlt?).');
+  pruefeRechenModul();
+  await window.BOS_AUTH_READY;
+  if (!kennungJetzt()) throw new Error('Keine Kennung — bist du angemeldet?');
+  try {
+    await db.collection('bos_regelstand').doc(REGEL_FASSUNG_EDITOR).get({ source: 'server' });
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      throw new Error('Die Firestore-Regeln sind älter als diese Seite. In der Firebase-Konsole ' + REGEL_DATEI_EDITOR + ' einsetzen (Fassung ' + REGEL_FASSUNG_EDITOR + '). Nichts geschrieben. (Original: ' + fehlerText(err) + ')');
+    }
+    throw err;
+  }
+  var frisch = await ladeVonFirestore();
+  if (!frisch || quelle !== 'db') throw new Error('Die Liste ließ sich nicht frisch vom Server laden — Grund in der Statuszeile oben. Nichts geschrieben.');
+}
+function namenListe(eintraege, mitText) {
+  if (!eintraege.length) return '<p style="color:var(--dim)">keine</p>';
+  return '<ul>' + eintraege.map(function (x) { return '<li>' + esc(x.name) + (x.pausiert ? ' <span class="etikett">pausiert</span>' : '') + (mitText && x.text ? ' — ' + esc(x.text) : '') + '</li>'; }).join('') + '</ul>';
+}
+
+/* 1) Richtwerte aus Backzettel füllen: nur ganz leere Richtwerte, nur mit Einheit, nur Backtage. */
+async function sammelFuellenStart() {
+  sammelOeffnen('Richtwerte aus Backzettel füllen');
+  try {
+    await sammelVorbereiten();
+    sammelStatus('Lese den Backzettel (einmal für alle Produkte) …');
+    var P = P_();
+    var gruppen = { fuellen: [], ohneBz: [], schon: [], ohneEinheit: [] }, auffaellig = [];
+    await window.BOS_VERBRAUCH.durchgang(async function () {
+      for (var n = 0; n < daten.length; n++) {
+        var p = daten[n];
+        var x = { key: p.legacyKey, name: p.name || p.legacyKey, pausiert: istPausiertP(p) };
+        if (!hatEinheitFuerRichtwert(p)) { gruppen.ohneEinheit.push(x); continue; }
+        if (!P.richtwertLeer(p)) { gruppen.schon.push(x); continue; }
+        var v = await backzettelVorschlag(p);
+        if (v.auffaellig.length) auffaellig.push({ name: x.name, pausiert: x.pausiert, text: v.auffaellig.join(', ') });
+        if (!v.hatWerte) { gruppen.ohneBz.push(x); continue; }
+        x.werte = v.werte;
+        x.text = werteText(v.werte) + (v.tageOhneZahl.length ? ' (leer: ' + v.tageOhneZahl.join(', ') + ')' : '');
+        gruppen.fuellen.push(x);
+      }
+    });
+    var h = '';
+    if (auffaellig.length) {
+      h += '<div class="bedarf-box bernstein" role="alert"><b>⚠ ' + auffaellig.length + ' Produkt(e) mit Backzettel-Zahlen an Nicht-Backtagen</b> (werden nicht übernommen). ' +
+        'Liegen sie bei vielen Produkten alle genau einen Tag neben den Backtagen, nicht füllen, sondern melden.' + namenListe(auffaellig, true) + '</div>';
+    }
+    h += '<h3>Wird gefüllt (' + gruppen.fuellen.length + ') — Quelle wird „Richtwert“</h3>' + namenListe(gruppen.fuellen, true);
+    h += '<h3>Kein Backzettel vorhanden (' + gruppen.ohneBz.length + ') — bleibt leer, Quelle bleibt</h3>' + namenListe(gruppen.ohneBz);
+    h += '<h3>Hat schon einen Richtwert (' + gruppen.schon.length + ') — wird nicht angefasst</h3>' + namenListe(gruppen.schon);
+    h += '<h3>Erst Einheit wählen (' + gruppen.ohneEinheit.length + ') — wird nicht angefasst</h3>' + namenListe(gruppen.ohneEinheit);
+    document.getElementById('sammelInhalt').innerHTML = h;
+    sammel = {
+      art: 'fuellen', laeuft: false,
+      liste: gruppen.fuellen.map(function (x) {
+        return { key: x.key, name: x.name, aendern: function (inhalt) { inhalt.richtwert = x.werte.slice(); inhalt.bedarfsQuelle = 'richtwert'; } };
+      })
+    };
+    zeigeLosKnopf(gruppen.fuellen.length, 'füllen', 'Nichts zu füllen.');
+  } catch (err) {
+    console.error('[Produkt-Config] Füllen (Vorschau):', err);
+    sammelStatus('⚠ ' + fehlerText(err), 'err');
+  }
+}
+
+/* 2) Alle auf Mitschrift: reif = Mitschrift an jedem Bedarf-Tag verlässlich (V1). */
+async function sammelMitschriftStart() {
+  sammelOeffnen('Alle auf Mitschrift');
+  try {
+    await sammelVorbereiten();
+    sammelStatus('Lese Mitschrift und Backzettel (einmal je Wochentag) …');
+    var P = P_();
+    var reif = [], unreif = [];
+    await window.BOS_VERBRAUCH.durchgang(async function () {
+      var einstM = await einstellungenFuer('manuell'), einstO = await einstellungenFuer('offiziell');
+      for (var n = 0; n < daten.length; n++) {
+        var p = daten[n], q = quelleVon(p);
+        if (q === 'manuell') continue;
+        var x = { key: p.legacyKey, name: p.name || p.legacyKey, pausiert: istPausiertP(p) };
+        var bt = P.backtagIndizes(p), tage = [];
+        if (!P.richtwertLeer(p)) {
+          var rw = P.richtwertWerte(p);
+          for (var i = 0; i < 7; i++) if (bt[i] && rw[i] !== null && rw[i] > 0) tage.push(i);
+          x.grundlage = 'Richtwert';
+        } else {
+          var off = await window.BOS_VERBRAUCH.holeWochenbedarf(db, p.legacyKey, einstO, 'offiziell', p);
+          for (var j = 0; j < 7; j++) if (bt[j] && off.needs[j] > 0) tage.push(j);
+          x.grundlage = 'Backzettel';
+        }
+        if (!tage.length) { x.text = 'noch nicht reif (keine Bedarf-Tage)'; unreif.push(x); continue; }
+        var m = await window.BOS_VERBRAUCH.holeWochenbedarf(db, p.legacyKey, einstM, 'manuell', p);
+        if (!m || !m.einheit) throw new Error('Rechen-Modul veraltet (bos_verbrauch_durchschnitt.js liefert keine Einheit) — Seite neu laden.');
+        var fehlt = tage.filter(function (i) { return !m.verlaesslich[i]; }).map(function (i) { return P.WT_KURZ[i]; });
+        x.text = 'jetzt ' + P.quelleText(q) + ', Bedarf-Tage nach ' + x.grundlage + ': ' + tage.map(function (i) { return P.WT_KURZ[i]; }).join(', ');
+        if (fehlt.length) { x.text = 'noch nicht reif (Tage: ' + fehlt.join(', ') + ')'; unreif.push(x); }
+        else reif.push(x);
+      }
+    });
+    var h = '<p>Reif heißt: Die Mitschrift hat an jedem Bedarf-Tag genug Werte (dieselbe Regel wie die Warnung an der Station). Umgestellt wird nur die Quelle, ein Richtwert bleibt ruhend stehen.</p>';
+    h += '<h3>Reif (' + reif.length + ') — wird auf „Mitschrift“ umgestellt</h3>' + namenListe(reif, true);
+    h += '<h3>Noch nicht reif (' + unreif.length + ') — bleibt, wo es ist</h3>' + namenListe(unreif, true);
+    document.getElementById('sammelInhalt').innerHTML = h;
+    sammel = {
+      art: 'mitschrift', laeuft: false,
+      liste: reif.map(function (x) { return { key: x.key, name: x.name, aendern: function (inhalt) { inhalt.bedarfsQuelle = 'manuell'; } }; })
+    };
+    zeigeLosKnopf(reif.length, 'umstellen', 'Kein Produkt ist reif.');
+  } catch (err) {
+    console.error('[Produkt-Config] Alle auf Mitschrift (Vorschau):', err);
+    sammelStatus('⚠ ' + fehlerText(err), 'err');
+  }
+}
+function zeigeLosKnopf(n, verb, leerText) {
+  var los = document.getElementById('sammelLosBtn');
+  if (n) { los.textContent = n + ' Produkt' + (n === 1 ? '' : 'e') + ' ' + verb; los.classList.remove('hidden'); los.disabled = false; sammelStatus('Erst lesen, dann bestätigen. Jedes Produkt bekommt eine eigene Sicherung (Vorversionen).'); }
+  else { los.classList.add('hidden'); sammelStatus(leerText); document.getElementById('sammelZuBtn').textContent = 'Schließen'; }
+}
+/* Schreiben: je Produkt ein Vorgang (Sicherung + Produkt + Stand + 1), nacheinander.
+   Bei einem Fehler wird gestoppt; Geschriebenes bleibt, ein neuer Durchgang
+   überspringt es (Füllen: Richtwert nicht mehr leer; Mitschrift: Quelle schon manuell). */
+async function sammelLos() {
+  if (!sammel || sammel.laeuft || !sammel.liste.length) return;
+  var los = document.getElementById('sammelLosBtn'), zu = document.getElementById('sammelZuBtn');
+  sammel.laeuft = true; los.disabled = true; zu.disabled = true;
+  var liste = sammel.liste, erledigt = 0, aktuell = null;
+  try {
+    var kennung = kennungJetzt();
+    if (!kennung) throw new Error('Keine Kennung — bist du angemeldet?');
+    var standSnap = await db.collection(STAND_COLLECTION).doc(STAND_DOK).get({ source: 'server' });
+    var serverStand = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : null;
+    if (serverStand !== geladenerStand) throw new Error('Jemand hat inzwischen gespeichert (Stand ' + serverStand + ', geladen war ' + geladenerStand + '). Nichts geschrieben — Knopf noch einmal drücken (lädt neu).');
+    var existiert = standSnap.exists;
+    for (var n = 0; n < liste.length; n++) {
+      aktuell = liste[n];
+      sammelStatus('Schreibe ' + (n + 1) + ' von ' + liste.length + ' … (' + aktuell.name + ')');
+      var roh = serverRoh[aktuell.key];
+      if (!roh) throw new Error('„' + aktuell.name + '“ steht nicht mehr in der Datenbank.');
+      var inhalt = ohneDbFelder(roh);
+      aktuell.aendern(inhalt);
+      inhalt.reihenfolge = typeof roh.reihenfolge === 'number' ? roh.reihenfolge : naechsteReihenfolge(serverRoh);
+      var erg = await window.BOS_PRODUKTE_SCHREIBEN.schreibe({
+        kennung: kennung, geladenerStand: geladenerStand, standExistiert: existiert,
+        eintraege: [{ key: aktuell.key, inhalt: inhalt, vorher: roh, aktion: 'aendern' }]
+      });
+      geladenerStand = erg.neuerStand; existiert = true;
+      serverRoh[aktuell.key] = inhalt;
+      var idx = daten.findIndex(function (x) { return x.legacyKey === aktuell.key; });
+      if (idx !== -1) daten[idx] = ohneDbFelder(inhalt);
+      erledigt++;
+    }
+    sammelStatus('✓ ' + erledigt + ' Produkt' + (erledigt === 1 ? '' : 'e') + ' geschrieben, je mit Sicherung · Stand ' + geladenerStand + '. Jetzt eine neue Notfall-Kopie ziehen.', 'ok');
+    status('✓ ' + (sammel.art === 'fuellen' ? 'Richtwerte gefüllt' : 'Auf Mitschrift umgestellt') + ': ' + erledigt + ' Produkt(e) · Stand ' + geladenerStand, 'ok');
+  } catch (err) {
+    console.error('[Produkt-Config] Sammel-Schreiben:', err);
+    sammelStatus('⚠ Gestoppt' + (aktuell ? ' bei „' + aktuell.name + '“ (' + (erledigt + 1) + ' von ' + liste.length + ')' : '') + ': ' + fehlerText(err) +
+      (err && err.code === 'permission-denied' ? ' — Regel älter als diese Seite, Konto ohne Rolle admin, oder jemand hat gleichzeitig gespeichert.' : '') +
+      ' · ' + erledigt + ' schon geschrieben (bleiben). Knopf noch einmal drücken macht beim Rest weiter.', 'err');
+  }
+  document.getElementById('quelleName').textContent = 'Datenbank (Stand-Zettel ' + (geladenerStand === null ? 'noch nicht angelegt' : 'Nr. ' + geladenerStand) + ')';
+  sammel.laeuft = false; sammel.liste = [];
+  los.classList.add('hidden'); zu.disabled = false; zu.textContent = 'Schließen';
+  render();
+  ladeNotfallZeile();
 }
 
 // ── Render: Tab-Leiste + reine Übersichtstabelle ─────────────────────────
@@ -763,6 +1302,8 @@ function render() {
   renderTabLeiste();
   var nbtn = document.getElementById('nurOhneEinheitBtn');
   if (nbtn) nbtn.classList.toggle('aktiv', nurOhneEinheit);
+  var pbtn = document.getElementById('pausierteBtn');   // 15.10.2026 (#63)
+  if (pbtn) { pbtn.classList.toggle('aktiv', pausierteAusblenden); pbtn.textContent = pausierteAusblenden ? 'Pausierte zeigen' : 'Pausierte ausblenden'; }
 
   var suche = document.getElementById('suchfeld').value;
   var indizes = sichtbareIndizes();
@@ -776,15 +1317,19 @@ function render() {
       var farbe = KAT_FARBEN[p.kategorie] || '#555';
       var eInfo = einheitVon(p);   // 13.10.2026 (#64)
       var luecke = hatEinheitLuecke(p);
+      var pausiert = istPausiertP(p);   // 15.10.2026 (#63)
+      var q = quelleVon(p), rwLuecken = richtwertLuecken(p);
+      var quelleZelle = esc(richtwertBereit() ? P_().quelleText(q) : '—') + (q === 'richtwert' && rwLuecken.length ? ' <span class="quelle-luecke" title="leer an: ' + esc(rwLuecken.join(', ')) + '">(' + rwLuecken.length + ' leer)</span>' : '');
       return (
-        '<tr class="klickbar' + (!p.frosterZustaendigkeit ? ' fehlt-fz' : '') + (luecke ? ' fehlt-einheit' : '') + '" style="border-left:4px solid ' + farbe + '" onclick="oeffneKarte(' + idx + ')">' +
+        '<tr class="klickbar' + (!p.frosterZustaendigkeit ? ' fehlt-fz' : '') + (luecke ? ' fehlt-einheit' : '') + (pausiert ? ' pausiert' : '') + '" style="border-left:4px solid ' + farbe + '" onclick="oeffneKarte(' + idx + ')">' +
           '<td class="col-artnr">' + esc(p.artNr || '—') + '</td>' +
-          '<td class="col-name">' + esc(p.name || '—') + '</td>' +
+          '<td class="col-name">' + esc(p.name || '—') + (pausiert ? '<span class="etikett">pausiert</span>' : '') + '</td>' +
           '<td class="col-spb' + (eInfo && eInfo.art === 'stueck' ? ' spb-ohne-bedeutung' : '') + '"' + (eInfo && eInfo.art === 'stueck' ? ' title="bei Stück ohne Bedeutung"' : '') + '>' +
             (p.stueckProBlech || (eInfo && eInfo.art === 'traeger' ? '<span class="einheit-luecke">— fehlt —</span>' : '—')) + '</td>' +
           '<td class="col-einheit">' + (eInfo && eInfo.art === 'fehlt' ? '<span class="einheit-luecke">— fehlt —</span>' : esc(p.einheit || '—')) + '</td>' +
           '<td class="col-legacy"><span class="legacy-readonly">' + (p.legacyKey || '—') + '</span></td>' +
           '<td class="col-fz">' + esc(p.frosterZustaendigkeit || '— offen —') + '</td>' +
+          '<td class="col-quelle">' + quelleZelle + '</td>' +
           '<td class="col-hinweis" style="color:var(--amber)">' + esc(p.hinweis || '—') + '</td>' +
           '<td class="col-del"><button class="btn-del" onclick="event.stopPropagation(); loescheProdukt(' + idx + ')" title="Löschen">✕</button></td>' +
         '</tr>'
@@ -799,6 +1344,7 @@ function render() {
           '<th class="col-einheit">Einheit <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'einheit\')" title="Was bedeutet das?">❓</button></th>' +
           '<th class="col-legacy">legacyKey</th>' +
           '<th class="col-fz">Froster-Zust. <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'frosterZustaendigkeit\')" title="Was bedeutet das?">❓</button></th>' +
+          '<th class="col-quelle">Quelle <button type="button" class="feld-hilfe-btn" onclick="event.stopPropagation(); zeigeFeldHilfe(\'bedarfsQuelle\')" title="Was bedeutet das?">❓</button></th>' +
           '<th class="col-hinweis">Hinweis</th><th class="col-del">✕</th>' +
         '</tr></thead>' +
         '<tbody>' + zeilen + '</tbody>' +
@@ -807,7 +1353,14 @@ function render() {
 
   var offen = daten.filter(function (p) { return !p.frosterZustaendigkeit; }).length;
   var ohneEinheit = daten.filter(hatEinheitLuecke).length;   // 13.10.2026 (#64)
-  status(daten.length + ' Produkte' + (offen ? ' · ' + offen + ' ohne Froster-Zuständigkeit' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit' : '') + (geaendert ? ' · ungespeicherte Änderungen' : ''), geaendert ? 'err' : ((offen || ohneEinheit) ? '' : 'ok'));
+  status(daten.length + ' Produkte' + (offen ? ' · ' + offen + ' ohne Froster-Zuständigkeit' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit' : '') + zaehlerRichtwert() + (geaendert ? ' · ungespeicherte Änderungen' : ''), geaendert ? 'err' : ((offen || ohneEinheit) ? '' : 'ok'));
+}
+
+/* 15.10.2026 (#63): „N pausiert · N mit leerem Richtwert-Tag“ (leer zählt nur an Backtagen). */
+function zaehlerRichtwert() {
+  var pausiert = daten.filter(istPausiertP).length;
+  var leer = daten.filter(function (p) { return richtwertLuecken(p).length > 0; }).length;
+  return (pausiert ? ' · ' + pausiert + ' pausiert' : '') + (leer ? ' · ' + leer + ' mit leerem Richtwert-Tag' : '');
 }
 
 // ── Kategorie-Tab-Leiste ──────────────────────────────────────────────
@@ -948,6 +1501,10 @@ var KARTEN_TABS = [
         '<div class="detail-section full">' + kfTeig(p.ausTeig) + '</div>'
       );
     }
+  },
+  {
+    id: 'bedarf', label: 'Bedarf',   // 15.10.2026 (#63): Aktiv, Quelle, Richtwert
+    render: function (p) { return kfBedarf(p); }
   },
   {
     id: 'einst', label: 'Einstellungen',
@@ -1191,6 +1748,12 @@ async function speichereKarte(idx, aktion) {
   var kennung = kennungJetzt();
   if (!kennung) { status('⚠ Keine Kennung — bist du angemeldet?', 'err'); return; }
   var roh = serverRoh[key] || null;
+  /* 15.10.2026 (#63): ungültige Richtwert-Eingaben und Richtwert ohne Einheit sperren das Speichern */
+  var rwFehler = richtwertBereit() ? richtwertFehlerListe(p) : [];
+  if (rwFehler.length) { status('⚠ Richtwert ' + rwFehler.join(' · ') + ' — nicht gespeichert.', 'err'); return; }
+  if (richtwertBereit() && aktion !== 'archivieren' && quelleVon(p) === 'richtwert' && !hatEinheitFuerRichtwert(p)) {
+    status('⚠ Quelle Richtwert braucht eine Einheit — erst die Einheit wählen oder eine andere Quelle (Reiter Bedarf). Nicht gespeichert.', 'err'); return;
+  }
   if (!aktion) aktion = roh ? 'aendern' : 'anlegen';
   var btn = document.getElementById('karteSpeichernBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Speichere …'; }
   var fertig = function () { if (btn) btn.textContent = '💾 Speichern'; zeigeKartenKnoepfe(); };
@@ -1230,7 +1793,8 @@ async function speichereKarte(idx, aktion) {
       document.getElementById('karteOverlay').classList.add('hidden'); karteIdx = null;
       status('✓ „' + (p.name || key) + '“ als gelöscht markiert (Sicherung angelegt, Stand ' + neuerStand + ')', 'ok');
     } else {
-      status('✓ „' + (p.name || key) + '“ gespeichert' + (aktion === 'anlegen' ? ' (neu)' : aktion === 'wiederherstellen' ? ' (zurückgeholt)' : '') + ' · Sicherung angelegt · Stand ' + neuerStand, 'ok');
+      var rwLeer = richtwertLuecken(inhalt);   // 15.10.2026 (#63): Hinweis, keine Sperre
+      status('✓ „' + (p.name || key) + '“ gespeichert' + (aktion === 'anlegen' ? ' (neu)' : aktion === 'wiederherstellen' ? ' (zurückgeholt)' : '') + ' · Sicherung angelegt · Stand ' + neuerStand + (rwLeer.length ? ' · Richtwert leer an ' + rwLeer.join(', ') + ' (die Station warnt dort)' : ''), 'ok');
     }
     document.getElementById('quelleName').textContent = 'Datenbank (Stand-Zettel Nr. ' + neuerStand + ')';
     var n = Object.keys(geaenderteKarten).length;
@@ -1401,7 +1965,7 @@ var helpData = {
     },
     {
       heading: "Wie navigiere ich durch die Produkte?",
-      text: "Die Kategorie-Tabs oben (Brötchen, Brot, ...) zeigen immer nur eine Kategorie gleichzeitig — antippen wechselt die Ansicht. Das Suchfeld sucht dagegen über alle Kategorien hinweg. Ein Tipp auf eine Zeile öffnet die Produkt-Karte mit mehreren Tabs (Stammdaten, Backinformationen, Einstellungen — künftig kommen weitere dazu). Oben in der Karte blättern die ‹/›-Pfeile zum vorherigen/nächsten Produkt der gerade sichtbaren Liste, ohne die Karte zu schließen."
+      text: "Die Kategorie-Tabs oben (Brötchen, Brot, ...) zeigen immer nur eine Kategorie gleichzeitig — antippen wechselt die Ansicht. Das Suchfeld sucht dagegen über alle Kategorien hinweg. Ein Tipp auf eine Zeile öffnet die Produkt-Karte mit mehreren Tabs (Stammdaten, Backinformationen, Bedarf, Einstellungen, Vorversionen). Oben in der Karte blättern die ‹/›-Pfeile zum vorherigen/nächsten Produkt der gerade sichtbaren Liste, ohne die Karte zu schließen."
     },
     {
       heading: "Woher kommen die Daten?",
@@ -1442,6 +2006,14 @@ var helpData = {
     {
       heading: "Was bedeuten „Einheit“ und „Stück pro Träger“?",
       text: "„Einheit“ sagt, worin ein Produkt gezählt und geplant wird: entweder Stück (zum Beispiel alle Brote, auch aus der Kastenform) oder ein Träger. Gewählt wird aus der Liste: Stück, Blech, Lochblech, Kuchenblech, Schlawinerblech, Rote Diele, Blaue Diele. „Andere …“ öffnet ein Textfeld, nur für den Notfall; die Abkürzungen der Station (KuBl., Dl. …) bitte nicht eintippen, sondern den vollen Namen wählen. Alte Schreibweisen (z. B. „bleche“) zeigt die Liste als ihren Eintrag, beim nächsten Speichern wird der Listentext geschrieben. „Stück pro Träger“ sagt, wie viele Stück auf einen Träger passen (in der Karte steht der Träger dabei, z. B. „Stück pro Diele“). Bei Stück spielt die Zahl keine Rolle, das Feld ist dann ausgegraut. Fehlt die Einheit, rechnet BOS vorerst wie mit Blechen; der Knopf „Nur ohne Einheit“ zeigt alle Produkte, bei denen sie oder „Stück pro Träger“ noch fehlt. Wechselst du bei einem gespeicherten Produkt die Einheit, stehen Froster-Bestand und Mitschrift noch in der alten Einheit: danach neu zählen und „Stück pro Träger“ prüfen."
+    },
+    {
+      heading: "Was steht im Reiter „Bedarf“?",
+      text: "Drei Dinge. „Aktiv“: Haken raus heißt Saison-Pause — das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster-Inventur und Teigecke-Nacht, alle Daten bleiben. In dieser Liste steht es dann ausgegraut mit „pausiert“; „Pausierte ausblenden“ blendet es aus. Steht laut letzter Zählung noch etwas im Froster, sagt die Karte es dir (nur ein Hinweis). „Woher kommt die Bedarfszahl?“: Richtwert, Backzettel oder Mitschrift. Damit rechnen Stationen und Schnellrechner bei diesem Produkt; ohne Wahl ist es die Mitschrift. Der „Richtwert“ ist deine eigene Zahl je Wochentag in der Einheit des Produkts (das Wort steht unter den Kästchen). Komma geht, leer ist nicht 0: leer heißt „keine Zahl“, und die Station warnt dort; 0 heißt „nichts“. Bei Stück nur ganze Zahlen. Tage, an denen das Produkt laut Backtagen nicht gebacken wird, sind grau und zählen als 0. Ohne Einheit lässt sich kein Richtwert eintragen. Ist eine andere Quelle gewählt, ruht der Richtwert grau, die Zahlen bleiben. „Aus Backzettel übernehmen“ zeigt die Backzettel-Zahlen und was sie überschreiben würden; erst „Übernehmen“ setzt sie ein, erst 💾 speichert. Wechselst du die Einheit, steht der Richtwert noch in der alten Einheit — neu eintragen oder aus dem Backzettel übernehmen."
+    },
+    {
+      heading: "Was machen „Richtwerte aus Backzettel füllen“ und „Alle auf Mitschrift“?",
+      text: "„Richtwerte aus Backzettel füllen“ füllt einmal alle Produkte, deren Richtwert noch ganz leer ist und die eine Einheit haben — nur an ihren Backtagen — und stellt sie auf die Quelle Richtwert. „Alle auf Mitschrift“ stellt die Produkte auf Mitschrift um, für die genug Mitschrift da ist: an jedem Wochentag mit Bedarf mindestens so viele Werte, wie die Station für „verlässlich“ verlangt. Beide zeigen erst eine Vorschau (was passiert, was nicht und warum, dazu Auffälligkeiten wie eine Backzettel-Zahl an einem Tag ohne Backtag) und schreiben erst nach deiner Bestätigung, Produkt für Produkt, jedes mit eigener Sicherung (Reiter Vorversionen). Bricht es ab, bleibt Geschriebenes stehen; noch einmal drücken macht beim Rest weiter. Vorher bitte eine Notfall-Kopie ziehen. Ungespeicherte Änderungen in Karten erst speichern."
     },
     {
       heading: "Was bedeutet „Aus Teig“?",

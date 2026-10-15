@@ -4,6 +4,14 @@
   MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-10-15 · 01:26 · v0.12b · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
+      Produktliste aus der Sicht 'laufend': pausierte Brote fehlen. Ein Teig,
+      dessen Brote alle pausiert sind, verschwindet damit von selbst (teigeDes-
+      Tages fragt produkteDesTeigs); ein Vorrats-Teig ebenso, auch wenn für
+      heute noch ein Vorrats-Haken gesetzt ist. Teilweise pausiert: Ist nur das
+      Froster-Brot pausiert, gilt der Teig als normaler Backzettel-Teig (Ulf
+      14.10., U4: „Ja, denke schon“). Logik unverändert, nur die Liste.
+      Fassungsprüfung mit sichtbarer Meldung. SESSION_2026-10-14_RICHTWERT_BAU.md
     2026-10-13 · 14:49 · v0.12a · Einheiten Nachtrag 1 (eine Zeile, KC-Freigabe)
       ANWEISUNG_2026-10-13_EINHEITEN_NACHTRAG1.md: Die Einheiten-Liste speichert
       „Rote Diele“/„Blaue Diele“ (Einzahl). vorratFeldHTML() wählte das Wort
@@ -1037,7 +1045,8 @@ async function ladeProdukte() {
   try { localStorage.removeItem(PRODUKTE_SPIEGEL_KEY_ALT); } catch (e) { /* egal */ }
   try {
     if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
-    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    if (typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Saison-Pause) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');   // 15.10.2026 (#63)
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'laufend' });   // 15.10.2026 (#63): ohne pausierte Brote
     S.produkte = e.liste; S.produkteOk = true;
     S.produkteAusSpiegel = (e.quelle === 'geraetekopie') ? (e.kopieZeit || e.stand) : null;
     if (e.quelle === 'geraetekopie' && e.grund) zeigeFehler(t('err_laden', { was: 'Produktliste' }), e.grund);

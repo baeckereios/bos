@@ -3,6 +3,17 @@
 <!--
   MODUL: produkt_config/produkt_config_sync.html — Produkt-Config Sync
   CHANGELOG
+    2026-10-15 · 01:28 · v-richtwert-1 · Import behält Richtwert, Quelle, Pause (Baustelle #63, B2/U1)
+      SESSION_2026-10-14_RICHTWERT_BAU.md (Freigabe Kontroll-Chat 14.10., 19:19).
+      Der Import ersetzt ganze Dokumente (batch.set). Eine ältere Notfall-Kopie
+      kennt die Felder bedarfsQuelle, richtwert, pausiert noch nicht — ohne
+      Vorkehrung würde das Einspielen sie bei allen Produkten löschen (Fund F1).
+      Jetzt: Fehlt ein solches Feld in einer Datei-Zeile (fehlt, nicht leer),
+      wird es aus der Datenbank übernommen, solange der Haken „Richtwert, Quelle
+      und Pause aus der Datenbank behalten“ gesetzt ist (vorbelegt, Ulf U1).
+      Die Vorschau nennt die betroffenen Produkte in einer eigenen Zeile und
+      rechnet mit dem Haken (ändern → Vorschau neu). Export, Sammel-Sicherung
+      und Rückweg unverändert; die Felder gehen dort ohnehin mit.
     2026-10-06 · 08:58 · v-sicherung-1 · Stufe 2 (SESSION_2026-10-06_PRODUKTE_AUS_FIRESTORE_STUFE2.md)
       Import schreibt EINE Sammel-Sicherung (produkte_sicherungen, aktion
       'einspielen', dokId '*', vorher = Liste aller rohen Serverstände) im selben
@@ -174,6 +185,9 @@
       <div class="row">
         <button id="importBtn" disabled>Vorschau gegen die Datenbank prüfen</button>
       </div>
+      <div id="importBehaltenRow" class="row hidden">
+        <label><input type="checkbox" id="importBehaltenHaken" checked> Richtwert, Quelle und Pause aus der Datenbank behalten, wo sie in der Datei fehlen</label>
+      </div>
       <div id="importLoeschRow" class="row hidden">
         <label><input type="checkbox" id="importLoeschHaken"> Produkte, die nur in der Datenbank stehen, als gelöscht markieren</label>
       </div>
@@ -253,7 +267,7 @@ var helpData = {
     },
     {
       heading: "Wichtig zu wissen",
-      text: "Vor jedem Einspielen sichert die Seite den ganzen bisherigen Stand als Sammel-Sicherung (unten, als Datei herunterladbar) — das ist der Rückweg. Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind."
+      text: "Vor jedem Einspielen sichert die Seite den ganzen bisherigen Stand als Sammel-Sicherung (unten, als Datei herunterladbar) — das ist der Rückweg. Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind. Eine Kopie von vor dem 15.10.2026 kennt Richtwert, Quelle und Pause (Saison-Pause) noch nicht: Die Vorschau sagt es in einer eigenen Zeile, und solange der Haken „aus der Datenbank behalten“ gesetzt ist (vorbelegt), bleiben diese drei aus der Datenbank stehen. Nimmst du ihn raus, werden sie mit zurückgedreht."
     }
   ]
 };
@@ -300,6 +314,13 @@ var STAND_DOK = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.STAND_DOK : 'aktuell';
 var importedData = null;
 var vorschau = null;
 var vorschauRoh = null;   /* rohe Serverstände der Vorschau — werden zur Sammel-Sicherung (Stufe 2) */
+var vorschauDb = null;    /* dieselben als [{ id, daten }] — für „behalten“ (15.10.2026) */
+document.getElementById('importBehaltenHaken').onchange = function () {
+  /* Vorschau mit dem neuen Stand des Hakens neu rechnen (ohne neuen Lesevorgang) */
+  if (!importedData || !vorschauDb || !vorschau) return;
+  vorschau = vergleicheImport(importedData, vorschauDb, this.checked);
+  document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
+};
 var SICH_COLLECTION = 'produkte_sicherungen';
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
@@ -307,6 +328,18 @@ function fehlerText(err) {
   return window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(err) : ((err && err.message) || String(err));
 }
 
+/* 15.10.2026 (#63, B2/U1): Felder, die eine ältere Datei noch nicht kennt. Fehlen sie in
+   einer Datei-Zeile (fehlt — ein vorhandenes Feld, auch null, gilt wie geschrieben), werden
+   sie aus der Datenbank übernommen, solange der Haken „behalten“ gesetzt ist. */
+var DB_BEHALTEN_FELDER = ['bedarfsQuelle', 'richtwert', 'pausiert'];
+function mitBehalten(p, db) {
+  if (!db || !p) return p;
+  var o = null;
+  DB_BEHALTEN_FELDER.forEach(function (k) {
+    if (!Object.prototype.hasOwnProperty.call(p, k) && db[k] !== undefined) { if (!o) o = Object.assign({}, p); o[k] = db[k]; }
+  });
+  return o || p;
+}
 /* --- VERGLEICH ANFANG (reine Logik, geprüft in pruefe_sync_vorschau.js) ---
    Feldweise, unabhängig von der Reihenfolge der Felder (K6). Die Felder
    reihenfolge und geloescht gehören der Datenbank, nicht der Datei (K7),
@@ -325,17 +358,21 @@ function geaenderteFelder(datei, db) {
   Object.keys(a).concat(Object.keys(b)).forEach(function (k) { felder[k] = true; });
   return Object.keys(felder).filter(function (k) { return !feldGleich(a[k], b[k]); }).sort();
 }
-/* datei: Liste aus der Datei; roh: [{ id, daten }] aus der Datenbank (Sicht „roh“). */
-function vergleicheImport(datei, roh) {
+/* datei: Liste aus der Datei; roh: [{ id, daten }] aus der Datenbank (Sicht „roh“).
+   behalten (seit 15.10.2026, optional): fehlende Felder aus DB_BEHALTEN_FELDER zählen
+   als „wie in der Datenbank“. r.fehlendeFelder nennt die Produkte, bei denen das greift. */
+function vergleicheImport(datei, roh, behalten) {
   var inDb = {};
   (roh || []).forEach(function (d) { inDb[d.id] = d.daten; });
   var inDatei = {};
   datei.forEach(function (p) { inDatei[p.legacyKey] = p; });
-  var r = { neu: [], geaendert: [], unveraendert: 0, wiederAktiv: [], reihenfolgeNeu: 0, nurDb: [], schonGeloescht: 0 };
+  var r = { neu: [], geaendert: [], unveraendert: 0, wiederAktiv: [], reihenfolgeNeu: 0, nurDb: [], schonGeloescht: 0, fehlendeFelder: [] };
   datei.forEach(function (p, i) {
     var db = inDb[p.legacyKey];
     if (!db) { r.neu.push({ key: p.legacyKey, name: p.name || p.legacyKey }); return; }
-    var felder = geaenderteFelder(p, db);
+    var eff = mitBehalten(p, db);
+    if (eff !== p) r.fehlendeFelder.push({ key: p.legacyKey, name: p.name || p.legacyKey });
+    var felder = geaenderteFelder(behalten ? eff : p, db);
     if (felder.length) r.geaendert.push({ key: p.legacyKey, name: p.name || p.legacyKey, felder: felder });
     else r.unveraendert++;
     if (db.geloescht === true) r.wiederAktiv.push({ key: p.legacyKey, name: p.name || p.legacyKey });
@@ -363,6 +400,11 @@ function vorschauHTML(v, anzahlDatei) {
   if (v.nurDb.length) h += '<div style="margin-top:6px;color:var(--amber)"><strong>Neu nur in der Datenbank, nicht in der Datei</strong> (' + v.nurDb.length + '): ' + namen(v.nurDb) + '<br>Ohne Haken unten bleiben sie, wie sie sind. Mit Haken werden sie als gelöscht markiert.</div>';
   else h += '<div style="margin-top:6px">Nur in der Datenbank: keine.</div>';
   if (v.schonGeloescht) h += '<div style="margin-top:6px;color:var(--dim)">Schon gelöscht (bleiben so): ' + v.schonGeloescht + '</div>';
+  if (v.fehlendeFelder && v.fehlendeFelder.length) {   /* 15.10.2026 (#63, B2) */
+    var behalten = document.getElementById('importBehaltenHaken').checked;
+    h += '<div style="margin-top:6px;color:' + (behalten ? 'var(--amber)' : 'var(--red)') + '"><strong>Ältere Datei: bei ' + v.fehlendeFelder.length + ' Produkt(en) fehlen Richtwert, Quelle oder Pause</strong> (' + namen(v.fehlendeFelder) + ').<br>' +
+      (behalten ? 'Sie bleiben aus der Datenbank, wie sie sind (Haken unten).' : 'Ohne Haken werden sie in der Datenbank GELÖSCHT — die Produkte rechnen dann wieder mit der Mitschrift und laufen wieder.') + '</div>';
+  }
   return h;
 }
 
@@ -378,7 +420,8 @@ document.getElementById('importFile').onchange = function (e) {
     var btn = document.getElementById('importBtn');
     document.getElementById('importConfirmRow').classList.add('hidden');
     document.getElementById('importLoeschRow').classList.add('hidden');
-    vorschau = null;
+    document.getElementById('importBehaltenRow').classList.add('hidden');
+    vorschau = null; vorschauDb = null;
     try {
       var data = JSON.parse(evt.target.result);
       if (!Array.isArray(data)) throw new Error("Erwarte ein JSON-Array");
@@ -421,8 +464,10 @@ document.getElementById('importBtn').onclick = function () {
   if (!window.BOS_PRODUKTE) { setzeStatus(statusEl, '✗ bos_produkte.js ist nicht geladen (neue Fassung noch nicht online? Seite neu laden).', 'err'); return; }
   /* immer frisch und nur vom Server — eine Vorschau gegen eine Gerätekopie wäre eine Lüge (F4) */
   window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true, frisch: true }).then(function (e) {
-    vorschau = vergleicheImport(importedData, e.liste);
+    vorschauDb = e.liste;
+    vorschau = vergleicheImport(importedData, e.liste, document.getElementById('importBehaltenHaken').checked);
     vorschauRoh = e.liste.map(function (d) { return d.daten; });
+    document.getElementById('importBehaltenRow').classList.toggle('hidden', !vorschau.fehlendeFelder.length);
     document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
     document.getElementById('importLoeschRow').classList.toggle('hidden', !vorschau.nurDb.length);
     document.getElementById('importLoeschHaken').checked = false;
@@ -431,8 +476,9 @@ document.getElementById('importBtn').onclick = function () {
   }).catch(function (err) {
     if (err && err.art === 'leer') {
       /* Leere Datenbank: alles in der Datei ist neu. Das ist beim ersten Einspielen der Normalfall. */
-      vorschau = vergleicheImport(importedData, []);
-      vorschauRoh = [];
+      vorschau = vergleicheImport(importedData, [], true);
+      vorschauRoh = []; vorschauDb = [];
+      document.getElementById('importBehaltenRow').classList.add('hidden');
       document.getElementById('importPreview').innerHTML = vorschauHTML(vorschau, importedData.length);
       document.getElementById('importLoeschRow').classList.add('hidden');
       setzeStatus(statusEl, 'Die Datenbank ist leer — alle Produkte der Datei sind neu.');
@@ -475,8 +521,13 @@ document.getElementById('importConfirmBtn').onclick = function () {
        update (KC SP1). Fünf Pfade je Batch, siehe Bauplan §1.1. */
     var sichRef = db.collection(SICH_COLLECTION).doc();
     batch.set(sichRef, { collection: COLLECTION, dokId: '*', aktion: 'einspielen', vorher: vorschauRoh || [], konto: kennung, ts: ts });
+    /* 15.10.2026 (#63, B2): fehlende Richtwert/Quelle/Pause aus der Datenbank übernehmen, solange der Haken steht */
+    var behalten = document.getElementById('importBehaltenHaken').checked;
+    var dbJeKey = {};
+    (vorschauDb || []).forEach(function (d) { dbJeKey[d.id] = d.daten; });
     importedData.forEach(function (p, i) {
-      batch.set(col.doc(p.legacyKey), Object.assign(inhaltOhne(p), { reihenfolge: i, sicherungId: sichRef.id }));
+      var eff = behalten ? mitBehalten(p, dbJeKey[p.legacyKey]) : p;
+      batch.set(col.doc(p.legacyKey), Object.assign(inhaltOhne(eff), { reihenfolge: i, sicherungId: sichRef.id }));
     });
     if (loeschen) {
       vorschau.nurDb.forEach(function (x) { batch.update(col.doc(x.key), { geloescht: true, sicherungId: sichRef.id }); });
@@ -490,6 +541,7 @@ document.getElementById('importConfirmBtn').onclick = function () {
       ladeSammelSicherungen(); ladeNotfallZeile();
       document.getElementById('importConfirmRow').classList.add('hidden');
       document.getElementById('importLoeschRow').classList.add('hidden');
+      document.getElementById('importBehaltenRow').classList.add('hidden');
       vorschau = null;
       zurueck();
     });
