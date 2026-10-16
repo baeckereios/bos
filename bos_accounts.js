@@ -40,6 +40,7 @@
        reparaturLesen: boolean,   // NEU 10.10.2026 — „Mitlesen & antworten“ (Posteingang, Verlauf, Chat)
        reparaturMelden: boolean,  // NEU 10.10.2026 — „Melden“ (neue Anfrage; schließt Mitlesen ein)
        reparaturBearbeiten: boolean, // NEU 10.10.2026 — „Bearbeiten“, Hausmeister (Status, Fenster, Dringlichkeit; schließt Mitlesen ein)
+       farbschema: string,        // NEU 15.10.2026 — Farbprofil-ID (bos_farbprofile.js), NUR bei Abweichung von der Rolle; fehlt = Profil der Rolle
        erstelltAm: Firestore-Timestamp
      }
 
@@ -75,6 +76,14 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-10-15 · 19:56 · v-Farbprofil-1 · Feature
+       Feld farbschema (Farbprofil am Konto, #72 Stufe B) mit
+       setzeFarbschema(): ID setzen, leer = Feld löschen (FieldValue.delete),
+       nie null oder ''. Gespeichert wird nur eine Abweichung vom Profil der
+       Rolle (E10), das entscheidet die Kontenverwaltung. Kein Haken (Wert
+       ist ein String), läuft also nicht in kontoHaken. Regel unverändert
+       (update nur istAdmin(), ohne Feldliste).
+       SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
      2026-10-10 · 09:33 · v-Reparatur-1 · Feature
        Drei Haken der Reparaturanfrage: reparaturLesen, reparaturMelden,
        reparaturBearbeiten, mit setzeReparaturLesenRecht(),
@@ -361,6 +370,16 @@ window.BOS_ACCOUNTS = (function () {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ reparaturBearbeiten: !!wert });
   }
 
+  /**
+   * NEU (15.10.2026, Farbprofile Stufe B). Admin-Funktion wie die Haken-Setzer.
+   * id = Profil-ID aus bos_farbprofile.js → wird gespeichert; leer/null →
+   * Feld wird GELÖSCHT („Nach Rolle“), nicht mit null oder '' beschrieben.
+   */
+  async function setzeFarbschema(db, schluessel, id) {
+    var wert = (typeof id === 'string' && id) ? id : firebase.firestore.FieldValue.delete();
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ farbschema: wert });
+  }
+
   /** Admin-Funktion, vorher adminReauth(passwort). Löscht das Konto unwiderruflich — kein Zurückholen. Schreibt über die isolierte Admin-App. */
   async function loescheKonto(db, schluessel) {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).delete();
@@ -414,6 +433,7 @@ window.BOS_ACCOUNTS = (function () {
     setzeReparaturLesenRecht: setzeReparaturLesenRecht,
     setzeReparaturMeldenRecht: setzeReparaturMeldenRecht,
     setzeReparaturBearbeitenRecht: setzeReparaturBearbeitenRecht,
+    setzeFarbschema: setzeFarbschema,
     loescheKonto: loescheKonto,
     ladeAlleKonten: ladeAlleKonten,
     adminReauth: adminReauth,

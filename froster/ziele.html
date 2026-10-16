@@ -50,6 +50,8 @@
       Fix: `var` → `let` (let erzeugt auf Top-Level KEINE window-
       Eigenschaft). froster_produktion.html hatte zufällig schon `let`
       an der Stelle, war deshalb nie betroffen.
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Schleier im Seitenkopf folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -95,7 +97,7 @@
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background: radial-gradient(ellipse at top, rgba(192,122,16,.05), transparent 55%), var(--bg);
+    background: radial-gradient(ellipse at top, color-mix(in srgb, var(--amber) 5%, transparent), transparent 55%), var(--bg);
     color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent;
   }
   header{

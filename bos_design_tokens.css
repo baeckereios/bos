@@ -15,6 +15,26 @@
    dem alten System übernommen (Wiedererkennung), aber gegen den
    dunklen Grund neu kalibriert — wie Glut/Ofenlicht in einer
    dunklen Backstube.
+
+   AKZENT UND STATUS (15.10.2026, Farbprofile Stufe A, Baustelle #72):
+     Akzent  = --bos-amber, --bos-amber-bright, --bos-amber-glow,
+               --bos-amber-glow-soft. Das ist die Markenfarbe der Oberfläche
+               (Auswahl, aktiv, heute, Fokus, Hover, Schleier). Sie färbt
+               künftig mit dem Farbprofil des Kontos um (Stufe B). Der Name
+               „amber“ bleibt, viele Seiten haben eigene Aliase darauf.
+     Status  = --bos-red, --bos-green, --bos-gelb, --bos-warn,
+               --bos-warn-bright, --bos-warn-glow, --bos-warn-glow-soft.
+               Färbt NIE um. --bos-warn* ist „knapp / offen / Achtung“ und hat
+               heute denselben Wert wie Honig, ist aber ein eigenes Token.
+     Neue Seiten: Akzent nur über --bos-amber*, Warnung nur über --bos-warn*,
+     keine festen Amber-Werte (rgba(192,122,16,…), #c07a10, #e0973a).
+     Tönungen über color-mix(in srgb, var(--bos-amber) X%, transparent).
+     Prüfung: _PRUEF_farbschema_waechter.js (nicht im Repo).
+
+   FARBPROFILE (15.10.2026, #72 Stufe B): sieben Profilblöcke je dunkel
+   und hell weiter unten (html[data-farbschema="…"]), Liste und Vorrang in
+   bos_farbprofile.js. --bos-marke ist die feste Markenfarbe für
+   Ausgedrucktes (bos_druck.js), färbt nie um (E12).
    ================================================================ */
 
 :root {
@@ -39,11 +59,19 @@
 
   --bos-amber:          #c07a10;   /* Honig — bestehende Systemfarbe */
   --bos-amber-bright:   #e0973a;   /* Glut — Hover/Fokus-Glow */
-  --bos-amber-glow:     rgba(192,122,16,0.35);
-  --bos-amber-glow-soft:rgba(192,122,16,0.16);
+  --bos-amber-glow:     color-mix(in srgb, var(--bos-amber) 35%, transparent);   /* 15.10.2026: folgt dem Akzent (vorher rgba(192,122,16,0.35)) */
+  --bos-amber-glow-soft:color-mix(in srgb, var(--bos-amber) 16%, transparent);   /* vorher rgba(192,122,16,0.16) */
+
+  /* Status „knapp / offen / Achtung“ — färbt NIE mit einem Profil um (15.10.2026, #72) */
+  --bos-warn:           #c07a10;
+  --bos-warn-bright:    #e0973a;
+  --bos-warn-glow:      color-mix(in srgb, var(--bos-warn) 35%, transparent);
+  --bos-warn-glow-soft: color-mix(in srgb, var(--bos-warn) 16%, transparent);
 
   --bos-green: #4caf7d;  /* Status: ok / verbunden */
   --bos-red:   #d6584a;  /* Status: Fehler / Lücke */
+  --bos-gelb:  #d9a521;  /* Status: gesehen / in Arbeit (15.10.2026, vorher nur --ra-gelb der Reparaturanfrage) */
+  --bos-marke: #c07a10;  /* Markenfarbe für Ausgedrucktes — färbt NIE mit einem Profil um (E12, 15.10.2026) */
   --bos-blue:  #4a8fd6;  /* Neutral-Akzent (z.B. Kühlung) */
   --bos-purple:#8b5cf6;  /* System-Kacheln (Einstellungen etc.) */
 
@@ -107,12 +135,225 @@ html[data-theme="light"] {
   --bos-text-faint:     #a49a89;
 
   --bos-amber-bright:   #a8690d;
-  --bos-amber-glow:     rgba(192,122,16,0.20);
-  --bos-amber-glow-soft:rgba(192,122,16,0.10);
+  --bos-amber-glow:     color-mix(in srgb, var(--bos-amber) 20%, transparent);   /* vorher rgba(192,122,16,0.20) */
+  --bos-amber-glow-soft:color-mix(in srgb, var(--bos-amber) 10%, transparent);   /* vorher rgba(192,122,16,0.10) */
+
+  --bos-warn:           #c07a10;
+  --bos-warn-bright:    #a8690d;
+  --bos-warn-glow:      color-mix(in srgb, var(--bos-warn) 20%, transparent);
+  --bos-warn-glow-soft: color-mix(in srgb, var(--bos-warn) 10%, transparent);
+  --bos-gelb:           #9a7406;
 
   --bos-shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
   --bos-shadow-md: 0 8px 24px rgba(0,0,0,0.10);
   --bos-shadow-lg: 0 16px 48px rgba(0,0,0,0.14);
+}
+
+/* ================================================================
+   Farbprofile je Konto (15.10.2026, Baustelle #72, Stufe B)
+   ================================================================
+   Gesetzt über <html data-farbschema="<id>"> (bos_theme_sync.js liest das
+   wirksame Profil aus dem Profileintrag; Liste und Vorrang in
+   bos_farbprofile.js). Honig = Grundstand oben, ohne eigenen Block, auch
+   bei data-farbschema="honig".
+   Je Profil ZWEI Blöcke mit allen neun Tokens (acht aus der Vorschau + --bos-text-faint, F25):
+     dunkel  html[data-farbschema="…"]                     (0,1,1)
+     hell    html[data-theme="light"][data-farbschema="…"] (0,2,1)
+   Der Dunkel-Block ist genauso stark wie html[data-theme="light"] und
+   steht danach — er würde im hellen Modus den hellen Grund überschreiben.
+   Deshalb setzt der Hell-Block (stärker) dieselben neun Tokens VOLLSTÄNDIG
+   neu. Das Glühen folgt von selbst (color-mix seit Stufe A).
+   NIE in einem Profil: Statusfarben (--bos-red, --bos-green, --bos-gelb,
+   --bos-warn*), --bos-marke (Druck), --bos-border*.
+   Werte: _ideen/2026-10-12_FARBSCHEMA_VORSCHAU.html §8 (dunkel 1:1); hell
+   mit dunklerem Akzent (Ulf 15.10.2026, 18:45: „Ja dunklere Fassung
+   nehmen“), Verweis-/Glutfarbe hell = Vorschau --glut-text.
+   --bos-text-faint (F25, Kontroll-Chat 18:48: „erst im Profilbild ansehen“):
+   Honigs warmes Grau wirkte bei Stahl, Lavendel und Apfel sichtbar braun.
+   Je Profil text-dim Richtung Grund gemischt, bis der Kontrast mindestens
+   so hoch ist wie bei Honig (dunkel 3,34, hell 2,47).
+   ================================================================ */
+
+/* Zitrone */
+html[data-farbschema="zitrone"] {
+  --bos-bg:             #14130b;
+  --bos-bg-soft:        #191810;
+  --bos-surface:        #201f14;
+  --bos-surface-raised: #29271a;
+  --bos-text:           #f3f1e2;
+  --bos-text-dim:       #aaa688;
+  --bos-amber:          #d8d65a;
+  --bos-amber-bright:   #e6e48a;
+  --bos-text-faint:     #6d6a55;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Apfel */
+html[data-farbschema="apfel"] {
+  --bos-bg:             #10140c;
+  --bos-bg-soft:        #141a10;
+  --bos-surface:        #1b2115;
+  --bos-surface-raised: #22291b;
+  --bos-text:           #eef3e6;
+  --bos-text-dim:       #9fab90;
+  --bos-amber:          #9bcf4a;
+  --bos-amber-bright:   #b8e07a;
+  --bos-text-faint:     #636c59;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Stahl */
+html[data-farbschema="stahl"] {
+  --bos-bg:             #101417;
+  --bos-bg-soft:        #141a1e;
+  --bos-surface:        #1a2126;
+  --bos-surface-raised: #222b31;
+  --bos-text:           #e8eef2;
+  --bos-text-dim:       #92a1ab;
+  --bos-amber:          #6cb4e4;
+  --bos-amber-bright:   #94cbee;
+  --bos-text-faint:     #616b73;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Lavendel */
+html[data-farbschema="lavendel"] {
+  --bos-bg:             #121119;
+  --bos-bg-soft:        #16151f;
+  --bos-surface:        #1c1a27;
+  --bos-surface-raised: #242131;
+  --bos-text:           #eeecf6;
+  --bos-text-dim:       #a19dba;
+  --bos-amber:          #9b8cf2;
+  --bos-amber-bright:   #b8adf6;
+  --bos-text-faint:     #69667b;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Orchidee */
+html[data-farbschema="orchidee"] {
+  --bos-bg:             #150f17;
+  --bos-bg-soft:        #1a121d;
+  --bos-surface:        #211725;
+  --bos-surface-raised: #2a1d2f;
+  --bos-text:           #f4ebf5;
+  --bos-text-dim:       #b19bb6;
+  --bos-amber:          #d46ee0;
+  --bos-amber-bright:   #e396ec;
+  --bos-text-faint:     #736376;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Himbeere */
+html[data-farbschema="himbeere"] {
+  --bos-bg:             #170f13;
+  --bos-bg-soft:        #1d1318;
+  --bos-surface:        #24171d;
+  --bos-surface-raised: #2d1d25;
+  --bos-text:           #f5e9ee;
+  --bos-text-dim:       #b399a6;
+  --bos-amber:          #e0679a;
+  --bos-amber-bright:   #f08ab4;
+  --bos-text-faint:     #76636d;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Kreide */
+html[data-farbschema="kreide"] {
+  --bos-bg:             #151413;
+  --bos-bg-soft:        #1a1918;
+  --bos-surface:        #211f1e;
+  --bos-surface-raised: #2a2826;
+  --bos-text:           #f2efe9;
+  --bos-text-dim:       #a8a39a;
+  --bos-amber:          #d8c9ad;
+  --bos-amber-bright:   #e8dcc6;
+  --bos-text-faint:     #6d6a64;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Zitrone hell */
+html[data-theme="light"][data-farbschema="zitrone"] {
+  --bos-bg:             #f6f5e8;
+  --bos-bg-soft:        #ecead6;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #fbfaf2;
+  --bos-text:           #22200f;
+  --bos-text-dim:       #66634a;
+  --bos-amber:          #8d8c21;
+  --bos-amber-bright:   #66650f;
+  --bos-text-faint:     #a09d89;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Apfel hell */
+html[data-theme="light"][data-farbschema="apfel"] {
+  --bos-bg:             #f1f6ea;
+  --bos-bg-soft:        #e4ecd9;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #f8fbf4;
+  --bos-text:           #1a2112;
+  --bos-text-dim:       #5a6650;
+  --bos-amber:          #6a9427;
+  --bos-amber-bright:   #4d7a12;
+  --bos-text-faint:     #96a08e;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Stahl hell */
+html[data-theme="light"][data-farbschema="stahl"] {
+  --bos-bg:             #eef2f5;
+  --bos-bg-soft:        #e1e7ec;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #f6f8fa;
+  --bos-text:           #1a2329;
+  --bos-text-dim:       #56646d;
+  --bos-amber:          #278ed3;
+  --bos-amber-bright:   #2e6f9a;
+  --bos-text-faint:     #919ba2;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Lavendel hell */
+html[data-theme="light"][data-farbschema="lavendel"] {
+  --bos-bg:             #f1f0f8;
+  --bos-bg-soft:        #e5e3f1;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #f8f7fc;
+  --bos-text:           #1d1a2b;
+  --bos-text-dim:       #5f5a75;
+  --bos-amber:          #8876f0;
+  --bos-amber-bright:   #5a48c4;
+  --bos-text-faint:     #9b98ab;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Orchidee hell */
+html[data-theme="light"][data-farbschema="orchidee"] {
+  --bos-bg:             #f6eff7;
+  --bos-bg-soft:        #ece1ee;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #fbf7fb;
+  --bos-text:           #26162a;
+  --bos-text-dim:       #6a586e;
+  --bos-amber:          #cd55db;
+  --bos-amber-bright:   #94389f;
+  --bos-text-faint:     #a396a6;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Himbeere hell */
+html[data-theme="light"][data-farbschema="himbeere"] {
+  --bos-bg:             #f8f0f3;
+  --bos-bg-soft:        #f0e3e9;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #fcf6f8;
+  --bos-text:           #2a1620;
+  --bos-text-dim:       #6e5762;
+  --bos-amber:          #dd5990;
+  --bos-amber-bright:   #a83a6a;
+  --bos-text-faint:     #a8979f;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
+}
+
+/* Kreide hell */
+html[data-theme="light"][data-farbschema="kreide"] {
+  --bos-bg:             #f4f3f0;
+  --bos-bg-soft:        #e9e7e2;
+  --bos-surface:        #ffffff;
+  --bos-surface-raised: #faf9f7;
+  --bos-text:           #22201d;
+  --bos-text-dim:       #67625a;
+  --bos-amber:          #a1844d;
+  --bos-amber-bright:   #6e6150;
+  --bos-text-faint:     #9e9b94;   /* F25: blasse Schrift im Farbton des Profils, Kontrast ≥ Honig */
 }
 
 /* ---------- Dichte: Kompakt (optional — z.B. für Windows-Nutzung, Maus statt Finger) ----------

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Tönungen Herkunftsmarke und aktiver Tag folgen dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -89,7 +90,7 @@
     font-family: var(--zk-font-label); font-size: var(--bos-font-xs, .68rem); font-weight: 800;
     letter-spacing: .03em; text-transform: uppercase; padding: var(--bos-space-3xs, 3px) var(--bos-space-xs, 8px); border-radius: 6px;
   }
-  .quelle-firestore { background: rgba(192,122,16,.22); color: var(--zk-amber-hell); }
+  .quelle-firestore { background: color-mix(in srgb, var(--zk-amber) 22%, transparent); color: var(--zk-amber-hell); }
   .quelle-lokal, .quelle-datei { background: rgba(171,156,138,.18); color: var(--zk-text-dim); }
   .quelle-entwurf { background: rgba(214,88,74,.2); color: var(--zk-red); }
 
@@ -137,7 +138,7 @@
     min-width: 68px; background: var(--zk-surface-2); border: 1px solid var(--zk-border); border-radius: 10px;
     padding: var(--bos-space-xs, 8px) var(--bos-space-2xs, 6px); cursor: pointer; font-family: var(--zk-font-label); position: relative;
   }
-  .tag-chip.aktiv { border-color: var(--zk-amber); background: rgba(192,122,16,.18); }
+  .tag-chip.aktiv { border-color: var(--zk-amber); background: color-mix(in srgb, var(--zk-amber) 18%, transparent); }
   .tag-chip.feiertag { box-shadow: inset 0 0 0 1px var(--zk-amber-hell); }
   .tag-chip.entwurf { border-style: dashed; border-color: var(--zk-red); }
   .tag-chip-entwurf-marke { position: absolute; top: 4px; right: 6px; color: var(--zk-red); font-size: var(--bos-font-2xs, .55rem); line-height: 1; }

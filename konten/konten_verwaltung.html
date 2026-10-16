@@ -7,6 +7,16 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-15 · 19:56 · v-Farbprofil-1 · Feature (Farbprofile Stufe B, #72; Freigabe Kontroll-Chat 18:48)
+      Konto-Karte, Stammdaten: eigene Gruppe „🎨 Farbprofil“ unter der Rolle,
+      Auswahl „Nach Rolle: ‹Profil›“ und alle Profile aus bos_farbprofile.js,
+      gespeichert in derselben Sammelaktion (setzeFarbschema). Nur eine
+      Abweichung von der Rolle wird gespeichert; das Profil der Rolle zu wählen
+      springt auf „Nach Rolle“ (E10), „Nach Rolle“ löscht das Feld. Auch bei
+      geschützten Konten wählbar. Hilfetext ergänzt.
+      SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Leerlauf-Streifen („sperrt sich in … s“) auf feste Warnfarbe --bos-warn. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-10 · 22:06 · v-Schichtplan-59 · Feature (#59 „gehört in den Schichtplan“)
       Pflichtfrage „Steht diese Person im Schichtplan?“ auf BEIDEN Wegen, auf
       denen eine Person entsteht: Beschriften „neue Person“ und „+ Neue
@@ -426,7 +436,7 @@
   </header>
 
   <main>
-    <div id="leerlaufStreifen" class="hidden" role="alert" style="position:sticky; top:env(safe-area-inset-top, 0px); z-index:40; margin-bottom:12px; padding:10px 14px; border:1px solid var(--bos-amber); border-radius:var(--bos-radius-sm, 8px); background:var(--bos-surface, #1c1a17); color:var(--bos-amber); font-weight:600; font-size:.9rem;"></div>
+    <div id="leerlaufStreifen" class="hidden" role="alert" style="position:sticky; top:env(safe-area-inset-top, 0px); z-index:40; margin-bottom:12px; padding:10px 14px; border:1px solid var(--bos-warn, var(--bos-amber)); border-radius:var(--bos-radius-sm, 8px); background:var(--bos-surface, #1c1a17); color:var(--bos-warn, var(--bos-amber)); font-weight:600; font-size:.9rem;"></div>
     <div id="gesperrtBox" class="bos-panel" style="max-width:520px; margin:24px auto; text-align:center; display:flex; flex-direction:column; gap:12px;">
       <div class="bos-title" style="font-size:1.1rem;">Nur mit Admin-Passwort</div>
       <p style="color:var(--bos-text-dim); font-size:.9rem; margin:0;">Die Kontenverwaltung zeigt erst nach der Admin-Anmeldung etwas an. Die Rolle Admin allein reicht nicht.</p>
@@ -576,6 +586,7 @@
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_accounts.js"></script>
 <script src="../bos_launcher_roles.js"></script>
+<script src="../bos_farbprofile.js"></script>   <!-- NEU 15.10.2026, #72 Stufe B: Profilliste für „🎨 Farbprofil“ -->
 
 <script>
 // ==========================================================================
@@ -605,6 +616,10 @@ var helpData = {
     {
       heading: "Wie funktioniert der Konten-Tab?",
       text: "Oben abgesetzt, in Rot: Konten ohne Rolle — die neuesten zuerst. Darunter alphabetisch alle bestätigten Konten. Rolle lässt sich direkt in der Zeile umstellen, das setzt automatisch die Zugriffs-Haken auf den Rollen-Standard. Ein Tipp auf die Zeile selbst öffnet die Konto-Karte mit den einzelnen Zugriffs-Ausnahmen, gruppiert nach Bereich."
+    },
+    {
+      heading: "Was ist das 🎨 Farbprofil?",
+      text: "Jedes Konto sieht BOS in einer eigenen Farbe: Akzent und Grundton der Flächen, auf jeder Seite. Statusfarben (Rot, Gelb, Grün, Warnung) und Ausgedrucktes bleiben immer gleich. Voreingestellt ist das Profil der Rolle („Nach Rolle: …“). Für Azubis zum Beispiel „Apfel“ wählen. Wählst du das Profil, das die Rolle ohnehin hat, springt die Auswahl auf „Nach Rolle“ — das Konto folgt dann bei einem Rollenwechsel der neuen Rolle. Eine neu angelegte Rolle hat noch kein eigenes Profil und bekommt Honig. Gespeichert wird mit „Änderungen speichern“, sichtbar wird es beim nächsten Anmelden."
     },
     {
       heading: "Warum das Admin-Passwort schon beim Öffnen?",
@@ -779,7 +794,9 @@ function initBearbeitung() {
       teigeckeRezepte: !!k.teigeckeRezepte,   // NEU 29.09.2026, Teigecke Stufe 2
       reparaturLesen: !!k.reparaturLesen,         // NEU 10.10.2026, Reparaturanfrage Stufe 1
       reparaturMelden: !!k.reparaturMelden,       // NEU 10.10.2026
-      reparaturBearbeiten: !!k.reparaturBearbeiten // NEU 10.10.2026
+      reparaturBearbeiten: !!k.reparaturBearbeiten, // NEU 10.10.2026
+      farbschema: (typeof k.farbschema === 'string' && k.farbschema) ? k.farbschema : null, // NEU 15.10.2026, #72 Stufe B — null = „Nach Rolle“
+      farbHinweis: null
     };
   });
 }
@@ -903,6 +920,7 @@ function setzeKontoRolle(kontoId, neu) {
   }
   bearbeitung[kontoId].role = neu;
   bearbeitung[kontoId].checks = standardChecks(neu);
+  normalisiereFarbschema(bearbeitung[kontoId]);   // 15.10.2026, #72 Stufe B (E10)
   markiereGeaendert();
   renderKontenListen();
   if (kontoKarteId === kontoId) renderKontoKarte();
@@ -962,6 +980,7 @@ var KONTO_KARTEN_TABS = [
             ? '<div class="readonly-wert">🛡 ' + esc(roleName(b.role) || 'ohne Rolle') + ' — geschützt, hier nicht änderbar</div></div>'
             : '<select onchange="setzeKontoRolle(\'' + k.id + '\', this.value)">' + rollenOptionsHTML(b.role) + '</select></div>') +
         '</div>' +
+        farbprofilHTML(k, b) +
         '<div class="detail-section full">' +
           '<label class="checkbox-feld"><input type="checkbox" ' + (b.taskboardAbhaken ? 'checked' : '') + ' onchange="toggleKontoAbhaken(this.checked)">' +
           '<span class="cb-label">Darf Aufgaben im Taskboard-Popup als erledigt markieren</span></label>' +
@@ -1109,6 +1128,51 @@ function reparaturHakenHTML(k, b) {
         ' onchange="toggleKontoReparatur(\'' + h.feld + '\', this.checked)">' +
         '<span class="cb-label">' + esc(h.text) + '</span></label>';
     }).join('') + ortHinweis + '</div></div>';
+}
+// NEU 15.10.2026, Farbprofile Stufe B (#72, E10): eigene Gruppe unter der Rolle.
+// bearbeitung[].farbschema = null heißt „Nach Rolle“. Gespeichert wird nur eine
+// Abweichung vom Profil der Rolle: Wer das Profil der Rolle wählt, landet auf
+// „Nach Rolle“ (und folgt damit künftig der Rolle). Liste und Vorrang:
+// bos_farbprofile.js. Auch bei geschützten Konten wählbar (nur Farbe).
+function normalisiereFarbschema(b) {
+  var FP = window.BOS_FARBPROFILE;
+  b.farbHinweis = null;
+  if (FP && b.farbschema && FP.gueltig(b.farbschema) && b.farbschema === FP.ausRolle(b.role)) {
+    b.farbHinweis = FP.name(b.farbschema);
+    b.farbschema = null;
+  }
+}
+function farbprofilHTML(k, b) {
+  var FP = window.BOS_FARBPROFILE;
+  var kopf = '<div class="detail-section full"><div><div class="haken-gruppe-titel">🎨 Farbprofil</div>';
+  var fuss = '</div></div>';
+  if (!FP) {
+    return kopf + '<div class="haken-gruppe-hinweis" style="color:var(--bos-red)">Profilliste (bos_farbprofile.js) nicht geladen — Seite neu laden. Fehlt sie weiter, ist die Datei noch nicht online.</div>' + fuss;
+  }
+  var rollenName = FP.name(FP.ausRolle(b.role));
+  var wert = b.farbschema;
+  var unbekannt = !!wert && !FP.gueltig(wert);
+  var optionen = '<option value="">Nach Rolle: ' + esc(rollenName) + '</option>' +
+    (unbekannt ? '<option value="' + esc(wert) + '" selected>Unbekannt (' + esc(wert) + ') — wirkt wie „Nach Rolle“</option>' : '') +
+    FP.liste().map(function (p) {
+      return '<option value="' + esc(p.id) + '" style="color:' + esc(p.tupfer) + '"' + (wert === p.id ? ' selected' : '') + '>● ' + esc(p.name) + '</option>';
+    }).join('');
+  var hinweis = b.farbHinweis
+    ? '„' + esc(b.farbHinweis) + '“ ist das Profil der Rolle — steht deshalb auf „Nach Rolle“ und wechselt künftig mit der Rolle.'
+    : (wert && !unbekannt
+      ? 'Eigene Auswahl — bleibt auch, wenn sich die Rolle ändert.'
+      : 'Folgt der Rolle. Wechselt die Rolle, wechselt das Profil mit.');
+  return kopf +
+    '<select aria-label="Farbprofil" onchange="setzeKontoFarbschema(\'' + k.id + '\', this.value)">' + optionen + '</select>' +
+    '<div class="haken-gruppe-hinweis">' + hinweis + ' Wirkt beim nächsten Anmelden.</div>' + fuss;
+}
+function setzeKontoFarbschema(kontoId, wert) {
+  var b = bearbeitung[kontoId];
+  if (!b) return;
+  b.farbschema = wert || null;
+  normalisiereFarbschema(b);
+  markiereGeaendert();
+  if (kontoKarteId === kontoId) renderKontoKarte();
 }
 function toggleKontoReparatur(feld, checked) {
   var erlaubt = REPARATUR_HAKEN.some(function (h) { return h.feld === feld; });
@@ -1931,6 +1995,16 @@ function tatsaechlichSpeichern() {
     }
     if (!!b.reparaturBearbeiten !== !!k.reparaturBearbeiten) {
       aufgaben.push(window.BOS_ACCOUNTS.setzeReparaturBearbeitenRecht(window.db, k.id, b.reparaturBearbeiten));
+    }
+    // NEU 15.10.2026, Farbprofile Stufe B: selbe Sammelaktion. Gegen die NEUE
+    // Rolle normalisiert (gleich wie Rolle = Feld löschen); unbekannte, nicht
+    // angefasste ID bleibt stehen.
+    var FP = window.BOS_FARBPROFILE;
+    var farbVorher = (typeof k.farbschema === 'string' && k.farbschema) ? k.farbschema : null;
+    var farbNachher = b.farbschema || null;
+    if (FP && farbNachher && FP.gueltig(farbNachher) && farbNachher === FP.ausRolle(b.role)) farbNachher = null;
+    if (farbNachher !== farbVorher) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeFarbschema(window.db, k.id, farbNachher));
     }
   });
   return Promise.all(aufgaben);

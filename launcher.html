@@ -19,6 +19,16 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-15 · 19:56 · v3.0 · Feature (Farbprofile Stufe B, #72; Freigabe Kontroll-Chat 18:48)
+      Farbprofil je Konto: lädt bos_theme_sync.js (nur die Funktion, ohne
+      Setzen beim Laden) und
+      bos_farbprofile.js (vor bos_konto_profil.js); applyProfileUI() setzt
+      data-farbschema über BOS_FARBSCHEMA_SYNC.setze(state), dieselbe
+      Funktion wie auf allen Satelliten. Alter Farbwähler entfällt (E6):
+      Einstellungs-Eintrag „Akzentfarbe“, setAccent(), applyAccent(), zwei
+      Wörterbuch-Texte; beim Start wird ein Inline---bos-amber entfernt.
+      Netz-Rückfall trägt farbschemaKonto mit, sonst ginge die Auswahl am
+      Konto offline verloren. Siehe SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md.
     2026-10-15 · 07:58 · v2.9 · Fix (Baustelle #71, Geisterklick; ANWEISUNG_2026-10-15_HUB_GEISTERKLICK.md)
       Ulf 15.10., 07:51: Ein Hub öffnete beim Antippen gleich eine seiner
       Seiten mit. Grund: Die Kachel öffnet beim Loslassen (pointerup), der
@@ -105,6 +115,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&family=Fraunces:ital,wght@0,600;0,700;0,900;1,700&display=swap" rel="stylesheet">
 
+<!-- 15.10.2026 (#72 Stufe B): Theme-Sync auch hier, aber NUR wegen der
+     gemeinsamen Funktion BOS_FARBSCHEMA_SYNC.setze — applyProfileUI() setzt
+     Theme und Farbprofil zusammen, wie bisher das Theme (Fund F27: sonst
+     liefe der Startbildschirm hell mit heller Schrift auf dunklem Grund). -->
+<script>window.BOS_THEME_SYNC_NUR_FUNKTION = true;</script>
+<script src="bos_theme_sync.js"></script>
 <!-- Zentrale Design-Datei — jeder künftige Satellit bindet dieselbe Datei ein -->
 <link rel="stylesheet" href="bos_design_tokens.css">
 
@@ -125,7 +141,7 @@
   /* ---------- Hintergründe (pro Profil wählbar) ----------
      Reine CSS-Muster, keine Bild-Uploads — nutzen dieselben Design-
      Tokens wie der Rest, passen sich also automatisch an Theme und
-     eigene Akzentfarbe an. Dieselben Selektoren gelten für den
+     Farbprofil an (seit 15.10.2026; vorher eigene Akzentfarbe). Dieselben Selektoren gelten für den
      echten Hintergrund (body[data-bg]) UND die Vorschau-Swatches
      in den Einstellungen (.bos-bgswatch[data-bg]) — ein Muster,
      zwei Verwendungen, keine doppelte Pflege. */
@@ -688,6 +704,7 @@
   <script src="bos_access.js"></script>         <!-- NEU seit 31.08.2026 -->
   <script src="bos_launcher_backgrounds.js" onerror=""></script>
   <script src="bos_accounts.js"></script>
+<script src="bos_farbprofile.js"></script>   <!-- NEU 15.10.2026, #72 Stufe B: vor bos_konto_profil.js -->
 <script src="bos_konto_profil.js"></script>
   <script src="bos_profil_sync.js"></script>   <!-- NEU seit 05.09.2026, siehe SESSION_2026-09-04_PROFIL_EINSTELLUNGEN_SYNC_KONZEPT.md -->
   <!-- Ausgelagert aus launcher.html am 03.09.2026, siehe SESSION_2026-09-03_BOOTSCREEN_SCREENSAVER_AUSLAGERUNG.md -->
@@ -710,6 +727,9 @@
      ================================================================ */
 
   var STORAGE_KEY = 'bos_launcher_state_v2';
+  // 15.10.2026 (#72 Stufe B): ein noch gesetztes Inline-Akzent der alten
+  // Akzentfarbe darf nicht hängen bleiben.
+  document.documentElement.style.removeProperty('--bos-amber');
 
   var BOS_I18N = { de: {
     'launcher.subtitle': 'Satellite',
@@ -758,8 +778,6 @@
     'settings.kachelgroesseStandard': 'Standard',
     'settings.kachelgroesseGross': 'Groß',
     'settings.kachelgroesseRiesig': 'Sehr groß',
-    'settings.accent': 'Akzentfarbe',
-    'settings.accentReset': 'Zurücksetzen',
     'settings.layout': 'Layout',
     'settings.layoutReset': 'Auf Standard zurücksetzen',
     'settings.layoutResetConfirm': 'Deine Kachel-Anpassungen (Reihenfolge, eigene Kacheln, Design) werden zurückgesetzt. Fortfahren?',
@@ -1568,13 +1586,6 @@
         '</div>' +
       '</div>' +
       '<div>' +
-        '<div class="bos-label">' + t('settings.accent') + '</div>' +
-        '<div style="display:flex;gap:.6rem;align-items:center;margin-top:.45rem;">' +
-          '<input type="color" class="bos-color" id="settingsAccent" value="' + (data.accent || '#c07a10') + '">' +
-          '<button class="bos-btn bos-btn--ghost" data-role="accent-reset">' + t('settings.accentReset') + '</button>' +
-        '</div>' +
-      '</div>' +
-      '<div>' +
         '<div class="bos-label">' + t('settings.symbolpaket') + '</div>' +
         '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
           '<button class="bos-btn" data-role="symbolpaket-hell">' + t('settings.symbolpaketHell') + '</button>' +
@@ -1614,8 +1625,6 @@
     el.querySelector('[data-role="symbolpaket-dunkel"]').addEventListener('click', function () { setSymbolpaket('dunkel'); });
     el.querySelector('[data-role="iconstil-emoji"]').addEventListener('click', function () { setIconStil('emoji'); });
     el.querySelector('[data-role="iconstil-blobmoji"]').addEventListener('click', function () { setIconStil('blobmoji'); });
-    el.querySelector('#settingsAccent').addEventListener('input', function (e) { setAccent(e.target.value); });
-    el.querySelector('[data-role="accent-reset"]').addEventListener('click', function () { setAccent(null); });
     el.querySelectorAll('[data-role="bg-pick"]').forEach(function (sw) {
       sw.addEventListener('click', function () {
         setBackground(sw.getAttribute('data-select-id'));
@@ -1634,7 +1643,6 @@
         document.documentElement.setAttribute('data-zoom', '100');
         document.getElementById('themeToggle').textContent = '🌙';
         applyBackground('ofenkohle');
-        applyAccent();
         renderGrid();
       }
     });
@@ -1861,7 +1869,7 @@
   // ungenutzt, und der Knopf hat jetzt eine neue Aufgabe — siehe bos_taskboard.js,
   // das #taskbarHome übernimmt und seinen eigenen Klick-Handler registriert.
 
-  /* ---------------- Theme / Akzentfarbe (pro Profil) ---------------- */
+  /* ---------------- Theme (pro Profil; Farbprofil kommt vom Konto, #72) ---------------- */
   function setTheme(mode) {
     var data = getActiveProfileData();
     data.theme = mode;
@@ -1949,17 +1957,10 @@
     saveState();
     renderGrid();
   }
-  function setAccent(hex) {
-    var data = getActiveProfileData();
-    data.accent = hex;
-    applyAccent();
-    saveState();
-  }
-  function applyAccent() {
-    var data = getActiveProfileData();
-    if (data.accent) document.documentElement.style.setProperty('--bos-amber', data.accent);
-    else document.documentElement.style.removeProperty('--bos-amber');
-  }
+  /* 15.10.2026 (#72 Stufe B, E6): eigene Akzentfarbe (setAccent/applyAccent)
+     entfällt. Das Farbprofil kommt vom Konto (applyProfileUI →
+     BOS_FARBSCHEMA_SYNC.setze). Das Feld accent bleibt in alten Profilen
+     liegen und wird nicht mehr gelesen (bos_profil_sync.js unverändert). */
   function setBackground(id) {
     var data = getActiveProfileData();
     data.background = id;
@@ -2381,7 +2382,8 @@
                eine Rolle war bekannt, und die gibt es nur mit Haken. */
             return warBekannt ? { name: eintrag.name, role: eintrag.role, overrides: eintrag.kontoOverrides,
                                   freigeschaltet: eintrag.freigeschaltet !== false,
-                                  kontoHaken: eintrag.kontoHaken || {} } : null;
+                                  kontoHaken: eintrag.kontoHaken || {},
+                                  farbschema: eintrag.farbschemaKonto || null } : null;   // 15.10.2026, #72 Stufe B
           })
         : Promise.resolve(null);
 
@@ -2461,7 +2463,7 @@
     document.documentElement.setAttribute('data-zoom', data.zoom || '100');
     document.getElementById('themeToggle').textContent = data.theme === 'light' ? '☀️' : '🌙';
     applyBackground(data.background || 'ofenkohle');
-    applyAccent();
+    if (window.BOS_FARBSCHEMA_SYNC) window.BOS_FARBSCHEMA_SYNC.setze(state);   // 15.10.2026, #72 Stufe B
     if (!p || p.role !== 'admin') exitEditMode();
     renderGrid();
     maybeShowBackstoreHinweis(); // NEU 02.09.2026, siehe BACKSTORE_DOKU.md

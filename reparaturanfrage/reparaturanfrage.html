@@ -17,6 +17,8 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Status-Zeichen ! gemeldet · 👁 gesehen · ✓ repariert an Statuswort und Verlauf (CSS ::before, Wort im Verlauf dafür in <span class="schritt-wort">); --ra-gelb liest --bos-gelb. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-12 · 01:57 · v0.4 · Feature (Stufe 2: Fotos, Freigabe KC 12.10. 00:53)
       ANWEISUNG_2026-10-11_REPARATURANFRAGE_STUFE2.md, Bauplan/Bau-Doku
       SESSION_2026-10-11_REPARATURANFRAGE_STUFE2_BAU.md.
@@ -130,10 +132,10 @@
   :root {
     --ra-tap: max(52px, var(--bos-tap-min, 44px));
     --ra-rot: var(--bos-red, #d6584a);
-    --ra-gelb: #d9a521;
+    --ra-gelb: var(--bos-gelb, #d9a521);   /* 15.10.2026 (#72): zentrale Statusfarbe */
     --ra-gruen: var(--bos-green, #4caf7d);
   }
-  html[data-theme="light"] { --ra-gelb: #9a7406; }
+  html[data-theme="light"] { --ra-gelb: var(--bos-gelb, #9a7406); }
   [hidden] { display: none !important; }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; padding-bottom: 80px; background: var(--bos-bg); color: var(--bos-text); font-family: var(--bos-font-body); -webkit-tap-highlight-color: transparent; }
@@ -190,6 +192,15 @@
   .statuswort.st-gemeldet { color: var(--ra-rot); }
   .statuswort.st-gesehen { color: var(--ra-gelb); }
   .statuswort.st-repariert { color: var(--ra-gruen); }
+  /* 15.10.2026 (#72, E9): Zeichen zusätzlich zu Farbe und Wort. Hängt am Status, nicht am Wort
+     (Wörter kommen je Kanal aus bos_meldungen.js). Vorleser lesen nur das Wort (Alternativtext ""). */
+  .statuswort::before, .schritt-wort::before { display: inline-block; margin-right: .35em; font-weight: 900; letter-spacing: 0; line-height: 1; }
+  .statuswort.st-gemeldet::before, .schritt.st-gemeldet .schritt-wort::before { content: "!" / ""; }
+  .statuswort.st-gesehen::before, .schritt.st-gesehen .schritt-wort::before { content: "\1F441\FE0E" / ""; }
+  .statuswort.st-repariert::before, .schritt.st-repariert .schritt-wort::before { content: "\2713\FE0E" / ""; }
+  .schritt.erreicht.st-gemeldet .schritt-wort::before { color: var(--ra-rot); }
+  .schritt.erreicht.st-gesehen .schritt-wort::before { color: var(--ra-gelb); }
+  .schritt.erreicht.st-repariert .schritt-wort::before { color: var(--ra-gruen); }
   .dringend { flex: none; font-family: var(--bos-font-label); font-weight: 800; text-transform: uppercase; font-size: var(--bos-font-2xs, .66rem); letter-spacing: .05em; color: #fff; background: var(--ra-rot); border-radius: 4px; padding: 2px 6px; }
 
   /* geöffnete Anfrage — Reiter (Nachtrag 2). Aktiv = Unterstrich UND Farbe.
@@ -830,9 +841,9 @@ function schritteHTML(k) {
   const gesehenErreicht = st === 'gesehen' || (st === 'repariert' && S.verlauf.some(function (e) { return e.art === 'status' && e.nachher === 'gesehen'; }));
   const gesehenUebersprungen = st === 'repariert' && !gesehenErreicht;
   return '<div class="schritte" aria-label="Fortschritt">' +
-    '<div class="schritt erreicht st-gemeldet">' + esc(wort('gemeldet')) + '</div>' +
-    '<div class="schritt st-gesehen' + (gesehenErreicht ? ' erreicht' : '') + (gesehenUebersprungen ? ' uebersprungen' : '') + '">' + esc(wort('gesehen')) + '</div>' +
-    '<div class="schritt st-repariert' + (st === 'repariert' ? ' erreicht' : '') + '">' + esc(wort('repariert')) + '</div></div>';
+    '<div class="schritt erreicht st-gemeldet"><span class="schritt-wort">' + esc(wort('gemeldet')) + '</span></div>' +
+    '<div class="schritt st-gesehen' + (gesehenErreicht ? ' erreicht' : '') + (gesehenUebersprungen ? ' uebersprungen' : '') + '"><span class="schritt-wort">' + esc(wort('gesehen')) + '</span></div>' +
+    '<div class="schritt st-repariert' + (st === 'repariert' ? ' erreicht' : '') + '"><span class="schritt-wort">' + esc(wort('repariert')) + '</span></div></div>';
 }
 
 function eintragText(e) {

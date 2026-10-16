@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Ladeanzeige-Tönung folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:25 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Nachtrag-Auswahl aus der Sicht 'laufend' (pausierte Produkte fehlen), mit Fassungsprüfung; die Einheit im Druck wird weiter über 'aktive' nachgeschlagen (auch ein inzwischen pausiertes Produkt eines alten Plans zeigt seine Einheit, F9). SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-13 · 12:10 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Druck-Wochenübersicht zeigt hinter Produktion, Endlager und Nachtrag die Einheit des Produkts (BOS_PRODUKTE.einheit().kurz) statt fest „Bl.“ — die Stationen planen seit #64 in der Einheit des Produkts (Brot in Stück). Produkt nicht in der Liste (gelöscht, Liste nicht geladen) → „Bl.“ wie bisher. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Nachtrag-Auswahl liest über ../bos_produkte.js statt fetch(produkt_config.json); Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
@@ -35,7 +36,7 @@
   .pp-hilfe-text { font-family:var(--bos-font-body); font-size:0.85rem; line-height:1.6; color:var(--bos-text-dim); white-space:pre-line; }
 
   .brain-status { padding:8px 16px; text-align:center; font-size:0.75rem; font-family:var(--bos-font-label); font-weight:700; letter-spacing:0.5px; border-bottom:2px solid var(--bos-border); }
-  .brain-status.loading { color:var(--bos-amber); background:rgba(192,122,16,0.06); }
+  .brain-status.loading { color:var(--bos-amber); background:color-mix(in srgb, var(--bos-amber) 6%, transparent); }
   .brain-status.ready   { color:var(--bos-green);  background:rgba(77,184,122,0.06); }
   .brain-status.error   { color:var(--bos-red);    background:rgba(201,74,74,0.06); }
 

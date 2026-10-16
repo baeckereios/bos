@@ -98,6 +98,8 @@
      BOS_PRODUKTE.richtwertWerte(p), .richtwertPruefen(eingaben, p), .rundeRichtwert(x, p)
 
    CHANGELOG
+     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+       Meldungsleiste (Art ≠ Fehler) Randfarbe auf feste Warnfarbe --bos-warn. Nur diese eine Farbzeile. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
      2026-10-15 · 01:17 · v0.5 · Richtwert und Saison-Pause (Baustelle #63)
        SESSION_2026-10-14_RICHTWERT_BAU.md (Freigabe Kontroll-Chat 14.10., 19:19).
        Neu: Sicht 'laufend' (aktive ohne pausierte), bedarfsQuelle(), quelleText(),
@@ -654,7 +656,7 @@
         el.setAttribute('role', 'alert');
         doc.body.insertBefore(el, doc.body.firstChild);
       }
-      var farbe = art === 'fehler' ? 'var(--bos-red, #d6584a)' : 'var(--bos-amber, #c07a10)';
+      var farbe = art === 'fehler' ? 'var(--bos-red, #d6584a)' : 'var(--bos-warn, var(--bos-amber, #c07a10))';
       el.style.cssText = [
         'position:sticky', 'top:0', 'z-index:2147483000', 'box-sizing:border-box', 'width:100%',
         'padding:8px 14px', 'font-family:var(--bos-font-body, Barlow, sans-serif)', 'font-size:var(--bos-font-sm, 0.82rem)',

@@ -7,6 +7,8 @@
    Etappe 2 (KC, 03.10.2026). Teil 2: Ergänzungen für „Orte“.
    Teil 3: Seite „Teige & Rezepte“ mit der Anlege-Strecke.
    CHANGELOG
+     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+       Listenstatus „teilweise“ (…) auf feste Warnfarbe --bos-warn-bright (Status färbt nie um). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
      2026-10-08 · 08:22 · v0.2 · Teil 3 angehängt (Etappe 2, Schub 2)
        Nur neue Klassen mit Vorsilbe rz- (Teil 1 und 2 unverändert).
      2026-10-03 · 04:42 · v0.1 · Erstfassung
@@ -263,7 +265,7 @@
   }
   .liste-zeile:hover, .liste-zeile:focus-visible { background: var(--bos-amber-glow-soft); outline: none; }
   .lz-status { font-size: 1.1rem; font-weight: 700; text-align: center; color: var(--bos-text-faint); }
-  .lz-status.ok { color: var(--bos-green); } .lz-status.warn { color: var(--bos-red); } .lz-status.teil { color: var(--bos-amber-bright); }
+  .lz-status.ok { color: var(--bos-green); } .lz-status.warn { color: var(--bos-red); } .lz-status.teil { color: var(--bos-warn-bright, var(--bos-amber-bright)); }
   .lz-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .lz-name b { font-weight: 600; font-size: var(--bos-font-md, .95rem); }
   .lz-name small { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .72rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

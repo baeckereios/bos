@@ -57,6 +57,8 @@
       die Konto-Notiz). Die Anzeige (Abwesenheiten-Editor) löst den Namen
       seit Schritt 5 über das Konto auf. Alte Anträge bleiben. NF-26: der Alttext „echtes Konto … (Vorname,
       Geburtsdatum, PIN)“ ist raus (Tür, Kennung, Passwort). Sonst nichts.
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Schleier im Seitenkopf folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -100,7 +102,7 @@
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg);
+    background: radial-gradient(ellipse at top, color-mix(in srgb, var(--amber) 6%, transparent), transparent 55%), var(--bg);
     color:var(--text); font-family:var(--font-body); min-height:100vh;
     padding-bottom:110px; -webkit-tap-highlight-color:transparent;
   }

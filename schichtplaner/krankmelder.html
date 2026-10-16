@@ -113,6 +113,8 @@
       Personen mit imSchichtplan:false fehlen schon beim Laden — nicht in
       der Auswahl, nicht in berechneTagKorrektur(). Fehlt das Feld, gilt
       „im Plan“.
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Schleier im Seitenkopf folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -142,7 +144,7 @@
     --font-body: var(--bos-font-body, 'Barlow', sans-serif);
   }
   *{box-sizing:border-box;} html,body{margin:0;padding:0;}
-  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+  body{ background: radial-gradient(ellipse at top, color-mix(in srgb, var(--amber) 6%, transparent), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
 
   header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
   .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }

@@ -54,6 +54,10 @@
      nutzt jetzt 'landscape'. Hinweis: bei vielen Personen kann der
      Ausdruck trotzdem mehrseitig werden — das ist schlicht die
      Zeilenzahl, kein Bug.
+   2026-10-15 · 19:56 · v0.3 · Fix (Farbprofile Stufe B, #72, E12)
+     Druckkopf liest das feste Token --bos-marke statt --bos-amber. Sonst
+     käme das Logo im Profil des Druckenden (z. B. Stahlblau). Ersatzwert
+     #c07a10. SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
    ============================================================ */
 
 window.BOS_DRUCK = (function () {
@@ -125,7 +129,7 @@ window.BOS_DRUCK = (function () {
     var extraCSS   = optionen.extraCSS || '';
     var ausrichtung = optionen.ausrichtung === 'landscape' ? 'landscape' : 'portrait'; // Default portrait, bestehende Aufrufer unverändert
 
-    var farbAmber = leseToken('--bos-amber', '#c07a10');
+    var farbAmber = leseToken('--bos-marke', '#c07a10');   // 15.10.2026 (E12): Ausgedrucktes bleibt Honig, egal welches Farbprofil
     var css = baueCSS(farbAmber, ausrichtung) + (extraCSS ? '\n' + extraCSS : '');
 
     var teile = [];

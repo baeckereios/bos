@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Auswahl- und Kalender-Tönungen folgen dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:26 · Beschriftung (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Reiter heißen „Mitschrift“ (Datentopf manuell) und „Backzettel“ (Datentopf offiziell), Hilfe entsprechend und um den Richtwert ergänzt (der hat keine Einstellungen). Werte in Datenbank, Datei und Code unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“) statt fetch(produkt_config.json); „von N aktiven Produkten“ zählt nur aktive; Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
@@ -195,7 +196,7 @@
     flex: 1; display: flex; align-items: center; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-xs, 10px); border-radius: 8px;
     border: 1px solid var(--ve-rand); background: var(--ve-oberflaeche-2); cursor: pointer;
   }
-  .radio-option.gewaehlt { border-color: var(--ve-primary); background: rgba(192,122,16,0.15); }
+  .radio-option.gewaehlt { border-color: var(--ve-primary); background: color-mix(in srgb, var(--ve-primary) 15%, transparent); }
 
   .modus-block { display: none; }
   .modus-block.sichtbar { display: block; }
@@ -236,10 +237,10 @@
   }
   .kal-tag .kal-sym { font-size: var(--bos-font-2xs, 9px); line-height: 1; margin-top: var(--bos-space-3xs, 1px); }
   .kal-tag.im-fenster {
-    border-style: solid; border-color: rgba(192,122,16,0.4); background: rgba(192,122,16,0.10);
+    border-style: solid; border-color: color-mix(in srgb, var(--ve-primary) 40%, transparent); background: color-mix(in srgb, var(--ve-primary) 10%, transparent);
     color: var(--ve-text); cursor: pointer;
   }
-  .kal-tag.im-fenster:active { background: rgba(192,122,16,0.22); }
+  .kal-tag.im-fenster:active { background: color-mix(in srgb, var(--ve-primary) 22%, transparent); }
   .kal-tag.feiertag { border-color: rgba(74,143,214,0.5); }
   .kal-tag.im-fenster.feiertag { background: rgba(74,143,214,0.16); }
   .kal-tag.ausgeschlossen { background: var(--ve-warnung-bg); border-color: var(--ve-warnung); }
@@ -514,7 +515,7 @@
           nochmal tippen nimmt ihn wieder auf.
         </div>
         <div class="kal-legende">
-          <span><i style="background:rgba(192,122,16,0.35);"></i> im Fenster</span>
+          <span><i style="background:color-mix(in srgb, var(--ve-primary) 35%, transparent);"></i> im Fenster</span>
           <span><i style="background:rgba(74,143,214,0.5);"></i> Feiertag/Ferien</span>
           <span><i style="background:var(--ve-warnung);"></i> manuell ausgeschlossen</span>
         </div>

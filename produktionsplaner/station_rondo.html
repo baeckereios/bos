@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-15 · 19:56 · Farbprofile Stufe B (#72, Freigabe Kontroll-Chat 18:48): Zelle „von Hand“ mit gestricheltem Rand (F12, im Profil Stahl sonst kaum von „automatisch“ zu unterscheiden); Zahl „von Hand“ dunkel #60a5fa statt #1d4ed8 (Kontrast 2,3 → 5,7 bis 6,3 je Profil), hell unverändert; „⚠ min“ mit FE0E wie die übrigen Zeichen (F22). SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md -->
+<!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Knapp, Bestand-Hinweis, Bestand 0, „teilweise geschätzt“ und „noch nicht“ auf feste Warnfarbe --bos-warn; Akzent-Tönungen über color-mix; Status-Zeichen ✓ ⚠ ✕ (Lücke ✕ statt ⚠, Bestand 0 ⚠ statt ◌). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:24 · Richtwert und Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Umschalter „Manuell | Offiziell“ entfernt — die Quelle steht je Produkt in der Produkt-Karte (BOS_PRODUKTE.bedarfsQuelle: Richtwert, Backzettel oder Mitschrift; ohne Feld Mitschrift = bisherige Voreinstellung). Einstellungen je Topf, einmal geladen. Liste aus Sicht 'laufend' (pausierte fehlen), mit Fassungsprüfung. Warnung ohne Quellennamen („Bedarfszahlen“, V2/B7). Einreichung trägt je Produkt bedarfsQuelle. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-13 · 12:08 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Bedarf kommt fertig in der Einheit des Produkts aus bos_verbrauch_durchschnitt.js (Produkt wird mitgegeben; Antwort ohne `einheit` = Rechen-Modul veraltet → sichtbarer Fehler, keine Rechnung). Keine eigene Teilung durch stueckProBlech mehr (behebt Doppelteilung der Mitschrift und Teilung bei Stück-Produkten). Einheit aus BOS_PRODUKTE.einheit().kurz statt fest „Bl.“ (Stk., Bl., Dl., LoBl. …; fehlt → Bl.). Ladefehler und Einreichen zeigen err.message. SESSION_2026-10-13_EINHEITEN_BAU.md -->
 <!-- 2026-10-06 · 07:29 · Nachtrag (Ulf): Statuszeile nennt nach dem Laden, woher die Produktliste kam („Liste vom Gerät/Server, Stand N“, aus bos_produkte.js quelle/standNummer); in der Ladephase danach heißt es „Bedarf und Frosterbestand werden geladen…“ statt irreführend „Produktdaten werden geladen…“ (B11 Nebenfund 1). SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
@@ -27,7 +29,7 @@
   .nfc-back:active { color:var(--bos-amber); }
 
   .brain-status { padding:8px 16px; text-align:center; font-size:0.75rem; font-family:var(--bos-font-label); font-weight:700; letter-spacing:0.5px; border-bottom:2px solid var(--bos-border); }
-  .brain-status.loading { color:var(--bos-amber); background:rgba(192,122,16,0.06); }
+  .brain-status.loading { color:var(--bos-amber); background:color-mix(in srgb, var(--bos-amber) 6%, transparent); }
   .brain-status.ready   { color:var(--bos-green);  background:rgba(77,184,122,0.06); }
   .brain-status.error   { color:var(--bos-red);    background:rgba(201,74,74,0.06); }
 
@@ -37,7 +39,7 @@
   .f-toggle { flex:1; display:flex; gap:6px; }
   .f-btn { flex:1; padding:8px 6px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); border-radius:10px; font-family:var(--bos-font-label); font-weight:900; font-size:0.78rem; color:var(--bos-text-dim); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:0.15s; }
   .f-btn.yes.active { border-color:var(--bos-green); background:rgba(77,184,122,0.1); color:var(--bos-green); }
-  .f-btn.no.active  { border-color:var(--bos-amber); background:rgba(192,122,16,0.1); color:var(--bos-amber); }
+  .f-btn.no.active  { border-color:var(--bos-warn, var(--bos-amber)); background:color-mix(in srgb, var(--bos-warn, var(--bos-amber)) 10%, transparent); color:var(--bos-warn, var(--bos-amber)); }
 
   .settings-bar { padding:7px 16px; border-bottom:2px solid var(--bos-border); }
   .settings-bar-inner { max-width:600px; margin:0 auto; display:flex; align-items:center; gap:10px; }
@@ -50,21 +52,21 @@
   .prod-card::before { content:''; display:block; height:3px; background:var(--bos-border-strong); transition:background 0.3s; }
   .prod-card.ok::before        { background:linear-gradient(90deg,var(--bos-green),rgba(77,184,122,0.1)); }
   .prod-card.warn::before      { background:linear-gradient(90deg,var(--bos-red),rgba(201,74,74,0.1)); }
-  .prod-card.knapp-card::before{ background:linear-gradient(90deg,var(--bos-amber),rgba(192,122,16,0.1)); }
+  .prod-card.knapp-card::before{ background:linear-gradient(90deg,var(--bos-warn, var(--bos-amber)),color-mix(in srgb, var(--bos-warn, var(--bos-amber)) 10%, transparent)); }
 
   .prod-name   { font-family:var(--bos-font-display); font-weight:900; font-size:1.05rem; padding:11px 14px 2px; color:var(--bos-text); }
   .prod-status { font-family:var(--bos-font-label); font-size:0.68rem; font-weight:700; color:var(--bos-text-dim); padding:0 14px 8px; }
   .prod-status.ok    { color:var(--bos-green); }
   .prod-status.err   { color:var(--bos-red); }
-  .prod-status.knapp { color:var(--bos-amber); }
+  .prod-status.knapp { color:var(--bos-warn, var(--bos-amber)); }
   .verlaesslich-hint { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:800; padding:0 14px 8px; }
 
   .bestand-row { display:flex; align-items:center; gap:8px; padding:2px 14px 10px; flex-wrap:wrap; }
   .bestand-label { font-family:var(--bos-font-label); font-weight:900; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.8px; color:var(--bos-text-dim); }
   .bestand-input { width:64px; padding:4px 6px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; font-size:0.95rem; text-align:center; }
   .bestand-unit { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:700; color:var(--bos-text-dim); }
-  .bestand-hint { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:700; color:var(--bos-amber); overflow-wrap:anywhere; }
-  .bestand-hint a { color:var(--bos-amber); text-decoration:underline; }
+  .bestand-hint { font-family:var(--bos-font-label); font-size:0.65rem; font-weight:700; color:var(--bos-warn, var(--bos-amber)); overflow-wrap:anywhere; }
+  .bestand-hint a { color:var(--bos-warn, var(--bos-amber)); text-decoration:underline; }
   .bestand-row.warn .bestand-input { border-color:var(--bos-red); }
 
   .section { padding:0 12px 10px; }
@@ -75,7 +77,7 @@
   .day-btn .db-icon { font-size:1rem; line-height:1; display:block; min-height:1rem; }
   .day-btn .db-day  { font-family:var(--bos-font-label); font-weight:900; font-size:0.72rem; color:var(--bos-text-dim); line-height:1; }
   .day-btn .db-date { font-family:var(--bos-font-label); font-weight:700; font-size:0.55rem; color:var(--bos-text-dim); opacity:0.55; }
-  .day-btn.on { background:rgba(192,122,16,0.1); border-color:var(--bos-amber); }
+  .day-btn.on { background:color-mix(in srgb, var(--bos-amber) 10%, transparent); border-color:var(--bos-amber); }
   .day-btn.on .db-day  { color:var(--bos-amber); }
   .day-btn.on .db-date { opacity:0.8; color:var(--bos-amber); }
   .day-btn.disabled { opacity:0.22; cursor:not-allowed; }
@@ -98,7 +100,7 @@
   .vorschlag-hint { font-family:var(--bos-font-label); font-size:0.68rem; font-weight:700; color:var(--bos-green); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
   .inline-warn { font-family:var(--bos-font-label); font-size:0.7rem; font-weight:700; padding:5px 8px; border-radius:8px; margin-bottom:6px; }
   .inline-warn.luecke { background:rgba(201,74,74,0.1); color:var(--bos-red); }
-  .inline-warn.knapp  { background:rgba(192,122,16,0.1); color:var(--bos-amber); }
+  .inline-warn.knapp  { background:color-mix(in srgb, var(--bos-warn, var(--bos-amber)) 10%, transparent); color:var(--bos-warn, var(--bos-amber)); }
   .hint-right { font-weight:700; color:var(--bos-text-dim); font-size:0.65rem; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 
   .vd-grid { display:grid; gap:8px; }
@@ -107,15 +109,16 @@
   .vd-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
 
   .vday-cell { background:var(--bos-surface-raised); border-radius:12px; padding:8px 8px 6px; border:1.5px solid var(--bos-border-strong); }
-  .vday-cell.is-auto   { border-color:var(--bos-amber);  background:rgba(192,122,16,0.05); }
-  .vday-cell.is-soft   { border-color:#60a5fa; background:rgba(96,165,250,0.06); }
+  .vday-cell.is-auto   { border-color:var(--bos-amber);  background:color-mix(in srgb, var(--bos-amber) 5%, transparent); }
+  .vday-cell.is-soft   { border-color:#60a5fa; border-style:dashed; background:rgba(96,165,250,0.06); }   /* 15.10.2026 (#72 F12): „von Hand“ an der Form erkennbar, nicht nur am Blau (Profil Stahl) */
   .vday-cell.is-locked { border-color:var(--bos-green);  background:rgba(77,184,122,0.06); }
   .vday-cell.is-warn   { border-color:var(--bos-red) !important; background:rgba(201,74,74,0.06) !important; }
 
   .vday-label { font-family:var(--bos-font-label); font-weight:900; font-size:0.72rem; color:var(--bos-text-dim); text-align:center; margin-bottom:4px; }
   .vday-label span { font-size:0.58rem; opacity:0.7; }
   .vday-input { width:100%; height:44px; border:none; background:transparent; color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; font-size:1.6rem; text-align:center; box-sizing:border-box; outline:none; padding:0; }
-  .vday-input.is-soft   { color:#1d4ed8; }
+  .vday-input.is-soft   { color:#60a5fa; }   /* 15.10.2026: dunkel wie der Rahmen (vorher #1d4ed8, Kontrast 2,3) */
+  html[data-theme="light"] .vday-input.is-soft { color:#1d4ed8; }
   .vday-input.is-locked { color:var(--bos-green); }
 
   .vday-footer { display:flex; align-items:center; justify-content:space-between; margin-top:3px; }
@@ -136,7 +139,7 @@
   .chain-row:last-child { border-bottom:none; }
   .chain-row.row-prod   { background:rgba(77,184,122,0.05); }
   .chain-row.row-luecke { background:rgba(201,74,74,0.06); }
-  .chain-row.row-heute  { background:rgba(192,122,16,0.04); }
+  .chain-row.row-heute  { background:color-mix(in srgb, var(--bos-amber) 4%, transparent); }
   .chain-row.row-froster { opacity:0.35; }
   .chain-row.row-zu { opacity:0.35; background:rgba(100,100,100,0.04); }
   .cr-tag  { font-family:var(--bos-font-label); font-weight:900; font-size:0.75rem; width:28px; color:var(--bos-text-dim); flex-shrink:0; }
@@ -146,12 +149,12 @@
   .cr-prod.empty { color:var(--bos-border); font-size:0.68rem; }
   .cr-best { flex:1; text-align:right; font-family:var(--bos-font-display); font-weight:900; font-size:1rem; }
   .cr-best.pos { color:var(--bos-green); }
-  .cr-best.nul { color:var(--bos-amber); }
+  .cr-best.nul { color:var(--bos-warn, var(--bos-amber)); }
   .cr-best.neg { color:var(--bos-red); }
 
   .warn-row { padding:6px 14px; font-family:var(--bos-font-label); font-size:0.7rem; font-weight:700; border-top:1.5px solid rgba(0,0,0,0.05); }
   .warn-row.ok     { background:rgba(77,184,122,0.08); color:var(--bos-green); }
-  .warn-row.knapp  { background:rgba(192,122,16,0.08); color:var(--bos-amber); }
+  .warn-row.knapp  { background:color-mix(in srgb, var(--bos-warn, var(--bos-amber)) 8%, transparent); color:var(--bos-warn, var(--bos-amber)); }
   .warn-row.luecke { background:rgba(201,74,74,0.08);  color:var(--bos-red); }
 
   .card-footer { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-top:1.5px solid var(--bos-border-strong); }
@@ -601,8 +604,8 @@ function buildCard(bosId) {
   if (s.zielOff !== null && !prodCount) statusTxt = 'Produktionstage wählen';
   else if (prodCount && s.zielOff === null) statusTxt = 'Zieldatum wählen';
   else if (isOk)      { statusTxt = '✓ Kette vollständig gedeckt · Bestand: ' + startBest + ' ' + eh; statusCls = ' ok'; }
-  else if (hatLuecke) { statusTxt = '⚠ Lücke — Produktion erhöhen oder Tag hinzufügen'; statusCls = ' err'; }
-  else if (hatKnapp)  { statusTxt = '◌ Bestand 0 an ' + result.warnungen.length + ' Tag' + (result.warnungen.length > 1 ? 'en' : '') + ' — Produktionstag nötig'; statusCls = ' knapp'; }
+  else if (hatLuecke) { statusTxt = '✕ Lücke — Produktion erhöhen oder Tag hinzufügen'; statusCls = ' err'; }
+  else if (hatKnapp)  { statusTxt = '⚠\uFE0E Bestand 0 an ' + result.warnungen.length + ' Tag' + (result.warnungen.length > 1 ? 'en' : '') + ' — Produktionstag nötig'; statusCls = ' knapp'; }
 
   // 06.09.2026 · Feature (Ulf: "ne Warnung wäre nett"): dasselbe Muster wie
   // in schnellrechner.html (srRenderErgebnis()) — verlaesslich[] sagt pro
@@ -617,9 +620,9 @@ function buildCard(bosId) {
   var html = '<div class="prod-name">' + prod.name + '</div>';
   html += '<div class="prod-status' + statusCls + '">' + statusTxt + '</div>';
   if (alleUnzuverlaessig) {
-    html += '<div class="verlaesslich-hint" style="color:var(--bos-red);">⚠️ Keine ausreichenden Bedarfszahlen — Ergebnis nicht verlässlich!</div>';
+    html += '<div class="verlaesslich-hint" style="color:var(--bos-red);">✕ Keine ausreichenden Bedarfszahlen — Ergebnis nicht verlässlich!</div>';
   } else if (teilweiseUnzuverlaessig) {
-    html += '<div class="verlaesslich-hint" style="color:var(--bos-amber);">◌ Für einzelne Wochentage fehlen verlässliche Bedarfszahlen — teilweise geschätzt.</div>';
+    html += '<div class="verlaesslich-hint" style="color:var(--bos-warn, var(--bos-amber));">⚠\uFE0E Für einzelne Wochentage fehlen verlässliche Bedarfszahlen — teilweise geschätzt.</div>';
   }
 
   // ── BESTAND (editierbar, Warnung bei veraltet/nie gezählt) ──
@@ -718,7 +721,7 @@ function buildCard(bosId) {
             + ' data-bid="' + bosId + '" data-off="' + off + '"'
             + ' oninput="onInput(\'' + bosId + '\',' + off + ',this)" onfocus="this.select()">'
             + '<div class="vday-footer">'
-            + '<span class="' + minCls + '">' + (unterMin ? '⚠ min ' + minBed : 'min ' + minBed) + ' ' + eh + '</span>'
+            + '<span class="' + minCls + '">' + (unterMin ? '⚠\uFE0E min ' + minBed : 'min ' + minBed) + ' ' + eh + '</span>'
             + '<button class="' + lockCls + '" onclick="toggleLock(\'' + bosId + '\',' + off + ')">' + lockIcon + '</button>'
             + '</div></div>';
     });
@@ -778,7 +781,7 @@ function buildCard(bosId) {
     } else {
       result.warnungen.forEach(function(w) {
         html += '<div class="warn-row ' + (w.typ === 'luecke' ? 'luecke' : 'knapp') + '">'
-              + (w.typ === 'luecke' ? '⚠ Lücke ' + w.tag + ' ' + w.datum + ': ' + rdAuf(Math.abs(w.delta)) + ' ' + eh + ' fehlen' : '◌ ' + w.tag + ' ' + w.datum + ': Bestand 0 — nächster Produktionstag nötig')
+              + (w.typ === 'luecke' ? '✕ Lücke ' + w.tag + ' ' + w.datum + ': ' + rdAuf(Math.abs(w.delta)) + ' ' + eh + ' fehlen' : '⚠\uFE0E ' + w.tag + ' ' + w.datum + ': Bestand 0 — nächster Produktionstag nötig')
               + '</div>';
       });
     }

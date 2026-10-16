@@ -185,6 +185,8 @@
       personenUndNamen() lädt über BOS_NAMEN.personenFuerPlanung():
       Personen mit imSchichtplan:false fehlen schon beim Laden — nicht in
       berechneMonat(), nicht in der Auswahl. Fehlt das Feld, gilt „im Plan“.
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Schleier und Feiertags-Etikett folgen dem Akzent; Doppelt-eingetragen-Warnung auf feste Warnfarbe --bos-warn*. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -217,7 +219,7 @@
     --font-body: var(--bos-font-body, 'Barlow', sans-serif);
   }
   *{box-sizing:border-box;} html,body{margin:0;padding:0;}
-  body{ background: radial-gradient(ellipse at top, rgba(192,122,16,.06), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
+  body{ background: radial-gradient(ellipse at top, color-mix(in srgb, var(--amber) 6%, transparent), transparent 55%), var(--bg); color:var(--text); font-family:var(--font-body); min-height:100vh; -webkit-tap-highlight-color:transparent; padding-bottom:24px; }
 
   header{ padding: var(--bos-space-lg,22px) var(--bos-space-md,18px) var(--bos-space-sm,16px); border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20; }
   .eyebrow{ font-family:var(--font-label); font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size: var(--bos-font-xs,.72rem); color:var(--amber); display:flex; align-items:center; gap: var(--bos-space-xs,8px); }
@@ -231,7 +233,7 @@
 
   select.bos-input{cursor:pointer;}
   .tag-typ-badge{ display:inline-block; font-size: var(--bos-font-2xs,.66rem); font-family:var(--font-label); font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:2px 7px; border-radius:6px; background:var(--surface-2); color:var(--dim); margin-left: var(--bos-space-2xs,6px); }
-  .tag-typ-badge.feiertag{background:rgba(224,151,58,.2); color:var(--amber-bright);}
+  .tag-typ-badge.feiertag{background:color-mix(in srgb, var(--amber-bright) 20%, transparent); color:var(--amber-bright);}
 
   .zusammenfassung{ display:flex; gap: var(--bos-space-md,16px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: var(--bos-space-sm,14px); margin-bottom: var(--bos-space-md,16px); flex-wrap:wrap; }
   .zusammenfassung .stat{flex:1; min-width:100px;}
@@ -254,10 +256,10 @@
   .sonntag-tabelle td.st-na{color:var(--dim-2); text-align:center;}
   .sonntag-tabelle select.st-auswahl{width:100%; min-width:130px;}
   .sonntag-tabelle td.luecke select{border-color:var(--danger);}
-  .sonntag-tabelle td.konflikt select{border-color:var(--amber-bright); background:rgba(224,151,58,.12);}
-  .konflikt-warnung{ font-size: var(--bos-font-sm,.85rem); color:var(--amber-bright); background:var(--amber-glow); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-sm,10px); line-height:1.6; }
+  .sonntag-tabelle td.konflikt select{border-color:var(--bos-warn-bright, var(--amber-bright)); background:color-mix(in srgb, var(--bos-warn-bright, var(--amber-bright)) 12%, transparent);}
+  .konflikt-warnung{ font-size: var(--bos-font-sm,.85rem); color:var(--bos-warn-bright, var(--amber-bright)); background:var(--bos-warn-glow, var(--amber-glow)); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-sm,10px); line-height:1.6; }
 
-  .ablehnung-karte{ background:var(--surface); border:1px solid rgba(224,151,58,.4); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
+  .ablehnung-karte{ background:var(--surface); border:1px solid color-mix(in srgb, var(--amber-bright) 40%, transparent); border-radius:var(--radius); padding: var(--bos-space-sm,12px); margin-bottom: var(--bos-space-2xs,6px); }
   .ablehnung-kopf{display:flex; align-items:center; justify-content:space-between; gap: var(--bos-space-sm,10px); flex-wrap:wrap;}
   .ablehnung-name{font-weight:700;}
   .ablehnung-datum{font-size: var(--bos-font-sm,.85rem); color:var(--dim); font-family:var(--font-label);}

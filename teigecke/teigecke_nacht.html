@@ -4,6 +4,8 @@
   MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Listenstatus „teilweise“ (…) auf feste Warnfarbe --bos-warn-bright (Status färbt nie um). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-15 · 01:26 · v0.12b · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
       Produktliste aus der Sicht 'laufend': pausierte Brote fehlen. Ein Teig,
       dessen Brote alle pausiert sind, verschwindet damit von selbst (teigeDes-
@@ -463,7 +465,7 @@
   }
   .liste-zeile:hover, .liste-zeile:focus-visible { background: var(--bos-amber-glow-soft); outline: none; }
   .lz-status { font-size: 1.1rem; font-weight: 700; text-align: center; color: var(--bos-text-faint); }
-  .lz-status.ok { color: var(--bos-green); } .lz-status.warn { color: var(--bos-red); } .lz-status.teil { color: var(--bos-amber-bright); }
+  .lz-status.ok { color: var(--bos-green); } .lz-status.warn { color: var(--bos-red); } .lz-status.teil { color: var(--bos-warn-bright, var(--bos-amber-bright)); }
   .lz-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .lz-name b { font-weight: 600; font-size: var(--bos-font-md, .95rem); }
   .lz-name small { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .72rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

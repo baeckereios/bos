@@ -35,6 +35,11 @@
    freigeschaltet, sonst {}. Gelesen von Launcher, Guard, Standalone-Login
    und BackStore als vierter Parameter von BOS_ACCESS.can().
 
+   15.10.2026 · 19:56 (Farbprofile Stufe B, #72): aktualisiere() legt
+   farbschema (wirksames Profil über BOS_FARBPROFILE.wirksam) und
+   farbschemaKonto (roher Kontowert) an. Braucht bos_farbprofile.js VOR
+   dieser Datei. SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
+
    EINE MECHANIK, ZWEI AUFRUFER:
      index.html   — nach der Anmeldung, bevor weitergeleitet wird
      launcher.html — beim Start, mit dem eigenen state-Objekt
@@ -136,6 +141,18 @@ window.BOS_KONTO_PROFIL = (function () {
       eintrag.freigeschaltet = false;
     }
     eintrag.icon = rollenIcon(eintrag.role);
+
+    // 15.10.2026 (#72 Stufe B): Farbprofil. farbschemaKonto = roher Wert am
+    // Konto (nur mit Haken), für den Netz-Rückfall im Launcher; farbschema =
+    // WIRKSAMES Profil, gelesen von bos_theme_sync.js auf jeder Seite.
+    // Ohne Haken ist role schon null → Honig. Fehlt bos_farbprofile.js (alte
+    // Datei im Cache), bleibt ein vorhandenes farbschema stehen.
+    eintrag.farbschemaKonto = (daten && eintrag.freigeschaltet && typeof daten.farbschema === 'string') ? daten.farbschema : null;
+    if (window.BOS_FARBPROFILE) {
+      eintrag.farbschema = window.BOS_FARBPROFILE.wirksam({ konto: eintrag.farbschemaKonto, rolle: eintrag.role });
+    } else {
+      console.warn('[BOS Kontoprofil] bos_farbprofile.js fehlt — Farbprofil bleibt unverändert');
+    }
 
     state.activeProfileId = id;
     return id;

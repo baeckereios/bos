@@ -3,6 +3,8 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Einheit-/Quellen-Hinweise, Bedarfskasten „bernstein“ und fehlende Einheit auf feste Warnfarbe --bos-warn; Tönung „aktiv“ folgt dem Akzent. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-15 · 07:40 · v-richtwert-1b · Nachtrag 2 (Ulf 15.10., 07:35/07:36; ANWEISUNG_2026-10-15_RICHTWERT_NACHTRAG2.md)
       Haken „Aktiv“ samt ❓, Erklärsatz und Froster-Hinweis zieht aus dem
       Reiter „Bedarf“ ganz nach oben in den Reiter „Stammdaten“ (über Name/
@@ -224,11 +226,11 @@
   .prod-tabelle tbody tr { border-bottom:1px solid var(--border); }
   .prod-tabelle tbody tr.fehlt-fz { background:rgba(224,101,95,.08); }
   /* 13.10.2026 (#64): Einheit fehlt (oder Träger ohne Stück pro Träger) */
-  .prod-tabelle tbody tr.fehlt-einheit { background:rgba(192,122,16,.12); }
-  .prod-tabelle td .einheit-luecke { color:var(--amber); font-weight:700; }
+  .prod-tabelle tbody tr.fehlt-einheit { background:color-mix(in srgb, var(--bos-warn, var(--amber)) 12%, transparent); }
+  .prod-tabelle td .einheit-luecke { color:var(--bos-warn, var(--amber)); font-weight:700; }
   .prod-tabelle td.spb-ohne-bedeutung { color:var(--dim); opacity:.55; }
-  .btn-outline.aktiv { border-color:var(--amber); color:var(--amber); background:rgba(192,122,16,.12); }
-  .einheit-hinweis { font-size:.75rem; line-height:1.35; margin-top:4px; color:var(--amber); }
+  .btn-outline.aktiv { border-color:var(--amber); color:var(--amber); background:color-mix(in srgb, var(--amber) 12%, transparent); }
+  .einheit-hinweis { font-size:.75rem; line-height:1.35; margin-top:4px; color:var(--bos-warn, var(--amber)); }
   .einheit-hinweis.rot { color:var(--red); }
   .detail-feld input:disabled { opacity:.45; }
   .prod-tabelle td { padding:8px 6px; vertical-align:middle; font-size:.78rem; }
@@ -364,7 +366,7 @@
   .prod-tabelle tbody tr.pausiert td { opacity:.45; }
   .etikett { display:inline-block; font-family:var(--font); font-size:.62rem; letter-spacing:.05em; text-transform:uppercase; border:1px solid var(--border); border-radius:999px; padding:1px 7px; color:var(--dim); margin-left:6px; vertical-align:middle; }
   .col-quelle { width:110px; }
-  .quelle-luecke { color:var(--amber); }
+  .quelle-luecke { color:var(--bos-warn, var(--amber)); }
   .quelle-knoepfe { display:flex; gap:8px; flex-wrap:wrap; }
   .quelle-knoepfe .bt-btn:disabled { opacity:.35; cursor:not-allowed; }
   .rw-tabelle { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:end; }
@@ -378,7 +380,7 @@
   .rw-einheit { font-size:.85rem; color:var(--text); margin-top:6px; }
   .bedarf-box { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:.82rem; line-height:1.45; }
   .bedarf-box.rot { border-color:var(--red); }
-  .bedarf-box.bernstein { border-color:var(--amber); }
+  .bedarf-box.bernstein { border-color:var(--bos-warn, var(--amber)); }
   #sammelOverlay { align-items:center; justify-content:center; padding:18px; }
   .sammel-sheet { background:var(--surface); width:100%; max-width:760px; max-height:86vh; display:flex; flex-direction:column; border-radius:18px; border:1px solid var(--border); box-shadow:0 20px 56px rgba(0,0,0,.6); }
   .sammel-kopf { padding:18px 22px 8px; font-family:'Fraunces',serif; font-size:1.2rem; }
@@ -1951,7 +1953,7 @@ async function ladeNotfallZeile() {
     var letzter = null;
     snap.forEach(function (d) { var x = d.data(); var ms = x.ts && x.ts.toMillis ? x.ts.toMillis() : 0; if (!letzter || ms > letzter.zeitMs) letzter = { stand: (x.vorher && x.vorher.stand) || 0, zeitMs: ms }; });
     var e = erinnerungsText(letzter, geladenerStand, Date.now());
-    txt.textContent = e.text; txt.style.color = e.warnen ? 'var(--amber)' : 'var(--dim)';
+    txt.textContent = e.text; txt.style.color = e.warnen ? 'var(--bos-warn, var(--amber))' : 'var(--dim)';
     zeile.classList.remove('hidden');
   } catch (err) {
     console.error('[Produkt-Config] Erinnerung:', err);

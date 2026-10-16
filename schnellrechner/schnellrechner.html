@@ -1,6 +1,8 @@
 <!--
   schnellrechner.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-15 · 10:55 · v0.23 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+    Knapp-Zeile und Warnkasten „teilweise Schätzung“ auf feste Warnfarbe --bos-warn; Status-Zeichen ✕ Lücke / ⚠ Knapp (vorher ⚠️ / ◌), Verlässlichkeit ✕ / ⚠. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
   2026-10-15 · 01:26 · v0.22 · Richtwert und Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
     Umschalter „Manuell | Offiziell“ entfernt: die Quelle steht je Produkt in
     der Produkt-Karte (BOS_PRODUKTE.bedarfsQuelle — Richtwert, Backzettel oder
@@ -538,7 +540,7 @@
   table.sr-calc { width: 100%; border-collapse: collapse; font-size: var(--bos-font-sm, 0.88rem); }
   table.sr-calc td { padding: var(--bos-space-2xs, 9px) var(--bos-space-3xs, 4px); border-bottom: 1px solid var(--bos-border); }
   .sr-row-warn-luecke { color: var(--bos-red); font-weight: 800; }
-  .sr-row-warn-knapp { color: var(--bos-amber); font-weight: 800; }
+  .sr-row-warn-knapp { color: var(--bos-warn, var(--bos-amber)); font-weight: 800; }
   .sr-empty-hint { color: var(--bos-text-faint); text-align: center; padding: var(--bos-space-xl, 40px) var(--bos-space-2xs, 10px); font-size: var(--bos-font-md, 0.9rem); }
 
   /* ── Hilfe-Sheet ────────────────────────────────────────── */
@@ -1102,12 +1104,12 @@ function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verla
     warnungBox.style.display = 'block';
     warnungBox.style.borderColor = 'var(--bos-red)'; warnungBox.style.color = 'var(--bos-red)';
     warnungBox.style.background = 'color-mix(in srgb, var(--bos-red) 12%, transparent)';
-    warnungBox.textContent = '⚠️ Keine ausreichenden Bedarfszahlen (' + srQuelleText() + ') für dieses Produkt — Ergebnis nicht verlässlich!';
+    warnungBox.textContent = '✕ Keine ausreichenden Bedarfszahlen (' + srQuelleText() + ') für dieses Produkt — Ergebnis nicht verlässlich!';
   } else if (teilweiseUnzuverlaessig) {
     warnungBox.style.display = 'block';
-    warnungBox.style.borderColor = 'var(--bos-amber)'; warnungBox.style.color = 'var(--bos-amber)';
-    warnungBox.style.background = 'color-mix(in srgb, var(--bos-amber) 12%, transparent)';
-    warnungBox.textContent = '◌ Für einzelne Wochentage fehlen verlässliche Bedarfszahlen (' + srQuelleText() + ') — Ergebnis ist teilweise eine Schätzung.';
+    warnungBox.style.borderColor = 'var(--bos-warn, var(--bos-amber))'; warnungBox.style.color = 'var(--bos-warn, var(--bos-amber))';
+    warnungBox.style.background = 'color-mix(in srgb, var(--bos-warn, var(--bos-amber)) 12%, transparent)';
+    warnungBox.textContent = '⚠\uFE0E Für einzelne Wochentage fehlen verlässliche Bedarfszahlen (' + srQuelleText() + ') — Ergebnis ist teilweise eine Schätzung.';
   } else {
     warnungBox.style.display = 'none';
   }
@@ -1140,7 +1142,7 @@ function srRenderErgebnis(ergebnis, anfangsbestandBleche, fehlmengeBleche, verla
   (ergebnis.kette || []).forEach(tag => {
     if (tag.istHeute) return; // heute hat keinen eigenen Verbrauch
     const warnKlasse = tag.warnung === 'luecke' ? 'sr-row-warn-luecke' : (tag.warnung === 'knapp' ? 'sr-row-warn-knapp' : '');
-    const warnIcon = tag.warnung === 'luecke' ? ' ⚠️ Lücke' : (tag.warnung === 'knapp' ? ' ◌ Knapp' : '');
+    const warnIcon = tag.warnung === 'luecke' ? ' ✕ Lücke' : (tag.warnung === 'knapp' ? ' ⚠\uFE0E Knapp' : '');
     const tagLabel = tag.tagKurz + ' ' + pad2(tag.datum.getDate()) + '.' + pad2(tag.datum.getMonth() + 1) + '.';
     const mengeSpalte = tag.gedecktDurchFroster
       ? '<span style="color:var(--bos-green);">❄️ Froster</span>'

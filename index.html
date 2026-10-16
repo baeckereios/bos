@@ -38,6 +38,10 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-10-15 · 19:56 · Farbprofile Stufe B (#72) · Einbindung
+      bos_farbprofile.js vor bos_konto_profil.js, damit der Profileintrag
+      das wirksame Farbprofil trägt. Sonst nichts; die Tür bleibt Honig.
+      SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
     2026-10-10 · 06:4x · Demo-Tour · Feature
       Großer Einstieg „Neu hier? Schau, dafür bin ich da.“ unter dem
       Formular, führt zur öffentlichen Tour (tour/tour.html, ohne
@@ -492,6 +496,10 @@
      auf einem Gerät aus, das den Launcher noch nie gesehen hat. -->
 <script src="bos_launcher_roles.js"></script>
 <script src="bos_accounts.js"></script>
+<!-- 15.10.2026 (#72 Stufe B): Farbprofile — die Tür trägt das wirksame Profil
+     in den Profileintrag ein (NFC-/QR-Einstieg). Die Tür selbst bleibt Honig,
+     sie lädt kein bos_theme_sync.js. -->
+<script src="bos_farbprofile.js"></script>
 <script src="bos_konto_profil.js"></script>
 
 <script>

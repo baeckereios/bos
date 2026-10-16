@@ -29,6 +29,8 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Prüfurteil „Achtung“, Blattstand „ungespeichert“ und Sperr-Hinweis auf feste Warnfarbe --bos-warn*; Status-Zeichen ✓ ⚠ ✕ (✗ → ✕, ● ungespeichert → ⚠, Warn-Urteile mit ⚠); Hilfetext „Sammelblatt speichern“ nennt jetzt ⚠ statt ●. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-08 · 14:17 · v1.3 · Hilfetext (zweites festes Ziel)
       Nur der Hilfetext „Schilder der Teigecke“ nennt das neue feste Ziel
       „Teigecke · Vorbereitungen“ (nfc_qr_logik.js v1.3). Die Liste zeigt es
@@ -91,7 +93,7 @@
     border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px); margin-bottom: var(--bos-space-xs, 9px); }
   .hinweis { border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px); margin-bottom: var(--bos-space-sm, 14px);
     border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); background: var(--bos-surface-raised, #2b2218); }
-  .hinweis.sperre { border-color: var(--bos-amber, #c07a10); background: var(--bos-amber-glow-soft, rgba(192,122,16,.16)); }
+  .hinweis.sperre { border-color: var(--bos-warn, var(--bos-amber, #c07a10)); background: var(--bos-warn-glow-soft, var(--bos-amber-glow-soft, rgba(192,122,16,.16))); }
   .hinweis.rot { border-color: var(--bos-red, #d6584a); }
   .hinweis b { display: block; margin-bottom: 4px; }
   .klein { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim, #ab9c8a); }
@@ -110,7 +112,7 @@
   .karte.aus .ziel-name { font-weight: 600; font-size: var(--bos-font-md, .95rem); }
   .ergebnis { margin-top: var(--bos-space-sm, 14px); padding-top: var(--bos-space-sm, 14px); border-top: 1px solid var(--bos-border, rgba(255,255,255,.08)); }
   .ergebnis .urteil { font-weight: 700; margin: 6px 0; }
-  .urteil.gut { color: var(--bos-green, #4caf7d); } .urteil.warn { color: var(--bos-amber-bright, #e0973a); } .urteil.schlecht { color: var(--bos-red, #d6584a); }
+  .urteil.gut { color: var(--bos-green, #4caf7d); } .urteil.warn { color: var(--bos-warn-bright, var(--bos-amber-bright, #e0973a)); } .urteil.schlecht { color: var(--bos-red, #d6584a); }
   #fehlerLeiste { border: 1px solid var(--bos-red, #d6584a); border-radius: var(--bos-radius-md, 14px); padding: var(--bos-space-sm, 14px);
     margin-bottom: var(--bos-space-sm, 14px); background: var(--bos-surface, #221b14); }
   #fehlerLeiste .fehler-kopf { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--bos-red, #d6584a); }
@@ -139,7 +141,7 @@
   .blatt-meldung { color: var(--bos-red, #d6584a); font-weight: 600; margin: 8px 0; word-break: break-word; }
   .zusatz-reihe { display: flex; gap: var(--bos-space-xs, 9px); margin-top: var(--bos-space-xs, 9px); flex-wrap: wrap; align-items: center; }
   .zusatz-reihe .bos-input { flex: 1; min-width: 10rem; width: auto; }
-  .marke.offen { border-color: var(--bos-amber, #c07a10); color: var(--bos-amber-bright, #e0973a); }
+  .marke.offen { border-color: var(--bos-warn, var(--bos-amber, #c07a10)); color: var(--bos-warn-bright, var(--bos-amber-bright, #e0973a)); }
   .warte { font-size: 2.6rem; text-align: center; margin: 10px 0; animation: puls 1.2s infinite; }
   @keyframes puls { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
   /* pointer-events: none — sonst fängt eine lange Meldung fünf Sekunden lang die Tipper auf die Knöpfe darunter ab (Fund im Ablauftest, 04.10.2026) */
@@ -305,12 +307,12 @@ const I18N_DE = {
   chip_schreiben_text: 'Jetzt den Chip an die Rückseite des Handys halten und ruhig halten, bis die Bestätigung kommt. Was vorher auf dem Chip stand, wird überschrieben.',
   chip_geschrieben: '✓ Chip beschrieben: {name}. Am besten gleich mit „Chip prüfen“ gegenlesen.',
   chip_gelesen: 'Auf dem Chip steht:',
-  chip_leer: 'Auf dem Chip steht keine Adresse (leer oder anderer Inhalt).',
+  chip_leer: '⚠\uFE0E Auf dem Chip steht keine Adresse (leer oder anderer Inhalt).',
   chip_ziel: '✓ Führt zu „{name}“ in diesem BOS.',
   chip_zusatz: 'Zusatz in der Adresse: {zusatz}',
-  chip_nicht_direkt: 'Achtung: „{name}“ ist nicht (mehr) für den Direktaufruf freigegeben. Wer scannt, landet womöglich vor einer Sperre.',
-  chip_ziel_fehlt: '⚠ Führt in dieses BOS, aber das Ziel gibt es nicht (mehr): {pfad}',
-  chip_fremd: '✗ Führt nicht in dieses BOS.',
+  chip_nicht_direkt: '⚠\uFE0E Achtung: „{name}“ ist nicht (mehr) für den Direktaufruf freigegeben. Wer scannt, landet womöglich vor einer Sperre.',
+  chip_ziel_fehlt: '⚠\uFE0E Führt in dieses BOS, aber das Ziel gibt es nicht (mehr): {pfad}',
+  chip_fremd: '✕ Führt nicht in dieses BOS.',
   chip_fremd_lokal: 'Diese Seite läuft gerade lokal. Verglichen wird mit der lokalen Adresse. Ein Chip mit der echten Online-Adresse gilt hier deshalb als fremd.',
   chip_kopieren: '📡 Auf einen anderen Chip kopieren',
   chip_kopieren_nur_ziel: 'Kopieren geht nur für Chips, die zu einem wählbaren Ziel in diesem BOS führen.',
@@ -348,7 +350,7 @@ const I18N_DE = {
   blatt_zeilen_zahl: '{ziele} Ziele, {ueber} Überschriften',
   blatt_tote_uebersicht: '⚠ {n} Ziel(e) gibt es nicht mehr. Blatt öffnen und die Zeile ersetzen oder entfernen. Bis dahin kein Druck.',
   blatt_zurueck: '‹ Alle Blätter',
-  blatt_ungespeichert: '● ungespeicherte Änderungen',
+  blatt_ungespeichert: '⚠\uFE0E ungespeicherte Änderungen',
   blatt_gespeichert_stand: '✓ gespeichert',
   blatt_standort: 'Standort (steht groß auf dem Blatt)',
   blatt_standort_platz: 'z. B. Backstubentür',
@@ -983,7 +985,7 @@ const helpData = [
   { heading: 'Chip beschreiben', text: '„📡 Chip beschreiben“ schreibt die Adresse des Ziels auf einen NFC-Chip. Das geht nur am Handy in Chrome (Android) mit eingeschaltetem NFC. Auf den Knopf tippen, dann den Chip ruhig an die Rückseite des Handys halten, bis die Bestätigung kommt. Was vorher auf dem Chip stand, wird überschrieben. Chips bleiben überschreibbar, es gibt keinen Schreibschutz. Einen Chip beschreiben geht auch ganz ohne Schild.' },
   { heading: 'Chip prüfen', text: '„📡 Chip prüfen“ liest einen Chip aus und sagt, wohin er führt. Es gibt drei Ergebnisse: Er führt zu einem Ziel in diesem BOS. Oder er führt in dieses BOS, aber das Ziel gibt es nicht mehr (dann den Chip neu beschreiben). Oder er führt nicht in dieses BOS (dann hat jemand ihn überschrieben, oder es ist ein fremder Chip). Führt der Chip zu einem wählbaren Ziel, kannst du ihn mit „Auf einen anderen Chip kopieren“ verdoppeln. Bei Zielen, die zu einer Gruppe gehören, steht am Bildschirm die Gruppe davor, zum Beispiel „Froster · Ziele“. Auf dem gedruckten Schild und Blatt steht nur der Name.' },
   { heading: 'Sammelblatt: ein Standort, mehrere Ziele', text: 'Ein Sammelblatt ist ein Blatt DIN A4 hoch für eine Stelle, an der man mehrere Dinge braucht, zum Beispiel die Backstubentür. Mit „＋ Neues Blatt“ legst du eines an: Standort eintippen (das ist nur der Name der Stelle, er steht groß oben), wählen, ob je Zeile ein QR-Code, ein Chip-Feld oder beides stehen soll, dann Ziele aus der Liste hinzufügen. Dazwischen kannst du Überschriften setzen. Mit ▲ und ▼ schiebst du eine Zeile hoch oder runter, mit ✕ nimmst du sie weg (mit Rückfrage). Auf ein Blatt passen höchstens 7 Ziele und 2 Überschriften, damit jeder Code mindestens 3 cm breit bleibt. Wird es mehr, sagt die Seite das, und du legst ein zweites Blatt an. Code und Chip-Feld wechseln von Zeile zu Zeile die Seite. Das ist Absicht: So erwischt das Handy nicht den Chip der Nachbarzeile.' },
-  { heading: 'Sammelblatt speichern und nachdrucken', text: 'Ein Blatt wird erst mit „Speichern“ gesichert. Solange oben „● ungespeicherte Änderungen“ steht, ist nichts gesichert, und die Seite fragt nach, bevor du das Blatt verlässt. Gespeicherte Blätter liegen in der Datenbank, nicht auf diesem Gerät: Du findest sie von jedem Gerät aus wieder und druckst sie mit „🖨 Drucken“ einfach nach. Gedruckt wird immer nur der gespeicherte Stand: Hast du ein Blatt geändert, erst speichern, dann drucken. Gespeichert wird nur, welche Ziele auf dem Blatt stehen, nie eine Adresse. Die Adresse entsteht erst beim Drucken. Ändert sich die Adresse von BäckereiOS, druckst du das Blatt einfach neu. „Blatt entfernen“ nimmt ein Blatt aus der Liste; Änderungen, die du davor nicht gespeichert hast, verfallen dabei. Speichern und lesen darf diese Blätter nur das Systempflege-Konto. Wurde ein Blatt inzwischen woanders geändert, überschreibt die Seite nichts, sondern meldet es.' },
+  { heading: 'Sammelblatt speichern und nachdrucken', text: 'Ein Blatt wird erst mit „Speichern“ gesichert. Solange oben „⚠\uFE0E ungespeicherte Änderungen“ steht, ist nichts gesichert, und die Seite fragt nach, bevor du das Blatt verlässt. Gespeicherte Blätter liegen in der Datenbank, nicht auf diesem Gerät: Du findest sie von jedem Gerät aus wieder und druckst sie mit „🖨 Drucken“ einfach nach. Gedruckt wird immer nur der gespeicherte Stand: Hast du ein Blatt geändert, erst speichern, dann drucken. Gespeichert wird nur, welche Ziele auf dem Blatt stehen, nie eine Adresse. Die Adresse entsteht erst beim Drucken. Ändert sich die Adresse von BäckereiOS, druckst du das Blatt einfach neu. „Blatt entfernen“ nimmt ein Blatt aus der Liste; Änderungen, die du davor nicht gespeichert hast, verfallen dabei. Speichern und lesen darf diese Blätter nur das Systempflege-Konto. Wurde ein Blatt inzwischen woanders geändert, überschreibt die Seite nichts, sondern meldet es.' },
   { heading: 'Ziel gibt es nicht mehr', text: 'Verschwindet ein Programm aus BäckereiOS oder ist es nicht mehr für den Direktaufruf freigegeben, merkt die Zentrale das beim Laden von selbst: In der Übersicht steht am Blatt eine rote Meldung, im Blatt ist die Zeile rot markiert. So ein Blatt lässt sich nicht drucken, bis du die Zeile entfernt oder durch ein anderes Ziel ersetzt hast. Ein Blatt mit einem Code, der ins Leere führt, soll gar nicht erst entstehen. Denk auch an das Blatt, das schon hängt: abnehmen und neu drucken.' },
   { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips.' },
   { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },

@@ -62,6 +62,8 @@
       frosterZustaendigkeit bisher nur "baecker" kennt).
 
   CHANGELOG
+    2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
+      Schleier im Seitenkopf folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-15 · 01:26 · v0.7 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
       Produktliste aus der Sicht 'laufend': pausierte Produkte fehlen.
       Fassungsprüfung mit sichtbarer Meldung. SESSION_2026-10-14_RICHTWERT_BAU.md
@@ -164,7 +166,7 @@
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background: radial-gradient(ellipse at top, rgba(192,122,16,.05), transparent 55%), var(--bg);
+    background: radial-gradient(ellipse at top, color-mix(in srgb, var(--amber) 5%, transparent), transparent 55%), var(--bg);
     color:var(--text);
     font-family:var(--font-body);
     min-height:100vh;
