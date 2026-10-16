@@ -30,8 +30,10 @@
    Aktivitäts-Erkennung über alle Satelliten hinweg, das würde aber an
    jede Satelliten-Datei ein neues Skript hängen (= das offene Access-
    Guard-Rollout-Thema aus BOS_BAUSTELLEN.md). Für v1 bewusst nicht
-   mitgezogen, analog zur "kein Live-Sync"-Einschränkung bei
-   bos_theme_sync.js.
+   mitgezogen. (Der frühere Vergleich mit der "kein Live-Sync"-Grenze von
+   bos_theme_sync.js ist seit 16.10.2026 hinfällig — der Theme-Sync zieht
+   jetzt über das storage-Ereignis nach. Für die Aktivitäts-Erkennung gilt
+   die Grenze hier weiter: Antippen im Iframe sieht der Launcher nicht.)
 
    z-index 1850: unter Profil-Auswahl (1900) und Bootscreen (1950),
    über Taskbar/Fenstern/Topbar (≤600) — der Screensaver kann also nie

@@ -40,6 +40,16 @@
    farbschemaKonto (roher Kontowert) an. Braucht bos_farbprofile.js VOR
    dieser Datei. SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
 
+   16.10.2026 · 07:54 (Einstellungen für alle, #72 Stufe C; Freigabe
+   Kontroll-Chat 07:26): Das wirksame Profil rechnet jetzt setzeFarbschema()
+   — mit der EIGENEN Wahl aus state.profileData[id].farbschema, falls dort
+   eine steht. aktualisiere() ruft sie auf (Tür), launcher.html ebenso nach
+   dem Laden der Einstellungen und nach jeder Auswahl: eine Stelle rechnet,
+   zwei rufen sie auf. Die Tür liest das Einstellungs-Dokument NICHT; auf
+   einem neuen Gerät gilt bis zum ersten Launcher-Start die Vorgabe (wie bei
+   hell/dunkel). Auf einem bekannten Gerät bleibt die eigene Wahl erhalten.
+   SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
+
    EINE MECHANIK, ZWEI AUFRUFER:
      index.html   — nach der Anmeldung, bevor weitergeleitet wird
      launcher.html — beim Start, mit dem eigenen state-Objekt
@@ -148,14 +158,41 @@ window.BOS_KONTO_PROFIL = (function () {
     // Ohne Haken ist role schon null → Honig. Fehlt bos_farbprofile.js (alte
     // Datei im Cache), bleibt ein vorhandenes farbschema stehen.
     eintrag.farbschemaKonto = (daten && eintrag.freigeschaltet && typeof daten.farbschema === 'string') ? daten.farbschema : null;
-    if (window.BOS_FARBPROFILE) {
-      eintrag.farbschema = window.BOS_FARBPROFILE.wirksam({ konto: eintrag.farbschemaKonto, rolle: eintrag.role });
-    } else {
-      console.warn('[BOS Kontoprofil] bos_farbprofile.js fehlt — Farbprofil bleibt unverändert');
-    }
+    setzeFarbschema(state, eintrag);
 
     state.activeProfileId = id;
     return id;
+  }
+
+  /**
+   * 16.10.2026 (#72 Stufe C): wirksames Farbprofil in den Profileintrag.
+   * Vorrang: eigene Wahl (state.profileData[eintrag.id].farbschema) >
+   * Konto (eintrag.farbschemaKonto) > Rolle (eintrag.role) > Honig.
+   * Die eigene Wahl wirkt auch ohne Haken „freigeschaltet“ — sie ist
+   * persönlich, kein Recht. Fehlt bos_farbprofile.js (alte Datei im Cache),
+   * bleibt ein vorhandenes farbschema stehen.
+   * @returns {string|null} das gesetzte Profil
+   */
+  function setzeFarbschema(state, eintrag) {
+    if (!eintrag) return null;
+    if (!window.BOS_FARBPROFILE) {
+      console.warn('[BOS Kontoprofil] bos_farbprofile.js fehlt — Farbprofil bleibt unverändert');
+      return eintrag.farbschema || null;
+    }
+    var daten = state && state.profileData ? state.profileData[eintrag.id] : null;
+    var eigene = (daten && typeof daten.farbschema === 'string') ? daten.farbschema : null;
+    eintrag.farbschema = window.BOS_FARBPROFILE.wirksam({
+      eigeneWahl: eigene, konto: eintrag.farbschemaKonto, rolle: eintrag.role
+    });
+    return eintrag.farbschema;
+  }
+
+  /** Vorgabe ohne eigene Wahl (Anzeige „Vorgabe: …“ in den Einstellungen). */
+  function vorgabeFarbschema(eintrag) {
+    if (!window.BOS_FARBPROFILE) return null;
+    return window.BOS_FARBPROFILE.wirksam({
+      konto: eintrag ? eintrag.farbschemaKonto : null, rolle: eintrag ? eintrag.role : null
+    });
   }
 
   function leseState() {
@@ -230,6 +267,8 @@ window.BOS_KONTO_PROFIL = (function () {
     profilIdAus: profilIdAus,
     aktualisiere: aktualisiere,
     hakenAus: hakenAus,
+    setzeFarbschema: setzeFarbschema,
+    vorgabeFarbschema: vorgabeFarbschema,
     stelleSicher: stelleSicher
   };
 })();

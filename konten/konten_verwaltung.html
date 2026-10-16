@@ -7,6 +7,11 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-16 · 07:54 · v-Farbprofil-2 · Text (Einstellungen für alle, #72 Stufe C; Freigabe Kontroll-Chat 07:26)
+      Nur Texte: Hinweis unter „🎨 Farbprofil“ um „Der Kollege kann es in seinen
+      Einstellungen für sich ändern.“ ergänzt, Hilfe „Was ist das 🎨 Farbprofil?“
+      um denselben Gedanken (F-D). Keine Logik geändert.
+      SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
     2026-10-15 · 19:56 · v-Farbprofil-1 · Feature (Farbprofile Stufe B, #72; Freigabe Kontroll-Chat 18:48)
       Konto-Karte, Stammdaten: eigene Gruppe „🎨 Farbprofil“ unter der Rolle,
       Auswahl „Nach Rolle: ‹Profil›“ und alle Profile aus bos_farbprofile.js,
@@ -619,7 +624,7 @@ var helpData = {
     },
     {
       heading: "Was ist das 🎨 Farbprofil?",
-      text: "Jedes Konto sieht BOS in einer eigenen Farbe: Akzent und Grundton der Flächen, auf jeder Seite. Statusfarben (Rot, Gelb, Grün, Warnung) und Ausgedrucktes bleiben immer gleich. Voreingestellt ist das Profil der Rolle („Nach Rolle: …“). Für Azubis zum Beispiel „Apfel“ wählen. Wählst du das Profil, das die Rolle ohnehin hat, springt die Auswahl auf „Nach Rolle“ — das Konto folgt dann bei einem Rollenwechsel der neuen Rolle. Eine neu angelegte Rolle hat noch kein eigenes Profil und bekommt Honig. Gespeichert wird mit „Änderungen speichern“, sichtbar wird es beim nächsten Anmelden."
+      text: "Jedes Konto sieht BOS in einer eigenen Farbe: Akzent und Grundton der Flächen, auf jeder Seite. Statusfarben (Rot, Gelb, Grün, Warnung) und Ausgedrucktes bleiben immer gleich. Voreingestellt ist das Profil der Rolle („Nach Rolle: …“). Für Azubis zum Beispiel „Apfel“ wählen. Wählst du das Profil, das die Rolle ohnehin hat, springt die Auswahl auf „Nach Rolle“ — das Konto folgt dann bei einem Rollenwechsel der neuen Rolle. Eine neu angelegte Rolle hat noch kein eigenes Profil und bekommt Honig. Gespeichert wird mit „Änderungen speichern“, sichtbar wird es beim nächsten Anmelden. Jeder kann sein Profil in seinen Einstellungen für sich ändern; das hier ist die Vorgabe."
     },
     {
       heading: "Warum das Admin-Passwort schon beim Öffnen?",
@@ -1164,7 +1169,7 @@ function farbprofilHTML(k, b) {
       : 'Folgt der Rolle. Wechselt die Rolle, wechselt das Profil mit.');
   return kopf +
     '<select aria-label="Farbprofil" onchange="setzeKontoFarbschema(\'' + k.id + '\', this.value)">' + optionen + '</select>' +
-    '<div class="haken-gruppe-hinweis">' + hinweis + ' Wirkt beim nächsten Anmelden.</div>' + fuss;
+    '<div class="haken-gruppe-hinweis">' + hinweis + ' Der Kollege kann es in seinen Einstellungen für sich ändern. Wirkt beim nächsten Anmelden.</div>' + fuss;
 }
 function setzeKontoFarbschema(kontoId, wert) {
   var b = bearbeitung[kontoId];

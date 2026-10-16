@@ -30,6 +30,18 @@
    Orbit-Icons kommen bewusst live aus window.BOS_APPS statt fest
    verdrahtet zu sein — eine Mechanik, eine Quelle, kein Duplikat
    der Registry.
+
+   HELLE ANSICHT (16.10.2026, Baustelle #74, Freigabe Kontroll-Chat
+   07:26): Der Weltraum-Grund ist fest dunkel, Schrift und Bäckerei-Grund
+   kamen aber aus den Tokens. Schaltet applyProfileUI() auf hell, solange
+   der Startbildschirm steht, lag dunkle Schrift auf Dunkel. Jetzt setzt
+   EINE Regel (html[data-theme="light"] .bosboot) die Tokens auf dem
+   Startbildschirm selbst auf feste dunkle Werte (Honig dunkel). Der
+   Akzent folgt weiter dem Profil, nimmt in hell aber das mittlere
+   --bos-amber statt des für hellen Grund abgedunkelten
+   --bos-amber-bright (Kontrast auf #16120e 5,2–5,4:1 statt 2,8–4,2:1).
+   Die dunkle Ansicht ist unverändert (pixelgleich).
+   SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
    ================================================================ */
 (function () {
   'use strict';
@@ -53,6 +65,11 @@
     '  opacity: 1; transition: opacity 700ms var(--bos-ease);' +
     '}' +
     '.bosboot--done { opacity: 0; pointer-events: none; }' +
+    /* 16.10.2026 (#74): in hell feste dunkle Werte auf dem Startbildschirm, siehe Kopf */
+    'html[data-theme="light"] .bosboot {' +
+    '  --bos-bg: #16120e; --bos-text: #f3ece1; --bos-text-dim: #ab9c8a; --bos-text-faint: #736656;' +
+    '  --bos-border-strong: rgba(255,255,255,0.18); --bos-amber-bright: var(--bos-amber);' +
+    '}' +
     '.bosboot__layer { position: absolute; inset: 0; }' +
     '.bosboot__space {' +
     '  background: radial-gradient(ellipse at 50% 40%, #241d29, #05060a 72%);' +

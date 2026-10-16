@@ -29,16 +29,26 @@
    irgendeiner Stelle ein Wert, ist 'dark' der Standard — exakt wie
    im Launcher selbst.
 
-   ABSICHTLICHE GRENZE: Liest nur EINMAL beim Laden der Seite, wie
-   bos_access_guard.js auch. Wechselt Ulf das Theme, während ein
-   Satelliten-Fenster schon offen ist, zieht das nicht automatisch
-   nach — dafür müsste die Seite neu geladen werden. Kein Live-Sync
-   über mehrere gleichzeitig offene Fenster hinweg; aktuell kein
-   konkreter Bedarf dafür.
+   LIVE-ÜBERNAHME (16.10.2026, Baustelle #75; ersetzt die frühere
+   „ABSICHTLICHE GRENZE … kein Live-Sync“): Beim Laden wird einmal
+   gelesen wie bisher. Zusätzlich hört die Seite auf das storage-Ereignis
+   für bos_launcher_state_v2 und setzt data-theme und data-farbschema neu.
+   Wechselt jemand im Launcher hell/dunkel oder das Farbprofil, ziehen
+   offene Fenster (Launcher-Iframes, andere Tabs) sofort nach, ohne Neuladen.
+   Das Ereignis feuert in jedem ANDEREN Dokument derselben Herkunft, nie im
+   speichernden selbst — der Launcher setzt sich in applyProfileUI() bzw.
+   setTheme() selbst und hört hier deshalb nicht zu (NUR_FUNKTION, unten).
+   Echte Grenze: nur dieselbe Herkunft (Domain) auf DEMSELBEN Gerät. Ein
+   zweites Gerät übernimmt die Einstellung erst beim nächsten Start.
+   Dichte (bos_density_sync.js) und Zoom (bos_zoom_sync.js) verhalten sich
+   gleich.
 
    15.10.2026 · 19:56 · Farbprofile Stufe B (#72, Freigabe Kontroll-Chat
    18:48): zusätzlich data-farbschema aus dem Profileintrag, siehe unten.
    SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
+
+   16.10.2026 · 07:54 · Live-Übernahme über das storage-Ereignis (#75,
+   Freigabe Kontroll-Chat 07:26). SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
    ================================================================ */
 
 /* ----------------------------------------------------------------
@@ -99,18 +109,30 @@ window.BOS_FARBSCHEMA_SYNC = (function () {
   // hellen Modus mit heller Schrift auf seinem dunklen Grund (Bildvergleich
   // Honig, 15.10.2026, Fund F27).
   if (window.BOS_THEME_SYNC_NUR_FUNKTION) return;
-  var state = null;
-  try {
-    var raw = localStorage.getItem('bos_launcher_state_v2');
-    state = raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    state = null;
+  var SCHLUESSEL = 'bos_launcher_state_v2';
+  function leseState() {
+    try {
+      var raw = localStorage.getItem(SCHLUESSEL);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
   }
-  function leseTheme() {
+  function leseTheme(state) {
     if (!state || !state.activeProfileId || !state.profileData) return 'dark';
     var data = state.profileData[state.activeProfileId];
     return (data && data.theme) ? data.theme : 'dark';
   }
-  document.documentElement.setAttribute('data-theme', leseTheme());
-  try { window.BOS_FARBSCHEMA_SYNC.setze(state); } catch (e) { /* ohne Profil: Honig */ }
+  function anwenden() {
+    var state = leseState();
+    document.documentElement.setAttribute('data-theme', leseTheme(state));
+    try { window.BOS_FARBSCHEMA_SYNC.setze(state); } catch (e) { /* ohne Profil: Honig */ }
+  }
+  anwenden();
+  // 16.10.2026 (#75): offene Fenster ziehen sofort nach. e.key === null
+  // heißt localStorage.clear() — dann ebenfalls neu lesen (→ Standard).
+  if (typeof window.addEventListener === 'function') window.addEventListener('storage', function (e) {
+    if (e.key !== null && e.key !== SCHLUESSEL) return;
+    anwenden();
+  });
 })();

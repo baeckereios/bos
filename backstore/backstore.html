@@ -1,6 +1,14 @@
 <!--
   backstore.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-16 · 07:54 · v0.3 · Feature (Einstellungen für alle, #38; Freigabe
+    Kontroll-Chat 07:26)
+    Katalog zeigt keine Einträge mit type 'system' mehr (die Einstellungen
+    öffnen sich jetzt aus dem Tray der Taskleiste, für jedes Konto). Der
+    Zähler „X von Y installiert“ zählt nur noch IDs, die im Katalog stehen —
+    vorher zählten eigene Kacheln und ein altes 'settings' in installed mit
+    („13 von 12“). profileData.installed selbst bleibt unangetastet.
+    Siehe SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md.
   2026-10-10 · v0.2 · Feature (Reparaturanfrage Stufe 1)
     Haken-Seiten (Registry-Feld haken): can() bekommt profile.kontoHaken als
     vierten Parameter; gesperrt steht „Haken fehlt · Freigabe einzeln je
@@ -69,6 +77,8 @@
       selbst — das war nicht Teil dieser Runde, offen gelassen statt
       still mitentschieden. Admin installiert es einmalig wie jede
       andere Kachel.
+      [16.10.2026: überholt. Einträge mit type 'system' stehen nicht mehr
+      im Katalog; die Einstellungen öffnen sich aus dem Tray.]
 
   WICHTIGER HINWEIS ZU VERBLEIBENDEN ANNAHMEN (§0 BOS_NEUER_SATELLIT_
   CHECKLISTE.md): bos_design_tokens.css, bos_app_registry.js,
@@ -317,7 +327,8 @@ function bsCatalogApps() {
   // Hub-Kind-Kacheln (a.hub gesetzt) tauchen wie im echten Grid nicht
   // einzeln auf. Gepinnte Kacheln (aktuell nur der BackStore selbst)
   // sind nicht über sich selbst installierbar, siehe Kopfkommentar.
-  return (window.BOS_APPS || []).filter(function (a) { return !a.hub && !a.pinned; });
+  // 16.10.2026: type 'system' (die Einstellungen, jetzt im Tray) ebenfalls nicht.
+  return (window.BOS_APPS || []).filter(function (a) { return !a.hub && !a.pinned && a.type !== 'system'; });
 }
 
 function bsRender() {
@@ -342,7 +353,10 @@ function bsRender() {
 
   var apps = bsCatalogApps();
   grid.innerHTML = apps.map(function (a) { return bsRenderCard(a, data, role, kontoOverrides, kontoHaken); }).join('');
-  countEl.textContent = data.installed.length + ' von ' + apps.length + ' installiert';
+  // 16.10.2026: nur IDs zählen, die im Katalog stehen (eigene Kacheln und
+  // ein altes 'settings' in installed zählten vorher mit).
+  var imKatalog = apps.filter(function (a) { return data.installed.indexOf(a.id) !== -1; }).length;
+  countEl.textContent = imKatalog + ' von ' + apps.length + ' installiert';
 }
 
 document.getElementById('bsGrid').addEventListener('click', function (e) {

@@ -59,6 +59,11 @@
    Zusätzlich korrigiert: freezer_produktion stand nur bei admin, obwohl die
    Registry seit 05.09.2026 admin/backstube/konditorei nennt (gleiche Rollen
    wie die Nachbarn im selben Hub). Backstube und Konditorei ergänzt. */
+/* 16.10.2026 (07:54, Einstellungen für alle, #38; Freigabe Kontroll-Chat
+   07:26): "settings" unter admin entfernt. Die Einstellungen sind keine
+   Kachel mehr, sie öffnen sich für JEDES Konto aus dem Tray der Taskleiste
+   (launcher.html). Der Registry-Eintrag hat keine roles mehr (Registry =
+   Rechte-Matrix). SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md */
 /* NEU 03.10.2026 (14:47): nfc_qr_zentrale nur bei admin, wie das roles-Feld der
    Registry (Registry = Rechte-Matrix, test_nfc_qr.js). */
 /* NEU 08.10.2026: Kind teigecke_rezepte („Teige & Rezepte“) bei denselben drei
@@ -157,7 +162,6 @@ window.BOS_PERMISSIONS = {
     "teigecke_rezepte": true
   },
   "admin": {
-    "settings": true,
     "freezer": true,
     "freezer_inventur": true,
     "freezer_produktion": true,

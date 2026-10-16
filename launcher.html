@@ -19,6 +19,31 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-16 · 07:54 · v3.1 · Feature (Einstellungen für alle #38, eigenes Farbprofil #72 Stufe C,
+      offene Fenster #75, Startbildschirm hell #74; Freigabe Kontroll-Chat 07:26)
+      - Tray rechts in der Taskleiste: ⚙️ öffnet die Einstellungen, 🌙/☀️
+        (#themeToggle, ID unverändert) wandert aus der Kopfleiste hierher.
+        Der Tray schrumpft nie, die Fensterknöpfe scrollen.
+      - Kachel „Einstellungen“ stillgelegt: renderGrid() zeigt type 'system'
+        nicht, auch wenn die ID in installed steht (installed bleibt). Der
+        BackStore-Hinweis zählt Systemeinträge nicht mit.
+      - Bearbeiten-Modus und „＋“-Kachel für jedes Konto (drei Admin-Prüfungen
+        entfernt); applyProfileUI() beendet den Bearbeiten-Modus immer.
+      - Adressfeld nur bei eigenen Kacheln. getMergedApps() verwirft url und
+        status aus overrides bei Registry-Kacheln (die eigentliche Sperre),
+        modalSave schreibt sie dort nicht mehr und räumt alte Reste weg.
+      - Einstellungen: Zeile „🎨 Farbprofil“ (Vorgabe + alle Profile), Feld
+        profileData.farbschema; wirksam über BOS_KONTO_PROFIL.setzeFarbschema()
+        (eigene Wahl > Konto > Rolle). Wirkt sofort.
+      - uebernimmEinstellungen(): eine Funktion für beide Ladestellen; löscht
+        ein lokales farbschema, das in Firestore fehlt (Object.assign löscht
+        nichts — sonst käme „Vorgabe“ auf dem zweiten Gerät nie an).
+      - profilOhneHaken(): Sync und Laden überspringen jetzt dieselben Profile
+        (Haken aus ODER kein Konto-Dokument, NF-52 erweitert). Scheitert ein
+        Sync trotzdem, steht err.message im Einstellungs-Fenster.
+      - Texte: Platzhalter ohne „Adresse eintragen“, Hilfe Abmelden/⚙️,
+        Infotext der Einstellungen (Konto statt „ohne Firestore“).
+      Siehe SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md.
     2026-10-15 · 19:56 · v3.0 · Feature (Farbprofile Stufe B, #72; Freigabe Kontroll-Chat 18:48)
       Farbprofil je Konto: lädt bos_theme_sync.js (nur die Funktion, ohne
       Setzen beim Laden) und
@@ -462,6 +487,21 @@
     font-weight: 900; font-size: 1rem; cursor: pointer;
   }
   .bos-taskbar__apps { flex: 1; display: flex; gap: .5rem; overflow-x: auto; height: 100%; align-items: center; }
+  /* Tray rechts (16.10.2026, #38): fest rechts wie #taskbarHome fest links.
+     Schrumpft nie — bei vielen Fenstern scrollen die Fensterknöpfe. Knöpfe
+     40 px wie „B“; 🌙/☀️ ganz außen (häufigster Griff, Daumenbereich). */
+  .bos-taskbar__tray {
+    flex-shrink: 0; display: flex; align-items: center; gap: .4rem;
+    padding-left: .7rem; border-left: 1px solid var(--bos-border); height: 60%;
+  }
+  .bos-taskbar__tray .bos-icon-btn { width: 40px; height: 40px; font-size: 1.15rem; }
+  /* Farbprofil-Auswahl in den Einstellungen (16.10.2026, #72 Stufe C) */
+  .bos-farbwahl { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .45rem; }
+  .bos-farbwahl .bos-btn[aria-pressed="true"] { border-color: var(--bos-amber); box-shadow: inset 0 0 0 1px var(--bos-amber); }
+  .bos-farbwahl__tupfer {
+    display: inline-block; width: .8rem; height: .8rem; border-radius: 50%;
+    margin-right: .35rem; vertical-align: -.05rem; border: 1px solid var(--bos-border-strong);
+  }
   .bos-taskbar__item {
     display: flex; align-items: center; gap: .4rem; padding: .45rem .85rem; flex-shrink: 0;
     border-radius: var(--bos-radius-sm); background: var(--bos-surface); border: 1px solid var(--bos-border);
@@ -616,7 +656,6 @@
       <div class="bos-topbar__clockdate" id="clockDate"></div>
     </div>
     <button class="bos-icon-btn" id="profileSwitchBtn" title="Abmelden">👤</button>
-    <button class="bos-icon-btn" id="themeToggle" title="Theme">🌙</button>
     <button class="bos-icon-btn" id="helpBtn" title="Hilfe">❓</button>
   </div>
 
@@ -629,6 +668,11 @@
   <div class="bos-taskbar">
     <button class="bos-taskbar__home" id="taskbarHome" title="Desktop anzeigen">B</button>
     <div class="bos-taskbar__apps" id="taskbarApps"></div>
+    <!-- 16.10.2026 (#38): Tray. #themeToggle kam aus der Kopfleiste, ID bleibt. -->
+    <div class="bos-taskbar__tray" id="taskbarTray">
+      <button class="bos-icon-btn" id="trayEinstellungen" title="Einstellungen" aria-label="Einstellungen">⚙️</button>
+      <button class="bos-icon-btn" id="themeToggle" title="Hell/Dunkel" aria-label="Hell/Dunkel">🌙</button>
+    </div>
   </div>
 
   <div class="bos-editbar" id="editbar" data-i18n="editbar.done"></div>
@@ -650,7 +694,7 @@
           <input type="color" class="bos-color" id="modalColor" value="#c07a10">
         </div>
       </div>
-      <div class="bos-modal__row">
+      <div class="bos-modal__row" id="modalUrlZeile"><!-- 16.10.2026: nur bei eigenen Kacheln sichtbar -->
         <label class="bos-label" data-i18n="modal.url"></label>
         <input type="text" class="bos-input" id="modalUrl" placeholder="z.B. ../froster/froster_inventar.html">
         <span style="font-size:.74rem;color:var(--bos-text-faint);" data-i18n="modal.urlHint"></span>
@@ -746,7 +790,7 @@
     'window.maximize': 'Maximieren',
     'window.restore': 'Wiederherstellen',
     'window.close': 'Schließen',
-    'window.placeholder': 'Diese App ist geplant, aber noch nicht gebaut. Sobald sie fertig ist: Adresse einfach in den Kachel-Einstellungen eintragen.',
+    'window.placeholder': 'Diese App ist geplant, aber noch nicht gebaut.',
     'modal.createTitle': 'Neue Kachel',
     'modal.editTitle': 'Kachel bearbeiten',
     'modal.name': 'Name',
@@ -781,7 +825,12 @@
     'settings.layout': 'Layout',
     'settings.layoutReset': 'Auf Standard zurücksetzen',
     'settings.layoutResetConfirm': 'Deine Kachel-Anpassungen (Reihenfolge, eigene Kacheln, Design) werden zurückgesetzt. Fortfahren?',
-    'settings.info': 'Erste Version des Launchers · noch ohne Firestore-Anbindung.',
+    'settings.info': 'Deine Einstellungen hängen an deinem Konto: Stellst du am Stationstablet etwas um, gilt das auf jedem Gerät mit diesem Konto. Ohne Freischaltung bleiben sie auf diesem Gerät.',
+    'settings.farbschema': '🎨 Farbprofil',
+    'settings.farbVorgabe': 'Vorgabe',
+    'settings.farbHinweis': 'Gilt für alle Seiten. Statusfarben (Rot, Gelb, Grün) und Ausgedrucktes bleiben immer gleich.',
+    'settings.syncFehler': 'Einstellungen konnten nicht gespeichert werden (bleiben auf diesem Gerät):',
+    'settings.ladeFehler': 'Einstellungen konnten nicht geladen werden (es gilt der Stand dieses Geräts):',
     'settings.symbolpaket': 'Symbolpaket (Beschriftung)',
     'settings.symbolpaketHell': 'Hell',
     'settings.symbolpaketDunkel': 'Dunkel',
@@ -795,9 +844,10 @@
     'settings.bg.mehlstaub': 'Mehlstaub',
     'settings.bg.kachelraster': 'Kachelraster',
     'help.title': 'Kurz erklärt',
-    'help.profile': 'Das Personen-Symbol oben wechselt dein Profil — jedes Profil hat seine eigene Kachel-Anordnung.',
+    'help.profile': 'Das Symbol oben (👤 bzw. dein Rollensymbol) meldet dich ab — angemeldet wird an der Tür.',
+    'help.settings': '⚙️ unten rechts → deine Einstellungen. 🌙/☀️ daneben → hell/dunkel.',
     'help.tap': 'Kachel antippen → öffnet die App in einem Fenster.',
-    'help.longpress': 'Kachel lange gedrückt halten → Bearbeiten-Modus: verschieben, umbenennen, Farbe/Größe ändern (nur Admin-Profile).',
+    'help.longpress': 'Kachel lange gedrückt halten → Bearbeiten-Modus: verschieben, umbenennen, Farbe/Größe ändern.',
     'help.add': 'Gestrichelte „+"-Kachel → eigene Verknüpfung hinzufügen.',
     'help.window': 'Fenster per Titelleiste verschieben, unten rechts an der Ecke in der Größe ändern.',
     'help.taskbar': 'Leiste unten zeigt alle geöffneten Apps — antippen wechselt oder minimiert.',
@@ -930,8 +980,22 @@
     // dem Laden aus Firestore, um den gerade erst empfangenen Stand nicht
     // sofort wieder ins selbe Dokument zurückzuschreiben.
     if (!keinSync && state.activeProfileId && state.profileData[state.activeProfileId] && window.BOS_PROFIL_SYNC && window.db && !aktivesProfilOhneHaken()) {
-      window.BOS_PROFIL_SYNC.speichere(window.db, state.activeProfileId, state.profileData[state.activeProfileId]);
+      window.BOS_PROFIL_SYNC.speichere(window.db, state.activeProfileId, state.profileData[state.activeProfileId], meldeSyncFehler);
     }
+  }
+  /* 16.10.2026 (Projektregel Fehlermeldungen): scheitert ein Sync, steht
+     err.message sichtbar im Einstellungs-Fenster, nicht nur in der Konsole.
+     null = gelungen → Zeile verschwindet. */
+  var syncFehlerText = '';
+  function meldeSyncFehler(fehler, art) {
+    syncFehlerText = fehler
+      ? (t(art === 'laden' ? 'settings.ladeFehler' : 'settings.syncFehler') + ' ' +
+         (fehler.code ? fehler.code + ' — ' : '') + (fehler.message || String(fehler)))
+      : '';
+    document.querySelectorAll('[data-role="sync-fehler"]').forEach(function (z) {
+      z.textContent = syncFehlerText;
+      z.style.display = syncFehlerText ? '' : 'none';
+    });
   }
 
   /* ---------------- Profile ---------------- */
@@ -987,8 +1051,19 @@
     var all = registry.concat(custom);
     var byId = {};
     all.forEach(function (a) { byId[a.id] = a; });
+    /* 16.10.2026 (#38, Ulf 09.10.): Registry-Kacheln übernehmen aus overrides
+       NIE url und status — das ist die eigentliche Sperre. Alte Einträge
+       (z. B. overrides.freezer.url) werden so wirkungslos, ohne Migration.
+       Eigene Kacheln (custom) übernehmen alles wie bisher. */
     Object.keys(data.overrides).forEach(function (id) {
-      if (byId[id]) Object.assign(byId[id], data.overrides[id]);
+      if (!byId[id]) return;
+      var ov = data.overrides[id] || {};
+      if (!byId[id].custom) {
+        ov = Object.assign({}, ov);
+        delete ov.url;
+        delete ov.status;
+      }
+      Object.assign(byId[id], ov);
     });
     var order = data.order.filter(function (id) { return byId[id]; });
     var missing = Object.keys(byId).filter(function (id) { return order.indexOf(id) === -1; });
@@ -1162,7 +1237,11 @@
        (data.installed). Vorher bekam automatisch JEDE Kachel, die die Rolle
        technisch erlaubte, sofort einen Platz — neue Satelliten tauchten so
        ungefragt bei allen berechtigten Profilen auf. */
+    /* 16.10.2026 (#38): type 'system' (die Einstellungen) ist keine Kachel
+       mehr — sie öffnet sich aus dem Tray. Auch wenn die ID noch in einem
+       alten installed steht: nicht zeigen, installed nicht bereinigen. */
     var shownApps = apps.filter(function (app) {
+      if (app.type === 'system') return false;
       return app.pinned || data.installed.indexOf(app.id) !== -1;
     });
     var spans = buildSpansMap(shownApps); // NEU 06.09.2026: Kachelgröße-Konzept
@@ -1207,8 +1286,8 @@
       grid.appendChild(el);
     });
 
-    var p = getActiveProfile();
-    if (p && p.role === 'admin') {
+    // 16.10.2026 (#38): „＋“-Kachel für jedes aktive Profil (vorher nur admin).
+    if (getActiveProfile()) {
       var addPos = nextFreeCellInOrder(displayPositions, cols, '__add__', spans);
       var addEl = buildAddTileEl();
       positionTileEl(addEl, addPos.col, addPos.row);
@@ -1241,12 +1320,14 @@
     }
   });
 
-  /* ---------------- Bearbeiten-Modus (nur Admin-Profile) ---------------- */
+  /* ---------------- Bearbeiten-Modus (alle Profile, seit 16.10.2026) ----------------
+     Vorher nur Admin — aus der Zeit, als admin gleich Ulf war. Seit #38 darf
+     jedes Konto seinen Desktop selbst ordnen (Ulf 09.10., 07:48; ausdrücklich
+     auch Stationskonten, 16.10., 07:00). */
   var editMode = false;
   function enterEditMode() {
     if (editMode) return;
-    var p = getActiveProfile();
-    if (!p || p.role !== 'admin') return;
+    if (!getActiveProfile()) return;
     editMode = true;
     document.getElementById('grid').classList.add('bos-editmode');
     document.getElementById('editbar').classList.add('bos-editbar--visible');
@@ -1425,6 +1506,7 @@
     document.getElementById('modalIcon').value = '🔗';
     document.getElementById('modalColor').value = '#c07a10';
     document.getElementById('modalUrl').value = '';
+    document.getElementById('modalUrlZeile').style.display = '';   // 16.10.2026: eigene Kachel → Adressfeld
     document.getElementById('modalDeleteBtn').style.display = 'none';
     showModal();
   }
@@ -1436,7 +1518,9 @@
     document.getElementById('modalName').value = app.name || '';
     document.getElementById('modalIcon').value = app.icon || '';
     document.getElementById('modalColor').value = app.color || '#c07a10';
-    document.getElementById('modalUrl').value = app.url || '';
+    document.getElementById('modalUrl').value = app.custom ? (app.url || '') : '';
+    // 16.10.2026 (#38): Adressfeld nur bei eigenen Kacheln, auch für Admin.
+    document.getElementById('modalUrlZeile').style.display = app.custom ? '' : 'none';
     document.getElementById('modalDeleteBtn').style.display = app.custom ? 'inline-flex' : 'none';
     modalGroesseKey = appGroesseKey(app);
     showModal();
@@ -1462,9 +1546,21 @@
       data.order.push(id);
       data.installed.push(id); // NEU 02.09.2026: eigene Kacheln erscheinen sofort, ohne Umweg über den BackStore
     } else if (modalMode === 'edit') {
-      data.overrides[modalTargetId] = Object.assign({}, data.overrides[modalTargetId], {
-        name: name, icon: icon, color: color, url: url, status: url ? 'live' : 'geplant', groesse: modalGroesseKey
-      });
+      var istEigene = data.customApps.some(function (a) { return a.id === modalTargetId; });
+      if (istEigene) {
+        data.overrides[modalTargetId] = Object.assign({}, data.overrides[modalTargetId], {
+          name: name, icon: icon, color: color, url: url, status: url ? 'live' : 'geplant', groesse: modalGroesseKey
+        });
+      } else {
+        // 16.10.2026 (#38): Registry-Kachel — keine Adresse, kein Status.
+        // Alte Reste fallen beim Speichern weg, damit sie nicht weiter synchronisiert werden.
+        var neu = Object.assign({}, data.overrides[modalTargetId], {
+          name: name, icon: icon, color: color, groesse: modalGroesseKey
+        });
+        delete neu.url;
+        delete neu.status;
+        data.overrides[modalTargetId] = neu;
+      }
     }
     saveState();
     hideModal();
@@ -1562,6 +1658,7 @@
           '<button class="bos-btn" data-role="theme-light">' + t('settings.light') + '</button>' +
         '</div>' +
       '</div>' +
+      farbwahlHTML() +
       '<div>' +
         '<div class="bos-label">' + t('settings.density') + '</div>' +
         '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
@@ -1608,7 +1705,31 @@
         '<button class="bos-btn" data-role="layout-reset" style="margin-top:.45rem;">' + t('settings.layoutReset') + '</button>' +
       '</div>' +
       '<div style="color:var(--bos-text-faint);font-size:.8rem;">' + t('settings.info') + '</div>' +
+      '<div data-role="sync-fehler" style="color:var(--bos-red);font-size:.8rem;' + (syncFehlerText ? '' : 'display:none;') + '">' + escapeHtml(syncFehlerText) + '</div>' +
       '</div>';
+  }
+  /* 16.10.2026 (#72 Stufe C): Zeile „🎨 Farbprofil“. Erster Knopf „Vorgabe:
+     ‹Name›“ (Konto bzw. Rolle, ohne eigene Wahl), dahinter alle Profile aus
+     BOS_FARBPROFILE.liste() mit Farbtupfer. Kein freier Farbwähler. */
+  function farbwahlHTML() {
+    var FP = window.BOS_FARBPROFILE;
+    var kopf = '<div class="bos-label">' + t('settings.farbschema') + '</div>';
+    if (!FP || !window.BOS_KONTO_PROFIL || typeof window.BOS_KONTO_PROFIL.vorgabeFarbschema !== 'function') {
+      return '<div>' + kopf + '<div style="color:var(--bos-red);font-size:.8rem;margin-top:.3rem;">' +
+        'Profilliste nicht geladen (bos_farbprofile.js / bos_konto_profil.js) — Seite neu laden. Bleibt es, ist eine Datei noch nicht online.</div></div>';
+    }
+    var data = getActiveProfileData();
+    var eigene = (typeof data.farbschema === 'string' && FP.gueltig(data.farbschema)) ? data.farbschema : '';
+    var vorgabe = window.BOS_KONTO_PROFIL.vorgabeFarbschema(getActiveProfile());
+    var vp = FP.profil(vorgabe);
+    var knopf = function (id, inhalt, aktiv) {
+      return '<button class="bos-btn" data-role="farb-pick" data-farb-id="' + escapeHtml(id) + '" aria-pressed="' + (aktiv ? 'true' : 'false') + '">' + inhalt + '</button>';
+    };
+    var tupfer = function (farbe) { return '<span class="bos-farbwahl__tupfer" style="background:' + escapeHtml(farbe) + ';"></span>'; };
+    var knoepfe = knopf('', (vp ? tupfer(vp.tupfer) : '') + escapeHtml(t('settings.farbVorgabe') + ': ' + (vp ? vp.name : vorgabe)), !eigene) +
+      FP.liste().map(function (pr) { return knopf(pr.id, tupfer(pr.tupfer) + escapeHtml(pr.name), eigene === pr.id); }).join('');
+    return '<div>' + kopf + '<div class="bos-farbwahl">' + knoepfe + '</div>' +
+      '<div style="color:var(--bos-text-faint);font-size:.8rem;margin-top:.35rem;">' + t('settings.farbHinweis') + '</div></div>';
   }
   function attachSettingsHandlers(el) {
     el.querySelector('[data-role="theme-dark"]').addEventListener('click', function () { setTheme('dark'); });
@@ -1632,10 +1753,23 @@
         sw.classList.add('bos-bgswatch--active');
       });
     });
+    el.querySelectorAll('[data-role="farb-pick"]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        setFarbschema(b.getAttribute('data-farb-id'));
+        el.querySelectorAll('[data-role="farb-pick"]').forEach(function (x) {
+          x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+        });
+      });
+    });
     el.querySelector('[data-role="layout-reset"]').addEventListener('click', function () {
       if (confirm(t('settings.layoutResetConfirm')) && state.activeProfileId) {
         state.profileData[state.activeProfileId] = defaultProfileData();
+        aktualisiereFarbschema();   // 16.10.2026: eigene Wahl ist mit zurückgesetzt → Vorgabe
         saveState();
+        if (window.BOS_FARBSCHEMA_SYNC) window.BOS_FARBSCHEMA_SYNC.setze(state);
+        el.querySelectorAll('[data-role="farb-pick"]').forEach(function (x) {
+          x.setAttribute('aria-pressed', x.getAttribute('data-farb-id') === '' ? 'true' : 'false');
+        });
         document.documentElement.setAttribute('data-theme', 'dark');
         document.documentElement.setAttribute('data-density', 'standard');
         document.documentElement.setAttribute('data-kachelgroesse', 'standard');
@@ -1967,9 +2101,33 @@
     applyBackground(id);
     saveState();
   }
+  /* 16.10.2026 (#72 Stufe C): eigenes Farbprofil. id leer = „Vorgabe“ → Feld
+     löschen (nicht leer speichern; bos_profil_sync.js schreibt ohne merge,
+     damit ist es auch in Firestore weg). Das wirksame Profil rechnet
+     bos_konto_profil.js (eine Stelle für Tür und Launcher). Offene Fenster
+     ziehen über das storage-Ereignis nach (bos_theme_sync.js, #75). */
+  function aktualisiereFarbschema() {
+    var p = getActiveProfile();
+    if (p && window.BOS_KONTO_PROFIL && typeof window.BOS_KONTO_PROFIL.setzeFarbschema === 'function') {
+      window.BOS_KONTO_PROFIL.setzeFarbschema(state, p);
+    }
+  }
+  function setFarbschema(id) {
+    var data = getActiveProfileData();
+    if (id && window.BOS_FARBPROFILE && window.BOS_FARBPROFILE.gueltig(id)) data.farbschema = id;
+    else delete data.farbschema;
+    aktualisiereFarbschema();
+    saveState();
+    if (window.BOS_FARBSCHEMA_SYNC) window.BOS_FARBSCHEMA_SYNC.setze(state);
+  }
   document.getElementById('themeToggle').addEventListener('click', function () {
     var data = getActiveProfileData();
     setTheme(data.theme === 'dark' ? 'light' : 'dark');
+  });
+  // 16.10.2026 (#38): ⚙️ im Tray. click wie #themeToggle — das click ist das
+  // letzte Ereignis eines Antippens, die Geisterklick-Sperre (v2.9) bleibt unberührt.
+  document.getElementById('trayEinstellungen').addEventListener('click', function () {
+    if (state.activeProfileId) launchApp('settings');
   });
 
   /* ---------------- Profil-Auswahl ---------------- */
@@ -2221,18 +2379,13 @@
        Admin-Profil aus bos_launcher_profiles.js, das kein bos_accounts-
        Dokument hat. Läuft parallel zur Rollen-Abfrage, ein Fehlschlag
        hier blockt den anderen Pfad nicht. */
-    var einstellungenPromise = (window.BOS_PROFIL_SYNC && window.db && !(p && p.freigeschaltet === false))
+    var einstellungenPromise = (window.BOS_PROFIL_SYNC && window.db && !profilOhneHaken(p))   // 16.10.2026: dieselbe Regel wie saveState
       ? (window.BOS_AUTH_READY || Promise.resolve())
           .then(function () { return window.BOS_PROFIL_SYNC.lade(window.db, id); })
-          .then(function (daten) {
-            if (daten) {
-              if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
-              Object.assign(state.profileData[id], daten);
-              saveState(true); // keinSync: gerade erst aus Firestore geladen, nicht sofort zurückschreiben
-            }
-          })
+          .then(function (daten) { uebernimmEinstellungen(id, daten); })
           .catch(function (fehler) {
             console.warn('BOS Launcher: Einstellungen konnten nicht synchronisiert werden, nutze lokalen Stand', fehler);
+            meldeSyncFehler(fehler, 'laden');
           })
       : Promise.resolve();
 
@@ -2294,9 +2447,34 @@
      Hintergrund-Zugriffe (Einstellungen laden/speichern) gar nicht erst
      versucht — sie scheitern ohne Haken an der Regel. Profile ohne das Feld
      (vor Schritt 2) zählen nicht als „ohne Haken“. */
+  /* NF-52, erweitert 16.10.2026 (F-A, Freigabe Kontroll-Chat 07:26): ohne
+     Haken „freigeschaltet“ verweigert die Regel bos_profil_einstellungen
+     (hatKonto()). Das gilt auch für Kennungen OHNE Konto-Dokument
+     (kontoVorhanden === false) — die rutschten bisher durch und erzeugten bei
+     jeder Änderung ein stilles permission-denied. Profile ganz ohne das Feld
+     freigeschaltet (vor Schritt 2) syncen bewusst weiter. Dieselbe Regel für
+     Speichern (saveState) und Laden (beide Ladestellen). */
+  function profilOhneHaken(p) {
+    return !!(p && (p.freigeschaltet === false || p.kontoVorhanden === false));
+  }
   function aktivesProfilOhneHaken() {
     var p = state && state.localProfiles ? state.localProfiles.find(function (x) { return x.id === state.activeProfileId; }) : null;
-    return !!(p && p.freigeschaltet === false && p.kontoVorhanden !== false);
+    return profilOhneHaken(p);
+  }
+  /* 16.10.2026: eine Funktion für beide Ladestellen. Object.assign übernimmt
+     den Firestore-Stand, löscht aber nichts — fehlt farbschema dort („Vorgabe“
+     auf einem anderen Gerät gewählt), muss es auch lokal weg. Danach das
+     wirksame Profil neu rechnen. */
+  function uebernimmEinstellungen(id, gespeichert) {
+    if (!gespeichert) return;
+    if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
+    Object.assign(state.profileData[id], gespeichert);
+    if (!Object.prototype.hasOwnProperty.call(gespeichert, 'farbschema')) delete state.profileData[id].farbschema;
+    var eintrag = state.localProfiles.find(function (x) { return x.id === id; });
+    if (eintrag && window.BOS_KONTO_PROFIL && typeof window.BOS_KONTO_PROFIL.setzeFarbschema === 'function') {
+      window.BOS_KONTO_PROFIL.setzeFarbschema(state, eintrag);
+    }
+    saveState(true); // keinSync: gerade erst aus Firestore geladen, nicht sofort zurückschreiben
   }
 
   function zeigeGeneralschluesselStreifen(kennung) {
@@ -2409,17 +2587,12 @@
         if (!(window.BOS_PROFIL_SYNC && window.db)) return;
         // NF-52: ohne Haken die persönlichen Einstellungen nicht laden — die
         // Regel verweigert es, der Versuch war nur eine Warnung mehr.
-        if (aktuell && aktuell.freigeschaltet === false) return;
+        if (profilOhneHaken(aktuell)) return;   // 16.10.2026: dieselbe Regel wie saveState
         return window.BOS_PROFIL_SYNC.lade(window.db, id)
-          .then(function (gespeichert) {
-            if (gespeichert) {
-              if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
-              Object.assign(state.profileData[id], gespeichert);
-              saveState(true); // gerade geladen, nicht sofort zurückschreiben
-            }
-          })
+          .then(function (gespeichert) { uebernimmEinstellungen(id, gespeichert); })
           .catch(function (fehler) {
             console.warn('BOS Launcher: Einstellungen konnten nicht geladen werden, nutze lokalen Stand', fehler);
+            meldeSyncFehler(fehler, 'laden');
           });
       }).then(function () {
         versteckeStartStatus();
@@ -2463,8 +2636,9 @@
     document.documentElement.setAttribute('data-zoom', data.zoom || '100');
     document.getElementById('themeToggle').textContent = data.theme === 'light' ? '☀️' : '🌙';
     applyBackground(data.background || 'ofenkohle');
+    aktualisiereFarbschema();   // 16.10.2026, #72 Stufe C: eigene Wahl > Konto > Rolle
     if (window.BOS_FARBSCHEMA_SYNC) window.BOS_FARBSCHEMA_SYNC.setze(state);   // 15.10.2026, #72 Stufe B
-    if (!p || p.role !== 'admin') exitEditMode();
+    exitEditMode();   // 16.10.2026: ein neu aktiviertes Profil startet nie im Bearbeiten-Modus
     renderGrid();
     maybeShowBackstoreHinweis(); // NEU 02.09.2026, siehe BACKSTORE_DOKU.md
     if (window.BOS_SCREENSAVER) window.BOS_SCREENSAVER.start(); // NEU 03.09.2026, siehe bos_screensaver.js
@@ -2476,9 +2650,16 @@
      ("erster Start" / "nach Freischaltung") — beide Momente sind an derselben
      Bedingung erkennbar: "installed" ist leer. Einmal gesehen/geschlossen →
      backstoreHinweisGesehen, taucht danach nicht mehr auf. */
+  /* 16.10.2026 (#38): Systemeinträge (die Einstellungen) zählen nicht als
+     installiert — sie sind keine Kachel mehr. Unbekannte IDs und eigene
+     Kacheln zählen wie bisher. */
+  function zaehltAlsInstalliert(id) {
+    var a = (window.BOS_APPS || []).find(function (x) { return x.id === id; });
+    return !(a && a.type === 'system');
+  }
   function maybeShowBackstoreHinweis() {
     var data = getActiveProfileData();
-    if (data.installed.length === 0 && !data.backstoreHinweisGesehen) {
+    if (data.installed.filter(zaehltAlsInstalliert).length === 0 && !data.backstoreHinweisGesehen) {
       document.getElementById('backstoreHinweisOverlay').classList.add('bos-modal-overlay--visible');
     }
   }
@@ -2529,7 +2710,7 @@
 
   /* ---------------- Hilfe ---------------- */
   function renderHelp() {
-    var items = ['help.profile', 'help.backstore', 'help.tap', 'help.longpress', 'help.add', 'help.window', 'help.taskbar'];
+    var items = ['help.profile', 'help.settings', 'help.backstore', 'help.tap', 'help.longpress', 'help.add', 'help.window', 'help.taskbar'];
     document.getElementById('helpList').innerHTML = items.map(function (k) {
       return '<div class="bos-help-item">' + t(k) + '</div>';
     }).join('');

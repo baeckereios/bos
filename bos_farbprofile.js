@@ -2,8 +2,8 @@
    BäckereiOS · Host — Farbprofile (Baustelle #72, Stufe B)
    ================================================================
    ZWECK: Die EINE Stelle für die Farbprofile. Kontenverwaltung,
-          bos_konto_profil.js und später die persönlichen Einstellungen
-          (Stufe C) lesen nur von hier (E11).
+          bos_konto_profil.js und die persönlichen Einstellungen im
+          Launcher (Stufe C) lesen nur von hier (E11).
 
    Ein Profil = Akzent + Grundton der Flächen, je hell und dunkel. Die
    Farbwerte selbst stehen in bos_design_tokens.css als Block
@@ -22,7 +22,8 @@
    Honig.
 
    WIRKSAMES PROFIL — wirksam({ eigeneWahl, konto, rolle }):
-     eigene Wahl (Stufe C, heute immer leer) > Feld farbschema am Konto
+     eigene Wahl (Einstellungen, profileData.farbschema; Stufe C seit
+     16.10.2026) > Feld farbschema am Konto
      > Profil der Rolle > Honig. Eine leere oder unbekannte ID fällt auf
      die nächste Stufe zurück. Das Ergebnis ist IMMER eine gültige ID.
      Ohne Haken „freigeschaltet“ übergibt bos_konto_profil.js weder Konto
@@ -37,6 +38,9 @@
      2026-10-15 · 19:56 · v1 · Erstfassung (Farbprofile Stufe B, Freigabe
        Kontroll-Chat 18:48). Acht Profile (E8), Rollen-Vorgabe (E10, E11).
        SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md
+     2026-10-16 · 07:54 · nur Kommentar (Stufe C): eigene Wahl ist jetzt
+       belegt, gerechnet in bos_konto_profil.js → setzeFarbschema().
+       SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
    ================================================================ */
 
 window.BOS_FARBPROFILE = (function () {

@@ -35,6 +35,12 @@
    schreibt — dieses Skript liest nur vor. Bis diese UI existiert,
    bleibt jeder Satellit ohne manuellen localStorage-Eingriff auf
    'standard'. Siehe BOS_DICHTE_DOKU.md für den vollständigen Stand.
+   [Stand 16.10.2026: Die UI gibt es längst — Einstellungen → Dichte.]
+
+   LIVE-ÜBERNAHME (16.10.2026, #75, Freigabe Kontroll-Chat 07:26): wie
+   bos_theme_sync.js — hört auf das storage-Ereignis für
+   bos_launcher_state_v2 und setzt data-density neu. Offene Fenster ziehen
+   ohne Neuladen nach. SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
    ================================================================ */
 
 (function () {
@@ -51,4 +57,9 @@
     }
   }
   document.documentElement.setAttribute('data-density', leseDensity());
+  // 16.10.2026 (#75): e.key === null heißt localStorage.clear().
+  if (typeof window.addEventListener === 'function') window.addEventListener('storage', function (e) {
+    if (e.key !== null && e.key !== 'bos_launcher_state_v2') return;
+    document.documentElement.setAttribute('data-density', leseDensity());
+  });
 })();

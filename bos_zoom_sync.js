@@ -58,6 +58,13 @@
    Dichte-Rollout (siehe BOS_DICHTE_DOKU.md §7). Bis dahin bleibt
    jeder Satellit unverändert bei Zoom "100", auch wenn im Launcher
    eine andere Stufe eingestellt ist.
+
+   LIVE-ÜBERNAHME (16.10.2026, #75, Freigabe Kontroll-Chat 07:26): wie
+   bos_theme_sync.js — hört auf das storage-Ereignis und setzt data-zoom
+   neu. Das Zuhören steht HINTER der Iframe-Weiche: In Launcher-Fenstern
+   gibt es kein Zuhören, dort skaliert der äußere Zoom mit. Nur
+   eigenständig geöffnete Seiten (eigener Tab) ziehen nach.
+   SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
    ================================================================ */
 
 (function () {
@@ -75,4 +82,9 @@
     }
   }
   document.documentElement.setAttribute('data-zoom', leseZoom());
+  // 16.10.2026 (#75): nur im obersten Fenster (Weiche oben). e.key === null = clear().
+  if (typeof window.addEventListener === 'function') window.addEventListener('storage', function (e) {
+    if (e.key !== null && e.key !== 'bos_launcher_state_v2') return;
+    document.documentElement.setAttribute('data-zoom', leseZoom());
+  });
 })();

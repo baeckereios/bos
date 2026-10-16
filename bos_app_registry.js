@@ -87,6 +87,13 @@
 
 window.BOS_APPS = [
   {
+    /* 16.10.2026 (07:54, #38; Freigabe Kontroll-Chat 07:26): keine Kachel
+       mehr, öffnet sich aus dem Tray (⚙️ unten rechts in der Taskleiste),
+       für jedes Konto; type system. Ohne roles und ohne Zeile in
+       bos_permissions.js. launcher.html (renderGrid) und backstore.html
+       (Katalog) blenden type 'system' aus, auch wenn die ID noch in einem
+       alten profileData.installed steht. launchApp('settings') öffnet das
+       Fenster weiter über getMergedApps(). */
     id: 'settings',
     bereich: 'verwaltung',
     name: 'Einstellungen',
@@ -94,8 +101,7 @@ window.BOS_APPS = [
     color: '#8b5cf6',
     url: null,
     status: 'system',
-    type: 'system',
-    roles: ['admin']
+    type: 'system'
   },
   {
     id: 'freezer',

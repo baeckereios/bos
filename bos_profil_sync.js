@@ -38,8 +38,15 @@
      {
        theme, density, kachelgroesse, accent, background, symbolpaket, iconStil,
        order, overrides, customApps, installed, backstoreHinweisGesehen,
+       farbschema,
        aktualisiertAm: Firestore-Timestamp
      }
+   farbschema (NEU 16.10.2026, #72 Stufe C): das selbst gewählte Farbprofil
+   (ID aus bos_farbprofile.js). FEHLT das Feld, gilt die Vorgabe aus Konto
+   bzw. Rolle. „Vorgabe“ in den Einstellungen löscht es lokal; weil .set()
+   ohne merge schreibt, ist es danach auch hier weg. launcher.html löscht
+   es beim Laden lokal, wenn es hier fehlt (uebernimmEinstellungen) —
+   Object.assign allein würde den alten Wert stehen lassen.
    kachelgroesse (NEU 06.09.2026, siehe SESSION_2026-09-06_LAUNCHER_KACHELGROESSE_KONZEPT.md):
    Grundgröße der Launcher-Symbole ('standard'|'gross'|'riesig'). Die
    Einzel-Override-Größe pro Kachel (span:{cols,rows}) braucht KEIN eigenes
@@ -67,13 +74,28 @@
    einen beim aktuellen Nutzungsmuster — ein Gerät zur Zeit — seltenen
    Fall): der nächste erfolgreiche saveState()-Aufruf synchronisiert
    den dann aktuellen Stand automatisch nach.
+
+   RÜCKMELDUNG (NEU 16.10.2026): speichere() nimmt als viertes Argument
+   eine Funktion rueckmeldung(fehler). Sie bekommt nach dem Schreiben null
+   (gelungen) oder den Fehler. launcher.html zeigt fehler.message damit
+   sichtbar im Einstellungs-Fenster (Projektregel Fehlermeldungen); die
+   console.warn bleibt zusätzlich.
+
+   CHANGELOG
+     2026-10-16 · 07:54 · Feature (Einstellungen für alle, #72 Stufe C;
+       Freigabe Kontroll-Chat 07:26): Feld farbschema in SYNCBARE_FELDER,
+       Rückmeldung an den Aufrufer. Achtung beim Ausrollen: Ein Gerät mit
+       der ALTEN Datei kennt farbschema nicht und löscht es beim nächsten
+       Speichern (.set() ohne merge) — nach dem Einspielen jedes Gerät
+       einmal neu laden. SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md
    ================================================================ */
 
 window.BOS_PROFIL_SYNC = (function () {
 
   var SYNCBARE_FELDER = [
     'theme', 'density', 'kachelgroesse', 'accent', 'background', 'symbolpaket', 'iconStil',
-    'order', 'overrides', 'customApps', 'installed', 'backstoreHinweisGesehen'
+    'order', 'overrides', 'customApps', 'installed', 'backstoreHinweisGesehen',
+    'farbschema'   // 16.10.2026, #72 Stufe C: eigene Wahl; fehlt = Vorgabe
   ];
   var VERZOEGERUNG_MS = 1000;
   var timer = {}; // { [profilId]: setTimeout-Handle } — pro Profil eigener Debounce
@@ -107,7 +129,7 @@ window.BOS_PROFIL_SYNC = (function () {
    * muss die Feldliste nicht kennen oder doppelt pflegen, "eine
    * Mechanik, ein Ort für die Feldliste".
    */
-  function speichere(db, profilId, daten) {
+  function speichere(db, profilId, daten, rueckmeldung) {
     if (!db || !profilId || !daten) return;
     if (timer[profilId]) clearTimeout(timer[profilId]);
     timer[profilId] = setTimeout(function () {
@@ -115,8 +137,12 @@ window.BOS_PROFIL_SYNC = (function () {
       var ausschnitt = extrahiere(daten);
       ausschnitt.aktualisiertAm = firebase.firestore.FieldValue.serverTimestamp();
       db.collection('bos_profil_einstellungen').doc(profilId).set(ausschnitt)
+        .then(function () {
+          if (typeof rueckmeldung === 'function') rueckmeldung(null);
+        })
         .catch(function (fehler) {
           console.warn('BOS_PROFIL_SYNC: Einstellungen konnten nicht synchronisiert werden, bleiben lokal', fehler);
+          if (typeof rueckmeldung === 'function') rueckmeldung(fehler);
         });
     }, VERZOEGERUNG_MS);
   }
