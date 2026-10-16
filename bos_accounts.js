@@ -37,6 +37,7 @@
        teigeckePflege: boolean,   // NEU 28.09.2026 — Anzeige seit 29.09.: „🧺 Wagen & Zutaten pflegen“
        teigeckeTeige: boolean,    // NEU 29.09.2026 — „🥣 Teige pflegen“ (Wasserregel, Tabelle, Einwaagen, Kessel)
        teigeckeRezepte: boolean,  // NEU 29.09.2026 — „📜 Rezepte pflegen“ (Zutatenliste, Vorstufe, Werte je kg)
+       weitereTeige: boolean,     // NEU 16.10.2026 — „🥨 Weitere Teige pflegen“ (Teige der Stationen: Name, Stationen, Ausbeute, Hefe, Kessel; RK §23)
        reparaturLesen: boolean,   // NEU 10.10.2026 — „Mitlesen & antworten“ (Posteingang, Verlauf, Chat)
        reparaturMelden: boolean,  // NEU 10.10.2026 — „Melden“ (neue Anfrage; schließt Mitlesen ein)
        reparaturBearbeiten: boolean, // NEU 10.10.2026 — „Bearbeiten“, Hausmeister (Status, Fenster, Dringlichkeit; schließt Mitlesen ein)
@@ -76,6 +77,13 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-10-16 · 17:51 · v-Teigrechner-1 · Feature (Teigrechner Stufe 1, #67)
+       Neues Feld weitereTeige (Haken „🥨 Weitere Teige pflegen“) und
+       setzeWeitereTeigeRecht() nach dem Muster der Teigecke-Setzer. Eigener Haken,
+       getrennt von den drei Teigecke-Haken, keine Automatik über die Rolle
+       (Ulf 16.10., 12:33/12:38). Die Firestore-Regel prüft ihn serverseitig
+       (darfWeitereTeige(), RK §23); setzen darf ihn nur der Generalschlüssel.
+       teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
      2026-10-15 · 19:56 · v-Farbprofil-1 · Feature
        Feld farbschema (Farbprofil am Konto, #72 Stufe B) mit
        setzeFarbschema(): ID setzen, leer = Feld löschen (FieldValue.delete),
@@ -353,6 +361,17 @@ window.BOS_ACCOUNTS = (function () {
   async function setzeTeigeckeRezepteRecht(db, schluessel, wert) {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ teigeckeRezepte: !!wert });
   }
+  /**
+   * NEU (16.10.2026, Teigrechner Stufe 1). Admin-Funktion wie oben. „Weitere
+   * Teige pflegen“ = Teige der Stationen (Rondo, Frühschicht, Brötchenstraße) im
+   * Teig-Editor: Name, Stationen, Ausbeute je Produkt, Hefe, Kessel. Produkte
+   * zuordnen braucht zusätzlich die Rolle admin (Produkt-Regel). Eigener Haken,
+   * auch die Produktionsleitung bekommt ihn nur einzeln (Ulf 16.10.: „So bleibt
+   * die Flexibilität“). Die Regel prüft ihn serverseitig (RK §23).
+   */
+  async function setzeWeitereTeigeRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ weitereTeige: !!wert });
+  }
 
   /**
    * NEU (10.10.2026, Reparaturanfrage Stufe 1). Admin-Funktionen wie die
@@ -430,6 +449,7 @@ window.BOS_ACCOUNTS = (function () {
     setzeTeigeckePflegeRecht: setzeTeigeckePflegeRecht,
     setzeTeigeckeTeigeRecht: setzeTeigeckeTeigeRecht,
     setzeTeigeckeRezepteRecht: setzeTeigeckeRezepteRecht,
+    setzeWeitereTeigeRecht: setzeWeitereTeigeRecht,
     setzeReparaturLesenRecht: setzeReparaturLesenRecht,
     setzeReparaturMeldenRecht: setzeReparaturMeldenRecht,
     setzeReparaturBearbeitenRecht: setzeReparaturBearbeitenRecht,

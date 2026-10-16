@@ -66,6 +66,9 @@
    Rechte-Matrix). SESSION_2026-10-16_EINSTELLUNGEN_FUER_ALLE_BAU.md */
 /* NEU 03.10.2026 (14:47): nfc_qr_zentrale nur bei admin, wie das roles-Feld der
    Registry (Registry = Rechte-Matrix, test_nfc_qr.js). */
+/* NEU 16.10.2026 (Teigrechner Stufe 1, #67): Kinder teigrechner_teige („Teige (Stationen)“)
+   und teigrechner („Teigrechner“) bei denselben drei Rollen wie der Hub teigecke
+   (Registry = Rechte-Matrix, Ulf 16.10., 16:36). */
 /* NEU 08.10.2026: Kind teigecke_rezepte („Teige & Rezepte“) bei denselben drei
    Rollen wie teigecke_orte (Registry = Rechte-Matrix, test_teigecke.js Teil 8). */
 /* NEU 03.10.2026: Hub teigecke und Kind teigecke_orte bei denselben drei
@@ -99,7 +102,9 @@ window.BOS_PERMISSIONS = {
     "teigecke": true,
     "teigecke_nacht": true,
     "teigecke_orte": true,
-    "teigecke_rezepte": true
+    "teigecke_rezepte": true,
+    "teigrechner_teige": true,
+    "teigrechner": true
   },
   "konditorei": {
     "freezer": true,
@@ -159,7 +164,9 @@ window.BOS_PERMISSIONS = {
     "teigecke": true,
     "teigecke_nacht": true,
     "teigecke_orte": true,
-    "teigecke_rezepte": true
+    "teigecke_rezepte": true,
+    "teigrechner_teige": true,
+    "teigrechner": true
   },
   "admin": {
     "freezer": true,
@@ -206,6 +213,8 @@ window.BOS_PERMISSIONS = {
     "teigecke_nacht": true,
     "teigecke_orte": true,
     "teigecke_rezepte": true,
+    "teigrechner_teige": true,
+    "teigrechner": true,
     "nfc_qr_zentrale": true
   }
 };

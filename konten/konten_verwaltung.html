@@ -7,6 +7,12 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-16 · 17:51 · v-Teigrechner-1 · Feature (Teigrechner Stufe 1, #67; Freigabe Kontroll-Chat 16:37)
+      Neuer Haken „🥨 Weitere Teige pflegen“ (Feld weitereTeige) direkt unter den drei
+      Teigecke-Haken, gleiche Mechanik (bearbeitung[], Sammelaktion, Admin-App über
+      BOS_ACCOUNTS.setzeWeitereTeigeRecht). Je Person, keine Automatik über die Rolle
+      (Ulf 16.10., 12:33). Die Datenbank prüft ihn (RK §23).
+      teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
     2026-10-16 · 07:54 · v-Farbprofil-2 · Text (Einstellungen für alle, #72 Stufe C; Freigabe Kontroll-Chat 07:26)
       Nur Texte: Hinweis unter „🎨 Farbprofil“ um „Der Kollege kann es in seinen
       Einstellungen für sich ändern.“ ergänzt, Hilfe „Was ist das 🎨 Farbprofil?“
@@ -797,6 +803,7 @@ function initBearbeitung() {
       teigeckePflege: !!k.teigeckePflege,     // NEU 28.09.2026, Teigecke Stufe 1
       teigeckeTeige: !!k.teigeckeTeige,       // NEU 29.09.2026, Teigecke Stufe 2
       teigeckeRezepte: !!k.teigeckeRezepte,   // NEU 29.09.2026, Teigecke Stufe 2
+      weitereTeige: !!k.weitereTeige,         // NEU 16.10.2026, Teigrechner Stufe 1
       reparaturLesen: !!k.reparaturLesen,         // NEU 10.10.2026, Reparaturanfrage Stufe 1
       reparaturMelden: !!k.reparaturMelden,       // NEU 10.10.2026
       reparaturBearbeiten: !!k.reparaturBearbeiten, // NEU 10.10.2026
@@ -1002,6 +1009,11 @@ var KONTO_KARTEN_TABS = [
           '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckeRezepte ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckeRezepte\', this.checked)">' +
           '<span class="cb-label">📜 Rezepte pflegen — Zutatenliste je Teig, Vorstufe, Sauer/Hefe/Vorstufe je kg (Datenbank prüft alle drei Haken)</span></label>' +
         '</div>' +
+        // NEU 16.10.2026, Teigrechner Stufe 1: eigener Haken, getrennt von den drei Teigecke-Haken
+        '<div class="detail-section full">' +
+          '<label class="checkbox-feld"><input type="checkbox" ' + (b.weitereTeige ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'weitereTeige\', this.checked)">' +
+          '<span class="cb-label">🥨 Weitere Teige pflegen — Teige der Stationen (Rondo, Frühschicht, Brötchenstraße): Name, Stationen, Ausbeute, Hefe, Kessel. Produkte zuordnen braucht zusätzlich die Rolle admin</span></label>' +
+        '</div>' +
         reparaturHakenHTML(k, b)
       );
     }
@@ -1107,7 +1119,8 @@ function toggleKontoAbhaken(checked) {
 }
 // NEU 28.09.2026, Teigecke Stufe 1 — gleiche Mechanik wie der Taskboard-Haken.
 // Seit 29.09.2026 für alle drei Teigecke-Haken (Feldname als Parameter).
-var TEIGECKE_HAKEN = ['teigeckePflege', 'teigeckeTeige', 'teigeckeRezepte'];
+// 16.10.2026: + weitereTeige (Teigrechner, eigener Haken, gleiche Mechanik).
+var TEIGECKE_HAKEN = ['teigeckePflege', 'teigeckeTeige', 'teigeckeRezepte', 'weitereTeige'];
 
 // NEU 10.10.2026, Reparaturanfrage Stufe 1 — eigene, abgetrennte Gruppe
 // direkt unter den Teigecke-Haken (Ulf, 10.10.2026). Gleiche Mechanik:
@@ -1990,6 +2003,10 @@ function tatsaechlichSpeichern() {
     }
     if (!!b.teigeckeRezepte !== !!k.teigeckeRezepte) {
       aufgaben.push(window.BOS_ACCOUNTS.setzeTeigeckeRezepteRecht(window.db, k.id, b.teigeckeRezepte));
+    }
+    // NEU 16.10.2026, Teigrechner Stufe 1: selbe Sammelaktion
+    if (!!b.weitereTeige !== !!k.weitereTeige) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeWeitereTeigeRecht(window.db, k.id, b.weitereTeige));
     }
     // NEU 10.10.2026, Reparaturanfrage Stufe 1: drei Haken, selbe Sammelaktion
     if (!!b.reparaturLesen !== !!k.reparaturLesen) {

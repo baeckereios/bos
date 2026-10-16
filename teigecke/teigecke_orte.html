@@ -5,6 +5,11 @@
   Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
   CHANGELOG
+    2026-10-16 · 17:51 · v0.3b · Nur Texte (Teigrechner Stufe 1, Freigabe KC 16:37 Teil H)
+      Die Nachtseite heißt „BrotTeigRechner“ (Ulf 16.10., 16:36): Rücksprung und
+      Hilfe nachgezogen. Nebenfund berichtigt: „Teige liest … ein“ nannte noch die
+      Nachtseite; seit 08.10. liest „Teige & Rezepte“ die Teige ein. Sonst nichts.
+      teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
     2026-10-08 · 14:17 · v0.3a · Pflege (Nachtrag Nachtseite)
       Nur REGEL_DATEI: nennt die neue Regeldatei
       firestore_regeln_2026-10-08_teigecke_nacht.rules (sie erfüllt die Fassung
@@ -89,7 +94,7 @@
 <header>
     <div class="kopf-titel">
       <h1 class="bos-title" data-i18n="titel">Teigecke · Orte</h1>
-      <div class="backtag"><a class="link-btn" href="teigecke_nacht.html" data-i18n="zur_nacht">‹ Teigecke Nacht</a></div>
+      <div class="backtag"><a class="link-btn" href="teigecke_nacht.html" data-i18n="zur_nacht">‹ BrotTeigRechner</a></div>
     </div>
     <div class="kopf-knoepfe">
       <button type="button" class="bos-btn pflege-btn" id="pflegeBtn" aria-pressed="false" hidden data-i18n="pflegen">✎ Pflegen</button>
@@ -250,7 +255,7 @@ const I18N_DE = {
   ohne_zuhause_erst_ort: 'Erst einen Ort anlegen, dann die Zutaten dorthin holen.',
   archiv_orte: 'Orte',
   archiv_zutaten: 'Zutaten',
-  zur_nacht: '‹ Teigecke Nacht',
+  zur_nacht: '‹ BrotTeigRechner',
   suche_label: 'Kennung suchen',
   suche_knopf: 'Öffnen',
   suche_format: '„{text}“ ist keine Kennung. Eine Kennung ist ein Buchstabe und eine Nummer, z. B. B01.',
@@ -302,7 +307,7 @@ const I18N_DE = {
   import_fertig: '✓ Übernommen: {n} Zutaten, jede mit eigener Sicherung.',
   import_orte_nicht: 'Die Datei enthält {n} Ort(e). Orte werden nicht mehr eingelesen — sie werden hier von Hand angelegt, BOS vergibt die Nummer.',
   import_ort_ignoriert: '{n} Zutat(en) nennen in der Datei einen Ort. Das wird überlesen; sie kommen ohne Zuhause an.',
-  import_teige_nicht: 'Die Datei enthält {n} Teig(e). Teige liest „Teigecke Nacht“ ein, nicht diese Seite.',
+  import_teige_nicht: 'Die Datei enthält {n} Teig(e). Teige liest die Seite „Teige & Rezepte“ ein, nicht diese Seite.',
   qr_ohne_hinweis: 'BäckereiOS ist noch nicht online. Schilder werden deshalb ohne Code gedruckt, mit einem leeren Feld an seiner Stelle. Nach dem Online-Gang die Schilder einmal neu drucken.',
   qr_ohne_toast: 'Schild ohne Code gedruckt, weil BäckereiOS noch nicht online ist. Nach dem Online-Gang einmal neu drucken.',
   druck_zu_voll_titel: 'Zu viele Zutaten für ein Blatt',
@@ -961,7 +966,7 @@ document.getElementById('editSheet').addEventListener('click', function (e) { if
 const helpData = {
   title: 'Teigecke · Orte — was ist das hier?',
   sections: [
-    { heading: 'Wofür ist diese Seite?', text: 'Hier richtest du die Teigecke ein: Orte anlegen, jeder Zutat ihr Zuhause geben, Schilder drucken. Das ist Arbeit in Ruhe, nicht für nebenbei am Kneter. Nachts sagt „Teigecke Nacht“ beim Einsammeln nur noch, an welchem Ort etwas steht.' },
+    { heading: 'Wofür ist diese Seite?', text: 'Hier richtest du die Teigecke ein: Orte anlegen, jeder Zutat ihr Zuhause geben, Schilder drucken. Das ist Arbeit in Ruhe, nicht für nebenbei am Kneter. Nachts sagt der „BrotTeigRechner“ (früher „Teigecke Nacht“) beim Einsammeln nur noch, an welchem Ort etwas steht.' },
     { heading: 'Was ist eine Kennung?', text: 'Jeder Ort hat eine Kennung aus einem Buchstaben und einer Nummer, zum Beispiel B01. Der Buchstabe ist der Bereich (B = Backstube, K = Kühlung …), die Nummer zählt BOS von selbst hoch: B01, B02, B03. Einmal B01, immer B01 — die Kennung bleibt bei ihrem Ort, egal was sich an seinem Inhalt ändert. Fällt ein Ort weg, bleibt seine Nummer leer; ein neuer Ort bekommt immer die nächste Nummer am Ende.' },
     { heading: 'Einen Ort anlegen', text: 'Oben „✎ Pflegen“ einschalten, dann „＋ Ort“. Bereich wählen oder mit „neuer Bereich“ einen Buchstaben und ein Wort dazu festlegen. Die Kennung siehst du als Vorschau, tippen kannst du sie nicht. Name, Beschreibung und „Reihenfolge im Gang“ sind freiwillig. „Reihenfolge im Gang“ sortiert die Orte nachts in der Einsammelliste: kleinere Zahl = weiter vorn.' },
     { heading: 'Zutaten ein Zuhause geben', text: 'Oben steht „Noch ohne Zuhause“ mit allen Zutaten, die noch nirgends wohnen. Am schnellsten geht es am Ort selbst: „＋ Zutaten hierher“, alle antippen, die dorthin gehören, „Hierher holen“. Einzelne Zutaten änderst du durch Antippen (Name, Zuhause, Gebinde). Neue Zutaten legst du mit „＋ Zutat“ an oder liest sie mit „Zutaten einlesen“ aus der Startdaten-Datei ein.' },

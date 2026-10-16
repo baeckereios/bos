@@ -29,6 +29,9 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-16 · 17:51 · Nur Hilfetext (Teigrechner Stufe 1, Freigabe KC 16:37 Teil H)
+      Die Nachtseite heißt „BrotTeigRechner“ (Ulf 16.10., 16:36). Der Name in der
+      Zielliste kommt aus der Registry; Adressen unverändert. SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
       Prüfurteil „Achtung“, Blattstand „ungespeichert“ und Sperr-Hinweis auf feste Warnfarbe --bos-warn*; Status-Zeichen ✓ ⚠ ✕ (✗ → ✕, ● ungespeichert → ⚠, Warn-Urteile mit ⚠); Hilfetext „Sammelblatt speichern“ nennt jetzt ⚠ statt ●. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-08 · 14:17 · v1.3 · Hilfetext (zweites festes Ziel)
@@ -990,7 +993,7 @@ const helpData = [
   { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips.' },
   { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },
   { heading: 'Wenn etwas nicht klappt', text: 'Jeder Fehler steht oben in einem roten Kasten, mit der Ursache in normaler Sprache und der Meldung des Geräts dahinter. Bei Chips heißt das meistens: NFC am Handy ist aus, die Erlaubnis für den Browser fehlt, oder der Chip wurde zu früh weggezogen. Ein fehlender Code ist kein Notfall: Alles bleibt auch über den Launcher erreichbar.' },
-  { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser. Einer davon gehört in die Teigecke: „Teigecke · Vorbereitungen“ steht in der Liste direkt unter „Teigecke Nacht“ und öffnet die Teigecke Nacht gleich im Reiter „Vorbereitungen“ — als QR-Schild oder Chip, wie jedes andere Ziel.' }
+  { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser. Einer davon gehört in die Teigecke: „Teigecke · Vorbereitungen“ steht in der Liste direkt unter „BrotTeigRechner“ (früher „Teigecke Nacht“) und öffnet den BrotTeigRechner gleich im Reiter „Vorbereitungen“ — als QR-Schild oder Chip, wie jedes andere Ziel.' }
 ];
 function oeffneHilfe() {
   document.getElementById('hilfeTitel').textContent = t('hilfe_titel');

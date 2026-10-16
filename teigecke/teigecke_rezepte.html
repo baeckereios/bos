@@ -5,6 +5,15 @@
   Doku:  teigecke/TEIGECKE_REZEPTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit „Orte“)
   CHANGELOG
+    2026-10-16 · 17:51 · v0.2b · Teigrechner Stufe 1 (#67, §4 F + Freigabe KC 16:37 Teil H)
+      Liest die Teige der Stationen (teigrechner_teige, nur id/name/geloescht):
+      „hängt an <Name>“ statt der rohen Kennung (Schritt 2 und Zusammenfassung,
+      über teigName), Kasten „Brote ohne Teig“ ohne Produkte der Stationen
+      (L.broteOhneTeig mit dritter Liste), Kennung und Name eines neuen Teigs auch
+      gegen die Teige der Stationen geprüft (L.pruefeSchritt mit beiden Listen).
+      Umhängen (schrittBrote) unverändert. Rücksprung und Hilfe nennen die
+      Nachtseite „BrotTeigRechner“ (Ulf 16.10., 16:36, nur Texte).
+      teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
     2026-10-15 · 01:27 · v0.2a · Anzeige Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
       Pausierte Brote (Feld pausiert am Produkt) bleiben auf dieser Pflegeseite
       sichtbar — ausgegraut mit dem Etikett „pausiert“, ohne eigenen Schalter;
@@ -77,7 +86,7 @@
 <header>
     <div class="kopf-titel">
       <h1 class="bos-title" data-i18n="titel">Teige &amp; Rezepte</h1>
-      <div class="backtag"><a class="link-btn" href="teigecke_nacht.html" data-i18n="zur_nacht">‹ Teigecke Nacht</a></div>
+      <div class="backtag"><a class="link-btn" href="teigecke_nacht.html" data-i18n="zur_nacht">‹ BrotTeigRechner</a></div>
     </div>
     <div class="kopf-knoepfe">
       <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
@@ -132,7 +141,8 @@
 const L = window.BOS_TEIGECKE_LOGIK;
 const COL = {
   orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', teigwerte: 'teigecke_teigwerte',
-  rezeptmengen: 'teigecke_rezeptmengen', sicherungen: 'teigecke_sicherungen'
+  rezeptmengen: 'teigecke_rezeptmengen', sicherungen: 'teigecke_sicherungen',
+  weitereTeige: 'teigrechner_teige'   /* 16.10.2026 (#67): nur lesen, Teige der Stationen */
 };
 /* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§14/§18).
    test_teigecke.js vergleicht beides automatisch. Teige: dieselbe Liste wie
@@ -184,7 +194,7 @@ const I18N_DE = {
   v_zu_lang: '„{feld}“ ist zu lang (höchstens {max} Zeichen).',
   f_keine_zutaten: 'Noch keine Zutaten im Stamm — erst auf der Seite „Orte“ Zutaten anlegen.',
   /* Seite */
-  titel: 'Teige & Rezepte', zur_nacht: '‹ Teigecke Nacht', lade: 'Lade Daten …', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
+  titel: 'Teige & Rezepte', zur_nacht: '‹ BrotTeigRechner', lade: 'Lade Daten …', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
   schliessen: 'Schließen', abbrechen: 'Abbrechen', speichern: 'Speichern', gespeichert: '✓ Gespeichert',
   archivieren: 'Archivieren', archiviert: '✓ Archiviert', wiederherstellen: '↩ Wiederherstellen', wiederhergestellt: '✓ Wiederhergestellt',
   archiv_zeigen: 'Archiv zeigen', archiv_verbergen: 'Archiv verbergen', archiv_leer: 'Nichts archiviert.',
@@ -225,7 +235,7 @@ const I18N_DE = {
   s1_kennung_hilfe: 'Die Kennung bildet BOS aus dem Namen. Nach dem ersten Speichern bleibt sie fest, auch wenn du den Namen später änderst.',
   v_name_fehlt: 'Bitte einen Namen eintippen.', v_name_lang: 'Der Name ist zu lang (höchstens 60 Zeichen).',
   v_kennung_ungueltig: 'Aus diesem Namen lässt sich keine Kennung bilden (mindestens zwei Buchstaben oder Ziffern).',
-  v_kennung_belegt: 'Die Kennung „{k}“ gibt es schon (auch archivierte zählen). Bitte den Namen etwas anders wählen.',
+  v_kennung_belegt: 'Die Kennung „{k}“ gibt es schon (auch archivierte zählen, auch die Teige der Stationen unter „Teige (Stationen)“). Bitte den Namen etwas anders wählen.',
   v_name_gleich: 'Einen Teig „{name}“ gibt es schon. Bitte den Namen unterscheidbar machen.',
   /* Schritt 2 */
   s2_frage: 'Welche Brote werden aus diesem Teig gemacht?', s2_hilfe: 'Anhaken und je Brot die Einwaage in g eintragen — das Teiggewicht, nicht das Ausbackgewicht.',
@@ -322,6 +332,7 @@ const S = {
   ansicht: 'liste', zeigeArchiv: false,
   orte: [], zutaten: [], teige: [], teigwerte: {}, rezeptmengen: [],
   produkte: [], produkteOk: false, produkteAusSpiegel: null,
+  weitereTeige: [],          // 16.10.2026 (#67): [{ id, name, geloescht }] der Teige der Stationen, nur zur Anzeige und Kennungsprüfung
   geladen: false,
   verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
   regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
@@ -341,7 +352,11 @@ const tm = function () { return L.nachId(S.teige); };
 const zm = function () { return L.nachId(S.zutaten); };
 const pm = function () { return L.produktMap(S.produkte); };
 function produktName(k) { const p = pm()[k]; return p ? p.name : k; }
-function teigName(k) { const x = tm()[k]; return x ? x.name : k; }
+/* 16.10.2026 (#67): kennt auch die Teige der Stationen (Name statt Kennung). */
+function teigName(k) { const x = tm()[k]; if (x) return x.name; const w = L.nachId(S.weitereTeige)[k]; return w ? w.name : k; }
+function istWeitererTeig(k) { return !!L.nachId(S.weitereTeige)[k]; }
+/* Kennungs- und Namensprüfung über beide Welten (Nacht + Stationen, archivierte eingeschlossen). */
+function teigeBeiderWelten() { return S.teige.concat(S.weitereTeige); }
 function sauerteig() { return L.aktiv(S.teige).filter(function (x) { return x.istSauerteig; })[0] || null; }
 function istAdmin() { return S.rolle === 'admin'; }
 function darfRezepte() { return S.haken.rezepte && online(); }
@@ -382,7 +397,9 @@ function abonniereStamm() {
     aboCollection('orte', function (a) { S.orte = a; }),          /* nur für „Startdaten einlesen“ (kopiert) */
     aboCollection('zutaten', function (a) { S.zutaten = a; }),
     aboCollection('teige', function (a) { S.teige = a; }),
-    aboCollection('teigwerte', function (a) { S.teigwerte = L.nachId(a); })
+    aboCollection('teigwerte', function (a) { S.teigwerte = L.nachId(a); }),
+    /* 16.10.2026 (#67): Teige der Stationen — nur Kennung, Name, archiviert */
+    aboCollection('weitereTeige', function (a) { S.weitereTeige = a.map(function (x) { return { id: x.id, name: x.name, geloescht: !!x.geloescht }; }); })
   ];
   /* Rezeptmengen werden NICHT abonniert: Sie kommen nur beim Öffnen eines
      Rezepts (Haken Rezepte), einzeln, und bleiben im Arbeitsspeicher. */
@@ -450,7 +467,7 @@ function teigZeileHTML(x) {
 }
 function broteOhneTeigHTML() {
   if (!S.produkteOk) return '';
-  const b = L.broteOhneTeig(S.produkte, S.teige);
+  const b = L.broteOhneTeig(S.produkte, S.teige, S.weitereTeige);   // 16.10.2026: Produkte der Stationen zählen nicht
   const n = b.fehlenderTeig.length + b.ohneTeig.length;
   if (!n) return '';
   let html = '<details class="hinweis baustelle" id="broteOhneTeig"><summary>' + esc(t('brote_ohne_teig_titel', { n: n })) + '</summary><div>' +
@@ -639,7 +656,7 @@ function geheZu(ziel) {
   ziel = Math.max(1, Math.min(SCHRITTE, ziel));
   if (ziel > st.schritt) {
     for (let s = st.schritt; s < ziel; s++) {
-      const f = fehlerTexte(L.pruefeSchritt(st.z, s, { teige: S.teige })).concat(zusatzFehler(s));
+      const f = fehlerTexte(L.pruefeSchritt(st.z, s, { teige: teigeBeiderWelten() })).concat(zusatzFehler(s));
       if (f.length) { st.schritt = s; st.fehler = f; zeichneStrecke(); return; }
     }
   }
@@ -759,7 +776,7 @@ function brotZeileHTML(p) {
   const kennung = z.neu ? L.kennungAus(z.name) : z.kennung;
   const hierAngehaengt = !!kennung && p.ausTeig === kennung;   /* auch: wartende Brote eines neuen Teigs */
   let unter = '';
-  if (p.ausTeig && p.ausTeig !== kennung) unter = tm()[p.ausTeig] && !tm()[p.ausTeig].geloescht ? t('s2_haengt_an', { teig: teigName(p.ausTeig) }) : t('s2_haengt_an_fehlend', { teig: p.ausTeig });
+  if (p.ausTeig && p.ausTeig !== kennung) unter = (tm()[p.ausTeig] && !tm()[p.ausTeig].geloescht) || istWeitererTeig(p.ausTeig) ? t('s2_haengt_an', { teig: teigName(p.ausTeig) }) : t('s2_haengt_an_fehlend', { teig: p.ausTeig });
   const darfHaken = istAdmin();
   const darfEinwaage = b.an && (darfHaken || hierAngehaengt);
   const pausiert = p.pausiert === true;   /* 15.10.2026 (#63, U3): ausgegraut mit Etikett */
@@ -1122,7 +1139,7 @@ async function speichereStrecke() {
   const st = S.strecke;
   if (!st || speichertGerade()) return;
   for (let s = 1; s <= 4; s++) {
-    const f = fehlerTexte(L.pruefeSchritt(st.z, s, { teige: S.teige })).concat(zusatzFehler(s));
+    const f = fehlerTexte(L.pruefeSchritt(st.z, s, { teige: teigeBeiderWelten() })).concat(zusatzFehler(s));
     if (f.length) { st.schritt = s; st.fehler = f; zeichneStrecke(); return; }
   }
   st.konflikt = '';
@@ -1428,7 +1445,7 @@ document.getElementById('editSheet').addEventListener('click', function (e) { if
 const helpData = {
   title: 'Teige & Rezepte — was ist das hier?',
   sections: [
-    { heading: 'Wofür ist diese Seite?', text: 'Hier legst du Teige an und tippst ihre Rezepte ein. Die Seite fragt, was ein Bäcker weiß: wie der Teig heißt, welche Brote daraus werden, ob Sauer oder eine Vorstufe hineinkommt und was im Hauptteig steht. Daraus rechnet BOS die Werte je kg Teig, mit denen die Nacht arbeitet. Nachts schaust du in „Teigecke Nacht“, nicht hier.' },
+    { heading: 'Wofür ist diese Seite?', text: 'Hier legst du Teige an und tippst ihre Rezepte ein. Die Seite fragt, was ein Bäcker weiß: wie der Teig heißt, welche Brote daraus werden, ob Sauer oder eine Vorstufe hineinkommt und was im Hauptteig steht. Daraus rechnet BOS die Werte je kg Teig, mit denen die Nacht arbeitet. Nachts schaust du in den „BrotTeigRechner“ (früher „Teigecke Nacht“), nicht hier.' },
     { heading: 'Die Liste', text: 'Oben steht der Sauerteig in einer eigenen kleinen Karte, darunter alle Teige mit ihren Broten. „Rumpf, noch keine Rezeptwerte“ heißt: Der Teig hat noch keine Hefe je kg und keine Zutaten — die Nacht kann ihn nicht rechnen. „ohne Brot“ heißt: Kein Produkt zeigt auf diesen Teig. Der eingeklappte Kasten „Brote ohne Teig“ ist nur eine Übersicht, keine Mahnung; manche Brote haben bewusst keinen eigenen Teig.' },
     { heading: 'Ein Rezept eintippen: die Strecke', text: 'Teig antippen oder „＋ Neuer Teig“. Die Strecke hat fünf Schritte: Name, Brote, Sauer & Vorstufe, Hauptteig, Zusammenfassung. Mit „Weiter“ und „Zurück“ (oder den Nummern oben) gehst du vor und zurück, ohne dass etwas verloren geht. Gespeichert wird erst am Ende. Ab Schritt 3 steht unten „Summe bisher“. Was du eintippst, steht nur auf diesem Bildschirm — gehst du vorher weg, fragt die Seite nach.' },
     { heading: 'Schritt 1 und 2: Name und Brote', text: 'Unter dem Namen siehst du die Kennung, die BOS daraus bildet (aus „Kürbis-Käse Kruste“ wird „kuerbis_kaese_kruste“). Nach dem ersten Speichern bleibt sie fest. Zeigen schon Brote auf diese Kennung (weil sie im Produkt-Editor schon diesem Teig zugeordnet sind), steht das unter dem Namen, und in Schritt 2 sind sie schon angehakt. In Schritt 2 hakst du die Brote an, die aus dem Teig gemacht werden — vorn alle Brote, über das Suchfeld alles andere — und trägst je Brot die Einwaage in g ein: das Teiggewicht, nicht das Ausbackgewicht. Hängt ein Brot schon an einem anderen Teig, steht das darunter; anhaken zieht es um. Ohne Brot darfst du speichern, aber dann rechnet die Nacht den Teig nicht. Brote umhängen darf nur ein Konto mit der Rolle admin, wie im Produkt-Editor.' },
@@ -1437,7 +1454,7 @@ const helpData = {
     { heading: 'Schritt 5: Zusammenfassung', text: 'Hier steht die Teigsumme, Hefe, Sauer und Vorstufe je kg Teig, ob der Teig Schüttwasser hat, je Brot „ergibt … kg Teig ≈ … Brote“ (nur zur Info) und was am Brot geändert wird. Die Proberechnung zeigt, was die Nacht bei 60 Broten sagen würde — mit denselben Rechnungen wie nachts. Unter „Hinweise & Sonstiges“ pflegst du den Hinweis oben in der Karte, den Hinweis zur Vorstufe, „nur bei Bedarf“, die Reihenfolge und das Archivieren.' },
     { heading: 'Speichern in zwei Schritten', text: 'Erst das Rezept (Teig, Einwaagen und Mengen in einem Rutsch), dann die Brote. Jeder Schritt sagt selbst, ob es geklappt hat, mit der echten Meldung, wenn nicht, und lässt sich einzeln wiederholen. Klappt das Rezept und nur das Umhängen der Brote nicht, bleibt das Rezept gespeichert. Was sich nicht geändert hat, wird nicht geschrieben.' },
     { heading: 'Ein altes Rezept ohne Mengen', text: 'Teige aus den Startdaten haben Werte je kg, aber keine eingetippten Mengen. Öffnest du so einen Teig und tippst keine Mengen, bleiben alle Werte je kg genau, wie sie sind („Mengen unvollständig“). Erst wenn alle Mengen dastehen, rechnet BOS neu. Tippst du nur die Hefe, wird nur die Hefe je kg auf die bisherige Rezeptbasis umgerechnet.' },
-    { heading: 'Was nicht hier gepflegt wird', text: 'Die Wasserregel (wie viel Wasser nachts weniger), die Tabelle nach Außentemperatur und den Kessel pflegst du weiter in „Teigecke Nacht“ unter „Anpassen“. Orte, Zuhause und Gruppe einer Zutat auf der Seite „Orte“. Neue Produkte legst du im Produkt-Editor an — die Strecke legt keine Produkte an.' },
+    { heading: 'Was nicht hier gepflegt wird', text: 'Die Wasserregel (wie viel Wasser nachts weniger), die Tabelle nach Außentemperatur und den Kessel pflegst du weiter im „BrotTeigRechner“ (früher „Teigecke Nacht“) unter „Anpassen“. Orte, Zuhause und Gruppe einer Zutat auf der Seite „Orte“. Neue Produkte legst du im Produkt-Editor an — die Strecke legt keine Produkte an. Die Teige von Rondo, Frühschicht und Brötchenstraße pflegst du unter „Teige (Stationen)“; hängt ein Produkt dort, steht hier „hängt an …“ mit dem Namen.' },
     { heading: 'Wer darf was?', text: 'Sehen darf die Liste jeder mit Konto. Rezepte eintippen und die Mengen sehen darf nur, wer den Haken 📜 Rezepte hat — die Mengen sind geheim und werden nur dann geladen. Einwaagen speichert der Haken 🥣 Teige, neue Zutaten der Haken 🧺 Wagen & Zutaten, Brote umhängen die Rolle admin. Fehlt etwas, sagt die Seite, was.' },
     { heading: 'Startdaten und Archiv', text: '„Startdaten einlesen“ liest Teige und Einwaagen aus der Startdaten-Datei ein (die liegt nur bei Ulf, nie im Programmordner). Was es schon gibt, wird übersprungen. Archivierte Teige stehen unten im Archiv und lassen sich wiederherstellen. Einen Teig archivieren kannst du erst, wenn kein Brot mehr auf ihn zeigt.' },
     { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten und beim Speichern direkt am Schritt, mit der echten Meldung des Systems. „Keine Berechtigung“ hat drei mögliche Gründe: Dir fehlt der Haken oder die Rolle, du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt hier nie), oder die Firestore-Regeln sind älter als die Seite — dann steht oben ein roter Hinweis mit der Regeldatei. „Inzwischen von … geändert“ heißt: jemand war schneller; du entscheidest, ob du frisch öffnest oder deine Eingabe speicherst. Ohne Netz lässt sich hier nichts ändern.' }

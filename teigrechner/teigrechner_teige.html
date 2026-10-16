@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: teigrechner/teigrechner_teige.html — Teige (Stationen): Teig-Editor für alle weiteren Teige
+  Doku:  teigrechner/TEIGRECHNER_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Gerüst: ../teigecke/teigecke_seite.js + ../teigecke/teigecke_seite.css (gemeinsam mit der Teigecke)
+  Logik:  teigrechner_logik.js (Rechnung, Formular), ../teigecke/teigecke_logik.js (Kennung, Umhängen)
+  CHANGELOG
+    2026-10-16 · 17:51 · v0.1 · Erstfassung (Teigrechner Stufe 1, #67)
+      ANWEISUNG_2026-10-16_TEIGRECHNER_STUFE1.md, Bauplan
+      SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md, Freigabe Kontroll-Chat 16:37.
+      Reiter je Station (Rondo, Frühschicht, Brötchenstraße) und Nachtschicht
+      (nur ansehen: Name und Kennung aus teigecke_teige, keine Rezeptmengen,
+      keine Teigwerte). Je Teig: Name, Stationen, Hefe, Kessel, je Produkt
+      „x kg Teig ergibt y <Einheit>“. Zuordnen = Feld ausTeig am Produkt, nur
+      Rolle admin, über ../bos_produkte_schreiben.js, höchstens 4 je Vorgang.
+      Schreiben Teig mit Haken weitereTeige, Sicherung im selben Vorgang
+      (teigrechner_sicherungen, RK §23). Der Ablauf „2 · Produkte“ ist KOPIERT aus
+      teigecke/teigecke_rezepte.html schrittBrote() (Stand v0.2a, 15.10.2026),
+      Weg B der Freigabe; zusammengeführt wird später mit #70.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Teige (Stationen)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="../teigecke/teigecke_seite.css">
+<style>
+  /* Nur Ergänzungen mit Vorsilbe tr- (Gerüst-CSS unverändert). Farben nur über Tokens,
+     Status (--bos-warn) getrennt vom Akzent (Checkliste §3a). */
+  .tr-karte-kopf { align-items: flex-start; }
+  .tr-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .tr-produkte { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .tr-produkte li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; padding: 6px 0; border-top: 1px solid var(--bos-border); font-size: var(--bos-font-sm, .9rem); }
+  .tr-produkte li:first-child { border-top: none; }
+  .tr-ausbeute { color: var(--bos-text-dim); }
+  .tr-fehlt { color: var(--bos-warn, var(--bos-amber-bright)); font-weight: 700; }
+  .tr-grau { opacity: .55; }
+  .tr-hinweis-klein { display: block; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .tr-zeile { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--bos-border); }
+  .tr-zeile:first-child { border-top: none; }
+  .tr-zeile-kopf { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tr-zeile-kopf .rz-brot-haken { flex: 1 1 240px; }
+  .tr-name-fest { flex: 1 1 240px; font-weight: 700; }
+  .tr-satz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .tr-satz .bos-input { width: 96px; min-height: 48px; }
+  .tr-satz .tr-wort { white-space: nowrap; }
+  .tr-je { font-size: var(--bos-font-sm, .9rem); color: var(--bos-text-dim); }
+  .tr-frage { border: 2px solid var(--bos-warn, var(--bos-amber)); border-radius: var(--bos-radius-sm, 8px); padding: 10px; margin: 6px 0; }
+  .tr-frage .sheet-knoepfe { margin-top: 8px; }
+  .tr-sp { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .tr-sp-zeile { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  .tr-sp-zeile b { min-width: 110px; }
+  .tr-sp-fehler { color: var(--bos-red, #d6584a); overflow-wrap: anywhere; }
+  .tr-nacht .karte { opacity: .7; }
+  .sheet.tr-sheet { max-width: 720px; }
+  /* Vier (bzw. drei) Reiter am Handy: Breite nach Inhalt, die Leiste scrollt seitlich statt die Wörter zu überlagern. */
+  @media (max-width: 520px) { nav.reiter button { flex: 0 0 auto; } }
+  #trKennung { margin-bottom: var(--bos-space-sm, 14px); }
+</style>
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge wie teigecke/teigecke_rezepte.html
+     (Checkliste §2a, bos_standalone_login.js-Kopf). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'teigrechner_teige';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_produkte.js"></script>
+<script src="../bos_produkte_schreiben.js"></script>
+<script src="../teigecke/teigecke_logik.js"></script>
+<script src="teigrechner_logik.js"></script>
+
+<div class="kopfbereich">
+<header>
+    <div class="kopf-titel">
+      <h1 class="bos-title" data-i18n="titel">Teige (Stationen)</h1>
+      <div class="backtag"><a class="link-btn" href="teigrechner.html" data-i18n="zum_rechner">‹ Teigrechner</a></div>
+    </div>
+    <div class="kopf-knoepfe">
+      <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+    </div>
+  </header>
+  <nav class="reiter" id="reiterLeiste" role="tablist" aria-label="Stationen"></nav>
+</div>
+
+<div id="verbindungLeiste" role="status" hidden></div>
+<div id="regelLeiste" class="hinweis rot" role="alert" hidden></div>
+
+<div id="fehlerLeiste" role="alert" hidden>
+  <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main>
+  <div id="ladeStatus" class="status" data-i18n="lade">Lade Daten …</div>
+  <div id="ansicht"></div>
+</main>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="editSheet" class="sheet-overlay" hidden>
+  <div class="sheet tr-sheet" role="dialog" aria-modal="true">
+    <h2 id="editTitel"></h2>
+    <div id="editInhalt"></div>
+    <div id="editFehler" class="sheet-fehler" role="alert"></div>
+    <div id="editInfo" class="sheet-info"></div>
+    <div class="sheet-knoepfe" id="editKnoepfe"></div>
+  </div>
+</div>
+
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Teige (Stationen) — Seiten-Kopf: was ../teigecke/teigecke_seite.js erwartet.
+   KEINE Daten im Code: keine Teignamen, keine Zahlen vom Zettel (Repo öffentlich).
+   ================================================================== */
+const L = window.BOS_TEIGECKE_LOGIK;
+const T = window.BOS_TEIGRECHNER_LOGIK;
+const COL = { teige: 'teigrechner_teige', sicherungen: 'teigrechner_sicherungen', nachtTeige: 'teigecke_teige' };
+/* Muss 1:1 zur hasOnly-Liste der Regel passen (RK §23), ohne die Herkunft, die das Gerüst setzt.
+   _PRUEF_teigrechner.js vergleicht beides. */
+const FELDER = { teigrechner_teige: T.FELDER_TEIG.slice() };
+/* Ein Haken für alles, was diese Seite schreibt. Produkte (ausTeig) schreibt die Rolle admin. */
+const HAKEN_FUER = { teigrechner_teige: 'weitere' };
+const REGEL_FASSUNG = 'teigrechner-2026-10-16';
+const REGEL_DATEI = 'firestore_regeln_2026-10-16_teigrechner.rules';
+const REITER = T.STATIONEN_REITER.concat(['Nachtschicht']);
+const TREFFER_MAX = 12;
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  /* Pflicht-Texte des Gerüsts (SEITE_TEXTE) */
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Dir fehlt der Haken 🥨 Weitere Teige (für Produkte zuordnen: die Rolle admin). (2) Du bist mit dem Generalschlüssel 👑 angemeldet — der schreibt hier nie. (3) Die Regeln sind älter als diese Seite — Regelstand in der Firebase-Konsole prüfen.',
+  err_perm_regel_alt: 'Wahrscheinlich Grund (3): Beim Laden passte der Regelstand nicht zur Seite. ',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_zeit: 'Keine Antwort vom Server nach {s} s — vermutlich kein Netz. Die Änderung kann noch nachträglich ankommen: später neu laden und nachsehen.',
+  err_unbehandelt: 'Unerwarteter Fehler',
+  err_laden: 'Laden „{was}“',
+  err_konto: 'Konto lesen (Haken und Rolle)',
+  err_speichern: 'Speichern',
+  err_gegenlesen: 'Gegenlesen nach abgelehntem Speichern',
+  err_haken_fehlt: 'Dafür fehlt dir der Haken 🥨 Weitere Teige in der Kontenverwaltung.',
+  offline_pflege: 'Ohne Verbindung wird nichts dauerhaft geändert.',
+  warte_uebertragung: 'Die letzte Änderung wird noch übertragen — bitte kurz warten.',
+  offline_stand: '📴 Ohne Verbindung — Stand von {zeit}. Ändern geht erst wieder mit Netz.',
+  ausstehend: '⏳ Änderungen werden übertragen …',
+  regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Lesen und Speichern können deshalb abgelehnt werden. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  konflikt: 'Inzwischen von {wer} geändert, neu geladen, bitte erneut speichern.',
+  v_pflicht: '„{feld}“ fehlt.',
+  v_zu_lang: '„{feld}“ ist zu lang (höchstens {max} Zeichen).',
+  f_keine_zutaten: '—',
+  /* Seite */
+  titel: 'Teige (Stationen)', zum_rechner: '‹ Teigrechner', lade: 'Lade Daten …', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
+  schliessen: 'Schließen', abbrechen: 'Abbrechen', speichern: '💾 Speichern', produkte_spiegel: 'Produktliste vom Gerät (Stand {zeit})',
+  reiter_nacht: '🌙 Nachtschicht', kein_konto: 'Keine Anmeldung erkannt — Pflege nicht möglich. Anzeigen geht trotzdem.',
+  nur_lesen: 'Du siehst die Teige, kannst sie aber nicht ändern: Dafür braucht dein Konto den Haken 🥨 Weitere Teige.',
+  neu_teig: '＋ Neuer Teig', liste_titel: 'Teige · {station} ({n})', liste_leer: 'Noch kein Teig für {station}. Mit „＋ Neuer Teig“ den ersten anlegen.',
+  liste_leer_lesen: 'Noch kein Teig für {station}.',
+  pausiert: 'pausiert', keine_produkte: 'noch kein Produkt zugeordnet', ausbeute_fehlt: 'Ausbeute fehlt',
+  ausbeute_satz: '{kg} kg ergibt {n} {einheit}', je_einheit: '= {x} kg je {einheit}',
+  hefe_kurz: 'Hefe: {kg} kg Teig mit {g} g', kessel_kurz: 'Kessel höchstens {kg} kg', stationen_kurz: 'Stationen: {liste}',
+  station_abweichend: 'steht in der Produktliste bei {station}',
+  einheit_fehlt: 'Einheit fehlt in der Produktliste',
+  ohne_teig_titel: 'Produkte dieser Station ohne Teig ({n})', ohne_teig_text: 'Nur zur Übersicht, keine Mahnung. Nicht jedes Produkt braucht einen Teig hier.',
+  fehlender_teig: 'Zeigen auf einen Teig, den es nicht (mehr) gibt:',
+  archiv_zeigen: 'Archiv zeigen', archiv_verbergen: 'Archiv verbergen', archiv_leer: 'Nichts archiviert.',
+  wiederherstellen: '↩ Wiederherstellen', wiederhergestellt: '✓ Wiederhergestellt',
+  nacht_titel: 'Teige der Nachtschicht ({n})',
+  nacht_text: 'Nur zum Ansehen. Diese Teige werden im BrotTeigRechner geführt und unter „Teige & Rezepte“ gepflegt — mit Rezept, Wasser und Hefe nach Temperatur. Hier steht nur, welche Produkte daraus werden.',
+  nacht_link: 'Zum BrotTeigRechner ›', nacht_leer: 'Keine Teige der Nachtschicht lesbar.',
+  /* Bearbeiten */
+  e_titel_neu: 'Neuer Teig', e_titel: 'Teig: {name}',
+  f_name: 'Name', f_name_hilfe: 'So, wie er in der Backstube heißt.',
+  f_kennung_neu: 'wird zu „{k}“ — bleibt nach dem ersten Speichern für immer (die Produkte zeigen darauf)',
+  f_kennung_fest: 'Kennung „{k}“ — bleibt für immer',
+  f_stationen: 'Stationen', f_stationen_hilfe: 'Ein Teig kann zu mehreren Stationen gehören. Er erscheint dann in jedem dieser Reiter und im Teigrechner jeder dieser Stationen.',
+  f_hefe: 'Hefe (freiwillig)', f_hefe_hilfe: 'So, wie es auf dem Zettel stünde. Leer lassen = der Rechner zeigt keine Hefe.',
+  w_kg_teig_mit: 'kg Teig mit', w_g_hefe: 'g Hefe',
+  f_kessel: 'Kessel (freiwillig)', f_kessel_hilfe: 'Leer lassen = der Rechner teilt nicht auf Kessel auf.',
+  w_hoechstens: 'höchstens', w_kg_je_kessel: 'kg je Kessel',
+  f_produkte: 'Produkte und Ausbeute', f_produkte_hilfe: 'Je Produkt so, wie es auf dem Zettel steht: „30 kg Teig ergibt 24 Bleche“. BOS rechnet die kg je Blech selbst.',
+  w_kg_teig_ergibt: 'kg Teig ergibt',
+  haengt_an: 'hängt an „{teig}“ — hier anhaken hängt es um', haengt_an_fehlend: 'zeigt auf „{teig}“ (gibt es nicht) — hier anhaken hängt es um',
+  uebernommen: 'Ausbeute vom bisherigen Teig übernommen — bitte prüfen.',
+  ohne_admin: 'Produkte zuordnen darf nur ein Konto mit der Rolle admin (wie im Produkt-Editor). Du siehst die Haken nur; die Ausbeute der Produkte, die schon an diesem Teig hängen, kannst du pflegen.',
+  ohne_haken_admin: 'Teig, Ausbeute, Hefe und Kessel speichert nur, wer den Haken 🥨 Weitere Teige hat. Mit deiner Rolle admin kannst du Produkte zuordnen.',
+  suche: 'Produkt suchen', suche_platz: 'Name tippen …', suche_nichts: 'Nichts gefunden.', suche_mehr: 'Weitere Treffer: Suche genauer fassen.',
+  frage_um: '„{name}“ hängt an „{teig}“. Hierher umhängen? {folge}', frage_um_nacht: 'Der BrotTeigRechner rechnet das Produkt dann nicht mehr.',
+  frage_um_weiter: 'Der Teig „{teig}“ rechnet das Produkt dann nicht mehr.',
+  frage_ja: 'Umhängen', frage_nein: 'Lieber nicht',
+  archivieren: 'Teig archivieren …', archiv_frage_titel: '„{name}“ archivieren?',
+  archiv_frage_text: 'Der Teig verschwindet aus der Liste und aus dem Teigrechner. Gelöscht wird nichts: Unten im Archiv lässt er sich wiederherstellen.',
+  archiviert: '✓ Archiviert', sperre_archiv: 'Archivieren geht nicht: Diese Produkte zeigen noch auf den Teig: {liste}. Erst abhaken und speichern.',
+  verwerfen_titel: 'Eingabe verwerfen?', verwerfen_text: 'Du hast etwas eingetippt, das noch nicht gespeichert ist. Es ist weg, wenn du jetzt schließt.', verwerfen_ja: 'Verwerfen', verwerfen_nein: 'Weiter bearbeiten',
+  v_name_fehlt: 'Bitte einen Namen eintippen.', v_name_lang: 'Der Name ist zu lang (höchstens 60 Zeichen).',
+  v_kennung_ungueltig: 'Aus diesem Namen lässt sich keine Kennung bilden (mindestens zwei Buchstaben oder Ziffern).',
+  v_kennung_belegt: 'Die Kennung „{k}“ gibt es schon — bei den Teigen der Stationen oder der Nacht, archivierte zählen mit. Bitte den Namen etwas anders wählen.',
+  v_name_doppelt: 'Einen Teig mit diesem Namen gibt es schon (Stationen oder Nacht). Bitte den Namen unterscheidbar machen.',
+  v_station_fehlt: 'Bitte mindestens eine Station ankreuzen.', v_station_unbekannt: 'Unbekannte Station.',
+  v_hefe_zahl: 'Hefe: beides Zahlen über 0 (oder beides leer).', v_hefe_halb: 'Hefe: kg Teig und g Hefe gehören zusammen — beides eintragen oder beides leer lassen.',
+  v_kessel_zahl: 'Kessel: eine Zahl über 0 kg (oder leer).',
+  v_ausbeute_zahl: 'Ausbeute bei „{name}“: Zahlen über 0 (oder beides leer).', v_ausbeute_halb: 'Ausbeute bei „{name}“: kg und Anzahl gehören zusammen — beides eintragen oder beides leer lassen.',
+  /* Speichern */
+  sp_teig: '1 · Teig', sp_produkte: '2 · Produkte', sp_laeuft: 'speichere …', sp_ok: '✓ gespeichert', sp_nichts: '✓ nichts zu ändern',
+  sp_wartet: 'wartet auf Schritt 1', sp_wiederholen: 'Nur diesen Schritt wiederholen',
+  sp_ohne_haken: 'übersprungen: Teig, Ausbeute, Hefe und Kessel speichert nur der Haken 🥨 Weitere Teige.',
+  sp_ohne_rolle: 'übersprungen: Produkte zuordnen braucht die Rolle admin. Der Teig ist gespeichert.',
+  sp_neu_ohne_haken: 'Ein neuer Teig braucht den Haken 🥨 Weitere Teige — ohne ihn wird nichts gespeichert.',
+  sp_produkte_teil: '{i} von {n} Produkten umgehängt, dann Fehler. Wiederholen liest alles frisch und macht nur den Rest.',
+  sp_produkte_ok: '✓ {n} Produkt(e) umgehängt · Stand {stand}',
+  sp_produkte_perm: 'Wenn „Keine Berechtigung“: Rolle admin fehlt, oder jemand hat gerade im Produkt-Editor gespeichert (Stand-Zettel). Wiederholen liest alles frisch.',
+  sp_fertig: '✓ Alles gespeichert', sp_belegt: 'Die Kennung „{k}“ war inzwischen vergeben (zweites Gerät?). Bitte den Namen etwas anders wählen.'
+};
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, haken: { weitere: false }, rolle: null,
+  station: 'Rondo', zeigeArchiv: false,
+  teige: [],           // teigrechner_teige, ganze Dokumente (Sicherung braucht den Serverstand)
+  nachtTeige: [],      // teigecke_teige, NUR { id, name, geloescht } — keine Rezeptwerte im Speicher
+  produkte: [], produkteOk: false, produkteAusSpiegel: null,
+  geladen: false,
+  verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
+  regelstand: 'unbekannt'
+};
+let abos = [];
+let E = null;   /* offene Bearbeitung, nur im Arbeitsspeicher */
+</script>
+<script src="../teigecke/teigecke_seite.js"></script>
+<script>
+'use strict';
+/* ==================================================================
+   Teige (Stationen) — Seitenlogik. Gerüst: ../teigecke/teigecke_seite.js.
+   Rechnen und Formular: teigrechner_logik.js (mit node prüfbar).
+   ================================================================== */
+const tm = function () { return L.nachId(S.teige); };
+const nm = function () { return L.nachId(S.nachtTeige); };
+const pm = function () { return L.produktMap(S.produkte); };
+function istAdmin() { return S.rolle === 'admin'; }
+function darfTeig() { return S.haken.weitere && online(); }
+function produktName(lk) { const p = pm()[lk]; return p ? p.name : lk; }
+/* Name eines Teigs aus beiden Welten, sonst die Kennung. */
+function teigName(k) { const x = tm()[k] || nm()[k]; return x ? x.name : k; }
+function istNachtTeig(k) { return !!nm()[k]; }
+function einheitVon(p) { return window.BOS_PRODUKTE.einheit(p || {}); }
+
+/* ---------- Laden ---------- */
+/* ladeProdukte: Muster aus teigecke/teigecke_rezepte.html (Sicht 'aktive': pausierte
+   bleiben sichtbar und werden ausgegraut). */
+async function ladeProdukte() {
+  try {
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    if (window.BOS_PRODUKTE.EINHEITEN_LISTE.indexOf('Halbes Kuchenblech') === -1) throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne „Halbes Kuchenblech“) — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.');
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    S.produkte = e.liste; S.produkteOk = true;
+    S.produkteAusSpiegel = (e.quelle === 'geraetekopie') ? (e.kopieZeit || e.stand) : null;
+    if (e.quelle === 'geraetekopie' && e.grund) zeigeFehler(t('err_laden', { was: 'Produktliste' }), e.grund);
+  } catch (err) {
+    zeigeFehler(t('err_laden', { was: 'Produktliste' }), err);
+    S.produkte = []; S.produkteOk = false;
+  }
+}
+/* Haken weitereTeige und Rolle aus dem eigenen Konto. Das Gerüst liest nur die
+   Teigecke-Haken; deshalb hier selbst, mit derselben Lade-Funktion. */
+async function ladeKontoWeitere() {
+  S.haken = { weitere: false }; S.rolle = null;
+  if (!S.kennung) return;
+  try {
+    const konto = await window.BOS_ACCOUNTS.ladeKonto(window.db, S.kennung);
+    S.haken = { weitere: !!(konto && konto.weitereTeige === true) };
+    S.rolle = (konto && konto.role) || null;
+  } catch (err) { zeigeFehler(t('err_konto'), err); }
+}
+function abonniere() {
+  abos.forEach(function (ab) { ab(); });
+  abos = [
+    aboCollection('teige', function (a) { S.teige = a; }),
+    /* Nacht-Reiter: nur Kennung, Name, archiviert. teigecke_rezeptmengen und
+       teigecke_teigwerte werden nie angefragt. */
+    aboCollection('nachtTeige', function (a) { S.nachtTeige = a.map(function (x) { return { id: x.id, name: x.name, geloescht: !!x.geloescht }; }); })
+  ];
+}
+function stationAusAdresse() {
+  try {
+    const s = new URLSearchParams(window.location.search).get('station');
+    if (!s) return null;
+    return REITER.filter(function (r) { return L.norm(r) === L.norm(s) || L.kennungAus(r) === L.kennungAus(s); })[0] || null;
+  } catch (e) { return null; }
+}
+async function start() {
+  wendeI18nAn();
+  renderHilfe();
+  let gemerkt = null;
+  try { gemerkt = localStorage.getItem('bos_teigrechner_teige_station'); } catch (x) { /* ohne Speicher: Rondo */ }
+  S.station = stationAusAdresse() || (REITER.indexOf(gemerkt) !== -1 ? gemerkt : 'Rondo');
+  if (!window.db || !window.BOS_AUTH_READY) {
+    zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt'));
+    return;
+  }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; }
+  catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); return; }
+  S.kennung = (nutzer && nutzer.email) ? nutzer.email.split('@')[0] : null;
+  if (!S.kennung) toast(t('kein_konto'));
+  await Promise.all([ladeProdukte(), ladeKontoWeitere()]);
+  abonniere();
+  S.geladen = true;
+  document.getElementById('ladeStatus').hidden = true;
+  render();
+  if (S.kennung) pruefeRegelstand();
+}
+window.addEventListener('online', planeRender);
+window.addEventListener('offline', planeRender);
+/* Ungespeicherte Eingabe: der Browser fragt nach (wie die sechs anderen Satelliten; #77 bleibt Launcher-Sache). */
+window.addEventListener('beforeunload', function (e) {
+  if (E && E.geaendert) { e.preventDefault(); e.returnValue = ''; }
+});
+async function neuLaden() { render(); }
+function oeffneNachCol(col, id) { if (col === COL.teige && id) oeffneTeig(id); }
+
+/* ---------- Rendern ---------- */
+function render() {
+  if (!S.geladen) return;
+  renderVerbindung();
+  renderReiter();
+  if (fokusIn(document.querySelector('main'))) { renderAufgeschoben = true; return; }
+  document.getElementById('ansicht').innerHTML = S.station === 'Nachtschicht' ? nachtHTML() : stationHTML(S.station);
+}
+function renderReiter() {
+  document.getElementById('reiterLeiste').innerHTML = REITER.map(function (r) {
+    const text = r === 'Nachtschicht' ? t('reiter_nacht') : r;
+    return '<button type="button" role="tab" data-aktion="reiter" data-station="' + esc(r) + '" aria-selected="' + (S.station === r) + '">' + esc(text) + '</button>';
+  }).join('');
+}
+function badge(text, klasse) { return '<span class="badge' + (klasse ? ' ' + klasse : '') + '">' + esc(text) + '</span>'; }
+function ausbeuteText(teig, p) {
+  const a = (teig.ausbeute || {})[p.legacyKey], eh = einheitVon(p);
+  if (!T.ausbeuteGueltig(a)) return '<span class="tr-fehlt">' + esc(t('ausbeute_fehlt')) + '</span>';
+  return '<span class="tr-ausbeute">' + esc(t('ausbeute_satz', { kg: T.zahlText(a.kg), n: T.zahlText(a.anzahl), einheit: eh.kurz })) + ' ' +
+    esc(t('je_einheit', { x: T.jeEinheitText(T.kgJeEinheit(a)), einheit: eh.kurz })) + '</span>';
+}
+function produktZeileHTML(teig, p) {
+  const pausiert = p.pausiert === true;
+  let unter = '';
+  if (T.stationAbweichend(p, teig)) unter += '<span class="tr-hinweis-klein">' + esc(t('station_abweichend', { station: p.station })) + '</span>';
+  if (einheitVon(p).art === 'fehlt') unter += '<span class="tr-hinweis-klein">' + esc(t('einheit_fehlt')) + '</span>';
+  return '<li' + (pausiert ? ' class="tr-grau"' : '') + '><span>' + esc(p.name) + (pausiert ? ' ' + badge(t('pausiert')) : '') + unter + '</span>' + ausbeuteText(teig, p) + '</li>';
+}
+function teigKarteHTML(teig, archiv) {
+  const produkte = T.produkteDesTeigs(teig.id, S.produkte);
+  const meta = [t('stationen_kurz', { liste: (teig.stationen || []).join(', ') })];
+  if (T.hefeGueltig(teig)) meta.push(t('hefe_kurz', { kg: T.zahlText(teig.hefeRefKg), g: T.zahlText(teig.hefeRefG) }));
+  if (T.positiv(teig.kesselMaxKg)) meta.push(t('kessel_kurz', { kg: T.zahlText(teig.kesselMaxKg) }));
+  const darfOeffnen = !archiv && (darfTeig() || (istAdmin() && online()));
+  const knopf = archiv
+    ? (darfTeig() ? '<button type="button" class="bos-btn" data-aktion="wiederherstellen" data-id="' + esc(teig.id) + '">' + esc(t('wiederherstellen')) + '</button>' : '')
+    : (darfOeffnen ? '<button type="button" class="bos-btn" data-aktion="teig-oeffnen" data-id="' + esc(teig.id) + '" aria-label="' + esc(t('e_titel', { name: teig.name })) + '">✎</button>' : '');
+  return '<div class="karte' + (archiv ? ' archiviert' : '') + '"><div class="karte-kopf tr-karte-kopf"><div><h3>' + esc(teig.name) + ' ' + badge(teig.id) + '</h3>' +
+    '<div class="tr-meta">' + meta.map(function (m) { return '<span class="karte-unter">' + esc(m) + '</span>'; }).join('') + '</div></div>' +
+    '<div class="karte-knoepfe">' + knopf + '</div></div>' +
+    (produkte.length ? '<ul class="tr-produkte">' + produkte.map(function (p) { return produktZeileHTML(teig, p); }).join('') + '</ul>'
+      : '<div class="karte-unter">' + esc(t('keine_produkte')) + '</div>') + '</div>';
+}
+function ohneTeigHTML(station) {
+  if (!S.produkteOk) return '';
+  const ohne = T.produkteOhneTeig(S.produkte, station);
+  const alle = S.nachtTeige.concat(S.teige);
+  const fehlend = S.produkte.filter(function (p) { return p && p.station === station && p.ausTeig && !L.nachId(alle)[p.ausTeig]; });
+  const n = ohne.length + fehlend.length;
+  if (!n) return '';
+  return '<details class="hinweis baustelle"><summary>' + esc(t('ohne_teig_titel', { n: n })) + '</summary><div>' +
+    '<p class="klein">' + esc(t('ohne_teig_text')) + '</p>' +
+    (ohne.length ? '<p>' + esc(ohne.map(function (p) { return p.name; }).join(', ')) + '</p>' : '') +
+    (fehlend.length ? '<p><b>' + esc(t('fehlender_teig')) + '</b> ' + esc(fehlend.map(function (p) { return p.name + ' → ' + p.ausTeig; }).join(', ')) + '</p>' : '') +
+    '</div></details>';
+}
+function stationHTML(station) {
+  let html = '';
+  if (S.kennung && !S.haken.weitere) html += '<div class="hinweis blau">' + esc(t('nur_lesen')) + '</div>';
+  if (darfTeig()) html += '<div class="pflege-leiste"><button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-teig">' + esc(t('neu_teig')) + '</button></div>';
+  else if (S.haken.weitere && !online()) html += '<p class="klein">' + esc(t('offline_pflege')) + '</p>';
+  const teige = T.teigeDerStation(S.teige, station);
+  html += '<section class="block"><div class="block-kopf"><h2 class="bos-title">' + esc(t('liste_titel', { station: station, n: teige.length })) + '</h2></div>' +
+    (teige.length ? teige.map(function (x) { return teigKarteHTML(x, false); }).join('')
+      : '<p class="status">' + esc(t(S.haken.weitere ? 'liste_leer' : 'liste_leer_lesen', { station: station })) + '</p>') + '</section>';
+  html += ohneTeigHTML(station);
+  if (S.haken.weitere) html += archivHTML();
+  return html;
+}
+function archivHTML() {
+  const arch = S.teige.filter(function (x) { return x.geloescht; }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  let html = '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-umschalten">' + esc(t(S.zeigeArchiv ? 'archiv_verbergen' : 'archiv_zeigen')) + ' (' + arch.length + ')</button></div>';
+  if (!S.zeigeArchiv) return html;
+  if (!arch.length) return html + '<p class="status">' + esc(t('archiv_leer')) + '</p>';
+  return html + arch.map(function (x) { return teigKarteHTML(x, true); }).join('');
+}
+function nachtHTML() {
+  const teige = L.aktiv(S.nachtTeige).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  let html = '<div class="hinweis blau">' + esc(t('nacht_text')) + ' <a class="link-btn" href="../teigecke/teigecke_nacht.html">' + esc(t('nacht_link')) + '</a></div>';
+  html += '<section class="block tr-nacht"><div class="block-kopf"><h2 class="bos-title">' + esc(t('nacht_titel', { n: teige.length })) + '</h2></div>';
+  if (!teige.length) return html + '<p class="status">' + esc(t('nacht_leer')) + '</p></section>';
+  html += teige.map(function (x) {
+    const produkte = L.produkteDesTeigs(x.id, S.produkte).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+    return '<div class="karte"><div class="karte-kopf"><div><h3>' + esc(x.name) + ' ' + badge(x.id) + '</h3>' +
+      '<div class="karte-unter">' + (produkte.length ? produkte.map(function (p) { return p.pausiert === true ? esc(p.name) + ' (' + esc(t('pausiert')) + ')' : esc(p.name); }).join(', ') : esc(t('keine_produkte'))) + '</div></div></div></div>';
+  }).join('');
+  return html + '</section>';
+}
+
+/* ==================================================================
+   BEARBEITEN. E = { id (null = neu), alt, form, auswahl {lk: bool}, ursprung {lk: bool},
+   uebernommen {lk: true}, frage (lk|null), geaendert, sp { teig, produkte, … } }
+   ================================================================== */
+function oeffneTeig(id) {
+  const alt = id ? tm()[id] : null;
+  if (id && !alt) return;
+  const produkte = alt ? T.produkteDesTeigs(id, S.produkte) : [];
+  const auswahl = {}; produkte.forEach(function (p) { auswahl[p.legacyKey] = true; });
+  const form = T.formAusTeig(alt, produkte);
+  if (!alt) form.stationen = S.station === 'Nachtschicht' ? [] : [S.station];
+  E = { id: id || null, alt: alt, form: form, auswahl: auswahl, ursprung: Object.assign({}, auswahl), uebernommen: {}, frage: null, geaendert: false, sp: null };
+  oeffneEdit(alt ? t('e_titel', { name: alt.name }) : t('e_titel_neu'), '', []);
+  zeichneEdit();
+}
+function kennungJetzt() { return E.id || L.kennungAus(E.form.name); }
+/* Zeilen im Formular: alles, was angehakt ist oder ursprünglich hier hing. */
+function zeilenLks() {
+  const lks = Object.keys(E.auswahl);
+  return lks.filter(function (lk) { return pm()[lk]; }).sort(function (a, b) { return String(produktName(a)).localeCompare(String(produktName(b)), 'de'); });
+}
+function zahlFeld(attr, wert, label) {
+  return '<input class="bos-input" ' + attr + ' inputmode="decimal" autocomplete="off" value="' + esc(wert == null ? '' : wert) + '" aria-label="' + esc(label) + '"' + (S.haken.weitere ? '' : ' disabled') + '>';
+}
+function jeEinheitZeile(lk) {
+  const a = E.form.ausbeute[lk] || {}, k = T.pflegeZahl(a.kg), n = T.pflegeZahl(a.anzahl);
+  if (!(k.ok && n.ok && T.positiv(k.wert) && T.positiv(n.wert))) return '';
+  return t('je_einheit', { x: T.jeEinheitText(k.wert / n.wert), einheit: einheitVon(pm()[lk]).einzahl });
+}
+function produktFormZeile(lk) {
+  const p = pm()[lk], an = E.auswahl[lk] === true, kennung = kennungJetzt();
+  const pausiert = p.pausiert === true, eh = einheitVon(p);
+  let unter = '';
+  if (p.ausTeig && p.ausTeig !== kennung) unter = (tm()[p.ausTeig] || nm()[p.ausTeig]) ? t('haengt_an', { teig: teigName(p.ausTeig) }) : t('haengt_an_fehlend', { teig: p.ausTeig });
+  const hinweise = (unter ? '<small>' + esc(unter) + '</small>' : '') +
+    (E.uebernommen[lk] ? '<small>' + esc(t('uebernommen')) + '</small>' : '') +
+    (an && T.stationAbweichend(p, { stationen: E.form.stationen }) ? '<small>' + esc(t('station_abweichend', { station: p.station })) + '</small>' : '') +
+    (eh.art === 'fehlt' ? '<small>' + esc(t('einheit_fehlt')) + '</small>' : '');
+  const name = '<span class="rz-brot-name">' + esc(p.name) + (pausiert ? ' ' + badge(t('pausiert')) : '') + hinweise + '</span>';
+  const kopf = istAdmin()
+    ? '<button type="button" class="vorrat-haken rz-brot-haken" data-aktion="haken" data-lk="' + esc(lk) + '" aria-pressed="' + an + '"' + (online() ? '' : ' disabled') + '>' +
+      '<span class="vh-kasten" aria-hidden="true">' + (an ? '✓' : '') + '</span>' + name + '</button>'
+    : '<span class="vorrat-haken rz-brot-haken" aria-disabled="true"><span class="vh-kasten" aria-hidden="true">' + (an ? '✓' : '') + '</span>' + name + '</span>';
+  const a = E.form.ausbeute[lk] || { kg: '', anzahl: '' };
+  const satz = an ? '<div class="tr-satz">' + zahlFeld('data-feld="ausbeute-kg" data-lk="' + esc(lk) + '"', a.kg, p.name + ' kg') +
+    '<span class="tr-wort">' + esc(t('w_kg_teig_ergibt')) + '</span>' + zahlFeld('data-feld="ausbeute-n" data-lk="' + esc(lk) + '"', a.anzahl, p.name + ' Anzahl') +
+    '<span class="tr-wort">' + esc(eh.lang) + '</span><span class="tr-je" id="trJe_' + esc(lk) + '">' + esc(jeEinheitZeile(lk)) + '</span></div>' : '';
+  return '<div class="tr-zeile' + (pausiert ? ' tr-grau' : '') + '"><div class="tr-zeile-kopf">' + kopf + '</div>' + satz + '</div>';
+}
+function frageHTML() {
+  if (!E.frage) return '';
+  const p = pm()[E.frage]; if (!p) return '';
+  const folge = istNachtTeig(p.ausTeig) ? t('frage_um_nacht') : t('frage_um_weiter', { teig: teigName(p.ausTeig) });
+  return '<div class="tr-frage" role="alertdialog"><p>' + esc(t('frage_um', { name: p.name, teig: teigName(p.ausTeig), folge: folge })) + '</p>' +
+    '<div class="sheet-knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="frage-ja">' + esc(t('frage_ja')) + '</button>' +
+    '<button type="button" class="bos-btn" data-aktion="frage-nein">' + esc(t('frage_nein')) + '</button></div></div>';
+}
+function stationenHTML() {
+  return '<div class="chips">' + T.STATIONEN_REITER.map(function (s) {
+    const an = E.form.stationen.indexOf(s) !== -1;
+    return '<button type="button" class="chip" data-aktion="station" data-station="' + esc(s) + '" aria-pressed="' + an + '"' + (S.haken.weitere ? '' : ' disabled') + '>' + esc(s) + '</button>';
+  }).join('') + '</div>';
+}
+function kennungZeile() {
+  return E.id ? t('f_kennung_fest', { k: E.id }) : t('f_kennung_neu', { k: L.kennungAus(E.form.name) || '…' });
+}
+function zeichneEdit() {
+  const f = E.form;
+  let html = '';
+  if (!S.haken.weitere && istAdmin()) html += '<div class="hinweis">' + esc(t('ohne_haken_admin')) + '</div>';
+  html += feldHTML(t('f_name'), '<input class="bos-input" id="trName" data-feld="name" maxlength="60" autocomplete="off" value="' + esc(f.name) + '"' + (S.haken.weitere ? '' : ' disabled') + '>',
+    t('f_name_hilfe')) + '<div class="feld-hilfe" id="trKennung">' + esc(kennungZeile()) + '</div>';
+  html += feldHTML(t('f_stationen'), '<div id="trStationen">' + stationenHTML() + '</div>', t('f_stationen_hilfe'));
+  html += feldHTML(t('f_hefe'), '<div class="tr-satz">' + zahlFeld('data-feld="hefeKg"', f.hefeKg, 'Hefe kg Teig') + '<span class="tr-wort">' + esc(t('w_kg_teig_mit')) + '</span>' +
+    zahlFeld('data-feld="hefeG"', f.hefeG, 'Hefe g') + '<span class="tr-wort">' + esc(t('w_g_hefe')) + '</span></div>', t('f_hefe_hilfe'));
+  html += feldHTML(t('f_kessel'), '<div class="tr-satz"><span class="tr-wort">' + esc(t('w_hoechstens')) + '</span>' + zahlFeld('data-feld="kesselKg"', f.kesselKg, 'Kessel kg') +
+    '<span class="tr-wort">' + esc(t('w_kg_je_kessel')) + '</span></div>', t('f_kessel_hilfe'));
+  html += '<div class="feld"><label class="bos-label">' + esc(t('f_produkte')) + '</label><div class="feld-hilfe">' + esc(t('f_produkte_hilfe')) + '</div>' +
+    (istAdmin() ? '' : '<div class="hinweis blau">' + esc(t('ohne_admin')) + '</div>') +
+    '<div id="trFrage">' + frageHTML() + '</div><div id="trProdukte">' + produkteFormHTML() + '</div>' +
+    (istAdmin() ? '<div class="feld rz-suche"><label class="bos-label" for="trSuche">' + esc(t('suche')) + '</label>' +
+      '<input class="bos-input" id="trSuche" autocomplete="off" placeholder="' + esc(t('suche_platz')) + '"><div id="trTreffer" class="chips"></div></div>' : '') + '</div>';
+  if (E.id && S.haken.weitere) html += '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-frage">' + esc(t('archivieren')) + '</button></div>';
+  html += '<div class="tr-sp" id="trSpeichern">' + speicherStatusHTML() + '</div>';
+  document.getElementById('editInhalt').innerHTML = html;
+  zeichneKnoepfe();
+}
+function produkteFormHTML() {
+  const lks = zeilenLks();
+  return lks.length ? lks.map(produktFormZeile).join('') : '<p class="status">' + esc(t('keine_produkte')) + '</p>';
+}
+function zeichneProdukte() {
+  document.getElementById('trProdukte').innerHTML = produkteFormHTML();
+  document.getElementById('trFrage').innerHTML = frageHTML();
+}
+function zeichneKnoepfe() {
+  const laeuft = speichertGerade();
+  document.getElementById('editKnoepfe').innerHTML =
+    '<button type="button" class="bos-btn bos-btn--amber" data-aktion="speichern"' + (laeuft || !online() ? ' disabled' : '') + '>' + esc(t('speichern')) + '</button>' +
+    '<button type="button" class="bos-btn" data-aktion="schliessen-frage">' + esc(t(E && E.sp && !E.geaendert ? 'schliessen' : 'abbrechen')) + '</button>';
+}
+function speicherStatusHTML() {
+  if (!E.sp) return '';
+  const zeile = function (titel, zustand, text, aktion) {
+    const z = zustand === 'laeuft' ? t('sp_laeuft') : zustand === 'ok' ? t('sp_ok') : zustand === 'nichts' ? t('sp_nichts') : zustand === 'wartet' ? t('sp_wartet') : '';
+    return '<div class="tr-sp-zeile"><b>' + esc(titel) + '</b><span' + (zustand === 'fehler' ? ' class="tr-sp-fehler"' : '') + '>' + esc(z) + (text ? ' ' + esc(text) : '') + '</span>' +
+      (zustand === 'fehler' && aktion ? '<button type="button" class="bos-btn" data-aktion="' + aktion + '">' + esc(t('sp_wiederholen')) + '</button>' : '') + '</div>';
+  };
+  return zeile(t('sp_teig'), E.sp.teig, E.sp.teigText, 'wiederhole-teig') + zeile(t('sp_produkte'), E.sp.produkte, E.sp.produkteText, 'wiederhole-produkte');
+}
+function zeichneSpeichern() { const el = document.getElementById('trSpeichern'); if (el) el.innerHTML = speicherStatusHTML(); zeichneKnoepfe(); }
+function speichertGerade() { return !!(E && E.sp && (E.sp.teig === 'laeuft' || E.sp.produkte === 'laeuft')); }
+
+/* ---------- Eingaben ---------- */
+function eingabeGeaendert(el) {
+  if (!E) return;
+  const feld = el.getAttribute('data-feld'), lk = el.getAttribute('data-lk');
+  if (!feld) return;
+  E.geaendert = true;
+  if (feld === 'name') { E.form.name = el.value; const k = document.getElementById('trKennung'); if (k) k.textContent = kennungZeile(); return; }
+  if (feld === 'hefeKg' || feld === 'hefeG' || feld === 'kesselKg') { E.form[feld] = el.value; return; }
+  if (feld === 'ausbeute-kg' || feld === 'ausbeute-n') {
+    const a = E.form.ausbeute[lk] || (E.form.ausbeute[lk] = { kg: '', anzahl: '' });
+    if (feld === 'ausbeute-kg') a.kg = el.value; else a.anzahl = el.value;
+    delete E.uebernommen[lk];
+    const je = document.getElementById('trJe_' + lk); if (je) je.textContent = jeEinheitZeile(lk);
+  }
+}
+function zeigeTreffer(text) {
+  const el = document.getElementById('trTreffer');
+  if (!el) return;
+  const n = L.norm(text);
+  if (n.length < 2) { el.innerHTML = ''; return; }
+  const treffer = S.produkte.filter(function (p) { return E.auswahl[p.legacyKey] !== true && L.norm(p.name).indexOf(n) !== -1; })
+    .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  el.innerHTML = treffer.length ? treffer.slice(0, TREFFER_MAX).map(function (p) {
+    return '<button type="button" class="chip" data-aktion="haken" data-lk="' + esc(p.legacyKey) + '">＋ ' + esc(p.name) + (p.station ? ' · ' + esc(p.station) : '') + '</button>';
+  }).join('') + (treffer.length > TREFFER_MAX ? '<span class="klein">' + esc(t('suche_mehr')) + '</span>' : '') : '<span class="klein">' + esc(t('suche_nichts')) + '</span>';
+}
+/* Anhaken: hängt das Produkt an einem anderen Teig, erst fragen (Anweisung §4 C). */
+function hakenUmschalten(lk) {
+  if (!istAdmin() || !E) return;
+  const p = pm()[lk]; if (!p) return;
+  if (E.auswahl[lk] === true) { E.auswahl[lk] = false; E.geaendert = true; zeichneProdukte(); return; }
+  if (p.ausTeig && p.ausTeig !== kennungJetzt() && !E.ursprung[lk]) { E.frage = lk; zeichneProdukte(); return; }
+  anhaken(lk);
+}
+function anhaken(lk) {
+  const p = pm()[lk];
+  E.auswahl[lk] = true; E.geaendert = true; E.frage = null;
+  /* Ausbeute vom bisherigen weiteren Teig übernehmen — sichtbar markiert (Freigabe KC §2). */
+  const a = E.form.ausbeute[lk];
+  if ((!a || (!a.kg && !a.anzahl)) && p && p.ausTeig && tm()[p.ausTeig]) {
+    const alt = (tm()[p.ausTeig].ausbeute || {})[lk];
+    if (T.ausbeuteGueltig(alt)) { E.form.ausbeute[lk] = { kg: T.zahlText(alt.kg), anzahl: T.zahlText(alt.anzahl) }; E.uebernommen[lk] = true; }
+  }
+  if (!E.form.ausbeute[lk]) E.form.ausbeute[lk] = { kg: '', anzahl: '' };
+  const s = document.getElementById('trSuche'); if (s) s.value = '';
+  zeigeTreffer('');
+  zeichneProdukte();
+}
+function stationUmschalten(s) {
+  if (!S.haken.weitere || !E) return;
+  const i = E.form.stationen.indexOf(s);
+  if (i === -1) E.form.stationen.push(s); else E.form.stationen.splice(i, 1);
+  E.geaendert = true;
+  document.getElementById('trStationen').innerHTML = stationenHTML();
+  zeichneProdukte();
+}
+
+/* ---------- Speichern: 1 · Teig, dann 2 · Produkte ---------- */
+function fehlerTexte(kennungen) {
+  return kennungen.map(function (f) {
+    const teil = f.split(':'), lk = teil[1];
+    switch (teil[0]) {
+      case 'name_fehlt': return t('v_name_fehlt');
+      case 'name_lang': return t('v_name_lang');
+      case 'kennung_ungueltig': return t('v_kennung_ungueltig');
+      case 'kennung_belegt': return t('v_kennung_belegt', { k: kennungJetzt() });
+      case 'name_doppelt': return t('v_name_doppelt');
+      case 'station_fehlt': return t('v_station_fehlt');
+      case 'station_unbekannt': return t('v_station_unbekannt');
+      case 'hefe_zahl': return t('v_hefe_zahl');
+      case 'hefe_halb': return t('v_hefe_halb');
+      case 'kessel_zahl': return t('v_kessel_zahl');
+      case 'ausbeute_zahl': return t('v_ausbeute_zahl', { name: produktName(lk) });
+      case 'ausbeute_halb': return t('v_ausbeute_halb', { name: produktName(lk) });
+      default: return f;
+    }
+  });
+}
+/* Formular für das Dokument: nur die Ausbeuten der angehakten Produkte. Abgehakte
+   behalten ihren alten Eintrag (bleiben liegen, Freigabe KC §2). */
+function formFuerDokument() {
+  const f = Object.assign({}, E.form, { kennung: kennungJetzt(), neu: !E.id, ausbeute: {} });
+  Object.keys(E.form.ausbeute).forEach(function (lk) { if (E.auswahl[lk] === true) f.ausbeute[lk] = E.form.ausbeute[lk]; });
+  return f;
+}
+function produkteGeaendert() { return Object.keys(E.auswahl).some(function (lk) { return !!E.auswahl[lk] !== !!E.ursprung[lk]; }); }
+async function speichere() {
+  if (!E || speichertGerade()) return;
+  editFehler('');
+  const form = formFuerDokument();
+  const fehler = (S.haken.weitere ? fehlerTexte(T.pruefeForm(form, { nacht: S.nachtTeige, weitere: S.teige })) : []);
+  if (!E.id && !S.haken.weitere) fehler.push(t('sp_neu_ohne_haken'));
+  if (fehler.length) { editFehler(fehler.join(' ')); return; }
+  E.sp = { teig: 'laeuft', teigText: '', produkte: 'wartet', produkteText: '' };
+  zeichneSpeichern();
+  const ok = await schrittTeig();
+  if (ok) await schrittProdukte();
+}
+async function schrittTeig() {
+  E.sp.teig = 'laeuft'; E.sp.teigText = ''; zeichneSpeichern();
+  const form = formFuerDokument();
+  const alt = E.id ? tm()[E.id] : null;
+  const daten = T.teigDokument(form, alt ? alt.ausbeute : null, alt ? !!alt.geloescht : false);
+  if (!S.haken.weitere) {
+    E.sp.teig = 'nichts'; E.sp.teigText = (alt && !T.teigGleich(daten, alt)) ? t('sp_ohne_haken') : '';
+    zeichneSpeichern(); return true;
+  }
+  if (alt && T.teigGleich(daten, alt)) { E.sp.teig = 'nichts'; zeichneSpeichern(); return true; }
+  try {
+    if (!alt) {
+      const kennung = form.kennung;
+      await schreibeNeuEindeutig(COL.teige, function (v) { return v === 0 ? { id: kennung, daten: daten } : null; }, 1);
+      E.id = kennung;
+    } else {
+      await schreibe(COL.teige, E.id, daten, 'aendern', alt);
+    }
+    E.sp.teig = 'ok';
+    E.alt = tm()[E.id] || E.alt;
+    document.getElementById('editTitel').textContent = t('e_titel', { name: daten.name });
+    zeichneSpeichern();
+    return true;
+  } catch (err) {
+    E.sp.teig = 'fehler';
+    if (err && err.code === 'belegt') E.sp.teigText = t('sp_belegt', { k: form.kennung });
+    else if (err && err.code === 'permission-denied' && alt) {
+      const konflikt = await konfliktText(COL.teige, E.id, alt);
+      E.sp.teigText = konflikt || fehlerText(t('err_speichern'), err);
+      if (!konflikt) zeigeFehler(t('sp_teig'), err); else console.error('[Teige Stationen] Teig abgelehnt: veralteter Stand', err);
+    } else { E.sp.teigText = fehlerText(t('err_speichern'), err); zeigeFehler(t('sp_teig'), err); }
+    zeichneSpeichern();
+    return false;
+  }
+}
+/* KOPIERT aus teigecke/teigecke_rezepte.html schrittBrote() (Stand v0.2a, 15.10.2026),
+   Weg B der Freigabe (KC 16.10., 16:37). Geändert nur: Zustand E statt S.strecke,
+   Texte sp_produkte_*, die Auswahl als { lk: { an } } für L.ausTeigAenderungen und
+   die Teilgröße T.PRODUKTE_JE_VORGANG (4) statt HOECHSTENS_JE_VORGANG (10, #70).
+   Zusammenführen später mit #70. */
+async function schrittProdukte() {
+  const kennung = E.id;
+  if (!produkteGeaendert()) { E.sp.produkte = 'nichts'; fertigPruefen(); return; }
+  if (!istAdmin()) { E.sp.produkte = 'nichts'; E.sp.produkteText = t('sp_ohne_rolle'); fertigPruefen(); return; }
+  E.sp.produkte = 'laeuft'; E.sp.produkteText = '';
+  zeichneSpeichern();
+  let erledigt = 0, gesamt = 0;
+  try {
+    if (!window.BOS_PRODUKTE || !window.BOS_PRODUKTE_SCHREIBEN) throw new Error('bos_produkte.js / bos_produkte_schreiben.js nicht geladen');
+    /* frisch vom Server, nie die Gerätekopie */
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true, frisch: true });
+    const brote = {}; Object.keys(E.auswahl).forEach(function (lk) { brote[lk] = { an: E.auswahl[lk] === true }; });
+    const aenderungen = L.ausTeigAenderungen(kennung, brote, e.liste);
+    gesamt = aenderungen.length;
+    if (!gesamt) { E.sp.produkte = 'nichts'; await ladeProdukte(); fertigPruefen(); return; }
+    const standRef = window.db.collection(window.BOS_PRODUKTE_SCHREIBEN.STAND_COLLECTION).doc(window.BOS_PRODUKTE_SCHREIBEN.STAND_DOK);
+    const standSnap = await standRef.get({ source: 'server' });
+    let stand = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : null;
+    let existiert = standSnap.exists;
+    for (const teil of L.teile(aenderungen, T.PRODUKTE_JE_VORGANG)) {
+      const erg = await mitZeitlimit(window.BOS_PRODUKTE_SCHREIBEN.schreibe({ kennung: S.kennung, geladenerStand: stand, standExistiert: existiert, eintraege: teil }));
+      stand = erg.neuerStand; existiert = true; erledigt += teil.length;
+    }
+    E.sp.produkte = 'ok'; E.sp.produkteText = t('sp_produkte_ok', { n: erledigt, stand: stand });
+    await ladeProdukte();    /* der Stand ist gestiegen: neue Liste holen */
+    fertigPruefen();
+  } catch (err) {
+    E.sp.produkte = 'fehler';
+    const teil = erledigt ? t('sp_produkte_teil', { i: erledigt, n: gesamt }) + ' ' : '';
+    E.sp.produkteText = teil + (window.BOS_PRODUKTE && err && err.meldung ? window.BOS_PRODUKTE.fehlerText(err) : fehlerText(t('err_speichern'), err)) +
+      (err && err.code === 'permission-denied' ? ' · ' + t('sp_produkte_perm') : '');
+    zeigeFehler(t('sp_produkte'), err);
+    if (erledigt) await ladeProdukte();
+    zeichneSpeichern();
+  }
+}
+function fertigPruefen() {
+  const ok = function (z) { return z === 'ok' || z === 'nichts'; };
+  if (ok(E.sp.teig) && ok(E.sp.produkte)) {
+    E.geaendert = false;
+    /* Neuer Ausgangsstand: was jetzt am Teig hängt. */
+    E.ursprung = {}; Object.keys(E.auswahl).forEach(function (lk) { if (E.auswahl[lk] === true) E.ursprung[lk] = true; });
+    toast(t('sp_fertig'));
+  }
+  zeichneSpeichern();
+  render();
+}
+
+/* ---------- Schließen, Archiv ---------- */
+function frageSchliessen() {
+  if (E && E.geaendert && !speichertGerade()) {
+    const id = E.id;
+    const merk = E;
+    oeffneEdit(t('verwerfen_titel'), '<p class="sheet-info">' + esc(t('verwerfen_text')) + '</p>',
+      [{ aktion: 'verwerfen', text: t('verwerfen_ja'), klasse: 'gefahr' }, { aktion: 'weiter-bearbeiten', text: t('verwerfen_nein') }]);
+    E = merk; E._zurueck = id;
+    return;
+  }
+  E = null; schliesseEdit();
+}
+function archivFrage() {
+  if (!E || !E.id) return;
+  const haengen = T.produkteDesTeigs(E.id, S.produkte);
+  if (haengen.length) { editFehler(t('sperre_archiv', { liste: haengen.map(function (p) { return p.name; }).join(', ') })); return; }
+  const name = (tm()[E.id] || {}).name || E.id, id = E.id;
+  E = null;
+  editZustand = { typ: 'archiv', id: id };
+  oeffneEdit(t('archiv_frage_titel', { name: name }), '<p class="sheet-info">' + esc(t('archiv_frage_text')) + '</p>',
+    [{ aktion: 'archivieren', text: t('archivieren').replace(' …', ''), klasse: 'gefahr' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
+}
+async function archiviere() {
+  const z = editZustand; if (!z || z.typ !== 'archiv') return;
+  const alt = tm()[z.id]; if (!alt) return;
+  await fuehreSchreibenAus(COL.teige, z.id, Object.assign({}, alt, { geloescht: true }), 'archivieren', alt, t('archiviert'));
+}
+async function stelleWiederHer(id) {
+  const dok = tm()[id];
+  if (!dok) return;
+  if (!S.haken.weitere) { zeigeFehler(t('wiederherstellen'), { message: t('err_haken_fehlt') }); return; }
+  if (T.nameBelegt(dok.name, L.aktiv(S.nachtTeige), L.aktiv(S.teige), id)) { zeigeFehler(t('wiederherstellen'), { message: t('v_name_doppelt') }); return; }
+  try {
+    await schreibe(COL.teige, id, Object.assign({}, dok, { geloescht: false }), 'wiederherstellen', dok);
+    toast(t('wiederhergestellt'));
+  } catch (err) {
+    if (err && err.code === 'permission-denied') {
+      const konflikt = await konfliktText(COL.teige, id, dok);
+      if (konflikt) { zeigeFehler(t('wiederherstellen'), { message: konflikt }); return; }
+    }
+    zeigeFehler(t('err_speichern'), err);
+  }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-aktion'), id = el.getAttribute('data-id');
+  switch (a) {
+    case 'reiter': {
+      S.station = el.getAttribute('data-station');
+      try { localStorage.setItem('bos_teigrechner_teige_station', S.station); } catch (x) { /* ohne Speicher geht es auch */ }
+      render(); window.scrollTo(0, 0); break;
+    }
+    case 'neu-teig': if (darfTeig()) oeffneTeig(null); break;
+    case 'teig-oeffnen': oeffneTeig(id); break;
+    case 'archiv-umschalten': S.zeigeArchiv = !S.zeigeArchiv; render(); break;
+    case 'wiederherstellen': stelleWiederHer(id); break;
+    case 'station': stationUmschalten(el.getAttribute('data-station')); break;
+    case 'haken': hakenUmschalten(el.getAttribute('data-lk')); break;
+    case 'frage-ja': if (E && E.frage) anhaken(E.frage); break;
+    case 'frage-nein': if (E) { E.frage = null; zeichneProdukte(); } break;
+    case 'speichern': speichere(); break;
+    case 'wiederhole-teig': (async function () { if (await schrittTeig()) await schrittProdukte(); })(); break;
+    case 'wiederhole-produkte': schrittProdukte(); break;
+    case 'schliessen-frage': frageSchliessen(); break;
+    case 'verwerfen': E = null; schliesseEdit(); break;
+    case 'weiter-bearbeiten': {
+      const merk = E; const id2 = merk && merk._zurueck;
+      oeffneEdit(id2 ? t('e_titel', { name: (tm()[id2] || {}).name || id2 }) : t('e_titel_neu'), '', []);
+      E = merk; zeichneEdit(); break;
+    }
+    case 'archiv-frage': archivFrage(); break;
+    case 'archivieren': archiviere(); break;
+    case 'abbrechen': E = null; schliesseEdit(); break;
+  }
+});
+document.addEventListener('input', function (e) {
+  if (e.target && e.target.id === 'trSuche') { zeigeTreffer(e.target.value); return; }
+  if (e.target && e.target.closest && e.target.closest('#editInhalt')) eingabeGeaendert(e.target);
+});
+document.getElementById('editSheet').addEventListener('click', function (e) { if (e.target === this) frageSchliessen(); });
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in TEIGRECHNER_DOKU.md) ---------- */
+const helpData = {
+  title: 'Teige (Stationen) — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'Hier pflegst du die Teige von Rondo, Frühschicht und Brötchenstraße: wie der Teig heißt, zu welchen Stationen er gehört und welche Produkte daraus werden — je Produkt mit der Ausbeute, so wie sie auf dem Zettel steht. Mit diesen Zahlen rechnet der Teigrechner, was in WinBack eingegeben wird. Die Teige der Nacht stehen im letzten Reiter nur zum Ansehen.' },
+    { heading: 'Die Reiter', text: 'Je Station ein Reiter. Ein Teig, der zu mehreren Stationen gehört, steht in jedem dieser Reiter. Im Reiter 🌙 Nachtschicht siehst du die Teige des BrotTeigRechners mit ihren Produkten, grau und ohne Stift. Gepflegt werden sie dort, unter „Teige & Rezepte“.' },
+    { heading: 'Ausbeute: so, wie es auf dem Zettel steht', text: 'Je Produkt trägst du zwei Zahlen ein: „30 kg Teig ergibt 24 Bleche“. Die Einheit kommt aus der Produktliste (Lochblech, Kuchenblech, Halbes Kuchenblech …). BOS rechnet daraus selbst, wie viel kg Teig ein Blech braucht, und zeigt es daneben („= 1,25 kg je Blech“). Die Zahl auf dem Zettel ist die Teigmenge für WinBack mit Abschnitt. Fehlt die Ausbeute, steht „Ausbeute fehlt“ — der Rechner rechnet den Teig dann nicht, sobald für dieses Produkt etwas eingetragen ist.' },
+    { heading: 'Hefe und Kessel', text: 'Beides ist freiwillig. Hefe trägst du ein wie auf einem Zettel: „20 kg Teig mit 500 g Hefe“. Dann zeigt der Rechner zur Teigmenge die Hefe in Gramm. Bleibt es leer, zeigt er keine Hefe. Beim Kessel trägst du ein, wie viel höchstens hineinpasst. Dann teilt der Rechner große Mengen gleichmäßig auf, zum Beispiel „2 × 60,0 kg“. Bleibt es leer, teilt er nicht auf.' },
+    { heading: 'Produkte zuordnen', text: 'Welches Produkt aus welchem Teig gemacht wird, steht am Produkt selbst („Aus Teig“ im Produkt-Editor) — genauso wie in der Nacht. Hier hakst du Produkte an oder ab und findest andere über „Produkt suchen“. Das ändert das Produkt und darf deshalb nur ein Konto mit der Rolle admin. Hängt ein Produkt schon an einem anderen Teig (auch einem der Nacht), fragt die Seite, ob du es wirklich umhängen willst. Steht ein Produkt in der Produktliste bei einer anderen Station als der Teig, steht das als Hinweis darunter — das ist erlaubt.' },
+    { heading: 'Speichern in zwei Schritten', text: 'Erst der Teig mit Name, Stationen, Hefe, Kessel und Ausbeuten, dann die Produkte. Jeder Schritt sagt selbst, ob es geklappt hat, mit der echten Meldung, wenn nicht, und lässt sich einzeln wiederholen. Was sich nicht geändert hat, wird nicht geschrieben. Jede Änderung am Teig wird mit der Vorversion gesichert.' },
+    { heading: 'Der Name und die Kennung', text: 'Aus dem Namen bildet BOS eine feste Kennung (aus „Plunderteig“ wird „plunderteig“). Sie bleibt nach dem ersten Speichern für immer, auch wenn du den Namen änderst, denn die Produkte zeigen darauf. Eine Kennung gibt es nur einmal im ganzen Betrieb: bei den Teigen der Stationen und der Nacht zusammen, archivierte eingeschlossen.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf die Teige jeder mit Konto. Teige anlegen und ändern, Ausbeute, Hefe und Kessel pflegen darf, wer den Haken 🥨 Weitere Teige hat. Produkte zuordnen braucht zusätzlich die Rolle admin. Fehlt etwas, sagt die Seite, was.' },
+    { heading: 'Archiv', text: 'Einen Teig archivieren kannst du erst, wenn kein Produkt mehr auf ihn zeigt. Er verschwindet dann aus der Liste und aus dem Teigrechner. Unten im Archiv lässt er sich wiederherstellen; gelöscht wird nichts.' },
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten und beim Speichern direkt am Schritt, mit der echten Meldung des Systems. „Keine Berechtigung“ heißt: Haken oder Rolle fehlen, du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt hier nie), oder die Firestore-Regeln sind älter als die Seite — dann steht oben ein roter Hinweis mit der Regeldatei. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat den frischen Stand geladen, bitte noch einmal speichern. Ohne Netz lässt sich hier nichts ändern.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.title;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.sections.map(function (s) {
+    return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>';
+  }).join('');
+}
+document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = false; });
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

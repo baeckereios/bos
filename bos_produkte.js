@@ -35,7 +35,8 @@
      'laufend' wie 'aktive', aber ohne pausierte Produkte (pausiert: true,
                Saison-Pause, seit 15.10.2026). Für die Betriebsseiten:
                Stationen, Übersicht (Nachtrag), Schnellrechner, Mitschrift,
-               Froster-Inventur und -Produktion, Teigecke Nacht.
+               Froster-Inventur und -Produktion, BrotTeigRechner (bis
+               16.10.2026 „Teigecke Nacht“), Teigrechner.
      'roh'     Dokumente unverändert als { id, daten }. Nur Sync-Tool.
 
    Weitere Optionen:
@@ -98,6 +99,11 @@
      BOS_PRODUKTE.richtwertWerte(p), .richtwertPruefen(eingaben, p), .rundeRichtwert(x, p)
 
    CHANGELOG
+     2026-10-16 · 16:55 · v0.6 · Einheit „Halbes Kuchenblech“ (Teigrechner Stufe 1, #67, Teil A)
+       ANWEISUNG_2026-10-16_TEIGRECHNER_STUFE1.md, Freigabe Kontroll-Chat 16:37.
+       EINHEITEN_LISTE + „Halbes Kuchenblech“ (hinter Kuchenblech), Kurzform
+       „halbKuBl.“ fest (EINHEIT_KURZ_FEST). Sonst unverändert: Laden, Sichten,
+       Rechnung, REGEL_FASSUNG. teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
      2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
        Meldungsleiste (Art ≠ Fehler) Randfarbe auf feste Warnfarbe --bos-warn. Nur diese eine Farbzeile. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
      2026-10-15 · 01:17 · v0.5 · Richtwert und Saison-Pause (Baustelle #63)
@@ -284,7 +290,8 @@
      Wächter (_PRUEF_einheiten_waechter.js) gemeldet. */
   var EINHEIT_NEUTRAL = ['stueck', 'stück'];
   /* Kurzformen an der Station (Ulf, 13.10.2026, 12:04). */
-  var EINHEIT_KURZ_FEST = { lochblech: 'LoBl.', kuchenblech: 'KuBl.', schlawinerblech: 'SchlaBl.' };
+  /* 16.10.2026 (#67, Ulf 12:38): 'halbes kuchenblech' fest, sonst ergäbe die …blech-Regel „HaBl.“. */
+  var EINHEIT_KURZ_FEST = { lochblech: 'LoBl.', kuchenblech: 'KuBl.', 'halbes kuchenblech': 'halbKuBl.', schlawinerblech: 'SchlaBl.' };
 
   function grossAnfang(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
   function einheitKurz(text) {
@@ -334,7 +341,8 @@
   /* Auswahlliste der Einheiten (Ulf, 13.10.2026, 14:44, „Passt so“) — EINE
      Stelle für Editor, Richtwert (#63) und spätere Seiten. Gespeichert wird
      der Listentext genau so. „Andere …“ (Freitext) bietet die Seite selbst an. */
-  var EINHEITEN_LISTE = ['Stück', 'Blech', 'Lochblech', 'Kuchenblech', 'Schlawinerblech', 'Rote Diele', 'Blaue Diele'];
+  /* 16.10.2026 (#67, Ulf 12:33/12:38): „Halbes Kuchenblech“ (60×20) hinter „Kuchenblech“ (60×40). */
+  var EINHEITEN_LISTE = ['Stück', 'Blech', 'Lochblech', 'Kuchenblech', 'Halbes Kuchenblech', 'Schlawinerblech', 'Rote Diele', 'Blaue Diele'];
   /* Normalform zum Vergleichen: getrimmt, klein, Leerzeichen zusammengefasst,
      Stück-Schreibweisen → 'stück', Mehrzahl …bleche → …blech, …dielen → …diele.
      'bleche' = 'Blech', 'Rote Dielen' = 'rote Diele', 'stueck' = 'Stück'. */
@@ -351,7 +359,7 @@
     for (var i = 0; i < EINHEITEN_LISTE.length; i++) if (einheitNorm(EINHEITEN_LISTE[i]) === n) return EINHEITEN_LISTE[i];
     return null;
   }
-  /* Ist der Text eine Stations-Kurzform (Stk., Bl., Dl., LoBl., KuBl., SchlaBl. — auch ohne Punkt)? */
+  /* Ist der Text eine Stations-Kurzform (Stk., Bl., Dl., LoBl., KuBl., halbKuBl., SchlaBl. — auch ohne Punkt)? */
   function einheitIstKurzform(wert) {
     var n = (typeof wert === 'string' ? wert : '').trim().toLowerCase().replace(/\.$/, '');
     if (!n) return false;

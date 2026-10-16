@@ -15,6 +15,14 @@
    bewusst Platzhalter.
 
    CHANGELOG
+     2026-10-16 · 17:51 · v0.13 · Ergänzung (Teigrechner Stufe 1, #67, §4 F)
+       ANWEISUNG_2026-10-16_TEIGRECHNER_STUFE1.md, Freigabe Kontroll-Chat 16:37.
+       unbekannterTeig(produkte, teige, weitere) und broteOhneTeig(…, weitere):
+       dritter, freiwilliger Parameter mit den Teigen der Stationen
+       (teigrechner_teige). Ein ausTeig dorthin ist kein „unbekannter Teig“.
+       Ohne dritten Parameter byte-gleiches Ergebnis wie v0.12 (Vergleich
+       alt/neu, test_teigecke.js Teil 13). Keine Rechnung berührt.
+       teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
      2026-10-08 · 14:17 · v0.12 · Feature (Nachtrag Nachtseite)
        ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md (KC 13:07), Bauplan
        SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md (KC 13:26 frei).
@@ -234,10 +242,15 @@
   function ohneTeig(produkte, teige, wochentag) {
     return (produkte || []).filter(function (p) { return istNachtBrot(p) && wirdGebacken(p, wochentag) && !p.ausTeig; });
   }
-  /* Produkte, die auf einen Teig zeigen, den es nicht (mehr) gibt. */
-  function unbekannterTeig(produkte, teige) {
+  /* Produkte, die auf einen Teig zeigen, den es nicht (mehr) gibt.
+     Seit v0.13 (16.10.2026, Teigrechner #67): weitere = Teige der Stationen
+     (teigrechner_teige, [{ id }], aktiv ODER archiviert). Ein ausTeig, das dort
+     steht, ist kein Fehler der Nacht — ob der weitere Teig archiviert ist,
+     zeigt der Teig-Editor. Ohne weitere: Ergebnis wie bis v0.12. */
+  function unbekannterTeig(produkte, teige, weitere) {
     var tm = nachId(aktiv(teige));
-    return (produkte || []).filter(function (p) { return p && p.ausTeig && !tm[p.ausTeig]; });
+    var wm = nachId(weitere);
+    return (produkte || []).filter(function (p) { return p && p.ausTeig && !tm[p.ausTeig] && !wm[p.ausTeig]; });
   }
   /* Lesbare, feste Teig-Kennung aus dem Namen (Dokument-ID, wie legacyKey). */
   function kennungAus(name) {
@@ -1034,8 +1047,8 @@
   /* Brote der Teigecke: Kategorie Brot (Ulf, 07.10.: alle Brote sind Nachtschicht). */
   function teigeckeBrote(produkte) { return (produkte || []).filter(function (p) { return p && !p.geloescht && p.kategorie === 'Brot'; }); }
   /* Kasten „Brote ohne Teig“ (nur Anzeige, keine Mahnung). */
-  function broteOhneTeig(produkte, teige) {
-    return { fehlenderTeig: unbekannterTeig((produkte || []).filter(function (p) { return p && !p.geloescht; }), teige),
+  function broteOhneTeig(produkte, teige, weitere) {   /* weitere: seit v0.13, wie unbekannterTeig */
+    return { fehlenderTeig: unbekannterTeig((produkte || []).filter(function (p) { return p && !p.geloescht; }), teige, weitere),
       ohneTeig: teigeckeBrote(produkte).filter(function (p) { return !p.ausTeig; }) };
   }
   /* Rumpf: noch keine Rezeptwerte (kein hefeJeKg und keine Zutaten), nicht der Sauer. */

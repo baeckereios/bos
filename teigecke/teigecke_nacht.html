@@ -1,9 +1,19 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
 <!--
-  MODUL: teigecke/teigecke_nacht.html — Teigecke Nacht (Stufe 2: Teigführung)
+  MODUL: teigecke/teigecke_nacht.html — BrotTeigRechner (bis 16.10.2026 „Teigecke Nacht“; Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-10-16 · 17:51 · v0.12c · Teigrechner Stufe 1 (#67, §4 F + Freigabe KC 16:37 Teil H)
+      (1) Liest die Kennungen der weiteren Teige (teigrechner_teige, Live-Abo,
+      behält nur id/name/geloescht) und gibt sie an L.unbekannterTeig als dritte
+      Liste: Produkte der Stationen sind kein „unbekannter Teig“ mehr. Scheitert
+      das Lesen, steht die echte Meldung in der Fehlerleiste und der Hinweis
+      verhält sich wie bisher. Teigliste, Einsammelliste, Sauer und Vorstufen
+      unverändert (sie kennen nur teigecke_teige). (2) Umbenennung, nur Texte
+      (Ulf 16.10., 16:36): Titel, Überschrift, Hilfe heißen „BrotTeigRechner“;
+      Datei, Adresse, id, Sammlungen, REGEL_FASSUNG bleiben.
+      teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
       Listenstatus „teilweise“ (…) auf feste Warnfarbe --bos-warn-bright (Status färbt nie um). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-15 · 01:26 · v0.12b · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
@@ -199,7 +209,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>BäckereiOS · Teigecke Nacht</title>
+<title>BäckereiOS · BrotTeigRechner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -630,7 +640,7 @@
 <div class="kopfbereich">
 <header>
     <div class="kopf-titel">
-      <h1 class="bos-title" data-i18n="titel">Teigecke Nacht</h1>
+      <h1 class="bos-title" data-i18n="titel">BrotTeigRechner</h1>
       <div class="backtag" id="backtagZeile">…</div>
     </div>
     <div class="kopf-knoepfe">
@@ -715,7 +725,8 @@ const L = window.BOS_TEIGECKE_LOGIK;
 const COL = {
   orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', teigwerte: 'teigecke_teigwerte',
   einstellungen: 'teigecke_einstellungen', sicherungen: 'teigecke_sicherungen',
-  naechte: 'teigecke_naechte', anpassungen: 'teigecke_nacht_anpassungen'
+  naechte: 'teigecke_naechte', anpassungen: 'teigecke_nacht_anpassungen',
+  weitereTeige: 'teigrechner_teige'   /* 16.10.2026 (#67): nur lesen, nur id/name — Teige der Stationen */
 };
 /* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§11).
    Orte und Zutaten schreibt seit 03.10.2026 nur noch teigecke_orte.html,
@@ -750,7 +761,7 @@ const KESSEL_VORGABE_KG = 190;   // Ulf, 29.09.2026
 
 /* ---------- i18n (Checkliste §6) ---------- */
 const I18N_DE = {
-  titel: 'Teigecke Nacht', pflegen: '✎ Pflegen', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
+  titel: 'BrotTeigRechner', pflegen: '✎ Pflegen', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden',
   reiter_einsammeln: 'Einsammeln', reiter_teige: 'Teige', reiter_orte: 'Orte', lade: 'Lade Daten …', schliessen: 'Schließen',
   backtag: 'Backtag: {tag} · ab 12:00 Uhr gilt der nächste Backtag',
   heute_titel: 'Für heute Nacht', heute_klein: 'Hauptteige · nach Ort sortiert',
@@ -916,7 +927,9 @@ const S = {
   regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
   aufgeklappt: {},  // eingeklappte Hinweise, nur für die Sitzung
   vorratEinheit: {}, // je Vorrats-Brot: Eingabe in 'bleche' oder 'stueck' (nur dieses Gerät)
-  langzeitGesichert: {} // v0.12: schon geschriebene Langzeit-Anzahlen dieser Sitzung (kein Doppelschreiben)
+  langzeitGesichert: {}, // v0.12: schon geschriebene Langzeit-Anzahlen dieser Sitzung (kein Doppelschreiben)
+  weitereTeige: null, // v0.12c: [{ id, name, geloescht }] der Teige der Stationen; null = (noch) nicht gelesen
+  weitereTeigeFehler: false // v0.12c: true = Lesen gescheitert (Meldung steht in der Fehlerleiste)
 };
 const abos = { stamm: [], naechte: [] };
 
@@ -1107,7 +1120,20 @@ function abonniereStamm() {
     aboCollection('teige', function (a) { S.teige = a; }),
     aboCollection('teigwerte', function (a) { S.teigwerte = L.nachId(a); }),
     aboDokument(COL.einstellungen, 'allgemein', 'einstellungen', function (d) { S.einstellungen = d || {}; }),
-    aboDokument(COL.anpassungen, 'aktuell', 'anpassungen', function (d) { S.anpassung = d; })
+    aboDokument(COL.anpassungen, 'aktuell', 'anpassungen', function (d) { S.anpassung = d; }),
+    /* 16.10.2026 (#67): Teige der Stationen — nur damit ihre Produkte nicht als
+       „unbekannter Teig“ gelten. Behalten werden nur Kennung und Name. Eigenes
+       Abo statt aboCollection: Scheitert das Lesen, merkt sich die Seite das
+       (S.weitereTeigeFehler) und der Hinweis verhält sich wie bisher. */
+    window.db.collection(COL.weitereTeige).onSnapshot({ includeMetadataChanges: false }, function (snap) {
+      S.weitereTeige = mitId(snap).map(function (x) { return { id: x.id, name: x.name, geloescht: !!x.geloescht }; });
+      S.weitereTeigeFehler = false;
+      planeRender();
+    }, function (err) {
+      S.weitereTeigeFehler = true;
+      zeigeFehler(t('err_laden', { was: COL.weitereTeige }), err);
+      planeRender();
+    })
   ];
 }
 function abonniereNaechte() {
@@ -1449,7 +1475,10 @@ function hinweiseHTML() {
   }
   if (!S.produkteOk) h.push('<div class="hinweis rot">' + esc(t('hinweis_produkte_fehlen')) + '</div>');
   if (S.produkteOk) {
-    const unb = L.unbekannterTeig(S.produkte, S.teige);
+    /* 16.10.2026: Teige der Stationen sind bekannt. Solange sie noch nicht gelesen
+       sind (und das Lesen nicht gescheitert ist), kein Hinweis — sonst blinkt er beim Laden auf. */
+    const weitereBereit = S.weitereTeige !== null || S.weitereTeigeFehler === true;
+    const unb = weitereBereit ? L.unbekannterTeig(S.produkte, S.teige, S.weitereTeige) : [];
     if (unb.length) h.push('<div class="hinweis rot">' + esc(t('hinweis_unbekannter_teig', { liste: unb.map(function (p) { return p.name + ' → ' + p.ausTeig; }).join(', ') })) +
       (hatHaken() ? ' <a class="link-btn" href="teigecke_rezepte.html">' + esc(t('rezepte_pflegen')) + '</a>' : '') + '</div>');
     const ohne = L.ohneTeig(S.produkte, S.teige, S.backtag.getDay());
@@ -2615,9 +2644,10 @@ document.getElementById('karteSheet').addEventListener('click', function (e) { i
 
 /* ---------- Hilfe (Checkliste §7; kanonische Fassung in der Modul-Doku) ---------- */
 const helpData = {
-  title: 'Teigecke Nacht — was ist das hier?',
+  title: 'BrotTeigRechner — was ist das hier?',
   sections: [
-    { heading: 'Wofür ist diese Seite?', text: 'In die Teigecke gehen, Brotzahlen eingeben, loslegen. Die Seite sagt dir je Teig, welche Menge du in WinBack eingibst, wie viel Wasser du weglässt, welche Wassertemperatur und wie viel Hefe passen — und welche Zutaten du brauchst und in welchem Wagen sie stehen. Die einzelnen Mengen zeigt dir weiter WinBack beim Abwiegen. BOS ist der Vermittler, nicht der Rezeptcomputer.' },
+    { heading: 'Wofür ist diese Seite?', text: 'In die Teigecke gehen, Brotzahlen eingeben, loslegen. Die Seite sagt dir je Teig, welche Menge du in WinBack eingibst, wie viel Wasser du weglässt, welche Wassertemperatur und wie viel Hefe passen — und welche Zutaten du brauchst und in welchem Wagen sie stehen. Die einzelnen Mengen zeigt dir weiter WinBack beim Abwiegen. BOS ist der Vermittler, nicht der Rezeptcomputer. Seit 16.10.2026 heißt die Seite „BrotTeigRechner“ (vorher „Teigecke Nacht“); Adresse, QR-Schilder und Chips bleiben gleich.' },
+    { heading: 'Und die Teige der Stationen?', text: 'Die Teige von Rondo, Frühschicht und Brötchenstraße rechnet diese Seite nicht. Sie stehen im „Teigrechner“ und werden unter „Teige (Stationen)“ gepflegt. Hängt ein Produkt an einem dieser Teige, ist das hier kein Fehler und erscheint nicht als „unbekannter Teig“.' },
     { heading: 'Welcher Tag wird angezeigt?', text: 'Oben steht der Backtag: der Tag, FÜR den gebacken wird. In der Nacht zum Mittwoch ist das Mittwoch. Ab 12 Uhr mittags springt die Seite auf den nächsten Backtag um. Alles, was du „nur für heute Nacht“ geändert hast, ist dann wieder weg, und es gelten die normalen Werte.' },
     { heading: 'Reiter „Teige“: die Liste', text: 'Du siehst die Teige des Backtags in der Reihenfolge, in der sie abgewogen werden. Unter dem Namen stehen die Brote des Teigs, jeweils mit ihrer Einwaage; fehlt eine, steht dort rot „Einwaage fehlt“. Rechts stehen die Anzahl und die Zahl für WinBack. Passt der Teig nicht in einen Kessel, steht dort die Menge je Kessel, zum Beispiel „2 × 106,6 kg“: zweimal 106,6 kg eingeben, nicht die Gesamtmenge. Die steht nur klein darunter („213,2 kg gesamt“). Tippst du einen Teig an, öffnet sich seine Karte. Ein grüner Haken heißt: alle Zahlen stehen. Ein Strich heißt: heute nicht (alle Brote 0) — damit sieht man den Unterschied zu „vergessen“. Ein Warnzeichen heißt: bei einem Brot fehlt die Einwaage, dann rechnet BOS bewusst keine Menge. Ein Kreispfeil ↻ mit „nur aufarbeiten“ ist ein Langzeitteig, der schon in der Vornacht angesetzt wurde — er zählt nicht als offener Teig. Unter den Teigen der Nacht steht manchmal eine zweite Gruppe „Langzeitteig für …“: Das sind Teige, die du heute Nacht komplett für morgen ansetzt.' },
     { heading: 'Die Karte eines Teigs', text: 'Oben tippst du die Brotzahlen ein, eine Zahl je Brot. Mit der Eingabetaste oder „Weiter“ springst du ins nächste Feld und nach dem letzten zum nächsten Teig — wie eine Diashow. Die Pfeile ‹ › blättern ebenfalls; das ✕ oder ein Tipp neben das Fenster bringt dich zurück zur Liste. Unter den Zahlen stehen zwei große Kästen: links, wie viel Schüttwasser du weglässt, rechts, wie viel kg du in WinBack eingibst. Hat der Teig eine Mehl-Regel, steht dazwischen ein dritter Kasten: wie viel Mehl von Hand dazukommt, und welches. Ist es mehr als in einen Kessel passt, teilt BOS gleichmäßig auf: Dann zeigen beide Kästen und die Hefe die Menge je Kessel („2 × …“), die Gesamtmenge steht nur klein darunter. Darunter stehen Wassertemperatur, Hefe, Einwaage und Kesselrest und klein der Rechenweg. Darunter stehen die Zutaten des Teigs mit ihrem Wagen. Hat der Teig eine Vorstufe, steht ganz unten, was in der Vornacht dafür gewählt wurde, zum Beispiel „Vornacht: 6 × (3 kg Schrot + 9 L Wasser) → reicht für 187 Brote“. „Vorschlag, nicht gewählt“ heißt: Gestern hat niemand eine Stufe angetippt, BOS zeigt, was vorgeschlagen war. Tippt ein Kollege auf einem anderen Gerät, siehst du seine Zahlen sofort.' },

@@ -176,14 +176,15 @@ window.BOS_APPS = [
     type: 'hub',
     roles: ['admin', 'backstube', 'produktionsleitung']
     // NEU 03.10.2026, Hub „Teigecke“ (Muster Druckzentrale). Kinder:
-    // teigecke_nacht, teigecke_orte, teigecke_rezepte (seit 08.10.2026).
+    // teigecke_nacht, teigecke_orte, teigecke_rezepte (seit 08.10.2026),
+    // teigrechner_teige und teigrechner (seit 16.10.2026, Teigrechner Stufe 1).
     // Siehe SESSION_2026-10-03_TEIGECKE_ORTE_HUB_BAU.md. Rollen = die der
     // bisherigen Einzelkachel „Teigecke Nacht“.
   },
   {
     id: 'teigecke_nacht',
     bereich: 'produktion',
-    name: 'Teigecke Nacht',
+    name: 'BrotTeigRechner',   // bis 16.10.2026 „Teigecke Nacht“ (Ulf 16.10., 16:36). id, url und Adresse bleiben.
     icon: '🛒',
     color: '#8b5a2b',
     url: 'teigecke/teigecke_nacht.html',
@@ -236,6 +237,39 @@ window.BOS_APPS = [
     // Brote umhängen (Feld ausTeig) nur Rolle admin (RK §16, §18). Die
     // Registry kennt keine Haken: den Stift zeigt die Seite selbst nur mit
     // Haken (Bauplan F13). Details: teigecke/TEIGECKE_REZEPTE_DOKU.md.
+  },
+  {
+    id: 'teigrechner_teige',
+    bereich: 'produktion',
+    name: 'Teige (Stationen)',
+    icon: '🥨',
+    color: '#8b5a2b',
+    url: 'teigrechner/teigrechner_teige.html',
+    direkt: 'anmeldung',
+    status: 'live',
+    hub: 'teigecke',
+    roles: ['admin', 'backstube', 'produktionsleitung']
+    // NEU 16.10.2026 (Teigrechner Stufe 1, #67; Freigabe Kontroll-Chat 16:37, Ulf
+    // 16:36: „in den Hub Teigecke“). Teig-Editor für alle weiteren Teige: Reiter
+    // je Station, Nacht-Reiter nur lesend. Rollen = die des Hubs. Lesen: jeder mit
+    // Konto. Schreiben: Haken weitereTeige (RK §23); Produkte zuordnen (ausTeig)
+    // nur Rolle admin (RK §16). Details: teigrechner/TEIGRECHNER_DOKU.md.
+  },
+  {
+    id: 'teigrechner',
+    bereich: 'produktion',
+    name: 'Teigrechner',
+    icon: '⚖️',
+    color: '#8b5a2b',
+    url: 'teigrechner/teigrechner.html',
+    direkt: 'anmeldung',
+    status: 'live',
+    hub: 'teigecke',
+    roles: ['admin', 'backstube', 'produktionsleitung']
+    // NEU 16.10.2026 (Teigrechner Stufe 1, #67): „Ich will x Bleche, was gebe ich
+    // in WinBack ein?“ für Rondo, Frühschicht, Brötchenstraße. Speichert nichts.
+    // Direkt aufrufbar (QR/NFC an der Station), ?station=rondo öffnet den Reiter.
+    // Rollen = die des Hubs Teigecke (Ulf 16:36). Details: teigrechner/TEIGRECHNER_DOKU.md.
   },
   {
     id: 'fahrer',

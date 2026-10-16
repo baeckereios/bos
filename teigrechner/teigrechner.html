@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: teigrechner/teigrechner.html — Teigrechner: Bleche eintragen, kg für WinBack
+  Doku:  teigrechner/TEIGRECHNER_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Gerüst: ../teigecke/teigecke_seite.js + ../teigecke/teigecke_seite.css (Fehler, Abos, Verbindung)
+  Logik:  teigrechner_logik.js (rechne, Kessel, Hefe, Anzeige)
+  CHANGELOG
+    2026-10-16 · 17:51 · v0.1 · Erstfassung (Teigrechner Stufe 1, #67)
+      ANWEISUNG_2026-10-16_TEIGRECHNER_STUFE1.md, Bauplan
+      SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md, Freigabe Kontroll-Chat 16:37.
+      Station wählen (Gerät merkt sich die Wahl; ?station= in der Adresse geht
+      vor), je Teig der Station eine Karte, je LAUFENDEM Produkt eine Zeile
+      (Sicht 'laufend'), Summe in kg = Eingabe in WinBack, Kessel und Hefe nur
+      wenn gepflegt. Ausbeute fehlt bei einer Menge über 0: keine Summe, auch
+      keine Teilsumme. Speichert nichts.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Teigrechner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="../teigecke/teigecke_seite.css">
+<style>
+  /* Nur Ergänzungen mit Vorsilbe tr- (Gerüst-CSS unverändert). Farben nur über Tokens,
+     Status (--bos-warn) getrennt vom Akzent (Checkliste §3a). */
+  .tr-zeilen { display: flex; flex-direction: column; }
+  .tr-rzeile { display: grid; grid-template-columns: minmax(0, 1fr) 110px 76px; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--bos-border); }
+  .tr-rzeile:first-child { border-top: none; }
+  .tr-rname { min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+  .tr-rname small { display: block; font-weight: 400; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .tr-rname small.tr-fehlt { color: var(--bos-warn, var(--bos-amber-bright)); font-weight: 700; }
+  .tr-rzeile .zahl-eingabe { width: 100%; min-width: 0; }
+  .tr-rzeile .zahl-eingabe.falsch { border-color: var(--bos-red, #d6584a); }
+  .tr-reinheit { font-family: var(--bos-font-label); color: var(--bos-text-dim); white-space: nowrap; }
+  .tr-ergebnis { margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--bos-border-strong, var(--bos-border)); }
+  .tr-winback-label { font-family: var(--bos-font-label); color: var(--bos-text-dim); text-transform: uppercase; letter-spacing: .04em; font-size: var(--bos-font-xs, .72rem); }
+  .tr-winback { font-size: 2rem; font-weight: 800; line-height: 1.15; color: var(--bos-text); }
+  .tr-gesamt { font-size: var(--bos-font-sm, .9rem); color: var(--bos-text-dim); }
+  .tr-hefe { margin-top: 6px; font-size: var(--bos-font-md, .95rem); }
+  .tr-offen { color: var(--bos-warn, var(--bos-amber-bright)); font-weight: 700; }
+  .tr-leer { color: var(--bos-text-faint); }
+  @media (max-width: 420px) { .tr-rzeile { grid-template-columns: minmax(0, 1fr) 92px 64px; gap: 6px; } .tr-winback { font-size: 1.6rem; } }
+  /* Vier (bzw. drei) Reiter am Handy: Breite nach Inhalt, die Leiste scrollt seitlich statt die Wörter zu überlagern. */
+  @media (max-width: 520px) { nav.reiter button { flex: 0 0 auto; } }
+</style>
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit, Reihenfolge wie teigecke/teigecke_rezepte.html
+     (Checkliste §2a, bos_standalone_login.js-Kopf). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'teigrechner';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_produkte.js"></script>
+<script src="../teigecke/teigecke_logik.js"></script>
+<script src="teigrechner_logik.js"></script>
+
+<div class="kopfbereich">
+<header>
+    <div class="kopf-titel">
+      <h1 class="bos-title" data-i18n="titel">Teigrechner</h1>
+      <div class="backtag"><a class="link-btn" href="teigrechner_teige.html" id="pflegeLink" data-i18n="zur_pflege">Teige pflegen ›</a></div>
+    </div>
+    <div class="kopf-knoepfe">
+      <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+    </div>
+  </header>
+  <nav class="reiter" id="reiterLeiste" role="tablist" aria-label="Stationen"></nav>
+</div>
+
+<div id="verbindungLeiste" role="status" hidden></div>
+<div id="regelLeiste" class="hinweis rot" role="alert" hidden></div>
+
+<div id="fehlerLeiste" role="alert" hidden>
+  <div class="fehler-kopf"><span data-i18n="fehler_titel">⚠ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main>
+  <div id="ladeStatus" class="status" data-i18n="lade">Lade Daten …</div>
+  <div id="ansicht"></div>
+</main>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <div class="sheet-knoepfe"><button type="button" class="bos-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<!-- Pflicht-Elemente des Gerüsts (Bearbeiten-Blatt); der Rechner schreibt nichts. -->
+<div id="editSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="editTitel"></h2><div id="editInhalt"></div><div id="editFehler" class="sheet-fehler" role="alert"></div>
+    <div id="editInfo" class="sheet-info"></div><div class="sheet-knoepfe" id="editKnoepfe"></div>
+  </div>
+</div>
+
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Teigrechner — Seiten-Kopf: was ../teigecke/teigecke_seite.js erwartet.
+   Speichert NICHTS (Stufe 1). Liest teigrechner_teige und die Produktliste.
+   KEINE Daten im Code (Repo öffentlich).
+   ================================================================== */
+const L = window.BOS_TEIGECKE_LOGIK;
+const T = window.BOS_TEIGRECHNER_LOGIK;
+const COL = { teige: 'teigrechner_teige' };
+const FELDER = {};          /* der Rechner schreibt nirgends hin */
+const HAKEN_FUER = {};
+const REGEL_FASSUNG = 'teigrechner-2026-10-16';
+const REGEL_DATEI = 'firestore_regeln_2026-10-16_teigrechner.rules';
+const STATION_KEY = 'bos_teigrechner_station';
+
+const I18N_DE = {
+  /* Pflicht-Texte des Gerüsts (SEITE_TEXTE) */
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Dein Konto ist nicht freigeschaltet. (2) Die Regeln sind älter als diese Seite — Regelstand in der Firebase-Konsole prüfen.',
+  err_perm_regel_alt: 'Wahrscheinlich Grund (2): Beim Laden passte der Regelstand nicht zur Seite. ',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_zeit: 'Keine Antwort vom Server nach {s} s — vermutlich kein Netz.',
+  err_unbehandelt: 'Unerwarteter Fehler',
+  err_laden: 'Laden „{was}“',
+  err_konto: 'Konto lesen',
+  err_speichern: 'Speichern',
+  err_gegenlesen: 'Gegenlesen',
+  err_haken_fehlt: '—',
+  offline_pflege: '—',
+  warte_uebertragung: '—',
+  offline_stand: '📴 Ohne Verbindung — Stand von {zeit}. Gerechnet wird mit diesem Stand.',
+  ausstehend: '⏳ Änderungen werden übertragen …',
+  regel_alt: '⚠ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Die Teige können deshalb nicht geladen werden. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  konflikt: '—', v_pflicht: '—', v_zu_lang: '—', f_keine_zutaten: '—',
+  /* Seite */
+  titel: 'Teigrechner', zur_pflege: 'Teige pflegen ›', lade: 'Lade Daten …', fehler_titel: '⚠ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  produkte_spiegel: 'Produktliste vom Gerät (Stand {zeit})', kein_konto: 'Keine Anmeldung erkannt.',
+  leeren: 'Alles leeren', geleert: 'Alle Felder geleert.',
+  keine_teige: 'Für {station} ist noch kein Teig mit laufendem Produkt gepflegt. Gepflegt wird unter „Teige (Stationen)“.',
+  ausbeute_fehlt: 'Ausbeute fehlt', je_einheit: '{x} kg je {einheit}', einheit_fehlt: 'Einheit fehlt in der Produktliste',
+  in_winback: 'In WinBack', je_kessel: 'je Kessel', gesamt: '{kg} gesamt',
+  hefe: 'Hefe: {g}', hefe_kessel: 'Hefe: {n} × {g}', hefe_gesamt: '({g} gesamt)',
+  noch_nichts: 'Noch nichts eingetragen.', nicht_fertig: 'Noch nicht fertig: Ausbeute fehlt bei {liste}. Erst unter „Teige (Stationen)“ eintragen.',
+  eingabe_falsch: 'Bitte die rot markierten Felder prüfen.', feld_falsch: '{name}: {fehler}'
+};
+
+const S = {
+  kennung: null, haken: {}, station: 'Rondo',
+  teige: [], produkte: [], produkteOk: false, produkteAusSpiegel: null,
+  eingabe: {},      // { teigId: { lk: Text } } — nur auf dem Bildschirm, nichts wird gespeichert
+  geladen: false,
+  verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
+  regelstand: 'unbekannt'
+};
+let abos = [];
+</script>
+<script src="../teigecke/teigecke_seite.js"></script>
+<script>
+'use strict';
+/* ==================================================================
+   Teigrechner — Seitenlogik. Rechnung: teigrechner_logik.js (T.rechne).
+   ================================================================== */
+const pm = function () { return L.produktMap(S.produkte); };
+function einheitVon(p) { return window.BOS_PRODUKTE.einheit(p || {}); }
+
+async function ladeProdukte() {
+  try {
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    if (typeof window.BOS_PRODUKTE.richtwertZahl !== 'function' || window.BOS_PRODUKTE.EINHEITEN_LISTE.indexOf('Halbes Kuchenblech') === -1) {
+      throw new Error('bos_produkte.js ist in einer alten Fassung geladen — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.');
+    }
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'laufend' });   // pausierte Produkte fehlen (E10)
+    S.produkte = e.liste; S.produkteOk = true;
+    S.produkteAusSpiegel = (e.quelle === 'geraetekopie') ? (e.kopieZeit || e.stand) : null;
+    if (e.quelle === 'geraetekopie' && e.grund) zeigeFehler(t('err_laden', { was: 'Produktliste' }), e.grund);
+  } catch (err) {
+    zeigeFehler(t('err_laden', { was: 'Produktliste' }), err);
+    S.produkte = []; S.produkteOk = false;
+  }
+}
+function stationAusAdresse() {
+  try {
+    const s = new URLSearchParams(window.location.search).get('station');
+    if (!s) return null;
+    return T.STATIONEN_REITER.filter(function (r) { return L.norm(r) === L.norm(s) || L.kennungAus(r) === L.kennungAus(s); })[0] || null;
+  } catch (e) { return null; }
+}
+function gemerkteStation() {
+  try { const s = localStorage.getItem(STATION_KEY); return T.STATIONEN_REITER.indexOf(s) !== -1 ? s : null; } catch (e) { return null; }
+}
+async function start() {
+  wendeI18nAn();
+  renderHilfe();
+  S.station = stationAusAdresse() || gemerkteStation() || T.STATIONEN_REITER[0];
+  if (!window.db || !window.BOS_AUTH_READY) {
+    zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt'));
+    return;
+  }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; }
+  catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); return; }
+  S.kennung = (nutzer && nutzer.email) ? nutzer.email.split('@')[0] : null;
+  if (!S.kennung) toast(t('kein_konto'));
+  await ladeProdukte();
+  abos = [aboCollection('teige', function (a) { S.teige = a; })];
+  S.geladen = true;
+  document.getElementById('ladeStatus').hidden = true;
+  render();
+  if (S.kennung) pruefeRegelstand();
+}
+window.addEventListener('online', planeRender);
+window.addEventListener('offline', planeRender);
+async function neuLaden() { render(); }
+function oeffneNachCol() { /* der Rechner bearbeitet nichts */ }
+
+/* ---------- Rendern ---------- */
+function render() {
+  if (!S.geladen) return;
+  renderVerbindung();
+  renderReiter();
+  if (fokusIn(document.querySelector('main'))) { renderAufgeschoben = true; return; }
+  const karten = T.rechnerKarten(S.teige, S.produkte, S.station);
+  let html = '';
+  if (karten.length) {
+    html += '<div class="pflege-leiste"><button type="button" class="bos-btn" data-aktion="leeren">' + esc(t('leeren')) + '</button></div>';
+    html += karten.map(karteHTML).join('');
+  } else html += '<p class="status">' + esc(t('keine_teige', { station: S.station })) + '</p>';
+  document.getElementById('ansicht').innerHTML = html;
+}
+function renderReiter() {
+  document.getElementById('reiterLeiste').innerHTML = T.STATIONEN_REITER.map(function (r) {
+    return '<button type="button" role="tab" data-aktion="reiter" data-station="' + esc(r) + '" aria-selected="' + (S.station === r) + '">' + esc(r) + '</button>';
+  }).join('');
+  document.getElementById('pflegeLink').setAttribute('href', 'teigrechner_teige.html?station=' + encodeURIComponent(S.station));
+}
+function zeileHTML(teig, p) {
+  const a = (teig.ausbeute || {})[p.legacyKey], eh = einheitVon(p);
+  const text = ((S.eingabe[teig.id] || {})[p.legacyKey]) || '';
+  const z = text ? window.BOS_PRODUKTE.richtwertZahl(text, p) : { ok: true };
+  const unter = T.ausbeuteGueltig(a)
+    ? '<small>' + esc(t('je_einheit', { x: T.jeEinheitText(T.kgJeEinheit(a)), einheit: eh.kurz })) + '</small>'
+    : '<small class="tr-fehlt">' + esc(t('ausbeute_fehlt')) + '</small>';
+  return '<div class="tr-rzeile"><span class="tr-rname">' + esc(p.name) + unter +
+    (eh.art === 'fehlt' ? '<small>' + esc(t('einheit_fehlt')) + '</small>' : '') + '</span>' +
+    '<input class="zahl-eingabe' + (z.ok ? '' : ' falsch') + '" data-teig="' + esc(teig.id) + '" data-lk="' + esc(p.legacyKey) + '" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="' + esc(text) + '" aria-label="' + esc(p.name) + '">' +
+    '<span class="tr-reinheit">' + esc(eh.kurz) + '</span></div>';
+}
+function karteHTML(k) {
+  return '<div class="karte" data-karte="' + esc(k.teig.id) + '"><div class="karte-kopf"><div><h3>' + esc(k.teig.name) + '</h3></div></div>' +
+    '<div class="tr-zeilen">' + k.produkte.map(function (p) { return zeileHTML(k.teig, p); }).join('') + '</div>' +
+    '<div class="tr-ergebnis" id="trErg_' + esc(k.teig.id) + '">' + ergebnisHTML(k) + '</div></div>';
+}
+/* Eingaben eines Teigs → Zeilen für T.rechne (leer = 0, ungültig = NaN). */
+function zeilenFuer(k) {
+  const ein = S.eingabe[k.teig.id] || {};
+  return k.produkte.map(function (p) {
+    const text = ein[p.legacyKey];
+    if (!text || !String(text).trim()) return { lk: p.legacyKey, menge: null };
+    const z = window.BOS_PRODUKTE.richtwertZahl(text, p);
+    return { lk: p.legacyKey, menge: z.ok ? z.wert : NaN, fehler: z.fehler };
+  });
+}
+function ergebnisHTML(k) {
+  const zeilen = zeilenFuer(k);
+  const r = T.rechne(k.teig, zeilen);
+  if (r.status === 'leer') return '<div class="tr-winback-label">' + esc(t('in_winback')) + '</div><div class="tr-leer">' + esc(t('noch_nichts')) + '</div>';
+  if (r.status === 'eingabeFehler') {
+    const liste = zeilen.filter(function (z) { return r.falsch.indexOf(z.lk) !== -1; })
+      .map(function (z) { return t('feld_falsch', { name: (pm()[z.lk] || {}).name || z.lk, fehler: z.fehler || '?' }); });
+    return '<div class="tr-offen">' + esc(t('eingabe_falsch')) + '</div><div class="tr-gesamt">' + esc(liste.join(' · ')) + '</div>';
+  }
+  if (r.status === 'ausbeuteFehlt') {
+    return '<div class="tr-offen">' + esc(t('nicht_fertig', { liste: r.fehlend.map(function (lk) { return (pm()[lk] || {}).name || lk; }).join(', ') })) + '</div>';
+  }
+  const m = L.mengeJeKessel(r.T, r.kessel.n, 'kg', 1);   /* Gersterbrot-Regel: Zahl je Kessel vorn */
+  let html = '<div class="tr-winback-label">' + esc(t('in_winback')) + (m.n > 1 ? ', ' + esc(t('je_kessel')) : '') + '</div>' +
+    '<div class="tr-winback">' + esc(m.haupt) + '</div>' + (m.gesamt ? '<div class="tr-gesamt">' + esc(m.gesamt) + '</div>' : '');
+  if (T.istZahl(r.hefeG)) {
+    html += '<div class="tr-hefe">' + (r.kessel.n > 1
+      ? esc(t('hefe_kessel', { n: r.kessel.n, g: T.grammText(r.hefeJeKesselG) })) + ' <span class="tr-gesamt">' + esc(t('hefe_gesamt', { g: T.grammText(r.hefeG) })) + '</span>'
+      : esc(t('hefe', { g: T.grammText(r.hefeG) }))) + '</div>';
+  }
+  return html;
+}
+/* Nur das Ergebnis der einen Karte neu zeichnen — das Eingabefeld behält den Fokus. */
+function aktualisiereKarte(teigId, inp) {
+  const k = T.rechnerKarten(S.teige, S.produkte, S.station).filter(function (x) { return x.teig.id === teigId; })[0];
+  if (!k) return;
+  const el = document.getElementById('trErg_' + teigId);
+  if (el) el.innerHTML = ergebnisHTML(k);
+  if (inp) {
+    const p = pm()[inp.getAttribute('data-lk')];
+    const z = inp.value.trim() ? window.BOS_PRODUKTE.richtwertZahl(inp.value, p) : { ok: true };
+    inp.classList.toggle('falsch', !z.ok);
+  }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-aktion');
+  if (a === 'reiter') {
+    S.station = el.getAttribute('data-station');
+    try { localStorage.setItem(STATION_KEY, S.station); } catch (x) { /* ohne Speicher geht es auch */ }
+    render(); window.scrollTo(0, 0);
+  } else if (a === 'leeren') {
+    T.teigeDerStation(S.teige, S.station).forEach(function (x) { delete S.eingabe[x.id]; });
+    render(); toast(t('geleert'));
+  }
+});
+document.addEventListener('input', function (e) {
+  const inp = e.target;
+  if (!inp || !inp.classList || !inp.classList.contains('zahl-eingabe')) return;
+  const teig = inp.getAttribute('data-teig'), lk = inp.getAttribute('data-lk');
+  (S.eingabe[teig] || (S.eingabe[teig] = {}))[lk] = inp.value;
+  aktualisiereKarte(teig, inp);
+});
+/* Beim Verlassen des Felds: gerundete Zahl SICHTBAR ins Feld (Träger auf eine Nachkommastelle,
+   BOS_PRODUKTE.richtwertZahl) — nichts wird still gerundet. */
+document.addEventListener('change', function (e) {
+  const inp = e.target;
+  if (!inp || !inp.classList || !inp.classList.contains('zahl-eingabe')) return;
+  const p = pm()[inp.getAttribute('data-lk')];
+  if (!inp.value.trim()) return;
+  const z = window.BOS_PRODUKTE.richtwertZahl(inp.value, p);
+  if (z.ok && z.wert !== null) {
+    const text = window.BOS_PRODUKTE.richtwertText(z.wert);
+    if (text !== inp.value.trim()) {
+      inp.value = text;
+      (S.eingabe[inp.getAttribute('data-teig')] || (S.eingabe[inp.getAttribute('data-teig')] = {}))[inp.getAttribute('data-lk')] = text;
+      aktualisiereKarte(inp.getAttribute('data-teig'), inp);
+    }
+  }
+});
+/* Eingabetaste = nächstes Feld (wie in der Nacht). */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' || !e.target.classList || !e.target.classList.contains('zahl-eingabe')) return;
+  e.preventDefault();
+  const felder = Array.prototype.slice.call(document.querySelectorAll('.zahl-eingabe'));
+  const i = felder.indexOf(e.target);
+  if (i >= 0 && i + 1 < felder.length) felder[i + 1].focus(); else e.target.blur();
+});
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in TEIGRECHNER_DOKU.md) ---------- */
+const helpData = {
+  title: 'Teigrechner — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: '„Ich will so viele Bleche machen — was gebe ich in WinBack ein?“ Oben wählst du deine Station. Je Teig steht eine Karte da, darin je Produkt eine Zeile. Du trägst ein, wie viele Bleche (oder Lochbleche, Kuchenbleche …) du von jedem Produkt machen willst. Unten in der Karte steht die Teigmenge für WinBack, mit Abschnitt.' },
+    { heading: 'Mehrere Produkte aus einem Teig', text: 'Werden aus einem Teig mehrere Produkte gemacht, zum Beispiel Brezeln und Taschen aus dem Plunderteig, hat die Karte je Produkt eine Zeile. Was du leer lässt, zählt 0. Die Summe ist der ganze Teig für WinBack. Ein Produkt mit Saison-Pause steht nicht da.' },
+    { heading: 'Kessel und Hefe', text: 'Ist für den Teig gepflegt, wie viel höchstens in einen Kessel passt, und ist die Menge größer, steht vorn die Zahl je Kessel, zum Beispiel „2 × 60,0 kg“: zweimal 60 kg eingeben, nicht die Gesamtmenge. Die steht nur klein darunter. Ist eine Hefe gepflegt, steht sie in Gramm darunter, bei mehreren Kesseln ebenfalls je Kessel.' },
+    { heading: '„Ausbeute fehlt“', text: 'Steht unter einem Produkt „Ausbeute fehlt“, weiß BOS noch nicht, wie viel Teig ein Blech braucht. Trägst du dort eine Zahl ein, zeigt die Karte keine Teigmenge — auch keine halbe —, sondern sagt, was fehlt. Lässt du das Feld leer, rechnet die Karte mit den übrigen Produkten. Die Ausbeute pflegt, wer den Haken dafür hat, unter „Teige (Stationen)“.' },
+    { heading: 'Speichert die Seite etwas?', text: 'Nein. Die Zahlen stehen nur auf diesem Bildschirm. Das Gerät merkt sich nur, welche Station du zuletzt gewählt hast. „Alles leeren“ setzt die Felder der Station zurück.' },
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. Geht das Netz weg, rechnet die Seite mit dem Stand weiter, den sie schon geladen hat; das steht dann oben. Fehlt dein Teig, ist er noch nicht unter „Teige (Stationen)“ für deine Station gepflegt oder hat kein laufendes Produkt.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.title;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.sections.map(function (s) {
+    return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>';
+  }).join('');
+}
+document.getElementById('hilfeBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = false; });
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

@@ -3,6 +3,13 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-16 · 17:51 · v-teigrechner-1 · Teigrechner Stufe 1 (#67, §4 F; Freigabe Kontroll-Chat 16:37)
+      „Aus Teig“ bietet zusätzlich die Teige der Stationen an (teigrechner_teige),
+      getrennt in zwei Gruppen „Nacht (BrotTeigRechner)“ und „Weitere Teige
+      (Stationen)“; „Teig nicht gefunden“ heißt jetzt: in keiner der beiden.
+      Scheitert nur das Lesen der weiteren Teige, steht der Grund am Feld.
+      Saison-Pause-Texte nennen die Nachtseite „BrotTeigRechner“ (Ulf 16.10.,
+      16:36). Schreibweg unverändert. teigrechner/_protokolle/SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
       Einheit-/Quellen-Hinweise, Bedarfskasten „bernstein“ und fehlende Einheit auf feste Warnfarbe --bos-warn; Tönung „aktiv“ folgt dem Akzent. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-15 · 07:40 · v-richtwert-1b · Nachtrag 2 (Ulf 15.10., 07:35/07:36; ANWEISUNG_2026-10-15_RICHTWERT_NACHTRAG2.md)
@@ -986,7 +993,7 @@ function kfAktiv(p) {
   return '<div class="detail-section full"><div class="detail-feld checkbox-feld">' +
     '<input type="checkbox" id="kfAktiv" ' + (aktiv ? 'checked' : '') + ' onchange="schalteAktiv(karteIdx,this.checked)">' +
     '<label for="kfAktiv" class="cb-label">Aktiv ' + fhBtn('pausiert') + '</label></div>' +
-    '<div class="einheit-hinweis" style="color:var(--dim)">' + (aktiv ? 'Haken raus = Saison-Pause: das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster und Teigecke-Nacht. Alle Daten bleiben.' : 'Pausiert (Saison-Pause). Erscheint im Betrieb nirgends, alle Daten bleiben. Haken setzen holt es zurück.') + '</div>' +
+    '<div class="einheit-hinweis" style="color:var(--dim)">' + (aktiv ? 'Haken raus = Saison-Pause: das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster und BrotTeigRechner. Alle Daten bleiben.' : 'Pausiert (Saison-Pause). Erscheint im Betrieb nirgends, alle Daten bleiben. Haken setzen holt es zurück.') + '</div>' +
     '<div id="kfFrosterHinweis">' + frosterHinweisHTML(key) + '</div></div>';
 }
 
@@ -1452,12 +1459,25 @@ function kfSelect(feld, label, wert, optionen, leerLabel) {
 // NEU 29.09.2026 (Teigecke Stufe 2): Auswahl „Aus Teig“. TEIG_LISTE:
 // null = lädt noch, Array = geladen, { fehler } = Lesen fehlgeschlagen.
 var TEIG_LISTE = null;
+// 16.10.2026 (Teigrechner #67): zusätzlich die weiteren Teige der Stationen
+// (teigrechner_teige). Jeder Eintrag trägt gruppe 'nacht' | 'weitere'. Kann nur
+// eine der beiden Sammlungen gelesen werden, kommt die andere trotzdem; der
+// Grund steht dann am Feld (TEIG_LISTE_FEHLER_WEITERE), nicht still verschluckt.
+var TEIG_LISTE_FEHLER_WEITERE = null;
 async function ladeTeigListe() {
   try {
     await window.BOS_AUTH_READY;
     var snap = await db.collection('teigecke_teige').get();
     var liste = [];
-    snap.forEach(function (d) { var x = d.data(); if (!x.geloescht) liste.push({ id: d.id, name: x.name || d.id }); });
+    snap.forEach(function (d) { var x = d.data(); if (!x.geloescht) liste.push({ id: d.id, name: x.name || d.id, gruppe: 'nacht' }); });
+    TEIG_LISTE_FEHLER_WEITERE = null;
+    try {
+      var snapW = await db.collection('teigrechner_teige').get();
+      snapW.forEach(function (d) { var x = d.data(); if (!x.geloescht) liste.push({ id: d.id, name: x.name || d.id, gruppe: 'weitere' }); });
+    } catch (errW) {
+      console.error('[Produkt-Config] Weitere Teige laden:', errW);
+      TEIG_LISTE_FEHLER_WEITERE = (errW && errW.code ? errW.code + ' — ' : '') + ((errW && errW.message) || String(errW));
+    }
     liste.sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
     TEIG_LISTE = liste;
   } catch (err) {
@@ -1474,11 +1494,17 @@ function kfTeig(wert) {
       '<div style="color:var(--red);font-size:.75rem;margin-top:4px">⚠ Teigliste nicht lesbar: ' + esc(TEIG_LISTE.fehler) + '</div></div>';
   }
   var bekannt = TEIG_LISTE.some(function (t) { return t.id === wert; });
+  // 16.10.2026 (#67): zwei Gruppen — „Nacht“ (BrotTeigRechner) und „Weitere Teige“ (Stationen).
+  var opt = function (t) { return '<option value="' + esc(t.id) + '"' + (t.id === wert ? ' selected' : '') + '>' + esc(t.name) + '</option>'; };
+  var nacht = TEIG_LISTE.filter(function (t) { return t.gruppe !== 'weitere'; });
+  var weitere = TEIG_LISTE.filter(function (t) { return t.gruppe === 'weitere'; });
   var opts = '<option value="">— kein Teig —</option>' +
-    (wert && !bekannt ? '<option value="' + esc(wert) + '" selected>⚠ ' + esc(wert) + ' (Teig nicht gefunden)</option>' : '') +
-    TEIG_LISTE.map(function (t) { return '<option value="' + esc(t.id) + '"' + (t.id === wert ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('');
+    (wert && !bekannt ? '<option value="' + esc(wert) + '" selected>⚠ ' + esc(wert) + ' (Teig nicht gefunden — weder Nacht noch Stationen)</option>' : '') +
+    (nacht.length ? '<optgroup label="Nacht (BrotTeigRechner)">' + nacht.map(opt).join('') + '</optgroup>' : '') +
+    (weitere.length ? '<optgroup label="Weitere Teige (Stationen)">' + weitere.map(opt).join('') + '</optgroup>' : '');
   return kopf + '<select onchange="aendereAusTeig(karteIdx,this.value)">' + opts + '</select>' +
-    (TEIG_LISTE.length ? '' : '<div style="font-size:.75rem;margin-top:4px;color:var(--text-dim)">Noch keine Teige in der Teigecke angelegt.</div>') + '</div>';
+    (TEIG_LISTE.length ? '' : '<div style="font-size:.75rem;margin-top:4px;color:var(--text-dim)">Noch keine Teige angelegt (weder Nacht noch Stationen).</div>') +
+    (TEIG_LISTE_FEHLER_WEITERE ? '<div style="color:var(--red);font-size:.75rem;margin-top:4px">⚠ Weitere Teige (Stationen) nicht lesbar: ' + esc(TEIG_LISTE_FEHLER_WEITERE) + '</div>' : '') + '</div>';
 }
 function aendereAusTeig(idx, wert) {
   if (wert) daten[idx].ausTeig = wert; else delete daten[idx].ausTeig;
@@ -2042,7 +2068,7 @@ var helpData = {
     },
     {
       heading: "Was heißt der Haken „Aktiv“?",
-      text: "Er steht ganz oben im Reiter Stammdaten. Haken raus heißt Saison-Pause — das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster-Inventur und Teigecke-Nacht, alle Daten bleiben. Oben in der Karte steht dann in jedem Reiter „pausiert“, in der Liste steht es ausgegraut mit „pausiert“; „Pausierte ausblenden“ blendet es aus. Steht laut letzter Zählung noch etwas im Froster, sagt die Karte es dir (nur ein Hinweis). Haken wieder setzen holt es zurück. In der Datenbank steht es erst nach 💾 Speichern."
+      text: "Er steht ganz oben im Reiter Stammdaten. Haken raus heißt Saison-Pause — das Produkt verschwindet aus Stationen, Mitschrift, Schnellrechner, Froster-Inventur und BrotTeigRechner, alle Daten bleiben. Oben in der Karte steht dann in jedem Reiter „pausiert“, in der Liste steht es ausgegraut mit „pausiert“; „Pausierte ausblenden“ blendet es aus. Steht laut letzter Zählung noch etwas im Froster, sagt die Karte es dir (nur ein Hinweis). Haken wieder setzen holt es zurück. In der Datenbank steht es erst nach 💾 Speichern."
     },
     {
       heading: "Was steht im Reiter „Bedarf“?",
@@ -2054,7 +2080,7 @@ var helpData = {
     },
     {
       heading: "Was bedeutet „Aus Teig“?",
-      text: "Im Reiter Backinformationen wählst du, aus welchem Teig ein Brot gemacht wird (z. B. kleine und große Korbbrote und Zwiebelbrote aus dem Korbbrot-Teig). Die Auswahl kommt aus den Teigen der Teigecke. Ein Brot gehört zu höchstens einem Teig. Die Teigecke rechnet daraus nachts die Teigmenge. Die Teigecke liest die Zuordnung aus der Datenbank, sobald du speicherst. Lässt sich die Teigliste nicht laden, bleibt der bisherige Wert stehen und am Feld steht die Fehlermeldung."
+      text: "Im Reiter Backinformationen wählst du, aus welchem Teig ein Brot gemacht wird (z. B. kleine und große Korbbrote und Zwiebelbrote aus dem Korbbrot-Teig). Die Auswahl kommt aus den Teigen der Nacht (BrotTeigRechner) und — getrennt darunter — aus den Teigen der Stationen (Seite „Teige (Stationen)“). Ein Produkt gehört zu höchstens einem Teig. Die Nacht rechnet daraus nachts die Teigmenge, der Teigrechner die Teigmenge der Stationen. Die Teigecke liest die Zuordnung aus der Datenbank, sobald du speicherst. Lässt sich die Teigliste nicht laden, bleibt der bisherige Wert stehen und am Feld steht die Fehlermeldung."
     }
   ]
 };
