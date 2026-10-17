@@ -1,5 +1,10 @@
 /* hamster_figur.css — Crumble, Hamster-Figur (Maskottchen, #62). Nutzt BOS-Design-Tokens mit Fallbacks.
-   Stand 17.10.2026, 06:49 Uhr (Stufe 1, Bau-Chat): Einbettungen hf--fest / hf--oben / hf--container (K6),
+   Stand 17.10.2026, 09:37 Uhr (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
+   hf--laeuft / hf--links / hf--zieht (K27/K28, Watscheln und Spiegeln aus der Demo des Kontroll-Chats), Blase mit
+   festen Farben für hell UND dunkel, über dem Kopf mit Spitze nach unten (K24, hf--blase-oben; hf--hell entfällt),
+   Requisiten-Ebene .hf__req-ebene/.hf__req und die Choreografien hf-ch-* (Requisiten) / hf-fig-* (Figur) für die
+   Nummern (K29); prefers-reduced-motion schaltet alles Bewegte ab. hf--container ist jetzt left-basiert (K30).
+   Vorher 06:49 (Stufe 1, Bau-Chat): Einbettungen hf--fest / hf--oben / hf--container (K6),
    Rollen-Klassen hf--lehrmeister / hf--spielplatz (nur Haken für spätere Optik), Bühnen- und Blasenmaße
    kommen jetzt aus hamster_figur.js (aus der Höhe gerechnet), Knopf bleibt in hf--oben sichtbar.
    Vorher 17.10.2026 ~04:00 Erstfassung (nur fixed unten rechts). */
@@ -17,8 +22,22 @@
 .hf--oben.hf--knopf .hf__buehne { transform: translateY(-16px) scale(.9); }
 .hf--oben.hf--knopf.hf--hervor .hf__buehne { transform: none; }
 
-/* ---- Einbettung 'container': absolut im Container (Bildschirmschoner), kein eigener Layer ---- */
-.hf--container { position: absolute; right: 24px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: auto; }
+/* ---- Einbettung 'container': absolut im Container (Bildschirmschoner), kein eigener Layer; left setzt hamster_figur.js (läuft) ---- */
+.hf--container { position: absolute; left: 0; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: auto; }
+
+/* ---- Einbettung 'schreibtisch' (Stufe 1c): absolut in der Bühne des Hosts (fixed, Ebene 300, zwischen Kacheln und Fenstern) ---- */
+.hf-buehne-schreibtisch { position: fixed; pointer-events: none; z-index: 300; overflow: visible; }
+.hf--schreibtisch { position: absolute; left: 0; bottom: 0; z-index: auto; pointer-events: auto; }
+.hf--schreibtisch .hf__buehne { pointer-events: none; }
+.hf--schreibtisch .hf__figur { touch-action: none; }
+.hf--versteckt { display: none !important; }
+
+/* Laufen und Ziehen (K27/K28) */
+.hf--laeuft .hf__figur { animation: hf-watscheln .42s ease-in-out infinite !important; }
+.hf--links .hf__koerper { transform: scaleX(-1); }
+.hf--zieht .hf__figur { animation: none !important; transform: scale(1.04); cursor: grabbing; }
+.hf--schreibtisch .hf__figur { cursor: grab; }
+@keyframes hf-watscheln { 0%,100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(4deg) translateY(-7px); } }
 
 /* Bühne: Figur + Blase. Im Ecke-Modus immer da, im Knopf-Modus nur bei .hf--hervor. Maße setzt hamster_figur.js. */
 .hf__buehne { position: relative; width: 240px; height: 230px; pointer-events: none; }
@@ -44,13 +63,16 @@
 .hf__figur.hf--wippen { animation: hf-wippen 1s ease-in-out; }
 .hf--hinweis .hf__figur { animation: hf-wippen 1.2s ease-in-out infinite 2.5s; }
 
-/* Sprechblase (right/bottom setzt hamster_figur.js aus der Höhe: links neben der Figur, auf Kopfhöhe) */
+/* Sprechblase (K24): feste Farben für hell UND dunkel — Tapete und Modus dürfen beliebig sein.
+   fest/oben: links neben der Figur (right/bottom setzt hamster_figur.js); Leiste (hf--blase-oben): über dem Kopf, Spitze unten. */
 .hf__blase { position: absolute; right: 150px; bottom: 150px; width: max-content; max-width: 260px; min-width: 80px; padding: 10px 12px; box-sizing: border-box; border-radius: 14px 14px 2px 14px;
-  background: var(--bos-text, #f3ece1); color: var(--bos-bg, #16120e); font-size: var(--bos-font-sm, .9rem); line-height: 1.35;
-  opacity: 0; transition: opacity .25s; pointer-events: auto; cursor: pointer; filter: drop-shadow(0 2px 6px rgba(0,0,0,.45)); }
+  background: #fbf3e4; color: #3a2a1e; border: 2px solid #4a2f1a; font-size: var(--bos-font-sm, .9rem); line-height: 1.35; z-index: 4;
+  opacity: 0; transition: opacity .25s; pointer-events: auto; cursor: pointer; filter: drop-shadow(0 2px 5px rgba(0,0,0,.35)); }
 .hf__blase--an { opacity: 1; }
 .hf__blase:not(.hf__blase--an) { pointer-events: none; }
-.hf--hell .hf__blase { background: #fbf3e4; color: #3a2a1e; }
+.hf--blase-oben .hf__blase { border-radius: 14px; left: 0; right: auto; }
+.hf--blase-oben .hf__blase::after { content: ''; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; margin-left: -7px;
+  background: #fbf3e4; border-right: 2px solid #4a2f1a; border-bottom: 2px solid #4a2f1a; transform: rotate(45deg); box-sizing: border-box; }
 .hf--container .hf__blase { font-size: var(--bos-font-md, 1.05rem); max-width: 320px; }
 
 /* Ruf-Knopf */
@@ -62,8 +84,87 @@
 .hf--hinweis .hf__knopf::after { content: ''; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bos-amber-bright, #e0973a); box-shadow: 0 0 0 2px var(--bos-bg-soft, #1d1711); }
 .hf__knopf:focus-visible { outline: 2px solid var(--bos-amber, #e0973a); outline-offset: 2px; }
 
+/* Knopf des Hosts in der Kopfleiste (bos_crumble_host.js, K26): zeigen/verstecken, Punkt bei wartendem Hinweis */
+.hf-knopf-host { position: relative; width: 40px; height: 40px; padding: 0; border-radius: 50%; overflow: hidden; cursor: pointer; flex-shrink: 0;
+  background: var(--bos-surface-raised, #2b2218); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.hf-knopf-host img { position: absolute; left: 50%; top: 12%; height: 150%; transform: translateX(-50%); pointer-events: none; }
+.hf-knopf-host--versteckt { opacity: .55; }
+.hf-knopf-host--versteckt img { filter: grayscale(.6); }
+.hf-knopf-host--wartet::after { content: ''; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bos-amber-bright, #e0973a); box-shadow: 0 0 0 2px var(--bos-bg-soft, #1d1711); }
+.hf-knopf-host--aus { display: none; }
+.hf-knopf-host:focus-visible { outline: 2px solid var(--bos-amber, #e0973a); outline-offset: 2px; }
+
 /* Konfetti (Geburtstag) */
 .hf__konfetti { position: absolute; top: -20px; width: 8px; height: 12px; animation: hf-fall 2.4s linear forwards; pointer-events: none; }
 @keyframes hf-fall { to { transform: translateY(280px) rotate(540deg); opacity: 0; } }
 
-@media (prefers-reduced-motion: reduce) { .hf__figur, .hf--hinweis .hf__figur { animation: none; } .hf--knopf .hf__buehne { transition: none; } }
+/* ---- Nummern (K29): Requisiten-Ebene exakt über dem Zustandsbild; Lage je Requisite aus dem Kasten ---- */
+.hf__req-ebene { position: absolute; z-index: 3; pointer-events: none; }
+.hf__req { position: absolute; display: block; transform-origin: 50% 50%; will-change: transform, opacity; }
+.hf--nummer .hf__koerper { z-index: 1; }
+
+/* Choreografien der Requisiten (hf-ch-*). --i = Index in der Ebene, --n = Anzahl */
+.hf-ch-kreisen     { animation: hf-kreisen 1.6s linear infinite; animation-delay: calc(var(--i) * -0.4s); }
+.hf-ch-auseinander { animation: hf-auseinander-r 1.2s ease-in forwards; animation-delay: calc(var(--i) * 0.05s); }
+.hf-ch-auseinander.hf__req--linksseite { animation-name: hf-auseinander-l; }
+.hf-ch-sprengen    { animation: hf-sprengen .8s ease-out forwards; animation-delay: calc(var(--i) * 0.04s); }
+.hf-ch-puff        { animation: hf-puff 1.8s ease-out forwards; animation-delay: calc(var(--i) * 0.08s); }
+.hf-ch-fallen      { animation: hf-fallen 2.6s linear infinite; animation-delay: calc(var(--i) * -0.7s); }
+.hf-ch-flackern    { animation: hf-flackern .6s steps(2, end) infinite; animation-delay: calc(var(--i) * 0.1s); }
+.hf-ch-umfallen    { animation: hf-umfallen .7s ease-in forwards; animation-delay: calc(0.6s + var(--i) * 0.18s); transform-origin: 20% 100%; }
+.hf-ch-steigen     { animation: hf-steigen 2.2s ease-out infinite; animation-delay: calc(var(--i) * 0.5s); }
+.hf-ch-schweben    { animation: hf-schweben 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * 0.3s); }
+.hf-ch-wedeln      { animation: hf-wedeln .35s ease-in-out infinite alternate; animation-delay: calc(var(--i) * 0.12s); }
+.hf-ch-tropfen     { animation: hf-tropfen 1.3s ease-in infinite; animation-delay: calc(var(--i) * 0.35s); }
+.hf-ch-spritzen    { animation: hf-spritzen-r 1s ease-out forwards; animation-delay: calc(var(--i) * 0.06s); }
+.hf-ch-spritzen.hf__req--linksseite { animation-name: hf-spritzen-l; }
+.hf-ch-flitzen     { animation: hf-flitzen-r .9s ease-in forwards; animation-delay: calc(0.3s + var(--i) * 0.08s); }
+.hf-ch-flitzen.hf__req--linksseite { animation-name: hf-flitzen-l; }
+.hf-ch-huepfen     { animation: hf-huepfen .6s ease-in-out infinite; }
+@keyframes hf-kreisen { 0% { transform: translate(0,0); } 25% { transform: translate(28px,-22px); } 50% { transform: translate(0,-44px); } 75% { transform: translate(-28px,-22px); } 100% { transform: translate(0,0); } }
+@keyframes hf-auseinander-r { to { transform: translateX(120px) rotate(200deg); opacity: 0; } }
+@keyframes hf-auseinander-l { to { transform: translateX(-120px) rotate(-200deg); opacity: 0; } }
+@keyframes hf-sprengen { 0% { transform: scale(.3); opacity: 1; } 60% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes hf-puff { 0% { transform: scale(.5); opacity: .95; } 100% { transform: scale(1.7); opacity: 0; } }
+@keyframes hf-fallen { 0% { transform: translateY(-10px) rotate(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(60px) rotate(180deg); opacity: 0; } }
+@keyframes hf-flackern { 0% { opacity: 1; } 100% { opacity: .25; } }
+@keyframes hf-umfallen { to { transform: rotate(85deg); } }
+@keyframes hf-steigen { 0% { transform: translateY(0) scale(.8); opacity: .9; } 100% { transform: translateY(-46px) scale(1.2); opacity: 0; } }
+@keyframes hf-schweben { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes hf-wedeln { from { opacity: .15; transform: scale(.9); } to { opacity: 1; transform: scale(1.1); } }
+@keyframes hf-tropfen { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(52px); opacity: 0; } }
+@keyframes hf-spritzen-r { to { transform: translate(70px,-36px) scale(.6); opacity: 0; } }
+@keyframes hf-spritzen-l { to { transform: translate(-70px,-36px) scale(.6); opacity: 0; } }
+@keyframes hf-flitzen-r { to { transform: translateX(150px); opacity: 0; } }
+@keyframes hf-flitzen-l { to { transform: translateX(-150px); opacity: 0; } }
+@keyframes hf-huepfen { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-26px); } }
+
+/* Choreografien der Figur (hf-fig-*), ersetzen das Atmen für die Dauer der Nummer */
+.hf__figur.hf-fig-wippen    { animation: hf-fig-wippen 1.2s ease-in-out infinite !important; }
+.hf__figur.hf-fig-ruck      { animation: hf-fig-ruck .9s ease-out 2 !important; }
+.hf__figur.hf-fig-niesen    { animation: hf-fig-niesen 1.4s ease-out 1 !important; }
+.hf__figur.hf-fig-zittern   { animation: hf-fig-zittern .09s linear infinite !important; }
+.hf__figur.hf-fig-neigen    { animation: hf-fig-neigen 1.6s ease-in-out infinite !important; }
+.hf__figur.hf-fig-nicken    { animation: hf-fig-nicken 1.8s ease-in-out infinite !important; }
+.hf__figur.hf-fig-ausfallen { animation: hf-fig-ausfallen 1.1s ease-in-out infinite !important; }
+.hf__figur.hf-fig-wackeln   { animation: hf-fig-wackeln .16s linear infinite !important; }
+.hf__figur.hf-fig-einschlag { animation: hf-fig-einschlag .8s ease-out 1 !important; }
+.hf__figur.hf-fig-pulsieren { animation: hf-fig-pulsieren 1.1s ease-in-out infinite !important; transform-origin: 50% 25%; }
+.hf__figur.hf-fig-wabern    { animation: hf-fig-wabern 2.2s ease-in-out infinite !important; }
+@keyframes hf-fig-wippen { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes hf-fig-ruck { 0% { transform: translateX(0); } 20% { transform: translateX(-8px) rotate(-3deg); } 40% { transform: translateX(14px) rotate(3deg); } 70% { transform: translateX(0); } 100% { transform: translateX(0); } }
+@keyframes hf-fig-niesen { 0% { transform: scale(1); } 20% { transform: scale(1.05,.95) translateY(-4px); } 35% { transform: scale(.95,1.06) translateY(8px); } 60% { transform: scale(1); } 100% { transform: scale(1); } }
+@keyframes hf-fig-zittern { 0% { transform: translateX(-2px); } 100% { transform: translateX(2px); } }
+@keyframes hf-fig-neigen { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-8deg); } }
+@keyframes hf-fig-nicken { 0%,100% { transform: rotate(0) translateY(0); } 50% { transform: rotate(-3deg) translateY(-5px); } }
+@keyframes hf-fig-ausfallen { 0%,100% { transform: translateX(0); } 40% { transform: translateX(-30px) rotate(-4deg); } 60% { transform: translateX(-30px) rotate(-4deg); } }
+@keyframes hf-fig-wackeln { 0% { transform: rotate(-2deg); } 100% { transform: rotate(2deg); } }
+@keyframes hf-fig-einschlag { 0% { transform: scale(1.25,.8); } 40% { transform: scale(.9,1.12); } 70% { transform: scale(1.04,.97); } 100% { transform: scale(1); } }
+@keyframes hf-fig-pulsieren { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes hf-fig-wabern { 0%,100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.08) rotate(2deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hf__figur, .hf--hinweis .hf__figur, .hf--laeuft .hf__figur, .hf__figur[class*="hf-fig-"] { animation: none !important; }
+  .hf__req { animation: none !important; }
+  .hf--knopf .hf__buehne { transition: none; }
+}

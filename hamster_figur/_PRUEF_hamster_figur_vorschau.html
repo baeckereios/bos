@@ -11,7 +11,11 @@
   Lokal öffnen über einen Server (z. B. Ulfs lokaler Server im bos-Ordner),
   nicht per file:// — fetch() des Manifests braucht http.
 
-  Stand 17.10.2026, 06:49 Uhr (Stufe 1, Bau-Chat): ZWEI Figuren nebeneinander —
+  Stand 17.10.2026, 09:37 Uhr (Stufe 1c, Bau-Chat): dazu ein SCHREIBTISCH-Kasten mit der Einbettung
+  'schreibtisch' (Figur D: schiebbar, läuft, spielt Nummern, sichtbar/versteckt mit Speicher-Attrappe),
+  Nummern-Knöpfe für D und S, kurze Schlaf-/Lauf-/Nummern-Zeiten per Knopf. hf--hell entfällt (Blase hat
+  feste Farben), Hell/Dunkel schaltet data-theme.
+  Vorher 06:49 (Stufe 1, Bau-Chat): ZWEI Figuren nebeneinander —
   Knopf-Crumble (Rolle Lehrmeister, Einbettung 'oben') in einer nachgebauten
   Kopfleiste und Spielplatz-Crumble (Rolle Spielplatz, Einbettung 'container')
   in einem Kasten mit Schoner-Hintergrund. Dazu eine dritte Figur 'fest' unten
@@ -53,6 +57,15 @@
   .schoner__label { font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .14em; color: var(--bos-amber, #e0973a); }
   .schoner__text { font-weight: 600; font-style: italic; font-size: clamp(1.3rem, 3.4vw, 2rem); line-height: 1.35; }
   .schoner__hint { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; opacity: .5; margin-top: .6rem; }
+  /* nachgebauter Schreibtisch mit Kacheln (Launcher: .bos-desktop) — Container für Einbettung 'schreibtisch' */
+  .schreibtisch { position: relative; height: 340px; margin-top: 8px; border-radius: 14px; border: 1px solid var(--bos-border, rgba(255,255,255,.1)); background: var(--bos-bg-soft, #1d1711); overflow: visible; }
+  body.hell .schreibtisch { background: #efe4d0; }
+  .kacheln { position: absolute; inset: 16px; display: grid; grid-template-columns: repeat(auto-fill, 84px); gap: 20px 28px; align-content: start; pointer-events: none; }
+  .kachel { width: 84px; text-align: center; font-size: 11px; font-weight: 700; opacity: .85; }
+  .kachel i { display: block; width: 60px; height: 60px; margin: 0 auto 4px; border-radius: 14px; background: #3a2a1e; }
+  body.hell .kachel i { background: #d9c9a8; }
+  .fenster { position: absolute; left: 40%; top: 20px; width: 45%; height: 70%; background: var(--bos-surface, #241c14); border: 1px solid #777; border-radius: 10px; z-index: 400; display: none; padding: 10px; font-size: 12px; }
+  .fenster.an { display: block; }
 </style>
 </head>
 <body>
@@ -97,6 +110,7 @@
   <span style="align-self:center;opacity:.7;margin-left:12px;">Schoner-Inhalt (beiläufig, Anteil aus dem Manifest):</span>
   <span class="row" id="ereignisseSchoner"></span>
 </div>
+<div class="row" style="margin-top:6px"><button onclick="S.laufe()">S laufen</button><button onclick="S.nummer()">S Nummer (zufällig)</button><span class="row" id="nummernS"></span></div>
 <div class="schoner" id="schoner">
   <div class="schoner__content">
     <div class="schoner__label">Nachtschicht (nachgebaut)</div>
@@ -105,7 +119,24 @@
   </div>
 </div>
 
-<h2>Dritte Figur (Kurzform init, Einbettung fest, unten rechts)</h2>
+<h2>Schreibtisch-Crumble (Einbettung schreibtisch, Figur D — wie im Launcher)</h2>
+<div class="row">
+  <button onclick="D.sichtbar(!D.istSichtbar())">Knopf: zeigen/verstecken</button>
+  <button onclick="D.laufe()">laufen</button>
+  <button onclick="D.nummer()">Nummer (zufällig)</button>
+  <button onclick="D.hinweis('Hinweis — auch versteckt gemerkt.')">hinweis()</button>
+  <button onclick="D.ereignis('viel_offen',{n:7})">viel_offen</button>
+  <button onclick="kurzeZeiten()">kurze Zeiten (Lauf 3 s, Nummer 6 s, Schlaf 12 s)</button>
+  <button onclick="document.getElementById('fenster').classList.toggle('an')">Fenster-Attrappe (Ebene 400) an/aus</button>
+  <span id="dStand" style="align-self:center;opacity:.7;font-size:12px;"></span>
+</div>
+<div class="row" id="nummernD" style="margin-top:6px"></div>
+<div class="schreibtisch" id="schreibtisch">
+  <div class="kacheln"><div class="kachel"><i></i>Teigecke</div><div class="kachel"><i></i>Produkte</div><div class="kachel"><i></i>Wunschtag</div><div class="kachel"><i></i>Urlaub</div><div class="kachel"><i></i>Reparatur</div><div class="kachel"><i></i>Konten</div><div class="kachel"><i></i>NFC &amp; QR</div><div class="kachel"><i></i>Rechner</div><div class="kachel"><i></i>Druck</div><div class="kachel"><i></i>Froster</div><div class="kachel"><i></i>Ziele</div><div class="kachel"><i></i>Planer</div></div>
+  <div class="fenster" id="fenster">Fenster-Attrappe (z-index 400) — Crumble muss dahinter verschwinden</div>
+</div>
+
+<h2>Dritte Figur (Kurzform init, Einbettung fest, unten links)</h2>
 <div class="row">
   <button onclick="H.setzeModus('ecke')">Ecke (dauerhaft)</button>
   <button onclick="H.setzeModus('knopf')">Ruf-Knopf</button>
@@ -156,11 +187,26 @@
     f.wurzel().style.right = 'auto'; f.wurzel().style.left = '14px';   // nur hier: unten LINKS, damit sie nicht über dem Spielplatz-Crumble steht
   }).catch(function (e) { logge('fehler', { manifest: true, message: e.message }); });
 
-  function alle(fn) { [K, S, F.standard()].forEach(function (f) { if (f) fn(f); }); }
+  function alle(fn) { [K, S, D, F.standard()].forEach(function (f) { if (f) fn(f); }); }
   function hellDunkel() {
     document.body.classList.toggle('hell');
     var hell = document.body.classList.contains('hell');
-    document.querySelectorAll('.hf').forEach(function (w) { w.classList.toggle('hf--hell', hell); });
+    if (hell) document.documentElement.setAttribute('data-theme', 'light'); else document.documentElement.removeAttribute('data-theme');
+  }
+  // Speicher-Attrappe (im Launcher: localStorage je Profil, bos_crumble_host.js)
+  var SPEICHER = { daten: {}, lese: function () { return SPEICHER.daten; }, schreibe: function (o) { SPEICHER.daten = o; zeigeDStand(); } };
+  function zeigeDStand() { var e = document.getElementById('dStand'); if (e) e.textContent = 'Speicher: ' + JSON.stringify(SPEICHER.daten) + (D && D.laufendeNummer ? '  Nummer: ' + (D.laufendeNummer() || '–') : ''); }
+  // 4) Schreibtisch-Crumble — Figur D
+  var D = F.neu({ name: 'schreibtisch', container: document.getElementById('schreibtisch'),
+                  basisPfad: './', modus: 'ecke', einbettung: 'schreibtisch', rolle: 'lehrmeister', hoehe: 170, zufall: false, speicher: SPEICHER });
+  ['sichtbar', 'position', 'laufen', 'angekommen', 'nummer', 'nummer-ende', 'ziehen', 'wartet'].forEach(function (n) {
+    document.addEventListener('hamster-figur:' + n, function (e) { logge(n, e.detail); zeigeDStand(); });
+  });
+  function kurzeZeiten() {
+    [D, S].forEach(function (f) { var m = f.manifest(); if (!m) return;
+      m.schreibtisch.lauf_min = [0.05, 0.05]; m.schreibtisch.nummer_min = [0.1, 0.1]; m.schreibtisch.schlaf_nach_ms = 12000;
+      m.spielplatz.lauf_min = [0.05, 0.05]; m.spielplatz.nummer_min = [0.1, 0.1]; m.spielplatz.schlaf_nach_ms = 12000; f.an(true); });
+    logge('kurze Zeiten', { lauf_s: 3, nummer_s: 6, schlaf_s: 12 });
   }
   function setzeRolle(r) {
     S.setzeRolle(r);
@@ -169,7 +215,12 @@
   }
   var inhalte = { fakt: 'Sauerteig lebt. Wirklich.', spruch: 'Erst der Teig, dann das Vergnügen.', emoji: '🥨', backstube: 'Der Ofen hat immer recht.', nachtschicht: 'Um drei Uhr ist die Welt am ehrlichsten.', konditorei: 'Sahne ist kein Verbrechen.', verkauf: 'Lächeln kostet nichts. Brötchen schon.' };
 
-  Promise.all([K.bereit, S.bereit]).then(function () {
+  Promise.all([K.bereit, S.bereit, D.bereit]).then(function () {
+    [['nummernD', D], ['nummernS', S]].forEach(function (p) {
+      var box = document.getElementById(p[0]);
+      p[1].nummern().forEach(function (n) { var b = document.createElement('button'); b.textContent = n; b.onclick = function () { p[1].nummer(n); }; box.appendChild(b); });
+    });
+    zeigeDStand();
     var m = K.manifest();
     var er = document.getElementById('ereignisseKnopf');
     Object.keys(m.ereignisse).forEach(function (e) {

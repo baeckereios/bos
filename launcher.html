@@ -19,6 +19,12 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-17 · 09:37 · v3.4 · Feature (Crumble #62 Stufe 1c, Schreibtisch-Crumble; Anweisung
+      Kontroll-Chat 09:00, Bauplan 09:03, Go 09:12)
+      - Eine Zeile: BOS_CRUMBLE_HOST.start() bekommt schreibtisch: #desktop. Der
+        Host legt dahinter eine eigene Bühne (fixed, Ebene 300: über den Kacheln,
+        unter den Fenstern) an und setzt seinen Knopf in die Kopfleiste. Sonst
+        nichts geändert — Einstellungs-Zeile „🐹 Crumble“ bleibt An/Aus.
     2026-10-17 · 06:49 · v3.3 · Feature (Crumble #62 Stufe 1, Teil B; Anweisung Kontroll-Chat
       17.10., 06:00, Bauplan 06:18, Ulf 06:27 „Mach alles in einem Rutsch“)
       - Lädt hamster_figur/hamster_figur.css + .js und bos_crumble_host.js
@@ -2741,7 +2747,8 @@
     if (window.BOS_CRUMBLE_HOST) {
       window.BOS_CRUMBLE_HOST.start({
         an: data.hamster !== false, basisPfad: 'hamster_figur/',
-        topbar: document.querySelector('.bos-topbar'), vor: document.querySelector('.bos-topbar__clockwrap')
+        topbar: document.querySelector('.bos-topbar'), vor: document.querySelector('.bos-topbar__clockwrap'),
+        schreibtisch: document.getElementById('desktop')   // 1c: Crumble steht auf einer Bühne hinter dem Schreibtisch (Ebene 300)
       });
     }
   }

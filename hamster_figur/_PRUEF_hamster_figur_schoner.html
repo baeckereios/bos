@@ -16,7 +16,7 @@
     ?hamster=false → Profil-Feld hamster = aus (Prüffall 8)
   Schoner sofort zeigen: BOS_SCREENSAVER._zeigeJetzt() (Prüfhaken, 3-Minuten-Zeit bleibt).
 
-  Stand 17.10.2026, 08:09 Uhr (Nachtrag 1: Attrappe BOS_TASKBOARD.neuLaden, Knopf Profilwechsel). Vorher 06:49 (Stufe 1, Bau-Chat). Nie ins Repo (_PRUEF_* in .gitignore).
+  Stand 17.10.2026, 09:37 Uhr (Stufe 1c: Schreibtisch mit Scroll-Raster, Taskleiste, Fenster-Attrappe, Profil-Attrappe, starteHost()). Vorher 08:09 (Nachtrag 1: Attrappe BOS_TASKBOARD.neuLaden, Knopf Profilwechsel). Vorher 06:49 (Stufe 1, Bau-Chat). Nie ins Repo (_PRUEF_* in .gitignore).
 -->
 <link rel="stylesheet" href="../bos_design_tokens.css" onerror="this.remove()">
 <link rel="stylesheet" href="hamster_figur.css">
@@ -27,9 +27,18 @@
   .bos-topbar__brand { font-size: 1.15rem; font-weight: 700; } .bos-topbar__spacer { flex: 1; }
   .bos-topbar__status { font-size: .72rem; opacity: .6; text-transform: uppercase; }
   .bos-topbar__clockwrap { font-weight: 800; font-size: .95rem; }
-  main { padding: 70px 16px 40px; }
+  main { position: relative; z-index: 700; padding: 8px 16px; background: var(--bos-surface, #241c14); border-bottom: 1px solid var(--bos-border, rgba(255,255,255,.1)); margin-top: 52px; }
+  /* Schreibtisch wie launcher.html (.bos-desktop: fixed, overflow:auto, padding) + Taskleiste + Fenster-Attrappe */
+  .bos-desktop { position: fixed; top: 52px; bottom: 64px; left: 0; right: 0; overflow: auto; padding: 1.6rem; }
+  .bos-grid { position: relative; width: 100%; min-height: 1400px; display: grid; grid-template-columns: repeat(auto-fill, 84px); gap: 20px 28px; align-content: start; }
+  .bos-tile { width: 84px; text-align: center; font-size: 11px; font-weight: 700; opacity: .85; }
+  .bos-tile i { display: block; width: 60px; height: 60px; margin: 0 auto 4px; border-radius: 14px; background: #3a2a1e; }
+  .bos-taskbar { position: fixed; left: 0; right: 0; bottom: 0; height: 64px; z-index: 500; background: var(--bos-surface-raised, #2b2218); border-top: 1px solid var(--bos-border, rgba(255,255,255,.1)); display: flex; align-items: center; padding: 0 12px; font-size: 12px; opacity: .9; }
+  .bos-windows-layer { position: fixed; top: 52px; bottom: 64px; left: 0; right: 0; pointer-events: none; z-index: 400; }
+  .fenster { position: absolute; left: 35%; top: 30px; width: 50%; height: 60%; pointer-events: auto; background: var(--bos-surface, #241c14); border: 1px solid #777; border-radius: 10px; display: none; padding: 10px; font-size: 12px; }
+  .fenster.an { display: block; }
   button { background: var(--bos-surface-raised, #2b2218); color: inherit; border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); border-radius: 10px; padding: 7px 10px; font-size: 13px; margin: 2px; }
-  #log { font-family: ui-monospace, monospace; font-size: 12px; opacity: .85; white-space: pre-wrap; max-height: 220px; overflow: auto; margin-top: 10px; }
+  #log { font-family: ui-monospace, monospace; font-size: 12px; opacity: .85; white-space: pre-wrap; max-height: 90px; overflow: auto; margin-top: 8px; }
   #log .fehler { color: #ff6b5c; font-weight: 700; }
 </style>
 </head>
@@ -41,10 +50,17 @@
   <div class="bos-topbar__clockwrap" id="clock">--:--</div>
   <button style="width:34px;height:34px;border-radius:50%;padding:0;">👤</button>
 </div>
+<div class="bos-desktop" id="desktop">
+  <div class="bos-grid" id="grid"></div>
+</div>
+<div class="bos-windows-layer"><div class="fenster" id="fenster">Fenster-Attrappe (Ebene 400) — Crumble muss dahinter verschwinden</div></div>
+<div class="bos-taskbar">🗒️ Taskleiste (Attrappe, Ebene 500)</div>
 <main>
-  <h1 style="font-size:18px;margin:0 0 6px;">Crumble im Schoner · Prüf-Hülle</h1>
-  <p style="opacity:.8;max-width:70ch;">Hier läuft der echte Bildschirmschoner mit der echten Brücke, aber ohne Firebase. Der Schoner kommt nach 3 Minuten Ruhe wie im Launcher — oder sofort über den Knopf. Tipp <b>auf</b> Crumble im Schoner: er reagiert, der Schoner bleibt. Tipp <b>daneben</b>: Schoner geht zu.</p>
+  <h1 style="font-size:18px;margin:0 0 6px;">Crumble · Prüf-Hülle (Schreibtisch + Schoner + Brücke, ohne Firebase)</h1>
+  <p style="opacity:.8;max-width:80ch;margin:0 0 6px;">Echter Schoner, echte Brücke, nachgebauter Schreibtisch mit Scroll-Raster. Schoner nach 3 Minuten Ruhe oder sofort per Knopf. Tipp <b>auf</b> Crumble im Schoner: er reagiert, der Schoner bleibt; Tipp <b>daneben</b>: zu.</p>
   <div>
+    <button onclick="document.getElementById('fenster').classList.toggle('an')">Fenster-Attrappe an/aus</button>
+    <button onclick="window.__profilId = (window.__profilId==='pruef' ? 'zweites' : 'pruef'); window.__neuLadenAntwort=null; starteHost()">Profil wechseln (Speicher je Profil)</button>
     <button onclick="BOS_SCREENSAVER._zeigeJetzt()">Schoner jetzt zeigen</button>
     <button onclick="feuer({offen:0,vorher:null,fehler:null})">bos:aufgaben offen 0, vorher null</button>
     <button onclick="feuer({offen:7,vorher:3,fehler:null})">offen 7, vorher 3</button>
@@ -52,11 +68,18 @@
     <button onclick="feuer({offen:4,vorher:7,fehler:'permission-denied — Probe'})">mit fehler</button>
     <button onclick="BOS_CRUMBLE_HOST.setzeAn(true)">Crumble an</button>
     <button onclick="BOS_CRUMBLE_HOST.setzeAn(false)">Crumble aus</button>
-    <button onclick="window.__neuLadenAntwort={offen:4,gesperrt:true}; BOS_CRUMBLE_HOST.start({an:true, basisPfad:'./', topbar:document.querySelector('.bos-topbar'), vor:document.querySelector('.bos-topbar__clockwrap')})">Profilwechsel (Attrappe antwortet gesperrt)</button>
+    <button onclick="window.__neuLadenAntwort={offen:4,gesperrt:true}; starteHost()">Profilwechsel (Attrappe antwortet gesperrt)</button>
   </div>
   <div id="log"></div>
 </main>
 
+<script>
+  // Attrappe der Profil-Auflösung (im Launcher: bos_profil_lookup.js) — Speicher-Schlüssel je Profil
+  window.__profilId = 'pruef';
+  window.BOS_PROFIL_LOOKUP = { aktivesProfil: function () { return { id: window.__profilId }; } };
+  (function () { var g = document.getElementById('grid'); var n = ['Teigecke','Produkte','Wunschtag','Urlaub','Reparatur','Konten','NFC & QR','Rechner','Druck','Froster','Ziele','Planer','Stempeluhr','BackStore','Hilfe','Aufgaben'];
+    for (var i = 0; i < 40; i++) { var d = document.createElement('div'); d.className = 'bos-tile'; d.innerHTML = '<i></i>' + n[i % n.length]; g.appendChild(d); } })();
+</script>
 <script src="../bos_screensaver_content.js"></script>
 <script src="../bos_screensaver.js"></script>
 <script>
@@ -93,13 +116,19 @@
   window.addEventListener('error', function (e) { logge('fehler', { seite: true, message: e.message }); });
   function feuer(detail) { logge('bos:aufgaben →', detail); document.dispatchEvent(new CustomEvent('bos:aufgaben', { detail: detail })); }
 
-  // Wie launcher.html applyProfileUI(): erst der Schoner, dann die Brücke
+  // Wie launcher.html applyProfileUI(): erst der Schoner, dann die Brücke (mit Schreibtisch-Element, 1c)
+  function starteHost() {
+    if (window.BOS_CRUMBLE_HOST) {
+      BOS_CRUMBLE_HOST.start({ an: HAMSTER_AN, basisPfad: './', topbar: document.querySelector('.bos-topbar'), vor: document.querySelector('.bos-topbar__clockwrap'), schreibtisch: document.getElementById('desktop') });
+    }
+  }
   window.addEventListener('load', function () {
     BOS_SCREENSAVER.start();
-    if (window.BOS_CRUMBLE_HOST) {
-      BOS_CRUMBLE_HOST.start({ an: HAMSTER_AN, basisPfad: './', topbar: document.querySelector('.bos-topbar'), vor: document.querySelector('.bos-topbar__clockwrap') });
-    }
+    starteHost();
     document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 5);
+  });
+  ['sichtbar', 'position', 'laufen', 'angekommen', 'nummer', 'nummer-ende', 'ziehen', 'wartet'].forEach(function (n) {
+    document.addEventListener('hamster-figur:' + n, function (e) { logge(n, e.detail); });
   });
 </script>
 </body>
