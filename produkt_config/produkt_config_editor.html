@@ -3,6 +3,11 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
+      Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
+      (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
+      im Launcher fragt nach. Fehlt die Datei, bleibt der alte Schutz.
+      Siehe SESSION_2026-10-17_UNGESPEICHERT_SCHUTZ_BAU.md.
     2026-10-16 · 17:51 · v-teigrechner-1 · Teigrechner Stufe 1 (#67, §4 F; Freigabe Kontroll-Chat 16:37)
       „Aus Teig“ bietet zusätzlich die Teige der Stationen an (teigrechner_teige),
       getrennt in zwei Gruppen „Nacht (BrotTeigRechner)“ und „Weitere Teige
@@ -519,6 +524,7 @@
 <script src="../bos_zeitkontext_referenz.js"></script>
 <script src="../bos_verbrauch_durchschnitt.js"></script>
 <script src="../bos_froster.js"></script>
+<script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 
 <script>
 var COLLECTION = 'produkte'; // seit 05.10.2026 gemessen, nicht mehr Annahme (PRODUKTE_KOMPENDIUM.md §2a)
@@ -2008,9 +2014,14 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
-window.addEventListener('beforeunload', function (e) {
-  if (geaendert) { e.preventDefault(); e.returnValue = ''; }
-});
+/* #77 (17.10.2026): Ungespeichert-Schutz über bos_ungespeichert.js — wirkt beim ✕ im
+   Launcher UND beim Neuladen/Verlassen der Einzelseite. Bedingung wörtlich vom
+   früheren beforeunload-Zuhörer. Fehlt die Datei (nicht hochgeladen), bleibt der
+   alte Schutz beim Neuladen bestehen. */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return geaendert; });
 
 // ==========================================================================
 // Hilfe (Standard-Muster: einfaches helpData-Objekt + Bottom-Sheet, Fundament §5.2/§5.2.1)

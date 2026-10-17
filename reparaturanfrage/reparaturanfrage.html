@@ -17,6 +17,12 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
+      Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
+      (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
+      im Launcher fragt nach. Fehlt die Datei, bleibt der alte Schutz.
+      Speichern läuft (fotoSendenLaeuft()): eigener Text in der Rückfrage.
+      Siehe SESSION_2026-10-17_UNGESPEICHERT_SCHUTZ_BAU.md.
     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
       Status-Zeichen ! gemeldet · 👁 gesehen · ✓ repariert an Statuswort und Verlauf (CSS ::before, Wort im Verlauf dafür in <span class="schritt-wort">); --ra-gelb liest --bos-gelb. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-12 · 01:57 · v0.4 · Feature (Stufe 2: Fotos, Freigabe KC 12.10. 00:53)
@@ -303,6 +309,7 @@
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
 <script src="../bos_meldungen.js"></script>
+<script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 
 <header>
   <div class="kopf-zeile">
@@ -1221,11 +1228,14 @@ window.addEventListener('popstate', function (ev) {
 /* Verlässt die Zurück-Taste die Seite ganz (kein eigener Eintrag — z. B.
    Direkteinstieg ?geraet=, oder Tab schließen) und steht ungesendeter Text
    da: die Browser-Rückfrage „Seite verlassen?“. Nur dann — sonst nie. */
-window.addEventListener('beforeunload', function (ev) {
-  if (!ungesendet()) return;
-  ev.preventDefault();
-  ev.returnValue = '';
-});
+/* #77 (17.10.2026): Ungespeichert-Schutz über bos_ungespeichert.js — wirkt beim ✕ im
+   Launcher UND beim Neuladen/Verlassen der Einzelseite. Bedingung wörtlich vom
+   früheren beforeunload-Zuhörer. Fehlt die Datei (nicht hochgeladen), bleibt der
+   alte Schutz beim Neuladen bestehen. */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return fotoSendenLaeuft(); } }); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return ungesendet(); });
 /* Launcher-Fenster geschlossen, während der eigene Eintrag der aktuelle ist:
    Ohne Gegenmittel bliebe ein toter Eintrag im Verlauf des Tabs, und der
    erste Druck auf Zurück täte nichts (Probe B1, Fall 2). Darum hier den

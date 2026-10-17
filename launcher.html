@@ -19,6 +19,19 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-17 · 02:36 · v3.2 · Fix (#77 ✕ ohne Rückfrage; Bauplan freigegeben vom Kontroll-Chat
+      17.10., 02:03, Kern-Datei-Freigabe Ulf 17.10.)
+      - Das ✕ fragt jetzt nach, wenn die Seite im Fenster Ungespeichertes
+        meldet. Vorher entfernte closeWindow() das iframe sofort, ohne
+        beforeunload — der Schutz der Seiten griff im Launcher nie.
+      - Lädt bos_ungespeichert.js (Abfrage, Dialog, Texte; E13: nicht hier).
+        closeWindow() fragt vorDemSchliessen(iframe, Name), das bisherige
+        Entfernen steht unverändert in entferneFenster(). Ohne iframe oder
+        ohne die Datei: synchron wie vorher.
+      - Auflage A1: Lehnt die Abfrage ab, Grund sichtbar per confirm,
+        w.schliesst wird zurückgesetzt (kein toter ✕-Knopf).
+      - Neuer Text window.closeCheckFailed. Abmelden, Neuladen und alles
+        andere unverändert. Siehe SESSION_2026-10-17_UNGESPEICHERT_SCHUTZ_BAU.md.
     2026-10-16 · 07:54 · v3.1 · Feature (Einstellungen für alle #38, eigenes Farbprofil #72 Stufe C,
       offene Fenster #75, Startbildschirm hell #74; Freigabe Kontroll-Chat 07:26)
       - Tray rechts in der Taskleiste: ⚙️ öffnet die Einstellungen, 🌙/☀️
@@ -758,6 +771,7 @@
   <!-- NEU 05.09.2026, siehe SESSION_2026-09-05_AUFGABEN_TASKBOARD_KONZEPT.md -->
   <script src="bos_aufgaben_logik.js"></script>
   <script src="bos_taskboard.js"></script>
+  <script src="bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Rückfrage beim ✕, siehe closeWindow() -->
   <script>
   /* ================================================================
      BOS Launcher — Logik
@@ -790,6 +804,7 @@
     'window.maximize': 'Maximieren',
     'window.restore': 'Wiederherstellen',
     'window.close': 'Schließen',
+    'window.closeCheckFailed': 'Konnte nicht prüfen, ob in „{app}“ etwas ungespeichert ist: {grund}. Trotzdem schließen?',
     'window.placeholder': 'Diese App ist geplant, aber noch nicht gebaut.',
     'modal.createTitle': 'Neue Kachel',
     'modal.editTitle': 'Kachel bearbeiten',
@@ -1972,8 +1987,35 @@
     w.el.classList.remove('bos-window--minimized');
     focusWindow(id);
   }
+  /* #77 (17.10.2026): Vor dem Entfernen bei der Seite im Fenster nachfragen,
+     ob etwas ungespeichert ist (bos_ungespeichert.js; Rückfrage und Texte
+     dort, nicht hier). Ohne iframe (Hub, Einstellungen, Platzhalter) oder
+     ohne die Datei: synchron wie vorher. w.schliesst: ✕ doppelt bzw. bei
+     offener Rückfrage tut nichts. Auflage A1: Lehnt die Abfrage trotz
+     Zusicherung ab, wird w.schliesst zurückgesetzt und der Grund sichtbar
+     gefragt — nie still geschlossen, nie ein toter ✕-Knopf. */
   function closeWindow(id) {
     var w = openWindows[id]; if (!w) return;
+    if (w.schliesst) return;
+    var frame = w.el.querySelector('.bos-window__body > iframe');
+    var modul = window.BOS_UNGESPEICHERT;
+    if (!frame || !modul || typeof modul.vorDemSchliessen !== 'function') { entferneFenster(id, w); return; }
+    w.schliesst = true;
+    var frage;
+    try { frage = Promise.resolve(modul.vorDemSchliessen(frame, w.app.name)); }
+    catch (err) { frage = Promise.reject(err); }
+    frage.then(function (ja) {
+      w.schliesst = false;
+      if (ja) entferneFenster(id, w);
+    }, function (err) {
+      w.schliesst = false;
+      console.error('[Launcher] Rückfrage vor dem Schließen fehlgeschlagen:', err);
+      var grund = (err && (err.message || err.code)) || String(err);
+      if (window.confirm(t('window.closeCheckFailed').split('{app}').join(w.app.name).split('{grund}').join(grund))) entferneFenster(id, w);
+    });
+  }
+  function entferneFenster(id, w) {
+    if (openWindows[id] !== w) return;   // inzwischen weg oder neu geöffnet
     w.el.remove();
     delete openWindows[id];
     if (activeWindowId === id) activeWindowId = null;

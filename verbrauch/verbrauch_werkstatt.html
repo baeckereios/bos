@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03): beforeunload über ../bos_ungespeichert.js (BOS_UNGESPEICHERT.melde), Bedingung detailGeaendert wörtlich; jetzt fragt auch das ✕ im Launcher. Fehlt die Datei, bleibt der alte Schutz. SESSION_2026-10-17_UNGESPEICHERT_SCHUTZ_BAU.md -->
 <!-- 2026-10-15 · 07:17 · Wort „Mitschrift“ (Richtwert #63, Nachtrag 1, Ulf 15.10., 07:12): Leer-Hinweis „Verbrauch (Mitschrift)“, Hilfe „aus der Mitschrift“. Typ verbrauch_manuell und Logik unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“, mit gelöschten) statt fetch(produkt_config.json); Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
 <head>
@@ -194,6 +195,7 @@
 <!-- MUSS vor bos_accounts.js — liefert BOS_BV.silbe()/adminKennung() -->
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_accounts.js"></script>
+<script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 
 <script>
 (function () {
@@ -549,9 +551,14 @@
       });
   });
 
-  window.addEventListener('beforeunload', function (e) {
-    if (detailGeaendert) { e.preventDefault(); e.returnValue = ''; }
-  });
+  /* #77 (17.10.2026): Ungespeichert-Schutz über bos_ungespeichert.js — wirkt beim ✕ im
+     Launcher UND beim Neuladen/Verlassen der Einzelseite. Bedingung wörtlich vom
+     früheren beforeunload-Zuhörer. Fehlt die Datei (nicht hochgeladen), bleibt der
+     alte Schutz beim Neuladen bestehen. */
+  (function (pruef) {
+    if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
+    window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+  })(function () { return detailGeaendert; });
 
   /* -----------------------------------------------------------
    * Init

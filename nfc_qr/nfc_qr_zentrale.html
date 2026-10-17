@@ -29,6 +29,11 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
+      Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
+      (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
+      im Launcher fragt nach. Fehlt die Datei, bleibt der alte Schutz.
+      Siehe SESSION_2026-10-17_UNGESPEICHERT_SCHUTZ_BAU.md.
     2026-10-16 · 17:51 · Nur Hilfetext (Teigrechner Stufe 1, Freigabe KC 16:37 Teil H)
       Die Nachtseite heißt „BrotTeigRechner“ (Ulf 16.10., 16:36). Der Name in der
       Zielliste kommt aus der Registry; Adressen unverändert. SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md
@@ -169,6 +174,7 @@
 <script src="../bos_druck.js"></script>
 <script src="../bos_qr.js"></script>
 <script src="../qrcode.min.js"></script>
+<script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 <script src="nfc_qr_logik.js"></script>
 
 <div class="seite">
@@ -1044,7 +1050,14 @@ document.getElementById('frageKnoepfe').addEventListener('click', function (e) {
   if (tun) tun();
 });
 /* Seite verlassen mit ungespeichertem Blatt: der Browser fragt nach */
-window.addEventListener('beforeunload', function (e) { if (blattGeaendert()) { e.preventDefault(); e.returnValue = ''; } });
+/* #77 (17.10.2026): Ungespeichert-Schutz über bos_ungespeichert.js — wirkt beim ✕ im
+   Launcher UND beim Neuladen/Verlassen der Einzelseite. Bedingung wörtlich vom
+   früheren beforeunload-Zuhörer. Fehlt die Datei (nicht hochgeladen), bleibt der
+   alte Schutz beim Neuladen bestehen. */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return blattGeaendert(); });
 document.getElementById('hilfeBtn').addEventListener('click', oeffneHilfe);
 document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
 document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').hidden = true; });

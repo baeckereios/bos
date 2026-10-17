@@ -6,6 +6,12 @@
   Gerüst: ../teigecke/teigecke_seite.js + ../teigecke/teigecke_seite.css (gemeinsam mit der Teigecke)
   Logik:  teigrechner_logik.js (Rechnung, Formular), ../teigecke/teigecke_logik.js (Kennung, Umhängen)
   CHANGELOG
+    2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
+      Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
+      (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
+      im Launcher fragt nach. Fehlt die Datei, bleibt der alte Schutz.
+      Speichern läuft (speichertGerade()): eigener Text in der Rückfrage.
+      Siehe SESSION_2026-10-17_UNGESPEICHERT_SCHUTZ_BAU.md.
     2026-10-16 · 17:51 · v0.1 · Erstfassung (Teigrechner Stufe 1, #67)
       ANWEISUNG_2026-10-16_TEIGRECHNER_STUFE1.md, Bauplan
       SESSION_2026-10-16_TEIGRECHNER_STUFE1_BAU.md, Freigabe Kontroll-Chat 16:37.
@@ -89,6 +95,7 @@
 <script src="../bos_produkte.js"></script>
 <script src="../bos_produkte_schreiben.js"></script>
 <script src="../teigecke/teigecke_logik.js"></script>
+<script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 <script src="teigrechner_logik.js"></script>
 
 <div class="kopfbereich">
@@ -341,10 +348,15 @@ async function start() {
 }
 window.addEventListener('online', planeRender);
 window.addEventListener('offline', planeRender);
-/* Ungespeicherte Eingabe: der Browser fragt nach (wie die sechs anderen Satelliten; #77 bleibt Launcher-Sache). */
-window.addEventListener('beforeunload', function (e) {
-  if (E && E.geaendert) { e.preventDefault(); e.returnValue = ''; }
-});
+/* Ungespeicherte Eingabe: der Browser fragt nach (wie die sechs anderen Satelliten). */
+/* #77 (17.10.2026): Ungespeichert-Schutz über bos_ungespeichert.js — wirkt beim ✕ im
+   Launcher UND beim Neuladen/Verlassen der Einzelseite. Bedingung wörtlich vom
+   früheren beforeunload-Zuhörer. Fehlt die Datei (nicht hochgeladen), bleibt der
+   alte Schutz beim Neuladen bestehen. */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return speichertGerade(); } }); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return E && E.geaendert; });
 async function neuLaden() { render(); }
 function oeffneNachCol(col, id) { if (col === COL.teige && id) oeffneTeig(id); }
 
