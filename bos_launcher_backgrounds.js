@@ -10,10 +10,12 @@
 
    Bild-Empfehlungen (fürs Ergebnis auf dem Tablet):
      - Querformat — der Launcher läuft nur im Querformat
-     - Eher dunkel/gedeckt halten. Der Launcher legt zusätzlich
-       automatisch einen leichten dunklen Schleier über jedes Bild,
-       damit Icons/Text lesbar bleiben — aber ein von Grund auf
-       helles oder sehr unruhiges Bild wirkt trotzdem ablenkend
+     - Hell oder dunkel, beides geht. (Korrigiert 17.10.2026, 07:00 Uhr,
+       Kontroll-Chat Crumble: Bis 05.09.2026 legte der Launcher einen
+       dunklen Schleier über jedes Bild; seitdem laufen Bilder in voller
+       Farbe, die Lesbarkeit der Kachelnamen kommt vom Symbolpaket —
+       siehe applyBackground() in launcher.html.) Sehr unruhige Bilder
+       lenken trotzdem ab.
      - Auflösung ~1920×1080 reicht völlig, Format JPG oder WebP,
        nach Möglichkeit unter ~800 KB pro Bild fürs schnelle Laden
 
@@ -72,5 +74,16 @@ window.BOS_BACKGROUNDS = [
   { id: 'aquarell_schaufenster', name: 'Aquarell: Schaufenster', file: 'bos_backgrounds/image08.png' },
   { id: 'aquarell_vitrine', name: 'Aquarell: Vitrine', file: 'bos_backgrounds/image09.png' },
   { id: 'anime_baeckerei_verkauf', name: 'Anime: Bäckerei am Morgen', file: 'bos_backgrounds/image10.png' },
-  { id: 'anime_baeckerei_leer', name: 'Anime: Bäckerei (leer)', file: 'bos_backgrounds/image11.png' }
+  { id: 'anime_baeckerei_leer', name: 'Anime: Bäckerei (leer)', file: 'bos_backgrounds/image11.png' },
+  /* Crumble-Wallpaper (17.10.2026, 07:00 Uhr, Kontroll-Chat Crumble). Namen frei
+     änderbar — Ulf benennt sie nach Motiv um; die id NIE ändern (s. Kopf). */
+  { id: 'crumble_12', name: 'Crumble 1 (dunkel)', file: 'bos_backgrounds/image12.jpg' },
+  { id: 'crumble_13', name: 'Crumble 1 (hell)',   file: 'bos_backgrounds/image13.jpg' },
+  { id: 'crumble_14', name: 'Crumble 2 (dunkel)', file: 'bos_backgrounds/image14.jpg' },
+  { id: 'crumble_15', name: 'Crumble 2 (hell)',   file: 'bos_backgrounds/image15.jpg' },
+  { id: 'crumble_16', name: 'Crumble 3 (dunkel)', file: 'bos_backgrounds/image16.jpg' },
+  { id: 'crumble_17', name: 'Crumble 3 (hell)',   file: 'bos_backgrounds/image17.jpg' },
+  { id: 'crumble_18', name: 'Crumble 4 (dunkel)', file: 'bos_backgrounds/image18.jpg' },
+  { id: 'crumble_19', name: 'Crumble 4 (hell)',   file: 'bos_backgrounds/image19.jpg' },
+  { id: 'crumble_20', name: 'Crumble 5 (hell)',   file: 'bos_backgrounds/image20.jpg' }
 ];
