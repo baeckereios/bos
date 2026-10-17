@@ -78,12 +78,14 @@
         "Froster bestätigt. Meine Lieblinge.",
         "Das war sauber.",
         "Mehlstaub in der Luft. Riecht nach Arbeit.",
-        "Froster bestätigt, Liste leer. Heute mag ich alle."
+        "Froster bestätigt, Liste leer. Heute mag ich alle.",
+        "Ich hamstere keine Vorräte, ich lagere Teiglinge."
       ],
       "texte_spielplatz": [
         "Krümel gefunden. Tag gerettet.",
         "Wenn ich groß bin, werd ich Brötchen.",
-        "Streuselkuchen hat mich gefunden. Nicht umgekehrt."
+        "Streuselkuchen hat mich gefunden. Nicht umgekehrt.",
+        "Ich habe heute wieder richtig viel Knete gemacht!"
       ]
     },
     "laughing": {
@@ -99,12 +101,14 @@
       "massstab": 1.0,
       "texte": [
         "Oh. Das lief ja mal durch.",
-        "Ich zähle Krümel. Zählt als Inventur. Bei mir."
+        "Ich zähle Krümel. Zählt als Inventur. Bei mir.",
+        "Keine Panik, der Teig geht sowieso auf. Meistens jedenfalls."
       ],
       "texte_spielplatz": [
         "Pfff. Der war gut. Sagt der mit den vollen Backen.",
         "Der Teig hat gelacht. Ich hab's gesehen.",
-        "Hihi. Das Croissant hat mich angeguckt."
+        "Hihi. Das Croissant hat mich angeguckt.",
+        "Lächle, du kannst sie nicht alle einmehlen."
       ]
     },
     "tongue": {
@@ -143,7 +147,8 @@
       ],
       "texte_spielplatz": [
         "Zu cool für Brötchen. Fast.",
-        "Hamster können nicht pfeifen. Dafür hamstern. Gleicht sich aus."
+        "Hamster können nicht pfeifen. Dafür hamstern. Gleicht sich aus.",
+        "Der Kunde ist König. Aber wir stehen an den Messern des Teigteilers."
       ]
     },
     "grumpy": {
@@ -300,7 +305,8 @@
       "texte": [
         "Nichts gefunden. Ehrlich.",
         "Da fehlt ein Haken. Ich sag's nur.",
-        "Nicht gefunden. Vielleicht war's nie da."
+        "Nicht gefunden. Vielleicht war's nie da.",
+        "Nachtschicht ist wie Tag, nur dunkler und mit mehr Mehlstaub."
       ],
       "texte_spielplatz": [
         "Weiß ich nicht. Frag das Brot.",
@@ -322,7 +328,9 @@
         "Es ist 3:15. Ich sag nur."
       ],
       "texte_spielplatz": [
-        "Nur kurz die Augen zu. Zehn Minuten. Oder vier Stunden."
+        "Nur kurz die Augen zu. Zehn Minuten. Oder vier Stunden.",
+        "Wir backen mit viel Liebe. Und mit purem Hass auf den Wecker.",
+        "Ich bin nicht unhöflich. Ich bin auf chronischem Tageslicht-Entzug."
       ]
     },
     "yawn": {
@@ -341,7 +349,8 @@
       ],
       "texte_spielplatz": [
         "Gäähn. Wer hat die Nacht erfunden.",
-        "Gääähn. Weckt mich, wenn's Streusel gibt."
+        "Gääähn. Weckt mich, wenn's Streusel gibt.",
+        "Der Teig muss ruhen. Ich auch. Aber einer von uns beiden muss leider arbeiten."
       ]
     },
     "wave": {
@@ -359,7 +368,8 @@
         "Moin. Nicht zu laut, ja?",
         "Vier Uhr. Draußen schläft die Konkurrenz.",
         "Die Augen sind offen. Mehr verspreche ich nicht.",
-        "Dritte Nacht. Ich zähle nicht mehr. Doch. Dritte."
+        "Dritte Nacht. Ich zähle nicht mehr. Doch. Dritte.",
+        "Mein Laufrad ist heute der Stikkenofen."
       ],
       "texte_spielplatz": [
         "Winken ist Sport. Für Hamster.",
@@ -432,7 +442,8 @@
       ],
       "texte_spielplatz": [
         "Fünfundzwanzig Kilo. Ich wiege dreißig Gramm. Läuft.",
-        "Ich bin nicht klein. Der Mehlsack ist groß."
+        "Ich bin nicht klein. Der Mehlsack ist groß.",
+        "Manche Menschen gehen ins Fitnessstudio. Ich hebe Mehlsäcke."
       ]
     },
     "apron": {
@@ -809,7 +820,27 @@
       },
       "texte": [
         "Es blubbert. Also lebt es.",
-        "Sauerteig: Tag 847. Er mag mich."
+        "Sauerteig: Tag 847. Er mag mich.",
+        "Willkommen im Labor! Hier züchten wir keine Viren, sondern den perfekten Trieb.",
+        "Technisch gesehen bin ich der leitende Mikrobiologe. Ich kommandiere eine Armee von Milliarden Hefepilzen.",
+        "Mein Humor ist wie dieses Anstellgut: extrem sauer und mit einem pH-Wert deutlich unter 4,0.",
+        "Vertrau mir, ich bin (Sauerteig-)Doktor.",
+        "Die perfekte Balance aus Milchsäure und Essigsäure... Das ist für mich wahre Poesie!",
+        "Wir sind nicht allein! In diesem Glas entsteht gerade ein eigenes, kleines Universum.",
+        "Ich habe das Mehl quantenphysikalisch analysiert. Das Brot wird heute simultan knusprig und weich sein.",
+        "Das ist mein Sauerteig. Er heißt Frankenstein und hat heute schon zwei Azubis gefressen.",
+        "Ich kümmere mich besser um dieses Glas Anstellgut als um meinen eigenen Schlafrhythmus.",
+        "Achtung, Raubtierfütterung! Die Kultur hat wieder Hunger auf frisches Mehl und Wasser.",
+        "Wenn es blubbert, lebt es. Wenn es grün wird... renn so schnell du kannst!",
+        "Dieser Sauerteigstamm ist älter als unser ältester Stikkenofen. Zeig etwas Respekt vor den Älteren!",
+        "Sauerteig ist wie ein Tamagotchi für Erwachsene. Man muss es füttern, warmhalten und ihm gut zureden.",
+        "Hamster-OS meldet: Die enzymatische Aktivität im Glas hat soeben Rekordniveau erreicht.",
+        "Der weiße Kittel ist eigentlich gar nicht für die Wissenschaft. Er tarnt nur hervorragend die Mehlflecken.",
+        "Nach meinen präzisen Berechnungen fehlt im Teig noch exakt 1,3 Gramm Liebe. Und Schüttwasser.",
+        "Mit dieser Brille sehe ich die Teigporen quasi auf molekularer Ebene.",
+        "Aus Mehl und Wasser Gold machen? Alchemie ist out. Ich mache daraus Brot, das ist viel wertvoller!",
+        "In meiner Kitteltasche ist kein Kugelschreiber, sondern ein geeichtes Kernthermometer.",
+        "System-Backup erfolgreich: Ein Teil des Anstellguts ist sicher im Kühlschrank archiviert."
       ]
     },
     "backen_voll": {
@@ -834,7 +865,27 @@
       },
       "texte": [
         "Mmmpf.",
-        "Ich sag später was."
+        "Ich sag später was.",
+        "Qualitätskontrolle abgeschlossen. Das Brot entspricht exakt meinen Standards.",
+        "Bruchware? Welche Bruchware? Hier gab es absolut keine Bruchware.",
+        "Ich schwöre, das Brötchen ist von ganz allein in meinen Mund gesprungen!",
+        "Wenn der Meister plötzlich um die Ecke biegt und du schnell noch den Beweis vernichten musst.",
+        "Das war Notwehr! Das Brot hat mich zuerst angegriffen.",
+        "Was guckst du so? Ich bin im hochoffiziellen Verkostungs-Modus.",
+        "Das Schild sagte ‚Bitte nicht naschen‘. Zum Glück bin ich ein Hamster und kann nicht lesen.",
+        "Ich hab die Backen voll. Wortwörtlich.",
+        "Hamsterkäufe in der Backstube: Level Experte.",
+        "Meine Backen haben gerade deutlich mehr Volumen als der Teig in der Stückgare.",
+        "Man nennt es nicht ‚vollgefressen‘, das ist die strategische Zwischenlagerung von Kohlenhydraten.",
+        "Vorratskammer? Wozu? Ich habe mein Hab und Gut immer direkt am Mann.",
+        "Ich bin nicht dick, das ist einfach nur extrem gut isolierte Bäcker-Energie.",
+        "Wenn um 3 Uhr nachts der Heißhunger kickt und man einfach keine Gefangenen mehr macht.",
+        "Hamster-OS Systemwarnung: Maximale Zuladung der Backtaschen kritisch überschritten!",
+        "Kohlenhydrat-Loading für den Endspurt am Stikkenofen. Das muss so.",
+        "Der panische Blick, wenn du merkst, dass du aus Versehen das Vorführmodell für den Laden gefressen hast.",
+        "Chef: ‚Ist der Rest schon im Froster?‘ Ich: nickt stumm und angestrengt mit vollem Mund.",
+        "Atmen wird massiv überbewertet, wenn man dafür einfach noch ein bisschen mehr Brot in den Mund bekommt.",
+        "Das ist keine Diät-Sünde, das ist essenzielle Nervennahrung für die anstehende Frühschicht-Übergabe."
       ]
     },
     "bowling": {
@@ -922,7 +973,29 @@
       },
       "texte": [
         "Strike. Mit Semmel.",
-        "Stangen umhauen ist auch Sport."
+        "Stangen umhauen ist auch Sport.",
+        "Strike! Alle zehn Baguette-Pins sauber abgeräumt.",
+        "Wer braucht eine teure Bowlingkugel, wenn er ein steinhartes Brötchen von gestern hat?",
+        "Wenn der Chef fragt: Das ist keine Spielerei, das ist dynamische Bruchtest-Qualitätskontrolle für Baguettes.",
+        "Nachtschicht-Olympiade, Disziplin 1: Semmel-Bowling im Hauptgang.",
+        "Chef: ‚Mit Essen spielt man nicht!‘ Ich: ‚Das ist professioneller Betriebssport zur Teambildung!‘",
+        "Fokus, Präzision und ein Brötchen mit absolut perfektem Rollwiderstand.",
+        "Wenn um 3 Uhr nachts der Froster fertig ist und du auf den Ofen warten musst, werden Baguettes eben zu Pins.",
+        "Das Geheimnis eines guten Wurfs? Die optimale Aerodynamik durch den perfekten Kreuzschnitt auf der Semmel!",
+        "Die Kaisersemmel rollt... auf zum Teig-Strike!",
+        "Spare? Ich kenne nur Spare-Ribs. In dieser Backstube wird direkt abgeräumt.",
+        "Nenn mich den Kingpin der Backstube. Keine Stange bleibt stehen.",
+        "Die Baguettes stehen artig in Formation. Sie haben keine Ahnung, was sie gleich trifft.",
+        "Rinne (Gutterball)? Nein, die Semmel ist nur aus strategischen Gründen in die Gärrinne abgebogen.",
+        "Räum die Bahn, hier kommt das Schwergewicht frisch aus der Gare.",
+        "Baguettes aufstellen dauert ewig. Sie mit einer gezielten Semmel umzunieten? Unbezahlbar.",
+        "Zungenspitze raus, Blick fixiert: Dieser Wurf entscheidet, wer heute am Ende der Schicht fegen muss.",
+        "Härtegrad-Test: Wenn das Brötchen die Baguettes beim Aufprall pulverisiert, war der Ofen definitiv zu heiß.",
+        "Manche bowlen um Pokale, ich bowle um den allerletzten Schluck Kaffee in der Kanne.",
+        "Dieser Moment der vollkommenen Stille, kurz bevor die Semmel krachend in die Baguettes einschlägt.",
+        "Hamster-OS Warnmeldung: Unautorisierte, bodennahe Flugobjekte im Versandbereich entdeckt.",
+        "Mach Platz da, die Semmel hat Vorfahrt und absolut keine Bremsen!",
+        "Perfekter Drall! Dieses Brötchen hat mehr Effet als mein gesamter Lebenslauf."
       ]
     },
     "chili": {
@@ -959,7 +1032,27 @@
       },
       "texte": [
         "Bisschen Schärfe schadet keiner Torte.",
-        "Das ist Deko. Rote Deko."
+        "Das ist Deko. Rote Deko.",
+        "Süß kann jeder. Ich bringe heute mal die extra Portion Schärfe ins Geschäft!",
+        "Wenn der nervige Kunde extra betont, er wolle etwas ‚Feuriges‘ zum Geburtstag...",
+        "Das Rezept verlangte nach ‚rotem Guss‘. Ich hoffe, sie mögen Scoville.",
+        "Hier, nimm das! Die Rache des Hamsters schmeckt scharf.",
+        "Ups, abgerutscht... Das war ganz sicher keine Absicht. (mit dem bösesten Blick)",
+        "Manche Leute wollen die Welt einfach brennen sehen. Ich fange bei dieser Torte an.",
+        "Wer hat gesagt, dass Konditoren immer nur lieb und süß sind?",
+        "Ich nenne es: ‚Süße Torte mit feurigem Abgang‘. Viel Spaß beim Probieren!",
+        "Chilisauce auf Torte – die ultimative Waffe gegen ungebetene Gäste im Pausenraum.",
+        "Die Geheimzutat ist heute Hass. Und verdammt viel Chili.",
+        "Ich bin nicht wütend. Ich würze nur nach!",
+        "Das ist mein ‚Ich-habe-heute-schlechte-Laune-Guss‘.",
+        "Ihr wolltet eine Überraschung? Ihr bekommt eine Überraschung.",
+        "Schärfegrad: Löscht den Durst... mit Tränen.",
+        "Es gibt kein Gesetz, das Chili auf Torte verbietet. Ich habe nachgesehen!",
+        "Die Torte war mir einfach zu langweilig. Jetzt hat sie Charakter.",
+        "Wenn der Azubi die rote Dekosoße mit der Chilisauce aus der Mittagspause verwechselt...",
+        "Hamster-OS-Fehlermeldung: Unerwartete Schärfe im Gebäckbereich festgestellt!",
+        "Die brennt zweimal. Einmal beim Essen und einmal beim Blick auf die Reklamation.",
+        "Wer diese Torte überlebt, darf sich offiziell ‚Schärfemeister‘ nennen."
       ]
     },
     "croissant": {
@@ -1027,7 +1120,32 @@
       },
       "texte": [
         "Pause. Auf Blätterteig.",
-        "Nicht stören. Ich reife."
+        "Nicht stören. Ich reife.",
+        "Teigruhe? Die nehme ich heute mal ganz wörtlich.",
+        "In der Ruhe liegt die Kraft. Und in der Butter. Vor allem in der Butter.",
+        "Manche meditieren. Ich lege mich einfach auf ein frisches Croissant.",
+        "Das Geheimnis eines perfekten Plunderteigs? Er darf sich nicht stressen lassen. Ich mache das einfach mal vor.",
+        "Pause. Bitte erst nach dem nächsten Ofen-Alarm wecken.",
+        "Ich lass mich heute einfach mal gehen wie ein guter Hefeteig.",
+        "Schwerkraft ist für heute nur noch eine Empfehlung.",
+        "Der Bäcker schläft nicht, er ruht wie ein gut gepflegtes Anstellgut.",
+        "Der Moment, wenn der 'FROSTER FERTIG'-Button endlich gedrückt ist und die Schicht endet.",
+        "Nachtschicht-Modus: Erfolgreich deaktiviert. Lade Akku...",
+        "Wenn das Bett ruft, aber die Backstube dein Zuhause ist.",
+        "Energielevel: 2 %. Croissant-Level: 100 %.",
+        "Kaffee wirkt nicht mehr. Ich inhaliere einfach den Duft warmer Butter und schlafe ein.",
+        "Wenn du morgens um vier den perfekten Schlafplatz findest... und es das Reste-Blech ist.",
+        "Ich bin dann mal im offiziellen Kohlenhydrat-Koma.",
+        "Tourieren macht müde. Frag nicht, wie viele Runden ich heute schon hinter mir habe.",
+        "Ich brauche keine Hängematte, wenn ich 27 Schichten Butterteig haben kann.",
+        "Ein Hörnchen auf dem Hörnchen.",
+        "Croissant-Ergonomie: Geprüft und von der Berufsgenossenschaft für exzellent befunden.",
+        "Das ist keine Faulheit, das ist eine sensorische Qualitätskontrolle der Kruste. Von außen.",
+        "Wer sagt, man soll nicht mit Essen spielen, hat noch nie darauf geschlafen.",
+        "Ich rolle mich jetzt ein. Weckt mich, wenn Wochenende ist.",
+        "Mein Spirit-Animal während der 30-minütigen Pausenschicht.",
+        "Ich habe heute schon genug Knete gemacht, jetzt wird gechillt.",
+        "Es gibt nichts Besseres als das Gefühl von frischem Gebäck... als Matratze."
       ]
     },
     "fechter": {
@@ -1085,7 +1203,32 @@
       },
       "texte": [
         "En garde! Mit Baguette.",
-        "Touché. Krümel."
+        "Touché. Krümel.",
+        "En garde! Verteidige deine Kruste!",
+        "Touché! Dieser Längsschnitt am Baguette war ein absolutes Meisterwerk.",
+        "Florett, Degen, Säbel... Baguette. Ein wahrer Meister wählt seine Waffe weise.",
+        "Parade, Riposte... und ab in den Ofen damit!",
+        "Ausfallschritt an den Stikkenofen: Perfekte Haltung, perfekte Bräunung.",
+        "Trefferfläche ist heute ausschließlich der Gärschrank.",
+        "Die Maske sitzt, das Baguette ist hart. Lasst die Spiele beginnen.",
+        "Ich kreuze die Klingen mit jedem, der es wagt, den Froster vorzeitig aufzumachen!",
+        "Zwei Tage altes französisches Weißbrot. Die gefährlichste Waffe der gesamten Nachtschicht.",
+        "Wer ein richtig gutes, knuspriges Baguette hat, braucht keinen Stahl mehr.",
+        "Qualitätskontrolle bestanden: Bricht selbst bei der härtesten Parade nicht durch.",
+        "Das ist kein Ausschuss von gestern, das ist mein offizielles Trainingsgerät.",
+        "Ein echter Fechtmeister verlässt sich nicht auf Klingen, sondern auf reine Kohlenhydrate.",
+        "Mein Baguette ist deutlich spitzer als deine Argumente.",
+        "Hamster-OS Warnung: Unautorisierter Schwertkampf mit Backwaren im Versandbereich erkannt.",
+        "Einer für alle, alle für ein verdammt gutes Frühstück!",
+        "D'Artagnan wäre stolz auf diese exzellente Porung.",
+        "Bonjour. Du hast mein Croissant beleidigt. Mach dich bereit zu kämpfen.",
+        "Für die Ehre Frankreichs und die perfekte Teigruhe!",
+        "Wir sind die Bäcker-Musketiere: Mehl, Wasser und Hefe.",
+        "Wenn die Frühschicht meckert und wir das jetzt wie Gentlemen klären müssen.",
+        "Komm nur her, Azubi. Heute lernst du die harte Schule des französischen Backhandwerks kennen.",
+        "Ein guter Bäcker führt die Klinge geschmeidig aus dem Handgelenk. Den Teigschaber übrigens auch.",
+        "Wenn der Meister fragt, warum ein Baguette fehlt... Ich verteidige hier nur unsere Ehre.",
+        "Zieh deine Waffe! Aber nimm besser ein Roggenbrot, Weizen hält meinen Schlägen nicht stand."
       ]
     },
     "froster": {
@@ -1190,7 +1333,32 @@
       },
       "texte": [
         "Der Name ist Crumble. Nur Crumble.",
-        "Geschüttelt, nicht geknetet."
+        "Geschüttelt, nicht geknetet.",
+        "Mein Name ist Brezel. Doppelnull-Brezel.",
+        "Der Vorteig? Geschüttelt, nicht gerührt.",
+        "Agent 00-Brezel im Einsatz. Mission: Die perfekte Kruste infiltrieren.",
+        "Ausgestattet mit der Lizenz zum Knoten.",
+        "Geheimwaffe: Der perfekt symmetrische, aerodynamische Brezelknoten.",
+        "Ein echter Gentleman trägt zum Smoking immer eine frisch belaugte Brezel.",
+        "Undercover in der Backstube. Codename: Goldkruste.",
+        "Du erwartest, dass ich rede? Nein, ich erwarte, dass der Teig aufgeht!",
+        "Man lebt nur zweimal: Einmal vor dem Gärschrank und einmal im Ofen.",
+        "Der Smoking war mal komplett schwarz. Dann kam die verdeckte Operation am Mehlsilo.",
+        "Wenn der Meister zur Qualitätskontrolle bittet, erscheine ich nur im feinsten Zwirn.",
+        "Stil ist keine Frage der Uhrzeit. Auch nachts um 3 Uhr hat der Teig Respekt verdient.",
+        "Ich binde keine Fliegen, ich schlinge Brezeln.",
+        "Das bisschen Mehl auf der Stirn? Das ist mein streng geheimes Agenten-Tarnpuder.",
+        "Ein guter Spion hinterlässt keine Spuren. Außer etwas grobes Salz auf dem Blech.",
+        "Erwarte nicht, dass ich mir für einen einfachen Weizenteig den Smoking ruiniere.",
+        "Hamster-OS Geheimdienst-Meldung: Der Stikkenofen ist gesichert und auf 220 Grad hochgefahren.",
+        "Für diese Brezel würdest du freiwillig Staatsgeheimnisse verraten.",
+        "Ich rette nicht die Welt. Ich sorge nur dafür, dass sie morgens anständig frühstückt. Im Grunde dasselbe.",
+        "Feinde? Kenne ich nicht. Nur Teiglinge, die noch diszipliniert werden müssen.",
+        "Wenn Blicke belaugen könnten...",
+        "Du hältst das für einfaches Gebäck? Das ist ein präzisionsgefertigtes Meisterwerk der Teig-Spionage.",
+        "Ich operiere ausschließlich im Schatten der Nachtschicht.",
+        "Mission Impossible? Überleb mal den Sonntagsansturm am Tresen, ohne die Fassung zu verlieren.",
+        "Agent Hamster meldet: Schling-Protokoll Alpha erfolgreich und fehlerfrei ausgeführt."
       ]
     },
     "gewichtheber": {
@@ -1227,7 +1395,27 @@
       },
       "texte": [
         "Zwei Brezeln. Laugen-Hantel.",
-        "Noch eine Wiederholung. Dann Pause."
+        "Noch eine Wiederholung. Dann Pause.",
+        "Do you even lift, Brezel?",
+        "Wer braucht ein teures Fitnessstudio, wenn er nachts 25-Kilo-Mehlsäcke stemmen darf?",
+        "Laugen-Pump: Das einzig wahre Krafttraining für die Elite der Backstube.",
+        "Vergiss gusseiserne Hantelscheiben. Wahre Champions stemmen reine Kohlenhydrate.",
+        "Kreuzheben war gestern. Der moderne Bäcker trainiert im Brezel-Drücken.",
+        "Carb-Loading extrem: Ich hebe meine Kohlenhydrate erst, bevor ich sie esse.",
+        "Mein Workout-Plan? Montag: Mehlsäcke. Dienstag: Teigbottiche. Mittwoch: Brezel-Reißen.",
+        "Das exakte Gesicht, wenn der Stikkenwagen eine blockierte Rolle hat und du ziehen musst wie ein Ochse.",
+        "Nachtschicht, 4 Uhr morgens: Jedes Gramm Teig wiegt plötzlich gefühlt eine Tonne.",
+        "Wenn der Chef fünf Minuten vor Feierabend sagt: ‚Mach noch schnell 200 Brezeln extra.‘",
+        "Ich schwitze nicht. Das ist kondensiertes Schüttwasser aus der Backstube.",
+        "Das ist kein hochroter Kopf vor Anstrengung, das ist die perfekte Krustenfarbe nach 20 Minuten bei 220 Grad.",
+        "Dieser Moment, wenn der Teig extrem zäh ist und einfach absolut keinen Bock hat, sich ziehen zu lassen.",
+        "Wenn du innerlich eigentlich schon im Bett liegst, aber der Meister genau zuschaut und du abliefern musst.",
+        "Komm schon, zieh durch! Der Froster füllt sich schließlich nicht von allein.",
+        "Hamster-OS Warnung: Maximale hydraulische Belastungsgrenze der Oberarme erreicht.",
+        "Schmerz vergeht, der Stolz auf die perfekt geschlungene Brezel bleibt.",
+        "Ganz ruhige Atmung... Einatmen, Ausatmen... und dabei bloß nicht die Brezel zerbrechen!",
+        "Der pure Überlebenskampf, wenn die Gärschränke wieder bis unters Dach voll sind.",
+        "Ich brauche keine Motivation. Mich treibt die pure Verzweiflung und der Wunsch nach Feierabend."
       ]
     },
     "hamstertag": {
@@ -1263,7 +1451,29 @@
       },
       "texte": [
         "Morgen Hamstertag. Ich bin vorbereitet.",
-        "Vorrat ist kein Hobby. Vorrat ist Pflicht."
+        "Vorrat ist kein Hobby. Vorrat ist Pflicht.",
+        "Klopapier war aus, da bin ich sicherheitshalber auf Brötchen umgestiegen.",
+        "Man nennt es Hamsterkauf. Ich nenne es eine solide strategische Kohlenhydrat-Reserve.",
+        "Der typische Kunde am Sonntagmorgen um 6:30 Uhr, der Angst hat, dass die Bäckerei um 7 Uhr schließt.",
+        "Ich bin ein Hamster. Was genau habt ihr bei dem Wort ‚Hamsterkauf‘ eigentlich erwartet?",
+        "Aus dem Weg! Der Kohlenhydrat-Express rollt und er hat absolut keine Bremsen!",
+        "Weltuntergang? Zombie-Apokalypse? Völlig egal, solange der Brötchen-Vorrat reicht.",
+        "Das Schild im Laden sagte ‚Abgabe nur in haushaltsüblichen Mengen‘. Mein Haushalt ist eben sehr, sehr hungrig.",
+        "Nur das Nötigste für ein kleines, bescheidenes Wochenend-Frühstück.",
+        "Wenn der Meister nach der Schicht sagt: ‚Nimm dir ruhig noch ein bisschen Bruchware mit.‘",
+        "Wie ich die Retoure heimlich abtransportiere, weil es einfach zu schade zum Wegwerfen ist.",
+        "Frühschicht-Versorgung gesichert. Wenn die Kollegen jetzt noch meckern, fahre ich den Wagen gegen die Wand.",
+        "Ich habe heute Nacht nicht gebacken, ich habe ausschließlich gehamstert.",
+        "Das ist keine Panik, das ist die fachgerechte Überführung von Backwaren in den Hochsicherheitsbereich.",
+        "Hamster-OS-Systemwarnung: Maximale Traglast des Einkaufswagens kritisch überschritten!",
+        "Wenn du nach der Nachtschicht endlich Feierabend hast und der Bäckerei-Heißhunger gnadenlos zuschlägt.",
+        "Der Wagen ist randvoll, die Backen sind auch schon gefüllt. Mission erfolgreich.",
+        "Ich bin der Brötchengeber der Nation. Verbeugt euch vor meinem vollen Einkaufswagen!",
+        "Hätte ich noch eine Hand frei, würde ich den kompletten Stikkenwagen auch noch mitnehmen.",
+        "Ich habe zwar die Kontrolle über mein Leben verloren, aber dafür besitze ich jetzt sehr viele Brötchen.",
+        "Wer sagt, man könne Glück nicht kaufen, hat nie einen Einkaufswagen voller ofenwarmer Kaisersemmeln geschoben.",
+        "Meins, meins, meins! Alles meins!",
+        "Die Semmeln stapeln sich bis zum Kinn, das ist die perfekte aerodynamische Formel für den Einkaufswagen."
       ]
     },
     "jongleur": {
@@ -1417,7 +1627,27 @@
       },
       "texte": [
         "HIIIJA. Scheibe gefällig?",
-        "Brotmesser? Brauch ich nicht."
+        "Brotmesser? Brauch ich nicht.",
+        "Brotschneidemaschine? Messer sind für Anfänger. Hier regiert die Handkante!",
+        "Haaaa-Ya! Kruste zu hart? Nicht für meinen Schwarzgurt-Schlag.",
+        "Zweiter Dan im Brötchen-Spalten, schwarzer Gürtel in der Teigknet-Kunst.",
+        "Das ist kein gewöhnlicher Karate-Chop, das ist der patentierte BäckereiOS-Brotteiler.",
+        "Wenn das alte Roggenbrot vom Vortag so hart ist, dass du die Kampfsport-Skills auspacken musst.",
+        "Ein echter Meister schneidet das Baguette nicht. Er zwingt es psychologisch dazu, sich zu teilen.",
+        "Die Kunst des Kampfes: Werde formlos wie Wasser, aber schlag zu wie ein drei Tage altes Baguette.",
+        "Sensei Hamster sagt: Nur wer das Mehl spürt, kann das Brot brechen.",
+        "Nachtschicht-Frustbewältigung, Level: Großmeister.",
+        "Stell dir einfach vor, der Teigling ist dein Wecker. Bäm!",
+        "Die Teigteilmaschine ist kaputt? Kein Problem, ich übernehme die nächsten 1000 Stück manuell.",
+        "Mein Chi ist absolut zentriert. Meine Wut auf die Frühschicht allerdings auch.",
+        "Ich meditiere nicht. Ich verprügele Backwaren, bis ich innere Ruhe finde.",
+        "Wenn der Chef sagt: ‚Mach mal schnell halbe Brote‘, fragt man nicht nach dem Wie.",
+        "Cobra Kai war gestern. Willkommen im Croissant-Dojo! No mercy für den Plunderteig.",
+        "Auftragen das Mehl, polieren den Ofen. Der Weg des Karate-Bäckers ist lang.",
+        "Bäckerei-Ninja-Regel #1: Lass den Teig niemals wissen, von wo der Schlag kommt.",
+        "Arbeitssicherheit hat heute leider frei. Wir machen hier Extreme-Teig-Teiling.",
+        "Das Geheimnis einer perfekten Krume? Ein präziser Handkantenschlag genau in die Magengegend des Teigs.",
+        "Du denkst, das ist Teig? Für mich ist es nur ein weiterer Gegner, der gleich klein beigibt."
       ]
     },
     "mehlbombe": {
@@ -1505,7 +1735,32 @@
       },
       "texte": [
         "War der Sack kaputt oder ich?",
-        "Hatschi. Mehl 550. Erkenn ich blind."
+        "Hatschi. Mehl 550. Erkenn ich blind.",
+        "Ich habe absolut keine Ahnung, wie dieser Mehlsack umgekippt ist.",
+        "Beweise? Ich sehe hier keine Beweise. Das ist nur mein neues Puder-Make-up.",
+        "Ich wollte nur kurz prüfen, ob das Typ 550 oder 1050 ist.",
+        "Der Sack hat angefangen! Ich habe mich nur gewehrt.",
+        "Welches Mehl? Ich bin von Natur aus so blass.",
+        "Das war ein plötzlicher, lokaler Schneesturm. Mitten in der Backstube. Ganz normale Sache.",
+        "Wenn der Azubi den Kneter auf Stufe 3 stellt, bevor das Wasser drin ist.",
+        "Geh in die Bäckerei, haben sie gesagt. Das ist ein schöner, sauberer Handwerksberuf, haben sie gesagt.",
+        "Dieser leere Blick, wenn du realisierst, dass du das jetzt alles selbst zusammenfegen darfst.",
+        "Hamster-OS meldet: Feinstaubbelastung am Arbeitsplatz kritisch überschritten.",
+        "Ich atme nicht mehr. Ich inhaliere reine Backwaren.",
+        "So sieht es aus, wenn man 'nur mal kurz' die Silo-Klappe aufmacht.",
+        "Das ist kein Mehl. Das ist der pure Stress der Nachtschicht, der an mir kondensiert.",
+        "Weiß steht mir. Es lenkt so schön von den tiefen Augenringen ab.",
+        "Einmal tief einatmen und ich niese Pizzateig.",
+        "Scarface für Bäcker: Say hello to my little Mehlsack!",
+        "Ich bin heute im Tarnmodus unterwegs: Schneeweißes Mehl auf blassem Hamster.",
+        "Das nennt man in der Fachsprache 'intensive Teigvorbereitung am lebenden Objekt'.",
+        "Halloween ist erst im Oktober, aber ich gehe heute als Mehlgeist.",
+        "Ich paniere mich schon mal vor. Man weiß ja nie, was der Meister heute vorhat.",
+        "Mehlstaub-Explosion in 3... 2... 1...",
+        "Wenn der Chef sagt: 'Staub mal kurz die Arbeitsfläche ab' und du das etwas zu wörtlich nimmst.",
+        "Puderzucker oder Mehl? Probier doch mal. Ich kann gerade nichts mehr schmecken.",
+        "Schneemann bauen im August? Challenge accepted.",
+        "Ich liebe meinen Job. Sieht man das nicht an meinem restlos begeisterten Gesichtsausdruck?"
       ]
     },
     "teigmonster": {
@@ -1530,7 +1785,29 @@
       },
       "texte": [
         "Hilfe. Der Teig geht. Mit mir.",
-        "Ich hab nur kurz reingefasst."
+        "Ich hab nur kurz reingefasst.",
+        "Hilfe! Die Hefe hat ein eigenes Bewusstsein entwickelt und verlangt nach Opfern.",
+        "Ich sagte ‚eine Prise‘ Hefe, nicht den verdammten Eimer!",
+        "Wenn du den Weizenteig ‚nur mal kurz für 5 Minuten‘ aus den Augen lässt.",
+        "Das ist kein Teig mehr, das ist eine unaufhaltsame biologische Waffe.",
+        "Rette sich wer kann, der Sauerteig hat den Knetkessel übernommen!",
+        "Ich gehe heute voll in meiner Arbeit auf. Buchstäblich.",
+        "Der panische Gesichtsausdruck, wenn du realisierst, dass das Schüttwasser 10 Grad zu warm war.",
+        "Kleiner Tipp: Hefe ist ein Lebewesen. Und dieses hier ist definitiv wütend!",
+        "Chef? Wir haben hier ein klitzekleines Problem in der Teigmacherei...",
+        "Hamster-OS Notfall-Protokoll: Kritische Volumenüberschreitung in Kessel 3. Sofortige Evakuierung einleiten!",
+        "Wer auch immer den Gärraum auf 45 Grad gestellt hat: Ich werde dich finden.",
+        "Das ist keine Angst in meinen Augen, das ist tiefer, ehrfürchtiger Respekt vor der enzymatischen Triebkraft.",
+        "Wenn der Azubi beim Abwiegen der Hefe das Komma versehentlich um eine Stelle verschoben hat.",
+        "Ich brauche keinen Rettungsschwimmer, ich brauche einen verdammten Teigschaber. Einen sehr großen!",
+        "Nachtschicht-Regel #1: Vertraue niemals einem stillen Hefeteig.",
+        "Es gibt gute Schichten, schlechte Schichten, und dann Schichten, in denen dich dein eigener Teig frisst.",
+        "Manche nehmen ein Schaumbad zum Entspannen. Ich nehme ein Teigbad, um meine Panik-Toleranz zu trainieren.",
+        "Houston, wir haben ein massives Hefe-Problem.",
+        "Der Teig und ich haben gerade eine kleine Meinungsverschiedenheit darüber, wer hier wen verarbeitet.",
+        "Ich bin nicht gefangen, ich führe nur eine sehr intime sensorische Qualitätskontrolle des Klebergerüsts durch.",
+        "Dieser Moment, wenn du feststellst, dass du heute nicht der Bäcker bist, sondern die Füllung.",
+        "Bin ich um 5 Uhr nicht zurück, sucht mich im Stikkenofen. Als Füllung eines gigantischen Mutanten-Brötchens."
       ]
     },
     "torte_gesicht": {
@@ -1578,7 +1855,27 @@
       },
       "texte": [
         "Das war Absicht. Fast.",
-        "Sahne. Überall. Auch hinten."
+        "Sahne. Überall. Auch hinten.",
+        "Ich sagte „Schwarzwälder Kirsch“, nicht „Schwarzwälder Klatsch“.",
+        "Montag. Muss ich noch mehr sagen?",
+        "Sahne macht nicht nur dick, sie nimmt einem auch die Sicht, wenn sie mit Mach 2 anfliegt.",
+        "Das war kein Unfall, das war ein gezielter Sahne-Schlag aus der Konditorei.",
+        "Der Konditor-Azubi übt wieder seine Wurftechnik.",
+        "Ich wollte doch nur kurz die Qualitätskontrolle machen. Die Torte hat mich zuerst angegriffen!",
+        "Arbeitsschutzmaßnahme #42: In der Konditorei immer einen Schutzhelm mit Visier tragen.",
+        "Das Wichtigste zuerst: Ist die Kirsche noch ganz?",
+        "Das mit der „Torten-Maske“ zur Hautpflege stand aber anders im Magazin.",
+        "Die Berufsgenossenschaft wird mir diesen „Arbeitsunfall“ niemals abkaufen.",
+        "Beim Tourieren eingeschlafen. Der Meister hat eine sehr direkte Weckmethode.",
+        "Facepalm? Anfänger. Wir machen hier die Gesichts-Torte!",
+        "Ich glaube, die Sahne war drüber. Die war heute extrem aggressiv.",
+        "Wer den Schaden hat, braucht für die Kalorien nicht zu sorgen.",
+        "Schwerkraft und Biskuitboden haben gemeinsame Sache gemacht.",
+        "Das ist keine Sauerei, das ist eine moderne, abstrakte Interpretation des Bäckerhandwerks.",
+        "Ich präsentiere unseren neuen Topseller: Die „In-Your-Face“-Torte. Kommt garantiert gut an.",
+        "Nächster Schritt im Rezept: Die Torte mit dem Gesicht auffangen. Check.",
+        "Ich hätte heute im Bett bleiben sollen.",
+        "Kuchen gut, alles gut. Mein linkes Auge sieht das allerdings gerade etwas verschwommen."
       ]
     },
     "zombie": {
@@ -1626,7 +1923,32 @@
       },
       "texte": [
         "Kaffee. Jetzt. Bitte. Danke.",
-        "Ich war schon wach, als du kamst."
+        "Ich war schon wach, als du kamst.",
+        "Bitte erst ansprechen, wenn der Kaffee-Pegel den Mehlstaub-Pegel übersteigt.",
+        "Das ist kein Kaffee. Das ist flüssiger, tiefschwarzer Überlebenswille.",
+        "Blutgruppe: 100% Arabica, extrastark geröstet.",
+        "Die Tasse ist nicht zu groß. Die Nachtschicht war einfach viel zu lang.",
+        "Koffein wirkt nicht mehr. Ich halte mich nur noch am Henkel fest, um nicht vornüber in den Teig zu kippen.",
+        "Ich trinke diesen Kaffee nicht, um wach zu werden. Sondern um niemanden mit dem Teigschaber zu bedrohen.",
+        "Der Stikkenofen wärmt den Raum, aber dieser Kaffee heilt meine geschundene Bäckerseele.",
+        "Der Moment, wenn du feststellst, dass du vor lauter Erschöpfung koffeinfreien Kaffee aufgebrüht hast.",
+        "Nachtschicht Tag 5. Ich spüre meine Ohren nicht mehr und blinzeln strengt mich an.",
+        "Augenringe? Das sind keine Augenringe. Das sind hart erarbeitete Bäcker-Schatten.",
+        "Ich bin nicht müde. Ich bin im hochgradig optimierten Energiesparmodus.",
+        "Mein Gesichtsausdruck, wenn der Sauerteig nicht anspringt, ich aber schon seit 2 Uhr auf den Beinen bin.",
+        "Die Bäckermütze hält eigentlich nur noch meine letzten zwei funktionierenden Gehirnzellen zusammen.",
+        "Weck mich, wenn die Frühschicht da ist und die Brötchen geputzt sind.",
+        "Hamster-OS Systemstatus: Akku bei 1%, Lebenserhaltungssysteme laufen ausschließlich über Kaffeebohnen.",
+        "Ich habe mittlerweile mehr Ringe als ein ordentlicher Baumkuchen.",
+        "Ein fröhliches ‚Guten Morgen‘ ist in der Nachtschicht eine absolute Provokation.",
+        "Chef: ‚Du siehst heute aber ein bisschen müde aus.‘ Ich: starrt stumm und hasserfüllt über den Tassenrand.",
+        "Noch ein blöder Spruch über mein Aussehen und ich bade dich höchstpersönlich im Vorteig.",
+        "Mehl im Gesicht, Tasse in der Hand, absolute Leere im Blick. Das magische Bäcker-Dreieck.",
+        "Ist es schon Zeit für Feierabend oder erst Zeit, um in der Kühlzelle zu weinen?",
+        "Geh ins Bäckerhandwerk, haben sie gesagt. Du hast den ganzen Nachmittag frei, haben sie gesagt.",
+        "Feierabend ist für mich kein Zeitpunkt mehr, es ist ein rein spiritueller Zustand, den ich verzweifelt suche.",
+        "Ich brauche kein Wochenende. Ich brauche ein medizinisches Koma.",
+        "Die Tasse wiegt schwer, aber die Last der Verantwortung für das Sonntagsfrühstück wiegt noch schwerer."
       ]
     }
   },
@@ -1649,6 +1971,6 @@
       55
     ],
     "aufgaben_schwelle": 5,
-    "nummer_dauer_ms": 6000
+    "nummer_dauer_ms": 8000
   }
 }

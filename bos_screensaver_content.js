@@ -86,5 +86,19 @@ window.BOS_SCREENSAVER_CONTENT = [
   { kategorie: 'emoji', text: '☀️🥐☕ Guten Morgen, Team!' },
   { kategorie: 'emoji', text: '💪🍞✨ Ihr backt das schon.' },
   { kategorie: 'emoji', text: '🌙🥖😴 Nachtschicht-Gang.' },
-  { kategorie: 'emoji', text: '🎂🕯️😋 Süßes für die Seele.' }
+  { kategorie: 'emoji', text: '🎂🕯️😋 Süßes für die Seele.' },
+
+  /* ---------- Nachschub Ulf, 17.10.2026, 18:27 (über den Kontroll-Chat Crumble; Azubi- und Asthma-Zeilen bewusst weggelassen) ---------- */
+  { kategorie: 'backstube', text: 'Wer morgens zerknittert ist, hat tagsüber viele Entfaltungsmöglichkeiten. Frag mal den Plunderteig!' },
+  { kategorie: 'backstube', text: 'Sauerteig ist wie ein Tamagotchi. Nur dass es nicht ganz so eklig ist, wenn man ihn sterben lässt.' },
+  { kategorie: 'backstube', text: 'Verbrenn dir nicht die Finger am Blech. Du brauchst sie noch, um den Urlaubsschein auszufüllen.' },
+  { kategorie: 'backstube', text: 'Man sagt, Hefe braucht Wärme und Zuneigung. Ich brauche das auch, kriege aber nur den Stikkenofen.' },
+  { kategorie: 'nachtschicht', text: 'Schlaf wird überbewertet. Koffein und Mehlstaub halten den Kreislauf auch irgendwie am Laufen.' },
+  { kategorie: 'nachtschicht', text: 'Nachtschicht: Die magische Zeit, in der normale Menschen träumen und wir unsere Lebensfreude in Brötchen pressen.' },
+  { kategorie: 'fakt', text: 'Wenn Mehlstaub in der Luft die richtige Konzentration erreicht, kann er explosiv werden. Also immer schön vorsichtig fegen, sonst machst du den großen Knall!' },
+  { kategorie: 'fakt', text: 'Im Mittelalter gab es für betrügerische Bäcker, die zu kleine Brote verkauften, die „Bäckertaufe“: Sie wurden in einem Schandkorb ins Wasser getaucht oder in den Dreck geworfen.' },
+  { kategorie: 'fakt', text: 'Wir sind eigentlich skrupellose Pilz-Mörder: Backhefe besteht aus unzähligen einzelligen Pilzen, die wir erst mästen und dann bei über 200 Grad im Ofen auslöschen.' },
+  { kategorie: 'fakt', text: 'Das Croissant ist eine Lüge! Es kommt gar nicht aus Frankreich, sondern stammt ursprünglich vom österreichischen Kipferl ab.' },
+  { kategorie: 'fakt', text: 'Im alten Ägypten war Brot so wertvoll, dass es teilweise als Lohn für die Arbeiter an den Pyramiden diente. (Leider akzeptiert dein Vermieter heute keine Doppelbrötchen.)' },
+  { kategorie: 'fakt', text: 'Pumpernickel verdankt seinen Namen angeblich einem Fluch: Napoleon soll das dunkle Brot nur für sein Pferd Nickel gut genug befunden haben („C’est pain pour Nickel!“). Vermutlich ein Mythos, aber ein lustiger.' }
 ];
