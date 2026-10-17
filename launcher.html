@@ -19,6 +19,19 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-17 · 06:49 · v3.3 · Feature (Crumble #62 Stufe 1, Teil B; Anweisung Kontroll-Chat
+      17.10., 06:00, Bauplan 06:18, Ulf 06:27 „Mach alles in einem Rutsch“)
+      - Lädt hamster_figur/hamster_figur.css + .js und bos_crumble_host.js
+        (die Brücke: Knopf, Schoner-Fabrik, Begrüßung, Aufgaben-Regeln, Ein/Aus).
+        Hier nur zwei Aufrufe: BOS_CRUMBLE_HOST.start() in applyProfileUI()
+        neben BOS_SCREENSAVER.start(), BOS_CRUMBLE_HOST.setzeAn() aus den
+        Einstellungen. Ladereihenfolge ist egal (lazy).
+      - Ruf-Knopf „Crumble“ in der Kopfleiste zwischen Firestore-Status und
+        Uhr (setzt bos_crumble_host.js selbst vor .bos-topbar__clockwrap).
+      - Einstellungen: Zeile „🐹 Crumble“ An/Aus → Feld hamster im Profil
+        (immer true/false; fehlt = an), per Profil-Sync auf alle Geräte.
+        storage-Ereignis zieht es in offenen Fenstern nach.
+      - Kein weiteres Verhalten geändert. Siehe SESSION_2026-10-17_HAMSTER_STUFE1_BAU.md.
     2026-10-17 · 02:36 · v3.2 · Fix (#77 ✕ ohne Rückfrage; Bauplan freigegeben vom Kontroll-Chat
       17.10., 02:03, Kern-Datei-Freigabe Ulf 17.10.)
       - Das ✕ fragt jetzt nach, wenn die Seite im Fenster Ungespeichertes
@@ -161,6 +174,8 @@
 <script src="bos_theme_sync.js"></script>
 <!-- Zentrale Design-Datei — jeder künftige Satellit bindet dieselbe Datei ein -->
 <link rel="stylesheet" href="bos_design_tokens.css">
+<!-- 17.10.2026 (Crumble #62): Figur-Stil, nutzt die Tokens oben -->
+<link rel="stylesheet" href="hamster_figur/hamster_figur.css">
 
 <!-- Firebase — Reihenfolge ist bindend (siehe BOS_REBUILD_FUNDAMENT.md §1.1) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -764,6 +779,7 @@
 <script src="bos_farbprofile.js"></script>   <!-- NEU 15.10.2026, #72 Stufe B: vor bos_konto_profil.js -->
 <script src="bos_konto_profil.js"></script>
   <script src="bos_profil_sync.js"></script>   <!-- NEU seit 05.09.2026, siehe SESSION_2026-09-04_PROFIL_EINSTELLUNGEN_SYNC_KONZEPT.md -->
+  <script src="hamster_figur/hamster_figur.js"></script>   <!-- NEU 17.10.2026, Crumble #62: Figur-Modul (Fabrik), Reihenfolge egal -->
   <!-- Ausgelagert aus launcher.html am 03.09.2026, siehe SESSION_2026-09-03_BOOTSCREEN_SCREENSAVER_AUSLAGERUNG.md -->
   <script src="bos_bootscreen.js"></script>
   <script src="bos_screensaver_content.js"></script>
@@ -771,6 +787,7 @@
   <!-- NEU 05.09.2026, siehe SESSION_2026-09-05_AUFGABEN_TASKBOARD_KONZEPT.md -->
   <script src="bos_aufgaben_logik.js"></script>
   <script src="bos_taskboard.js"></script>
+  <script src="bos_crumble_host.js"></script>   <!-- NEU 17.10.2026, Crumble #62: Brücke Knopf/Schoner/Aufgaben, siehe applyProfileUI() -->
   <script src="bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Rückfrage beim ✕, siehe closeWindow() -->
   <script>
   /* ================================================================
@@ -842,6 +859,10 @@
     'settings.layoutResetConfirm': 'Deine Kachel-Anpassungen (Reihenfolge, eigene Kacheln, Design) werden zurückgesetzt. Fortfahren?',
     'settings.info': 'Deine Einstellungen hängen an deinem Konto: Stellst du am Stationstablet etwas um, gilt das auf jedem Gerät mit diesem Konto. Ohne Freischaltung bleiben sie auf diesem Gerät.',
     'settings.farbschema': '🎨 Farbprofil',
+    'settings.hamster': '🐹 Crumble',
+    'settings.hamsterAn': 'An',
+    'settings.hamsterAus': 'Aus',
+    'settings.hamsterHinweis': 'Ruf-Knopf in der Kopfleiste und Figur im Bildschirmschoner. Gilt für dieses Konto auf allen Geräten.',
     'settings.farbVorgabe': 'Vorgabe',
     'settings.farbHinweis': 'Gilt für alle Seiten. Statusfarben (Rot, Gelb, Grün) und Ausgedrucktes bleiben immer gleich.',
     'settings.syncFehler': 'Einstellungen konnten nicht gespeichert werden (bleiben auf diesem Gerät):',
@@ -1332,6 +1353,8 @@
     if (e.key === STORAGE_KEY && state.activeProfileId) {
       loadState();
       renderGrid();
+      // 17.10.2026 (Crumble #62): Ein/Aus aus einem anderen Fenster nachziehen (wie farbschema über bos_theme_sync.js)
+      if (window.BOS_CRUMBLE_HOST) window.BOS_CRUMBLE_HOST.setzeAn(getActiveProfileData().hamster !== false);
     }
   });
 
@@ -1674,6 +1697,7 @@
         '</div>' +
       '</div>' +
       farbwahlHTML() +
+      crumbleHTML() +
       '<div>' +
         '<div class="bos-label">' + t('settings.density') + '</div>' +
         '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' +
@@ -1746,7 +1770,36 @@
     return '<div>' + kopf + '<div class="bos-farbwahl">' + knoepfe + '</div>' +
       '<div style="color:var(--bos-text-faint);font-size:.8rem;margin-top:.35rem;">' + t('settings.farbHinweis') + '</div></div>';
   }
+  /* 17.10.2026 (Crumble #62): Zeile „🐹 Crumble“ An/Aus. Feld hamster im Profil,
+     fehlt = an. Muster der Darstellungs-Knöpfe, aria-pressed zeigt den Stand. */
+  function crumbleHTML() {
+    var data = getActiveProfileData();
+    var istAn = data.hamster !== false;
+    var knopf = function (wert, inhalt, aktiv) {
+      return '<button class="bos-btn" data-role="hamster-' + wert + '" aria-pressed="' + (aktiv ? 'true' : 'false') + '">' + inhalt + '</button>';
+    };
+    var fehlt = !window.BOS_CRUMBLE_HOST || !window.BOS_HAMSTER_FIGUR;
+    return '<div>' +
+      '<div class="bos-label">' + t('settings.hamster') + '</div>' +
+      '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' + knopf('an', t('settings.hamsterAn'), istAn) + knopf('aus', t('settings.hamsterAus'), !istAn) + '</div>' +
+      '<div style="color:var(--bos-text-faint);font-size:.8rem;margin-top:.35rem;">' + t('settings.hamsterHinweis') + '</div>' +
+      (fehlt ? '<div style="color:var(--bos-red);font-size:.8rem;margin-top:.3rem;">Figur nicht geladen (hamster_figur/hamster_figur.js / bos_crumble_host.js) — Seite neu laden. Bleibt es, ist eine Datei noch nicht online.</div>' : '') +
+      '</div>';
+  }
+  function setHamster(wert) {
+    var data = getActiveProfileData();
+    data.hamster = wert !== false;   // immer ausdrücklich true/false (siehe bos_profil_sync.js)
+    if (window.BOS_CRUMBLE_HOST) window.BOS_CRUMBLE_HOST.setzeAn(data.hamster);
+    saveState();
+  }
   function attachSettingsHandlers(el) {
+    ['an', 'aus'].forEach(function (wert) {
+      var b = el.querySelector('[data-role="hamster-' + wert + '"]');
+      if (b) b.addEventListener('click', function () {
+        setHamster(wert === 'an');
+        el.querySelectorAll('[data-role^="hamster-"]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      });
+    });
     el.querySelector('[data-role="theme-dark"]').addEventListener('click', function () { setTheme('dark'); });
     el.querySelector('[data-role="theme-light"]').addEventListener('click', function () { setTheme('light'); });
     el.querySelector('[data-role="density-standard"]').addEventListener('click', function () { setDensity('standard'); });
@@ -2684,6 +2737,13 @@
     renderGrid();
     maybeShowBackstoreHinweis(); // NEU 02.09.2026, siehe BACKSTORE_DOKU.md
     if (window.BOS_SCREENSAVER) window.BOS_SCREENSAVER.start(); // NEU 03.09.2026, siehe bos_screensaver.js
+    // NEU 17.10.2026 (Crumble #62): Knopf in der Kopfleiste, Figur im Schoner, Begrüßung — siehe bos_crumble_host.js
+    if (window.BOS_CRUMBLE_HOST) {
+      window.BOS_CRUMBLE_HOST.start({
+        an: data.hamster !== false, basisPfad: 'hamster_figur/',
+        topbar: document.querySelector('.bos-topbar'), vor: document.querySelector('.bos-topbar__clockwrap')
+      });
+    }
   }
 
   /* ---------------- BackStore-Hinweis ----------------

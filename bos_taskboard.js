@@ -53,7 +53,21 @@
    .get() statt onSnapshot, siehe konten_verwaltung.html/
    aufgaben_verwaltung.html).
 
+   EREIGNIS NACH AUSSEN (NEU 17.10.2026, Crumble #62 Stufe 1, K10): Nach
+   jedem Laden feuert das Brett
+     document.dispatchEvent(new CustomEvent('bos:aufgaben', { detail: {
+       offen: <Zahl offener Aufgaben>, vorher: <zuletzt gemeldete Zahl oder null>,
+       fehler: <Grund oder null>, gesperrt: <true, wenn Konto nicht freigeschaltet> } }))
+   Kein Hamster-Wissen hier: wer darauf hört (bos_crumble_host.js), entscheidet
+   selbst. "vorher" ist beim ersten Laden null — damit kann ein Hörer "Liste
+   war leer beim Start" von "jemand hat gerade die letzte Aufgabe abgehakt"
+   unterscheiden. Sonst nichts geändert.
+
    CHANGELOG
+     2026-10-17 · 08:09 · Feature (Crumble Nachtrag 1, K23): BOS_TASKBOARD.neuLaden()
+       nach außen (= ladeOffeneAufgaben, liefert das Promise). Sonst nichts.
+     2026-10-17 · 06:49 · Feature (Crumble Stufe 1, K10): CustomEvent
+       'bos:aufgaben' nach jedem Laden (Erfolg, Fehler, gesperrt). Additiv.
      2026-09-26 · Fix (N-9 / NF-14, Kontroll-Chat) — nicht Teil des
        Namens-Fundaments, getrennt ausgeliefert.
        pruefeAbhakenRecht() las das Konto unter profil.id
@@ -94,6 +108,18 @@
   }
   var darfAbhaken = false;
   var rechteFehler = null;   // 26.09.2026: Grund, falls das Konto nicht lesbar war
+  var zuletztGemeldet = null; // 17.10.2026: letzte nach außen gemeldete Zahl (null = noch nie)
+
+  /* 17.10.2026 (K10): Stand nach außen melden — siehe Kopfkommentar "EREIGNIS NACH AUSSEN". */
+  function meldeAufgaben() {
+    var offen = offeneAufgaben.length;
+    try {
+      document.dispatchEvent(new CustomEvent('bos:aufgaben', { detail: {
+        offen: offen, vorher: zuletztGemeldet, fehler: ladeFehler || null, gesperrt: !!nichtFreigeschaltet
+      } }));
+    } catch (e) { console.warn('BOS_TASKBOARD: bos:aufgaben konnte nicht gemeldet werden', e); }
+    zuletztGemeldet = offen;
+  }
 
   /* ---------- Style injizieren (nur das Neue — Bottom-Sheet-CSS existiert schon in launcher.html) ---------- */
   var style = document.createElement('style');
@@ -177,7 +203,7 @@
   function ladeOffeneAufgaben() {
     if (!window.BOS_AUTH_READY || !window.db) return Promise.resolve();
     nichtFreigeschaltet = istNichtFreigeschaltet();
-    if (nichtFreigeschaltet) { offeneAufgaben = []; ladeFehler = null; renderBadge(); return Promise.resolve(); }
+    if (nichtFreigeschaltet) { offeneAufgaben = []; ladeFehler = null; renderBadge(); meldeAufgaben(); return Promise.resolve(); }
     return window.BOS_AUTH_READY.then(function () {
       return window.db.collection('bos_events').where('type', '==', 'produktionsleiter_aufgabe').get();
     }).then(function (snap) {
@@ -188,10 +214,12 @@
       });
       ladeFehler = null;
       renderBadge();
+      meldeAufgaben();   // 17.10.2026 (K10)
     }).catch(function (fehler) {
       console.warn('BOS_TASKBOARD: Laden fehlgeschlagen', fehler);
       // 27.09.2026: sichtbar im Popup statt „Nichts offen“
       ladeFehler = ((fehler && fehler.code) ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler));
+      meldeAufgaben();   // 17.10.2026 (K10): auch den Fehlerfall melden (Hörer tun dann nichts)
     });
   }
 
@@ -288,5 +316,7 @@
     setInterval(ladeOffeneAufgaben, REFRESH_MS);
   }
 
-  window.BOS_TASKBOARD = { init: init };
+  // 17.10.2026 (Crumble Nachtrag 1, K23): neuLaden() = ladeOffeneAufgaben() nach außen, liefert das Promise.
+  // Aufrufer: bos_crumble_host.js bei jeder Profil-Aktivierung (frisches bos:aufgaben mit richtigem gesperrt).
+  window.BOS_TASKBOARD = { init: init, neuLaden: ladeOffeneAufgaben };
 })();

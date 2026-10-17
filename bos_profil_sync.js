@@ -81,7 +81,20 @@
    sichtbar im Einstellungs-Fenster (Projektregel Fehlermeldungen); die
    console.warn bleibt zusätzlich.
 
+   hamster (NEU 17.10.2026, Crumble #62 Stufe 1): true/false, Ein/Aus der
+   Hamster-Figur (Ruf-Knopf in der Kopfleiste UND Figur im Bildschirmschoner,
+   ein Schalter für beides). FEHLT das Feld, gilt AN. Die Einstellungs-Zeile
+   in launcher.html schreibt immer ausdrücklich true oder false — so braucht
+   uebernimmEinstellungen() keine Löschlogik wie bei farbschema.
+   Achtung beim Ausrollen (gleiche Lehre wie farbschema am 16.10.): Ein Gerät
+   mit der ALTEN Datei kennt hamster nicht und löscht es beim nächsten
+   Speichern (.set() ohne merge) — nach dem Einspielen JEDES GERÄT EINMAL
+   NEU LADEN. Firestore-Regel (RK §9) schränkt keine Felder ein, geprüft
+   17.10.2026 (Bauplan Crumble §4) — keine Regeländerung nötig.
+
    CHANGELOG
+     2026-10-17 · 06:49 · Feature (Crumble Stufe 1, K11): Feld hamster in
+       SYNCBARE_FELDER. Nach dem Einspielen jedes Gerät einmal neu laden.
      2026-10-16 · 07:54 · Feature (Einstellungen für alle, #72 Stufe C;
        Freigabe Kontroll-Chat 07:26): Feld farbschema in SYNCBARE_FELDER,
        Rückmeldung an den Aufrufer. Achtung beim Ausrollen: Ein Gerät mit
@@ -95,7 +108,8 @@ window.BOS_PROFIL_SYNC = (function () {
   var SYNCBARE_FELDER = [
     'theme', 'density', 'kachelgroesse', 'accent', 'background', 'symbolpaket', 'iconStil',
     'order', 'overrides', 'customApps', 'installed', 'backstoreHinweisGesehen',
-    'farbschema'   // 16.10.2026, #72 Stufe C: eigene Wahl; fehlt = Vorgabe
+    'farbschema',  // 16.10.2026, #72 Stufe C: eigene Wahl; fehlt = Vorgabe
+    'hamster'      // 17.10.2026, Crumble #62: true/false; fehlt = an
   ];
   var VERZOEGERUNG_MS = 1000;
   var timer = {}; // { [profilId]: setTimeout-Handle } — pro Profil eigener Debounce

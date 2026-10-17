@@ -1,0 +1,69 @@
+/* hamster_figur.css — Crumble, Hamster-Figur (Maskottchen, #62). Nutzt BOS-Design-Tokens mit Fallbacks.
+   Stand 17.10.2026, 06:49 Uhr (Stufe 1, Bau-Chat): Einbettungen hf--fest / hf--oben / hf--container (K6),
+   Rollen-Klassen hf--lehrmeister / hf--spielplatz (nur Haken für spätere Optik), Bühnen- und Blasenmaße
+   kommen jetzt aus hamster_figur.js (aus der Höhe gerechnet), Knopf bleibt in hf--oben sichtbar.
+   Vorher 17.10.2026 ~04:00 Erstfassung (nur fixed unten rechts). */
+.hf { font-family: var(--bos-font-body, system-ui, sans-serif); user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.hf--aus { display: none !important; }
+
+/* ---- Einbettung 'fest': fixed unten rechts (Prüfseite, Satelliten) — wie bisher ---- */
+.hf--fest { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 900; }
+
+/* ---- Einbettung 'oben': im Container (Kopfleiste), Knopf inline, Bühne hängt darunter ---- */
+.hf--oben { position: relative; display: inline-block; width: 40px; height: 40px; flex-shrink: 0; z-index: 5; }
+.hf--oben .hf__knopf { position: relative; right: auto; bottom: auto; display: block; width: 40px; height: 40px; }   /* relative, damit overflow:hidden das Bild beschneidet */
+.hf--oben .hf__buehne { position: absolute; top: 100%; right: 0; margin-top: 6px; }
+.hf--oben.hf--knopf.hf--hervor .hf__knopf { opacity: 1; pointer-events: auto; }   /* Knopf bleibt Anker, auch wenn die Figur draußen ist */
+.hf--oben.hf--knopf .hf__buehne { transform: translateY(-16px) scale(.9); }
+.hf--oben.hf--knopf.hf--hervor .hf__buehne { transform: none; }
+
+/* ---- Einbettung 'container': absolut im Container (Bildschirmschoner), kein eigener Layer ---- */
+.hf--container { position: absolute; right: 24px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: auto; }
+
+/* Bühne: Figur + Blase. Im Ecke-Modus immer da, im Knopf-Modus nur bei .hf--hervor. Maße setzt hamster_figur.js. */
+.hf__buehne { position: relative; width: 240px; height: 230px; pointer-events: none; }
+.hf--knopf .hf__buehne { opacity: 0; transform: translateY(24px) scale(.9); transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
+.hf--knopf.hf--hervor .hf__buehne { opacity: 1; transform: none; }
+.hf--knopf:not(.hf--hervor) .hf__buehne * { pointer-events: none; }   /* unsichtbare Bühne fängt keine Tipps */
+
+.hf__figur { position: absolute; right: 0; bottom: 0; pointer-events: auto; cursor: pointer; transform-origin: 50% 100%; animation: hf-atmen 3.6s ease-in-out infinite; }
+.hf__koerper { position: absolute; inset: 0; }
+.hf__bild { position: absolute; opacity: 0; transition: opacity .2s ease; will-change: opacity; }
+.hf__bild--an { opacity: 1; }
+.hf__bild--schnell { transition: opacity .07s linear; }
+.hf__ausr { position: absolute; left: 50%; bottom: 0; width: 0; height: 0; }
+.hf__ausr--hinter { z-index: 0; } .hf__koerper { z-index: 1; } .hf__ausr--vor { z-index: 2; }
+.hf__gegenstand { position: absolute; }
+
+@keyframes hf-atmen { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.02) scaleX(.995); } }
+@keyframes hf-squish { 0% { transform: scaleY(1); } 30% { transform: scale(1.08,.9); } 60% { transform: scale(.96,1.05); } 100% { transform: scaleY(1); } }
+@keyframes hf-nicken { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-3deg) translateY(-6px); } 60% { transform: rotate(2deg); } }
+@keyframes hf-wippen { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-4deg) translateY(-8px); } 40% { transform: rotate(3deg); } 60% { transform: rotate(-2deg) translateY(-4px); } }
+.hf__figur.hf--squish { animation: hf-squish .5s ease-out; }
+.hf__figur.hf--nicken { animation: hf-nicken .8s ease-in-out; }
+.hf__figur.hf--wippen { animation: hf-wippen 1s ease-in-out; }
+.hf--hinweis .hf__figur { animation: hf-wippen 1.2s ease-in-out infinite 2.5s; }
+
+/* Sprechblase (right/bottom setzt hamster_figur.js aus der Höhe: links neben der Figur, auf Kopfhöhe) */
+.hf__blase { position: absolute; right: 150px; bottom: 150px; width: max-content; max-width: 260px; min-width: 80px; padding: 10px 12px; box-sizing: border-box; border-radius: 14px 14px 2px 14px;
+  background: var(--bos-text, #f3ece1); color: var(--bos-bg, #16120e); font-size: var(--bos-font-sm, .9rem); line-height: 1.35;
+  opacity: 0; transition: opacity .25s; pointer-events: auto; cursor: pointer; filter: drop-shadow(0 2px 6px rgba(0,0,0,.45)); }
+.hf__blase--an { opacity: 1; }
+.hf__blase:not(.hf__blase--an) { pointer-events: none; }
+.hf--hell .hf__blase { background: #fbf3e4; color: #3a2a1e; }
+.hf--container .hf__blase { font-size: var(--bos-font-md, 1.05rem); max-width: 320px; }
+
+/* Ruf-Knopf */
+.hf__knopf { display: none; position: absolute; right: 0; bottom: 0; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; cursor: pointer;
+  background: var(--bos-surface-raised, #2b2218); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.hf--knopf .hf__knopf { display: block; }
+.hf__knopf-bild { position: absolute; left: 50%; top: 12%; height: 150%; transform: translateX(-50%); }
+.hf--fest.hf--knopf.hf--hervor .hf__knopf { opacity: 0; pointer-events: none; }
+.hf--hinweis .hf__knopf::after { content: ''; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bos-amber-bright, #e0973a); box-shadow: 0 0 0 2px var(--bos-bg-soft, #1d1711); }
+.hf__knopf:focus-visible { outline: 2px solid var(--bos-amber, #e0973a); outline-offset: 2px; }
+
+/* Konfetti (Geburtstag) */
+.hf__konfetti { position: absolute; top: -20px; width: 8px; height: 12px; animation: hf-fall 2.4s linear forwards; pointer-events: none; }
+@keyframes hf-fall { to { transform: translateY(280px) rotate(540deg); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) { .hf__figur, .hf--hinweis .hf__figur { animation: none; } .hf--knopf .hf__buehne { transition: none; } }
