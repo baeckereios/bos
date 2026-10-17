@@ -1,5 +1,5 @@
 /* hamster_figur.css — Crumble, Hamster-Figur (Maskottchen, #62). Nutzt BOS-Design-Tokens mit Fallbacks.
-   Stand 17.10.2026, 09:37 Uhr (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
+   Stand 17.10.2026, 13:49 Uhr (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
    hf--laeuft / hf--links / hf--zieht (K27/K28, Watscheln und Spiegeln aus der Demo des Kontroll-Chats), Blase mit
    festen Farben für hell UND dunkel, über dem Kopf mit Spitze nach unten (K24, hf--blase-oben; hf--hell entfällt),
    Requisiten-Ebene .hf__req-ebene/.hf__req und die Choreografien hf-ch-* (Requisiten) / hf-fig-* (Figur) für die
@@ -50,6 +50,7 @@
 .hf__bild { position: absolute; opacity: 0; transition: opacity .2s ease; will-change: opacity; }
 .hf__bild--an { opacity: 1; }
 .hf__bild--schnell { transition: opacity .07s linear; }
+.hf__bild--schicht { opacity: 1 !important; transition: none !important; z-index: 2; }   /* K33: blink/look als Schicht über idle, kein Crossfade (Flackern) */
 .hf__ausr { position: absolute; left: 50%; bottom: 0; width: 0; height: 0; }
 .hf__ausr--hinter { z-index: 0; } .hf__koerper { z-index: 1; } .hf__ausr--vor { z-index: 2; }
 .hf__gegenstand { position: absolute; }
@@ -86,12 +87,15 @@
 
 /* Knopf des Hosts in der Kopfleiste (bos_crumble_host.js, K26): zeigen/verstecken, Punkt bei wartendem Hinweis */
 .hf-knopf-host { position: relative; width: 40px; height: 40px; padding: 0; border-radius: 50%; overflow: hidden; cursor: pointer; flex-shrink: 0;
-  background: var(--bos-surface-raised, #2b2218); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  background: var(--bos-surface-raised, #2b2218); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }   /* K40 (Nachtrag 4): Long-Press am Tablet ohne Wisch-Deutung, Textauswahl oder Callout */
 .hf-knopf-host img { position: absolute; left: 50%; top: 12%; height: 150%; transform: translateX(-50%); pointer-events: none; }
 .hf-knopf-host--versteckt { opacity: .55; }
 .hf-knopf-host--versteckt img { filter: grayscale(.6); }
 .hf-knopf-host--wartet::after { content: ''; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bos-amber-bright, #e0973a); box-shadow: 0 0 0 2px var(--bos-bg-soft, #1d1711); }
 .hf-knopf-host--aus { display: none; }
+.hf-knopf-host { transition: transform .15s ease; }
+.hf-knopf-host--haelt { transform: scale(1.08); }   /* K35: Long-Press-Rückmeldung (Easter Egg) */
 .hf-knopf-host:focus-visible { outline: 2px solid var(--bos-amber, #e0973a); outline-offset: 2px; }
 
 /* Konfetti (Geburtstag) */

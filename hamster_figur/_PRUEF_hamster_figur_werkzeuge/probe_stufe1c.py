@@ -7,8 +7,15 @@ Legt fehlende Bilder als Platzhalter an (die echten liegen im Bilder-Archiv), st
 Ergebnis als JSON (stdout und probe_ergebnis.json daneben), Bildschirmfotos daneben (bild_*.png).
 
 Aufruf:  python3 -I probe_stufe1c.py <pfad zu bos> [--alt <bos aus Paket 0607>] [--geliefert <bos der Lieferung 06:50>] [--stufe1 <bos der Lieferung Nachtrag 1, 08:09>]
+         [--geliefert1c <bos der Lieferung 1c, 09:39>] [--geliefertn3 <bos der Lieferung Nachtrag 3, 12:35>]
 Stufe 1c (Anweisung 09:00 §6): 1c-1 Blase, 1c-2 Ebene, 1c-3 Knopf (+ Timer-Zaehler), 1c-4 Schieben, 1c-5 Laufen, 1c-6 Nummern (+ Ebene nach Abbruch),
 1c-7 Schlaf, 1c-8 Spielplatz; Gegenprobe --stufe1: 1c-1..1c-4 muessen gegen die Stufe-1-Dateien rot sein.
+Nachtrag 4 (13:49, Anweisung 12:55): n4-1 Nachholen statt Ueberspringen (F1, auch bei offenem Hinweis), n4-2 Long-Press weckt (F2, eine Nummer / Show),
+n4-3 pointercancel schaltet nichts (F3), n4-4 Knopf-CSS und contextmenu (F4), n4-5 hidden in der Nummer -> Ruhebild (F5);
+Gegenprobe --geliefertn3 <bos der Lieferung Nachtrag 3, 12:35>: n4-1..n4-5 muessen dort rot sein. K42: n3-3 (e) wartet vor an(true) auf idle,
+n3-4 stellt die Huellen-Figur mit RUHIG (Sichtkontakt-Uhren weit weg) — beide dreimal hintereinander gruen gefahren (Bau-Doku Nachtrag 4).
+Nachtrag 3 (12:35, Anweisung 11:40): n3-1 Blinzeln als Schicht (Frames ohne Durchsicht), n3-2 Ereignis im Blinzeln, n3-3 Sichtkontakt a-e,
+n3-4 Long-Press (Host-Knopf); Gegenprobe --geliefert1c: n3-1 und n3-4 muessen gegen die 1c-Dateien rot sein.
 Nachtrag 2 (10:05, Anweisung 09:52): 1c-9 Nummer mit fehlendem Bild -> sofort beendet, idle; Gegenprobe --geliefert1c <bos der Lieferung 09:39> muss rot sein.
 Nachtrag 1 (17.10., 08:09): Faelle 14-16 (Einschlafen trotz Inhalt, Tipp waehrend draussen, Profilwechsel) und Fall 17
 (Gegenprobe gegen die GELIEFERTE Fassung von 06:50 — dort muessen 14-16 rot sein).
@@ -28,6 +35,8 @@ stufe1 = None
 if '--stufe1' in args: stufe1 = os.path.abspath(args[args.index('--stufe1') + 1])
 geliefert1c = None   # Nachtrag 2: Gegenprobe Fall 1c-9 gegen die Lieferung 1c von 09:39
 if '--geliefert1c' in args: geliefert1c = os.path.abspath(args[args.index('--geliefert1c') + 1])
+geliefertn3 = None   # Nachtrag 4: Gegenprobe n4-1..n4-5 gegen die Lieferung Nachtrag 3 von 12:35
+if '--geliefertn3' in args: geliefertn3 = os.path.abspath(args[args.index('--geliefertn3') + 1])
 hier = os.path.dirname(os.path.abspath(__file__))
 
 def platzhalter(bos_ordner):
@@ -241,6 +250,268 @@ with sync_playwright() as pw:
     p8.close()
 
 
+    # ================================================================ Nachtrag 3: Faelle n3-1 .. n3-4
+    def faelle_n3(basis_url, nur_1_und_4=False):
+        R = {}
+        def sicher(name, fn):
+            try: R[name] = fn()
+            except Exception as ex: R[name] = {'fehler': str(ex)[:300], 'bestanden': False}
+        from PIL import Image as PILImage, ImageChops
+        q = b.new_page(viewport={'width': 1100, 'height': 900}); kq = []; q.on('console', lambda m: kq.append((m.type, m.text)))
+        q.goto(basis_url + '_PRUEF_hamster_figur_vorschau.html')
+        q.wait_for_function("window.D && D.manifest && D.manifest() && D.wurzel()"); q.wait_for_timeout(800)
+        def f1():
+            # Blinzeln dicht takten, dann den Moment der Schicht abpassen
+            q.evaluate("D.manifest().verhalten.blinzeln_ms = [700, 800]; D.manifest().verhalten.blick_anteil = 0; D.manifest().verhalten.blink_dauer_ms = 300; D.an(true)")   # Blinzeln 300 ms an, 400-500 ms aus
+            q.wait_for_timeout(300)
+            ref = os.path.join(hier, '_tmp_ref.png'); q.locator('#schreibtisch .hf__figur').screenshot(path=ref)
+            q.wait_for_function("(() => { const b=D.wurzel().querySelector('.hf__bild[data-zustand=blink]'); return b && (b.classList.contains('hf__bild--schicht') || b.classList.contains('hf__bild--an')); })()", timeout=5000)
+            m = q.evaluate("(() => { const w=D.wurzel(); const i=w.querySelector('.hf__bild[data-zustand=idle]'), b=w.querySelector('.hf__bild[data-zustand=blink]'); return {idle: getComputedStyle(i).opacity, blink: getComputedStyle(b).opacity, blink_transition: getComputedStyle(b).transitionDuration, schicht: b.classList.contains('hf__bild--schicht')}; })()")
+            frames = []
+            for i in range(3):
+                fp = os.path.join(hier, f'_tmp_f{i}.png'); q.locator('#schreibtisch .hf__figur').screenshot(path=fp); frames.append(fp); q.wait_for_timeout(30)
+            q.wait_for_function("(() => { const b=D.wurzel().querySelector('.hf__bild[data-zustand=blink]'); return !b.classList.contains('hf__bild--schicht') && !b.classList.contains('hf__bild--an'); })()", timeout=5000)
+            q.wait_for_timeout(50)
+            n = q.evaluate("(() => { const b=D.wurzel().querySelector('.hf__bild[data-zustand=blink]'); return {blink: getComputedStyle(b).opacity, transition: getComputedStyle(b).transitionDuration}; })()")
+            # „Tinte“ = Summe der Dunkelheit im Figurbereich; ein halb durchsichtiger Körper verliert davon einen großen Teil, Blinzeln/Atmen fast nichts
+            def tinte(fp): im = PILImage.open(fp).convert('L'); return sum(255 - v for v in im.getdata()) / (im.size[0] * im.size[1])
+            t_ref = tinte(ref); anteile = []
+            for fp in frames:
+                anteile.append(round(abs(tinte(fp) - t_ref) / max(t_ref, 1), 4)); os.remove(fp)
+            os.remove(ref)
+            q.evaluate("D.manifest().verhalten.blinzeln_ms = [3000, 6000]; D.manifest().verhalten.blick_anteil = 0.3; D.manifest().verhalten.blink_dauer_ms = 110; D.an(true)")
+            return {'waehrend': m, 'danach': n, 'tinte_abweichung_je_frame': anteile,
+                    'bestanden': m['idle'] == '1' and m['blink'] == '1' and m['blink_transition'] == '0s' and m['schicht'] and n['blink'] == '0' and all(a < 0.05 for a in anteile)}
+        sicher('n3_1_blinzeln_schicht', f1)
+        if not nur_1_und_4:
+            def f2():
+                q.evaluate("D.manifest().verhalten.blinzeln_ms = [400, 500]; D.manifest().verhalten.blick_anteil = 0; D.manifest().verhalten.blink_dauer_ms = 300; D.an(true)")
+                q.wait_for_function("D.wurzel().querySelector('.hf__bild[data-zustand=blink]').classList.contains('hf__bild--schicht')", timeout=5000)
+                q.evaluate("D.ereignis('erfolg')"); q.wait_for_timeout(120)
+                r = q.evaluate("(() => { const w=D.wurzel(); return {an: [...w.querySelectorAll('.hf__bild--an')].map(i=>i.dataset.zustand), schicht: w.querySelectorAll('.hf__bild--schicht').length, zustand: D.zustand()}; })()")
+                q.wait_for_timeout(700)
+                r2 = q.evaluate("D.wurzel().querySelectorAll('.hf__bild--schicht').length")
+                q.evaluate("D.manifest().verhalten.blinzeln_ms = [3000, 6000]; D.manifest().verhalten.blick_anteil = 0.3; D.manifest().verhalten.blink_dauer_ms = 110; D.an(true)")
+                return {'sofort': r, 'schicht_nach_0_8s': r2, 'bestanden': r['an'] == ['laughing'] and r['schicht'] == 0 and r2 == 0}
+            sicher('n3_2_ereignis_im_blinzeln', f2)
+        q.close()
+        # ---- Huelle: Sichtkontakt und Long-Press
+        h = b.new_page(viewport={'width': 1100, 'height': 800}); kh = []; h.on('console', lambda m: kh.append((m.type, m.text)))
+        h.add_init_script("window.__ev=[]; ['nummer','laufen','sichtbar','sichtphase','nummer-ende','tipp'].forEach(n => document.addEventListener('hamster-figur:'+n, e => window.__ev.push([n, e.detail, Date.now()])));")
+        h.goto(basis_url + '_PRUEF_hamster_figur_schoner.html'); h.wait_for_load_state('load')
+        h.evaluate("try { localStorage.clear(); } catch (e) {}")
+        h.wait_for_function("BOS_CRUMBLE_HOST.figur && BOS_CRUMBLE_HOST.figur() && BOS_CRUMBLE_HOST.figur().manifest() && BOS_CRUMBLE_HOST.figur().wurzel()"); h.wait_for_timeout(3300)
+        FIG = "BOS_CRUMBLE_HOST.figur()"
+        def ev(art): return h.evaluate(f"window.__ev.filter(e=>e[0]==='{art}').map(e=>e[2])")
+        def zaehl(art): return len(ev(art))
+        if not nur_1_und_4:
+            def f3():
+                h.evaluate(f"{FIG}.manifest().schreibtisch.sichtkontakt = {{erste_nummer_s: [1, 2], nummer_s: [3, 4], lauf_s: [2, 3], phase_s: 180}}; {FIG}.manifest().verhalten.nummer_dauer_ms = 800; window.__ev.length = 0; {FIG}.an(true)")
+                h.wait_for_timeout(3200)
+                a = {'nummern_binnen_3s': zaehl('nummer'), 'phase': h.evaluate(f"{FIG}.sichtphase()")}
+                # (b) hidden
+                h.evaluate("Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'hidden'}); Object.defineProperty(document, 'hidden', {configurable: true, get: () => true}); document.dispatchEvent(new Event('visibilitychange')); window.__ev.length = 0")
+                h.wait_for_timeout(9000)
+                bb = {'nummern': zaehl('nummer'), 'laeufe': zaehl('laufen'), 'phase': h.evaluate(f"{FIG}.sichtphase()"), 'timer': h.evaluate(f"{FIG}._timerAktiv()"), 'laeuft': h.evaluate(f"{FIG}.laeuft()")}
+                # (c) visible
+                h.evaluate("Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'visible'}); Object.defineProperty(document, 'hidden', {configurable: true, get: () => false}); document.dispatchEvent(new Event('visibilitychange')); window.__ev.length = 0")
+                h.wait_for_timeout(3200)
+                c = {'nummern_binnen_3s': zaehl('nummer'), 'phase': h.evaluate(f"{FIG}.sichtphase()")}
+                # (d) Phase endet ohne Beruehrung
+                h.evaluate(f"{FIG}.manifest().schreibtisch.sichtkontakt.phase_s = 3; {FIG}.an(true)")
+                h.wait_for_timeout(4500); h.evaluate("window.__ev.length = 0")
+                d0 = h.evaluate(f"{FIG}.sichtphase()")
+                h.wait_for_timeout(5000)
+                d = {'phase_nach_ende': d0, 'nummern_danach_5s': zaehl('nummer'), 'laeufe_danach_5s': zaehl('laufen')}
+                h.evaluate(f"{FIG}.wurzel().querySelector('.hf__figur').click()"); h.wait_for_timeout(200)
+                d['phase_nach_tipp'] = h.evaluate(f"{FIG}.sichtphase()")
+                # (e) nie gleichzeitig: Zeitstempel ueber 20 s — K42: erst die Tipp-Reaktion aus (d) abwarten (idle), dann an(true)
+                h.wait_for_function(f"{FIG}.zustand() === 'idle'", timeout=9000)
+                h.evaluate(f"{FIG}.manifest().schreibtisch.sichtkontakt = {{erste_nummer_s: [2, 3], nummer_s: [4, 6], lauf_s: [2, 4], phase_s: 180}}; window.__ev.length = 0; {FIG}.an(true)")
+                h.wait_for_timeout(20000)
+                nz, lz = ev('nummer'), ev('laufen')
+                mind = min([abs(x - y) for x in nz for y in lz] or [99999])
+                e = {'nummern': len(nz), 'laeufe': len(lz), 'kleinster_abstand_ms': mind}
+                h.evaluate(f"{FIG}.manifest().schreibtisch.sichtkontakt = {{erste_nummer_s: [8, 15], nummer_s: [40, 90], lauf_s: [25, 60], phase_s: 180}}; {FIG}.manifest().verhalten.nummer_dauer_ms = 6000; {FIG}.an(true)")
+                return {'a_start': a, 'b_hidden_9s': bb, 'c_visible': c, 'd_phase_ende': d, 'e_abstand': e,
+                        'bestanden': a['nummern_binnen_3s'] >= 1 and a['phase'] and bb['nummern'] == 0 and bb['laeufe'] == 0 and bb['phase'] is False and bb['timer'] >= 1 and bb['laeuft'] is False
+                                     and c['nummern_binnen_3s'] >= 1 and c['phase'] and d0 is False and d['nummern_danach_5s'] == 0 and d['laeufe_danach_5s'] == 0 and d['phase_nach_tipp'] is True
+                                     and len(nz) >= 1 and len(lz) >= 1 and mind >= 9000}
+            sicher('n3_3_sichtkontakt', f3)
+        RUHIG_H = f"{FIG}.manifest().schreibtisch.sichtkontakt = {{erste_nummer_s: [600, 600], nummer_s: [600, 600], lauf_s: [600, 600], phase_s: 180}}; "   # K42: keine automatische Nummer in die Messung
+        def f4():
+            h.evaluate(RUHIG_H + f"{FIG}.manifest().verhalten.nummer_dauer_ms = 1200; {FIG}.an(true); {FIG}.sichtbar(true)"); h.wait_for_timeout(300)
+            kb = h.evaluate("(() => { const r=document.querySelector('.hf-knopf-host').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2]; })()")
+            def halte(ms, dx=0):
+                h.mouse.move(kb[0], kb[1]); h.mouse.down()
+                if dx: h.wait_for_timeout(ms // 2); h.mouse.move(kb[0] + dx, kb[1]); h.wait_for_timeout(ms - ms // 2)
+                else: h.wait_for_timeout(ms)
+                h.mouse.up(); h.wait_for_timeout(250)
+            h.evaluate("window.__ev.length = 0"); halte(300)
+            k1 = {'sichtbar': h.evaluate(f"{FIG}.istSichtbar()"), 'umschaltungen': zaehl('sichtbar')}
+            halte(300)
+            k2 = {'sichtbar': h.evaluate(f"{FIG}.istSichtbar()"), 'umschaltungen': zaehl('sichtbar')}
+            h.evaluate("window.__ev.length = 0"); halte(800); h.wait_for_timeout(200)
+            l1 = {'nummern': zaehl('nummer'), 'sichtbar': h.evaluate(f"{FIG}.istSichtbar()"), 'umschaltungen': zaehl('sichtbar'), 'haelt_klasse_nach_loslassen': h.evaluate("document.querySelector('.hf-knopf-host').classList.contains('hf-knopf-host--haelt')")}
+            h.wait_for_timeout(1500)
+            h.evaluate(f"{FIG}.sichtbar(false); window.__ev.length = 0"); h.wait_for_timeout(200); halte(800); h.wait_for_timeout(200)
+            l2 = {'sichtbar': h.evaluate(f"{FIG}.istSichtbar()"), 'nummern': zaehl('nummer'), 'umschaltungen': zaehl('sichtbar')}
+            h.wait_for_timeout(1500)
+            h.evaluate(f"{FIG}.manifest().verhalten.nummer_dauer_ms = 2500; window.__ev.length = 0"); halte(2200); h.wait_for_timeout(9000)   # Dauer 2,5 s: die 600-ms-Nummer läuft bei 2 s noch und zählt als erste der Show
+            sh = h.evaluate("(() => { const n=window.__ev.filter(e=>e[0]==='nummer').map(e=>e[1].nummer); const en=window.__ev.filter(e=>e[0]==='nummer-ende'); return {nummern: n, verschieden: new Set(n).size, enden: en.length, req_jetzt: document.querySelectorAll('.hf--schreibtisch .hf__req').length, umschaltungen: window.__ev.filter(e=>e[0]==='sichtbar').length}; })()")
+            # Tipp waehrend der Show
+            h.evaluate("window.__ev.length = 0"); halte(2200); h.wait_for_timeout(300)
+            h.evaluate(f"{FIG}.wurzel().querySelector('.hf__figur').click()"); h.wait_for_timeout(3500)
+            ab = h.evaluate("(() => { const n=window.__ev.filter(e=>e[0]==='nummer').length; return {nummern_gesamt: n, req: document.querySelectorAll('.hf--schreibtisch .hf__req').length, laufend: BOS_CRUMBLE_HOST.figur().laufendeNummer()}; })()")
+            # 5 px Bewegung waehrend des Haltens -> trotzdem Long-Press
+            h.wait_for_timeout(1500); h.evaluate("window.__ev.length = 0"); halte(800, dx=5); h.wait_for_timeout(200)
+            bw = {'nummern': zaehl('nummer'), 'umschaltungen': zaehl('sichtbar')}
+            h.evaluate(f"{FIG}.manifest().verhalten.nummer_dauer_ms = 6000")
+            return {'kurz_1': k1, 'kurz_2': k2, 'lang_800': l1, 'lang_800_versteckt': l2, 'show_2200': sh, 'tipp_in_show': ab, 'bewegt_5px': bw,
+                    'bestanden': k1['sichtbar'] is False and k1['umschaltungen'] == 1 and k2['sichtbar'] is True and k2['umschaltungen'] == 2
+                                 and l1['nummern'] == 1 and l1['sichtbar'] is True and l1['umschaltungen'] == 0 and l1['haelt_klasse_nach_loslassen'] is False
+                                 and l2['sichtbar'] is True and l2['nummern'] == 1 and l2['umschaltungen'] == 1
+                                 and sh['verschieden'] == 3 and len(sh['nummern']) == 3 and sh['req_jetzt'] == 0 and sh['umschaltungen'] == 0
+                                 and ab['nummern_gesamt'] <= 2 and ab['req'] == 0 and ab['laufend'] is None
+                                 and bw['nummern'] == 1 and bw['umschaltungen'] == 0}
+        sicher('n3_4_long_press', f4)
+        R['N3_konsole_fehler'] = [t for t in kh if t[0] == 'pageerror' or (t[0] == 'error' and '404' not in t[1])] + [t for t in kq if t[0] == 'pageerror' or (t[0] == 'error' and '404' not in t[1])]
+        h.evaluate("try { localStorage.clear(); } catch (e) {}"); h.close()
+        return R
+    E.update(faelle_n3(U))
+
+    # ================================================================ Nachtrag 4: Faelle n4-1 .. n4-5
+    def faelle_n4(basis_url):
+        R = {}
+        def sicher(name, fn):
+            try: R[name] = fn()
+            except Exception as ex: R[name] = {'fehler': str(ex)[:300], 'bestanden': False}
+        HIDDEN = "Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'hidden'}); Object.defineProperty(document, 'hidden', {configurable: true, get: () => true}); document.dispatchEvent(new Event('visibilitychange'));"
+        VISIBLE = "Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'visible'}); Object.defineProperty(document, 'hidden', {configurable: true, get: () => false}); document.dispatchEvent(new Event('visibilitychange'));"
+        # ---- Pruefseite D (Schreibtisch-Figur, Sichtkontakt)
+        q = b.new_page(viewport={'width': 1100, 'height': 900}); kq = []; q.on('console', lambda m: kq.append((m.type, m.text))); q.on('pageerror', lambda e: kq.append(('pageerror', str(e))))
+        q.add_init_script("window.__ev=[]; ['nummer','nummer-ende','geweckt','zustand'].forEach(n => document.addEventListener('hamster-figur:'+n, e => { if (e.detail.instanz==='schreibtisch') window.__ev.push([n, e.detail, Date.now()]); }));")
+        q.goto(basis_url + '_PRUEF_hamster_figur_vorschau.html')
+        q.wait_for_function("window.D && D.manifest && D.manifest() && D.wurzel()"); q.wait_for_timeout(800)
+        def evq(art): return q.evaluate(f"window.__ev.filter(e=>e[0]==='{art}').map(e=>e[2])")
+        def f1():
+            # F1: erste Nummer 1,5 s, sofort ein Ereignis (5,5 s) -> erste Nummer zwischen 5,5 und 10 s (Nachholen 2-4 s), nicht erst bei 31 s
+            t0 = q.evaluate("D.manifest().schreibtisch.sichtkontakt = {erste_nummer_s: [1.5, 1.5], nummer_s: [30, 30], lauf_s: [100, 100], nachhol_s: [2, 4], phase_s: 180}; D.manifest().verhalten.nummer_dauer_ms = 1500; window.__ev.length = 0; D.an(true); D.ereignis('erfolg'); Date.now()")
+            q.wait_for_timeout(14000)
+            nz = [t - t0 for t in evq('nummer')]
+            a = {'nummern_in_14s': len(nz), 'zeiten_ms': nz}
+            # mit offenem Hinweis: 0 Nummern bis zum Tipp, danach binnen 4 s
+            t1 = q.evaluate("window.__ev.length = 0; D.an(true); D.hinweis('Probe Hinweis'); Date.now()")
+            q.wait_for_timeout(8000)
+            h0 = {'nummern_bei_offenem_hinweis_8s': len(evq('nummer')), 'hinweis_offen': q.evaluate("D.hinweisOffen()")}
+            t2 = q.evaluate("D.wurzel().querySelector('.hf__figur').click(); Date.now()")
+            q.wait_for_timeout(4600)
+            nt = [t - t2 for t in evq('nummer')]
+            hb = {'nummern_nach_tipp_4_6s': len(nt), 'zeiten_ms': nt, 'hinweis_offen': q.evaluate("D.hinweisOffen()")}
+            q.evaluate("D.manifest().schreibtisch.sichtkontakt = {erste_nummer_s: [600, 600], nummer_s: [600, 600], lauf_s: [600, 600], nachhol_s: [2, 4], phase_s: 180}; D.manifest().verhalten.nummer_dauer_ms = 6000; D.an(true)")
+            return {'a_ereignis_vor_erster_nummer': a, 'b_hinweis_offen': h0, 'c_nach_tipp': hb,
+                    'bestanden': len(nz) >= 1 and 5400 <= nz[0] <= 10100 and h0['nummern_bei_offenem_hinweis_8s'] == 0 and h0['hinweis_offen'] is True
+                                 and len(nt) == 1 and nt[0] <= 4100 and hb['hinweis_offen'] is False}
+        sicher('n4_1_nachholen', f1)
+        def f5():
+            # F5: Nummer, 0,7 s, hidden -> idle, 0 Requisiten; visible -> idle, nur Ruhebild an
+            q.evaluate("D.manifest().verhalten.nummer_dauer_ms = 3000; D.an(true); window.__ev.length = 0")
+            q.wait_for_timeout(300)
+            r0 = q.evaluate("D.nummer('karate')"); q.wait_for_timeout(700)
+            vor = q.evaluate("({zustand: D.zustand(), req: D.wurzel().querySelectorAll('.hf__req').length, klasse: D.wurzel().classList.contains('hf--nummer')})")
+            q.evaluate(HIDDEN); q.wait_for_timeout(150)
+            hid = q.evaluate("({zustand: D.zustand(), req: D.wurzel().querySelectorAll('.hf__req').length, klasse: D.wurzel().classList.contains('hf--nummer'), bild_an: [...D.wurzel().querySelectorAll('.hf__bild--an')].map(i=>i.dataset.zustand), laufend: D.laufendeNummer()})")
+            q.evaluate(VISIBLE); q.wait_for_timeout(400)
+            vis = q.evaluate("({zustand: D.zustand(), req: D.wurzel().querySelectorAll('.hf__req').length, bild_an: [...D.wurzel().querySelectorAll('.hf__bild--an')].map(i=>i.dataset.zustand), schicht: D.wurzel().querySelectorAll('.hf__bild--schicht').length})")
+            q.wait_for_timeout(2500)   # die alte Rueckweg-Zeit der Nummer verstreichen lassen
+            spaet = q.evaluate("({zustand: D.zustand(), bild_an: [...D.wurzel().querySelectorAll('.hf__bild--an')].map(i=>i.dataset.zustand)})")
+            q.evaluate("delete document.visibilityState; delete document.hidden; D.manifest().verhalten.nummer_dauer_ms = 6000")
+            return {'start': r0, 'vor_hidden_0_7s': vor, 'hidden': hid, 'visible_0_4s': vis, 'visible_2_9s': spaet,
+                    'bestanden': r0 is True and vor['zustand'] == 'nummer_karate' and vor['req'] >= 1 and hid['zustand'] == 'idle' and hid['req'] == 0 and hid['klasse'] is False and hid['bild_an'] == ['idle'] and hid['laufend'] is None
+                                 and vis['zustand'] == 'idle' and vis['req'] == 0 and vis['bild_an'] == ['idle'] and spaet['zustand'] == 'idle' and spaet['bild_an'] == ['idle']}
+        sicher('n4_5_hidden_in_nummer', f5)
+        q.close()
+        # ---- Huelle: Host-Knopf (F2, F3, F4)
+        h = b.new_page(viewport={'width': 1100, 'height': 800}); kh = []; h.on('console', lambda m: kh.append((m.type, m.text))); h.on('pageerror', lambda e: kh.append(('pageerror', str(e))))
+        h.add_init_script("window.__ev=[]; ['nummer','nummer-ende','sichtbar','sichtphase','geweckt','zustand'].forEach(n => document.addEventListener('hamster-figur:'+n, e => { if (e.detail.instanz==='lehrmeister') window.__ev.push([n, e.detail, Date.now()]); })); document.addEventListener('pointerdown', e => { window.__pid = e.pointerId; }, true);")
+        h.goto(basis_url + '_PRUEF_hamster_figur_schoner.html'); h.wait_for_load_state('load')
+        h.evaluate("try { localStorage.clear(); } catch (e) {}")
+        h.wait_for_function("BOS_CRUMBLE_HOST.figur && BOS_CRUMBLE_HOST.figur() && BOS_CRUMBLE_HOST.figur().manifest() && BOS_CRUMBLE_HOST.figur().wurzel()")
+        FIG = "BOS_CRUMBLE_HOST.figur()"
+        h.wait_for_timeout(3000)   # der Host gruesst erst nach 2,5 s (wartet auf die Aufgabenzahl) ...
+        h.wait_for_function(f"{FIG}.zustand() === 'idle'", timeout=12000)   # ... und das Winken (5,5 s) muss vorbei sein, sonst schlaeft er in n4-2 nicht ein
+        RUHIG_H = f"{FIG}.manifest().schreibtisch.sichtkontakt = {{erste_nummer_s: [600, 600], nummer_s: [600, 600], lauf_s: [600, 600], nachhol_s: [2, 4], phase_s: 180}}; "
+        def ev(art): return h.evaluate(f"window.__ev.filter(e=>e[0]==='{art}').map(e=>e[2])")
+        def zaehl(art): return len(ev(art))
+        kb = h.evaluate("(() => { const r=document.querySelector('.hf-knopf-host').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2]; })()")
+        def halte(ms):
+            h.mouse.move(kb[0], kb[1]); h.mouse.down(); h.wait_for_timeout(ms); h.mouse.up(); h.wait_for_timeout(250)
+        def f2():
+            # F2: schlafend (schlaf 1,5 s), Knopf 900 ms -> geweckt, dann EINE Nummer; 2300 ms -> Show (drei). Sichtphase danach aktiv.
+            h.evaluate(RUHIG_H + f"{FIG}.manifest().schreibtisch.schlaf_nach_ms = 1500; {FIG}.manifest().verhalten.nummer_dauer_ms = 2500; {FIG}.an(true); {FIG}.sichtbar(true)")   # Dauer 2,5 s: die Nummer beginnt ~1,7 s nach dem Druckbeginn und muss im Messpunkt noch laufen
+            h.wait_for_timeout(2600)
+            s0 = h.evaluate(f"{FIG}.zustand()")
+            h.evaluate(f"{FIG}.manifest().schreibtisch.schlaf_nach_ms = 600000; window.__ev.length = 0")   # nach dem Wecken nicht gleich wieder einschlafen
+            halte(900); h.wait_for_timeout(1300)   # Druckbeginn + 0,6 s Halten + 1,06 s Aufwachen = Nummer ab ~1,7 s; Messpunkt bei ~2,45 s
+            e1 = {'schlief': s0, 'geweckt': zaehl('geweckt'), 'nummern': zaehl('nummer'), 'zustand': h.evaluate(f"{FIG}.zustand()"), 'umschaltungen': zaehl('sichtbar'), 'sichtphase': h.evaluate(f"{FIG}.sichtphase()")}
+            h.wait_for_timeout(3000)
+            e1['nummern_gesamt_danach'] = zaehl('nummer')
+            # wieder einschlafen lassen, dann Show
+            h.evaluate(f"{FIG}.manifest().schreibtisch.schlaf_nach_ms = 1500; {FIG}.zeige('idle', {{still: true}})"); h.wait_for_timeout(2600)
+            s1 = h.evaluate(f"{FIG}.zustand()")
+            h.evaluate(f"{FIG}.manifest().schreibtisch.schlaf_nach_ms = 600000; window.__ev.length = 0")
+            halte(2300); h.wait_for_timeout(9500)   # Wecken 1 s + drei Nummern a 2,5 s + Pausen
+            sh = h.evaluate("(() => { const n=window.__ev.filter(e=>e[0]==='nummer').map(e=>e[1].nummer); return {nummern: n, verschieden: new Set(n).size, geweckt: window.__ev.filter(e=>e[0]==='geweckt').length, enden: window.__ev.filter(e=>e[0]==='nummer-ende').length, umschaltungen: window.__ev.filter(e=>e[0]==='sichtbar').length, req_jetzt: document.querySelectorAll('.hf--schreibtisch .hf__req').length}; })()")
+            sh['schlief'] = s1; sh['sichtphase'] = h.evaluate(f"{FIG}.sichtphase()")
+            h.evaluate(f"{FIG}.manifest().verhalten.nummer_dauer_ms = 6000")
+            return {'eine_nummer_900ms': e1, 'show_2300ms': sh,
+                    'bestanden': s0.startswith('sleep') and e1['geweckt'] == 1 and e1['nummern'] == 1 and e1['zustand'].startswith('nummer_') and e1['umschaltungen'] == 0 and e1['sichtphase'] is True and e1['nummern_gesamt_danach'] == 1
+                                 and s1.startswith('sleep') and sh['geweckt'] == 1 and len(sh['nummern']) == 3 and sh['verschieden'] == 3 and sh['enden'] == 3 and sh['umschaltungen'] == 0 and sh['req_jetzt'] == 0 and sh['sichtphase'] is True}
+        sicher('n4_2_long_press_weckt', f2)
+        def f3():
+            # F3: pointerdown 200 ms -> pointercancel -> nichts; 1000 ms -> pointercancel -> Nummer war ausgeloest, keine Umschaltung; danach normaler Tipp schaltet wieder
+            h.evaluate(RUHIG_H + f"{FIG}.manifest().verhalten.nummer_dauer_ms = 1200; {FIG}.an(true); {FIG}.sichtbar(true); window.__ev.length = 0"); h.wait_for_timeout(300)
+            CANCEL = "(() => { const el=document.querySelector('.hf-knopf-host'); el.dispatchEvent(new PointerEvent('pointercancel', {pointerId: window.__pid, bubbles: true, cancelable: true})); return el.classList.contains('hf-knopf-host--haelt'); })()"
+            h.mouse.move(kb[0], kb[1]); h.mouse.down(); h.wait_for_timeout(200); hk = h.evaluate(CANCEL); h.mouse.up(); h.wait_for_timeout(300)
+            c1 = {'umschaltungen': zaehl('sichtbar'), 'nummern': zaehl('nummer'), 'sichtbar': h.evaluate(f"{FIG}.istSichtbar()"), 'haelt_klasse': hk}
+            h.evaluate("window.__ev.length = 0")
+            h.mouse.move(kb[0], kb[1]); h.mouse.down(); h.wait_for_timeout(1000); hk2 = h.evaluate(CANCEL); h.mouse.up(); h.wait_for_timeout(300)
+            c2 = {'umschaltungen': zaehl('sichtbar'), 'nummern': zaehl('nummer'), 'sichtbar': h.evaluate(f"{FIG}.istSichtbar()"), 'haelt_klasse_nach_cancel': hk2}
+            h.wait_for_timeout(2500); h.evaluate("window.__ev.length = 0"); halte(300)
+            c3 = {'umschaltungen': zaehl('sichtbar'), 'sichtbar': h.evaluate(f"{FIG}.istSichtbar()")}
+            halte(300)
+            h.evaluate(f"{FIG}.manifest().verhalten.nummer_dauer_ms = 6000")
+            return {'cancel_200ms': c1, 'cancel_1000ms': c2, 'tipp_danach': c3,
+                    'bestanden': c1['umschaltungen'] == 0 and c1['nummern'] == 0 and c1['sichtbar'] is True and c1['haelt_klasse'] is False
+                                 and c2['umschaltungen'] == 0 and c2['nummern'] == 1 and c2['haelt_klasse_nach_cancel'] is False
+                                 and c3['umschaltungen'] == 1 and c3['sichtbar'] is False}
+        sicher('n4_3_pointercancel', f3)
+        def f4():
+            r = h.evaluate("(() => { const el=document.querySelector('.hf-knopf-host'); const cs=getComputedStyle(el); const e=new MouseEvent('contextmenu', {bubbles: true, cancelable: true}); el.dispatchEvent(e); return {touch_action: cs.touchAction, user_select: cs.userSelect || cs.webkitUserSelect, contextmenu_verhindert: e.defaultPrevented}; })()")
+            return dict(r, bestanden=(r['touch_action'] == 'none' and r['user_select'] == 'none' and r['contextmenu_verhindert'] is True))
+        sicher('n4_4_knopf_css_contextmenu', f4)
+        R['N4_konsole_fehler'] = [t for t in kh if t[0] == 'pageerror' or (t[0] == 'error' and '404' not in t[1])] + [t for t in kq if t[0] == 'pageerror' or (t[0] == 'error' and '404' not in t[1])]
+        h.evaluate("try { localStorage.clear(); } catch (e) {}"); h.close()
+        return R
+    E.update(faelle_n4(U))
+    if geliefertn3:
+        tmpn3 = tempfile.mkdtemp(prefix='crumble_n3_')
+        shutil.copy(os.path.join(bos, 'bos_design_tokens.css'), tmpn3)
+        shutil.copytree(os.path.join(geliefertn3, 'hamster_figur'), os.path.join(tmpn3, 'hamster_figur'), ignore=shutil.ignore_patterns('_PRUEF_hamster_figur_werkzeuge', 'nummern', 'bilder'))
+        shutil.copytree(os.path.join(bos, 'hamster_figur', 'bilder'), os.path.join(tmpn3, 'hamster_figur', 'bilder'))
+        shutil.copytree(os.path.join(bos, 'hamster_figur', 'nummern'), os.path.join(tmpn3, 'hamster_figur', 'nummern'))
+        for name in ['bos_screensaver.js', 'bos_screensaver_content.js', 'bos_crumble_host.js']:
+            src = os.path.join(geliefertn3, name) if os.path.exists(os.path.join(geliefertn3, name)) else os.path.join(bos, name)
+            shutil.copy(src, tmpn3)
+        for name in ['_PRUEF_hamster_figur_schoner.html', '_PRUEF_hamster_figur_vorschau.html']:   # neue Pruefseiten gegen die Nachtrag-3-Dateien
+            shutil.copy(os.path.join(bos, 'hamster_figur', name), os.path.join(tmpn3, 'hamster_figur'))
+        srvn3 = server(tmpn3, PORT + 5)
+        GN4 = faelle_n4(f'http://127.0.0.1:{PORT + 5}/hamster_figur/')
+        GN4 = {k: v for k, v in GN4.items() if isinstance(v, dict) and 'bestanden' in v}
+        E['gegenprobe_n4_lieferung_n3'] = {k: {'bestanden': bool(v.get('bestanden')), 'rot_wie_erwartet': not v.get('bestanden'), 'kurz': (v.get('fehler') or {kk: vv for kk, vv in v.items() if kk != 'bestanden'})} for k, v in GN4.items()}
+        E['gegenprobe_n4_lieferung_n3']['alle_rot'] = all(not v.get('bestanden') for v in GN4.values())
+        srvn3.shutdown(); shutil.rmtree(tmpn3, ignore_errors=True)
+
     # ================================================================ Nachtrag 2: Fall 1c-9 — Nummer mit fehlendem Bild
     def fall_1c9(basis_url):
         q9 = b.new_page(viewport={'width': 1100, 'height': 900}); k9 = []; q9.on('console', lambda m: k9.append((m.type, m.text)))
@@ -262,9 +533,18 @@ with sync_playwright() as pw:
         shutil.copytree(os.path.join(geliefert1c, 'hamster_figur'), os.path.join(tmp9, 'hamster_figur'), ignore=shutil.ignore_patterns('_PRUEF_hamster_figur_werkzeuge', 'nummern'))
         shutil.copytree(os.path.join(bos, 'hamster_figur', 'bilder'), os.path.join(tmp9, 'hamster_figur', 'bilder'))
         shutil.copytree(os.path.join(bos, 'hamster_figur', 'nummern'), os.path.join(tmp9, 'hamster_figur', 'nummern'))
+        for name in ['bos_screensaver.js', 'bos_screensaver_content.js', 'bos_crumble_host.js']:
+            src = os.path.join(geliefert1c, name) if os.path.exists(os.path.join(geliefert1c, name)) else os.path.join(bos, name)
+            shutil.copy(src, tmp9)
+        shutil.copy(os.path.join(bos, 'hamster_figur', '_PRUEF_hamster_figur_schoner.html'), os.path.join(tmp9, 'hamster_figur'))   # neue Huelle gegen alte Dateien
+        shutil.copy(os.path.join(bos, 'hamster_figur', '_PRUEF_hamster_figur_vorschau.html'), os.path.join(tmp9, 'hamster_figur'))
         srv9 = server(tmp9, PORT + 4)
         G9 = fall_1c9(f'http://127.0.0.1:{PORT + 4}/hamster_figur/')
         E['gegenprobe_1c9_lieferung_0939'] = {'bestanden': G9['bestanden'], 'rot_wie_erwartet': not G9['bestanden'], 'kurz': {k: v for k, v in G9.items() if k != 'bestanden'}}
+        GN3 = faelle_n3(f'http://127.0.0.1:{PORT + 4}/hamster_figur/', nur_1_und_4=True)
+        GN3 = {k: v for k, v in GN3.items() if isinstance(v, dict) and 'bestanden' in v}   # Konsolenliste raus
+        E['gegenprobe_n3_lieferung_1c'] = {k: {'bestanden': bool(v.get('bestanden')), 'rot_wie_erwartet': not v.get('bestanden'), 'kurz': (v.get('fehler') or {kk: vv for kk, vv in v.items() if kk != 'bestanden'})} for k, v in GN3.items()}
+        E['gegenprobe_n3_lieferung_1c']['alle_rot'] = all(not v.get('bestanden') for v in GN3.values())
         srv9.shutdown(); shutil.rmtree(tmp9, ignore_errors=True)
 
     # ================================================================ Stufe 1c: Faelle 1c-1 .. 1c-8
@@ -290,8 +570,9 @@ with sync_playwright() as pw:
             return {'hell_auf_dunkel': a, 'dunkel_bg': d, 'teigmonster': tm,
                     'bestanden': a['bg'] == 'rgb(251, 243, 228)' and a['rand'] == 'rgb(74, 47, 26)' and a['randBreite'] == '2px' and d == 'rgb(251, 243, 228)' and tm['zustand'] == 'nummer_teigmonster' and tm['blase_bottom'] <= tm['bild_top'] + 2}
         sicher('1c1_blase', f1)
+        RUHIG = "D.manifest().schreibtisch.sichtkontakt = {erste_nummer_s: [600, 600], nummer_s: [600, 600], lauf_s: [600, 600], phase_s: 180}; "   # Sichtphasen-Uhren weit weg, damit sie die Faelle nicht ueberlagern
         def f5():
-            q.evaluate("D.an(true)"); q.wait_for_timeout(300)
+            q.evaluate(RUHIG + "D.an(true)"); q.wait_for_timeout(300)
             x0 = q.evaluate("D.x()")
             ok = q.evaluate("D.laufe(0.5)"); q.wait_for_timeout(300)
             w = q.evaluate("({laeuft: D.wurzel().classList.contains('hf--laeuft'), links: D.wurzel().classList.contains('hf--links'), api: D.laeuft()})")
@@ -305,7 +586,7 @@ with sync_playwright() as pw:
                     'bestanden': ok is True and w['laeuft'] and w['links'] is False and n['laeuft'] is False and abs(n['x'] - 0.5) < 0.01 and 0 <= n['links_px'] <= n['breite'] and l['links'] is True and l['laeuft'] is True and ab['laeuft'] is False and ab['klasse'] is False and ab['zustand'] != 'idle'}
         sicher('1c5_laufen', f5)
         def f6():
-            q.evaluate("D.an(true); D.manifest().verhalten.nummer_dauer_ms = 1600"); q.wait_for_timeout(300)
+            q.evaluate(RUHIG + "D.an(true); D.manifest().verhalten.nummer_dauer_ms = 1600"); q.wait_for_timeout(300)
             liste = q.evaluate("D.nummern()")
             je = {}
             for n in liste:
@@ -336,7 +617,7 @@ with sync_playwright() as pw:
                     'bestanden': len(liste) == 16 and alle_ok and schl['rueckgabe'] is False and schl['zustand'] == 'sleep_sitting' and vor > 0 and ab['zustand'] == 'sweating' and ab['req'] == 0 and ab['ebene'] == 0 and ab['laufend'] is None and 'hf-fig-' not in ab['fig_klasse'] and ab2['req'] == 0 and ab2['ebene'] == 0}
         sicher('1c6_nummern', f6)
         def f7():
-            q.evaluate("D.manifest().schreibtisch.schlaf_nach_ms = 3000; D.manifest().schreibtisch.lauf_min = [0.03, 0.03]; D.manifest().schreibtisch.nummer_min = [0.05, 0.05]; D.manifest().verhalten.nummer_dauer_ms = 1500; D.an(true)")
+            q.evaluate("D.manifest().schreibtisch.schlaf_nach_ms = 3000; D.manifest().schreibtisch.sichtkontakt = {erste_nummer_s: [3, 3], nummer_s: [3, 3], lauf_s: [1.5, 1.5], phase_s: 180}; D.manifest().verhalten.nummer_dauer_ms = 1500; D.an(true)")
             verlauf = []
             for i in range(12):
                 q.wait_for_timeout(2000); verlauf.append(q.evaluate("({z: D.zustand(), laeuft: D.laeuft(), nummer: D.laufendeNummer()})"))
@@ -345,7 +626,7 @@ with sync_playwright() as pw:
             bewegt = any(v['laeuft'] or v['nummer'] for v in verlauf)
             q.evaluate("D.wurzel().querySelector('.hf__figur').click()"); q.wait_for_timeout(150)
             w = q.evaluate("D.zustand()")
-            q.evaluate("D.manifest().schreibtisch.schlaf_nach_ms = 600000; D.manifest().schreibtisch.lauf_min = [2,6]; D.manifest().schreibtisch.nummer_min = [3,8]; D.an(true)")
+            q.evaluate("D.manifest().schreibtisch.schlaf_nach_ms = 600000; D.manifest().schreibtisch.sichtkontakt = {erste_nummer_s: [8, 15], nummer_s: [40, 90], lauf_s: [25, 60], phase_s: 180}; D.an(true)")
             return {'verlauf_alle_2s': verlauf, 'eingeschlafen': geschl, 'zwischendurch_gelaufen_oder_nummer': bewegt, 'nach_tipp': w, 'bestanden': geschl and w == 'surprised'}
         sicher('1c7_schlaf', f7)
         R['A1c_konsole_fehler'] = [t for t in kq if t[0] == 'pageerror' or (t[0] == 'error' and '404' not in t[1])]
@@ -585,5 +866,7 @@ if alt: E['zusammenfassung']['fall13_alt_rot'] = E['fall13_alt_gegenprobe']['rot
 if geliefert: E['zusammenfassung']['fall17_geliefert_14_16_rot'] = E['fall17_gegenprobe_gelieferte_fassung']['alle_rot']
 if stufe1: E['zusammenfassung']['gegenprobe_stufe1_1c_rot'] = E['gegenprobe_stufe1_1c']['alle_rot']
 if geliefert1c: E['zusammenfassung']['gegenprobe_1c9_rot'] = E['gegenprobe_1c9_lieferung_0939']['rot_wie_erwartet']
+if geliefert1c: E['zusammenfassung']['gegenprobe_n3_1_4_rot'] = E['gegenprobe_n3_lieferung_1c']['alle_rot']
+if geliefertn3: E['zusammenfassung']['gegenprobe_n4_1_5_rot'] = E['gegenprobe_n4_lieferung_n3']['alle_rot']
 json.dump(E, open(os.path.join(hier, 'probe_ergebnis.json'), 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
 print(json.dumps(E, indent=1, ensure_ascii=False))

@@ -11,7 +11,7 @@
   Lokal öffnen über einen Server (z. B. Ulfs lokaler Server im bos-Ordner),
   nicht per file:// — fetch() des Manifests braucht http.
 
-  Stand 17.10.2026, 09:37 Uhr (Stufe 1c, Bau-Chat): dazu ein SCHREIBTISCH-Kasten mit der Einbettung
+  Stand 17.10.2026, 12:35 Uhr (Nachtrag 3: Sichtkontakt-Zeiten, Show-Knopf). Vorher 09:37 (Stufe 1c, Bau-Chat): dazu ein SCHREIBTISCH-Kasten mit der Einbettung
   'schreibtisch' (Figur D: schiebbar, läuft, spielt Nummern, sichtbar/versteckt mit Speicher-Attrappe),
   Nummern-Knöpfe für D und S, kurze Schlaf-/Lauf-/Nummern-Zeiten per Knopf. hf--hell entfällt (Blase hat
   feste Farben), Hell/Dunkel schaltet data-theme.
@@ -126,7 +126,9 @@
   <button onclick="D.nummer()">Nummer (zufällig)</button>
   <button onclick="D.hinweis('Hinweis — auch versteckt gemerkt.')">hinweis()</button>
   <button onclick="D.ereignis('viel_offen',{n:7})">viel_offen</button>
-  <button onclick="kurzeZeiten()">kurze Zeiten (Lauf 3 s, Nummer 6 s, Schlaf 12 s)</button>
+  <button onclick="kurzeZeiten()">kurze Zeiten (Sichtphase: Nummer 2–3 s, dann 6–8 s, Lauf 3–4 s, Phase 60 s; Schlaf 12 s)</button>
+  <button onclick="D.show(3)">Show (3 Nummern)</button>
+  <button onclick="D.sichtkontakt('knopf')">Sichtphase starten</button>
   <button onclick="document.getElementById('fenster').classList.toggle('an')">Fenster-Attrappe (Ebene 400) an/aus</button>
   <span id="dStand" style="align-self:center;opacity:.7;font-size:12px;"></span>
 </div>
@@ -199,14 +201,14 @@
   // 4) Schreibtisch-Crumble — Figur D
   var D = F.neu({ name: 'schreibtisch', container: document.getElementById('schreibtisch'),
                   basisPfad: './', modus: 'ecke', einbettung: 'schreibtisch', rolle: 'lehrmeister', hoehe: 170, zufall: false, speicher: SPEICHER });
-  ['sichtbar', 'position', 'laufen', 'angekommen', 'nummer', 'nummer-ende', 'ziehen', 'wartet'].forEach(function (n) {
+  ['sichtbar', 'position', 'laufen', 'angekommen', 'nummer', 'nummer-ende', 'ziehen', 'wartet', 'sichtphase'].forEach(function (n) {
     document.addEventListener('hamster-figur:' + n, function (e) { logge(n, e.detail); zeigeDStand(); });
   });
   function kurzeZeiten() {
     [D, S].forEach(function (f) { var m = f.manifest(); if (!m) return;
-      m.schreibtisch.lauf_min = [0.05, 0.05]; m.schreibtisch.nummer_min = [0.1, 0.1]; m.schreibtisch.schlaf_nach_ms = 12000;
+      m.schreibtisch.sichtkontakt = { erste_nummer_s: [2, 3], nummer_s: [6, 8], lauf_s: [3, 4], phase_s: 60 }; m.schreibtisch.schlaf_nach_ms = 12000;
       m.spielplatz.lauf_min = [0.05, 0.05]; m.spielplatz.nummer_min = [0.1, 0.1]; m.spielplatz.schlaf_nach_ms = 12000; f.an(true); });
-    logge('kurze Zeiten', { lauf_s: 3, nummer_s: 6, schlaf_s: 12 });
+    logge('kurze Zeiten', { sichtkontakt: 'Nummer 2-3 s / 6-8 s, Lauf 3-4 s, Phase 60 s', schlaf_s: 12 });
   }
   function setzeRolle(r) {
     S.setzeRolle(r);

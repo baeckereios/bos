@@ -33,6 +33,17 @@
  * Speichern (Sichtbarkeit, Position) macht der Host über die Option speicher { lese(), schreibe(o) }.
  *
  * CHANGELOG
+ *   2026-10-17 · 13:49 · Nachtrag 4 (Kontroll-Chat 12:55): K37 verpasster Nummern-Termin (Reaktion/Lauf/Hinweis) wird
+ *     binnen sichtkontakt.nachhol_s (2–4 s) nachgeholt statt eine volle Runde zu warten; phaseErsteNummer endet erst mit
+ *     der gespielten ersten Nummer · K38 nummer({wecken:true}) / show(n,{wecken:true}) / wecke(): Schlafender wird wie
+ *     beim Tipp geweckt (surprised, verhalten.aufwach_ms), Nummer danach · K41 hidden mitten in der Nummer → sofort
+ *     Ruhebild · N4-1 Terminreste (naechsterLaufAt) beim Phasenstart und bei an()/sichtbar(false) gelöscht.
+ *   2026-10-17 · 12:35 · Nachtrag 3 (Kontroll-Chat 11:40/11:45): K33 interne Bilder (blink, look_*) als
+ *     Schicht über idle ohne Überblendung (hf__bild--schicht) — das Flackern war der Crossfade
+ *     pixelgleicher Bilder · K34 Sichtkontakt statt Uhr (schreibtisch.sichtkontakt: Sichtphase bei
+ *     sichtbar/Fokus/start/Berührung, erste Nummer nach erste_nummer_s, dann nummer_s/lauf_s,
+ *     Phase endet nach phase_s ohne Berührung oder bei hidden; hidden hält alle Bewegungs-Uhren an) ·
+ *     K35 show(n): mehrere Nummern nacheinander (Easter Egg des Host-Knopfs).
  *   2026-10-17 · 10:05 · Nachtrag 2 (Kontroll-Chat 09:52): nummer() beendet sich sofort, wenn das
  *     Nummern-Bild nicht ladbar ist (img null / naturalWidth 0) — vorher sechs Sekunden leeres
  *     Bild, z. B. wenn der Ordner nummern/ beim Sync fehlt. Prüffall 1c-9.
@@ -79,7 +90,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       container: document.body, basisPfad: 'hamster_figur/', modus: 'ecke', einbettung: 'fest',
       rolle: 'lehrmeister', hoehe: 150, an: true, ausruestung: {}, zufall: true,
       name: 'standard', vor: null, manifest: null, tippZustaende: null,
-      laufen: null, nummern: null, schiebbar: null, speicher: null, xStart: null
+      laufen: null, nummern: null, schiebbar: null, speicher: null, xStart: null, sichtkontakt: null
     }, o || {});
     if (!/\/$/.test(opt.basisPfad)) opt.basisPfad += '/';
     if (opt.modus !== 'knopf') opt.modus = 'ecke';
@@ -89,15 +100,18 @@ window.BOS_HAMSTER_FIGUR = (function () {
     if (opt.laufen === null) opt.laufen = aufLeiste;
     if (opt.nummern === null) opt.nummern = aufLeiste;
     if (opt.schiebbar === null) opt.schiebbar = (opt.einbettung === 'schreibtisch');
+    if (opt.sichtkontakt === null) opt.sichtkontakt = (opt.einbettung === 'schreibtisch');   // K34: Sichtphasen statt Minuten-Uhr
 
     var manifest = null, el = {}, aktuell = 'idle', ereignisSperre = false;
-    var t = { reaktion: null, blase: null, leben: null, lebenZurueck: null, schlaf: null, reinschauen: null, zufall: null, tipp: null, hervor: null, lauf: null, nummer: null, vorlade: null };
+    var t = { reaktion: null, blase: null, leben: null, lebenZurueck: null, schlaf: null, reinschauen: null, zufall: null, tipp: null, hervor: null, lauf: null, nummer: null, vorlade: null, phase: null, weck: null };
     var tipps = 0, aktiv = opt.an !== false, hervor = false, hinweisOffen = false, hinweisText = '', zerstoert = false;
     var sichtbarIst = true, wartend = null;            // K26: versteckt = Figur weg, Timer gelöscht; wartend = letzter Hinweis/Ereignis im Versteck
     var xAnteil = null;                                // Position auf der Unterkante (0..1)
     var lauf = null;                                   // laufender Spaziergang { ziel, raf }
     var nummerAktiv = null, letzteNummer = null;       // laufende Nummer { name, ebene }
     var zieh = null, ignoriereClick = false;           // Ziehen
+    var phaseAktiv = false, phaseErsteNummer = false, naechsteNummerAt = 0, naechsterLaufAt = 0, letzteBeruehrung = 0, versteckteSeite = false;   // K34 Sichtkontakt
+    var showRest = 0;                                  // K35 show(n): noch zu spielende Nummern
     var figW = Math.round(opt.hoehe * 0.95);
     var handler = {}, vorab = [], nachBereit = [];
 
@@ -166,6 +180,9 @@ window.BOS_HAMSTER_FIGUR = (function () {
         if (gesp.sichtbar === false) sichtbarIst = false;
         el.wurzel.classList.toggle('hf--versteckt', !sichtbarIst);
         window.addEventListener('resize', beiResize);
+        document.addEventListener('visibilitychange', beiSichtbarkeit);
+        if (opt.sichtkontakt) window.addEventListener('focus', beiFokus);
+        versteckteSeite = (document.visibilityState === 'hidden');
       }
     }
     function beiResize() { if (el.wurzel && xAnteil !== null) setzeX(xAnteil, true); }
@@ -204,7 +221,17 @@ window.BOS_HAMSTER_FIGUR = (function () {
     }
 
     // ---------------------------------------------------------------- Zustände
+    /** K33 (Nachtrag 3): interne Bilder (blink, look_*) sind pixelgleich zum Ruhebild — sie werden als SCHICHT
+     *  über idle gelegt (opacity 1, ohne Übergang), idle bleibt voll sichtbar. Sonst Crossfade wie bisher. */
+    function raeumeSchicht() { Object.keys(el.bilder).forEach(function (n) { el.bilder[n].classList.remove('hf__bild--schicht'); }); }
     function zeigeBild(name, schnell) {
+      var z = manifest.zustaende[name];
+      if (z && z.kategorie === 'intern' && aktuell === 'idle') {
+        raeumeSchicht();
+        if (el.bilder[name]) el.bilder[name].classList.add('hf__bild--schicht');
+        return;                                                // idle bleibt --an, Ausrüstung bleibt auf idle
+      }
+      raeumeSchicht();
       Object.keys(el.bilder).forEach(function (n) {
         var img = el.bilder[n];
         img.classList.toggle('hf__bild--schnell', !!schnell);
@@ -347,6 +374,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
 
     function tipp() {
       if (!aktiv || !manifest || !sichtbarIst) return;
+      beruehrung();
       clearTimeout(t.tipp); tipps++; t.tipp = setTimeout(function () { tipps = 0; }, 1500);
       var war = aktuell;
       stoppeLaufen();
@@ -475,18 +503,68 @@ window.BOS_HAMSTER_FIGUR = (function () {
       lauf.raf = requestAnimationFrame(schritt);
       return true;
     }
+    function sk() { return (manifest.schreibtisch && manifest.schreibtisch.sichtkontakt) || {}; }
     function armLauf() {
       clearTimeout(t.lauf);
-      if (!opt.laufen || !aufLeiste) return;
-      var m = zeiten().lauf_min; if (!m) return;
-      t.lauf = setTimeout(function () { laufe(); armLauf(); }, zufall(m[0], m[1]) * 60000);
+      if (!opt.laufen || !aufLeiste || versteckteSeite) return;
+      var ms;
+      if (opt.sichtkontakt) {
+        if (!phaseAktiv) return;
+        var l = sk().lauf_s || [25, 60]; ms = zufall(l[0], l[1]) * 1000;
+        if (naechsteNummerAt && Math.abs((Date.now() + ms) - naechsteNummerAt) < 10000) ms = (naechsteNummerAt - Date.now()) + 10000 + zufall(0, 3000);   // nie binnen 10 s der Nummer: dahinter legen
+        naechsterLaufAt = Date.now() + ms;
+      } else {
+        var m = zeiten().lauf_min; if (!m) return; ms = zufall(m[0], m[1]) * 60000;
+      }
+      t.lauf = setTimeout(function () { naechsterLaufAt = 0; laufe(); armLauf(); }, ms);
     }
+
+    // ---------------------------------------------------------------- Sichtkontakt (K34): Sichtphase statt Minuten-Uhr
+    /** Sichtphase starten/verlängern. grund: 'sichtbar' | 'fokus' | 'start' | 'beruehrung' | 'knopf'. */
+    function startePhase(grund) {
+      if (!opt.sichtkontakt || !manifest || !aktiv || !sichtbarIst || versteckteSeite) return;
+      var neu = !phaseAktiv;
+      phaseAktiv = true; letzteBeruehrung = Date.now();
+      clearTimeout(t.phase);
+      var ph = sk().phase_s; if (typeof ph !== 'number') ph = 180;
+      t.phase = setTimeout(endePhase, ph * 1000);
+      if (neu) { phaseErsteNummer = true; naechsteNummerAt = 0; naechsterLaufAt = 0; armNummer(); armLauf(); melde('sichtphase', { aktiv: true, grund: grund }); }   // N4-1: beide Terminreste löschen — ein stehengebliebener Lauf-Termin schob sonst die erste Nummer über die 10-s-Regel weit nach hinten
+    }
+    function endePhase() {
+      if (!phaseAktiv) return;
+      phaseAktiv = false; clearTimeout(t.phase); clearTimeout(t.lauf); clearTimeout(t.nummer); t.phase = t.lauf = t.nummer = null; naechsteNummerAt = 0; naechsterLaufAt = 0;
+      melde('sichtphase', { aktiv: false });
+    }
+    function beruehrung() {
+      if (!opt.sichtkontakt) return;
+      if (phaseAktiv) { letzteBeruehrung = Date.now(); clearTimeout(t.phase); var ph = sk().phase_s; if (typeof ph !== 'number') ph = 180; t.phase = setTimeout(endePhase, ph * 1000); }
+      else startePhase('beruehrung');
+    }
+    /** Seite im Hintergrund (hidden): alle Bewegungs-Uhren anhalten, nur der Schlaf läuft weiter. */
+    function seiteVersteckt(ja) {
+      versteckteSeite = !!ja;
+      if (ja) {
+        endePhase(); clearTimeout(t.lauf); clearTimeout(t.nummer); clearTimeout(t.vorlade); clearTimeout(t.weck); t.lauf = t.nummer = t.vorlade = t.weck = null;
+        stoppeLaufen();
+        var warNummer = !!(manifest.zustaende[aktuell] && manifest.zustaende[aktuell].kategorie === 'nummer');
+        beendeNummer();
+        // K41 (Nachtrag 4): mitten in der Nummer in den Hintergrund → sofort Ruhebild, Rückweg-Timer weg (zeige löscht ihn);
+        // sonst stand Crumble beim Zurückkommen ohne Requisiten in der Nummern-Pose. Schlaf-Uhr läuft weiter (ohneSchlafReset).
+        if (warNummer) zeige('idle', { still: true, ohneSchlafReset: true, ohneAnimation: true });
+      } else if (aktiv && sichtbarIst) {
+        if (opt.sichtkontakt) startePhase('sichtbar'); else { armLauf(); armNummer(); }
+        if (opt.nummern) vorladen();
+      }
+    }
+    function beiSichtbarkeit() { seiteVersteckt(document.visibilityState === 'hidden'); }
+    function beiFokus() { if (!versteckteSeite) startePhase('fokus'); }
 
     // Ziehen (K27): Pointer auf der Figur; ab 8 px Bewegung ziehen, sonst Tipp (click folgt)
     function verdrahteZiehen() {
       el.figur.style.touchAction = 'none';
       el.figur.addEventListener('pointerdown', function (e) {
         if (!aktiv || !sichtbarIst || e.button) return;
+        beruehrung();
         zieh = { id: e.pointerId, x0: e.clientX, startLinks: parseFloat(el.wurzel.style.left) || 0, aktivGeworden: false };
         try { el.figur.setPointerCapture(e.pointerId); } catch (x) {}
       });
@@ -530,10 +608,39 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.figur.className = el.figur.className.replace(/\s*hf-fig-\S+/g, '');
       el.wurzel.classList.remove('hf--nummer');
       melde('nummer-ende', { nummer: n.name, abgebrochen: !n.fertig });
+      if (showRest > 0 && n.fertig) { showRest--; setTimeout(function () { if (aktiv && sichtbarIst && !beschaeftigt()) { if (!nummer()) showRest = 0; } else showRest = 0; }, 350); }
+      else showRest = 0;
     }
-    /** Nummer abspielen: Zustandsbild + Requisiten-Ebene + Choreografie + Spruch, nach dauer_ms zurück. */
-    function nummer(name) {
-      if (!manifest || !aktiv || !sichtbarIst || !opt.nummern || schlaeft() || zieh || hinweisOffen) return false;
+    /** K38 (Nachtrag 4): Schlafenden wecken wie ein Tipp — Aufwach-Zustand kurz (verhalten.aufwach_ms), Schlaf-Timer neu. */
+    function aufwachMs() { return typeof manifest.verhalten.aufwach_ms === 'number' ? manifest.verhalten.aufwach_ms : 1000; }
+    function wecke() {
+      if (!manifest || !aktiv || !sichtbarIst || !schlaeft()) return false;
+      var ms = aufwachMs();
+      zeige('surprised', { dauer: ms, dauerText: ms });
+      melde('geweckt', {});
+      return true;
+    }
+    /** Nummer abspielen: Zustandsbild + Requisiten-Ebene + Choreografie + Spruch, nach dauer_ms zurück.
+     *  nummer(name?, o?) oder nummer(o); o.wecken (K38): schläft er, erst wecken, Nummer nach der Aufwach-Dauer. */
+    function nummer(name, o) {
+      if (name && typeof name === 'object') { o = name; name = null; }
+      o = o || {};
+      if (!manifest || !aktiv || !sichtbarIst || !opt.nummern || zieh || hinweisOffen) return false;
+      if (o.wecken) {
+        schlafFaellig = false;                                 // ein Mensch hält den Knopf: kein nachzuholender Schlaf, Schlaf-Uhr neu
+        if (!schlaeft()) armSchlaf();
+        else {
+          wecke();
+          clearTimeout(t.weck);
+          t.weck = setTimeout(function () {
+            t.weck = null;
+            if (aktiv && sichtbarIst && aktuell === 'idle' && !beschaeftigt() && !hinweisOffen) { if (!nummer(name)) showRest = 0; }
+            else showRest = 0;
+          }, aufwachMs() + 60);                                // kurz NACH dem Rückweg aus 'surprised' (gleiche Dauer, früher gestellt)
+          return true;
+        }
+      }
+      if (schlaeft()) return false;
       var liste = nummernListe(); if (!liste.length) return false;
       if (!name) { var i = 0; do { name = wahl(liste); i++; } while (liste.length > 1 && name === letzteNummer && i < 20); }
       var n = manifest.nummern[name]; if (!n) { console.warn('[hamster_figur] unbekannte Nummer: ' + name); return false; }
@@ -585,11 +692,37 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.figur.appendChild(ebene);
       meine.ebene = ebene;
     }
-    function armNummer() {
+    /** Nächsten Nummern-Termin stellen. nachholen (K37, Nachtrag 4): der letzte Termin traf auf Reaktion, Lauf, Ziehen
+     *  oder offenen Hinweis → kurzer Termin nachhol_s (2–4 s) statt voller Runde, so oft nötig, solange die Phase läuft. */
+    function armNummer(nachholen) {
       clearTimeout(t.nummer);
-      if (!opt.nummern || !aufLeiste || !nummernListe().length) return;
-      var m = zeiten().nummer_min; if (!m) return;
-      t.nummer = setTimeout(function () { if (aktuell === 'idle' && !beschaeftigt() && !hinweisOffen) nummer(); armNummer(); }, zufall(m[0], m[1]) * 60000);
+      if (!opt.nummern || !aufLeiste || !nummernListe().length || versteckteSeite) return;
+      var ms;
+      if (opt.sichtkontakt) {
+        if (!phaseAktiv) return;
+        var e = nachholen ? (sk().nachhol_s || [2, 4]) : (phaseErsteNummer ? (sk().erste_nummer_s || [8, 15]) : (sk().nummer_s || [40, 90]));
+        ms = zufall(e[0], e[1]) * 1000;
+        if (naechsterLaufAt && Math.abs((Date.now() + ms) - naechsterLaufAt) < 10000) ms = (naechsterLaufAt - Date.now()) + 10000 + zufall(0, 3000);   // nie binnen 10 s des Spaziergangs: dahinter legen (gilt auch für den Nachholtermin)
+        naechsteNummerAt = Date.now() + ms;
+      } else {
+        var m = zeiten().nummer_min; if (!m) return; ms = zufall(m[0], m[1]) * 60000;
+      }
+      t.nummer = setTimeout(function () {
+        naechsteNummerAt = 0;
+        var frei = aktuell === 'idle' && !beschaeftigt() && !hinweisOffen;
+        var gespielt = frei && nummer();
+        if (gespielt) phaseErsteNummer = false;                                   // K37: erst die GESPIELTE erste Nummer beendet die Erst-Phase
+        armNummer(!gespielt && opt.sichtkontakt && phaseAktiv && !schlaeft());   // verpasst (Reaktion/Lauf/Hinweis): nachholen; schläft er: volle Runde wie bisher
+      }, ms);
+    }
+    /** K35: Show — anzahl verschiedene Nummern nacheinander; Tipp/Ereignis bricht ab wie eine einzelne Nummer. */
+    function show(anzahl, o) {
+      if (anzahl && typeof anzahl === 'object') { o = anzahl; anzahl = null; }
+      showRest = Math.max(0, (anzahl || 3) - 1);
+      if (nummerAktiv) return true;                       // eine Nummer läuft schon (z. B. vom 600-ms-Halten): sie zählt als erste
+      if (t.weck) return true;                            // K38: er wird gerade geweckt, die Nummer kommt gleich — showRest bleibt stehen
+      if (!nummer(null, o)) { showRest = 0; return false; }
+      return true;
     }
     /** Nummern-Figuren in Leerlaufzeit vorladen (eine alle 400 ms), damit die erste Nummer nicht hakt. */
     function vorladen() {
@@ -639,13 +772,14 @@ window.BOS_HAMSTER_FIGUR = (function () {
     // ---------------------------------------------------------------- An/Aus, Sichtbar (K26)
     function clearAll() { Object.keys(t).forEach(function (k) { if (t[k]) { clearTimeout(t[k]); t[k] = null; } }); schlafFaellig = false; }
     function timerAktiv() { var n = 0; Object.keys(t).forEach(function (k) { if (t[k]) n++; }); if (lauf) n++; return n; }
-    function starteUhren() { leben(); armReinschauen(); armZufall(); armSchlaf(); armLauf(); armNummer(); }
+    function starteUhren() { leben(); armReinschauen(); armZufall(); armSchlaf(); if (opt.sichtkontakt) startePhase('start'); else { armLauf(); armNummer(); } }
 
     function an(wert) {
       aktiv = wert !== false;
       if (!el.wurzel) return;
       el.wurzel.classList.toggle('hf--aus', !aktiv);
       clearAll(); tipps = 0; hinweisOffen = false; hinweisText = ''; wartend = null; el.wurzel.classList.remove('hf--hinweis');
+      phaseAktiv = false; showRest = 0; naechsteNummerAt = 0; naechsterLaufAt = 0;
       stoppeLaufen(); beendeNummer(); zieh = null; el.wurzel.classList.remove('hf--zieht');
       verstecken();
       if (aktiv) { zeige('idle', { still: true, ohneSchlafReset: !sichtbarIst }); if (sichtbarIst) { starteUhren(); if (opt.nummern) vorladen(); } }
@@ -661,6 +795,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.wurzel.classList.toggle('hf--versteckt', !neu);
       if (!still) speicherSchreibe({ sichtbar: neu });
       if (!neu) {
+        phaseAktiv = false; showRest = 0; naechsteNummerAt = 0; naechsterLaufAt = 0;
         clearAll(); stoppeLaufen(); beendeNummer(); zieh = null; el.wurzel.classList.remove('hf--zieht', 'hf--laeuft');
         clearTimeout(t.reaktion); sage('');
         if (hinweisOffen) wartend = { art: 'hinweis', text: hinweisText, o: { text: hinweisText, dauer: 0, ohneRueckweg: true }, zustand: null };
@@ -693,7 +828,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       if (manifest && aktiv && sichtbarIst) { armSchlaf(); armLauf(); armNummer(); }
     }
 
-    function zerstoere() { clearAll(); stoppeLaufen(); beendeNummer(); window.removeEventListener('resize', beiResize); if (el.wurzel) el.wurzel.remove(); el = {}; aktiv = false; zerstoert = true; }
+    function zerstoere() { clearAll(); stoppeLaufen(); beendeNummer(); window.removeEventListener('resize', beiResize); document.removeEventListener('visibilitychange', beiSichtbarkeit); window.removeEventListener('focus', beiFokus); if (el.wurzel) el.wurzel.remove(); el = {}; aktiv = false; zerstoert = true; }
 
     function reg(fn) { if (manifest) fn(); else vorab.push(fn); }
     var registriere = {
@@ -724,6 +859,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       sichtbar: sichtbar, istSichtbar: function () { return sichtbarIst; }, ladeGespeichert: ladeGespeichert,
       laufe: laufe, setzeX: setzeX, x: function () { return xAnteil; },
       nummer: nummer, nummern: nummernListe, laufendeNummer: function () { return nummerAktiv ? nummerAktiv.name : null; },
+      show: show, wecke: wecke, sichtkontakt: function (grund) { startePhase(grund || 'start'); }, sichtphase: function () { return phaseAktiv; },
       zustand: function () { return aktuell; },
       manifest: function () { return manifest; },
       rolle: function () { return opt.rolle; },
@@ -770,7 +906,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
     init: init,
     an: durch('an'), zeige: durch('zeige'), ereignis: durch('ereignis'), hinweis: durch('hinweis'), sage: durch('sage'),
     setzeAusruestung: durch('setzeAusruestung'), setzeModus: durch('setzeModus'), setzeRolle: durch('setzeRolle'),
-    sichtbar: durch('sichtbar'), laufe: durch('laufe'), nummer: durch('nummer'),
+    sichtbar: durch('sichtbar'), laufe: durch('laufe'), nummer: durch('nummer'), show: durch('show'), wecke: durch('wecke'), sichtkontakt: durch('sichtkontakt'),
     zerstoere: function () { if (standard) { standard.zerstoere(); standard = null; } },
     registriere: registriereStandard,
     auf: function (name, fn) { if (standard) standard.auf(name, fn); else vorabAuf.push([name, fn]); },

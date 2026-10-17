@@ -1,1606 +1,1654 @@
 {
- "_kommentar": "Manifest der Hamster-Figur Crumble (hamster_figur.js). Koordinaten in Anteilen 0..1 der Bilddatei. koerper = Kasten des Hamster-Koerpers ohne Schwebe-Elemente; die Figur wird ueber diesen Kasten skaliert und unten mittig verankert. Seit 17.10.2026 (Stufe 1): texte = Rolle lehrmeister (ueber die Lage, nie an den Nutzer), texte_spielplatz = Rolle spielplatz (darf albern sein; fehlt es, gilt texte). texte_mit_zahl / texte_mit_zahl_1 / texte_mit_zahl_0 mit Platzhalter {n} fuer ereignis(name, { n }). ereignisse.<name> darf ein Zustand oder eine Liste von Zustaenden sein (zufaellige Wahl). Block spielplatz: Tipp-Auswahl, Schlaf, Reaktionsanteil auf beilaeufige Ereignisse.",
- "version": 3,
- "stand": "2026-10-17",
- "basis_hoehe_px": 480,
- "zustaende": {
-  "idle": {
-   "datei": "idle.png",
-   "gruppe": "stand",
-   "kategorie": "grund",
-   "koerper": [
-    0.0,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Ach, schon wieder du. Na gut.",
-    "Alles ruhig hier."
-   ],
-   "texte_spielplatz": [
-    "Ich bin nicht faul. Ich bin energiesparend.",
-    "Backe hat Pause. Backe hat immer Pause."
-   ]
+  "_kommentar": "Manifest der Hamster-Figur Crumble (hamster_figur.js). Koordinaten in Anteilen 0..1 der Bilddatei. koerper = Kasten des Hamster-Koerpers ohne Schwebe-Elemente; die Figur wird ueber diesen Kasten skaliert und unten mittig verankert. Seit 17.10.2026 (Stufe 1): texte = Rolle lehrmeister (ueber die Lage, nie an den Nutzer), texte_spielplatz = Rolle spielplatz (darf albern sein; fehlt es, gilt texte). texte_mit_zahl / texte_mit_zahl_1 / texte_mit_zahl_0 mit Platzhalter {n} fuer ereignis(name, { n }). ereignisse.<name> darf ein Zustand oder eine Liste von Zustaenden sein (zufaellige Wahl). Block spielplatz: Tipp-Auswahl, Schlaf, Reaktionsanteil auf beilaeufige Ereignisse.",
+  "version": 5,
+  "stand": "2026-10-17",
+  "basis_hoehe_px": 480,
+  "zustaende": {
+    "idle": {
+      "datei": "idle.png",
+      "gruppe": "stand",
+      "kategorie": "grund",
+      "koerper": [
+        0.0,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Ach, schon wieder du. Na gut.",
+        "Alles ruhig hier."
+      ],
+      "texte_spielplatz": [
+        "Ich bin nicht faul. Ich bin energiesparend.",
+        "Backe hat Pause. Backe hat immer Pause."
+      ]
+    },
+    "blink": {
+      "datei": "blink.png",
+      "gruppe": "stand",
+      "kategorie": "intern",
+      "koerper": [
+        0.0,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": []
+    },
+    "look_left": {
+      "datei": "look_left.png",
+      "gruppe": "stand",
+      "kategorie": "intern",
+      "koerper": [
+        0.0,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": []
+    },
+    "look_right": {
+      "datei": "look_right.png",
+      "gruppe": "stand",
+      "kategorie": "intern",
+      "koerper": [
+        0.0,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": []
+    },
+    "happy": {
+      "datei": "happy.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0008,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Froster bestätigt. Meine Lieblinge.",
+        "Das war sauber.",
+        "Mehlstaub in der Luft. Riecht nach Arbeit.",
+        "Froster bestätigt, Liste leer. Heute mag ich alle."
+      ],
+      "texte_spielplatz": [
+        "Krümel gefunden. Tag gerettet.",
+        "Wenn ich groß bin, werd ich Brötchen.",
+        "Streuselkuchen hat mich gefunden. Nicht umgekehrt."
+      ]
+    },
+    "laughing": {
+      "datei": "laughing.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0,
+        0.0005,
+        1.0,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Oh. Das lief ja mal durch.",
+        "Ich zähle Krümel. Zählt als Inventur. Bei mir."
+      ],
+      "texte_spielplatz": [
+        "Pfff. Der war gut. Sagt der mit den vollen Backen.",
+        "Der Teig hat gelacht. Ich hab's gesehen.",
+        "Hihi. Das Croissant hat mich angeguckt."
+      ]
+    },
+    "tongue": {
+      "datei": "tongue.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0007,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Bäh."
+      ],
+      "texte_spielplatz": [
+        "Bäääh. Mit Streuseln.",
+        "Bäh. Rosinen. Ich bin raus."
+      ]
+    },
+    "cool": {
+      "datei": "cool.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0007,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Liste leer. Was jetzt?",
+        "Alles im Kasten. Ich war's nicht, aber ich sag's trotzdem."
+      ],
+      "texte_spielplatz": [
+        "Zu cool für Brötchen. Fast.",
+        "Hamster können nicht pfeifen. Dafür hamstern. Gleicht sich aus."
+      ]
+    },
+    "grumpy": {
+      "datei": "grumpy.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0008,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Die Absprache galt. Gestern. Angeblich.",
+        "Jemand hat die Schublade offen gelassen. Jemand."
+      ],
+      "texte_spielplatz": [
+        "Jemand hat die Brötchenkante zuerst gegessen. Jemand."
+      ]
+    },
+    "worried": {
+      "datei": "worried.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Die Inventur ist von vorgestern…"
+      ],
+      "texte_spielplatz": [
+        "Hab ich den Ofen aus? Ich hab keinen Ofen."
+      ]
+    },
+    "sweating": {
+      "datei": "sweating.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.046,
+        0.0005,
+        0.9645,
+        0.9995
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Lange Liste. Sehr lange Liste."
+      ],
+      "texte_spielplatz": [
+        "Puh. Zugucken ist anstrengend."
+      ],
+      "texte_mit_zahl": [
+        "{n} offene Punkte. {n}.",
+        "{n} Aufgaben. Ich schwitze mit."
+      ]
+    },
+    "surprised": {
+      "datei": "surprised.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Moment. Was?",
+        "Hä?"
+      ],
+      "texte_spielplatz": [
+        "Hä?! Wer hat das Licht angemacht.",
+        "Wer hat die Lampe an. Ich war das. Trotzdem."
+      ]
+    },
+    "thinking": {
+      "datei": "thinking.png",
+      "gruppe": "stand_pose",
+      "kategorie": "miene",
+      "koerper": [
+        0.0,
+        0.0005,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "War das die Froster-Liste oder die Bestellung…",
+        "Ofen aus, Licht an. Eins von beiden ist falsch.",
+        "Es ist still. Zu still. Wer hat die Rondo aus?",
+        "Hab die Liste gelesen. Zweimal. Bleibt gleich.",
+        "Wenn Type 550 die Asche ist — wo ist dann das Feuer.",
+        "Rechne gerade. Dauert. Ist eine große Zahl.",
+        "Zwölf Bleche. Elf Bleche. Wer hat eins.",
+        "Ich habe nachgezählt. Es sind mehr als vorhin.",
+        "Die Zahl sieht komisch aus. Vielleicht bin ich's."
+      ],
+      "texte_spielplatz": [
+        "Wenn ein Brot im Ofen fällt und keiner hört es…",
+        "Ich hab einen Plan. Er beinhaltet Streusel.",
+        "Wenn Brot fällt, fällt es auf die Butterseite. Hamster auch."
+      ]
+    },
+    "counting": {
+      "datei": "counting.png",
+      "gruppe": "stand_pose",
+      "kategorie": "miene",
+      "koerper": [
+        0.0,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "…vierzehn, fünfzehn. Moment."
+      ],
+      "texte_spielplatz": [
+        "Eins, zwei, viele."
+      ]
+    },
+    "raise_hand": {
+      "datei": "raise_hand.png",
+      "gruppe": "stand_pose",
+      "kategorie": "hinweis",
+      "koerper": [
+        0.0006,
+        0.0,
+        1.0,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Ähm. Da wäre was."
+      ]
+    },
+    "shrug": {
+      "datei": "shrug.png",
+      "gruppe": "stand_pose",
+      "kategorie": "miene",
+      "koerper": [
+        0.0006,
+        0.0,
+        0.9994,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Nichts gefunden. Ehrlich.",
+        "Da fehlt ein Haken. Ich sag's nur.",
+        "Nicht gefunden. Vielleicht war's nie da."
+      ],
+      "texte_spielplatz": [
+        "Weiß ich nicht. Frag das Brot.",
+        "Im Froster wohnt ein Eisbär. Sagt er. Ich glaub ihm."
+      ]
+    },
+    "tired": {
+      "datei": "tired.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0008,
+        0.0,
+        0.9992,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Es ist 3:15. Ich sag nur."
+      ],
+      "texte_spielplatz": [
+        "Nur kurz die Augen zu. Zehn Minuten. Oder vier Stunden."
+      ]
+    },
+    "yawn": {
+      "datei": "yawn.png",
+      "gruppe": "stand_pose",
+      "kategorie": "miene",
+      "koerper": [
+        0.0007,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Mhhhh."
+      ],
+      "texte_spielplatz": [
+        "Gäähn. Wer hat die Nacht erfunden.",
+        "Gääähn. Weckt mich, wenn's Streusel gibt."
+      ]
+    },
+    "wave": {
+      "datei": "wave.png",
+      "gruppe": "stand_pose",
+      "kategorie": "geste",
+      "koerper": [
+        0.0006,
+        0.0004,
+        0.9994,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Moin. Nicht zu laut, ja?",
+        "Vier Uhr. Draußen schläft die Konkurrenz.",
+        "Die Augen sind offen. Mehr verspreche ich nicht.",
+        "Dritte Nacht. Ich zähle nicht mehr. Doch. Dritte."
+      ],
+      "texte_spielplatz": [
+        "Winken ist Sport. Für Hamster.",
+        "Winke winke. Das war Sport für heute."
+      ],
+      "texte_mit_zahl": [
+        "Moin. {n} Aufgaben warten.",
+        "Moin. {n} offene Punkte. Nur so."
+      ],
+      "texte_mit_zahl_1": [
+        "Moin. Eine Aufgabe wartet."
+      ],
+      "texte_mit_zahl_0": [
+        "Moin. Nichts offen. Verdächtig.",
+        "Moin. Liste leer."
+      ]
+    },
+    "eating": {
+      "datei": "eating.png",
+      "gruppe": "stand_pose",
+      "kategorie": "geste",
+      "koerper": [
+        0.0007,
+        0.0004,
+        1.0,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Zählt nicht als Schwund."
+      ],
+      "texte_spielplatz": [
+        "Das war schon vorher angebissen. Ehrlich.",
+        "Meine Backen fassen 300 Gramm. Theoretisch. Praktisch mehr.",
+        "Das war Probieren. Qualitätskontrolle. Viermal.",
+        "Ich esse nur, was runterfällt. Ich helfe beim Runterfallen."
+      ]
+    },
+    "wheat": {
+      "datei": "wheat.png",
+      "gruppe": "stand",
+      "kategorie": "geste",
+      "koerper": [
+        0.0007,
+        0.0,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Alles ruhig. Weitermachen."
+      ],
+      "texte_spielplatz": [
+        "Ich hab's angebaut. Also: zugeguckt."
+      ]
+    },
+    "flour_sack": {
+      "datei": "flour_sack.png",
+      "gruppe": "stand_pose",
+      "kategorie": "geste",
+      "koerper": [
+        0.0006,
+        0.0,
+        0.9994,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Der ist schwerer als ich."
+      ],
+      "texte_spielplatz": [
+        "Fünfundzwanzig Kilo. Ich wiege dreißig Gramm. Läuft.",
+        "Ich bin nicht klein. Der Mehlsack ist groß."
+      ]
+    },
+    "apron": {
+      "datei": "apron.png",
+      "gruppe": "stand",
+      "kategorie": "geste",
+      "koerper": [
+        0.0,
+        0.0,
+        0.9993,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Dienst ist Dienst."
+      ],
+      "texte_spielplatz": [
+        "Backe im Dienst. Keine Autogramme.",
+        "Backe ist mein Nachname. Crumble Backe. Steht nirgends."
+      ]
+    },
+    "bread_peel": {
+      "datei": "bread_peel.png",
+      "gruppe": "stand_pose",
+      "kategorie": "geste",
+      "koerper": [
+        0.0006,
+        0.0004,
+        1.0,
+        0.9996
+      ],
+      "massstab": 1.04,
+      "texte": [
+        "Ofen läuft. Ich hab das im Griff."
+      ],
+      "texte_spielplatz": [
+        "Ofen! Vorsicht! Heiß! Kennt man."
+      ]
+    },
+    "sneeze": {
+      "datei": "sneeze.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0083,
+        0.0005,
+        0.9937,
+        1.0
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Hatschi. Entschuldigung."
+      ],
+      "texte_spielplatz": [
+        "Hatschi. Mehl überall. Auch im Ohr.",
+        "Hatschi. Puderzucker. Jetzt bin ich glasiert."
+      ]
+    },
+    "cold": {
+      "datei": "cold.png",
+      "gruppe": "stand",
+      "kategorie": "miene",
+      "koerper": [
+        0.0649,
+        0.0005,
+        0.9357,
+        0.9995
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "F-f-froster. Schnell bestätigen."
+      ],
+      "texte_spielplatz": [
+        "Brrr. Wer schläft im Kühlraum? Ich. Einmal."
+      ]
+    },
+    "professor": {
+      "datei": "professor.png",
+      "gruppe": "stand_pose",
+      "kategorie": "geste",
+      "koerper": [
+        0.0007,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.02,
+      "texte": [
+        "Nachgerechnet. Zweimal. Stimmt."
+      ],
+      "texte_spielplatz": [
+        "Laut meiner Berechnung: mehr Krümel."
+      ]
+    },
+    "birthday": {
+      "datei": "birthday.png",
+      "gruppe": "stand_pose",
+      "kategorie": "geste",
+      "koerper": [
+        0.0007,
+        0.0004,
+        0.9993,
+        0.9996
+      ],
+      "massstab": 1.0,
+      "texte": [
+        "Alles Gute! Heute ohne Kommentar."
+      ],
+      "texte_spielplatz": [
+        "Torte! Für mich? Nein? Trotzdem Torte."
+      ]
+    },
+    "sleep_sitting": {
+      "datei": "sleep_sitting.png",
+      "gruppe": "sitzend",
+      "kategorie": "schlaf",
+      "koerper": [
+        0.0006,
+        0.0,
+        0.923,
+        0.9995
+      ],
+      "massstab": 0.9,
+      "texte": [
+        "Zzz…"
+      ],
+      "texte_spielplatz": [
+        "Zzz… Krümel…"
+      ]
+    },
+    "sleep_lying": {
+      "datei": "sleep_lying.png",
+      "gruppe": "liegend",
+      "kategorie": "schlaf",
+      "koerper": [
+        0.0006,
+        0.068,
+        0.9994,
+        0.9991
+      ],
+      "massstab": 0.62,
+      "texte": [
+        "Zzzzz…"
+      ],
+      "texte_spielplatz": [
+        "Zzzzz… noch ein Brötchen…"
+      ]
+    }
   },
-  "blink": {
-   "datei": "blink.png",
-   "gruppe": "stand",
-   "kategorie": "intern",
-   "koerper": [
-    0.0,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": []
+  "ausruestung": {
+    "slots": {
+      "stirn": {
+        "x": 0.5003,
+        "y": 0.0938,
+        "gruppen": [
+          "stand",
+          "stand_pose"
+        ]
+      },
+      "hals": {
+        "x": 0.4997,
+        "y": 0.4579,
+        "gruppen": [
+          "stand",
+          "stand_pose"
+        ]
+      },
+      "kopf": {
+        "x": 0.5,
+        "y": 0.0,
+        "gruppen": [
+          "stand",
+          "stand_pose"
+        ]
+      },
+      "pfote": {
+        "x": 0.5,
+        "y": 0.72,
+        "gruppen": [
+          "stand"
+        ]
+      }
+    },
+    "gegenstaende": {
+      "sonnenbrille": {
+        "datei": "ausruestung_sonnenbrille.png",
+        "slot": "stirn",
+        "breite": 0.6873,
+        "bezeichnung": "sonnenbrille",
+        "quelle": "aus cool.png geschnitten (Beispiel; eigene Gegenstände nach demselben Muster)"
+      },
+      "schal": {
+        "datei": "ausruestung_schal.png",
+        "slot": "hals",
+        "breite": 0.8435,
+        "bezeichnung": "schal",
+        "quelle": "aus cold.png geschnitten (Beispiel; eigene Gegenstände nach demselben Muster)"
+      }
+    }
   },
-  "look_left": {
-   "datei": "look_left.png",
-   "gruppe": "stand",
-   "kategorie": "intern",
-   "koerper": [
-    0.0,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": []
+  "ereignisse": {
+    "app_geoeffnet": "wave",
+    "hinweis": "raise_hand",
+    "froster_offen": "cold",
+    "froster_ok": "happy",
+    "backen_aktiv": "bread_peel",
+    "inventur_laeuft": "counting",
+    "inventur_alt": "worried",
+    "viel_offen": "sweating",
+    "nichts_gefunden": "shrug",
+    "spaet": "tired",
+    "alles_erledigt": "cool",
+    "fehler": "surprised",
+    "erfolg": "laughing",
+    "geburtstag": "birthday",
+    "hamstertag": "eating",
+    "rechner": "professor",
+    "schoner_fakt": [
+      "thinking",
+      "professor"
+    ],
+    "schoner_spruch": [
+      "laughing",
+      "happy"
+    ],
+    "schoner_emoji": [
+      "tongue",
+      "eating"
+    ],
+    "schoner_backstube": [
+      "bread_peel",
+      "flour_sack",
+      "apron",
+      "wheat"
+    ],
+    "schoner_nachtschicht": [
+      "yawn",
+      "tired",
+      "sneeze"
+    ],
+    "schoner_konditorei": [
+      "eating",
+      "birthday"
+    ],
+    "schoner_verkauf": [
+      "wave",
+      "cool"
+    ]
   },
-  "look_right": {
-   "datei": "look_right.png",
-   "gruppe": "stand",
-   "kategorie": "intern",
-   "koerper": [
-    0.0,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": []
+  "zufall": [
+    "thinking",
+    "wheat",
+    "sneeze",
+    "flour_sack",
+    "apron",
+    "grumpy",
+    "laughing",
+    "eating",
+    "yawn"
+  ],
+  "spielplatz": {
+    "_kommentar": "Rolle spielplatz (Bildschirmschoner). tippZustaende = alberne Auswahl beim Antippen; schlaf_nach_ms = schlaeft frueher ein (nur Tipp weckt); reaktions_anteil = Anteil der beilaeufigen Ereignisse (schoner_*), auf die er reagiert.",
+    "tippZustaende": [
+      "tongue",
+      "laughing",
+      "happy",
+      "surprised",
+      "shrug",
+      "wave",
+      "eating",
+      "sneeze"
+    ],
+    "schlaf_nach_ms": 90000,
+    "reaktions_anteil": 0.7,
+    "lauf_min": [
+      0.3,
+      1
+    ],
+    "nummer_min": [
+      0.3,
+      0.8
+    ],
+    "x_start": 0.85
   },
-  "happy": {
-   "datei": "happy.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0008,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Froster bestätigt. Meine Lieblinge.",
-    "Das war sauber."
-   ],
-   "texte_spielplatz": [
-    "Krümel gefunden. Tag gerettet."
-   ]
+  "schreibtisch": {
+    "_kommentar": "Einbettung schreibtisch (Launcher). Seit Nachtrag 3 (K34): SICHTKONTAKT statt Minuten-Uhr — eine Sichtphase beginnt, wenn die Seite sichtbar wird, das Fenster Fokus bekommt, ein Profil aktiviert wird oder jemand Crumble beruehrt; in der Phase erste Nummer nach erste_nummer_s, dann Nummern alle nummer_s und Spaziergaenge alle lauf_s (nie gleichzeitig); trifft ein Nummern-Termin auf eine Reaktion, einen Lauf oder einen offenen Hinweis, wird er nach nachhol_s (K37, Nachtrag 4) nachgeholt statt eine volle Runde zu warten; die Phase endet nach phase_s ohne Beruehrung oder sofort, wenn die Seite in den Hintergrund geht. Schlaf nach schlaf_nach_ms ohne Tipp. geschwindigkeit_px_s, x_start wie bisher. schritt_bilder: Haken fuer echtes Laufen (O12), leer.",
+    "sichtkontakt": {
+      "erste_nummer_s": [
+        8,
+        15
+      ],
+      "nummer_s": [
+        40,
+        90
+      ],
+      "lauf_s": [
+        25,
+        60
+      ],
+      "phase_s": 180,
+      "nachhol_s": [
+        2,
+        4
+      ]
+    },
+    "schlaf_nach_ms": 600000,
+    "geschwindigkeit_px_s": 55,
+    "x_start": 0.12,
+    "schritt_bilder": []
   },
-  "laughing": {
-   "datei": "laughing.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0,
-    0.0005,
-    1.0,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Oh. Das lief ja mal durch."
-   ],
-   "texte_spielplatz": [
-    "Pfff. Der war gut. Sagt der mit den vollen Backen."
-   ]
+  "nummern": {
+    "alchemist": {
+      "bild": "alchemist/figur.png",
+      "groesse": [
+        1049,
+        1363
+      ],
+      "koerper": [
+        0.001,
+        0.0,
+        0.9809,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "alchemist/req_01.png",
+          "kasten": [
+            0.8694,
+            0.0521,
+            1.0,
+            0.1548
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "alchemist/req_02.png",
+          "kasten": [
+            0.9066,
+            0.2084,
+            1.0,
+            0.2825
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "alchemist/req_03.png",
+          "kasten": [
+            0.8055,
+            0.1599,
+            0.8923,
+            0.2267
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "alchemist/klein.png",
+          "kasten": [
+            0.0009532888465204957,
+            0.001467351430667645,
+            0.047664442326024785,
+            0.03815113719735877
+          ],
+          "klasse": "klein",
+          "anzahl": 1
+        }
+      ],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": "nicken",
+        "gross": "steigen",
+        "klein": "steigen"
+      },
+      "texte": [
+        "Es blubbert. Also lebt es.",
+        "Sauerteig: Tag 847. Er mag mich."
+      ]
+    },
+    "backen_voll": {
+      "bild": "backen_voll/figur.png",
+      "groesse": [
+        895,
+        1137
+      ],
+      "koerper": [
+        0.0011,
+        0.0,
+        0.9989,
+        0.9991
+      ],
+      "requisiten": [],
+      "klein": [],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": "pulsieren",
+        "gross": null,
+        "klein": null
+      },
+      "texte": [
+        "Mmmpf.",
+        "Ich sag später was."
+      ]
+    },
+    "bowling": {
+      "bild": "bowling/figur.png",
+      "groesse": [
+        2376,
+        1289
+      ],
+      "koerper": [
+        0.0,
+        0.0008,
+        0.6296,
+        0.9604
+      ],
+      "requisiten": [
+        {
+          "datei": "bowling/req_01.png",
+          "kasten": [
+            0.7698,
+            0.2296,
+            0.9154,
+            0.9775
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "bowling/req_02.png",
+          "kasten": [
+            0.9162,
+            0.3328,
+            0.9537,
+            1.0
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "bowling/req_03.png",
+          "kasten": [
+            0.734,
+            0.3181,
+            0.771,
+            0.9255
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "bowling/req_04.png",
+          "kasten": [
+            0.6911,
+            0.2855,
+            0.7277,
+            0.8891
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "bowling/req_05.png",
+          "kasten": [
+            0.9642,
+            0.2676,
+            1.0,
+            0.8712
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "bowling/klein.png",
+          "kasten": [
+            0.00042087542087542086,
+            0.0015515903801396431,
+            0.04040404040404041,
+            0.04344453064391001
+          ],
+          "klasse": "klein",
+          "anzahl": 6
+        }
+      ],
+      "massstab": 1.25,
+      "choreografie": {
+        "figur": "neigen",
+        "gross": "umfallen",
+        "klein": "sprengen"
+      },
+      "texte": [
+        "Strike. Mit Semmel.",
+        "Stangen umhauen ist auch Sport."
+      ]
+    },
+    "chili": {
+      "bild": "chili/figur.png",
+      "groesse": [
+        1175,
+        1110
+      ],
+      "koerper": [
+        0.0,
+        0.0009,
+        1.0,
+        0.9991
+      ],
+      "requisiten": [],
+      "klein": [
+        {
+          "datei": "chili/klein_links.png",
+          "kasten": [
+            0.000851063829787234,
+            0.0009009009009009009,
+            0.04425531914893617,
+            0.03783783783783784
+          ],
+          "klasse": "klein",
+          "anzahl": 3
+        }
+      ],
+      "massstab": 1.25,
+      "choreografie": {
+        "figur": "neigen",
+        "gross": null,
+        "klein": "tropfen"
+      },
+      "texte": [
+        "Bisschen Schärfe schadet keiner Torte.",
+        "Das ist Deko. Rote Deko."
+      ]
+    },
+    "croissant": {
+      "bild": "croissant/figur.png",
+      "groesse": [
+        1566,
+        1361
+      ],
+      "koerper": [
+        0.0006,
+        0.0007,
+        0.9994,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "croissant/req_01.png",
+          "kasten": [
+            0.887,
+            0.8575,
+            0.9872,
+            0.9331
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "croissant/req_02.png",
+          "kasten": [
+            0.023,
+            0.8472,
+            0.0971,
+            0.9089
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "croissant/req_03.png",
+          "kasten": [
+            0.0894,
+            0.9206,
+            0.1545,
+            0.9728
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "croissant/klein.png",
+          "kasten": [
+            0.001277139208173691,
+            0.0014695077149155032,
+            0.04533844189016603,
+            0.04041146216017634
+          ],
+          "klasse": "klein",
+          "anzahl": 1
+        }
+      ],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": null,
+        "gross": "schweben",
+        "klein": "schweben"
+      },
+      "texte": [
+        "Pause. Auf Blätterteig.",
+        "Nicht stören. Ich reife."
+      ]
+    },
+    "fechter": {
+      "bild": "fechter/figur.png",
+      "groesse": [
+        1538,
+        1316
+      ],
+      "koerper": [
+        0.0007,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "fechter/req_01.png",
+          "kasten": [
+            0.1261,
+            0.6155,
+            0.2997,
+            0.7052
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "fechter/req_02.png",
+          "kasten": [
+            0.1632,
+            0.4065,
+            0.3257,
+            0.465
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "fechter/klein.png",
+          "kasten": [
+            0.0006501950585175553,
+            0.001519756838905775,
+            0.07022106631989597,
+            0.04331306990881459
+          ],
+          "klasse": "klein",
+          "anzahl": 6
+        }
+      ],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": "ausfallen",
+        "gross": "wedeln",
+        "klein": "sprengen"
+      },
+      "texte": [
+        "En garde! Mit Baguette.",
+        "Touché. Krümel."
+      ]
+    },
+    "froster": {
+      "bild": "froster/figur.png",
+      "groesse": [
+        2016,
+        1400
+      ],
+      "koerper": [
+        0.3591,
+        0.0,
+        0.9509,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "froster/req_01.png",
+          "kasten": [
+            0.0,
+            0.5007,
+            0.2475,
+            0.8957
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "froster/req_02.png",
+          "kasten": [
+            0.7971,
+            0.0871,
+            1.0,
+            0.4143
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "froster/req_03.png",
+          "kasten": [
+            0.1369,
+            0.0721,
+            0.3408,
+            0.3986
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "froster/klein.png",
+          "kasten": [
+            0.000496031746031746,
+            0.0014285714285714286,
+            0.027281746031746032,
+            0.11428571428571428
+          ],
+          "klasse": "klein",
+          "anzahl": 11
+        }
+      ],
+      "massstab": 1.3,
+      "choreografie": {
+        "figur": "zittern",
+        "gross": "fallen",
+        "klein": "flackern"
+      },
+      "texte": [
+        "Im Froster ist es kalt. Hab ich geprüft.",
+        "Minus achtzehn. Wie mein Humor."
+      ]
+    },
+    "geheimagent": {
+      "bild": "geheimagent/figur.png",
+      "groesse": [
+        1235,
+        1365
+      ],
+      "koerper": [
+        0.0,
+        0.0,
+        0.9636,
+        1.0
+      ],
+      "requisiten": [],
+      "klein": [
+        {
+          "datei": "geheimagent/klein_rechts.png",
+          "kasten": [
+            0.0016194331983805667,
+            0.0007326007326007326,
+            0.03805668016194332,
+            0.03956043956043956
+          ],
+          "klasse": "klein",
+          "anzahl": 4
+        }
+      ],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": "ruck",
+        "gross": null,
+        "klein": "flitzen"
+      },
+      "texte": [
+        "Der Name ist Crumble. Nur Crumble.",
+        "Geschüttelt, nicht geknetet."
+      ]
+    },
+    "gewichtheber": {
+      "bild": "gewichtheber/figur.png",
+      "groesse": [
+        2536,
+        1289
+      ],
+      "koerper": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "requisiten": [],
+      "klein": [
+        {
+          "datei": "gewichtheber/klein.png",
+          "kasten": [
+            0.0003943217665615142,
+            0.0007757951900698216,
+            0.05914826498422713,
+            0.11404189294026378
+          ],
+          "klasse": "klein",
+          "anzahl": 16
+        }
+      ],
+      "massstab": 1.25,
+      "choreografie": {
+        "figur": "wackeln",
+        "gross": null,
+        "klein": "flackern"
+      },
+      "texte": [
+        "Zwei Brezeln. Laugen-Hantel.",
+        "Noch eine Wiederholung. Dann Pause."
+      ]
+    },
+    "hamstertag": {
+      "bild": "hamstertag/figur.png",
+      "groesse": [
+        1582,
+        1350
+      ],
+      "koerper": [
+        0.0006,
+        0.0007,
+        1.0,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "hamstertag/req_01.png",
+          "kasten": [
+            0.6479,
+            0.1674,
+            0.7819,
+            0.2978
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [],
+      "massstab": 1.3,
+      "choreografie": {
+        "figur": "wippen",
+        "gross": "huepfen",
+        "klein": null
+      },
+      "texte": [
+        "Morgen Hamstertag. Ich bin vorbereitet.",
+        "Vorrat ist kein Hobby. Vorrat ist Pflicht."
+      ]
+    },
+    "jongleur": {
+      "bild": "jongleur/figur.png",
+      "groesse": [
+        566,
+        678
+      ],
+      "koerper": [
+        0.0866,
+        0.2065,
+        0.9329,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "jongleur/req_01.png",
+          "kasten": [
+            0.5583,
+            0.0,
+            0.7951,
+            0.1549
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "jongleur/req_02.png",
+          "kasten": [
+            0.0,
+            0.2625,
+            0.2244,
+            0.4292
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "jongleur/req_03.png",
+          "kasten": [
+            0.7756,
+            0.2655,
+            1.0,
+            0.4307
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "jongleur/req_04.png",
+          "kasten": [
+            0.1961,
+            0.0118,
+            0.4223,
+            0.1785
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [],
+      "massstab": 1.3,
+      "choreografie": {
+        "figur": "wippen",
+        "gross": "kreisen",
+        "klein": null
+      },
+      "texte": [
+        "Vier Brote. Null Hände frei. Kein Problem.",
+        "Jonglieren ist nur Werfen mit Stil."
+      ]
+    },
+    "karate": {
+      "bild": "karate/figur.png",
+      "groesse": [
+        2293,
+        1332
+      ],
+      "koerper": [
+        0.2364,
+        0.0,
+        0.741,
+        0.9992
+      ],
+      "requisiten": [
+        {
+          "datei": "karate/req_01.png",
+          "kasten": [
+            0.0,
+            0.1254,
+            0.2403,
+            0.5405
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "karate/req_02.png",
+          "kasten": [
+            0.7662,
+            0.2883,
+            1.0,
+            0.7117
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "karate/req_03.png",
+          "kasten": [
+            0.1483,
+            0.5098,
+            0.2215,
+            0.6336
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "karate/req_04.png",
+          "kasten": [
+            0.7331,
+            0.211,
+            0.7963,
+            0.3416
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "karate/req_05.png",
+          "kasten": [
+            0.1827,
+            0.7027,
+            0.222,
+            0.7793
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "karate/klein.png",
+          "kasten": [
+            0.0004361098996947231,
+            0.0007507507507507507,
+            0.09332751853467074,
+            0.12537537537537538
+          ],
+          "klasse": "klein",
+          "anzahl": 28
+        }
+      ],
+      "massstab": 1.3,
+      "choreografie": {
+        "figur": "ruck",
+        "gross": "auseinander",
+        "klein": "sprengen"
+      },
+      "texte": [
+        "HIIIJA. Scheibe gefällig?",
+        "Brotmesser? Brauch ich nicht."
+      ]
+    },
+    "mehlbombe": {
+      "bild": "mehlbombe/figur.png",
+      "groesse": [
+        1726,
+        1326
+      ],
+      "koerper": [
+        0.0516,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "mehlbombe/req_01.png",
+          "kasten": [
+            0.0939,
+            0.1297,
+            0.1912,
+            0.2564
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "mehlbombe/req_02.png",
+          "kasten": [
+            0.686,
+            0.1448,
+            0.7793,
+            0.267
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "mehlbombe/req_03.png",
+          "kasten": [
+            0.0614,
+            0.6003,
+            0.1315,
+            0.6976
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "mehlbombe/req_04.png",
+          "kasten": [
+            0.7775,
+            0.3205,
+            0.8407,
+            0.3974
+          ],
+          "klasse": "gross"
+        },
+        {
+          "datei": "mehlbombe/req_05.png",
+          "kasten": [
+            0.7578,
+            0.9412,
+            0.8355,
+            0.9872
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "mehlbombe/klein.png",
+          "kasten": [
+            0.0,
+            0.0007541478129713424,
+            0.06025492468134415,
+            0.043740573152337855
+          ],
+          "klasse": "klein",
+          "anzahl": 12
+        }
+      ],
+      "massstab": 1.3,
+      "choreografie": {
+        "figur": "niesen",
+        "gross": "puff",
+        "klein": "puff"
+      },
+      "texte": [
+        "War der Sack kaputt oder ich?",
+        "Hatschi. Mehl 550. Erkenn ich blind."
+      ]
+    },
+    "teigmonster": {
+      "bild": "teigmonster/figur.png",
+      "groesse": [
+        1726,
+        1382
+      ],
+      "koerper": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "requisiten": [],
+      "klein": [],
+      "massstab": 1.45,
+      "choreografie": {
+        "figur": "wabern",
+        "gross": null,
+        "klein": null
+      },
+      "texte": [
+        "Hilfe. Der Teig geht. Mit mir.",
+        "Ich hab nur kurz reingefasst."
+      ]
+    },
+    "torte_gesicht": {
+      "bild": "torte_gesicht/figur.png",
+      "groesse": [
+        1095,
+        1224
+      ],
+      "koerper": [
+        0.0356,
+        0.0,
+        0.9991,
+        1.0
+      ],
+      "requisiten": [],
+      "klein": [
+        {
+          "datei": "torte_gesicht/klein_links.png",
+          "kasten": [
+            0.0,
+            0.0008169934640522876,
+            0.0958904109589041,
+            0.06862745098039216
+          ],
+          "klasse": "klein",
+          "anzahl": 8
+        },
+        {
+          "datei": "torte_gesicht/klein_rechts.png",
+          "kasten": [
+            0.0018264840182648401,
+            0.0016339869281045752,
+            0.06940639269406393,
+            0.03594771241830065
+          ],
+          "klasse": "klein",
+          "anzahl": 1
+        }
+      ],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": "einschlag",
+        "gross": null,
+        "klein": "spritzen"
+      },
+      "texte": [
+        "Das war Absicht. Fast.",
+        "Sahne. Überall. Auch hinten."
+      ]
+    },
+    "zombie": {
+      "bild": "zombie/figur.png",
+      "groesse": [
+        1128,
+        1356
+      ],
+      "koerper": [
+        0.0355,
+        0.0007,
+        0.922,
+        1.0
+      ],
+      "requisiten": [
+        {
+          "datei": "zombie/req_01.png",
+          "kasten": [
+            0.0,
+            0.3621,
+            0.1436,
+            0.5752
+          ],
+          "klasse": "gross"
+        }
+      ],
+      "klein": [
+        {
+          "datei": "zombie/klein.png",
+          "kasten": [
+            0.0017730496453900709,
+            0.0007374631268436578,
+            0.05851063829787234,
+            0.04498525073746313
+          ],
+          "klasse": "klein",
+          "anzahl": 2
+        }
+      ],
+      "massstab": 1.15,
+      "choreografie": {
+        "figur": "nicken",
+        "gross": "steigen",
+        "klein": "steigen"
+      },
+      "texte": [
+        "Kaffee. Jetzt. Bitte. Danke.",
+        "Ich war schon wach, als du kamst."
+      ]
+    }
   },
-  "tongue": {
-   "datei": "tongue.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0007,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Bäh."
-   ],
-   "texte_spielplatz": [
-    "Bäääh. Mit Streuseln."
-   ]
-  },
-  "cool": {
-   "datei": "cool.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0007,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Liste leer. Was jetzt?"
-   ],
-   "texte_spielplatz": [
-    "Zu cool für Brötchen. Fast."
-   ]
-  },
-  "grumpy": {
-   "datei": "grumpy.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0008,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Die Absprache galt. Gestern. Angeblich."
-   ],
-   "texte_spielplatz": [
-    "Jemand hat die Brötchenkante zuerst gegessen. Jemand."
-   ]
-  },
-  "worried": {
-   "datei": "worried.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Die Inventur ist von vorgestern…"
-   ],
-   "texte_spielplatz": [
-    "Hab ich den Ofen aus? Ich hab keinen Ofen."
-   ]
-  },
-  "sweating": {
-   "datei": "sweating.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.046,
-    0.0005,
-    0.9645,
-    0.9995
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Sieben offene Punkte. Sieben."
-   ],
-   "texte_spielplatz": [
-    "Puh. Zugucken ist anstrengend."
-   ],
-   "texte_mit_zahl": [
-    "{n} offene Punkte. {n}.",
-    "{n} Aufgaben. Ich schwitze mit."
-   ]
-  },
-  "surprised": {
-   "datei": "surprised.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0,
-    0.0,
-    1.0,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "3,2 kg? Wirklich?",
-    "Hä?"
-   ],
-   "texte_spielplatz": [
-    "Hä?! Wer hat das Licht angemacht."
-   ]
-  },
-  "thinking": {
-   "datei": "thinking.png",
-   "gruppe": "stand_pose",
-   "kategorie": "miene",
-   "koerper": [
-    0.0,
-    0.0005,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "War das die Froster-Liste oder die Bestellung…"
-   ],
-   "texte_spielplatz": [
-    "Wenn ein Brot im Ofen fällt und keiner hört es…"
-   ]
-  },
-  "counting": {
-   "datei": "counting.png",
-   "gruppe": "stand_pose",
-   "kategorie": "miene",
-   "koerper": [
-    0.0,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "…vierzehn, fünfzehn. Moment."
-   ],
-   "texte_spielplatz": [
-    "Eins, zwei, viele."
-   ]
-  },
-  "raise_hand": {
-   "datei": "raise_hand.png",
-   "gruppe": "stand_pose",
-   "kategorie": "hinweis",
-   "koerper": [
-    0.0006,
-    0.0,
-    1.0,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Ähm. Da wäre was."
-   ]
-  },
-  "shrug": {
-   "datei": "shrug.png",
-   "gruppe": "stand_pose",
-   "kategorie": "miene",
-   "koerper": [
-    0.0006,
-    0.0,
-    0.9994,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Nichts gefunden. Ehrlich."
-   ],
-   "texte_spielplatz": [
-    "Weiß ich nicht. Frag das Brot."
-   ]
-  },
-  "tired": {
-   "datei": "tired.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0008,
-    0.0,
-    0.9992,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Es ist 3:15. Ich sag nur."
-   ],
-   "texte_spielplatz": [
-    "Nur kurz die Augen zu. Zehn Minuten. Oder vier Stunden."
-   ]
-  },
-  "yawn": {
-   "datei": "yawn.png",
-   "gruppe": "stand_pose",
-   "kategorie": "miene",
-   "koerper": [
-    0.0007,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Mhhhh."
-   ],
-   "texte_spielplatz": [
-    "Gäähn. Wer hat die Nacht erfunden."
-   ]
-  },
-  "wave": {
-   "datei": "wave.png",
-   "gruppe": "stand_pose",
-   "kategorie": "geste",
-   "koerper": [
-    0.0006,
-    0.0004,
-    0.9994,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Moin. Nicht zu laut, ja?"
-   ],
-   "texte_spielplatz": [
-    "Winken ist Sport. Für Hamster."
-   ],
-   "texte_mit_zahl": [
-    "Moin. {n} Aufgaben warten.",
-    "Moin. {n} offene Punkte. Nur so."
-   ],
-   "texte_mit_zahl_1": [
-    "Moin. Eine Aufgabe wartet."
-   ],
-   "texte_mit_zahl_0": [
-    "Moin. Nichts offen. Verdächtig.",
-    "Moin. Liste leer."
-   ]
-  },
-  "eating": {
-   "datei": "eating.png",
-   "gruppe": "stand_pose",
-   "kategorie": "geste",
-   "koerper": [
-    0.0007,
-    0.0004,
-    1.0,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Zählt nicht als Schwund."
-   ],
-   "texte_spielplatz": [
-    "Das war schon vorher angebissen. Ehrlich."
-   ]
-  },
-  "wheat": {
-   "datei": "wheat.png",
-   "gruppe": "stand",
-   "kategorie": "geste",
-   "koerper": [
-    0.0007,
-    0.0,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Alles ruhig. Weitermachen."
-   ],
-   "texte_spielplatz": [
-    "Ich hab's angebaut. Also: zugeguckt."
-   ]
-  },
-  "flour_sack": {
-   "datei": "flour_sack.png",
-   "gruppe": "stand_pose",
-   "kategorie": "geste",
-   "koerper": [
-    0.0006,
-    0.0,
-    0.9994,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Der ist schwerer als ich."
-   ],
-   "texte_spielplatz": [
-    "Fünfundzwanzig Kilo. Ich wiege dreißig Gramm. Läuft."
-   ]
-  },
-  "apron": {
-   "datei": "apron.png",
-   "gruppe": "stand",
-   "kategorie": "geste",
-   "koerper": [
-    0.0,
-    0.0,
-    0.9993,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Dienst ist Dienst."
-   ],
-   "texte_spielplatz": [
-    "Backe im Dienst. Keine Autogramme."
-   ]
-  },
-  "bread_peel": {
-   "datei": "bread_peel.png",
-   "gruppe": "stand_pose",
-   "kategorie": "geste",
-   "koerper": [
-    0.0006,
-    0.0004,
-    1.0,
-    0.9996
-   ],
-   "massstab": 1.04,
-   "texte": [
-    "Ofen läuft. Ich hab das im Griff."
-   ],
-   "texte_spielplatz": [
-    "Ofen! Vorsicht! Heiß! Kennt man."
-   ]
-  },
-  "sneeze": {
-   "datei": "sneeze.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0083,
-    0.0005,
-    0.9937,
-    1.0
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Hatschi. Entschuldigung."
-   ],
-   "texte_spielplatz": [
-    "Hatschi. Mehl überall. Auch im Ohr."
-   ]
-  },
-  "cold": {
-   "datei": "cold.png",
-   "gruppe": "stand",
-   "kategorie": "miene",
-   "koerper": [
-    0.0649,
-    0.0005,
-    0.9357,
-    0.9995
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "F-f-froster. Schnell bestätigen."
-   ],
-   "texte_spielplatz": [
-    "Brrr. Wer schläft im Kühlraum? Ich. Einmal."
-   ]
-  },
-  "professor": {
-   "datei": "professor.png",
-   "gruppe": "stand_pose",
-   "kategorie": "geste",
-   "koerper": [
-    0.0007,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.02,
-   "texte": [
-    "Nach meiner Rechnung: 62 % Hydration."
-   ],
-   "texte_spielplatz": [
-    "Laut meiner Berechnung: mehr Krümel."
-   ]
-  },
-  "birthday": {
-   "datei": "birthday.png",
-   "gruppe": "stand_pose",
-   "kategorie": "geste",
-   "koerper": [
-    0.0007,
-    0.0004,
-    0.9993,
-    0.9996
-   ],
-   "massstab": 1.0,
-   "texte": [
-    "Alles Gute! Heute ohne Kommentar."
-   ],
-   "texte_spielplatz": [
-    "Torte! Für mich? Nein? Trotzdem Torte."
-   ]
-  },
-  "sleep_sitting": {
-   "datei": "sleep_sitting.png",
-   "gruppe": "sitzend",
-   "kategorie": "schlaf",
-   "koerper": [
-    0.0006,
-    0.0,
-    0.923,
-    0.9995
-   ],
-   "massstab": 0.9,
-   "texte": [
-    "Zzz…"
-   ],
-   "texte_spielplatz": [
-    "Zzz… Krümel…"
-   ]
-  },
-  "sleep_lying": {
-   "datei": "sleep_lying.png",
-   "gruppe": "liegend",
-   "kategorie": "schlaf",
-   "koerper": [
-    0.0006,
-    0.068,
-    0.9994,
-    0.9991
-   ],
-   "massstab": 0.62,
-   "texte": [
-    "Zzzzz…"
-   ],
-   "texte_spielplatz": [
-    "Zzzzz… noch ein Brötchen…"
-   ]
+  "verhalten": {
+    "blinzeln_ms": [
+      3000,
+      6000
+    ],
+    "blick_anteil": 0.3,
+    "blink_dauer_ms": 110,
+    "blick_dauer_ms": 900,
+    "reaktion_ms": 5500,
+    "aufwach_ms": 1000,
+    "hinweis_ms": 0,
+    "schlaf_nach_ms": 120000,
+    "reinschauen_min": 60,
+    "zunge_nach_tipps": 3,
+    "zufall_min": [
+      25,
+      55
+    ],
+    "aufgaben_schwelle": 5,
+    "nummer_dauer_ms": 6000
   }
- },
- "ausruestung": {
-  "slots": {
-   "stirn": {
-    "x": 0.5003,
-    "y": 0.0938,
-    "gruppen": [
-     "stand",
-     "stand_pose"
-    ]
-   },
-   "hals": {
-    "x": 0.4997,
-    "y": 0.4579,
-    "gruppen": [
-     "stand",
-     "stand_pose"
-    ]
-   },
-   "kopf": {
-    "x": 0.5,
-    "y": 0.0,
-    "gruppen": [
-     "stand",
-     "stand_pose"
-    ]
-   },
-   "pfote": {
-    "x": 0.5,
-    "y": 0.72,
-    "gruppen": [
-     "stand"
-    ]
-   }
-  },
-  "gegenstaende": {
-   "sonnenbrille": {
-    "datei": "ausruestung_sonnenbrille.png",
-    "slot": "stirn",
-    "breite": 0.6873,
-    "bezeichnung": "sonnenbrille",
-    "quelle": "aus cool.png geschnitten (Beispiel; eigene Gegenstände nach demselben Muster)"
-   },
-   "schal": {
-    "datei": "ausruestung_schal.png",
-    "slot": "hals",
-    "breite": 0.8435,
-    "bezeichnung": "schal",
-    "quelle": "aus cold.png geschnitten (Beispiel; eigene Gegenstände nach demselben Muster)"
-   }
-  }
- },
- "ereignisse": {
-  "app_geoeffnet": "wave",
-  "hinweis": "raise_hand",
-  "froster_offen": "cold",
-  "froster_ok": "happy",
-  "backen_aktiv": "bread_peel",
-  "inventur_laeuft": "counting",
-  "inventur_alt": "worried",
-  "viel_offen": "sweating",
-  "nichts_gefunden": "shrug",
-  "spaet": "tired",
-  "alles_erledigt": "cool",
-  "fehler": "surprised",
-  "erfolg": "laughing",
-  "geburtstag": "birthday",
-  "hamstertag": "eating",
-  "rechner": "professor",
-  "schoner_fakt": [
-   "thinking",
-   "professor"
-  ],
-  "schoner_spruch": [
-   "laughing",
-   "happy"
-  ],
-  "schoner_emoji": [
-   "tongue",
-   "eating"
-  ],
-  "schoner_backstube": [
-   "bread_peel",
-   "flour_sack",
-   "apron",
-   "wheat"
-  ],
-  "schoner_nachtschicht": [
-   "yawn",
-   "tired",
-   "sneeze"
-  ],
-  "schoner_konditorei": [
-   "eating",
-   "birthday"
-  ],
-  "schoner_verkauf": [
-   "wave",
-   "cool"
-  ]
- },
- "zufall": [
-  "thinking",
-  "wheat",
-  "sneeze",
-  "flour_sack",
-  "apron",
-  "grumpy",
-  "laughing",
-  "eating",
-  "yawn"
- ],
- "spielplatz": {
-  "_kommentar": "Rolle spielplatz (Bildschirmschoner). tippZustaende = alberne Auswahl beim Antippen; schlaf_nach_ms = schlaeft frueher ein (nur Tipp weckt); reaktions_anteil = Anteil der beilaeufigen Ereignisse (schoner_*), auf die er reagiert.",
-  "tippZustaende": [
-   "tongue",
-   "laughing",
-   "happy",
-   "surprised",
-   "shrug",
-   "wave",
-   "eating",
-   "sneeze"
-  ],
-  "schlaf_nach_ms": 90000,
-  "reaktions_anteil": 0.7,
-  "lauf_min": [
-   0.5,
-   2
-  ],
-  "nummer_min": [
-   0.5,
-   1.5
-  ],
-  "x_start": 0.85
- },
- "schreibtisch": {
-  "_kommentar": "Einbettung schreibtisch (Launcher, Stufe 1c): Laufen alle lauf_min Minuten, Nummer alle nummer_min Minuten, Schlaf nach schlaf_nach_ms ohne Tipp (Laufen/Nummern stellen ihn nicht), Geschwindigkeit px/s, Startposition als Anteil der Breite. schritt_bilder: Haken fuer echtes Laufen (O12), leer.",
-  "lauf_min": [
-   2,
-   6
-  ],
-  "nummer_min": [
-   3,
-   8
-  ],
-  "schlaf_nach_ms": 600000,
-  "geschwindigkeit_px_s": 55,
-  "x_start": 0.12,
-  "schritt_bilder": []
- },
- "nummern": {
-  "alchemist": {
-   "bild": "alchemist/figur.png",
-   "groesse": [
-    1049,
-    1363
-   ],
-   "koerper": [
-    0.001,
-    0.0,
-    0.9809,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "alchemist/req_01.png",
-     "kasten": [
-      0.8694,
-      0.0521,
-      1.0,
-      0.1548
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "alchemist/req_02.png",
-     "kasten": [
-      0.9066,
-      0.2084,
-      1.0,
-      0.2825
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "alchemist/req_03.png",
-     "kasten": [
-      0.8055,
-      0.1599,
-      0.8923,
-      0.2267
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "alchemist/klein.png",
-     "kasten": [
-      0.0009532888465204957,
-      0.001467351430667645,
-      0.047664442326024785,
-      0.03815113719735877
-     ],
-     "klasse": "klein",
-     "anzahl": 1
-    }
-   ],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": "nicken",
-    "gross": "steigen",
-    "klein": "steigen"
-   },
-   "texte": [
-    "Es blubbert. Also lebt es.",
-    "Sauerteig: Tag 847. Er mag mich."
-   ]
-  },
-  "backen_voll": {
-   "bild": "backen_voll/figur.png",
-   "groesse": [
-    895,
-    1137
-   ],
-   "koerper": [
-    0.0011,
-    0.0,
-    0.9989,
-    0.9991
-   ],
-   "requisiten": [],
-   "klein": [],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": "pulsieren",
-    "gross": null,
-    "klein": null
-   },
-   "texte": [
-    "Mmmpf.",
-    "Ich sag später was."
-   ]
-  },
-  "bowling": {
-   "bild": "bowling/figur.png",
-   "groesse": [
-    2376,
-    1289
-   ],
-   "koerper": [
-    0.0,
-    0.0008,
-    0.6296,
-    0.9604
-   ],
-   "requisiten": [
-    {
-     "datei": "bowling/req_01.png",
-     "kasten": [
-      0.7698,
-      0.2296,
-      0.9154,
-      0.9775
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "bowling/req_02.png",
-     "kasten": [
-      0.9162,
-      0.3328,
-      0.9537,
-      1.0
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "bowling/req_03.png",
-     "kasten": [
-      0.734,
-      0.3181,
-      0.771,
-      0.9255
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "bowling/req_04.png",
-     "kasten": [
-      0.6911,
-      0.2855,
-      0.7277,
-      0.8891
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "bowling/req_05.png",
-     "kasten": [
-      0.9642,
-      0.2676,
-      1.0,
-      0.8712
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "bowling/klein.png",
-     "kasten": [
-      0.00042087542087542086,
-      0.0015515903801396431,
-      0.04040404040404041,
-      0.04344453064391001
-     ],
-     "klasse": "klein",
-     "anzahl": 6
-    }
-   ],
-   "massstab": 1.25,
-   "choreografie": {
-    "figur": "neigen",
-    "gross": "umfallen",
-    "klein": "sprengen"
-   },
-   "texte": [
-    "Strike. Mit Semmel.",
-    "Stangen umhauen ist auch Sport."
-   ]
-  },
-  "chili": {
-   "bild": "chili/figur.png",
-   "groesse": [
-    1175,
-    1110
-   ],
-   "koerper": [
-    0.0,
-    0.0009,
-    1.0,
-    0.9991
-   ],
-   "requisiten": [],
-   "klein": [
-    {
-     "datei": "chili/klein_links.png",
-     "kasten": [
-      0.000851063829787234,
-      0.0009009009009009009,
-      0.04425531914893617,
-      0.03783783783783784
-     ],
-     "klasse": "klein",
-     "anzahl": 3
-    }
-   ],
-   "massstab": 1.25,
-   "choreografie": {
-    "figur": "neigen",
-    "gross": null,
-    "klein": "tropfen"
-   },
-   "texte": [
-    "Bisschen Schärfe schadet keiner Torte.",
-    "Das ist Deko. Rote Deko."
-   ]
-  },
-  "croissant": {
-   "bild": "croissant/figur.png",
-   "groesse": [
-    1566,
-    1361
-   ],
-   "koerper": [
-    0.0006,
-    0.0007,
-    0.9994,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "croissant/req_01.png",
-     "kasten": [
-      0.887,
-      0.8575,
-      0.9872,
-      0.9331
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "croissant/req_02.png",
-     "kasten": [
-      0.023,
-      0.8472,
-      0.0971,
-      0.9089
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "croissant/req_03.png",
-     "kasten": [
-      0.0894,
-      0.9206,
-      0.1545,
-      0.9728
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "croissant/klein.png",
-     "kasten": [
-      0.001277139208173691,
-      0.0014695077149155032,
-      0.04533844189016603,
-      0.04041146216017634
-     ],
-     "klasse": "klein",
-     "anzahl": 1
-    }
-   ],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": null,
-    "gross": "schweben",
-    "klein": "schweben"
-   },
-   "texte": [
-    "Pause. Auf Blätterteig.",
-    "Nicht stören. Ich reife."
-   ]
-  },
-  "fechter": {
-   "bild": "fechter/figur.png",
-   "groesse": [
-    1538,
-    1316
-   ],
-   "koerper": [
-    0.0007,
-    0.0,
-    1.0,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "fechter/req_01.png",
-     "kasten": [
-      0.1261,
-      0.6155,
-      0.2997,
-      0.7052
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "fechter/req_02.png",
-     "kasten": [
-      0.1632,
-      0.4065,
-      0.3257,
-      0.465
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "fechter/klein.png",
-     "kasten": [
-      0.0006501950585175553,
-      0.001519756838905775,
-      0.07022106631989597,
-      0.04331306990881459
-     ],
-     "klasse": "klein",
-     "anzahl": 6
-    }
-   ],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": "ausfallen",
-    "gross": "wedeln",
-    "klein": "sprengen"
-   },
-   "texte": [
-    "En garde! Mit Baguette.",
-    "Touché. Krümel."
-   ]
-  },
-  "froster": {
-   "bild": "froster/figur.png",
-   "groesse": [
-    2016,
-    1400
-   ],
-   "koerper": [
-    0.3591,
-    0.0,
-    0.9509,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "froster/req_01.png",
-     "kasten": [
-      0.0,
-      0.5007,
-      0.2475,
-      0.8957
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "froster/req_02.png",
-     "kasten": [
-      0.7971,
-      0.0871,
-      1.0,
-      0.4143
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "froster/req_03.png",
-     "kasten": [
-      0.1369,
-      0.0721,
-      0.3408,
-      0.3986
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "froster/klein.png",
-     "kasten": [
-      0.000496031746031746,
-      0.0014285714285714286,
-      0.027281746031746032,
-      0.11428571428571428
-     ],
-     "klasse": "klein",
-     "anzahl": 11
-    }
-   ],
-   "massstab": 1.3,
-   "choreografie": {
-    "figur": "zittern",
-    "gross": "fallen",
-    "klein": "flackern"
-   },
-   "texte": [
-    "Im Froster ist es kalt. Hab ich geprüft.",
-    "Minus achtzehn. Wie mein Humor."
-   ]
-  },
-  "geheimagent": {
-   "bild": "geheimagent/figur.png",
-   "groesse": [
-    1235,
-    1365
-   ],
-   "koerper": [
-    0.0,
-    0.0,
-    0.9636,
-    1.0
-   ],
-   "requisiten": [],
-   "klein": [
-    {
-     "datei": "geheimagent/klein_rechts.png",
-     "kasten": [
-      0.0016194331983805667,
-      0.0007326007326007326,
-      0.03805668016194332,
-      0.03956043956043956
-     ],
-     "klasse": "klein",
-     "anzahl": 4
-    }
-   ],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": "ruck",
-    "gross": null,
-    "klein": "flitzen"
-   },
-   "texte": [
-    "Der Name ist Crumble. Nur Crumble.",
-    "Geschüttelt, nicht geknetet."
-   ]
-  },
-  "gewichtheber": {
-   "bild": "gewichtheber/figur.png",
-   "groesse": [
-    2536,
-    1289
-   ],
-   "koerper": [
-    0.0,
-    0.0,
-    1.0,
-    1.0
-   ],
-   "requisiten": [],
-   "klein": [
-    {
-     "datei": "gewichtheber/klein.png",
-     "kasten": [
-      0.0003943217665615142,
-      0.0007757951900698216,
-      0.05914826498422713,
-      0.11404189294026378
-     ],
-     "klasse": "klein",
-     "anzahl": 16
-    }
-   ],
-   "massstab": 1.25,
-   "choreografie": {
-    "figur": "wackeln",
-    "gross": null,
-    "klein": "flackern"
-   },
-   "texte": [
-    "Zwei Brezeln. Laugen-Hantel.",
-    "Noch eine Wiederholung. Dann Pause."
-   ]
-  },
-  "hamstertag": {
-   "bild": "hamstertag/figur.png",
-   "groesse": [
-    1582,
-    1350
-   ],
-   "koerper": [
-    0.0006,
-    0.0007,
-    1.0,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "hamstertag/req_01.png",
-     "kasten": [
-      0.6479,
-      0.1674,
-      0.7819,
-      0.2978
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [],
-   "massstab": 1.3,
-   "choreografie": {
-    "figur": "wippen",
-    "gross": "huepfen",
-    "klein": null
-   },
-   "texte": [
-    "Morgen Hamstertag. Ich bin vorbereitet.",
-    "Vorrat ist kein Hobby. Vorrat ist Pflicht."
-   ]
-  },
-  "jongleur": {
-   "bild": "jongleur/figur.png",
-   "groesse": [
-    566,
-    678
-   ],
-   "koerper": [
-    0.0866,
-    0.2065,
-    0.9329,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "jongleur/req_01.png",
-     "kasten": [
-      0.5583,
-      0.0,
-      0.7951,
-      0.1549
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "jongleur/req_02.png",
-     "kasten": [
-      0.0,
-      0.2625,
-      0.2244,
-      0.4292
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "jongleur/req_03.png",
-     "kasten": [
-      0.7756,
-      0.2655,
-      1.0,
-      0.4307
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "jongleur/req_04.png",
-     "kasten": [
-      0.1961,
-      0.0118,
-      0.4223,
-      0.1785
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [],
-   "massstab": 1.3,
-   "choreografie": {
-    "figur": "wippen",
-    "gross": "kreisen",
-    "klein": null
-   },
-   "texte": [
-    "Vier Brote. Null Hände frei. Kein Problem.",
-    "Jonglieren ist nur Werfen mit Stil."
-   ]
-  },
-  "karate": {
-   "bild": "karate/figur.png",
-   "groesse": [
-    2293,
-    1332
-   ],
-   "koerper": [
-    0.2364,
-    0.0,
-    0.741,
-    0.9992
-   ],
-   "requisiten": [
-    {
-     "datei": "karate/req_01.png",
-     "kasten": [
-      0.0,
-      0.1254,
-      0.2403,
-      0.5405
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "karate/req_02.png",
-     "kasten": [
-      0.7662,
-      0.2883,
-      1.0,
-      0.7117
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "karate/req_03.png",
-     "kasten": [
-      0.1483,
-      0.5098,
-      0.2215,
-      0.6336
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "karate/req_04.png",
-     "kasten": [
-      0.7331,
-      0.211,
-      0.7963,
-      0.3416
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "karate/req_05.png",
-     "kasten": [
-      0.1827,
-      0.7027,
-      0.222,
-      0.7793
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "karate/klein.png",
-     "kasten": [
-      0.0004361098996947231,
-      0.0007507507507507507,
-      0.09332751853467074,
-      0.12537537537537538
-     ],
-     "klasse": "klein",
-     "anzahl": 28
-    }
-   ],
-   "massstab": 1.3,
-   "choreografie": {
-    "figur": "ruck",
-    "gross": "auseinander",
-    "klein": "sprengen"
-   },
-   "texte": [
-    "HIIIJA. Scheibe gefällig?",
-    "Brotmesser? Brauch ich nicht."
-   ]
-  },
-  "mehlbombe": {
-   "bild": "mehlbombe/figur.png",
-   "groesse": [
-    1726,
-    1326
-   ],
-   "koerper": [
-    0.0516,
-    0.0,
-    1.0,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "mehlbombe/req_01.png",
-     "kasten": [
-      0.0939,
-      0.1297,
-      0.1912,
-      0.2564
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "mehlbombe/req_02.png",
-     "kasten": [
-      0.686,
-      0.1448,
-      0.7793,
-      0.267
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "mehlbombe/req_03.png",
-     "kasten": [
-      0.0614,
-      0.6003,
-      0.1315,
-      0.6976
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "mehlbombe/req_04.png",
-     "kasten": [
-      0.7775,
-      0.3205,
-      0.8407,
-      0.3974
-     ],
-     "klasse": "gross"
-    },
-    {
-     "datei": "mehlbombe/req_05.png",
-     "kasten": [
-      0.7578,
-      0.9412,
-      0.8355,
-      0.9872
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "mehlbombe/klein.png",
-     "kasten": [
-      0.0,
-      0.0007541478129713424,
-      0.06025492468134415,
-      0.043740573152337855
-     ],
-     "klasse": "klein",
-     "anzahl": 12
-    }
-   ],
-   "massstab": 1.3,
-   "choreografie": {
-    "figur": "niesen",
-    "gross": "puff",
-    "klein": "puff"
-   },
-   "texte": [
-    "War der Sack kaputt oder ich?",
-    "Hatschi. Mehl 550. Erkenn ich blind."
-   ]
-  },
-  "teigmonster": {
-   "bild": "teigmonster/figur.png",
-   "groesse": [
-    1726,
-    1382
-   ],
-   "koerper": [
-    0.0,
-    0.0,
-    1.0,
-    1.0
-   ],
-   "requisiten": [],
-   "klein": [],
-   "massstab": 1.45,
-   "choreografie": {
-    "figur": "wabern",
-    "gross": null,
-    "klein": null
-   },
-   "texte": [
-    "Hilfe. Der Teig geht. Mit mir.",
-    "Ich hab nur kurz reingefasst."
-   ]
-  },
-  "torte_gesicht": {
-   "bild": "torte_gesicht/figur.png",
-   "groesse": [
-    1095,
-    1224
-   ],
-   "koerper": [
-    0.0356,
-    0.0,
-    0.9991,
-    1.0
-   ],
-   "requisiten": [],
-   "klein": [
-    {
-     "datei": "torte_gesicht/klein_links.png",
-     "kasten": [
-      0.0,
-      0.0008169934640522876,
-      0.0958904109589041,
-      0.06862745098039216
-     ],
-     "klasse": "klein",
-     "anzahl": 8
-    },
-    {
-     "datei": "torte_gesicht/klein_rechts.png",
-     "kasten": [
-      0.0018264840182648401,
-      0.0016339869281045752,
-      0.06940639269406393,
-      0.03594771241830065
-     ],
-     "klasse": "klein",
-     "anzahl": 1
-    }
-   ],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": "einschlag",
-    "gross": null,
-    "klein": "spritzen"
-   },
-   "texte": [
-    "Das war Absicht. Fast.",
-    "Sahne. Überall. Auch hinten."
-   ]
-  },
-  "zombie": {
-   "bild": "zombie/figur.png",
-   "groesse": [
-    1128,
-    1356
-   ],
-   "koerper": [
-    0.0355,
-    0.0007,
-    0.922,
-    1.0
-   ],
-   "requisiten": [
-    {
-     "datei": "zombie/req_01.png",
-     "kasten": [
-      0.0,
-      0.3621,
-      0.1436,
-      0.5752
-     ],
-     "klasse": "gross"
-    }
-   ],
-   "klein": [
-    {
-     "datei": "zombie/klein.png",
-     "kasten": [
-      0.0017730496453900709,
-      0.0007374631268436578,
-      0.05851063829787234,
-      0.04498525073746313
-     ],
-     "klasse": "klein",
-     "anzahl": 2
-    }
-   ],
-   "massstab": 1.15,
-   "choreografie": {
-    "figur": "nicken",
-    "gross": "steigen",
-    "klein": "steigen"
-   },
-   "texte": [
-    "Kaffee. Jetzt. Bitte. Danke.",
-    "Ich war schon wach, als du kamst."
-   ]
-  }
- },
- "verhalten": {
-  "blinzeln_ms": [
-   3000,
-   6000
-  ],
-  "blick_anteil": 0.3,
-  "blink_dauer_ms": 110,
-  "blick_dauer_ms": 900,
-  "reaktion_ms": 5500,
-  "hinweis_ms": 0,
-  "schlaf_nach_ms": 120000,
-  "reinschauen_min": 60,
-  "zunge_nach_tipps": 3,
-  "zufall_min": [
-   25,
-   55
-  ],
-  "aufgaben_schwelle": 5,
-  "nummer_dauer_ms": 6000
- }
 }

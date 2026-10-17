@@ -42,6 +42,13 @@
    neuLaden), bos_profil_lookup.js (Profil-Id für den Speicher).
 
    CHANGELOG
+     2026-10-17 · 13:49 · Nachtrag 4 (K38–K40): Long-Press weckt einen schlafenden Crumble
+       (nummer({wecken:true}) / show(3,{wecken:true})) und zählt als Sichtkontakt
+       (figur.sichtkontakt('knopf')); pointercancel schaltet nichts mehr um (eigener
+       Handler, click danach 1 s verschluckt); contextmenu auf dem Knopf unterdrückt.
+     2026-10-17 · 12:35 · Nachtrag 3 (K35): Long-Press auf den Kopf-Knopf — ≥ 600 ms eine
+       Nummer, ≥ 2000 ms Show (drei Nummern), kurz = zeigen/verstecken wie bisher;
+       click nach Long-Press verschluckt. Sichtphase (K34) startet im Modul bei an()/start().
      2026-10-17 · 09:37 · Stufe 1c (K25, K26, K30, K31): Schreibtisch-Bühne statt
        Knopf-Modus in der Kopfleiste; eigener Knopf = zeigen/verstecken mit
        Wartepunkt; Speicher je Gerät/Profil; Schoner-Figur läuft und spielt
@@ -150,10 +157,66 @@ window.BOS_CRUMBLE_HOST = (function () {
     knopfEl.setAttribute('aria-pressed', 'true');
     knopfEl.innerHTML = '<img alt="" draggable="false">';
     knopfEl.querySelector('img').src = optionen.basisPfad + 'bilder/idle.png';
-    knopfEl.addEventListener('click', function (e) { e.stopPropagation(); if (figur) figur.sichtbar(!figur.istSichtbar()); });
+    verdrahteKnopf(knopfEl);
     if (optionen.vor && optionen.vor.parentNode === optionen.topbar) optionen.topbar.insertBefore(knopfEl, optionen.vor);
     else optionen.topbar.appendChild(knopfEl);
     aktualisiereKnopf();
+  }
+  /* K35 (Nachtrag 3, Easter Egg): Kurz tippen = zeigen/verstecken. Halten ≥ HALTEN_MS = eine Nummer (versteckt: erst zeigen).
+     Halten ≥ SHOW_MS = Show, drei verschiedene Nummern nacheinander. Der click nach einem Long-Press wird verschluckt
+     (Muster K27); Bewegung während des Haltens ist egal, der Knopf bewegt sich nicht. Kein Tooltip, keine Hilfe. */
+  var HALTEN_MS = 600, SHOW_MS = 2000, KURZ_MS = 500;
+  function verdrahteKnopf(el) {
+    var halt = null;
+    function aufraeumen() { if (!halt) return; clearTimeout(halt.t1); clearTimeout(halt.t2); el.classList.remove('hf-knopf-host--haelt'); }
+    /* click nach pointerup kommt im selben Ereignislauf → bis zum nächsten Tick verschlucken; nach pointercancel kommt er
+       (wenn überhaupt) erst beim Loslassen → ein Fenster von 1 s (K39). Tastatur-click (Enter/Leertaste) hat kein pointerdown. */
+    function verschlucke(ms) { el._verschlucke = true; el._verschluckeBis = ms ? Date.now() + ms : 0; if (!ms) setTimeout(function () { el._verschlucke = false; }, 0); }
+    /* K38 (Nachtrag 4): vor der Nummer zeigen, Berührung zählt als Sichtkontakt, Schlafender wird geweckt */
+    function bereitFuerNummer() { if (!figur.istSichtbar()) figur.sichtbar(true); figur.sichtkontakt('knopf'); }
+    el.addEventListener('pointerdown', function (e) {
+      if (e.button) return;
+      aufraeumen(); el._verschlucke = false;
+      halt = { id: e.pointerId, start: Date.now(), lang: false, t1: null, t2: null };
+      try { el.setPointerCapture(e.pointerId); } catch (x) {}
+      halt.t1 = setTimeout(function () {
+        if (!halt || !figur) return;
+        halt.lang = true; el.classList.add('hf-knopf-host--haelt');
+        bereitFuerNummer();
+        figur.nummer({ wecken: true });
+      }, HALTEN_MS);
+      halt.t2 = setTimeout(function () {
+        if (!halt || !figur) return;
+        halt.lang = true;
+        bereitFuerNummer();
+        figur.show(3, { wecken: true });
+      }, SHOW_MS);
+    });
+    function ende(e) {
+      if (!halt || e.pointerId !== halt.id) return;
+      var h = halt; halt = null;
+      clearTimeout(h.t1); clearTimeout(h.t2); el.classList.remove('hf-knopf-host--haelt');
+      try { el.releasePointerCapture(e.pointerId); } catch (x) {}
+      verschlucke(0);
+      if (h.lang) return;
+      if (Date.now() - h.start < KURZ_MS && figur) figur.sichtbar(!figur.istSichtbar());   // zwischen kurz und lang: nichts
+    }
+    /* K39 (Nachtrag 4): abgebrochener Zeiger (Browser übernimmt die Geste) → aufräumen, NICHT umschalten. Nur pointerup entscheidet. */
+    function abbruch(e) {
+      if (!halt || e.pointerId !== halt.id) return;
+      var h = halt; halt = null;
+      clearTimeout(h.t1); clearTimeout(h.t2); el.classList.remove('hf-knopf-host--haelt');
+      try { el.releasePointerCapture(e.pointerId); } catch (x) {}
+      verschlucke(1000);
+    }
+    el.addEventListener('pointerup', ende);
+    el.addEventListener('pointercancel', abbruch);
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });   // K40: Long-Press darf kein Kontextmenü öffnen
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (el._verschlucke) { el._verschlucke = false; if (!el._verschluckeBis || Date.now() < el._verschluckeBis) return; }
+      if (figur) figur.sichtbar(!figur.istSichtbar());
+    });
   }
   function aktualisiereKnopf() {
     if (!knopfEl) return;
