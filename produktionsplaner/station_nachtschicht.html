@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-17 · 04:59 · #77 Teil 2 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 04:57): Das ✕ im Launcher und das Neuladen fragen nach, wenn die Planung von der zuletzt geladenen bzw. eingereichten abweicht (Fingerabdruck planungsAbdruck(), ohne „Kette prüfen“; zurückgestellt = unverändert). Während des Einreichens Text „wird gerade gespeichert“. Über ../bos_ungespeichert.js, Rückfall auf eigenen beforeunload. Rechnung, Rendern, Einreichen-Inhalt unverändert. SESSION_2026-10-17_UNGESPEICHERT_STATIONEN_BAU.md -->
 <!-- 2026-10-15 · 19:56 · Farbprofile Stufe B (#72, Freigabe Kontroll-Chat 18:48): Zelle „von Hand“ mit gestricheltem Rand (F12, im Profil Stahl sonst kaum von „automatisch“ zu unterscheiden); Zahl „von Hand“ dunkel #60a5fa statt #1d4ed8 (Kontrast 2,3 → 5,7 bis 6,3 je Profil), hell unverändert; „⚠ min“ mit FE0E wie die übrigen Zeichen (F22). SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Knapp, Bestand-Hinweis, Bestand 0, „teilweise geschätzt“ und „noch nicht“ auf feste Warnfarbe --bos-warn; Akzent-Tönungen über color-mix; Status-Zeichen ✓ ⚠ ✕ (Lücke ✕ statt ⚠, Bestand 0 ⚠ statt ◌). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:24 · Richtwert und Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Umschalter „Manuell | Offiziell“ entfernt — die Quelle steht je Produkt in der Produkt-Karte (BOS_PRODUKTE.bedarfsQuelle: Richtwert, Backzettel oder Mitschrift; ohne Feld Mitschrift = bisherige Voreinstellung). Einstellungen je Topf, einmal geladen. Liste aus Sicht 'laufend' (pausierte fehlen), mit Fassungsprüfung. Warnung ohne Quellennamen („Bedarfszahlen“, V2/B7). Einreichung trägt je Produkt bedarfsQuelle. SESSION_2026-10-14_RICHTWERT_BAU.md -->
@@ -196,6 +197,7 @@
 <script src="../bos_hamster.js"></script>
 <script src="../bos_produktionskette.js"></script>
 <script src="../bos_froster.js"></script>
+<script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77 Teil 2: Ungespeichert-Schutz -->
 
 <div class="nfc-header">
   <div class="nfc-header-top">
@@ -328,6 +330,7 @@ function zeigeProduktFehler(text) {
 }
 
 var frosterFertig = false;
+var frosterStartwert = frosterFertig;   // #77 Teil 2 (17.10.2026): Vorwahl beim Start festhalten, bevor ein Klick möglich ist — Ausgangsstand für den ersten Abdruck
 var state = {};
 var PRODUKTE = [];
 var rebuildTimers = {};
@@ -392,6 +395,33 @@ function planungsfenster(von) {
   start.setHours(0, 1, 0, 0);
   return { start: start, ende: ende, offen: von >= start && von <= ende };
 }
+
+// ── UNGESPEICHERT-SCHUTZ (#77 Teil 2, 17.10.2026) ──────────────────
+// Ulfs Regel: Gefragt wird bei allem, was in die Einreichung gehen würde —
+// nicht bei reinem Ansehen, nicht bei „Kette prüfen“, nicht nach
+// erfolgreichem Einreichen; geändert und zurückgestellt = unverändert.
+// Darum ein Fingerabdruck aller Nutzerfelder statt eines Kennzeichens in
+// jedem Eingabe-Handler. Gemerkt wird er nach dem Laden (mit dem Froster-
+// Startwert, siehe frosterStartwert) und nach erfolgreichem Einreichen
+// (Stand beim Zusammenstellen, vor dem await). Kein Abdruck (lädt,
+// Ladefehler, Planung gesperrt) = nichts ungespeichert. Alle Produkte zählen,
+// auch halb geplante (Kontroll-Chat 04:57, Weg A).
+function planungsAbdruck(frosterWert) {
+  function sortiert(o) { var r = {}; Object.keys(o || {}).sort().forEach(function (k) { r[k] = o[k]; }); return r; }
+  var p = {};
+  Object.keys(state).sort().forEach(function (id) {
+    var s = state[id];
+    p[id] = [s.zielOff, sortiert(s.prodTage), sortiert(s.manuelleWerte), sortiert(s.gesperrtWerte),
+             s.startBestand, s.fehlmengeAbs || 0, !!s.gleichmaessig];   // ohne _akkOpen
+  });
+  return JSON.stringify([frosterWert === undefined ? frosterFertig : frosterWert, p]);
+}
+var gemerkterAbdruck = null;   // null = kein Abdruck → nichts ungespeichert
+var einreichenLaeuft = false;
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return einreichenLaeuft; } }); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return gemerkterAbdruck !== null && planungsAbdruck() !== gemerkterAbdruck; });
 
 window.addEventListener('load', async function() {
   var fenster = planungsfenster(new Date());
@@ -507,6 +537,9 @@ window.addEventListener('load', async function() {
     return;
   }
 
+  // #77 Teil 2: erster Abdruck — alle startBestand-Schreibzugriffe (oben im .then) sind vorbei,
+  // Karten gibt es noch keine. Froster mit dem Startwert: eine Wahl während des Ladens zählt als Eingabe.
+  gemerkterAbdruck = planungsAbdruck(frosterStartwert);
   setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText);
   renderAll();
 });
@@ -961,9 +994,11 @@ async function planungEinreichen() {
     };
   });
   if (!mind1) return;
+  var abdruckEingereicht = planungsAbdruck();   // #77 Teil 2: Stand beim Zusammenstellen, VOR dem await
 
   var urspruenglicherText = btn.textContent;
   btn.disabled = true;
+  einreichenLaeuft = true;   // #77 Teil 2: „wird gerade gespeichert“ bis zum Ende von try/catch
   btn.textContent = 'Wird eingereicht …';
 
   try {
@@ -977,6 +1012,7 @@ async function planungEinreichen() {
       ts: firebase.firestore.FieldValue.serverTimestamp(),
       produkte: produkteDaten
     });
+    gemerkterAbdruck = abdruckEingereicht;   // #77 Teil 2: nur bei Erfolg; spätere Änderungen bleiben „ungespeichert“
     btn.textContent = '✓ Eingereicht';
     setTimeout(function() {
       btn.textContent = urspruenglicherText;
@@ -991,6 +1027,7 @@ async function planungEinreichen() {
     cnt.textContent = '⚠ ' + fehlerGrund(fehler);
     cnt.style.color = 'var(--bos-red)';
   }
+  einreichenLaeuft = false;   // #77 Teil 2
 }
 
 // ── Hilfe (Standard-Muster: einfaches Schritte-Array + Bottom-Sheet,
