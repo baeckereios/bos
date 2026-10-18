@@ -9,6 +9,15 @@
 <link rel="apple-touch-icon" href="pwa/bos_icon_192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="pwa/bos_icon_192.png">
 <title>BäckereiOS</title>
+<script>
+  /* Stufe 1f (Crumble #62): Platz für den Loch-Crumble in der Karte „Neu hier?“ VOR dem ersten Bild
+     reservieren (Symbolkasten 84 px, 74 px Platz für die Blase über der Karte) — sonst spränge die
+     Karte, wenn er nachgeladen ist. Aus nur bei bos_crumble_tuer = 'aus' (Gerätewert vom Launcher);
+     Speicher gesperrt → an. Lädt er nicht, nimmt bos_tuer_crumble.js bzw. der Lader unten die Klasse
+     wieder weg. */
+  (function () { var an = true; try { an = localStorage.getItem('bos_crumble_tuer') !== 'aus'; } catch (e) {}
+    if (an) document.documentElement.classList.add('mit-crumble'); })();
+</script>
 
 <!--
   MODUL: index.html
@@ -38,6 +47,16 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-10-18 · 15:28 · Loch-Crumble in der Karte (#62 Stufe 1f; Anweisung Kontroll-Chat
+      14:50, Bauplan 15:04, Go 15:15) · Feature
+      Anmelden und „Mobile Ansicht“ nebeneinander (div.knopfreihe; Mobil-Knopf bricht
+      „(in Planung)“ von selbst um). Der stehende Türsteher aus 1e entfällt: Crumble
+      schaut jetzt aus einem Loch statt des Kreis-Symbols der Karte „Neu hier?“, die
+      Blase steht über der Karte. Kopfzeile setzt html.mit-crumble (Platz: Symbol 84 px,
+      74 px über der Karte), bevor etwas zu sehen ist; der Lader nimmt die Klasse bei
+      einem Ladefehler wieder weg. Kartentitel/-untertitel mit text-wrap: balance (Z4).
+      crumbleFall(), fallAusCode(), Lader nach 'load', anmelden(), weiter() unverändert.
+      SESSION_2026-10-18_CRUMBLE_STUFE1F_LOCH_BAU.md
     2026-10-18 · 11:43 · Türsteher Crumble (#62 Stufe 1e; Anweisung Kontroll-Chat
       09:49, Bauplan 10:06, Go 10:22) · Feature
       Crumble steht neben dem Formular, sagt einen Satz, gibt ein paar Tipps und
@@ -233,6 +252,16 @@
 
   .feld input:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: 2px; }
 
+  /* Stufe 1f (K76): Anmelden und Mobil nebeneinander, je halbe Breite, gleiche Höhe. Tab-Reihenfolge
+     Kennung → Passwort → Anmelden → Mobil bleibt (Reihenfolge im Markup). */
+  .knopfreihe {
+    display: flex;
+    gap: 10px;
+    margin-top: var(--bos-space-md);
+  }
+  .knopfreihe > .tuer,
+  .knopfreihe > .nebenweg { flex: 0 0 calc(50% - 5px); box-sizing: border-box; min-width: 0; margin-top: 0; }
+
   .tuer {
     width: 100%;
     min-height: var(--bos-tap-min);
@@ -271,9 +300,15 @@
     text-transform: uppercase;
     cursor: pointer;
     display: flex;
+    flex-wrap: wrap;            /* Stufe 1f: „(in Planung)“ rutscht von selbst in die zweite Zeile, wenn es nicht passt */
     align-items: center;
+    align-content: center;
     justify-content: center;
-    gap: var(--bos-space-2xs);
+    column-gap: var(--bos-space-2xs);
+    row-gap: 1px;
+    padding: 4px 8px;
+    line-height: 1.15;
+    white-space: nowrap;
     transition: border-color var(--bos-transition-fast), color var(--bos-transition-fast);
   }
 
@@ -312,6 +347,13 @@
 
   .einblick-symbol { flex: 0 0 52px; width: 52px; height: 52px; }
   .einblick-symbol svg { width: 100%; height: 100%; overflow: visible; }
+  /* Stufe 1f (K77/K78): mit Crumble (Klasse aus der Kopfzeile) ist der Symbolkasten von Anfang an 84 px,
+     das alte Kreis-Symbol (52 px) steht mittig darin, bis die Büsten da sind; 20 px Abstand zum Text;
+     über der Karte fest 74 px Platz für die Blase (Ulf 15:15: „Finde ich sogar gut, dass es fest ist“).
+     Das Loch selbst zeichnet hamster_figur/loch/loch.css. */
+  html.mit-crumble .einblick { gap: 20px; position: relative; margin-top: var(--tuer-blasenraum, 74px); }
+  html.mit-crumble .einblick-symbol { flex: 0 0 84px; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; }
+  html.mit-crumble .einblick-symbol svg { width: 52px; height: 52px; flex: 0 0 52px; }
   .einblick-symbol .kreis-sat {
     transform-origin: 26px 26px;
     animation: einblick-kreisen 7s linear infinite;
@@ -337,6 +379,7 @@
     font-weight: 600;
     font-size: var(--bos-font-lg);
     line-height: 1.2;
+    text-wrap: balance;   /* Stufe 1f (Z4): kein einzelnes Wort allein in der letzten Zeile */
   }
   .einblick-unter {
     display: block;
@@ -344,6 +387,7 @@
     font-size: var(--bos-font-sm);
     color: var(--bos-text-dim);
     line-height: 1.4;
+    text-wrap: balance;
   }
   .einblick-pfeil {
     flex: 0 0 auto;
@@ -454,11 +498,10 @@
       <input type="password" id="passwort" autocomplete="current-password">
     </div>
 
-    <button type="button" class="tuer" id="anmeldenBtn">Anmelden</button>
-
-    <button type="button" class="nebenweg" id="mobilBtn">
-      Mobile Ansicht <span class="planung">(in Planung)</span>
-    </button>
+    <div class="knopfreihe">
+      <button type="button" class="tuer" id="anmeldenBtn">Anmelden</button>
+      <button type="button" class="nebenweg" id="mobilBtn"><span class="nebenweg-titel">Mobile Ansicht</span> <span class="planung">(in Planung)</span></button>
+    </div>
 
     <div class="meldung" id="meldung" role="status" aria-live="polite"></div>
 
@@ -901,7 +944,10 @@
       var s = document.createElement('script');
       s.src = 'bos_tuer_crumble.js';
       s.async = true;
-      s.onerror = function () { console.warn('[tuer-crumble] bos_tuer_crumble.js nicht ladbar — die Tür läuft ohne Crumble.'); };
+      s.onerror = function () {
+        console.warn('[tuer-crumble] bos_tuer_crumble.js nicht ladbar — die Tür läuft ohne Crumble.');
+        document.documentElement.classList.remove('mit-crumble');   // Stufe 1f: Platz über der Karte zurück
+      };
       document.body.appendChild(s);
     };
     var spaeter = function () {

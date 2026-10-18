@@ -1,192 +1,270 @@
 /* ================================================================
-   BäckereiOS · Türsteher Crumble an der Tür (index.html) — #62 Stufe 1e
+   BäckereiOS · Loch-Crumble an der Tür (index.html) — #62 Stufe 1f
    ================================================================
-   Neu 18.10.2026 (Bau-Chat Crumble; Anweisung Kontroll-Chat 09:49,
-   Bauplan 10:06, Go 10:22). Crumble steht neben dem Anmeldeformular,
-   sagt beim Öffnen einen Satz, gibt danach ein paar Tipps und reagiert
-   auf die echten Meldungen der Tür — NEBEN der Meldung, nie statt ihr.
+   Crumble schaut aus einem Loch in der Karte „Neu hier? Schau, dafür bin ich
+   da.“ (statt des Kreis-Symbols), sagt beim Öffnen einen Satz, gibt danach
+   ein paar Tipps und reagiert auf die echten Meldungen der Tür — NEBEN der
+   Meldung, nie statt ihr. Die Blase steht über der Karte.
+   Ersetzt den stehenden Türsteher aus Stufe 1e (Ulf 14:12: „wirkt ein wenig
+   verloren dort unten“). Anweisung Kontroll-Chat 14:50, Bauplan 15:04, Go 15:15.
 
-   GRUNDSATZ (K60, B3): Die Tür ist der einzige Weg ins System. Nichts
-   hier darf die Anmeldung aufhalten oder stören:
-     - index.html lädt diese Datei erst nach 'load' und im Leerlauf
-       (requestIdleCallback), als async-Skript, ohne await irgendwo;
-     - fehlt diese Datei, hamster_figur/, das Manifest oder wirft das
-       Modul: Crumble bleibt weg, EIN console.warn, sonst nichts
-       (F1, Ulf 10:2x: an der Tür keine sichtbare Fehlermeldung für
-       einen fehlenden Türsteher — er ist Schmuck);
-     - index.html spricht ihn nur über crumbleFall(schlüssel) an, ein
-       eingepackter Aufruf, der ohne Crumble nichts tut.
+   GRUNDSATZ (K60, unverändert aus 1e): Die Tür ist der einzige Weg ins
+   System. Nichts hier darf die Anmeldung aufhalten oder stören:
+     - index.html lädt diese Datei erst nach 'load' im Leerlauf, async, ohne
+       await irgendwo; spricht sie nur über crumbleFall(schlüssel) an;
+     - fehlt etwas (diese Datei, hamster_figur/loch/, loch.json, ein Bild)
+       oder wirft etwas: Crumble bleibt weg, das alte Kreis-Symbol bleibt,
+       EIN console.warn, sonst nichts (F1, keine sichtbare Meldung) — und
+       die Klasse mit-crumble geht von <html>, damit der Platz über der
+       Karte zurückgeht.
+   Diese Datei braucht KEIN Figuren-Modul und kein Manifest (Bauplan §5):
+   loch/loch.css, loch/loch.json, 11 Büsten — zusammen ≈ 120 KB.
 
-   EIN/AUS (K61): localStorage['bos_crumble_tuer'] ('an'/'aus'), geschrieben
-   vom Launcher (bos_crumble_host.js) bei jedem start()/setzeAn(). Fehlt
-   er oder wirft der Speicher → an. Das prüft schon der Lader in index.html.
+   PLATZ: steht schon in index.html (html.mit-crumble, von der Kopfzeile
+   gesetzt, bevor etwas zu sehen ist): Symbolkasten 84 × 84, 74 px über der
+   Karte für die Blase. Das alte Kreis-Symbol steht darin, bis alle Büsten
+   dekodiert sind — erst dann wird es ersetzt (kein leeres Loch, kein Springen).
 
-   PLATZ (K62, Bauplan §1.3): (A) rechter Streifen neben der Formularspalte
-   ≥ 220 px → Bühne = Streifen, Figur mittig unten; sonst (B) freier Raum
-   unter dem untersten geschützten Element → Figur rechts; Figurhöhe
-   zwischen tuer.min_hoehe_px (60) und max_hoehe_px (150), sonst WEG.
-   Blase über dem Kopf, höchstens Bühnenbreite − 8 px breit. Neu gerechnet
-   bei resize, visualViewport-resize (Tastatur) und wenn die Formularspalte
-   wächst (Meldung erscheint) — passt er nicht mehr, geht er (und ist dann
-   auch nicht antippbar).
-
-   VERHALTEN (K63): ~1 s nach dem Erscheinen ein Satz aus tuer.oeffnen
-   (wird gerade durchgewunken: „Rein mit dir. Gute Schicht!“). Danach
-   Tipps aus tuer.tipps, zufällig, ohne Wiederholung, alle 20–30 s,
-   höchstens 4, dann still. Eingabe ins Formular → Blase sofort weg,
-   20 s keine Tipps. Als Eingabe zählt nur, was ein MENSCH tut (B1):
-   input, Zeiger/Touch auf ein Feld, Fokus binnen 500 ms nach Tab (K74) —
-   NICHT der Autofokus beim Laden und nicht der Fokus, den die Tür nach einem
-   Fehler selbst ins Passwort setzt (index.html).
-   Tipp auf Crumble → nächster Tipp (zählt in die 4); danach freut er sich
-   nur noch. Keine Nummern, kein Laufen, kein Schieben, kein Long-Press.
+   VERHALTEN (K63/K79): ~1 s nach dem Erscheinen ein Satz aus „oeffnen“
+   (winken); wird gerade durchgewunken: daumen „Rein mit dir. Gute Schicht!“.
+   Danach Tipps (zwinkern oder wangen), zufällig, ohne Wiederholung, alle
+   20–30 s, höchstens 4; nach der Lesezeit des 4. Tipps 2,5 s lachen, dann
+   neutral und still (F3). Ruhe = neutral, alle 3–6 s blinzeln (120 ms, nur
+   aus neutral, nicht bei prefers-reduced-motion). 2 min ohne Satz und ohne
+   Eingabe → schlafen; die nächste Reaktion oder Eingabe weckt.
+   Eingabe ins Formular → Blase sofort weg, 20 s keine Tipps. Als Eingabe
+   zählt nur, was ein MENSCH tut (B1, K74): input, Zeiger/Touch auf ein Feld,
+   Fokus binnen 500 ms nach Tab — nicht der Autofokus beim Laden und nicht
+   der Fokus, den die Tür nach einem Fehler selbst ins Passwort setzt.
+   Tipp auf Crumble = Tipp auf die Karte → Tour (er sitzt im Link; kein
+   eigener Klick-Weg). Tipp auf die Blase → nichts (pointer-events: none).
 
    REAKTIONEN (K64): fall(schlüssel) aus index.html — falsch (1. Mal) /
-   falsch2 (ab dem 2. Mal je Besuch), format, zu_viele, netz, freischalten,
-   angemeldet, durchwinken (= angemeldet), gesperrt (schweigt). Texte und
-   Posen: Manifest-Block tuer. Kommt ein Fall, bevor er geladen ist, holt
-   er ihn nach, wenn er binnen 4 s bereit ist.
+   falsch2 (ab dem 2. Mal je Besuch), format, netz → besorgt; zu_viele →
+   gaehnen; freischalten → pfote; angemeldet, durchwinken → daumen;
+   gesperrt → neutral, still. Texte, Büsten, Zeiten: hamster_figur/loch/
+   loch.json. Kommt ein Fall, bevor er bereit ist, holt er ihn nach, wenn er
+   binnen 4 s bereit ist.
+
+   BLASE (K78, K82): höchstens Kartenbreite, nie ein Wort allein in der letzten Zeile, auf die längste Zeile
+   zugeschnitten (min. bis hinter die Spitze); ist ein Text auf einer sehr schmalen
+   Größe höher als der Platz, bekommt diese Blase eine Stufe kleinere Schrift,
+   reicht auch das nicht, wächst der Platz einmalig (--tuer-blasenraum).
 
    CHANGELOG
-     2026-10-18 · 13:07 · Nacharbeit 1e (Kontroll-Chat 12:53): K74 — als Fokus von Menschenhand zählt nur Tab;
-       Enter im Kennungsfeld wischte die Reaktion weg (Tür setzt danach selbst passwortFeld.focus()).
-     2026-10-18 · 11:43 · Erstfassung (Stufe 1e, K60–K66).
+     2026-10-18 · 21:20 · Nacharbeit 1f (Kontroll-Chat 20:54): K82 — kein einzelnes Wort allein in der letzten
+       Blasenzeile (CSS text-wrap: pretty in loch.css; ohne Unterstützung schrittweise schmaler), Blase danach auf die
+       längste Zeile zugeschnitten.
+     2026-10-18 · 15:28 · Stufe 1f: neu geschrieben — Loch-Crumble in der Karte
+       (K76–K81), ohne Figuren-Modul und Manifest. Eingabe-Stille, Tipps, Reaktionen
+       und K74 wie 1e.
+     2026-10-18 · 13:07 · Nacharbeit 1e (Kontroll-Chat 12:53): K74 — als Fokus von Menschenhand zählt nur Tab.
+     2026-10-18 · 11:43 · Erstfassung (Stufe 1e, K60–K66): stehender Türsteher neben dem Formular.
    ================================================================ */
 (function () {
   'use strict';
   if (window.BOS_TUER_CRUMBLE) return;
 
-  var BASIS = 'hamster_figur/';
-  var GESCHUETZT = ['.marke', '#kennung', '#passwort', '#anmeldenBtn', '#mobilBtn', '#meldung', '.einblick', '.wechsel', '#band'];
-  var STREIFEN_MIN = 220, RAND = 12, LUFT = 26, BLASE_H = 80;   // BLASE_H: Reserve über dem Kopf wie im Bauplan-Prototyp (längster Tür-Text 82 px bei 260 px Breite)
+  var BASIS = 'hamster_figur/loch/';
+  var RESERVE_LUFT = 16;   // Blase: 12 px über der Karte + 4 px Abstand nach oben
 
-  var figur = null, buehne = null, tuer = null, manifest = null;
-  var bereit = false, kaputt = false, weg = true;
-  var modus = null, hoehe = 0;
-  var tipps = [], gezeigt = 0, tTipp = null, tErster = null;
-  var stilleBis = 0, letzteTaste = 0;
-  var falschZaehler = 0, wartenderFall = null;
+  var daten = null, symbol = null, karte = null, blase = null, altesSymbol = '';
+  var bilder = {};
+  var bereit = false, kaputt = false;
+  var aktuell = 'neutral', schlaeft = false;
+  var tipps = [], gezeigt = 0, tTipp = null, tErster = null, tZurueck = null, tBlinzel = null, tSchlaf = null, tLachen = null;
+  var stilleBis = 0, letzteTaste = 0, letzteAktivitaet = Date.now();
+  var falschZaehler = 0, wartenderFall = null, sprichtBis = 0;
+  var wenigBewegung = false;
+  try { wenigBewegung = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
 
   function warne(was, fehler) {
     if (kaputt) return;
     kaputt = true;
     console.warn('[tuer-crumble] ' + was + ' — die Tür läuft ohne Crumble.', fehler || '');
-    try { if (buehne && buehne.parentNode) buehne.parentNode.removeChild(buehne); } catch (e) {}
-    try { if (figur) figur.zerstoere(); } catch (e) {}
-    figur = null;
+    [tTipp, tErster, tZurueck, tBlinzel, tSchlaf, tLachen].forEach(function (t) { clearTimeout(t); });
+    try { if (symbol && altesSymbol && symbol.classList.contains('loch')) { symbol.classList.remove('loch'); symbol.innerHTML = altesSymbol; } } catch (e) {}
+    try { if (blase && blase.parentNode) blase.parentNode.removeChild(blase); } catch (e) {}
+    try { document.documentElement.classList.remove('mit-crumble'); } catch (e) {}
   }
-  function zufallZahl(a, b) { return a + Math.random() * (b - a); }
+  function zufall(a, b) { return a + Math.random() * (b - a); }
+  function eins(liste) { return liste[Math.floor(Math.random() * liste.length)]; }
 
-  /* ---------- Laden: CSS und Modul (beides selbst, ohne index.html zu berühren) ---------- */
+  /* ---------- Laden: CSS, Daten, Büsten ---------- */
   function ladeCss() {
-    if (document.querySelector('link[data-tuer-crumble]')) return;
-    var l = document.createElement('link');
-    l.rel = 'stylesheet'; l.href = BASIS + 'hamster_figur.css'; l.setAttribute('data-tuer-crumble', '1');
-    document.head.appendChild(l);
-  }
-  function ladeModul() {
     return new Promise(function (ok, nein) {
-      if (window.BOS_HAMSTER_FIGUR) return ok();
-      var s = document.createElement('script');
-      s.src = BASIS + 'hamster_figur.js'; s.async = true;
-      s.onload = function () { window.BOS_HAMSTER_FIGUR ? ok() : nein(new Error('hamster_figur.js geladen, aber BOS_HAMSTER_FIGUR fehlt')); };
-      s.onerror = function () { nein(new Error('hamster_figur.js nicht ladbar')); };
-      document.head.appendChild(s);
+      var l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = BASIS + 'loch.css'; l.setAttribute('data-tuer-crumble', '1');
+      l.onload = function () { ok(); };
+      l.onerror = function () { nein(new Error('loch.css nicht ladbar')); };
+      document.head.appendChild(l);
     });
   }
-
-  /* ---------- Platz (K62) ---------- */
-  function rechteck(el) { var r = el.getBoundingClientRect(); return (r.width > 0 && r.height > 0) ? r : null; }
-  function platz() {
-    var vw = window.innerWidth, vh = window.innerHeight;
-    if (window.visualViewport) { vw = Math.min(vw, window.visualViewport.width); vh = Math.min(vh, window.visualViewport.height); }
-    var mitte = document.querySelector('.mitte');
-    var spalte = mitte ? mitte.getBoundingClientRect() : { left: vw / 2 - 190, right: vw / 2 + 190 };
-    var unten = 0;
-    GESCHUETZT.forEach(function (s) {
-      var e = document.querySelector(s); if (!e || e.hidden) return;
-      var r = rechteck(e); if (r) unten = Math.max(unten, r.bottom);
+  function ladeDaten() {
+    return fetch(BASIS + 'loch.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('loch.json: HTTP ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      if (!d || !d.buesten || !d.reaktionen || !d.oeffnen || !d.tipps) throw new Error('loch.json unvollständig');
+      daten = d;
     });
-    var minH = (tuer && tuer.min_hoehe_px) || 60, maxH = (tuer && tuer.max_hoehe_px) || 150;
-    var streifen = vw - spalte.right - RAND - 8;
-    if (streifen >= STREIFEN_MIN) {
-      var h = Math.max(minH, Math.min(maxH, Math.round(vh * 0.22)));
-      if (h + LUFT + BLASE_H + 16 <= vh) return { modus: 'streifen', h: h, x: 0.5, r: { left: spalte.right + RAND, top: 0, width: streifen, height: vh - 8 } };
+  }
+  function ladeBuesten() {
+    var namen = Object.keys(daten.buesten).filter(function (n) { return daten.buesten[n].tuer !== false; });   // herzen: nicht an der Tür (O22)
+    return Promise.all(namen.map(function (n) {
+      var img = new Image();
+      img.alt = ''; img.className = 'loch__buste'; img.setAttribute('data-buste', n); img.draggable = false;
+      img.decoding = 'async';
+      img.src = BASIS + daten.buesten[n].datei;
+      bilder[n] = img;
+      return (img.decode ? img.decode() : new Promise(function (ok, nein) { img.onload = ok; img.onerror = nein; }))
+        .catch(function () { throw new Error('Büste nicht ladbar: ' + daten.buesten[n].datei); });
+    }));
+  }
+
+  /* ---------- Loch einsetzen (K77): erst, wenn alles da ist ---------- */
+  function setzeEin() {
+    symbol = document.querySelector('.einblick .einblick-symbol');
+    karte = document.querySelector('.einblick');
+    if (!symbol || !karte) throw new Error('Karte „Neu hier?“ nicht gefunden');
+    altesSymbol = symbol.innerHTML;
+    var frag = document.createDocumentFragment();
+    var hinten = document.createElement('span'); hinten.className = 'loch__hinten'; frag.appendChild(hinten);
+    Object.keys(bilder).forEach(function (n) { frag.appendChild(bilder[n]); });
+    var schatten = document.createElement('span'); schatten.className = 'loch__schatten'; frag.appendChild(schatten);
+    var vorne = document.createElement('span'); vorne.className = 'loch__vorne'; frag.appendChild(vorne);
+    symbol.classList.add('loch');   // zuerst: warne() erkennt daran, dass das alte Symbol zurück muss
+    symbol.innerHTML = '';
+    symbol.appendChild(frag);
+    blase = document.createElement('span');
+    blase.className = 'loch-blase'; blase.setAttribute('aria-hidden', 'true'); blase.hidden = true;
+    karte.appendChild(blase);
+    legeSpitze();
+    zeige('neutral');
+  }
+  function legeSpitze() {
+    if (!symbol || !karte || !blase) return;
+    var s = symbol.getBoundingClientRect(), k = karte.getBoundingClientRect();
+    blase.style.setProperty('--spitze-x', Math.round(s.left - k.left + s.width / 2) + 'px');
+  }
+
+  /* ---------- Ausdruck und Blase ---------- */
+  function zeige(name) {
+    if (!bilder[name]) name = 'neutral';
+    Object.keys(bilder).forEach(function (n) { bilder[n].classList.toggle('loch__buste--an', n === name); });
+    aktuell = name;
+  }
+  function platzOben() {
+    var reihe = document.querySelector('.knopfreihe'), me = document.getElementById('meldung');
+    var oben = reihe ? reihe.getBoundingClientRect().bottom : 0;
+    if (me) { var r = me.getBoundingClientRect(); if (r.height > 0) oben = Math.max(oben, r.bottom); }
+    return karte.getBoundingClientRect().top - oben;
+  }
+  /* K82 (Nacharbeit 1f): Zeilen der Blase über die Wort-Rechtecke (Range) — wie viele, wie viele Wörter in der letzten,
+     wo endet die längste. */
+  function zeilen() {
+    var tn = blase.firstChild, t = tn ? tn.textContent : '', re = /\S+/g, m, z = [];
+    while ((m = re.exec(t))) {
+      var r = document.createRange(); r.setStart(tn, m.index); r.setEnd(tn, m.index + m[0].length);
+      var rs = r.getClientRects(); if (!rs.length) continue;
+      var q = rs[rs.length - 1], y = Math.round(q.top), zl = null;
+      for (var i = 0; i < z.length; i++) if (Math.abs(z[i].y - y) < 4) { zl = z[i]; break; }
+      if (!zl) { zl = { y: y, n: 0, r: 0 }; z.push(zl); }
+      zl.n++; zl.r = Math.max(zl.r, q.right);
     }
-    var frei = vh - unten - RAND - 8;
-    var hb = Math.min(maxH, Math.floor(frei - LUFT - BLASE_H));
-    if (hb >= minH) return { modus: 'unten', h: hb, x: 0.9, r: { left: 8, top: unten + RAND, width: vw - 16, height: frei } };
-    return { modus: null };
+    var maxR = 0; z.forEach(function (x) { maxR = Math.max(maxR, x.r); });
+    return { anzahl: z.length, letzte: z.length ? z[z.length - 1].n : 0, maxR: maxR };
   }
-  function legeBuehne(p) {
-    buehne.style.left = Math.round(p.r.left) + 'px'; buehne.style.top = Math.round(p.r.top) + 'px';
-    buehne.style.width = Math.round(p.r.width) + 'px'; buehne.style.height = Math.round(p.r.height) + 'px';
-    buehne.style.setProperty('--tuer-blase-max', Math.max(120, Math.min(260, Math.round(p.r.width) - 8)) + 'px');
+  var PRETTY = false;
+  try { PRETTY = !!(window.CSS && CSS.supports && CSS.supports('text-wrap', 'pretty')); } catch (e) {}
+  /* K82: kein einzelnes Wort allein in der letzten Zeile (CSS text-wrap: pretty; ohne Unterstützung: Blase schrittweise schmaler),
+     danach die Blase auf die längste Zeile zuschneiden — sonst bliebe rechts bis zu 50 px leer (gemessen, Bau-Doku §7). */
+  function passeBreite() {
+    blase.style.width = '';
+    var z = zeilen();
+    if (z.anzahl < 2) return;
+    var b = blase.getBoundingClientRect(), w = b.width, n = z.anzahl;
+    for (var i = 0; i < 16 && z.letzte === 1 && !PRETTY; i++) {
+      w -= 10; blase.style.width = w + 'px'; z = zeilen();
+      if (z.anzahl > n + 1) { blase.style.width = ''; z = zeilen(); break; }
+    }
+    var cs = getComputedStyle(blase); b = blase.getBoundingClientRect();
+    var vorher = { anzahl: z.anzahl, letzte: z.letzte, breite: blase.style.width };
+    blase.style.width = Math.ceil(z.maxR - b.left + parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth) + 1) + 'px';
+    var nach = zeilen();
+    if (nach.anzahl !== vorher.anzahl || nach.letzte === 1) blase.style.width = vorher.breite;   // Zuschnitt hätte neu umbrochen: lassen
   }
-  function neuLegen() {
-    if (kaputt || !buehne) return;
-    try {
-      var p = platz();
-      if (!p.modus) {
-        modus = null;
-        if (!weg) { weg = true; buehne.classList.add('bos-tuer-buehne--weg'); if (figur && bereit) figur.sage(''); }
-        return;
+  function blaseText(text) {
+    if (!blase) return;
+    if (!text) { blase.hidden = true; blase.textContent = ''; blase.style.width = ''; return; }
+    blase.classList.remove('loch-blase--klein');
+    blase.style.width = '';
+    blase.textContent = text;
+    blase.hidden = false;
+    legeSpitze();
+    // Sicherung (Bauplan §4): passt die Blase nicht in den Platz über der Karte → eine Stufe kleiner, sonst Platz einmalig größer
+    var frei = platzOben();
+    if (blase.offsetHeight + RESERVE_LUFT > frei) {
+      blase.classList.add('loch-blase--klein');
+      if (blase.offsetHeight + RESERVE_LUFT > frei) {
+        var jetzt = parseFloat(getComputedStyle(karte).marginTop) || 74;
+        document.documentElement.style.setProperty('--tuer-blasenraum', Math.ceil(jetzt + blase.offsetHeight + RESERVE_LUFT - frei) + 'px');
+        groesser++;
       }
-      legeBuehne(p);
-      var neu = !figur;
-      modus = p.modus;
-      if (neu) { hoehe = p.h; legeFigurAn(p); }
-      else if (bereit) {
-        if (p.h !== hoehe) { hoehe = p.h; figur.setzeGroesse(p.h); }
-        figur.setzeX(p.x, true);
-        pruefeTrefflaeche();
-      }
-      if (weg) { weg = false; buehne.classList.remove('bos-tuer-buehne--weg'); }
-    } catch (e) { warne('Platz konnte nicht gerechnet werden', e); }
+    }
+    try { passeBreite(); } catch (e) { blase.style.width = ''; }   // K82; Fehler hier sind kosmetisch → Blase wie vorher
+  }
+  var groesser = 0;
+  function lesedauer(text) {
+    var l = daten.lesedauer_ms || {};
+    return Math.max(l.min || 4000, Math.min(l.max || 7500, (text || '').length * (l.je_zeichen || 70)));
+  }
+  function wecke() { if (schlaeft) { schlaeft = false; } }
+  function sprich(buste, text, danach) {
+    if (!bereit || kaputt) return false;
+    wecke();
+    clearTimeout(tZurueck); clearTimeout(tLachen); tLachen = null;
+    zeige(buste);
+    blaseText(text);
+    var d = text ? lesedauer(text) : 2500;
+    sprichtBis = Date.now() + d;
+    letzteAktivitaet = Date.now();
+    tZurueck = setTimeout(function () {
+      tZurueck = null; sprichtBis = 0;
+      blaseText('');
+      zeige('neutral');
+      if (typeof danach === 'function') danach();
+      planeSchlaf();
+    }, d);
+    return true;
   }
 
-  /* ---------- Figur ---------- */
-  function legeFigurAn(p) {
-    try { figur = baueFigur(p); } catch (e) { figur = null; warne('Figur nicht anlegbar', e); return; }   // eigener Text: die Konsole soll sagen, was los ist
-    figur.auf('fehler', function (d) { if (d && d.manifest) warne('Manifest nicht ladbar', d.message); });
-    warteAufFigur(p);
-  }
-  function baueFigur(p) {
-    return window.BOS_HAMSTER_FIGUR.neu({
-      name: 'tuer', container: buehne, basisPfad: BASIS, einbettung: 'container', rolle: 'lehrmeister',
-      modus: 'ecke', hoehe: p.h, laufen: false, nummern: false, schiebbar: false, zufall: false, sichtkontakt: false,
-      xStart: p.x, klasse: 'hf--tuer',
-      nurZustaende: function (m) { return (m.tuer && m.tuer.zustaende) || null; },   // K65: 15 Bilder statt 30
-      beiTipp: beiTipp
-    });
-  }
-  function warteAufFigur(p) {
-    figur.bereit.then(function () {
+  /* ---------- Blinzeln und Schlaf ---------- */
+  function planeBlinzeln() {
+    clearTimeout(tBlinzel); tBlinzel = null;
+    if (wenigBewegung || kaputt) return;
+    var b = daten.blinzeln_s || [3, 6];
+    tBlinzel = setTimeout(function () {
+      tBlinzel = null;
       if (kaputt) return;
-      manifest = figur.manifest();
-      if (!manifest) return warne('Manifest leer');
-      tuer = manifest.tuer || null;
-      if (!tuer) return warne('Manifest ohne Block tuer');
-      tipps = (tuer.tipps || []).slice();
-      bereit = true;
-      figur.setzeX(p.x, true);
-      pruefeTrefflaeche();
-      neuLegen();
-      tErster = setTimeout(ersterSatz, tuer.erster_satz_ms || 1000);
-    }).catch(function (e) { warne('Figur nicht ladbar', e); });
+      if (aktuell === 'neutral' && !schlaeft && bilder.blinzeln) {   // nur aus neutral — nie während eines anderen Ausdrucks
+        zeige('blinzeln');
+        setTimeout(function () { if (aktuell === 'blinzeln') zeige('neutral'); }, daten.blinzel_ms || 120);
+      }
+      planeBlinzeln();
+    }, zufall(b[0], b[1]) * 1000);
   }
-  /* Z3: Körperkasten unter 40 px breit → Tipp auf Crumble aus (zu klein, um ihn sicher zu treffen) */
-  function pruefeTrefflaeche() {
-    var w = figur && figur.wurzel && figur.wurzel(); if (!w) return;
-    var k = w.querySelector('.hf__figur'); if (!k) return;
-    w.classList.toggle('hf--ohne-tipp', k.getBoundingClientRect().width < 40);
-  }
-  function lesedauer(text) { return Math.max(4000, Math.min(7500, (text || '').length * 70)); }
-  function sprich(pose, text) {
-    if (!figur || !bereit || kaputt || weg) return false;
-    var d = lesedauer(text);
-    figur.zeige(pose || 'idle', { text: text || '', dauer: d + 1000, dauerText: d });
-    return true;
+  function planeSchlaf() {
+    clearTimeout(tSchlaf); tSchlaf = null;
+    if (kaputt) return;
+    var ms = (daten.schlaf_s || 120) * 1000;
+    var rest = letzteAktivitaet + ms - Date.now();
+    tSchlaf = setTimeout(function () {
+      tSchlaf = null;
+      if (kaputt) return;
+      if (Date.now() - letzteAktivitaet < ms - 50 || sprichtBis > Date.now()) return planeSchlaf();
+      schlaeft = true; blaseText(''); zeige(daten.ausdruck && daten.ausdruck.schlaf || 'schlafen');
+    }, Math.max(0, rest));
   }
 
   /* ---------- Sätze und Tipps (K63) ---------- */
@@ -194,53 +272,52 @@
     tErster = null;
     if (wartenderFall && Date.now() - wartenderFall.t < 4000) { var f = wartenderFall; wartenderFall = null; fall(f.k); planeTipp(); return; }
     var z = window.BOS_TUER_ZUSTAND || {};
-    if (z.durchwinken) { reagiere('angemeldet'); return; }   // die Weiterleitung wartet nicht auf ihn — ist er zu spät, sieht man es eben nicht
-    var liste = tuer.oeffnen || [];
-    if (liste.length && Date.now() >= stilleBis) { var s = liste[Math.floor(Math.random() * liste.length)]; sprich('wave', s.text); }
+    if (z.durchwinken) { reagiere('angemeldet'); return; }   // die Weiterleitung wartet nicht auf ihn
+    if (daten.oeffnen.length && Date.now() >= stilleBis) sprich((daten.ausdruck && daten.ausdruck.oeffnen) || 'winken', eins(daten.oeffnen).text);
     planeTipp();
   }
+  function tippsMax() { return daten.tipps_max || 4; }
   function planeTipp() {
     clearTimeout(tTipp); tTipp = null;
-    if (gezeigt >= ((tuer && tuer.tipps_max) || 4) || !tipps.length) return;
-    var ab = (tuer.tipp_abstand_s || [20, 30]);
-    var ms = zufallZahl(ab[0], ab[1]) * 1000;
-    if (stilleBis > Date.now() + ms) ms = stilleBis - Date.now() + zufallZahl(1000, 3000);
+    if (gezeigt >= tippsMax() || !tipps.length) return;
+    var ab = daten.tipp_abstand_s || [20, 30];
+    var ms = zufall(ab[0], ab[1]) * 1000;
+    if (stilleBis > Date.now() + ms) ms = stilleBis - Date.now() + zufall(1000, 3000);
     tTipp = setTimeout(function () {
       tTipp = null;
-      if (Date.now() < stilleBis) return planeTipp();
-      if (weg) return planeTipp();
+      if (Date.now() < stilleBis || sprichtBis > Date.now()) return planeTipp();
       zeigeTipp();
       planeTipp();
     }, ms);
   }
   function zeigeTipp() {
-    if (gezeigt >= ((tuer && tuer.tipps_max) || 4) || !tipps.length) return false;
-    var i = Math.floor(Math.random() * tipps.length), t = tipps.splice(i, 1)[0];   // ohne Wiederholung im Besuch
+    if (gezeigt >= tippsMax() || !tipps.length) return false;
+    var t = tipps.splice(Math.floor(Math.random() * tipps.length), 1)[0];   // ohne Wiederholung im Besuch
     gezeigt++;
-    sprich(t.pose || 'raise_hand', t.text);
+    var letzter = gezeigt >= tippsMax();
+    var ausdr = (daten.ausdruck && daten.ausdruck.tipp) || ['zwinkern', 'wangen'];
+    sprich(Array.isArray(ausdr) ? eins(ausdr) : ausdr, t.text, letzter ? lachen : null);
     return true;
   }
-  /* Tipp auf Crumble (Modul-Option beiTipp): nächster Tipp, zählt mit; danach freut er sich nur noch */
-  function beiTipp(info) {
-    if (!bereit || kaputt) return true;
-    var weiter = function () { if (kaputt || !figur) return; if (!zeigeTipp()) figur.zeige('happy', { text: '' }); planeTipp(); };
-    if (info && info.schlief) {   // Bauplan §1.4: Tipp weckt (surprised), dann zählt er als Tipp
-      figur.zeige('surprised', { text: '' });
-      setTimeout(weiter, (manifest && manifest.verhalten && manifest.verhalten.aufwach_ms) || 1000);
-      return true;
-    }
-    weiter();
-    return true;
+  /* F3: nach der Lesezeit des 4. Tipps 2,5 s lachen ohne Text, dann neutral und still */
+  function lachen() {
+    if (kaputt) return;
+    zeige((daten.ausdruck && daten.ausdruck.nach_tipps) || 'lachen');
+    tLachen = setTimeout(function () { tLachen = null; if (aktuell === ((daten.ausdruck && daten.ausdruck.nach_tipps) || 'lachen')) zeige('neutral'); }, daten.lachen_ms || 2500);
   }
 
-  /* ---------- Eingabe-Stille (K63, B1) ---------- */
+  /* ---------- Eingabe-Stille (K63, B1, K74) ---------- */
   function stille() {
-    stilleBis = Date.now() + (((tuer && tuer.eingabe_stille_s) || 20) * 1000);
-    if (figur && bereit) figur.sage('');
+    stilleBis = Date.now() + ((daten && daten.eingabe_stille_s) || 20) * 1000;
+    letzteAktivitaet = Date.now();
+    if (!bereit) return;
+    blaseText('');
+    if (tZurueck) { clearTimeout(tZurueck); tZurueck = null; sprichtBis = 0; }   // Satz abgebrochen: Gesicht gleich zurück, nicht erst nach der Lesezeit
+    if (schlaeft || aktuell !== 'neutral') { schlaeft = false; zeige('neutral'); }
+    planeSchlaf();
   }
   function verdrahteEingabe() {
-    // K74 (Nacharbeit 1e): nur Tab (auch Umschalt+Tab) zählt als Fokus von Menschenhand — Zeichen kommen ohnehin als input.
-    // Vorher zählte jede Taste: Enter im Kennungsfeld → Tür setzt nach dem Fehler selbst passwortFeld.focus() → Stille wischte die Reaktion weg.
+    // K74: nur Tab (auch Umschalt+Tab) zählt als Fokus von Menschenhand — Zeichen kommen ohnehin als input.
     document.addEventListener('keydown', function (e) { if (e && e.key === 'Tab') letzteTaste = Date.now(); }, true);
     ['kennung', 'passwort'].forEach(function (id) {
       var f = document.getElementById(id); if (!f) return;
@@ -251,12 +328,16 @@
     });
   }
 
-  /* ---------- Reaktionen auf echte Meldungen (K64) ---------- */
+  /* ---------- Reaktionen auf echte Meldungen (K64, K79) ---------- */
   function reagiere(k) {
-    var r = tuer && tuer.reaktionen && tuer.reaktionen[k];
-    if (!r) return;
-    if (!r.text) { if (figur && bereit) { figur.zeige('idle', { still: true }); figur.sage(''); } return; }   // gesperrt: schweigt
-    sprich(r.pose, r.text);
+    var r = daten && daten.reaktionen && daten.reaktionen[k];
+    if (!r || !bereit) return;
+    if (!r.text) {   // gesperrt: neutral, still
+      clearTimeout(tZurueck); tZurueck = null; sprichtBis = 0; clearTimeout(tLachen); tLachen = null;
+      wecke(); blaseText(''); zeige(r.buste || 'neutral'); letzteAktivitaet = Date.now(); planeSchlaf();
+      return;
+    }
+    sprich(r.buste || 'besorgt', r.text);
   }
   function fall(k) {
     if (!k || kaputt) return;
@@ -271,25 +352,28 @@
     fall: function (k) { try { fall(k); } catch (e) { warne('Reaktion fehlgeschlagen', e); } },
     /* nur für Prüfwerkzeuge */
     _zustand: function () {
-      return { bereit: bereit, kaputt: kaputt, weg: weg, modus: modus, hoehe: hoehe, gezeigt: gezeigt, rest: tipps.map(function (t) { return t.id; }),
-               stilleBis: stilleBis, falsch: falschZaehler, figur: figur };
+      return { bereit: bereit, kaputt: kaputt, aktuell: aktuell, schlaeft: schlaeft, gezeigt: gezeigt, rest: tipps.map(function (t) { return t.id; }),
+               stilleBis: stilleBis, falsch: falschZaehler, blase: blase && !blase.hidden ? blase.textContent : '', klein: !!(blase && blase.classList.contains('loch-blase--klein')),
+               groesser: groesser, letzteAktivitaet: letzteAktivitaet };
     },
-    _tippJetzt: function () { if (bereit && Date.now() >= stilleBis) { zeigeTipp(); planeTipp(); } }
+    _tippJetzt: function () { if (bereit && Date.now() >= stilleBis) { zeigeTipp(); planeTipp(); } },
+    _sage: function (buste, text) { if (bereit) { clearTimeout(tZurueck); zeige(buste); blaseText(text); } }
   };
   try {
-    ladeCss();
-    buehne = document.createElement('div');
-    buehne.className = 'bos-tuer-buehne bos-tuer-buehne--weg';
-    buehne.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(buehne);
     verdrahteEingabe();
-    ladeModul().then(function () {
+    if (!window.fetch || !window.Promise) throw new Error('Browser ohne fetch/Promise');
+    Promise.all([ladeCss(), ladeDaten()]).then(function () {
       if (kaputt) return;
-      neuLegen();
-      window.addEventListener('resize', neuLegen);
-      if (window.visualViewport) window.visualViewport.addEventListener('resize', neuLegen);
-      var mitte = document.querySelector('.mitte');
-      if (mitte && window.ResizeObserver) new ResizeObserver(function () { neuLegen(); }).observe(mitte);
-    }).catch(function (e) { warne('Modul nicht ladbar', e); });
+      tipps = daten.tipps.slice();
+      return ladeBuesten();
+    }).then(function () {
+      if (kaputt) return;
+      setzeEin();
+      bereit = true;
+      window.addEventListener('resize', legeSpitze);
+      planeBlinzeln();
+      planeSchlaf();
+      tErster = setTimeout(function () { try { ersterSatz(); } catch (e) { warne('Satz fehlgeschlagen', e); } }, daten.erster_satz_ms || 1000);
+    }).catch(function (e) { warne((e && e.message) || 'Laden fehlgeschlagen', e); });
   } catch (e) { warne('Start fehlgeschlagen', e); }
 })();
