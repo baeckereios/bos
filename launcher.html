@@ -19,6 +19,11 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-18 · 11:43 · v3.6 · Feature (Crumble #62 Stufe 1e: Begrüßungen; Bauplan 10:06, Go 10:22)
+      - Der Hörer 'hamster-figur:fehler' zeigt auch detail.name: „Name für die
+        Begrüßung nicht lesbar: <err.message>“ in der Crumble-Zeile der Einstellungen
+        (bos_crumble_host.js liest den Rufnamen im Hintergrund). Ein i18n-Schlüssel.
+        Sonst nichts geändert — Begrüßung, Schichttag, Tür-Schalter stecken im Host.
     2026-10-18 · 06:23 · v3.5 · Feature (Crumble #62 Nachtrag 6: Größe, Knopf in der Leiste;
       Anweisung Kontroll-Chat 04:12/04:16, Bauplan 04:21, Go 04:23)
       - BOS_CRUMBLE_HOST.start() bekommt tray: #taskbarTray statt topbar/vor —
@@ -889,6 +894,7 @@
     'settings.hamsterStufe75': '75 %',
     'settings.hamsterStufe100': '100 %',
     'settings.hamsterSpeicherFehler': 'Größe konnte auf diesem Gerät nicht gespeichert werden:',
+    'settings.hamsterNameFehler': 'Name für die Begrüßung nicht lesbar:',
     'settings.farbVorgabe': 'Vorgabe',
     'settings.farbHinweis': 'Gilt für alle Seiten. Statusfarben (Rot, Gelb, Grün) und Ausgedrucktes bleiben immer gleich.',
     'settings.syncFehler': 'Einstellungen konnten nicht gespeichert werden (bleiben auf diesem Gerät):',
@@ -1814,6 +1820,7 @@
   }
   document.addEventListener('hamster-figur:fehler', function (e) {   // z. B. Position nach dem Ziehen nicht speicherbar
     if (e.detail && e.detail.speicher) zeigeCrumbleFehler(t('settings.hamsterSpeicherFehler') + ' ' + e.detail.message);
+    else if (e.detail && e.detail.name) zeigeCrumbleFehler(t('settings.hamsterNameFehler') + ' ' + e.detail.message);   // Stufe 1e (K70): Rufname für die Begrüßung
   });
   function crumbleHTML() {
     var data = getActiveProfileData();

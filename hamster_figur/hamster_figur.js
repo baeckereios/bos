@@ -33,6 +33,10 @@
  * Speichern (Sichtbarkeit, Position) macht der Host über die Option speicher { lese(), schreibe(o) }.
  *
  * CHANGELOG
+ *   2026-10-18 · 11:43 · Stufe 1e (Kontroll-Chat 09:49, Bauplan 10:06, Go 10:22): Optionen nurZustaende (K65, Tür lädt
+ *     nur ihre 15 Bilder vorab), beiTipp (K63, Gastgeber übernimmt den Tipp), klasse (Zusatzklasse der Wurzel, hf--tuer);
+ *     API ruhe(ms)/ruheBis() — keine automatische Nummer (Nachholweg K37) und kein Spaziergang bis zum Ende der
+ *     Begrüßungsfolge (K71); an()/aus() setzt die Ruhe zurück (räumt die Folge ohnehin ab). Sonst unverändert.
  *   2026-10-18 · 06:23 · Nachtrag 6 (Kontroll-Chat 04:12/04:16, Bauplan 04:21, Go 04:23): T1 setzeGroesse(px)/groesse() zur
  *     Laufzeit (masseBild/masseRequisiten/masseKasten, Position als Anteil, Blase neu) · T2 Blasen-rAF endet nach
  *     blase_folge_ms (3000) · T3 Luft/Mitgehen der Blase auch im Schoner (spielplatz.blase_abstand_px) · Option schlaf:false
@@ -99,7 +103,8 @@ window.BOS_HAMSTER_FIGUR = (function () {
       container: document.body, basisPfad: 'hamster_figur/', modus: 'ecke', einbettung: 'fest',
       rolle: 'lehrmeister', hoehe: 150, an: true, ausruestung: {}, zufall: true,
       name: 'standard', vor: null, manifest: null, tippZustaende: null,
-      laufen: null, nummern: null, schiebbar: null, speicher: null, xStart: null, sichtkontakt: null, schlaf: true
+      laufen: null, nummern: null, schiebbar: null, speicher: null, xStart: null, sichtkontakt: null, schlaf: true,
+      nurZustaende: null, beiTipp: null, klasse: ''          // Stufe 1e: Tür (K65 nur diese Bilder vorab, K63 Tipp-Weg, Zusatzklasse)
     }, o || {});
     if (!/\/$/.test(opt.basisPfad)) opt.basisPfad += '/';
     if (opt.modus !== 'knopf') opt.modus = 'ecke';
@@ -120,6 +125,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
     var nummerAktiv = null, letzteNummer = null;       // laufende Nummer { name, ebene }
     var zieh = null, ignoriereClick = false;           // Ziehen
     var phaseAktiv = false, phaseErsteNummer = false, naechsteNummerAt = 0, naechsterLaufAt = 0, letzteBeruehrung = 0, versteckteSeite = false;   // K34 Sichtkontakt
+    var ruheBis = 0;                                   // Stufe 1e: ruhe(ms) — bis dahin keine automatische Nummer, kein Spaziergang
     var showRest = 0, showNamen = [];                  // K35 show(n): noch zu spielende Nummern; N6-7: in dieser Show schon gespielte Namen
     var figW = Math.round(opt.hoehe * 0.95);
     var handler = {}, vorab = [], nachBereit = [];
@@ -144,7 +150,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
     // ---------------------------------------------------------------- Aufbau DOM
     function baue() {
       var wurzel = document.createElement('div');
-      wurzel.className = 'hf hf--' + opt.modus + ' hf--' + opt.einbettung + ' hf--' + opt.rolle + (aufLeiste ? ' hf--blase-oben' : '');
+      wurzel.className = 'hf hf--' + opt.modus + ' hf--' + opt.einbettung + ' hf--' + opt.rolle + (aufLeiste ? ' hf--blase-oben' : '') + (opt.klasse ? ' ' + opt.klasse : '');
       wurzel.dataset.instanz = opt.name;
       wurzel.innerHTML =
         '<div class="hf__knopf" role="button" tabindex="0" title="Crumble" aria-label="Crumble"><img class="hf__knopf-bild" alt=""></div>' +
@@ -168,7 +174,13 @@ window.BOS_HAMSTER_FIGUR = (function () {
       masseKasten();
 
       el.bilder = {};
-      Object.keys(manifest.zustaende).forEach(function (name) { if (!manifest.zustaende[name].lazy) legeBildAn(name); });
+      // K65 (Stufe 1e): nurZustaende = nur diese Bilder vorab anlegen (Liste oder function(manifest) → Liste); alle anderen lädt zeige() bei Bedarf
+      var nur = typeof opt.nurZustaende === 'function' ? opt.nurZustaende(manifest) : opt.nurZustaende;
+      Object.keys(manifest.zustaende).forEach(function (name) {
+        if (manifest.zustaende[name].lazy) return;
+        if (Array.isArray(nur) && nur.indexOf(name) < 0) return;
+        legeBildAn(name);
+      });
 
       el.knopf.addEventListener('click', function (e) { e.stopPropagation(); tipp(); });
       el.knopf.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.knopf.click(); } });
@@ -458,6 +470,12 @@ window.BOS_HAMSTER_FIGUR = (function () {
         return;
       }
       if (opt.modus === 'knopf') hervorHolen();
+      // K63 (Stufe 1e): eigener Tipp-Weg des Gastgebers (Tür: nächster Tipp statt Zufallsreaktion). true = erledigt.
+      if (typeof opt.beiTipp === 'function') {
+        var erledigt = false;
+        try { erledigt = opt.beiTipp({ schlief: manifest.zustaende[war].kategorie === 'schlaf' }) === true; } catch (e) { console.warn('[hamster_figur] beiTipp', e); }
+        if (erledigt) { melde('tipp', { gastgeber: true }); return; }
+      }
       if (manifest.zustaende[war].kategorie === 'schlaf') { zeige('surprised'); melde('tipp', { geweckt: true }); return; }
       if (tipps >= manifest.verhalten.zunge_nach_tipps) { tipps = 0; zeige('tongue'); melde('tipp', { zunge: true }); return; }
       var liste = opt.tippZustaende || (istSpielplatz() && sp().tippZustaende) || ['happy', 'thinking', 'shrug', 'wave', 'laughing'];
@@ -587,7 +605,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       } else {
         var m = zeiten().lauf_min; if (!m) return; ms = zufall(m[0], m[1]) * 60000;
       }
-      t.lauf = setTimeout(function () { naechsterLaufAt = 0; laufe(); armLauf(); }, ms);
+      t.lauf = setTimeout(function () { naechsterLaufAt = 0; if (Date.now() >= ruheBis) laufe(); armLauf(); }, ms);   // ruhe(): kein Spaziergang (nähme die Blase weg)
     }
 
     // ---------------------------------------------------------------- Sichtkontakt (K34): Sichtphase statt Minuten-Uhr
@@ -794,7 +812,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       }
       t.nummer = setTimeout(function () {
         naechsteNummerAt = 0;
-        var frei = aktuell === 'idle' && !beschaeftigt() && !hinweisOffen;
+        var frei = aktuell === 'idle' && !beschaeftigt() && !hinweisOffen && Date.now() >= ruheBis;   // ruhe() (Stufe 1e): Termin fällt auf den Nachholweg K37
         var gespielt = frei && nummer();
         if (gespielt) phaseErsteNummer = false;                                   // K37: erst die GESPIELTE erste Nummer beendet die Erst-Phase
         armNummer(!gespielt && opt.sichtkontakt && phaseAktiv && !schlaeft());   // verpasst (Reaktion/Lauf/Hinweis): nachholen; schläft er: volle Runde wie bisher
@@ -866,6 +884,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.wurzel.classList.toggle('hf--aus', !aktiv);
       clearAll(); tipps = 0; hinweisOffen = false; hinweisText = ''; wartend = null; el.wurzel.classList.remove('hf--hinweis');
       phaseAktiv = false; showRest = 0; naechsteNummerAt = 0; naechsterLaufAt = 0;
+      ruheBis = 0;   // Stufe 1e: an()/aus() räumt die Begrüßungsfolge ab (Zustand, Wartepunkt) — dann auch ihre Ruhe
       stoppeLaufen(); beendeNummer(); zieh = null; el.wurzel.classList.remove('hf--zieht');
       verstecken();
       if (aktiv) { zeige('idle', { still: true, ohneSchlafReset: !sichtbarIst }); if (sichtbarIst) { starteUhren(); if (opt.nummern) vorladen(); } }
@@ -946,7 +965,8 @@ window.BOS_HAMSTER_FIGUR = (function () {
       laufe: laufe, setzeX: setzeX, x: function () { return xAnteil; },
       setzeGroesse: setzeGroesse, groesse: function () { return opt.hoehe; },
       nummer: nummer, nummern: nummernListe, laufendeNummer: function () { return nummerAktiv ? nummerAktiv.name : null; },
-      show: show, wecke: wecke, sichtkontakt: function (grund) { startePhase(grund || 'start'); }, sichtphase: function () { return phaseAktiv; },
+      show: show, wecke: wecke,
+      ruhe: function (ms) { ruheBis = Math.max(ruheBis, Date.now() + Math.max(0, ms || 0)); return ruheBis; }, ruheBis: function () { return ruheBis; }, sichtkontakt: function (grund) { startePhase(grund || 'start'); }, sichtphase: function () { return phaseAktiv; },
       zustand: function () { return aktuell; },
       manifest: function () { return manifest; },
       rolle: function () { return opt.rolle; },

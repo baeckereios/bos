@@ -43,6 +43,17 @@
    neuLaden), bos_profil_lookup.js (Profil-Id für den Speicher).
 
    CHANGELOG
+     2026-10-18 · 13:07 · Nacharbeit 1e (Kontroll-Chat 12:53): K75 — Konto aus: begruesse()/begruesseMit()
+       zählen nicht, merken keine IDs, lesen keinen Rufnamen (keine Fehlerzeile für ein abgeschaltetes Feature).
+     2026-10-18 · 11:43 · Stufe 1e (K61, K67–K73; Bauplan 10:06, Go 10:22): Begrüßung nach
+       Schichttag (ab 20:00 Folgetag), Zähler je Gerät/Profil (gruss { tag, starts, letzte,
+       rufname, rufnameTag }), Topf Tageszeit/Wochentag/wieder da, Rufname im Hintergrund
+       (eigene Person, genau 1, kein Ort-Konto, ≤ 20 Zeichen), Aufgabenzahl als zweite Blase
+       (versteckt: eine Blase, Z1), ruhe() bis zum Ende der Folge; viel_offen wartet auf das
+       Ende der ganzen Folge (grussLaeuftBis wird sofort gesetzt und beim Ablauf erneut gelesen —
+       sonst kam viel_offen bei 7 offenen gleichzeitig mit dem Gruß, Fund probe_1e e10);
+       Rufname-Lesefehler: einmal je Schichttag je Seite, Speicher unverändert; Tür-Schalter
+       localStorage bos_crumble_tuer bei start()/setzeAn().
      2026-10-18 · 06:23 · Nachtrag 6 (K48–K50, Bauplan 04:21, Go 04:23): Knopf im Tray
        (Option tray, Klasse hf-knopf-host--tray); Speicher { groesse, schoner } je Gerät
        mit Stufen 50/75/100 (Schoner 0 = aus), Vorgaben 75/100; setzeGroesse/setzeSchoner/
@@ -67,7 +78,7 @@ window.BOS_CRUMBLE_HOST = (function () {
   'use strict';
 
   var WARTE_MS = 2500;          // so lange warten wir auf 'bos:aufgaben', bevor wir ohne Zahl grüßen
-  var NACH_GRUSS_MS = 6500;     // viel_offen erst nach der Begrüßung (reaktion_ms 5500 + Luft)
+  var NACH_GRUSS_MS = 6500;     // viel_offen erst nach der Begrüßung (reaktion_ms 5500 + Luft) — Stufe 1e: Ende der ganzen Folge, siehe begruesseMit
   var SCHWELLE_VORGABE = 5;
   var HOEHE_SCHREIBTISCH = 170, HOEHE_SCHONER = 240;
 
@@ -109,20 +120,152 @@ window.BOS_CRUMBLE_HOST = (function () {
     return typeof s === 'number' && s > 0 ? s : SCHWELLE_VORGABE;
   }
 
-  /* ---------- Begrüßung ---------- */
+  /* ---------- Begrüßung (Stufe 1e, K67–K73) ----------
+     Je start(): Schichttag (ab 20:00 der Folgetag) → Zähler im Gerätespeicher → Topf (erster Start: Tageszeit nach der Uhr
+     oder an Mo/Fr/Sa/So mit wochentag_anteil der Wochentag; weitere Starts: „wieder da“, {mal} ab dem 3.) → ohne die letzten
+     5 → mit Rufname (name_anteil, nur wenn im Speicher) → Gruß als Ereignis app_geoeffnet (Pose wave). Die Aufgabenzahl
+     folgt nach zahl_nach_ms als zweite Blase; ist Crumble versteckt, stehen Gruß und Zahl in EINER Blase (Z1), weil der
+     Wartepunkt nur das Ereignis merkt. Bis zum Ende der Folge ruhe(): keine Nummer, kein Spaziergang. */
+  var grussZahl = null, tZahl = null;   // nur für Prüfwerkzeuge: was als zweite Blase kam
+  function zweistellig(n) { return (n < 10 ? '0' : '') + n; }
+  function datumText(d) { return d.getFullYear() + '-' + zweistellig(d.getMonth() + 1) + '-' + zweistellig(d.getDate()); }
+  /** Schichttag: ab abUhr (20) zählt schon der Folgetag (K67). Liefert { tag: 'JJJJ-MM-TT', wochentag: 0..6 }. */
+  function schichttag(jetzt, abUhr) {
+    var d = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+    if (jetzt.getHours() >= abUhr) d.setDate(d.getDate() + 1);
+    return { tag: datumText(d), wochentag: d.getDay() };
+  }
+  function tageszeitTopf(b, stunde) {
+    var t = b.tageszeit || {}, k;
+    for (k in t) {
+      if (!t.hasOwnProperty(k)) continue;
+      var v = t[k].von, bis = t[k].bis;
+      if (v < bis ? (stunde >= v && stunde < bis) : (stunde >= v || stunde < bis)) return t[k].zeilen || [];
+    }
+    return [];
+  }
+  function zufall(liste) { return liste[Math.floor(Math.random() * liste.length)]; }
+  function meldeFehler(detail) { try { document.dispatchEvent(new CustomEvent('hamster-figur:fehler', { detail: detail })); } catch (e) {} }
+  /** Den Gruß wählen und den Zähler fortschreiben. Gibt { text, id, start } oder null (kein Block im Manifest). */
+  function waehleGruss(b) {
+    var jetzt = new Date();
+    var st = schichttag(jetzt, typeof b.schichttag_ab_uhr === 'number' ? b.schichttag_ab_uhr : 20);
+    var g = speicher.lese().gruss || {};
+    var start = (g.tag === st.tag ? (g.starts || 0) : 0) + 1;
+    var letzte = Array.isArray(g.letzte) ? g.letzte : [];   // je Profil, über Schichttage hinweg (K69)
+    var topf;
+    if (start === 1) {
+      var woche = (b.wochentag || {})[String(st.wochentag)];
+      topf = (woche && woche.length && Math.random() < (typeof b.wochentag_anteil === 'number' ? b.wochentag_anteil : 0.33)) ? woche : tageszeitTopf(b, jetzt.getHours());
+    } else {
+      topf = (b.wieder_da || []).filter(function (z) { return !z.ab_start || start >= z.ab_start; });
+    }
+    if (!topf.length) return null;
+    var frei = topf.filter(function (z) { return letzte.indexOf(z.id) < 0; });
+    var z = zufall(frei.length ? frei : topf);
+    var rufname = (g.rufnameTag && typeof g.rufname === 'string') ? g.rufname : '';
+    var text = (rufname && z.name && Math.random() < (typeof b.name_anteil === 'number' ? b.name_anteil : 0.5)) ? z.name.replace(/\{name\}/g, function () { return rufname; }) : z.text;
+    text = text.replace(/\{mal\}/g, String(start));
+    if (/[{}]/.test(text)) text = z.text.replace(/\{mal\}/g, String(start));   // K70: nie {name}/{mal} wörtlich
+    if (/[{}]/.test(text)) return null;
+    var neu = Object.assign({}, g, { tag: st.tag, starts: start, letzte: [z.id].concat(letzte.filter(function (i) { return i !== z.id; })).slice(0, b.letzte_merken || 5) });
+    try { speicher.schreibe(Object.assign(speicher.lese(), { gruss: neu })); }
+    catch (err) { console.warn('[crumble] Begrüßung: Zähler nicht gespeichert', err); meldeFehler({ speicher: true, message: (err && err.message) || String(err) }); }
+    return { text: text, id: z.id, start: start, tag: st.tag };
+  }
+  function zahlText(b, n) {
+    var z = b.zahl || {};
+    var liste = n === 0 ? z['null'] : (n === 1 ? z.eins : z.mehr);
+    return (liste && liste.length) ? zufall(liste).replace(/\{n\}/g, String(n)) : '';
+  }
   function begruesseMit(detail) {
     clearTimeout(tWarten); tWarten = null; wartetAufZahl = false;
     if (!figur) return;
-    var o = {};
-    if (detail && !detail.fehler && !detail.gesperrt && typeof detail.offen === 'number') o.n = detail.offen;
-    figur.ereignis('app_geoeffnet', o);
-    grussLaeuftBis = Date.now() + NACH_GRUSS_MS;
+    if (!an) return;   // K75 (Nacharbeit 1e): Konto-Aus — nicht zählen, keine IDs merken, keinen Rufnamen lesen. Später eingeschaltet: der nächste Start ist der „erste“
+    var n = (detail && !detail.fehler && !detail.gesperrt && typeof detail.offen === 'number') ? detail.offen : null;
+    var f = figur;
+    grussLaeuftBis = Date.now() + NACH_GRUSS_MS;   // sofort, wie vor 1e: aufAufgaben() liest den Wert gleich danach; das Ende der Folge setzt bereit.then genauer
+    f.bereit.then(function () {
+      if (f !== figur) return;
+      var m = f.manifest(), b = m && m.begruessung;
+      if (!b) { f.ereignis('app_geoeffnet', typeof n === 'number' ? { n: n } : {}); grussLaeuftBis = Date.now() + NACH_GRUSS_MS; return; }
+      var gruss = waehleGruss(b);
+      if (!gruss) return;
+      var zahlNach = typeof b.zahl_nach_ms === 'number' ? b.zahl_nach_ms : 3500, zahlDauer = typeof b.zahl_dauer_ms === 'number' ? b.zahl_dauer_ms : 4000;
+      var mitZahl = typeof n === 'number' && (gruss.start === 1 || n > 0);
+      var zt = mitZahl ? zahlText(b, n) : '';
+      grussZahl = { gruss: gruss.text, id: gruss.id, start: gruss.start, zahl: zt, versteckt: !f.istSichtbar() };
+      clearTimeout(tZahl); tZahl = null;
+      var reaktion = (m.verhalten && m.verhalten.reaktion_ms) || 5500;
+      var dauer = zt ? zahlNach + zahlDauer : reaktion;
+      if (!f.istSichtbar() || !f.istAn()) {
+        f.ereignis('app_geoeffnet', { text: zt ? gruss.text + ' ' + zt : gruss.text });   // Z1: versteckt → eine Blase, der Wartepunkt merkt sie
+      } else {
+        f.ereignis('app_geoeffnet', { text: gruss.text });
+        if (zt) tZahl = setTimeout(function () { tZahl = null; if (f === figur && f.istAn() && f.istSichtbar()) f.sage(zt, zahlDauer); }, zahlNach);
+      }
+      if (f.ruhe) f.ruhe(dauer + 500);
+      grussLaeuftBis = Date.now() + dauer + 500;
+      leseRufnameSpaeter(gruss.tag);
+    });
   }
   function begruesse() {
     clearTimeout(tWarten);
+    if (!an) { wartetAufZahl = false; tWarten = null; return; }   // K75
     if (letzteAufgaben) { begruesseMit(letzteAufgaben); return; }
     wartetAufZahl = true;
     tWarten = setTimeout(function () { if (wartetAufZahl) begruesseMit(null); }, WARTE_MS);
+  }
+
+  /* ---------- Rufname (K70): im Hintergrund, höchstens einmal je Schichttag; der Gruß wartet nie darauf ----------
+     Nur der Rufname der EIGENEN Person (personen.where bosKontoId == Kennung, genau 1 Treffer, kein Ort-Konto,
+     namen/<Nr>.rufname 1–20 Zeichen). Nie Beschreibung, nie BOS_NAMEN.anzeige(), nie Kennung. Konto ohne Haken: gar nicht
+     lesen (die Regel verweigert es ohnehin — sonst stünde jeden Tag ein Fehler in den Einstellungen). Lesefehler: Gruß ohne
+     Namen, console.warn und 'hamster-figur:fehler' { name: true } → Crumble-Zeile der Einstellungen; Gerätespeicher unverändert,
+     an diesem Schichttag liest diese Seite nicht noch einmal (ein Neuladen versucht es wieder). */
+  var nameLiest = false, fehlVersuch = {};   // fehlVersuch[profilId] = Schichttag eines fehlgeschlagenen Lesens (nur im Speicher der Seite)
+  function leseRufnameSpaeter(tag) {
+    var g = speicher.lese().gruss || {};
+    if (g.rufnameTag === tag || nameLiest || fehlVersuch[profilId()] === tag) return;
+    var p = null;
+    try { p = window.BOS_PROFIL_LOOKUP && window.BOS_PROFIL_LOOKUP.aktivesProfil ? window.BOS_PROFIL_LOOKUP.aktivesProfil() : null; } catch (e) {}
+    if (p && p.freigeschaltet === false) return;
+    if (!window.db || !window.firebase || typeof window.firebase.auth !== 'function') return;
+    nameLiest = true;
+    var db = window.db, pid = profilId();
+    (window.BOS_AUTH_READY || Promise.resolve()).then(function () {
+      var u = window.firebase.auth().currentUser;
+      if (!u || !u.email) return null;
+      var kennung = String(u.email).split('@')[0].toLowerCase();
+      var konto = (window.BOS_ACCOUNTS && typeof window.BOS_ACCOUNTS.ladeKonto === 'function') ? window.BOS_ACCOUNTS.ladeKonto(db, kennung).catch(function () { return null; }) : Promise.resolve(null);
+      return Promise.all([db.collection('personen').where('bosKontoId', '==', kennung).limit(2).get(), konto]).then(function (r) {
+        var snap = r[0], k = r[1];
+        if (!snap || snap.size !== 1 || (k && k.art === 'ort')) return '';
+        return db.collection('namen').doc(snap.docs[0].id).get().then(function (d) {
+          var e = d && d.exists ? (d.data() || {}) : {};
+          var rn = String(e.rufname || '').trim();
+          return (rn.length >= 1 && rn.length <= 20 && !/[{}]/.test(rn)) ? rn : '';
+        });
+      });
+    }).then(function (rn) {
+      nameLiest = false;
+      if (rn === null || pid !== profilId()) return;
+      try { var alt = speicher.lese(); speicher.schreibe(Object.assign(alt, { gruss: Object.assign({}, alt.gruss || {}, { rufname: rn, rufnameTag: tag }) })); }
+      catch (err) { meldeFehler({ speicher: true, message: (err && err.message) || String(err) }); }
+    }).catch(function (err) {
+      nameLiest = false;
+      // Bauplan §2.2: Speicher bleibt unverändert (ein schon bekannter Name bleibt). „Höchstens einmal je Schichttag“ hält ein
+      // Merker im Speicher der Seite: weitere Starts dieser Seite lesen heute nicht erneut; ein Neuladen versucht es wieder.
+      fehlVersuch[pid] = tag;
+      console.warn('[crumble] Rufname für die Begrüßung nicht lesbar', err);
+      meldeFehler({ name: true, message: (err && (err.code ? err.code + ' — ' : '') + (err.message || '')) || String(err) });
+    });
+  }
+
+  /* ---------- Tür (K61): Konto-Schalter als Gerätewert für index.html ---------- */
+  function schreibeTuer() {
+    try { localStorage.setItem('bos_crumble_tuer', an ? 'an' : 'aus'); }
+    catch (err) { meldeFehler({ speicher: true, message: (err && err.message) || String(err) }); }
   }
 
   /* ---------- Aufgaben-Regeln ---------- */
@@ -137,8 +280,9 @@ window.BOS_CRUMBLE_HOST = (function () {
     if (offen >= schwelle()) {
       if (!vielGemeldet) {
         vielGemeldet = true;
-        var verzug = Math.max(0, grussLaeuftBis - Date.now());
-        setTimeout(function () { if (figur) figur.ereignis('viel_offen', { n: offen }); }, verzug);
+        // Stufe 1e: das Ende der Folge kann sich nach hinten schieben (Zahl-Blase) — beim Ablauf erneut nachsehen
+        var spaeter = function () { var rest = grussLaeuftBis - Date.now(); if (rest > 0) { setTimeout(spaeter, rest); return; } if (figur) figur.ereignis('viel_offen', { n: offen }); };
+        setTimeout(spaeter, Math.max(0, grussLaeuftBis - Date.now()));
       }
     } else {
       vielGemeldet = false;
@@ -337,6 +481,7 @@ window.BOS_CRUMBLE_HOST = (function () {
   /** Ein/Aus für alles (Profil-Feld hamster) — der Hauptschalter. */
   function setzeAn(wert) {
     an = wert !== false;
+    schreibeTuer();
     if (figur) figur.an(an);
     if (window.BOS_SCREENSAVER && typeof window.BOS_SCREENSAVER.figurAn === 'function') window.BOS_SCREENSAVER.figurAn(an);
     else if (schoner) schoner.an(an);
@@ -354,6 +499,7 @@ window.BOS_CRUMBLE_HOST = (function () {
     buehne: function () { return buehne; },
     schoner: function () { return schoner; },
     /* nur für Prüfwerkzeuge */
-    _zustand: function () { return { an: an, wartetAufZahl: wartetAufZahl, vielGemeldet: vielGemeldet, letzteAufgaben: letzteAufgaben, profilId: profilId() }; }
+    _zustand: function () { return { an: an, wartetAufZahl: wartetAufZahl, vielGemeldet: vielGemeldet, letzteAufgaben: letzteAufgaben, profilId: profilId(), gruss: grussZahl, grussLaeuftBis: grussLaeuftBis }; },
+    _schichttag: function (d, ab) { return schichttag(d || new Date(), typeof ab === 'number' ? ab : 20); }
   };
 })();

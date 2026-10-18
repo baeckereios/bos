@@ -1,6 +1,6 @@
 {
   "_kommentar": "Manifest der Hamster-Figur Crumble (hamster_figur.js). Koordinaten in Anteilen 0..1 der Bilddatei. koerper = Kasten des Hamster-Koerpers ohne Schwebe-Elemente; die Figur wird ueber diesen Kasten skaliert und unten mittig verankert. Seit 17.10.2026 (Stufe 1): texte = Rolle lehrmeister (ueber die Lage, nie an den Nutzer), texte_spielplatz = Rolle spielplatz (darf albern sein; fehlt es, gilt texte). texte_mit_zahl / texte_mit_zahl_1 / texte_mit_zahl_0 mit Platzhalter {n} fuer ereignis(name, { n }). ereignisse.<name> darf ein Zustand oder eine Liste von Zustaenden sein (zufaellige Wahl). Block spielplatz: Tipp-Auswahl, Schlaf, Reaktionsanteil auf beilaeufige Ereignisse.",
-  "version": 7,
+  "version": 8,
   "stand": "2026-10-18",
   "basis_hoehe_px": 480,
   "zustaende": {
@@ -374,17 +374,6 @@
       "texte_spielplatz": [
         "Winken ist Sport. Für Hamster.",
         "Winke winke. Das war Sport für heute."
-      ],
-      "texte_mit_zahl": [
-        "Moin. {n} Aufgaben warten.",
-        "Moin. {n} offene Punkte. Nur so."
-      ],
-      "texte_mit_zahl_1": [
-        "Moin. Eine Aufgabe wartet."
-      ],
-      "texte_mit_zahl_0": [
-        "Moin. Nichts offen. Verdächtig.",
-        "Moin. Liste leer."
       ]
     },
     "eating": {
@@ -759,6 +748,552 @@
     "geschwindigkeit_px_s": 55,
     "x_start": 0.12,
     "schritt_bilder": []
+  },
+  "tuer": {
+    "_kommentar": "Stufe 1e (Anweisung Kontroll-Chat 09:49, Go 10:22): Türsteher an der Tür (index.html, bos_tuer_crumble.js). oeffnen = ein Satz ~erster_satz_ms nach dem Erscheinen (wave); tipps = danach zufällig ohne Wiederholung, Abstand tipp_abstand_s, höchstens tipps_max je Besuch (T16 gestrichen); reaktionen = auf echte Meldungen der Tür, Fall-Schlüssel aus index.html (falsch2 ab dem 2. Mal im Besuch; gesperrt: schweigt). Nach einer Eingabe ins Formular eingabe_stille_s keine Tipps. Platz: Figur zwischen min_hoehe_px und max_hoehe_px, sonst bleibt er weg. Nie Kennungen, Namen, Beispiele.",
+    "erster_satz_ms": 1000,
+    "tipp_abstand_s": [
+      20,
+      30
+    ],
+    "tipps_max": 4,
+    "eingabe_stille_s": 20,
+    "min_hoehe_px": 60,
+    "max_hoehe_px": 150,
+    "zustaende": [
+      "idle",
+      "blink",
+      "look_left",
+      "look_right",
+      "wave",
+      "raise_hand",
+      "thinking",
+      "professor",
+      "shrug",
+      "tired",
+      "worried",
+      "happy",
+      "surprised",
+      "sleep_sitting",
+      "sleep_lying"
+    ],
+    "oeffnen": [
+      {
+        "id": "T1",
+        "text": "Moin. Hier geht's rein."
+      },
+      {
+        "id": "T2",
+        "text": "Ich bin Crumble. Ich pass hier auf."
+      },
+      {
+        "id": "T3",
+        "text": "Kennung, Passwort, rein. Ich halt die Tür auf."
+      },
+      {
+        "id": "T4",
+        "text": "Na, Schicht? Dann mal rein."
+      },
+      {
+        "id": "T5",
+        "text": "Willkommen in der Backstube. Fast. Erst die Tür."
+      },
+      {
+        "id": "T6",
+        "text": "Ich bin der Türsteher. Hamster-Format."
+      },
+      {
+        "id": "T7",
+        "text": "Ohne Kennung kommt hier keiner rein. Nicht mal ich."
+      },
+      {
+        "id": "T8",
+        "text": "Moin. Ich hab extra die Krümel weggefegt."
+      }
+    ],
+    "tipps": [
+      {
+        "id": "T9",
+        "text": "Oben die Kennung, darunter das Passwort. Enter geht auch.",
+        "pose": "raise_hand"
+      },
+      {
+        "id": "T10",
+        "text": "Neu hier? Ganz unten zeige ich dir, wofür das alles gut ist. Ohne Anmeldung.",
+        "pose": "raise_hand"
+      },
+      {
+        "id": "T11",
+        "text": "Die kurzen Geschichten unten kann jeder anschauen. Auch ohne Kennung.",
+        "pose": "professor"
+      },
+      {
+        "id": "T12",
+        "text": "Passwort weg? Sag Ulf Bescheid.",
+        "pose": "thinking"
+      },
+      {
+        "id": "T13",
+        "text": "Einmal angemeldet, merkt sich das Gerät dich. Dann wink ich dich nur noch durch.",
+        "pose": "professor"
+      },
+      {
+        "id": "T14",
+        "text": "Die Handy-Ansicht ist noch in Planung. Ich übe schon mal, klein zu sein.",
+        "pose": "thinking"
+      },
+      {
+        "id": "T15",
+        "text": "Kein Netz, keine Tür. Ohne Internet komm ich auch nicht weiter.",
+        "pose": "thinking"
+      },
+      {
+        "id": "T17",
+        "text": "Beim Passwort zählen Groß- und Kleinbuchstaben. Passwort-Hamster sind pingelig.",
+        "pose": "professor"
+      },
+      {
+        "id": "T18",
+        "text": "Erst anmelden, dann Brötchen. So ist die Regel.",
+        "pose": "raise_hand"
+      }
+    ],
+    "reaktionen": {
+      "falsch": {
+        "pose": "shrug",
+        "text": "Hm. Nochmal in Ruhe?"
+      },
+      "falsch2": {
+        "pose": "thinking",
+        "text": "Kennung prüfen. Die Tippfehler verstecken sich gern da."
+      },
+      "format": {
+        "pose": "thinking",
+        "text": "Die Kennung sieht komisch aus. Leerzeichen drin?"
+      },
+      "zu_viele": {
+        "pose": "tired",
+        "text": "Kurze Pause. Ich zähl solange Brötchen."
+      },
+      "netz": {
+        "pose": "worried",
+        "text": "Kein Netz. Ich warte mit."
+      },
+      "freischalten": {
+        "pose": "raise_hand",
+        "text": "Fast drin. Ulf muss dich noch freischalten."
+      },
+      "angemeldet": {
+        "pose": "wave",
+        "text": "Rein mit dir. Gute Schicht!"
+      },
+      "gesperrt": {
+        "pose": "idle",
+        "text": ""
+      }
+    }
+  },
+  "begruessung": {
+    "_kommentar": "Stufe 1e (K67–K72): Begrüßung im Launcher bei jedem start() (Laden, Profilwechsel). Schichttag wechselt um schichttag_ab_uhr (20:00 gilt schon der Folgetag) — für „heute“ und den Wochentag-Topf; der Tageszeit-Topf geht nach der Uhr. Erster Start am Schichttag: an Mo/Fr/Sa/So (Schlüssel = Date.getDay(), 0 = Sonntag) mit wochentag_anteil aus wochentag, sonst aus tageszeit; weitere Starts: wieder_da ({mal} = Startnummer, Zeilen mit ab_start erst ab diesem Start). name = Fassung mit Rufname, genommen mit name_anteil, nur wenn ein Rufname bekannt ist. Die letzten letzte_merken Grüße je Profil kommen nicht wieder. zahl = zweite Blase nach zahl_nach_ms (erster Start immer wenn bekannt, wieder da nur n > 0); sie ersetzt wave.texte_mit_zahl*.",
+    "wochentag_anteil": 0.33,
+    "name_anteil": 0.5,
+    "zahl_nach_ms": 3500,
+    "zahl_dauer_ms": 4000,
+    "schichttag_ab_uhr": 20,
+    "letzte_merken": 5,
+    "tageszeit": {
+      "nacht": {
+        "von": 22,
+        "bis": 4,
+        "zeilen": [
+          {
+            "id": "N1",
+            "text": "Moin. Die Welt schläft, wir backen.",
+            "name": "Moin, {name}. Die Welt schläft, wir backen."
+          },
+          {
+            "id": "N2",
+            "text": "Nachtschicht. Die schönste Schicht, sagt keiner.",
+            "name": "Nachtschicht, {name}. Die schönste Schicht, sagt keiner."
+          },
+          {
+            "id": "N3",
+            "text": "Da bist du ja. Der Ofen hat schon gefragt.",
+            "name": "Da bist du ja, {name}. Der Ofen hat schon gefragt."
+          },
+          {
+            "id": "N4",
+            "text": "Gute Nacht? Nicht hier. Guten Teig!"
+          },
+          {
+            "id": "N5",
+            "text": "Leise rein. Der Sauerteig schläft noch.",
+            "name": "Leise, {name}. Der Sauerteig schläft noch."
+          },
+          {
+            "id": "N6",
+            "text": "Schön, dass du da bist. Ehrlich. Um die Uhrzeit zählt das doppelt.",
+            "name": "Schön, dass du da bist, {name}. Um die Uhrzeit zählt das doppelt."
+          },
+          {
+            "id": "N7",
+            "text": "Kaffee steht? Dann kann's losgehen.",
+            "name": "Kaffee steht, {name}? Dann los."
+          },
+          {
+            "id": "N8",
+            "text": "Draußen dunkel, drinnen warm. Gute Wahl."
+          },
+          {
+            "id": "N9",
+            "text": "Die Brötchen backen sich nicht allein. Ich hab's versucht."
+          },
+          {
+            "id": "N10",
+            "text": "Eulen-Schicht. Willkommen im Club.",
+            "name": "Willkommen im Eulen-Club, {name}."
+          },
+          {
+            "id": "N11",
+            "text": "Mitternacht ist auch nur eine Uhrzeit. Mit Mehl."
+          },
+          {
+            "id": "N12",
+            "text": "Die Stadt schläft. Morgen isst sie, was du heute backst."
+          },
+          {
+            "id": "N13",
+            "text": "Moin. Ich hab die Krümel gezählt. Alle da.",
+            "name": "Moin, {name}. Krümel gezählt. Alle da."
+          },
+          {
+            "id": "N14",
+            "text": "Auf eine ruhige Nacht. Und einen heißen Ofen."
+          },
+          {
+            "id": "N15",
+            "text": "Tag 1 der Woche oder Tag 6? Egal, Hauptsache Teig."
+          }
+        ]
+      },
+      "frueh": {
+        "von": 4,
+        "bis": 9,
+        "zeilen": [
+          {
+            "id": "F1",
+            "text": "Guten Morgen. Die ersten Brötchen sind schon weg.",
+            "name": "Guten Morgen, {name}. Die ersten Brötchen sind schon weg."
+          },
+          {
+            "id": "F2",
+            "text": "Morgen! Der Laden wartet schon.",
+            "name": "Morgen, {name}! Der Laden wartet."
+          },
+          {
+            "id": "F3",
+            "text": "Frühschicht. Die Nachtschicht hat was übrig gelassen. Vielleicht."
+          },
+          {
+            "id": "F4",
+            "text": "Moin. Riecht nach frischem Brot. Das waren wir.",
+            "name": "Moin, {name}. Riecht nach frischem Brot. Das waren wir."
+          },
+          {
+            "id": "F5",
+            "text": "Guten Morgen. Ich bin seit drei Uhr wach. Freiwillig nicht."
+          },
+          {
+            "id": "F6",
+            "text": "Erster Kaffee oder zweiter? Ich frag ja nur."
+          },
+          {
+            "id": "F7",
+            "text": "Moin. Heute wird ein guter Tag. Sagt der Hamster.",
+            "name": "Moin, {name}. Heute wird ein guter Tag."
+          },
+          {
+            "id": "F8",
+            "text": "Der Ofen ist warm, die Theke voll. Fast."
+          },
+          {
+            "id": "F9",
+            "text": "Guten Morgen! Die Kundschaft steht schon vor der Tür."
+          },
+          {
+            "id": "F10",
+            "text": "Moin. Ich hab extra gelächelt. Siehst du?",
+            "name": "Moin, {name}. Extra gelächelt. Siehst du?"
+          },
+          {
+            "id": "F11",
+            "text": "Schicht beginnt. Ich zähl mit."
+          },
+          {
+            "id": "F12",
+            "text": "Guten Morgen. Hast du gut geschlafen? Ich nicht.",
+            "name": "Guten Morgen, {name}. Gut geschlafen?"
+          }
+        ]
+      },
+      "vormittag": {
+        "von": 9,
+        "bis": 12,
+        "zeilen": [
+          {
+            "id": "V1",
+            "text": "Guten Vormittag. Halbzeit ist noch nicht, aber bald.",
+            "name": "Guten Vormittag, {name}. Halbzeit kommt bald."
+          },
+          {
+            "id": "V2",
+            "text": "Moin. Zweites Frühstück schon gehabt?",
+            "name": "Moin, {name}. Zweites Frühstück schon?"
+          },
+          {
+            "id": "V3",
+            "text": "Da bist du. Ich hab dich vermisst. Ein bisschen."
+          },
+          {
+            "id": "V4",
+            "text": "Guten Vormittag. Die Brezeln sind raus, die Laune ist drin."
+          },
+          {
+            "id": "V5",
+            "text": "Vormittags bin ich am klügsten. Frag mich was. Nein, lieber nicht."
+          },
+          {
+            "id": "V6",
+            "text": "Hallo! Alles ruhig hier. Noch.",
+            "name": "Hallo, {name}! Alles ruhig. Noch."
+          },
+          {
+            "id": "V7",
+            "text": "Schön, dass du reinschaust.",
+            "name": "Schön, dass du reinschaust, {name}."
+          },
+          {
+            "id": "V8",
+            "text": "Moin. Die Liste ist da, ich auch."
+          }
+        ]
+      },
+      "tag": {
+        "von": 12,
+        "bis": 18,
+        "zeilen": [
+          {
+            "id": "D1",
+            "text": "Mahlzeit!",
+            "name": "Mahlzeit, {name}!"
+          },
+          {
+            "id": "D2",
+            "text": "Guten Tag. Ich hab gerade gegessen. Krümel.",
+            "name": "Guten Tag, {name}. Ich hab gegessen. Krümel."
+          },
+          {
+            "id": "D3",
+            "text": "Hallo. Der Nachmittag gehört den Konditoren."
+          },
+          {
+            "id": "D4",
+            "text": "Moin am Mittag. Gibt's das? Jetzt schon."
+          },
+          {
+            "id": "D5",
+            "text": "Hallo! Hier wird schon für morgen geplant.",
+            "name": "Hallo, {name}! Hier wird schon für morgen geplant."
+          },
+          {
+            "id": "D6",
+            "text": "Mittagstief? Nicht bei mir. Ich bin ein Hamster."
+          },
+          {
+            "id": "D7",
+            "text": "Guten Tag. Kuchen ist auch da. Irgendwo."
+          },
+          {
+            "id": "D8",
+            "text": "Schön, dich zu sehen. Mitten am Tag sogar.",
+            "name": "Schön, dich zu sehen, {name}."
+          },
+          {
+            "id": "D9",
+            "text": "Hallo. Die Vorbestellungen schreiben sich nicht von allein."
+          },
+          {
+            "id": "D10",
+            "text": "Tag! Ich hab die Torte nur angeguckt. Ehrlich."
+          }
+        ]
+      },
+      "abend": {
+        "von": 18,
+        "bis": 22,
+        "zeilen": [
+          {
+            "id": "A1",
+            "text": "Guten Abend. Gleich fängt die Nacht an.",
+            "name": "Guten Abend, {name}. Gleich fängt die Nacht an."
+          },
+          {
+            "id": "A2",
+            "text": "N'Abend. Die Planung für morgen ruft.",
+            "name": "N'Abend, {name}. Die Planung ruft."
+          },
+          {
+            "id": "A3",
+            "text": "Abends noch hier? Respekt.",
+            "name": "Abends noch hier, {name}? Respekt."
+          },
+          {
+            "id": "A4",
+            "text": "Guten Abend. Ich mach gleich die Augen zu. Gleich."
+          },
+          {
+            "id": "A5",
+            "text": "Feierabend für die einen, Vorteig für die anderen."
+          },
+          {
+            "id": "A6",
+            "text": "Guten Abend. Der Teig für morgen dankt."
+          },
+          {
+            "id": "A7",
+            "text": "N'Abend. Ich hab die Tür offen gelassen. Für dich.",
+            "name": "N'Abend, {name}. Tür ist offen."
+          },
+          {
+            "id": "A8",
+            "text": "Hallo. Die Nacht kommt, ich bin bereit. Fast."
+          }
+        ]
+      }
+    },
+    "wochentag": {
+      "1": [
+        {
+          "id": "W1",
+          "text": "Montag. Ich sag nichts. Du weißt Bescheid."
+        },
+        {
+          "id": "W2",
+          "text": "Neue Woche, neuer Teig. Alter Hamster."
+        },
+        {
+          "id": "W3",
+          "text": "Montag. Der Sauerteig hatte ein ruhiges Wochenende. Wir nicht."
+        }
+      ],
+      "5": [
+        {
+          "id": "W4",
+          "text": "Freitag! Fast geschafft. Fast."
+        },
+        {
+          "id": "W5",
+          "text": "Freitag. Morgen ist Samstag. Samstag ist Brötchentag."
+        },
+        {
+          "id": "W6",
+          "text": "Freitag. Die Woche war lang. Die Liste auch."
+        }
+      ],
+      "6": [
+        {
+          "id": "W7",
+          "text": "Samstag. Die ganze Stadt will Brötchen. Alle. Gleichzeitig."
+        },
+        {
+          "id": "W8",
+          "text": "Samstag. Ich hab Kraft getankt. Und Kohlenhydrate."
+        }
+      ],
+      "0": [
+        {
+          "id": "W9",
+          "text": "Sonntag. Andere schlafen aus. Wir backen ihr Frühstück."
+        },
+        {
+          "id": "W10",
+          "text": "Sonntagsschicht. Dafür gibt's Kuchen. Hoffentlich."
+        },
+        {
+          "id": "W11",
+          "text": "Sonntag. Leise reden, die Stadt schläft noch."
+        }
+      ]
+    },
+    "wieder_da": [
+      {
+        "id": "R1",
+        "text": "Wieder da?",
+        "name": "Wieder da, {name}?"
+      },
+      {
+        "id": "R2",
+        "text": "Ah, du. Schön.",
+        "name": "Ah, {name}. Schön."
+      },
+      {
+        "id": "R3",
+        "text": "Nochmal hallo."
+      },
+      {
+        "id": "R4",
+        "text": "Vergessen, was du wolltest? Passiert mir auch."
+      },
+      {
+        "id": "R5",
+        "text": "Da bist du ja wieder.",
+        "name": "Da bist du ja wieder, {name}."
+      },
+      {
+        "id": "R6",
+        "text": "Schon zurück? Ich hab mich nicht mal hingesetzt."
+      },
+      {
+        "id": "R7",
+        "text": "Hallo again. Wie man im Englischen sagt. Glaube ich."
+      },
+      {
+        "id": "R8",
+        "text": "Zum {mal}. Mal heute. Ich führe Strichliste.",
+        "ab_start": 3
+      },
+      {
+        "id": "R9",
+        "text": "{mal}. Mal heute. Wir sind ja quasi Kollegen.",
+        "ab_start": 3
+      },
+      {
+        "id": "R10",
+        "text": "{mal}. Mal. Ich fang an, dich zu mögen.",
+        "ab_start": 3
+      },
+      {
+        "id": "R11",
+        "text": "Kurz reinschauen? Ich guck mit."
+      },
+      {
+        "id": "R12",
+        "text": "Huch. Ich hab gerade nicht aufgepasst."
+      }
+    ],
+    "zahl": {
+      "mehr": [
+        "{n} Aufgaben warten.",
+        "{n} offene Punkte. Nur so."
+      ],
+      "eins": [
+        "Eine Aufgabe wartet."
+      ],
+      "null": [
+        "Nichts offen. Verdächtig.",
+        "Liste leer."
+      ]
+    }
   },
   "nummern": {
     "alchemist": {

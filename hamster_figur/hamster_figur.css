@@ -1,5 +1,5 @@
 /* hamster_figur.css — Crumble, Hamster-Figur (Maskottchen, #62). Nutzt BOS-Design-Tokens mit Fallbacks.
-   Stand 18.10.2026, 09:24 Uhr (Nacharbeit 6: K55 Trefffläche im Schoner-Auftritt = Körperkasten, .bosss__buehne). Vorher 06:23 (Nachtrag 6: hf-knopf-host--tray K48, .bosss__buehne für den Schoner-Auftritt T9). Vorher 02:41 (Nachtrag 5: hf--schreibtisch .hf__blase pointer-events none K46). Vorher 17.10., 13:49 (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
+   Stand 18.10.2026, 11:43 Uhr (Stufe 1e: .bos-tuer-buehne, .hf--tuer — Türsteher). Vorher 09:24 (Nacharbeit 6: K55 Trefffläche im Schoner-Auftritt = Körperkasten, .bosss__buehne). Vorher 06:23 (Nachtrag 6: hf-knopf-host--tray K48, .bosss__buehne für den Schoner-Auftritt T9). Vorher 02:41 (Nachtrag 5: hf--schreibtisch .hf__blase pointer-events none K46). Vorher 17.10., 13:49 (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
    hf--laeuft / hf--links / hf--zieht (K27/K28, Watscheln und Spiegeln aus der Demo des Kontroll-Chats), Blase mit
    festen Farben für hell UND dunkel, über dem Kopf mit Spitze nach unten (K24, hf--blase-oben; hf--hell entfällt),
    Requisiten-Ebene .hf__req-ebene/.hf__req und die Choreografien hf-ch-* (Requisiten) / hf-fig-* (Figur) für die
@@ -120,6 +120,18 @@
 .bosss__buehne .hf__koerper, .bosss__buehne .hf__blase { pointer-events: none; }   /* Tipp auf die Blase = neben Crumble → Schoner schließt */
 .bosss__buehne .hf--container { bottom: 0; }   /* in der Bühne steht er auf deren Kante, nicht 24 px über dem Schoner-Rand */
 .bosss__buehne--out { opacity: 0; }
+
+/* Stufe 1e: Türsteher an der Tür (index.html, bos_tuer_crumble.js). Bühne setzt das Skript (fixed, Lage aus der Platzregel).
+   Blase so breit wie die Bühne erlaubt (--tuer-blase-max) und in der Schrift des Schreibtischs — die Container-Blase wäre 320 px
+   breit und lag im Prototyp bei 860×420 über Kennung und Passwort. Trefffläche = Körperkasten (K46/K55), Blase lässt durch. */
+.bos-tuer-buehne { position: fixed; pointer-events: none; z-index: 5; transition: opacity .3s ease; }
+.bos-tuer-buehne--weg { opacity: 0; visibility: hidden; transition: opacity .3s ease, visibility 0s linear .3s; }   /* weg = auch nicht antippbar */
+.bos-tuer-buehne .hf--container { bottom: 0; }
+.hf--container.hf--tuer .hf__blase { max-width: var(--tuer-blase-max, 260px); font-size: var(--bos-font-sm, .9rem); }
+.hf--tuer { pointer-events: none; }
+.hf--tuer .hf__figur { pointer-events: auto; }
+.hf--tuer .hf__bild, .hf--tuer .hf__req-ebene, .hf--tuer .hf__ausr, .hf--tuer .hf__koerper, .hf--tuer .hf__blase { pointer-events: none; }
+.hf--tuer.hf--ohne-tipp .hf__figur { pointer-events: none; }   /* Z3: Körperkasten unter 40 px breit → kein Tipp auf Crumble */
 
 /* Konfetti (Geburtstag) */
 .hf__konfetti { position: absolute; top: -20px; width: 8px; height: 12px; animation: hf-fall 2.4s linear forwards; pointer-events: none; }

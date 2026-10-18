@@ -38,6 +38,18 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-10-18 · 11:43 · Türsteher Crumble (#62 Stufe 1e; Anweisung Kontroll-Chat
+      09:49, Bauplan 10:06, Go 10:22) · Feature
+      Crumble steht neben dem Formular, sagt einen Satz, gibt ein paar Tipps und
+      reagiert auf die Meldungen der Tür. Die ganze Logik steckt in
+      bos_tuer_crumble.js; diese Seite (1) lädt sie nach 'load' im Leerlauf nach
+      (nie im Anmeldeweg, kein await; aus, wenn localStorage bos_crumble_tuer
+      = 'aus'), (2) meldet ihr über crumbleFall(schlüssel) die Fälle aus
+      fallAusCode() bzw. der auslösenden Stelle, (3) setzt beim Durchwinken
+      BOS_TUER_ZUSTAND.durchwinken. Fehlt Crumble oder wirft er: ein
+      console.warn, die Tür bleibt wie sie war (F1, Ulf: keine sichtbare
+      Meldung). anmelden(), weiter(), zielPfad() sonst unverändert.
+      SESSION_2026-10-18_CRUMBLE_STUFE1E_TUER_BEGRUESSUNG_BAU.md
     2026-10-15 · 19:56 · Farbprofile Stufe B (#72) · Einbindung
       bos_farbprofile.js vor bos_konto_profil.js, damit der Profileintrag
       das wirksame Farbprofil trägt. Sonst nichts; die Tür bleibt Honig.
@@ -594,6 +606,27 @@
     }
   }
 
+  /* --- Türsteher Crumble (18.10.2026, #62 Stufe 1e) ----------------
+     Nur Schmuck: jeder Aufruf ist eingepackt und tut ohne Crumble nichts.
+     Fall-Schlüssel kommen aus dem Firebase-Code bzw. der auslösenden Stelle,
+     nie aus dem Meldungstext. Der Lader steht ganz unten. */
+  window.BOS_TUER_ZUSTAND = window.BOS_TUER_ZUSTAND || {};
+  function crumbleFall(schluessel) {
+    try { if (schluessel && window.BOS_TUER_CRUMBLE) window.BOS_TUER_CRUMBLE.fall(schluessel); } catch (e) {}
+  }
+  function fallAusCode(fehler) {
+    switch ((fehler && fehler.code) || '') {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found':         return 'falsch';
+      case 'auth/invalid-email':          return 'format';
+      case 'auth/user-disabled':          return 'gesperrt';
+      case 'auth/too-many-requests':      return 'zu_viele';
+      case 'auth/network-request-failed': return 'netz';
+      default:                            return '';   // unbekannt: er schweigt
+    }
+  }
+
   /* --- Weiterleitungsziel ----------------------------------------- */
   /* Nur seiteneigene, relative Pfade. Ein absoluter oder fremder Wert
      würde die Seite zu einem offenen Weiterleiter machen. */
@@ -675,6 +708,7 @@
         if (ergebnis && ergebnis.geladen && ergebnis.kontoVorhanden && ergebnis.freigeschaltet === false) {
           zeigeMeldung('Noch nicht freigeschaltet — dein Konto ist angelegt, aber noch nicht aktiv. ' +
                        'Sag Ulf Bescheid.', 'hinweis');
+          crumbleFall('freischalten');
           setTimeout(los, 2600);
           return;
         }
@@ -742,6 +776,7 @@
         'fehler',
         'Zeitausfall nach ' + (GEDULD_MS / 1000) + ' Sekunden. Adresse: ' + adresse
       );
+      crumbleFall('netz');
     }, GEDULD_MS);
 
     firebase.auth().signInWithEmailAndPassword(adresse, passwort)
@@ -749,6 +784,7 @@
         if (fertig) return;   /* Zeitausfall war schneller — nicht überschreiben */
         fertig = true; clearTimeout(uhr);
         zeigeMeldung('Angemeldet. Einen Moment …', 'laeuft');
+        crumbleFall('angemeldet');
         weiter();
       })
       .catch(function (fehler) {
@@ -762,6 +798,7 @@
           'fehler',
           (fehler && fehler.code ? fehler.code + ' — ' : '') + ((fehler && fehler.message) || String(fehler))
         );
+        crumbleFall(fallAusCode(fehler));
         passwortFeld.focus();
       });
   }
@@ -813,6 +850,8 @@
       if (nutzer) {
         var wer = nutzer.email || (nutzer.isAnonymous ? 'anonyme Sitzung (alter Stand)' : nutzer.uid);
         zeigeMeldung('Angemeldet als ' + wer + '. Weiter zum Launcher …', 'laeuft');
+        window.BOS_TUER_ZUSTAND.durchwinken = true;
+        crumbleFall('durchwinken');
         btn.disabled = true;
         kennungFeld.disabled = true;
         passwortFeld.disabled = true;
@@ -850,6 +889,27 @@
   } else {
     beobachteAnmeldung();
   }
+
+  /* --- Türsteher nachladen (18.10.2026, #62 Stufe 1e) -------------
+     Erst nach 'load' und im Leerlauf, als async-Skript — das Formular ist
+     längst bedienbar. Aus, wenn das letzte Konto an diesem Gerät Crumble
+     ausgeschaltet hatte (Gerätewert vom Launcher). Ladefehler: ein Hinweis
+     in der Konsole, sonst nichts. */
+  try {
+    var ladeTuerCrumble = function () {
+      try { if (window.localStorage && localStorage.getItem('bos_crumble_tuer') === 'aus') return; } catch (e) { /* Speicher gesperrt: an */ }
+      var s = document.createElement('script');
+      s.src = 'bos_tuer_crumble.js';
+      s.async = true;
+      s.onerror = function () { console.warn('[tuer-crumble] bos_tuer_crumble.js nicht ladbar — die Tür läuft ohne Crumble.'); };
+      document.body.appendChild(s);
+    };
+    var spaeter = function () {
+      if (window.requestIdleCallback) window.requestIdleCallback(ladeTuerCrumble, { timeout: 1500 });
+      else setTimeout(ladeTuerCrumble, 600);
+    };
+    if (document.readyState === 'complete') spaeter(); else window.addEventListener('load', spaeter);
+  } catch (e) { console.warn('[tuer-crumble] Lader', e); }
 })();
 </script>
 
