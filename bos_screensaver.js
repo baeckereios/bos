@@ -57,7 +57,26 @@
    Schoner über jemanden, der gerade mit ihm spielt). Hinweistext dann
    "Neben Crumble tippen".
 
+   SPRUCH ODER CRUMBLE (NEU 18.10.2026, Nachtrag 6, K54; Ulf 04:11): Jeder
+   10-s-Wechsel ist ENTWEDER ein Spruch wie bisher (ohne Figur) ODER ein
+   Crumble-Auftritt: Figur mittig auf einer eigenen Bühne (.bosss__buehne,
+   Unterkante bei --bosss-fuss = 38 % Bildschirmhöhe), Label und Text leer,
+   eine Nummer (ihr Spruch in der Blase) oder mit spielplatz.auftritt_pose_anteil
+   eine Spielplatz-Pose. Anteil der Auftritte spielplatz.auftritt_anteil (0,35),
+   nie zwei hintereinander. Die beiläufigen schoner_*-Reaktionen auf Sprüche
+   entfallen (er ist dann nicht da); Schlaf im Schoner entfällt (Fabrik gibt
+   schlaf:false). Größe je Gerät über setzeFigurGroesse(px), 0 = aus (Schoner
+   wie vor Crumble: nur Sprüche, "Tippen zum Fortfahren", jeder Tipp schließt).
+   Konto-Aus (figurAn) bleibt der Hauptschalter. Zeiten 3 min / 10 s und Ebene
+   1850 unverändert. Z1 (Go 04:23): die Schoner-Figur hat keinen speicher —
+   sichtbar/x je Wechsel landen nie im Gerätespeicher.
+
    CHANGELOG
+     2026-10-18 · 06:23 · Nachtrag 6 (K50/K54, Bau-Chat; Bauplan 04:21, Go 04:23):
+       Auftritte statt Figur-daneben, Bühne .bosss__buehne, setzeFigurGroesse(),
+       Hinweistext je Wechsel, Prüfhaken _wechsel()/_auftritte()/_letzterWechsel()/_rotation().
+       auftritt_anteil = Anteil aller Wechsel (Würfel p = a/(1−a) nach einem Spruch); erster
+       Auftritt wartet auf den Aufbau der Figur (N6-8).
      2026-10-17 · 06:49 · Crumble Stufe 1 (K9, Bau-Chat; Anweisung
        Kontroll-Chat 06:00): setzeFigur(), figurAn(), Ausnahme in
        onActivity(), Hinweistext, Ereignis je Inhalt. Zeiten 3 min / 10 s
@@ -90,18 +109,49 @@
   var figurFabrik = null;   // vom Host über setzeFigur() gestellt
   var figur = null;         // Instanz, lazy beim ersten show()
   var figurAn = true;       // Profil-Feld hamster (fehlt = an)
+  var figurPx = null;       // T6 (Nachtrag 6): Größe je Gerät (px), 0 = aus, null = Vorgabe der Fabrik
   var HINT_OHNE = 'Tippen zum Fortfahren';
   var HINT_MIT = 'Neben Crumble tippen';
-  function figurDa() { return !!(figur && figurAn && figur.istAn && figur.istAn()); }
+  var auftritt = false, letzterWarAuftritt = false, zaehlAuftritte = 0, zaehlWechsel = 0, auftrittTimer = null;   // T8
+  function figurDa() { return !!(figur && figurAn && figurPx !== 0 && figur.istAn && figur.istAn()); }
   function holeFigur() {
     if (figur || !figurFabrik) return figur;
-    try { figur = figurFabrik(root) || null; }
+    try { figur = figurFabrik(buehne) || null; if (figur && figurPx) figur.setzeGroesse(figurPx); }
     catch (e) { console.error('BOS_SCREENSAVER: Figur konnte nicht angelegt werden', e); figur = null; figurFabrik = null; }
     return figur;
   }
   function setzeHint() {
     var h = root.querySelector('.bosss__hint');
-    if (h) h.textContent = figurDa() ? HINT_MIT : HINT_OHNE;
+    if (h) h.textContent = (figurDa() && auftritt) ? HINT_MIT : HINT_OHNE;
+  }
+  function sp() { var m = figur && figur.manifest ? figur.manifest() : null; return (m && m.spielplatz) || {}; }
+  function zufall(liste) { return liste[Math.floor(Math.random() * liste.length)]; }
+  /* Auftritt: Figur mittig, Nummer (oder Pose). Spruch: Figur weg. */
+  function figurZeigen(ja) {
+    if (!figur) return;
+    var tu = function () {
+      try {
+        if (ja) { if (!visible || !auftritt) return; figur.sichtbar(true, true); figur.setzeX(0.5, true); }
+        else { figur.sichtbar(false, true); }
+      } catch (e) { console.warn('BOS_SCREENSAVER: Figur zeigen', e); }
+    };
+    // N6-8: beim allerersten Schoner ist die Figur noch im Aufbau (Manifest lädt) — setzeX vor dem Aufbau verpuffte (Figur bei x_start)
+    if (figur.wurzel && figur.wurzel()) tu(); else if (figur.bereit) figur.bereit.then(tu);
+  }
+  function starteAuftritt() {
+    if (auftrittTimer) { clearTimeout(auftrittTimer); auftrittTimer = null; }
+    figurZeigen(true);
+    auftrittTimer = setTimeout(function () {
+      auftrittTimer = null;
+      if (!visible || !auftritt || !figurDa()) return;
+      if (!(figur.manifest && figur.manifest())) { if (figur.bereit) figur.bereit.then(function () { if (visible && auftritt && figurDa()) starteAuftritt(); }); return; }   // N6-8: erst nach dem Aufbau spielen
+      try {
+        var poseAnteil = typeof sp().auftritt_pose_anteil === 'number' ? sp().auftritt_pose_anteil : 0.25;
+        var posen = sp().tippZustaende || [];
+        if (posen.length && Math.random() < poseAnteil) figur.zeige(zufall(posen));
+        else if (!figur.nummer()) { if (posen.length) figur.zeige(zufall(posen)); }
+      } catch (e) { console.warn('BOS_SCREENSAVER: Auftritt', e); }
+    }, 300);
   }
 
   /* ---------- Style injizieren ---------- */
@@ -149,25 +199,40 @@
   var contentEl = document.getElementById('bosssContent');
   var labelEl = document.getElementById('bosssLabel');
   var textEl = document.getElementById('bosssText');
+  // T9 (Nachtrag 6): Bühne für den Auftritt — Stil in hamster_figur.css (.bosss__buehne), Fuß-Höhe --bosss-fuss
+  var buehne = document.createElement('div');
+  buehne.className = 'bosss__buehne';
+  root.appendChild(buehne);
 
   /* ---------- Inhalt wählen/anzeigen ---------- */
   function renderContent(crossfade) {
     var entries = window.BOS_SCREENSAVER_CONTENT || [];
     if (!entries.length) return;
-    var idx;
-    do { idx = Math.floor(Math.random() * entries.length); }
-    while (entries.length > 1 && idx === lastIndex);
-    lastIndex = idx;
-    var entry = entries[idx];
-
+    // T8 (Nachtrag 6, K54): Spruch ODER Crumble — Auftritt mit spielplatz.auftritt_anteil, nie zwei hintereinander, nie ohne Figur
+    zaehlWechsel++;
+    // auftritt_anteil ist der ANTEIL ALLER WECHSEL, der Auftritte sind. Weil nie zwei aufeinander folgen, wird nur nach einem
+    // Spruch gewürfelt — mit p = a/(1−a), damit der gemessene Anteil a trifft (0,35 → p 0,54; mit p = a käme nur a/(1+a) = 0,26 heraus).
+    var anteil = typeof sp().auftritt_anteil === 'number' ? sp().auftritt_anteil : 0.35;
+    var p = anteil >= 0.5 ? 1 : anteil / (1 - anteil);
+    var neuAuftritt = figurDa() && !letzterWarAuftritt && Math.random() < p;
+    var entry = null;
+    if (!neuAuftritt) {
+      var idx;
+      do { idx = Math.floor(Math.random() * entries.length); }
+      while (entries.length > 1 && idx === lastIndex);
+      lastIndex = idx;
+      entry = entries[idx];
+    }
     function apply() {
-      labelEl.textContent = LABELS[entry.kategorie] || '';
-      textEl.textContent = entry.text;
-      // 17.10.2026: Crumble reagiert auf den Inhalt — beiläufig (darf auslassen, schläft durch)
-      if (figurDa()) { try { figur.ereignis('schoner_' + entry.kategorie, { beilaeufig: true }); } catch (e) { console.warn('BOS_SCREENSAVER: Figur-Ereignis', e); } }
+      auftritt = neuAuftritt; letzterWarAuftritt = neuAuftritt;
+      if (neuAuftritt) { zaehlAuftritte++; labelEl.textContent = ''; textEl.textContent = ''; starteAuftritt(); }
+      else { labelEl.textContent = LABELS[entry.kategorie] || ''; textEl.textContent = entry.text; if (auftrittTimer) { clearTimeout(auftrittTimer); auftrittTimer = null; } figurZeigen(false); }
+      setzeHint();
+      buehne.classList.remove('bosss__buehne--out');
     }
     if (crossfade) {
       contentEl.classList.add('bosss__content--out');
+      buehne.classList.add('bosss__buehne--out');
       setTimeout(function () {
         apply();
         contentEl.classList.remove('bosss__content--out');
@@ -180,9 +245,9 @@
   /* ---------- Anzeigen / Verbergen ---------- */
   function show() {
     visible = true;
-    // 17.10.2026: Figur lazy anlegen, dann ein/aus nach Profil (vor dem ersten Inhalt, damit er reagieren kann)
-    if (holeFigur()) { try { figur.an(figurAn); } catch (e) { console.warn('BOS_SCREENSAVER: figur.an', e); } }
-    setzeHint();
+    letzterWarAuftritt = false; auftritt = false;
+    // 17.10.2026: Figur lazy anlegen, dann ein/aus nach Profil; T8: versteckt starten, der Wechsel entscheidet
+    if (holeFigur()) { try { figur.an(figurAn && figurPx !== 0); figur.sichtbar(false, true); } catch (e) { console.warn('BOS_SCREENSAVER: figur.an', e); } }
     renderContent(false);
     root.classList.add('bosss--visible');
     rotateTimer = setInterval(function () { renderContent(true); }, ROTATE_INTERVAL_MS);
@@ -191,6 +256,8 @@
     visible = false;
     root.classList.remove('bosss--visible');
     if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+    if (auftrittTimer) { clearTimeout(auftrittTimer); auftrittTimer = null; }
+    auftritt = false;
     if (figur) { try { figur.an(false); } catch (e) { console.warn('BOS_SCREENSAVER: figur.an(false)', e); } }   // 17.10.2026: Timer aus
     armIdleTimer();
   }
@@ -234,12 +301,23 @@
       if (figur && figur.zerstoere) { try { figur.zerstoere(); } catch (e) {} }
       figur = null;
       figurFabrik = typeof fabrikFn === 'function' ? fabrikFn : null;
-      if (visible) { holeFigur(); if (figur) figur.an(figurAn); setzeHint(); }
+      if (visible) { holeFigur(); if (figur) { figur.an(figurAn && figurPx !== 0); figur.sichtbar(auftritt, true); } setzeHint(); }
     },
     /* 17.10.2026 (Crumble): Ein/Aus aus dem Profil (Feld hamster; fehlt = an). Wirkt sofort. */
     figurAn: function (wert) {
       figurAn = wert !== false;
-      if (figur && visible) { try { figur.an(figurAn); } catch (e) {} }
+      if (figur && visible) { try { figur.an(figurAn && figurPx !== 0); if (!figurAn) { auftritt = false; } } catch (e) {} }
+      setzeHint();
+    },
+    /* T6 (Nachtrag 6, K50): Größe der Schoner-Figur in px je Gerät; 0 = aus (nie Auftritte, Schoner wie vor Crumble). */
+    setzeFigurGroesse: function (px) {
+      figurPx = (px === 0 || px === '0' || px === 'aus') ? 0 : (Number(px) > 0 ? Number(px) : null);
+      if (figur) {
+        try {
+          if (figurPx) figur.setzeGroesse(figurPx);
+          if (visible) { figur.an(figurAn && figurPx !== 0); if (figurPx === 0) auftritt = false; }
+        } catch (e) { console.warn('BOS_SCREENSAVER: setzeFigurGroesse', e); }
+      }
       setzeHint();
     },
     /* nur für Prüfwerkzeuge (Playwright, kein Produktivaufrufer): Figur lesen, Sichtbarkeit lesen,
@@ -247,6 +325,12 @@
     _figur: function () { return figur; },
     _sichtbar: function () { return visible; },
     _letzteAktivitaet: function () { return letzteAktivitaet; },
-    _zeigeJetzt: function () { if (started && !visible) { if (idleTimer) clearTimeout(idleTimer); show(); } }
+    _zeigeJetzt: function () { if (started && !visible) { if (idleTimer) clearTimeout(idleTimer); show(); } },
+    /* Nachtrag 6, nur Prüfwerkzeuge: nächster Wechsel sofort (ohne Überblendung), Zähler, letzter Wechsel */
+    _wechsel: function () { if (visible) renderContent(false); },
+    _auftritte: function () { return { auftritte: zaehlAuftritte, wechsel: zaehlWechsel }; },
+    _letzterWechsel: function () { return auftritt ? 'auftritt' : 'spruch'; },
+    _buehne: function () { return buehne; },
+    _rotation: function (ja) { if (!visible) return; if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; } if (ja !== false) rotateTimer = setInterval(function () { renderContent(true); }, ROTATE_INTERVAL_MS); }   // Messung: 10-s-Wechsel anhalten/fortsetzen
   };
 })();

@@ -19,6 +19,18 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-18 · 06:23 · v3.5 · Feature (Crumble #62 Nachtrag 6: Größe, Knopf in der Leiste;
+      Anweisung Kontroll-Chat 04:12/04:16, Bauplan 04:21, Go 04:23)
+      - BOS_CRUMBLE_HOST.start() bekommt tray: #taskbarTray statt topbar/vor —
+        der Knopf sitzt unten rechts vor ⚙️ und 🌙 (Ulf 04:04: oben fehl am Platz).
+      - Einstellungen „🐹 Crumble“: unter An/Aus (Konto) die Zeilen „Auf diesem
+        Gerät“ Schreibtisch Aus/50/75/100 und Bildschirmschoner Aus/50/75/100
+        (Stufen-Knöpfe wie Kachelgröße, kein Regler) → BOS_CRUMBLE_HOST.setzeGroesse/
+        setzeSchoner, Gerätespeicher bos_crumble_<profilId>, KEIN Profil-Sync.
+        Schreibtisch-Aus = Verstecken per Knopf (ein Zustand; Fenster hört auf
+        hamster-figur:sichtbar). Speicherfehler mit err.message in der Zeile
+        crumble-fehler. Hinweistext settings.hamsterHinweis neu (O10).
+      - Sonst nichts geändert. Siehe SESSION_2026-10-18_CRUMBLE_NACHTRAG6_GROESSE_LEISTE_SCHONER_BAU.md.
     2026-10-17 · 09:37 · v3.4 · Feature (Crumble #62 Stufe 1c, Schreibtisch-Crumble; Anweisung
       Kontroll-Chat 09:00, Bauplan 09:03, Go 09:12)
       - Eine Zeile: BOS_CRUMBLE_HOST.start() bekommt schreibtisch: #desktop. Der
@@ -868,7 +880,15 @@
     'settings.hamster': '🐹 Crumble',
     'settings.hamsterAn': 'An',
     'settings.hamsterAus': 'Aus',
-    'settings.hamsterHinweis': 'Ruf-Knopf in der Kopfleiste und Figur im Bildschirmschoner. Gilt für dieses Konto auf allen Geräten.',
+    'settings.hamsterHinweis': 'An/Aus gilt für dieses Konto auf allen Geräten. Zeigen und verstecken: Knopf unten rechts in der Leiste. Größen gelten nur für dieses Gerät.',
+    'settings.hamsterGeraet': 'Auf diesem Gerät',
+    'settings.hamsterSchreibtisch': 'Schreibtisch',
+    'settings.hamsterSchoner': 'Bildschirmschoner',
+    'settings.hamsterStufeAus': 'Aus',
+    'settings.hamsterStufe50': '50 %',
+    'settings.hamsterStufe75': '75 %',
+    'settings.hamsterStufe100': '100 %',
+    'settings.hamsterSpeicherFehler': 'Größe konnte auf diesem Gerät nicht gespeichert werden:',
     'settings.farbVorgabe': 'Vorgabe',
     'settings.farbHinweis': 'Gilt für alle Seiten. Statusfarben (Rot, Gelb, Grün) und Ausgedrucktes bleiben immer gleich.',
     'settings.syncFehler': 'Einstellungen konnten nicht gespeichert werden (bleiben auf diesem Gerät):',
@@ -1777,7 +1797,24 @@
       '<div style="color:var(--bos-text-faint);font-size:.8rem;margin-top:.35rem;">' + t('settings.farbHinweis') + '</div></div>';
   }
   /* 17.10.2026 (Crumble #62): Zeile „🐹 Crumble“ An/Aus. Feld hamster im Profil,
-     fehlt = an. Muster der Darstellungs-Knöpfe, aria-pressed zeigt den Stand. */
+     fehlt = an. Muster der Darstellungs-Knöpfe, aria-pressed zeigt den Stand.
+     18.10.2026 (Nachtrag 6, K51): darunter „Auf diesem Gerät“ — Schreibtisch
+     Aus/50/75/100 und Bildschirmschoner Aus/50/75/100, Stufen aus
+     BOS_CRUMBLE_HOST.stufen() (Gerätespeicher, kein Profil-Sync). Schreibtisch
+     „Aus“ ist derselbe Zustand wie Verstecken per Knopf; das Fenster hört auf
+     hamster-figur:sichtbar und zieht nach. Speicherfehler (localStorage) stehen
+     mit err.message in der Zeile crumble-fehler (Projektregel). */
+  var crumbleFehlerText = '';
+  function zeigeCrumbleFehler(text) {
+    crumbleFehlerText = text || '';
+    document.querySelectorAll('[data-role="crumble-fehler"]').forEach(function (z) {
+      z.textContent = crumbleFehlerText;
+      z.style.display = crumbleFehlerText ? '' : 'none';
+    });
+  }
+  document.addEventListener('hamster-figur:fehler', function (e) {   // z. B. Position nach dem Ziehen nicht speicherbar
+    if (e.detail && e.detail.speicher) zeigeCrumbleFehler(t('settings.hamsterSpeicherFehler') + ' ' + e.detail.message);
+  });
   function crumbleHTML() {
     var data = getActiveProfileData();
     var istAn = data.hamster !== false;
@@ -1785,10 +1822,22 @@
       return '<button class="bos-btn" data-role="hamster-' + wert + '" aria-pressed="' + (aktiv ? 'true' : 'false') + '">' + inhalt + '</button>';
     };
     var fehlt = !window.BOS_CRUMBLE_HOST || !window.BOS_HAMSTER_FIGUR;
+    var stufen = (window.BOS_CRUMBLE_HOST && window.BOS_CRUMBLE_HOST.stufen) ? window.BOS_CRUMBLE_HOST.stufen() : { schreibtisch: 75, schoner: 100 };
+    var stufenZeile = function (art, aktiv) {
+      var aus = (art === 'schreibtisch') ? aktiv === 'aus' : aktiv === 0;
+      return '<div style="display:flex;gap:.6rem;margin-top:.45rem;flex-wrap:wrap;align-items:center;">' +
+        '<span style="min-width:9rem;color:var(--bos-text-faint);font-size:.85rem;">' + t(art === 'schreibtisch' ? 'settings.hamsterSchreibtisch' : 'settings.hamsterSchoner') + '</span>' +
+        knopf(art + '-aus', t('settings.hamsterStufeAus'), aus) +
+        [50, 75, 100].map(function (st) { return knopf(art + '-' + st, t('settings.hamsterStufe' + st), !aus && aktiv === st); }).join('') +
+        '</div>';
+    };
     return '<div>' +
       '<div class="bos-label">' + t('settings.hamster') + '</div>' +
       '<div style="display:flex;gap:.6rem;margin-top:.45rem;">' + knopf('an', t('settings.hamsterAn'), istAn) + knopf('aus', t('settings.hamsterAus'), !istAn) + '</div>' +
+      '<div class="bos-label" style="margin-top:.8rem;">' + t('settings.hamsterGeraet') + '</div>' +
+      stufenZeile('schreibtisch', stufen.schreibtisch) + stufenZeile('schoner', stufen.schoner) +
       '<div style="color:var(--bos-text-faint);font-size:.8rem;margin-top:.35rem;">' + t('settings.hamsterHinweis') + '</div>' +
+      '<div data-role="crumble-fehler" style="color:var(--bos-red);font-size:.8rem;margin-top:.3rem;' + (crumbleFehlerText ? '' : 'display:none;') + '">' + escapeHtml(crumbleFehlerText) + '</div>' +
       (fehlt ? '<div style="color:var(--bos-red);font-size:.8rem;margin-top:.3rem;">Figur nicht geladen (hamster_figur/hamster_figur.js / bos_crumble_host.js) — Seite neu laden. Bleibt es, ist eine Datei noch nicht online.</div>' : '') +
       '</div>';
   }
@@ -1798,14 +1847,46 @@
     if (window.BOS_CRUMBLE_HOST) window.BOS_CRUMBLE_HOST.setzeAn(data.hamster);
     saveState();
   }
+  /* Nachtrag 6: Geräte-Stufe setzen (Host wirft bei gesperrtem localStorage → err.message sichtbar), Knöpfe nachziehen */
+  function setCrumbleStufe(art, wert, el) {
+    if (!window.BOS_CRUMBLE_HOST) return;
+    try {
+      if (art === 'schreibtisch') window.BOS_CRUMBLE_HOST.setzeGroesse(wert === 'aus' ? 'aus' : Number(wert));
+      else window.BOS_CRUMBLE_HOST.setzeSchoner(wert === 'aus' ? 0 : Number(wert));
+      zeigeCrumbleFehler('');
+    } catch (err) {
+      console.error('[crumble] Stufe speichern', err);
+      zeigeCrumbleFehler(t('settings.hamsterSpeicherFehler') + ' ' + ((err && err.message) || String(err)));
+    }
+    aktualisiereCrumbleStufen(el);
+  }
+  function aktualisiereCrumbleStufen(el) {
+    if (!window.BOS_CRUMBLE_HOST || !window.BOS_CRUMBLE_HOST.stufen) return;
+    var st = window.BOS_CRUMBLE_HOST.stufen();
+    ['schreibtisch', 'schoner'].forEach(function (art) {
+      var aktiv = st[art], aus = (art === 'schreibtisch') ? aktiv === 'aus' : aktiv === 0;
+      ['aus', 50, 75, 100].forEach(function (w) {
+        var b = el.querySelector('[data-role="hamster-' + art + '-' + w + '"]'); if (!b) return;
+        b.setAttribute('aria-pressed', (w === 'aus' ? aus : (!aus && aktiv === w)) ? 'true' : 'false');
+      });
+    });
+  }
   function attachSettingsHandlers(el) {
     ['an', 'aus'].forEach(function (wert) {
       var b = el.querySelector('[data-role="hamster-' + wert + '"]');
       if (b) b.addEventListener('click', function () {
         setHamster(wert === 'an');
-        el.querySelectorAll('[data-role^="hamster-"]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        ['an', 'aus'].forEach(function (w) { var x = el.querySelector('[data-role="hamster-' + w + '"]'); if (x) x.setAttribute('aria-pressed', w === wert ? 'true' : 'false'); });
       });
     });
+    ['schreibtisch', 'schoner'].forEach(function (art) {
+      ['aus', 50, 75, 100].forEach(function (w) {
+        var b = el.querySelector('[data-role="hamster-' + art + '-' + w + '"]');
+        if (b) b.addEventListener('click', function () { setCrumbleStufe(art, w, el); });
+      });
+    });
+    var sichtbarHandler = function () { if (document.body.contains(el)) aktualisiereCrumbleStufen(el); else document.removeEventListener('hamster-figur:sichtbar', sichtbarHandler); };
+    document.addEventListener('hamster-figur:sichtbar', sichtbarHandler);   // Knopf im Tray ⇄ Zeile „Schreibtisch“
     el.querySelector('[data-role="theme-dark"]').addEventListener('click', function () { setTheme('dark'); });
     el.querySelector('[data-role="theme-light"]').addEventListener('click', function () { setTheme('light'); });
     el.querySelector('[data-role="density-standard"]').addEventListener('click', function () { setDensity('standard'); });
@@ -2747,7 +2828,7 @@
     if (window.BOS_CRUMBLE_HOST) {
       window.BOS_CRUMBLE_HOST.start({
         an: data.hamster !== false, basisPfad: 'hamster_figur/',
-        topbar: document.querySelector('.bos-topbar'), vor: document.querySelector('.bos-topbar__clockwrap'),
+        tray: document.getElementById('taskbarTray'),      // Nachtrag 6 (K48): Knopf im Tray unten rechts, vor ⚙️ und 🌙 (vorher Kopfleiste)
         schreibtisch: document.getElementById('desktop')   // 1c: Crumble steht auf einer Bühne hinter dem Schreibtisch (Ebene 300)
       });
     }

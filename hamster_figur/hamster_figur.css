@@ -1,5 +1,5 @@
 /* hamster_figur.css — Crumble, Hamster-Figur (Maskottchen, #62). Nutzt BOS-Design-Tokens mit Fallbacks.
-   Stand 18.10.2026, 02:41 Uhr (Nachtrag 5: hf--schreibtisch .hf__blase pointer-events none K46). Vorher 17.10., 13:49 (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
+   Stand 18.10.2026, 09:24 Uhr (Nacharbeit 6: K55 Trefffläche im Schoner-Auftritt = Körperkasten, .bosss__buehne). Vorher 06:23 (Nachtrag 6: hf-knopf-host--tray K48, .bosss__buehne für den Schoner-Auftritt T9). Vorher 02:41 (Nachtrag 5: hf--schreibtisch .hf__blase pointer-events none K46). Vorher 17.10., 13:49 (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
    hf--laeuft / hf--links / hf--zieht (K27/K28, Watscheln und Spiegeln aus der Demo des Kontroll-Chats), Blase mit
    festen Farben für hell UND dunkel, über dem Kopf mit Spitze nach unten (K24, hf--blase-oben; hf--hell entfällt),
    Requisiten-Ebene .hf__req-ebene/.hf__req und die Choreografien hf-ch-* (Requisiten) / hf-fig-* (Figur) für die
@@ -103,6 +103,23 @@
 .hf-knopf-host { transition: transform .15s ease; }
 .hf-knopf-host--haelt { transform: scale(1.08); }   /* K35: Long-Press-Rückmeldung (Easter Egg) */
 .hf-knopf-host:focus-visible { outline: 2px solid var(--bos-amber, #e0973a); outline-offset: 2px; }
+/* T4 (Nachtrag 6, K48): Knopf im Tray unten rechts — Rahmen wie die Nachbarn (.bos-icon-btn im Tray: 40 px, Surface, Border),
+   Crumbles Kopf innen so groß wie im Medaillon (Bild 150 %, Kopf oben). */
+.hf-knopf-host--tray { background: var(--bos-surface, #2b2218); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.18)); box-shadow: none; transition: border-color .15s ease, transform .15s ease; }
+.hf-knopf-host--tray:hover { border-color: var(--bos-amber, #e0973a); }
+.hf-knopf-host--tray.hf-knopf-host--wartet::after { box-shadow: 0 0 0 2px var(--bos-surface, #2b2218); }
+
+/* T9 (Nachtrag 6, K54): Bühne der Schoner-Figur — volle Breite, Unterkante bei --bosss-fuss (38 % Bildschirmhöhe): Figur
+   (240 px) plus Blase stehen als Block um die Bildschirmmitte. Blendet mit dem Inhalt über. */
+/* Fuß bei 38 % — aber nie höher, als --bosss-kopfraum (540 px: größtes Nummernbild ≈ 400 px + Blase) über der Kante lassen; bei sehr
+   niedrigen Bildschirmen (Handy quer) steht er auf der Unterkante und die Blase hält oben am Rand (Grenze zu #78, Bau-Doku Nachtrag 6). */
+.bosss__buehne { position: absolute; left: 0; right: 0; bottom: max(0px, min(var(--bosss-fuss, 38%), calc(100% - var(--bosss-kopfraum, 540px)))); height: 0; pointer-events: none; transition: opacity .3s ease; }
+.bosss__buehne .hf { pointer-events: none; }   /* K55 (Nacharbeit 6): Trefffläche = Körperkasten wie am Schreibtisch (K46) — sonst fingen */
+.bosss__buehne .hf__figur { pointer-events: auto; }   /* Wurzelkasten, unsichtbare Zustandsbilder und Blase Tipps bis ~300 px neben ihm ab */
+.bosss__buehne .hf__bild, .bosss__buehne .hf__req-ebene, .bosss__buehne .hf__ausr,
+.bosss__buehne .hf__koerper, .bosss__buehne .hf__blase { pointer-events: none; }   /* Tipp auf die Blase = neben Crumble → Schoner schließt */
+.bosss__buehne .hf--container { bottom: 0; }   /* in der Bühne steht er auf deren Kante, nicht 24 px über dem Schoner-Rand */
+.bosss__buehne--out { opacity: 0; }
 
 /* Konfetti (Geburtstag) */
 .hf__konfetti { position: absolute; top: -20px; width: 8px; height: 12px; animation: hf-fall 2.4s linear forwards; pointer-events: none; }

@@ -1,6 +1,6 @@
 {
   "_kommentar": "Manifest der Hamster-Figur Crumble (hamster_figur.js). Koordinaten in Anteilen 0..1 der Bilddatei. koerper = Kasten des Hamster-Koerpers ohne Schwebe-Elemente; die Figur wird ueber diesen Kasten skaliert und unten mittig verankert. Seit 17.10.2026 (Stufe 1): texte = Rolle lehrmeister (ueber die Lage, nie an den Nutzer), texte_spielplatz = Rolle spielplatz (darf albern sein; fehlt es, gilt texte). texte_mit_zahl / texte_mit_zahl_1 / texte_mit_zahl_0 mit Platzhalter {n} fuer ereignis(name, { n }). ereignisse.<name> darf ein Zustand oder eine Liste von Zustaenden sein (zufaellige Wahl). Block spielplatz: Tipp-Auswahl, Schlaf, Reaktionsanteil auf beilaeufige Ereignisse.",
-  "version": 6,
+  "version": 7,
   "stand": "2026-10-18",
   "basis_hoehe_px": 480,
   "zustaende": {
@@ -705,7 +705,7 @@
     "yawn"
   ],
   "spielplatz": {
-    "_kommentar": "Rolle spielplatz (Bildschirmschoner). tippZustaende = alberne Auswahl beim Antippen; schlaf_nach_ms = schlaeft frueher ein (nur Tipp weckt); reaktions_anteil = Anteil der beilaeufigen Ereignisse (schoner_*), auf die er reagiert.",
+    "_kommentar": "Rolle spielplatz (Bildschirmschoner). tippZustaende = alberne Auswahl beim Antippen und fuer Posen-Auftritte; schlaf_nach_ms = schlaeft frueher ein (im Schoner seit Nachtrag 6 ungenutzt: Auftritte beginnen wach, schlaf:false); reaktions_anteil = Anteil der beilaeufigen Ereignisse (schoner_*) — seit Nachtrag 6 ungenutzt, der Schoner zeigt Spruch ODER Crumble. auftritt_anteil (Nachtrag 6, K54) = Anteil der Wechsel, die ein Crumble-Auftritt sind (nie zwei hintereinander); auftritt_pose_anteil = Anteil der Auftritte, die statt einer Nummer eine Spielplatz-Pose mit texte_spielplatz zeigen. blase_abstand_px / blase_folge_ms wie im Block schreibtisch (Nachtrag 5/6).",
     "tippZustaende": [
       "tongue",
       "laughing",
@@ -718,6 +718,10 @@
     ],
     "schlaf_nach_ms": 90000,
     "reaktions_anteil": 0.7,
+    "auftritt_anteil": 0.35,
+    "auftritt_pose_anteil": 0.25,
+    "blase_abstand_px": 14,
+    "blase_folge_ms": 3000,
     "lauf_min": [
       0.3,
       1
@@ -729,7 +733,7 @@
     "x_start": 0.85
   },
   "schreibtisch": {
-    "_kommentar": "Einbettung schreibtisch (Launcher). Seit Nachtrag 3 (K34): SICHTKONTAKT statt Minuten-Uhr — eine Sichtphase beginnt, wenn die Seite sichtbar wird, das Fenster Fokus bekommt, ein Profil aktiviert wird oder jemand Crumble beruehrt; in der Phase erste Nummer nach erste_nummer_s, dann Nummern alle nummer_s und Spaziergaenge alle lauf_s (nie gleichzeitig); trifft ein Nummern-Termin auf eine Reaktion, einen Lauf oder einen offenen Hinweis, wird er nach nachhol_s (K37, Nachtrag 4) nachgeholt statt eine volle Runde zu warten; die Phase endet nach phase_s ohne Beruehrung oder sofort, wenn die Seite in den Hintergrund geht. Schlaf nach schlaf_nach_ms ohne Tipp. geschwindigkeit_px_s, x_start wie bisher. schritt_bilder: Haken fuer echtes Laufen (O12), leer. blase_abstand_px (Nachtrag 5, K44): Luft in px zwischen Blasenspitze und Oberkante des sichtbaren Bildes; die Blase zieht waehrend einer Choreografie nur nach oben nach (K45).",
+    "_kommentar": "Einbettung schreibtisch (Launcher). Seit Nachtrag 3 (K34): SICHTKONTAKT statt Minuten-Uhr — eine Sichtphase beginnt, wenn die Seite sichtbar wird, das Fenster Fokus bekommt, ein Profil aktiviert wird oder jemand Crumble beruehrt; in der Phase erste Nummer nach erste_nummer_s, dann Nummern alle nummer_s und Spaziergaenge alle lauf_s (nie gleichzeitig); trifft ein Nummern-Termin auf eine Reaktion, einen Lauf oder einen offenen Hinweis, wird er nach nachhol_s (K37, Nachtrag 4) nachgeholt statt eine volle Runde zu warten; die Phase endet nach phase_s ohne Beruehrung oder sofort, wenn die Seite in den Hintergrund geht. Schlaf nach schlaf_nach_ms ohne Tipp. geschwindigkeit_px_s, x_start wie bisher. schritt_bilder: Haken fuer echtes Laufen (O12), leer. blase_abstand_px (Nachtrag 5, K44): Luft in px zwischen Blasenspitze und Oberkante des sichtbaren Bildes; die Blase zieht waehrend einer Choreografie nur nach oben nach (K45). blase_folge_ms (Nachtrag 6): so lange zieht die Blase nach (rAF), dann steht sie.",
     "sichtkontakt": {
       "erste_nummer_s": [
         8,
@@ -750,6 +754,7 @@
       ]
     },
     "blase_abstand_px": 14,
+    "blase_folge_ms": 3000,
     "schlaf_nach_ms": 600000,
     "geschwindigkeit_px_s": 55,
     "x_start": 0.12,

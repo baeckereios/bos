@@ -33,6 +33,11 @@
  * Speichern (Sichtbarkeit, Position) macht der Host über die Option speicher { lese(), schreibe(o) }.
  *
  * CHANGELOG
+ *   2026-10-18 · 06:23 · Nachtrag 6 (Kontroll-Chat 04:12/04:16, Bauplan 04:21, Go 04:23): T1 setzeGroesse(px)/groesse() zur
+ *     Laufzeit (masseBild/masseRequisiten/masseKasten, Position als Anteil, Blase neu) · T2 Blasen-rAF endet nach
+ *     blase_folge_ms (3000) · T3 Luft/Mitgehen der Blase auch im Schoner (spielplatz.blase_abstand_px) · Option schlaf:false
+ *     (Schoner-Auftritte) · Speicher-Schreibfehler als 'fehler' { speicher, message } gemeldet statt geschluckt ·
+ *     N6-7 show(n) wiederholt innerhalb einer Show keine Nummer (vorher nur „nie die letzte“).
  *   2026-10-18 · 02:41 · Nachtrag 5 (Kontroll-Chat 01:55): K44 Luft zwischen Blasenspitze und Figur aus
  *     schreibtisch.blase_abstand_px (14) statt fest 1 px · K45 Blase folgt der Figur per rAF nur nach oben, solange
  *     sie steht (Choreografie/squish/Atmen hoben die Figur in die Blase — Foto Ulf 01:51), oben am Rand bleibt sie
@@ -94,7 +99,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       container: document.body, basisPfad: 'hamster_figur/', modus: 'ecke', einbettung: 'fest',
       rolle: 'lehrmeister', hoehe: 150, an: true, ausruestung: {}, zufall: true,
       name: 'standard', vor: null, manifest: null, tippZustaende: null,
-      laufen: null, nummern: null, schiebbar: null, speicher: null, xStart: null, sichtkontakt: null
+      laufen: null, nummern: null, schiebbar: null, speicher: null, xStart: null, sichtkontakt: null, schlaf: true
     }, o || {});
     if (!/\/$/.test(opt.basisPfad)) opt.basisPfad += '/';
     if (opt.modus !== 'knopf') opt.modus = 'ecke';
@@ -115,7 +120,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
     var nummerAktiv = null, letzteNummer = null;       // laufende Nummer { name, ebene }
     var zieh = null, ignoriereClick = false;           // Ziehen
     var phaseAktiv = false, phaseErsteNummer = false, naechsteNummerAt = 0, naechsterLaufAt = 0, letzteBeruehrung = 0, versteckteSeite = false;   // K34 Sichtkontakt
-    var showRest = 0;                                  // K35 show(n): noch zu spielende Nummern
+    var showRest = 0, showNamen = [];                  // K35 show(n): noch zu spielende Nummern; N6-7: in dieser Show schon gespielte Namen
     var figW = Math.round(opt.hoehe * 0.95);
     var handler = {}, vorab = [], nachBereit = [];
 
@@ -131,7 +136,10 @@ window.BOS_HAMSTER_FIGUR = (function () {
     function schlaeft() { return !!(manifest && manifest.zustaende[aktuell] && manifest.zustaende[aktuell].kategorie === 'schlaf'); }
     function beschaeftigt() { return !!(lauf || nummerAktiv || zieh); }
     function speicherLese() { try { return opt.speicher && opt.speicher.lese ? (opt.speicher.lese() || {}) : {}; } catch (e) { return {}; } }
-    function speicherSchreibe(teil) { try { if (opt.speicher && opt.speicher.schreibe) opt.speicher.schreibe(Object.assign(speicherLese(), teil)); } catch (e) {} }
+    function speicherSchreibe(teil) {
+      try { if (opt.speicher && opt.speicher.schreibe) opt.speicher.schreibe(Object.assign(speicherLese(), teil)); }
+      catch (e) { console.warn('[hamster_figur] Speicher', e); melde('fehler', { speicher: true, message: e && e.message ? e.message : String(e) }); }   // T5: sichtbar machen, nicht schlucken
+    }
 
     // ---------------------------------------------------------------- Aufbau DOM
     function baue() {
@@ -157,11 +165,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.koerper = wurzel.querySelector('.hf__koerper');
       el.ausrVor = wurzel.querySelector('.hf__ausr--vor');
       el.ausrHinter = wurzel.querySelector('.hf__ausr--hinter');
-      el.figur.style.height = opt.hoehe + 'px';
-      el.figur.style.width = figW + 'px';
-      el.buehne.style.width = figW + 'px';
-      el.buehne.style.height = (opt.hoehe + 80) + 'px';
-      if (!aufLeiste) { el.blase.style.right = (figW + 8) + 'px'; el.blase.style.bottom = opt.hoehe + 'px'; }
+      masseKasten();
 
       el.bilder = {};
       Object.keys(manifest.zustaende).forEach(function (name) { if (!manifest.zustaende[name].lazy) legeBildAn(name); });
@@ -190,6 +194,29 @@ window.BOS_HAMSTER_FIGUR = (function () {
       }
     }
     function beiResize() { if (el.wurzel && xAnteil !== null) setzeX(xAnteil, true); }
+    function masseKasten() {
+      el.figur.style.height = opt.hoehe + 'px';
+      el.figur.style.width = figW + 'px';
+      el.buehne.style.width = figW + 'px';
+      el.buehne.style.height = (opt.hoehe + 80) + 'px';
+      if (!aufLeiste) { el.blase.style.right = (figW + 8) + 'px'; el.blase.style.bottom = opt.hoehe + 'px'; }
+    }
+    /** T1 (Nachtrag 6, K49): Größe zur Laufzeit — kein Neuaufbau, Timer unberührt; Bilder, Requisiten-Ebene, Ausrüstung,
+     *  Position (Anteil bleibt, Pixel neu) und Blase werden neu vermessen. Blasenschrift bleibt (CSS). */
+    function setzeGroesse(px) {
+      px = Math.round(Number(px));
+      if (!(px > 0) || px === opt.hoehe) return false;
+      opt.hoehe = px; figW = Math.round(px * 0.95);
+      if (!el.wurzel) return true;
+      masseKasten();
+      Object.keys(el.bilder).forEach(function (n) { masseBild(el.bilder[n]); });
+      if (nummerAktiv && nummerAktiv.ebene && nummerAktiv.bild) masseRequisiten(nummerAktiv.ebene, nummerAktiv.bild);
+      aktualisiereAusruestung(aktuell);
+      if (aufLeiste && xAnteil !== null) setzeX(xAnteil, true);
+      if (el.blase.classList.contains('hf__blase--an')) legeBlase();
+      melde('groesse', { hoehe: px });
+      return true;
+    }
 
     function bildFehlt(datei, url) {
       console.warn('[hamster_figur] Bild fehlt: ' + datei + ' (' + url + ')');
@@ -197,22 +224,31 @@ window.BOS_HAMSTER_FIGUR = (function () {
     }
 
     /** Ein Zustandsbild anlegen (Crossfade statt Nachladen). Gibt ein Promise auf das geladene Bild. */
+    /** T1 (Nachtrag 6): Maß eines Zustandsbilds aus opt.hoehe — beim Laden UND bei setzeGroesse() dieselbe Rechnung. */
+    function masseBild(img) {
+      var z = manifest.zustaende[img.dataset.zustand]; if (!z) return;
+      var k = z.koerper, kh = k[3] - k[1], kw = k[2] - k[0];
+      var hoehe = opt.hoehe * (z.massstab || 1) / kh;        // Bildhöhe in px (Skalierung über den Körperkasten)
+      img.style.height = hoehe + 'px';
+      img.style.bottom = (-(1 - k[3]) * hoehe) + 'px';           // Körperunterkante auf 0
+      img.style.left = '50%';
+      img.dataset.hoehe = hoehe;
+      if (img.naturalWidth && img.naturalHeight) {
+        var w = (img.naturalWidth / img.naturalHeight) * hoehe;
+        img.style.marginLeft = (-(k[0] + kw / 2) * w) + 'px';
+        img.dataset.breite = w;
+      }
+    }
     function legeBildAn(name) {
       var z = manifest.zustaende[name];
       if (el.bilder[name]) return el.bilder[name]._fertig;
       var img = document.createElement('img');
       img.className = 'hf__bild'; img.alt = ''; img.draggable = false;
       img.dataset.zustand = name;
-      var k = z.koerper, kh = k[3] - k[1], kw = k[2] - k[0];
-      var hoehe = opt.hoehe * (z.massstab || 1) / kh;        // Bildhöhe in px (Skalierung über den Körperkasten)
-      img.style.height = hoehe + 'px';
-      img.style.bottom = (-(1 - k[3]) * hoehe) + 'px';           // Körperunterkante auf 0
-      img.style.left = '50%';
+      masseBild(img);
       img._fertig = new Promise(function (ok) {
         img.addEventListener('load', function () {
-          var w = (img.naturalWidth / img.naturalHeight) * hoehe;
-          img.style.marginLeft = (-(k[0] + kw / 2) * w) + 'px';
-          img.dataset.breite = w; img.dataset.hoehe = hoehe;
+          masseBild(img);
           if (name === aktuell) aktualisiereAusruestung(name);
           ok(img);
         });
@@ -257,7 +293,9 @@ window.BOS_HAMSTER_FIGUR = (function () {
      *  hineinhebt — nie nach unten (kein Zittern); jeder neue Satz rechnet frisch von der Ruhelage. Oben am Rand bleibt sie stehen. */
     var SPITZE_PX = 12;                                    // ::after 14 px, um 45° gedreht, bottom -9px → die Spitze reicht ≈ 12 px unter den Blasenkasten
     var blaseRaf = null, blaseBottom = 0;
-    function luftBlase() { return opt.einbettung === 'schreibtisch' ? ((typeof zeiten().blase_abstand_px === 'number' ? zeiten().blase_abstand_px : 14) + SPITZE_PX) : 10; }
+    function luftBlase() { return aufLeiste ? ((typeof zeiten().blase_abstand_px === 'number' ? zeiten().blase_abstand_px : 14) + SPITZE_PX) : 10; }   // T3 (Nachtrag 6): Schreibtisch UND Schoner, je eigener Block
+    function folgeMs() { return typeof zeiten().blase_folge_ms === 'number' ? zeiten().blase_folge_ms : 3000; }   // T2: rAF endet danach (längste Choreografie-Periode 2,2 s, „nur nach oben“ ist monoton)
+    var blaseFolgeBis = 0;
     function stoppeBlaseFolgen() { if (blaseRaf) cancelAnimationFrame(blaseRaf); blaseRaf = null; }
     /** bottom (px über der Wurzel-Unterkante) setzen, aber nie über die Bildschirm-Oberkante hinaus. */
     function setzeBlaseBottom(bottom) {
@@ -284,11 +322,11 @@ window.BOS_HAMSTER_FIGUR = (function () {
       else if (r.right > breite - rand) schub = (breite - rand) - r.right;
       if (schub) el.blase.style.transform = 'translateX(' + Math.round(schub) + 'px)';
       stoppeBlaseFolgen();
-      if (opt.einbettung === 'schreibtisch') blaseRaf = requestAnimationFrame(folgeBlase);
+      if (aufLeiste) { blaseFolgeBis = Date.now() + folgeMs(); blaseRaf = requestAnimationFrame(folgeBlase); }
     }
     function folgeBlase() {
       blaseRaf = null;
-      if (!el.blase || !el.blase.classList.contains('hf__blase--an')) return;
+      if (!el.blase || !el.blase.classList.contains('hf__blase--an') || Date.now() > blaseFolgeBis) return;
       var img = aktivesBild();
       if (img) {
         var wr = el.wurzel.getBoundingClientRect(), oben = img.getBoundingClientRect().top;
@@ -456,8 +494,8 @@ window.BOS_HAMSTER_FIGUR = (function () {
       if (aktiv && sichtbarIst && aktuell === 'idle' && !beschaeftigt()) zeige(Math.random() < 0.7 ? 'sleep_sitting' : 'sleep_lying', { dauer: 0 });
     }
     function armSchlaf() {
-      clearTimeout(t.schlaf); schlafFaellig = false;
-      if (opt.modus !== 'ecke') return;
+      clearTimeout(t.schlaf); t.schlaf = null; schlafFaellig = false;
+      if (opt.modus !== 'ecke' || opt.schlaf === false) return;   // schlaf:false (Nachtrag 6, Schoner-Auftritte): nie einschlafen
       var ms = schlafNachMs(); if (!(ms > 0)) return;
       t.schlaf = setTimeout(function () {
         if (!aktiv || schlaeft()) return;
@@ -641,8 +679,8 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.figur.className = el.figur.className.replace(/\s*hf-fig-\S+/g, '');
       el.wurzel.classList.remove('hf--nummer');
       melde('nummer-ende', { nummer: n.name, abgebrochen: !n.fertig });
-      if (showRest > 0 && n.fertig) { showRest--; setTimeout(function () { if (aktiv && sichtbarIst && !beschaeftigt()) { if (!nummer()) showRest = 0; } else showRest = 0; }, 350); }
-      else showRest = 0;
+      if (showRest > 0 && n.fertig) { showRest--; setTimeout(function () { if (aktiv && sichtbarIst && !beschaeftigt()) { if (!nummer()) { showRest = 0; showNamen = []; } } else { showRest = 0; showNamen = []; } if (!showRest && !nummerAktiv) showNamen = []; }, 350); }
+      else { showRest = 0; showNamen = []; }
     }
     /** K38 (Nachtrag 4): Schlafenden wecken wie ein Tipp — Aufwach-Zustand kurz (verhalten.aufwach_ms), Schlaf-Timer neu. */
     function aufwachMs() { return typeof manifest.verhalten.aufwach_ms === 'number' ? manifest.verhalten.aufwach_ms : 1000; }
@@ -675,7 +713,12 @@ window.BOS_HAMSTER_FIGUR = (function () {
       }
       if (schlaeft()) return false;
       var liste = nummernListe(); if (!liste.length) return false;
-      if (!name) { var i = 0; do { name = wahl(liste); i++; } while (liste.length > 1 && name === letzteNummer && i < 20); }
+      if (!name) {                                             // zufällig: nie die letzte, und in einer Show (K35) keine schon gespielte (N6-7)
+        var frei = liste.filter(function (n) { return n !== letzteNummer && showNamen.indexOf(n) < 0; });
+        if (!frei.length) frei = liste.filter(function (n) { return n !== letzteNummer; });
+        name = wahl(frei.length ? frei : liste);
+      }
+      if (showRest > 0 || showNamen.length) showNamen.push(name);
       var n = manifest.nummern[name]; if (!n) { console.warn('[hamster_figur] unbekannte Nummer: ' + name); return false; }
       if (schlafFaellig && !lauf) { schlafen(); return false; }  // Schlaf war fällig: erst schlafen
       stoppeLaufen(); beendeNummer();
@@ -699,20 +742,27 @@ window.BOS_HAMSTER_FIGUR = (function () {
       });
       return true;
     }
-    function baueRequisiten(meine, n, img) {
+    /** Geometrie der Requisiten-Ebene aus dem Bildmaß — beim Aufbau und bei setzeGroesse() (T1). */
+    function masseRequisiten(ebene, img) {
       var W = parseFloat(img.dataset.breite), H = parseFloat(img.dataset.hoehe);
-      var ebene = document.createElement('div');
-      ebene.className = 'hf__req-ebene';
       ebene.style.width = W + 'px'; ebene.style.height = H + 'px';
       ebene.style.bottom = img.style.bottom; ebene.style.left = '50%'; ebene.style.marginLeft = img.style.marginLeft;
+      Array.prototype.forEach.call(ebene.children, function (e) {
+        var k = (e.dataset.kasten || '').split(',').map(Number); if (k.length !== 4) return;
+        e.style.left = (k[0] * W) + 'px'; e.style.top = (k[1] * H) + 'px';
+        e.style.width = ((k[2] - k[0]) * W) + 'px'; e.style.height = ((k[3] - k[1]) * H) + 'px';
+      });
+    }
+    function baueRequisiten(meine, n, img) {
+      var ebene = document.createElement('div');
+      ebene.className = 'hf__req-ebene';
       var ch = n.choreografie || {};
       var alle = (n.requisiten || []).concat(n.klein || []);
       alle.forEach(function (r, i) {
         var e = document.createElement('img'); e.alt = ''; e.draggable = false;
         e.className = 'hf__req hf__req--' + (r.klasse === 'gross' ? 'gross' : 'klein');
         var k = r.kasten;
-        e.style.left = (k[0] * W) + 'px'; e.style.top = (k[1] * H) + 'px';
-        e.style.width = ((k[2] - k[0]) * W) + 'px'; e.style.height = ((k[3] - k[1]) * H) + 'px';
+        e.dataset.kasten = k.join(',');
         e.style.setProperty('--i', String(i));
         if (k[0] + (k[2] - k[0]) / 2 < 0.5) e.classList.add('hf__req--linksseite');
         var cho = r.klasse === 'gross' ? ch.gross : ch.klein;
@@ -722,8 +772,10 @@ window.BOS_HAMSTER_FIGUR = (function () {
         ebene.appendChild(e);
       });
       ebene.style.setProperty('--n', String(alle.length));
+      masseRequisiten(ebene, img);
       el.figur.appendChild(ebene);
       meine.ebene = ebene;
+      meine.bild = img;
     }
     /** Nächsten Nummern-Termin stellen. nachholen (K37, Nachtrag 4): der letzte Termin traf auf Reaktion, Lauf, Ziehen
      *  oder offenen Hinweis → kurzer Termin nachhol_s (2–4 s) statt voller Runde, so oft nötig, solange die Phase läuft. */
@@ -752,6 +804,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
     function show(anzahl, o) {
       if (anzahl && typeof anzahl === 'object') { o = anzahl; anzahl = null; }
       showRest = Math.max(0, (anzahl || 3) - 1);
+      showNamen = nummerAktiv ? [nummerAktiv.name] : [];  // N6-7: die laufende zählt als erste und wird in der Show nicht wiederholt
       if (nummerAktiv) return true;                       // eine Nummer läuft schon (z. B. vom 600-ms-Halten): sie zählt als erste
       if (t.weck) return true;                            // K38: er wird gerade geweckt, die Nummer kommt gleich — showRest bleibt stehen
       if (!nummer(null, o)) { showRest = 0; return false; }
@@ -891,6 +944,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       registriere: registriere, auf: auf,
       sichtbar: sichtbar, istSichtbar: function () { return sichtbarIst; }, ladeGespeichert: ladeGespeichert,
       laufe: laufe, setzeX: setzeX, x: function () { return xAnteil; },
+      setzeGroesse: setzeGroesse, groesse: function () { return opt.hoehe; },
       nummer: nummer, nummern: nummernListe, laufendeNummer: function () { return nummerAktiv ? nummerAktiv.name : null; },
       show: show, wecke: wecke, sichtkontakt: function (grund) { startePhase(grund || 'start'); }, sichtphase: function () { return phaseAktiv; },
       zustand: function () { return aktuell; },
@@ -939,7 +993,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
     init: init,
     an: durch('an'), zeige: durch('zeige'), ereignis: durch('ereignis'), hinweis: durch('hinweis'), sage: durch('sage'),
     setzeAusruestung: durch('setzeAusruestung'), setzeModus: durch('setzeModus'), setzeRolle: durch('setzeRolle'),
-    sichtbar: durch('sichtbar'), laufe: durch('laufe'), nummer: durch('nummer'), show: durch('show'), wecke: durch('wecke'), sichtkontakt: durch('sichtkontakt'),
+    sichtbar: durch('sichtbar'), laufe: durch('laufe'), nummer: durch('nummer'), show: durch('show'), wecke: durch('wecke'), sichtkontakt: durch('sichtkontakt'), setzeGroesse: durch('setzeGroesse'),
     zerstoere: function () { if (standard) { standard.zerstoere(); standard = null; } },
     registriere: registriereStandard,
     auf: function (name, fn) { if (standard) standard.auf(name, fn); else vorabAuf.push([name, fn]); },

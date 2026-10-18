@@ -30,9 +30,10 @@
         BOS_PROFIL_LOOKUP.aktivesProfil().id (wie bos_taskboard.js), fehlt sie:
         '_geraet'. localStorage in try/catch (PWA/Privatmodus).
 
-   launcher.html kennt nur: BOS_CRUMBLE_HOST.start({ an, basisPfad, topbar, vor,
-   schreibtisch }) in applyProfileUI() und BOS_CRUMBLE_HOST.setzeAn(wert) aus
-   der Einstellungs-Zeile.
+   launcher.html kennt: BOS_CRUMBLE_HOST.start({ an, basisPfad, tray, schreibtisch })
+   in applyProfileUI(), setzeAn(wert) aus der Einstellungs-Zeile, und seit Nachtrag 6
+   setzeGroesse('aus'|50|75|100) / setzeSchoner(0|50|75|100) / stufen() für die
+   Geräte-Stufen (T5). topbar/vor als Knopf-Ort bleibt für Hülle und Satelliten.
 
    Fehlende Bilder / Manifest: Crumble bleibt still (Kompendium T4), Fehler in
    der Konsole und als 'hamster-figur:fehler' auf document.
@@ -42,6 +43,11 @@
    neuLaden), bos_profil_lookup.js (Profil-Id für den Speicher).
 
    CHANGELOG
+     2026-10-18 · 06:23 · Nachtrag 6 (K48–K50, Bauplan 04:21, Go 04:23): Knopf im Tray
+       (Option tray, Klasse hf-knopf-host--tray); Speicher { groesse, schoner } je Gerät
+       mit Stufen 50/75/100 (Schoner 0 = aus), Vorgaben 75/100; setzeGroesse/setzeSchoner/
+       stufen; Schoner-Figur ohne speicher (Z1), schlaf:false, laufen:false; schreibe() wirft
+       weiter (err.message ins Einstellungsfenster).
      2026-10-17 · 13:49 · Nachtrag 4 (K38–K40): Long-Press weckt einen schlafenden Crumble
        (nummer({wecken:true}) / show(3,{wecken:true})) und zählt als Sichtkontakt
        (figur.sichtkontakt('knopf')); pointercancel schaltet nichts mehr um (eigener
@@ -79,10 +85,23 @@ window.BOS_CRUMBLE_HOST = (function () {
     try { var p = window.BOS_PROFIL_LOOKUP && window.BOS_PROFIL_LOOKUP.aktivesProfil ? window.BOS_PROFIL_LOOKUP.aktivesProfil() : null; return (p && p.id) ? String(p.id) : '_geraet'; }
     catch (e) { return '_geraet'; }
   }
+  /* T5 (Nachtrag 6): { sichtbar, x, groesse (50/75/100, fehlt = 75), schoner (0/50/75/100, fehlt = 100) } je Gerät und Profil.
+     schreibe() wirft weiter (err.message) — der Aufrufer zeigt es (Einstellungsfenster, Projektregel); die Figur fängt
+     ihre eigenen Schreibvorgänge ab und meldet 'fehler' { speicher }. */
+  var STUFEN = [50, 75, 100], GROESSE_VORGABE = 75, SCHONER_VORGABE = 100;
   var speicher = {
     lese: function () { try { var raw = localStorage.getItem('bos_crumble_' + profilId()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; } },
-    schreibe: function (o) { try { localStorage.setItem('bos_crumble_' + profilId(), JSON.stringify(o || {})); } catch (e) {} }
+    schreibe: function (o) { localStorage.setItem('bos_crumble_' + profilId(), JSON.stringify(o || {})); }
   };
+  function stufe(wert, vorgabe, nullErlaubt) {
+    var n = Number(wert);
+    if (nullErlaubt && n === 0) return 0;
+    return STUFEN.indexOf(n) >= 0 ? n : vorgabe;
+  }
+  function gespeicherteGroesse() { return stufe(speicher.lese().groesse, GROESSE_VORGABE, false); }
+  function gespeicherterSchoner() { return stufe(speicher.lese().schoner, SCHONER_VORGABE, true); }
+  function pxSchreibtisch(st) { return Math.round((optionen && optionen.hoeheSchreibtisch || HOEHE_SCHREIBTISCH) * st / 100); }
+  function pxSchoner(st) { return Math.round((optionen && optionen.hoeheSchoner || HOEHE_SCHONER) * st / 100); }
 
   function schwelle() {
     var m = figur && figur.manifest ? figur.manifest() : null;
@@ -147,18 +166,20 @@ window.BOS_CRUMBLE_HOST = (function () {
     buehne.style.left = Math.round(r.left) + 'px';
     buehne.style.right = Math.round(Math.max(0, (window.innerWidth || document.documentElement.clientWidth) - r.right)) + 'px';
   }
+  /* T4 (Nachtrag 6, K48): Knopf im Tray unten rechts (erstes Kind, vor ⚙️ und 🌙); topbar/vor bleibt als Rückfall (Hülle, Satelliten). */
   function legeKnopfAn() {
-    if (knopfEl || !optionen.topbar) return;
+    if (knopfEl || !(optionen.tray || optionen.topbar)) return;
     knopfEl = document.createElement('button');
     knopfEl.type = 'button';
-    knopfEl.className = 'hf-knopf-host';
+    knopfEl.className = 'hf-knopf-host' + (optionen.tray ? ' hf-knopf-host--tray' : '');
     knopfEl.title = 'Crumble zeigen/verstecken';
     knopfEl.setAttribute('aria-label', 'Crumble zeigen/verstecken');
     knopfEl.setAttribute('aria-pressed', 'true');
     knopfEl.innerHTML = '<img alt="" draggable="false">';
     knopfEl.querySelector('img').src = optionen.basisPfad + 'bilder/idle.png';
     verdrahteKnopf(knopfEl);
-    if (optionen.vor && optionen.vor.parentNode === optionen.topbar) optionen.topbar.insertBefore(knopfEl, optionen.vor);
+    if (optionen.tray) optionen.tray.insertBefore(knopfEl, optionen.tray.firstChild);
+    else if (optionen.vor && optionen.vor.parentNode === optionen.topbar) optionen.topbar.insertBefore(knopfEl, optionen.vor);
     else optionen.topbar.appendChild(knopfEl);
     aktualisiereKnopf();
   }
@@ -236,7 +257,7 @@ window.BOS_CRUMBLE_HOST = (function () {
     figur = M.neu({
       name: 'lehrmeister', container: buehne, basisPfad: optionen.basisPfad,
       modus: 'ecke', einbettung: 'schreibtisch', rolle: 'lehrmeister',
-      hoehe: optionen.hoeheSchreibtisch || HOEHE_SCHREIBTISCH, an: an, zufall: false,
+      hoehe: pxSchreibtisch(gespeicherteGroesse()), an: an, zufall: false,
       laufen: true, nummern: true, schiebbar: true, speicher: speicher
     });
     ['sichtbar', 'wartet', 'hinweis', 'hinweis-gesehen', 'zustand'].forEach(function (n) { figur.auf(n, aktualisiereKnopf); });
@@ -245,11 +266,13 @@ window.BOS_CRUMBLE_HOST = (function () {
   function fabrikSchoner(container) {
     var M = figurModul();
     if (!M) return null;
+    // Z1 (Go 04:23): KEIN speicher — die Schoner-Figur schreibt nie in den Gerätespeicher (sichtbar/x je Wechsel sind Schoner-Sache).
+    // T8: schlaf:false (Auftritte beginnen wach), laufen:false (steht mittig).
     schoner = M.neu({
       name: 'spielplatz', container: container, basisPfad: optionen.basisPfad,
       modus: 'ecke', einbettung: 'container', rolle: 'spielplatz',
-      hoehe: optionen.hoeheSchoner || HOEHE_SCHONER, an: an, zufall: false,
-      laufen: true, nummern: true, schiebbar: false
+      hoehe: pxSchoner(gespeicherterSchoner() || SCHONER_VORGABE), an: an, zufall: false,
+      laufen: false, nummern: true, schiebbar: false, schlaf: false
     });
     schoner.bereit.catch(function (e) { console.error('[crumble] Schoner-Crumble nicht ladbar: ' + (e && e.message ? e.message : e)); });
     return schoner;
@@ -274,7 +297,8 @@ window.BOS_CRUMBLE_HOST = (function () {
     legeBuehneAn();
     legeKnopfAn();
     legeFigurAn();
-    if (figur) { figur.bereit.then(function () { figur.ladeGespeichert(); aktualisiereKnopf(); }); }
+    if (figur) { figur.bereit.then(function () { figur.ladeGespeichert(); figur.setzeGroesse(pxSchreibtisch(gespeicherteGroesse())); aktualisiereKnopf(); }); }
+    wendeSchonerAn();
     setzeAn(an);
     // K23 (Nachtrag 1): nichts vom vorherigen Profil übernehmen, Brett frisch laden
     letzteAufgaben = null;
@@ -284,6 +308,30 @@ window.BOS_CRUMBLE_HOST = (function () {
       catch (e) { console.warn('[crumble] BOS_TASKBOARD.neuLaden', e); }
     }
     begruesse();
+  }
+
+  /* ---------- Stufen je Gerät (T5/T6, Nachtrag 6) ---------- */
+  function wendeSchonerAn() {
+    var st = gespeicherterSchoner();
+    if (window.BOS_SCREENSAVER && typeof window.BOS_SCREENSAVER.setzeFigurGroesse === 'function') window.BOS_SCREENSAVER.setzeFigurGroesse(st ? pxSchoner(st) : 0);
+    else if (schoner && st) schoner.setzeGroesse(pxSchoner(st));
+  }
+  function schreibeStufe(teil) { speicher.schreibe(Object.assign(speicher.lese(), teil)); }   // wirft bei gesperrtem localStorage → Aufrufer zeigt err.message
+  /** Schreibtisch: 'aus' | 50 | 75 | 100. 'aus' = verstecken wie der Knopf (derselbe Zustand). Wirft bei Speicherfehler. */
+  function setzeGroesse(wert) {
+    if (wert === 'aus' || wert === 0) { if (figur) figur.sichtbar(false); return; }
+    var st = stufe(wert, GROESSE_VORGABE, false);
+    schreibeStufe({ groesse: st });
+    if (figur) { figur.setzeGroesse(pxSchreibtisch(st)); if (!figur.istSichtbar()) figur.sichtbar(true); }
+  }
+  /** Schoner: 0 (aus) | 50 | 75 | 100. Wirft bei Speicherfehler. */
+  function setzeSchoner(wert) {
+    var st = (wert === 'aus') ? 0 : stufe(wert, SCHONER_VORGABE, true);
+    schreibeStufe({ schoner: st });
+    wendeSchonerAn();
+  }
+  function stufen() {
+    return { schreibtisch: (figur && !figur.istSichtbar()) ? 'aus' : gespeicherteGroesse(), schoner: gespeicherterSchoner() };
   }
 
   /** Ein/Aus für alles (Profil-Feld hamster) — der Hauptschalter. */
@@ -299,6 +347,7 @@ window.BOS_CRUMBLE_HOST = (function () {
     start: start,
     setzeAn: setzeAn,
     istAn: function () { return an; },
+    setzeGroesse: setzeGroesse, groesse: gespeicherteGroesse, setzeSchoner: setzeSchoner, schoner: gespeicherterSchoner, stufen: stufen,
     figur: function () { return figur; },
     knopf: function () { return figur; },          // Alias (Stufe 1: Knopf-Crumble); seit 1c die Schreibtisch-Figur
     knopfElement: function () { return knopfEl; },
