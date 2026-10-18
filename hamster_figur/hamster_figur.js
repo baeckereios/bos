@@ -33,6 +33,10 @@
  * Speichern (Sichtbarkeit, Position) macht der Host über die Option speicher { lese(), schreibe(o) }.
  *
  * CHANGELOG
+ *   2026-10-18 · 02:41 · Nachtrag 5 (Kontroll-Chat 01:55): K44 Luft zwischen Blasenspitze und Figur aus
+ *     schreibtisch.blase_abstand_px (14) statt fest 1 px · K45 Blase folgt der Figur per rAF nur nach oben, solange
+ *     sie steht (Choreografie/squish/Atmen hoben die Figur in die Blase — Foto Ulf 01:51), oben am Rand bleibt sie
+ *     stehen; rAF endet mit der Blase, zählt in _timerAktiv() mit. Manifest Version 6.
  *   2026-10-17 · 13:49 · Nachtrag 4 (Kontroll-Chat 12:55): K37 verpasster Nummern-Termin (Reaktion/Lauf/Hinweis) wird
  *     binnen sichtkontakt.nachhol_s (2–4 s) nachgeholt statt eine volle Runde zu warten; phaseErsteNummer endet erst mit
  *     der gespielten ersten Nummer · K38 nummer({wecken:true}) / show(n,{wecken:true}) / wecke(): Schlafender wird wie
@@ -247,7 +251,21 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.figur.classList.add(klasse);
     }
 
-    /** Blase legen (K24): über dem Kopf nach dem sichtbaren Bild (Leiste) bzw. links neben der Figur (fest/oben); nie aus dem Bildschirm. */
+    /** Blase legen (K24): über dem Kopf nach dem sichtbaren Bild (Leiste) bzw. links neben der Figur (fest/oben); nie aus dem Bildschirm.
+     *  K44/K45 (Nachtrag 5, nur Schreibtisch): Luft schreibtisch.blase_abstand_px (14) zwischen Spitze und Bildoberkante, und solange
+     *  die Blase steht, zieht ein rAF sie NUR NACH OBEN nach, wenn die Choreografie (hf-fig-*, squish, Atmen) die Figur in sie
+     *  hineinhebt — nie nach unten (kein Zittern); jeder neue Satz rechnet frisch von der Ruhelage. Oben am Rand bleibt sie stehen. */
+    var SPITZE_PX = 12;                                    // ::after 14 px, um 45° gedreht, bottom -9px → die Spitze reicht ≈ 12 px unter den Blasenkasten
+    var blaseRaf = null, blaseBottom = 0;
+    function luftBlase() { return opt.einbettung === 'schreibtisch' ? ((typeof zeiten().blase_abstand_px === 'number' ? zeiten().blase_abstand_px : 14) + SPITZE_PX) : 10; }
+    function stoppeBlaseFolgen() { if (blaseRaf) cancelAnimationFrame(blaseRaf); blaseRaf = null; }
+    /** bottom (px über der Wurzel-Unterkante) setzen, aber nie über die Bildschirm-Oberkante hinaus. */
+    function setzeBlaseBottom(bottom) {
+      var rand = 8;
+      el.blase.style.bottom = Math.round(bottom) + 'px';
+      var r = el.blase.getBoundingClientRect();
+      if (r.top < rand) el.blase.style.bottom = Math.round(bottom - (rand - r.top)) + 'px';
+    }
     function legeBlase() {
       el.blase.style.transform = '';
       if (!el.blase.classList.contains('hf__blase--an')) return;
@@ -256,23 +274,37 @@ window.BOS_HAMSTER_FIGUR = (function () {
         var img = aktivesBild(), wr = el.wurzel.getBoundingClientRect();
         var kopf = img ? img.getBoundingClientRect().top : (wr.bottom - opt.hoehe);
         el.blase.style.right = 'auto';
-        el.blase.style.bottom = Math.round(Math.max(opt.hoehe, wr.bottom - kopf) + 10) + 'px';
         var bw = el.blase.offsetWidth;
         el.blase.style.left = Math.round(figW / 2 - bw / 2) + 'px';
+        blaseBottom = Math.max(opt.hoehe, wr.bottom - kopf) + luftBlase();
+        setzeBlaseBottom(blaseBottom);
       }
       var r = el.blase.getBoundingClientRect(), schub = 0;
       if (r.left < rand) schub = rand - r.left;
       else if (r.right > breite - rand) schub = (breite - rand) - r.right;
       if (schub) el.blase.style.transform = 'translateX(' + Math.round(schub) + 'px)';
+      stoppeBlaseFolgen();
+      if (opt.einbettung === 'schreibtisch') blaseRaf = requestAnimationFrame(folgeBlase);
+    }
+    function folgeBlase() {
+      blaseRaf = null;
+      if (!el.blase || !el.blase.classList.contains('hf__blase--an')) return;
+      var img = aktivesBild();
+      if (img) {
+        var wr = el.wurzel.getBoundingClientRect(), oben = img.getBoundingClientRect().top;
+        var noetig = (wr.bottom - oben) + luftBlase();
+        if (noetig > blaseBottom + 0.5) { blaseBottom = noetig; setzeBlaseBottom(noetig); }   // nur nach oben
+      }
+      blaseRaf = requestAnimationFrame(folgeBlase);
     }
 
     function sage(text, dauerMs) {
-      clearTimeout(t.blase);
-      if (!text || !sichtbarIst) { el.blase.classList.remove('hf__blase--an'); el.blase.style.transform = ''; return; }
+      clearTimeout(t.blase); t.blase = null;                 // N5-2: Id nullen, sonst zählt _timerAktiv() einen toten Timer
+      if (!text || !sichtbarIst) { stoppeBlaseFolgen(); el.blase.classList.remove('hf__blase--an'); el.blase.style.transform = ''; return; }
       el.blase.textContent = text;
       el.blase.classList.add('hf__blase--an');
       legeBlase();
-      if (dauerMs > 0) t.blase = setTimeout(function () { el.blase.classList.remove('hf__blase--an'); }, dauerMs);
+      if (dauerMs > 0) t.blase = setTimeout(function () { t.blase = null; stoppeBlaseFolgen(); el.blase.classList.remove('hf__blase--an'); }, dauerMs);
     }
 
     function texteFuer(z) {
@@ -291,7 +323,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       if (!manifest) return;
       if (!manifest.zustaende[name]) { console.warn('[hamster_figur] unbekannter Zustand: ' + name); return; }
       if (nummerAktiv && name !== 'nummer_' + nummerAktiv.name) beendeNummer();   // jeder andere Zustand beendet die Nummer (Ebene weg)
-      clearTimeout(t.reaktion);
+      clearTimeout(t.reaktion); t.reaktion = null;
       var z = manifest.zustaende[name];
       if (!el.bilder[name]) legeBildAn(name);
       aktuell = name;
@@ -304,6 +336,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       var zurueck = o.dauer !== undefined ? o.dauer : (z.kategorie === 'hinweis' ? manifest.verhalten.hinweis_ms : manifest.verhalten.reaktion_ms);
       if (zurueck > 0 && !o.ohneRueckweg && name !== 'idle' && z.kategorie !== 'schlaf') {
         t.reaktion = setTimeout(function () {
+          t.reaktion = null;
           zeige('idle', { still: true, ohneSchlafReset: !!o.ohneSchlafReset });
           if (schlafFaellig) schlafen();
           if (opt.modus === 'knopf') verstecken();
@@ -574,7 +607,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
         if (!zieh.aktivGeworden) {
           if (Math.abs(dx) < 8) return;
           zieh.aktivGeworden = true;
-          stoppeLaufen(); beendeNummer(); clearTimeout(t.reaktion); sage('');
+          stoppeLaufen(); beendeNummer(); clearTimeout(t.reaktion); t.reaktion = null; sage('');
           el.wurzel.classList.add('hf--zieht');
           zeigeBild(Math.random() < 0.5 ? 'surprised' : 'tongue', true);
           melde('ziehen', { start: true });
@@ -770,8 +803,8 @@ window.BOS_HAMSTER_FIGUR = (function () {
     }
 
     // ---------------------------------------------------------------- An/Aus, Sichtbar (K26)
-    function clearAll() { Object.keys(t).forEach(function (k) { if (t[k]) { clearTimeout(t[k]); t[k] = null; } }); schlafFaellig = false; }
-    function timerAktiv() { var n = 0; Object.keys(t).forEach(function (k) { if (t[k]) n++; }); if (lauf) n++; return n; }
+    function clearAll() { Object.keys(t).forEach(function (k) { if (t[k]) { clearTimeout(t[k]); t[k] = null; } }); schlafFaellig = false; stoppeBlaseFolgen(); }
+    function timerAktiv() { var n = 0; Object.keys(t).forEach(function (k) { if (t[k]) n++; }); if (lauf) n++; if (blaseRaf) n++; return n; }   // K45: der Blasen-rAF zählt mit, solange die Blase steht
     function starteUhren() { leben(); armReinschauen(); armZufall(); armSchlaf(); if (opt.sichtkontakt) startePhase('start'); else { armLauf(); armNummer(); } }
 
     function an(wert) {
@@ -797,7 +830,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       if (!neu) {
         phaseAktiv = false; showRest = 0; naechsteNummerAt = 0; naechsterLaufAt = 0;
         clearAll(); stoppeLaufen(); beendeNummer(); zieh = null; el.wurzel.classList.remove('hf--zieht', 'hf--laeuft');
-        clearTimeout(t.reaktion); sage('');
+        clearTimeout(t.reaktion); t.reaktion = null; sage('');
         if (hinweisOffen) wartend = { art: 'hinweis', text: hinweisText, o: { text: hinweisText, dauer: 0, ohneRueckweg: true }, zustand: null };
       } else if (aktiv) {
         zeige('idle', { still: true });
@@ -869,7 +902,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       wartet: function () { return !!wartend; },
       laeuft: function () { return !!lauf; },
       sperre: function (w) { ereignisSperre = !!w; },
-      _timerAktiv: timerAktiv
+      _timerAktiv: timerAktiv, _blaseFolgt: function () { return !!blaseRaf; }
     };
 
     api.bereit = ladeManifest(opt.basisPfad, opt.manifest).then(function (m) {

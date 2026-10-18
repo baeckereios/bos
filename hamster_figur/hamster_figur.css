@@ -1,5 +1,5 @@
 /* hamster_figur.css — Crumble, Hamster-Figur (Maskottchen, #62). Nutzt BOS-Design-Tokens mit Fallbacks.
-   Stand 17.10.2026, 13:49 Uhr (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
+   Stand 18.10.2026, 02:41 Uhr (Nachtrag 5: hf--schreibtisch .hf__blase pointer-events none K46). Vorher 17.10., 13:49 (Nachtrag 4: hf-knopf-host touch-action/user-select/touch-callout K40). Vorher 12:35 (Nachtrag 3: hf__bild--schicht ohne Überblendung K33, hf-knopf-host--haelt K35). Vorher 09:37 (Stufe 1c, Bau-Chat): Einbettung hf--schreibtisch (K25), hf--versteckt (K26),
    hf--laeuft / hf--links / hf--zieht (K27/K28, Watscheln und Spiegeln aus der Demo des Kontroll-Chats), Blase mit
    festen Farben für hell UND dunkel, über dem Kopf mit Spitze nach unten (K24, hf--blase-oben; hf--hell entfällt),
    Requisiten-Ebene .hf__req-ebene/.hf__req und die Choreografien hf-ch-* (Requisiten) / hf-fig-* (Figur) für die
@@ -27,7 +27,7 @@
 
 /* ---- Einbettung 'schreibtisch' (Stufe 1c): absolut in der Bühne des Hosts (fixed, Ebene 300, zwischen Kacheln und Fenstern) ---- */
 .hf-buehne-schreibtisch { position: fixed; pointer-events: none; z-index: 300; overflow: visible; }
-.hf--schreibtisch { position: absolute; left: 0; bottom: 0; z-index: auto; pointer-events: auto; }
+.hf--schreibtisch { position: absolute; left: 0; bottom: 0; z-index: auto; }   /* pointer-events: siehe K46 unten */
 .hf--schreibtisch .hf__buehne { pointer-events: none; }
 .hf--schreibtisch .hf__figur { touch-action: none; }
 .hf--versteckt { display: none !important; }
@@ -75,6 +75,12 @@
 .hf--blase-oben .hf__blase::after { content: ''; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; margin-left: -7px;
   background: #fbf3e4; border-right: 2px solid #4a2f1a; border-bottom: 2px solid #4a2f1a; transform: rotate(45deg); box-sizing: border-box; }
 .hf--container .hf__blase { font-size: var(--bos-font-md, 1.05rem); max-width: 320px; }
+.hf--schreibtisch .hf__blase { pointer-events: none; cursor: default; }   /* K46 (Nachtrag 5): Blase lässt Tipps durch — die Kachel darunter bleibt bedienbar; Tipp auf Crumble selbst wie bisher. Schoner unverändert. */
+/* K46, Teil 2 (Bau-Chat): Trefffläche von Crumble = Körperkasten (.hf__figur, hoehe × figW), nicht der ganze Bildkasten — die durchsichtigen
+   Bildränder (hochgereckte Torte, Hantel, Hut) und die 80 px Blasenraum der Wurzel fingen sonst Tipps ab, die der Kachel darunter galten. */
+.hf--schreibtisch { pointer-events: none; }
+.hf--schreibtisch .hf__figur { pointer-events: auto; }
+.hf--schreibtisch .hf__bild, .hf--schreibtisch .hf__req-ebene, .hf--schreibtisch .hf__ausr, .hf--schreibtisch .hf__koerper { pointer-events: none; }
 
 /* Ruf-Knopf */
 .hf__knopf { display: none; position: absolute; right: 0; bottom: 0; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; cursor: pointer;
