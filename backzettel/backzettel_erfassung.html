@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: backzettel/backzettel_erfassung.html — Backzettel fotografieren, auslesen, prüfen, speichern
+  Doku:  backzettel/BACKZETTEL_ERFASSUNG_DOKU.md (dort der kanonische Nutzer-Hilfetext)
+  Logik: backzettel_logik.js (Zahlen, Prüfsummen, Zuordnung, „fehlt“, Dokument bauen)
+  API:   backzettel_api.js (Gerät, Anfrage, Fehler) · Prompt: backzettel_prompt.js
+  Rechner: ../bos_verbrauch_durchschnitt.js (Schnitt, Abweichung, Tage des Topfs)
+  Fotos: ../bos_foto.js (Verkleinern, Kopie aus bos_meldungen.js)
+
+  Schreibt: bos_events/verbrauch_offiziell_<JJJJ-MM-TT> (Backzettel-Topf), per
+  Transaktion als GANZES Dokument (bewusste Ausnahme von „nur anhängen“, B11:
+  ein Dokument je Backtag, mehrere Durchgänge, ein zurückgenommener Ausschluss
+  muss verschwinden). Regel RK §4: nur Planung (admin, produktionsleitung).
+  Fotos werden NIRGENDS gespeichert (nur im Speicher dieser Sitzung).
+  Der API-Schlüssel liegt nur auf diesem Gerät (localStorage), nie in Firestore.
+
+  CHANGELOG
+    2026-10-19 · 17:32 · v1 · Erstfassung (Backzettel-Erfassung Stufe 1)
+      ANWEISUNG_2026-10-19_BACKZETTEL_STUFE1.md, Bauplan SESSION_2026-10-19_
+      BACKZETTEL_STUFE1_BAU.md (Fassung 2), Freigabe KC 09:47 (B1–B12).
+    2026-10-19 · 18:32 · v2 · Nachtrag 1 (KC 18:02)
+      N1: Umschalter „Als Kundenbestellung kennzeichnen / Normales Produkt“
+      im Zeilen-Fenster (zeile.kundenbestellung, null = automatisch), auch
+      ohne Kunde-Block und bei unbekannten Nummern. Bekanntes Produkt als
+      Kundenbestellung steht unter „Bitte ansehen“ (ruhiger Hinweis),
+      unbekannte Bestellungen bleiben eingeklappt.
+      N2: Topfwechsel gegenüber dem gespeicherten Tag = „bisher / jetzt“
+      („bisher: Produkt 20 · jetzt: Kundenbestellung 20“), sperrt bis
+      entschieden. Einträge tragen legacyKeys (Logik räumt die anderen Töpfe).
+      Dazu: „Heute nicht auf dem Zettel“ kennt jetzt jede Zeile mit bekannter
+      Nummer (auch Bestellung oder rot) — sonst hieße eine als Bestellung
+      gekennzeichnete Zeile „Seite vergessen?“.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Backzettel erfassen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
+
+<style>
+  /* Vorsilbe bz-. Farben nur über Tokens; Status (rot/Warnung/grün) getrennt vom Akzent (Checkliste §3a). */
+  [hidden] { display: none !important; }
+  body { min-height: 100vh; }
+  .bz-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm);
+    padding: var(--bos-space-sm) var(--bos-space-md); border-bottom: 1px solid var(--bos-border); background: var(--bos-bg-soft);
+    position: sticky; top: 0; z-index: 20; }
+  .bz-kopf h1 { margin: 0; font-size: var(--bos-font-xl); }
+  .bz-kopf small { display: block; color: var(--bos-text-dim); font-size: var(--bos-font-xs); }
+  .bz-knoepfe { display: flex; gap: var(--bos-space-2xs); }
+  .bz-rund { min-width: var(--bos-tap-min); min-height: var(--bos-tap-min); padding: 0 10px; font-size: 1.1rem; }
+  main { max-width: 900px; margin: 0 auto; padding: var(--bos-space-md); display: flex; flex-direction: column; gap: var(--bos-space-md); }
+  .bz-karte { padding: var(--bos-space-md); }
+  .bz-karte h2 { margin: 0 0 var(--bos-space-xs); font-family: var(--bos-font-label); text-transform: uppercase; letter-spacing: .05em; font-size: var(--bos-font-sm); color: var(--bos-text-dim); }
+  .bz-zeile { display: flex; flex-wrap: wrap; gap: var(--bos-space-2xs); align-items: center; }
+  .bz-btn { min-height: var(--bos-tap-min); }
+  .bz-btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .bz-dim { color: var(--bos-text-dim); font-size: var(--bos-font-sm); }
+  .bz-faint { color: var(--bos-text-faint); font-size: var(--bos-font-xs); }
+  .bz-ok { color: var(--bos-green); font-weight: 700; }
+  .bz-rot { color: var(--bos-red); font-weight: 700; }
+  .bz-warn { color: var(--bos-warn-bright, var(--bos-warn)); font-weight: 700; }
+  .bz-akzent { color: var(--bos-amber-bright); }
+  .bz-tage { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .bz-tage li { font-size: var(--bos-font-sm); }
+  .bz-tage b { font-family: var(--bos-font-label); }
+  .bz-hinweis { border-left: 3px solid var(--bos-amber); padding: 6px 10px; background: var(--bos-amber-glow-soft); border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm); }
+  .bz-warnbox { border-left: 3px solid var(--bos-warn); padding: 6px 10px; background: var(--bos-warn-glow-soft); border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm); }
+  .bz-fehlbox { border-left: 3px solid var(--bos-red); padding: 6px 10px; background: color-mix(in srgb, var(--bos-red) 14%, transparent); border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm); overflow-wrap: anywhere; }
+  .bz-fehlbox a, .bz-warnbox a { color: inherit; font-weight: 700; }
+  /* Fotostapel */
+  .bz-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--bos-space-xs); margin-top: var(--bos-space-xs); }
+  .bz-foto { border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); overflow: hidden; background: var(--bos-surface-raised); display: flex; flex-direction: column; }
+  .bz-foto img { width: 100%; height: 120px; object-fit: cover; display: block; background: var(--bos-bg-soft); }
+  .bz-foto .bz-fstatus { padding: 6px 8px; font-size: var(--bos-font-xs); min-height: 2.6em; overflow-wrap: anywhere; }
+  .bz-foto .bz-fknoepfe { display: flex; gap: 4px; padding: 0 6px 6px; flex-wrap: wrap; }
+  .bz-foto .bz-fknoepfe .bos-btn { padding: 4px 8px; font-size: var(--bos-font-xs); min-height: 34px; }
+  .bz-foto.verworfen { opacity: .45; }
+  /* Übersicht */
+  .bz-summe { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--bos-font-label); font-size: var(--bos-font-md); }
+  .bz-reiter { display: flex; gap: 6px; overflow-x: auto; margin: var(--bos-space-xs) 0; }
+  .bz-reiter button { flex: 0 0 auto; }
+  .bz-reiter button.aktiv { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .bz-seiten { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--bos-space-xs); }
+  .bz-seite { border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); padding: 2px 8px; font-family: var(--bos-font-label); font-size: var(--bos-font-sm); }
+  .bz-liste { display: flex; flex-direction: column; gap: 4px; }
+  .bz-z { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; text-align: left; width: 100%;
+    background: var(--bos-surface-raised); border: 1px solid var(--bos-border); border-left-width: 4px; border-radius: var(--bos-radius-sm);
+    padding: 8px 10px; color: var(--bos-text); font-family: var(--bos-font-body); font-size: var(--bos-font-md); cursor: pointer; min-height: var(--bos-tap-min); }
+  .bz-z .bz-zname { font-weight: 700; overflow-wrap: anywhere; }
+  .bz-z .bz-zzahl { font-family: var(--bos-font-label); font-weight: 800; font-size: var(--bos-font-lg); text-align: right; }
+  .bz-z .bz-zgrund { grid-column: 1 / -1; font-size: var(--bos-font-xs); color: var(--bos-text-dim); }
+  .bz-z.rot { border-left-color: var(--bos-red); }
+  .bz-z.gelb { border-left-color: var(--bos-warn); }
+  .bz-z.hinweis { border-left-color: var(--bos-amber); }
+  .bz-z.ruhig { border-left-color: var(--bos-border-strong); }
+  .bz-z.ok { border-left-color: var(--bos-green); }
+  .bz-z.verworfen { opacity: .5; text-decoration: line-through; }
+  details.bz-auf > summary { cursor: pointer; padding: 8px 0; font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-text-dim); }
+  .bz-unterkopf { font-family: var(--bos-font-label); text-transform: uppercase; letter-spacing: .05em; font-size: var(--bos-font-xs); color: var(--bos-text-dim); margin: var(--bos-space-xs) 0 4px; }
+  /* Blätter (Sheets) */
+  .bz-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+  .bz-sheet { background: var(--bos-surface); border-top-left-radius: var(--bos-radius-lg); border-top-right-radius: var(--bos-radius-lg); width: 100%; max-width: 720px;
+    max-height: 92vh; overflow-y: auto; padding: var(--bos-space-md); box-shadow: var(--bos-shadow-lg); }
+  .bz-sheet h2 { margin: 0 0 var(--bos-space-xs); font-family: var(--bos-font-display); font-size: var(--bos-font-xl); overflow-wrap: anywhere; }
+  .bz-sheet h3 { margin: var(--bos-space-sm) 0 4px; font-family: var(--bos-font-label); font-size: var(--bos-font-md); }
+  .bz-sheet p { margin: 4px 0; line-height: 1.45; }
+  .bz-sheetknoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--bos-space-sm); position: sticky; bottom: 0; background: var(--bos-surface); padding-top: 8px; }
+  .bz-feld { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+  .bz-feld label { font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-text-dim); font-size: var(--bos-font-sm); }
+  .bz-zweispaltig { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .bz-bildrahmen { margin-top: var(--bos-space-xs); border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); overflow: auto; max-height: 60vh; background: var(--bos-bg-soft); }
+  .bz-bildrahmen img { display: block; width: 100%; }
+  .bz-bildrahmen.gross img { width: auto; max-width: none; }
+  .bz-gruende { margin: 6px 0; padding-left: 18px; }
+  .bz-gruende li { margin: 2px 0; font-size: var(--bos-font-sm); }
+  #fehlerLeiste { position: sticky; top: 64px; z-index: 19; margin: 0 var(--bos-space-md); }
+  #fehlerLeiste ul { margin: 4px 0 0; padding-left: 18px; }
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--bos-surface-raised); border: 1px solid var(--bos-border-strong);
+    padding: 10px 16px; border-radius: var(--bos-radius-md); z-index: 60; box-shadow: var(--bos-shadow-md); max-width: 92vw; }
+  input.bos-input { min-height: var(--bos-tap-min); }
+  @media (max-width: 480px) { main { padding: var(--bos-space-sm); } .bz-zweispaltig { grid-template-columns: 1fr; } .bz-fotos { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<!-- Zugriff (Checkliste §2a): normaler Satellit über den Launcher -->
+<script>var BOS_APP_ID = 'backzettel_erfassung';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_ungespeichert.js"></script>
+<script src="../bos_foto.js"></script>
+<script src="backzettel_prompt.js"></script>
+<script src="backzettel_logik.js"></script>
+<script src="backzettel_api.js"></script>
+
+<header class="bz-kopf">
+  <div>
+    <h1 class="bos-title" data-i18n="titel">Backzettel erfassen</h1>
+    <small id="kopfKonto"></small>
+  </div>
+  <div class="bz-knoepfe">
+    <button type="button" class="bos-btn bz-rund" id="geraetBtn" title="Gerät" aria-label="Gerät">⚙</button>
+    <button type="button" class="bos-btn bz-rund" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="fehlerLeiste" class="bz-fehlbox" role="alert" hidden>
+  <div class="bz-zeile" style="justify-content:space-between;"><b data-i18n="fehler_titel">✕ Fehler</b>
+    <button type="button" class="bos-btn bos-btn--ghost" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main>
+  <section class="bos-panel bz-karte" id="standKarte">
+    <h2 data-i18n="stand_titel">Stand</h2>
+    <div id="standInhalt" class="bz-dim" data-i18n="lade">Lade …</div>
+  </section>
+
+  <section class="bos-panel bz-karte" id="fotoKarte">
+    <h2 data-i18n="fotos_titel">Fotos</h2>
+    <p class="bz-dim" data-i18n="fotos_hinweis">Eine Seite pro Foto, mit der Kopfzeile oben drauf. Gerade von oben, gut ausgeleuchtet.</p>
+    <div class="bz-zeile">
+      <label class="bos-btn bos-btn--amber bz-btn" for="kameraInput" id="kameraLabel" style="display:inline-flex;align-items:center;" data-i18n="foto_aufnehmen">📷 Foto aufnehmen</label>
+      <input type="file" id="kameraInput" accept="image/*" capture="environment" hidden>
+      <label class="bos-btn bz-btn" for="galerieInput" style="display:inline-flex;align-items:center;" data-i18n="aus_galerie">🖼 Aus der Galerie</label>
+      <input type="file" id="galerieInput" accept="image/*" multiple hidden>
+    </div>
+    <div class="bz-fotos" id="fotoListe"></div>
+    <div class="bz-zeile" style="margin-top:var(--bos-space-sm);">
+      <button type="button" class="bos-btn bos-btn--amber bz-btn" id="auslesenBtn" disabled>…</button>
+      <span class="bz-dim" id="kostenZeile"></span>
+    </div>
+  </section>
+
+  <section class="bos-panel bz-karte" id="uebersichtKarte" hidden>
+    <h2 data-i18n="uebersicht_titel">Übersicht</h2>
+    <div id="uebersichtInhalt"></div>
+  </section>
+</main>
+
+<!-- Gerät: Schlüssel, Modell, Gründlichkeit (nur dieses Gerät) -->
+<div id="geraetSheet" class="bz-overlay" hidden>
+  <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="geraetTitel">
+    <h2 id="geraetTitel" data-i18n="geraet_titel">Gerät</h2>
+    <p class="bz-dim" data-i18n="geraet_erklaerung">Diese Einstellungen gelten nur auf diesem Gerät. Der Schlüssel geht nur an Anthropic, nie in die Datenbank.</p>
+    <div class="bz-feld">
+      <label for="schluesselInput" data-i18n="schluessel">API-Schlüssel</label>
+      <div class="bz-dim" id="schluesselStand"></div>
+      <input type="password" class="bos-input" id="schluesselInput" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+      <div class="bz-zeile">
+        <button type="button" class="bos-btn bos-btn--amber bz-btn" id="schluesselSpeichernBtn" data-i18n="schluessel_speichern">Schlüssel speichern</button>
+        <button type="button" class="bos-btn bz-btn" id="schluesselLoeschenBtn" data-i18n="schluessel_loeschen">Schlüssel löschen</button>
+      </div>
+    </div>
+    <div class="bz-feld">
+      <label for="modellWahl" data-i18n="modell">Modell</label>
+      <select class="bos-input" id="modellWahl"></select>
+      <input type="text" class="bos-input" id="modellFrei" autocomplete="off" spellcheck="false" hidden>
+    </div>
+    <div class="bz-feld">
+      <label for="effortWahl" data-i18n="gruendlichkeit">Gründlichkeit</label>
+      <select class="bos-input" id="effortWahl"></select>
+    </div>
+    <p class="bz-faint" id="geraetPreise"></p>
+    <div class="bz-sheetknoepfe"><button type="button" class="bos-btn bz-btn" id="geraetZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<!-- Eine Zeile bearbeiten -->
+<div id="zeileSheet" class="bz-overlay" hidden>
+  <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="zeileTitel">
+    <h2 id="zeileTitel"></h2>
+    <div id="zeileInhalt"></div>
+    <div class="bz-sheetknoepfe" id="zeileKnoepfe"></div>
+    <div class="bz-zeile" style="margin-top:8px;"><button type="button" class="bos-btn bz-btn" id="bildGrossBtn" data-i18n="vergroessern">Vergrößern</button></div>
+    <div class="bz-bildrahmen" id="zeileBildRahmen"><img id="zeileBild" alt=""></div>
+  </div>
+</div>
+
+<!-- Speichern: Zusammenfassung mit zwei Knöpfen ohne Vorauswahl (Checkliste §11) -->
+<div id="speichernSheet" class="bz-overlay" hidden>
+  <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="speichernTitel">
+    <h2 id="speichernTitel" data-i18n="speichern_titel">Speichern?</h2>
+    <div id="speichernInhalt"></div>
+    <div class="bz-sheetknoepfe">
+      <button type="button" class="bos-btn bos-btn--amber bz-btn" id="speichernJaBtn" data-i18n="speichern">Speichern</button>
+      <button type="button" class="bos-btn bz-btn" id="speichernNeinBtn" data-i18n="zurueck">Zurück</button>
+    </div>
+  </div>
+</div>
+
+<div id="hilfeSheet" class="bz-overlay" hidden>
+  <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="hilfeTitel">
+    <h2 id="hilfeTitel" data-i18n="hilfe_titel">Hilfe: Backzettel erfassen</h2>
+    <div id="hilfeInhalt"></div>
+    <div class="bz-sheetknoepfe"><button type="button" class="bos-btn bz-btn" id="hilfeZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+'use strict';
+
+/* ===================== Texte (i18n, Checkliste §6) ===================== */
+const I18N_DE = {
+  titel: 'Backzettel erfassen', lade: 'Lade …', fehler_titel: '✕ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  stand_titel: 'Stand', fotos_titel: 'Fotos', uebersicht_titel: 'Übersicht', zurueck: 'Zurück', speichern: 'Speichern',
+  fotos_hinweis: 'Eine Seite pro Foto, mit der Kopfzeile oben drauf. Gerade von oben, gut ausgeleuchtet.',
+  foto_aufnehmen: '📷 Foto aufnehmen', aus_galerie: '🖼 Aus der Galerie', vergroessern: 'Vergrößern', verkleinern_ansicht: 'Ganze Seite',
+  auslesen: 'Auslesen ({n} Seiten)', auslesen_eins: 'Auslesen (1 Seite)', auslesen_laeuft: 'Lese … ({fertig}/{n})', auslesen_leer: 'Erst Fotos aufnehmen',
+  angemeldet: 'angemeldet als {k}',
+  geraet_titel: 'Gerät', geraet_erklaerung: 'Diese Einstellungen gelten nur auf diesem Gerät. Der Schlüssel geht nur an Anthropic, nie in die Datenbank.',
+  schluessel: 'API-Schlüssel', schluessel_speichern: 'Schlüssel speichern', schluessel_loeschen: 'Schlüssel löschen',
+  schluessel_da: '✓ Schlüssel hinterlegt: {k}', schluessel_fehlt: '✕ Kein Schlüssel auf diesem Gerät',
+  schluessel_gespeichert: '✓ Schlüssel gespeichert', schluessel_geloescht: 'Schlüssel gelöscht', schluessel_leer: 'Bitte erst einen Schlüssel eintragen.',
+  speicher_geht_nicht: 'Dieses Gerät erlaubt kein Speichern (privater Modus?). Der Schlüssel gilt nur bis zum Schließen.',
+  modell: 'Modell', modell_anderes: 'Anderer Name …', gruendlichkeit: 'Gründlichkeit',
+  eff_low: 'niedrig (günstiger)', eff_medium: 'mittel', eff_high: 'hoch (gründlicher, teurer)',
+  preise: 'Preise je 1 Mio. Tokens (Stand {s}): {liste}',
+  kein_schluessel_start: '⚠︎ Auf diesem Gerät ist noch kein API-Schlüssel hinterlegt. Oben rechts ⚙ antippen.',
+  letzter_backtag: 'Letzter erfasster Backtag: {tag} (vor {n} Tagen)', letzter_backtag_heute: 'Letzter erfasster Backtag: {tag} (heute)',
+  letzter_backtag_gestern: 'Letzter erfasster Backtag: {tag} (gestern)',
+  noch_nichts: 'Noch kein Backzettel erfasst.', letzte_tage: 'Die letzten erfassten Backtage:',
+  stand_fehler: 'Stand nicht lesbar: {m}', index_fehlt_link: 'Index anlegen (öffnet die Firebase-Konsole)',
+  index_folge: 'Ohne Index gehen Abweichungsprüfung, „fehlt“ und „kam n×“ nicht. Auslesen und Speichern gehen trotzdem.',
+  produkte_fehler: 'Produktliste nicht ladbar: {m}', einstellungen_fehler: 'Einstellungen nicht ladbar, es gelten die Startwerte: {m}',
+  f_wartet: 'wartet', f_verkleinert: 'bereit', f_liest: 'liest …', f_fehler: '✕ {m}', f_kein_backzettel: '⚠︎ Kein Backzettel erkannt',
+  f_fertig: '✓ {abt} S.{s} · {z} Zeilen', f_teilweise: '⚠︎ {abt} S.{s} · {z} Zeilen · teilweise lesbar{h}', f_schlecht: '⚠︎ {abt} S.{s} · schlecht lesbar{h} → neu fotografieren?',
+  f_entfernen: '✕ entfernen', f_nochmal: '↻ nochmal lesen', f_wiederaufnehmen: 'wieder aufnehmen', f_verworfen: 'zählt nicht (doppelte Seite)',
+  foto_lesen_fehler: 'Foto nicht lesbar: {m}',
+  kopf_summe: '{tag} · {seiten} Seiten · {zeilen} Zeilen', z_rot: '{n} rot', z_gelb: '{n} Abweichung', z_unbekannt: '{n} unbekannt', z_bestellungen: '{n} Bestellungen', z_fehlt: '{n} fehlt',
+  kosten: 'Kosten dieses Durchgangs: ≈ {b} US-$', kosten_ca: 'Kosten dieses Durchgangs: ca. {b} US-$ (Preise Stand {s})',
+  ergebnis_kopieren: 'Ergebnis kopieren', kopiert: '✓ Ergebnis in die Zwischenablage kopiert', kopieren_geht_nicht: 'Kopieren ging nicht — Text wird angezeigt, bitte von Hand markieren.',
+  alles: 'Alle', auffaellig: 'Bitte ansehen', in_ordnung: '{n} Zeilen in Ordnung', ruhig_zeilen: '{n} Zeilen ohne Produkt oder Kundenbestellung (still mitgespeichert)',
+  alle_gelesen: 'Alle Seiten gelesen', keine_auffaelligen: '✓ Nichts Auffälliges.',
+  fehlt_titel: 'Heute nicht auf dem Zettel', fehlt_zeile: '{name} — heute nicht auf dem Zettel. Seite vergessen? (sonst {an} von {von} {wt}en)',
+  fehlt_kaltstart: 'Fehlt-Prüfung ab dem {n}. erfassten {wt} (bisher {v}).',
+  doppelt_titel: '{abt} Seite {s} ist {n}× da — welches Foto gilt?', doppelt_wahl: 'Foto {i} gilt',
+  datum_kein: '✕ Foto {i}: Backtag oben links nicht lesbar ({g}).', datum_wt: '✕ Foto {i}: Wochentag passt nicht zum Datum ({wt} {d}).',
+  datum_mehrere: '✕ Die Fotos haben verschiedene Backtage: {liste}. Falsche Fotos entfernen.',
+  datum_rueck_alt: '⚠︎ Alter Backzettel: {tag} liegt {n} Tage zurück.', datum_rueck_zukunft: '⚠︎ Backtag {tag} liegt {n} Tage in der Zukunft.',
+  import_tag: '✕ Für {tag} liegen alte BOS1-Zahlen vor — dieser Tag wird nicht ergänzt.',
+  bestand_tag: 'Für {tag} ist schon gespeichert: {seiten}. Neues wird ergänzt.',
+  bestand_fehler: 'Gespeicherter Stand des Tages nicht lesbar: {m}',
+  sperre: 'Speichern geht erst, wenn: {liste}', sperre_rot: '{n} rote Zeile(n) korrigiert oder bestätigt', sperre_doppelt: 'doppelte Seiten entschieden',
+  sperre_datum: 'der Backtag klar ist', sperre_konflikt: '{n}× „bisher / jetzt“ entschieden', sperre_foto: 'alle Fotos gelesen oder entfernt',
+  sperre_import: 'kein BOS1-Tag', sperre_leer: 'mindestens eine Zeile da ist', sperre_bestand: 'der gespeicherte Stand gelesen ist', sperre_laeuft: 'das Auslesen fertig ist',
+  speichern_btn: 'Speichern …', speichern_titel: 'Speichern?',
+  sp_zeile: 'Backtag {tag} · {p} Produkte ({n} zählen nicht) · {o} ohne Produkt · {b} Bestellungen',
+  sp_sorten: 'Dazu still gespeichert: Sorten unter {n} GESAMT-Zeile(n).',
+  sp_erklaerung: 'Gespeichert wird nur die Stückzahl. Fotos werden nicht gespeichert.',
+  gespeichert: '✓ Gespeichert: {p} Produkte ({n} zählen nicht), {o} ohne Produkt, {b} Bestellungen — {tag}',
+  neuer_durchgang: 'Neuer Durchgang', speichert: 'Speichere …',
+  sp_fehler: 'Speichern fehlgeschlagen: {m}', sp_konflikt: 'Inzwischen wurde dieser Tag geändert (anderes Gerät?). Übersicht neu laden und nochmal speichern.',
+  sp_zeit: 'Keine Bestätigung vom Server nach {s} s. Netz prüfen, dann die Seite neu laden und nachsehen, ob der Tag gespeichert ist.',
+  sp_perm: 'Die Datenbank hat abgelehnt: Backzettel speichern darf nur die Planung (Rolle admin oder produktionsleitung). Angemeldet als {k}.',
+  sp_netz: 'Keine Verbindung zum Server (WLAN?). Nichts wurde gespeichert.',
+  /* Gründe an Zeilen */
+  g_nummer_fehlt: '✕ Artikelnummer fehlt oder unlesbar', g_anzahl_fehlt: '✕ Anzahl fehlt oder unlesbar',
+  g_p1_falsch: '✕ Prüfsumme: {a} ÷ {c} = {soll} Bleche, gelesen {b}', g_p1_nicht_pruefbar: '✕ Nicht nachrechenbar (Bleche oder Charge unlesbar)',
+  g_bestaetigt: '✓ Von Hand bestätigt', g_konflikt_produkt: '✕ Zwei Produkte mit dieser Artikelnummer: {namen} — in der Produktkarte klären oder Zeile verwerfen',
+  g_kein_stueck: '⚠︎ Produkt „{name}“ führt seinen Schlüssel nicht in Stück — wird als „ohne Produkt“ gespeichert',
+  g_doppelt_durchgang: '✕ Diese Artikelnummer steht zweimal in diesem Durchgang',
+  g_abweichung: '⚠︎ Abweichung: heute {heute}, Schnitt {wt} {schnitt} ({db} Bleche, {dp} %) — zählt vorab nicht für den Schnitt',
+  g_abweichung_zaehlt: '⚠︎ Abweichung: heute {heute}, Schnitt {wt} {schnitt} ({db} Bleche, {dp} %) — von Hand auf „zählt“ gestellt',
+  g_zaehlt_nicht_hand: 'Zählt nicht für den Schnitt (von Hand)',
+  g_zu_wenig: 'Zu wenig Vergleichstage ({n}) — keine Abweichungsprüfung', g_keine_charge: 'Keine Charge — keine Abweichungsprüfung',
+  g_pruefung_fehler: 'Abweichungsprüfung nicht möglich: {m}',
+  g_charge: '💡 Charge: Zettel {z}, Produktkarte {p} — Produktkarte prüfen', g_charge_leer: '💡 Produktkarte hat keine „Stück pro Träger“ — Zettel sagt {z}',
+  g_unsicher: '⚠︎ Die KI war hier unsicher — mit dem Foto vergleichen', g_sorten_summe: '💡 Sorten ergeben {s} statt {a}',
+  g_abteilung: '💡 Artikelnummer gehört zu {k}, steht aber auf {abt}',
+  g_unbekannt: 'Unbekannte Artikelnummer — wird still mitgespeichert · kam {n}× in den letzten 4 Wochen',
+  g_bestellung: 'Kundenbestellung (Menge = Anzahl) — zählt nicht, löst nie „fehlt“ aus · kam {n}× in den letzten 4 Wochen',
+  g_bestellung_hand: 'Kundenbestellung (von Hand gekennzeichnet) — zählt nicht, löst nie „fehlt“ aus · kam {n}× in den letzten 4 Wochen',
+  g_bestellung_bekannt: 'Bekanntes Produkt als Kundenbestellung erkannt (Menge = Anzahl) — zählt nicht für den Schnitt',
+  g_bestellung_bekannt_hand: 'Bekanntes Produkt, von Hand als Kundenbestellung gekennzeichnet — zählt nicht für den Schnitt',
+  g_keine_bestellung_hand: 'Von Hand: keine Kundenbestellung (Kunde-Menge {m} = Anzahl)',
+  g_wechsel: '✕ Schon gespeichert — bisher: {ba} {bisher} · jetzt: {ja} {jetzt} — bitte entscheiden',
+  g_wechsel_bisher: 'bisher behalten: {ba} {bisher} (gelesen: {ja} {jetzt})', g_wechsel_jetzt: 'jetzt übernommen: {ja} {jetzt} (bisher: {ba} {bisher})',
+  art_produkt: 'Produkt', art_bestellung: 'Kundenbestellung', art_ohneProdukt: 'ohne Produkt',
+  g_konflikt_bisher: '✕ Schon gespeichert: bisher {bisher}, jetzt {jetzt} — bitte entscheiden', g_entschieden_bisher: 'bisher {bisher} behalten (gelesen {jetzt})', g_entschieden_jetzt: 'jetzt {jetzt} übernommen (bisher {bisher})',
+  g_verworfen: 'Zeile verworfen — wird nicht gespeichert', g_ohne_nummer: '✕ Ohne Artikelnummer kann die Zeile nicht gespeichert werden',
+  /* Zeilen-Blatt */
+  zs_artnr: 'Artikelnummer', zs_anzahl: 'Anzahl (Stück)', zs_zettel: 'Vom Zettel: Bleche {b} · Charge {c} · {abt} Seite {s}',
+  zs_uebernehmen: 'Übernehmen', zs_stimmt: 'Wert stimmt so', zs_zaehlt_nicht: 'Zählt nicht für den Schnitt', zs_zaehlt: 'Zählt für den Schnitt',
+  zs_bisher: 'Bisher behalten', zs_jetzt: 'Neu übernehmen', zs_verwerfen: 'Zeile verwerfen', zs_aufnehmen: 'Zeile wieder aufnehmen',
+  zs_produkt: 'Produkt: {name}', zs_kein_produkt: 'Kein Produkt mit dieser Artikelnummer', zs_bestellung: 'Kundenbestellung: Menge {m} = Anzahl',
+  zs_bestellung_hand: 'Kundenbestellung — von Hand gekennzeichnet', zs_keine_bestellung_hand: 'Keine Kundenbestellung — von Hand (Kunde-Menge {m} = Anzahl)',
+  zs_als_bestellung: 'Als Kundenbestellung kennzeichnen', zs_als_produkt: 'Normales Produkt (keine Kundenbestellung)', zs_keine_bestellung: 'Keine Kundenbestellung',
+  zs_kein_foto: 'Foto nicht mehr im Speicher.', zs_anzahl_ungueltig: 'Anzahl bitte als Zahl eintragen (z. B. 1170).', zs_artnr_ungueltig: 'Artikelnummer: nur Ziffern.',
+  zs_stufe2: '🚧 Produkt anlegen — in Planung (Stufe 2)',
+  hilfe_titel: 'Hilfe: Backzettel erfassen',
+  unbehandelt: 'Unerwarteter Fehler: {m}', ungueltig_bild: 'Kein Bild: {n}',
+  wt_kurz: 'So,Mo,Di,Mi,Do,Fr,Sa'
+};
+function t(k, w) {
+  let s = Object.prototype.hasOwnProperty.call(I18N_DE, k) ? I18N_DE[k] : k;
+  Object.keys(w || {}).forEach(function (x) { s = s.split('{' + x + '}').join(String(w[x])); });
+  return s;
+}
+function wendeI18nAn() { document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); }); }
+function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function zahlText(x, nachkomma) {
+  if (x === null || x === undefined || !Number.isFinite(x)) return '–';
+  return x.toLocaleString('de-DE', { maximumFractionDigits: nachkomma === undefined ? 2 : nachkomma });
+}
+function datumKurz(iso) {
+  if (!iso) return '–';
+  const d = L.ausIso(iso);
+  return t('wt_kurz').split(',')[d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+}
+const $ = function (id) { return document.getElementById(id); };
+
+/* ===================== Fehler sichtbar (Checkliste §7a) ===================== */
+const L = window.BOS_BACKZETTEL_LOGIK, A = window.BOS_BACKZETTEL_API, PR = window.BOS_BACKZETTEL_PROMPT, V = window.BOS_VERBRAUCH;
+function schluesselJetzt() { try { return A.geraet().schluessel; } catch (e) { return ''; } }
+function sauber(text) { return A ? A.entschaerfe(text, schluesselJetzt()) : String(text); }
+function zeigeFehler(text, err) {
+  const zeile = sauber(text);
+  const li = document.createElement('li');
+  li.textContent = zeile;
+  $('fehlerListe').appendChild(li);
+  $('fehlerLeiste').hidden = false;
+  // console.error nur mit der Meldung, nie mit Anfrage oder Kopfzeilen
+  console.error('Backzettel:', zeile, err && err.code ? '[' + err.code + ']' : '');
+}
+window.addEventListener('error', function (ev) { zeigeFehler(t('unbehandelt', { m: (ev.message || '') + (ev.filename ? ' (' + ev.filename.split('/').pop() + ':' + ev.lineno + ')' : '') })); });
+window.addEventListener('unhandledrejection', function (ev) { const r = ev.reason; zeigeFehler(t('unbehandelt', { m: (r && (r.meldung || r.message)) || String(r) }), r); });
+$('fehlerZuBtn').addEventListener('click', function () { $('fehlerLeiste').hidden = true; $('fehlerListe').innerHTML = ''; });
+let toastUhr = null;
+function toast(text) {
+  const el = $('toast'); el.textContent = text; el.hidden = false;
+  clearTimeout(toastUhr); toastUhr = setTimeout(function () { el.hidden = true; }, 3500);
+}
+
+/* ===================== Zustand ===================== */
+const S = {
+  kennung: null, produkte: [], index: {}, einst: null, tage: [], tageFehler: null,
+  heute: L.iso(new Date()),
+  fotos: [],            // { id, datei, url, status, fehler, bild, seite, verworfen, ergebnis }
+  laeuft: false,
+  alt: { datum: null, dok: null, geladen: false, fehler: null },
+  abw: {},              // key → Ergebnis von pruefeBackzettelWert (je Zeile)
+  reiter: null,
+  bildGross: false,
+  speichertGerade: false,
+  gespeichert: false,
+  quittung: null,
+  zeileOffen: null
+};
+let fotoZaehler = 0;
+
+/* ===================== Start ===================== */
+async function start() {
+  wendeI18nAn();
+  zeichneGeraet();
+  zeichneFotos();
+  try {
+    if (window.BOS_AUTH_READY) await window.BOS_AUTH_READY;
+    const nutzer = window.firebase && firebase.auth().currentUser;
+    S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+    $('kopfKonto').textContent = S.kennung ? t('angemeldet', { k: S.kennung }) : '';
+  } catch (err) {
+    zeigeFehler(String(err && err.message || err), err);
+  }
+  await Promise.all([ladeProdukte(), ladeEinstellungen(), ladeTage()]);
+  zeichneStand();
+}
+async function ladeProdukte() {
+  try {
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    S.produkte = e.liste || [];
+    S.index = L.produktIndex(S.produkte);
+    const h = window.BOS_PRODUKTE.hinweisText ? window.BOS_PRODUKTE.hinweisText(e) : null;
+    if (h) toast(h);
+  } catch (err) {
+    S.produkte = []; S.index = {};
+    zeigeFehler(t('produkte_fehler', { m: (err && (err.meldung || err.message)) || String(err) }), err);
+  }
+}
+async function ladeEinstellungen() {
+  try { S.einst = await V.holeEinstellungen('offiziell'); }
+  catch (err) { S.einst = null; zeigeFehler(t('einstellungen_fehler', { m: err.message }), err); }
+}
+async function ladeTage() {
+  try { S.tage = await V.holeOffizielleTage(window.db); S.tageFehler = null; }
+  catch (err) { S.tage = []; S.tageFehler = err; }
+}
+
+/* ===================== Stand-Karte ===================== */
+function zeichneStand() {
+  const el = $('standInhalt');
+  let html = '';
+  if (!A.geraet().schluessel) html += '<p class="bz-warnbox">' + esc(t('kein_schluessel_start')) + '</p>';
+  if (S.tageFehler) {
+    const f = S.tageFehler;
+    html += '<div class="bz-fehlbox"><p>' + esc(t('stand_fehler', { m: f.meldung || f.message })) + '</p>' +
+      (f.link ? '<p><a href="' + esc(f.link) + '" target="_blank" rel="noopener">' + esc(t('index_fehlt_link')) + '</a></p>' : '') +
+      (f.art === 'index_fehlt' ? '<p>' + esc(t('index_folge')) + '</p>' : '') + '</div>';
+  } else {
+    const letzter = L.letzterBacktag(S.tage, S.heute);
+    if (!letzter) html += '<p>' + esc(t('noch_nichts')) + '</p>';
+    else {
+      const k = letzter.tage === 0 ? 'letzter_backtag_heute' : letzter.tage === 1 ? 'letzter_backtag_gestern' : 'letzter_backtag';
+      html += '<p class="' + (letzter.warnung ? 'bz-warn' : '') + '">' + (letzter.warnung ? '⚠︎ ' : '') + esc(t(k, { tag: datumKurz(letzter.datum), n: letzter.tage })) + '</p>';
+      const neu = S.tage.filter(function (d) { return d.quelle === 'backzettel_ki'; }).slice(0, 7);
+      html += '<p class="bz-dim">' + esc(t('letzte_tage')) + '</p><ul class="bz-tage">' + neu.map(function (d) {
+        return '<li><b>' + esc(datumKurz(d.datum)) + '</b> · ' + esc(seitenText(d.seiten)) + '</li>';
+      }).join('') + '</ul>';
+    }
+  }
+  el.innerHTML = html;
+  el.classList.remove('bz-dim');
+}
+function seitenText(seiten) {
+  const g = {};
+  (seiten || []).forEach(function (s) { (g[s.abteilung] = g[s.abteilung] || []).push(s.seite); });
+  return Object.keys(g).sort(function (a, b) { return a.localeCompare(b, 'de'); }).map(function (a) {
+    return a + ' ' + g[a].sort(function (x, y) { return x - y; }).map(function (n) { return 'S.' + n; }).join(' ');
+  }).join(' · ') || '–';
+}
+
+/* ===================== Gerät ===================== */
+function zeichneGeraet() {
+  const g = A.geraet();
+  $('schluesselStand').textContent = g.schluessel ? t('schluessel_da', { k: A.schluesselAnzeige(g.schluessel) }) : t('schluessel_fehlt');
+  $('schluesselStand').className = g.schluessel ? 'bz-ok' : 'bz-warn';
+  const wahl = $('modellWahl');
+  wahl.innerHTML = PR.MODELLE.map(function (m) { return '<option value="' + esc(m.name) + '">' + esc(m.label) + '</option>'; }).join('') +
+    '<option value="__anderes">' + esc(t('modell_anderes')) + '</option>';
+  const bekannt = PR.MODELLE.some(function (m) { return m.name === g.modell; });
+  wahl.value = bekannt ? g.modell : '__anderes';
+  $('modellFrei').hidden = bekannt;
+  $('modellFrei').value = bekannt ? '' : g.modell;
+  $('effortWahl').innerHTML = PR.GRUENDLICHKEIT.map(function (e) { return '<option value="' + e + '">' + esc(t('eff_' + e)) + '</option>'; }).join('');
+  $('effortWahl').value = g.effort;
+  const liste = Object.keys(PR.PREISE).filter(function (k) { return k !== 'stand'; }).map(function (k) {
+    const p = PR.PREISE[k]; return k + ' ' + (p.ca ? 'ab ' : '') + zahlText(p.ein) + ' / ' + zahlText(p.aus) + ' $';
+  }).join(' · ');
+  $('geraetPreise').textContent = t('preise', { s: PR.PREISE.stand, liste: liste });
+}
+$('geraetBtn').addEventListener('click', function () { zeichneGeraet(); $('geraetSheet').hidden = false; });
+$('geraetZuBtn').addEventListener('click', function () { $('geraetSheet').hidden = true; zeichneStand(); zeichneFotos(); });
+$('schluesselSpeichernBtn').addEventListener('click', function () {
+  const k = $('schluesselInput').value.trim();
+  if (!k) { toast(t('schluessel_leer')); return; }
+  const ok = A.setzeSchluessel(k);
+  $('schluesselInput').value = '';
+  if (!ok) { S.schluesselNurSitzung = k; toast(t('speicher_geht_nicht')); }
+  else toast(t('schluessel_gespeichert'));
+  zeichneGeraet();
+});
+$('schluesselLoeschenBtn').addEventListener('click', function () { A.loescheSchluessel(); S.schluesselNurSitzung = null; zeichneGeraet(); toast(t('schluessel_geloescht')); });
+$('modellWahl').addEventListener('change', function () {
+  const v = $('modellWahl').value;
+  $('modellFrei').hidden = v !== '__anderes';
+  if (v !== '__anderes') A.setzeModell(v);
+});
+$('modellFrei').addEventListener('change', function () { A.setzeModell($('modellFrei').value); });
+$('effortWahl').addEventListener('change', function () { A.setzeGruendlichkeit($('effortWahl').value); });
+function aktuellerSchluessel() { return A.geraet().schluessel || S.schluesselNurSitzung || ''; }
+
+/* ===================== Fotos ===================== */
+function fotoNeu(datei) {
+  if (datei.type && !/^image\//.test(datei.type)) { zeigeFehler(t('ungueltig_bild', { n: datei.name || datei.type })); return; }
+  fotoZaehler++;
+  S.fotos.push({ id: 'f' + fotoZaehler, nr: fotoZaehler, datei: datei, url: URL.createObjectURL(datei), status: 'wartet', fehler: null, bild: null, seite: null, verworfen: false, ergebnis: null });
+  S.gespeichert = false;
+}
+$('kameraInput').addEventListener('change', function (ev) { Array.from(ev.target.files || []).forEach(fotoNeu); ev.target.value = ''; nachFotoAenderung(); });
+$('galerieInput').addEventListener('change', function (ev) { Array.from(ev.target.files || []).forEach(fotoNeu); ev.target.value = ''; nachFotoAenderung(); });
+function nachFotoAenderung() { zeichneFotos(); bewerteUndZeichne(); }
+
+function fotoStatusText(f) {
+  if (f.status === 'fehler') return '<span class="bz-rot">' + esc(t('f_fehler', { m: sauber(f.fehler) })) + '</span>';
+  if (f.status === 'liest') return '<span class="bz-akzent">' + esc(t('f_liest')) + '</span>';
+  if (f.status !== 'fertig') return esc(t(f.status === 'verkleinert' ? 'f_verkleinert' : 'f_wartet'));
+  const s = f.seite;
+  if (!s.istBackzettel) return '<span class="bz-warn">' + esc(t('f_kein_backzettel')) + '</span>';
+  const w = { abt: s.abteilung || '?', s: s.seite === null ? '?' : s.seite, z: s.zeilen.length, h: s.hinweis ? ': ' + s.hinweis : '' };
+  if (f.verworfen) return '<span class="bz-faint">' + esc(t('f_verworfen')) + '</span>';
+  if (s.lesbarkeit === 'schlecht') return '<span class="bz-warn">' + esc(t('f_schlecht', w)) + '</span>';
+  if (s.lesbarkeit === 'teilweise') return '<span class="bz-warn">' + esc(t('f_teilweise', w)) + '</span>';
+  return '<span class="bz-ok">' + esc(t('f_fertig', w)) + '</span>';
+}
+function zeichneFotos() {
+  const liste = $('fotoListe');
+  liste.innerHTML = S.fotos.map(function (f) {
+    return '<div class="bz-foto' + (f.verworfen ? ' verworfen' : '') + '" data-foto="' + f.id + '">' +
+      '<img src="' + esc(f.url) + '" alt="Foto ' + f.nr + '">' +
+      '<div class="bz-fstatus">' + esc('Foto ' + f.nr) + ' · ' + fotoStatusText(f) + '</div>' +
+      '<div class="bz-fknoepfe">' +
+        (S.laeuft && f.status === 'liest' ? '' : '<button type="button" class="bos-btn" data-aktion="entfernen">' + esc(t('f_entfernen')) + '</button>') +
+        (f.status === 'fehler' && !S.laeuft ? '<button type="button" class="bos-btn" data-aktion="nochmal">' + esc(t('f_nochmal')) + '</button>' : '') +
+      '</div></div>';
+  }).join('');
+  const offen = S.fotos.filter(function (f) { return f.status !== 'fertig'; }).length;
+  const btn = $('auslesenBtn');
+  if (S.laeuft) {
+    const fertig = S.fotos.filter(function (f) { return f.status === 'fertig' || f.status === 'fehler'; }).length;
+    btn.textContent = t('auslesen_laeuft', { fertig: fertig, n: S.fotos.length }); btn.disabled = true;
+  } else if (!offen) {
+    btn.textContent = S.fotos.length ? t('alle_gelesen') : t('auslesen_leer'); btn.disabled = true;
+  } else {
+    btn.textContent = offen === 1 ? t('auslesen_eins') : t('auslesen', { n: offen }); btn.disabled = false;
+  }
+  zeichneKosten();
+}
+$('fotoListe').addEventListener('click', function (ev) {
+  const b = ev.target.closest('button[data-aktion]'); if (!b) return;
+  const id = b.closest('[data-foto]').getAttribute('data-foto');
+  const f = S.fotos.find(function (x) { return x.id === id; }); if (!f) return;
+  if (b.getAttribute('data-aktion') === 'entfernen') {
+    URL.revokeObjectURL(f.url);
+    S.fotos = S.fotos.filter(function (x) { return x !== f; });
+  } else if (b.getAttribute('data-aktion') === 'nochmal') {
+    f.status = f.bild ? 'verkleinert' : 'wartet'; f.fehler = null;
+    lesenAlle();
+    return;
+  }
+  nachFotoAenderung();
+});
+$('auslesenBtn').addEventListener('click', function () { lesenAlle(); });
+
+async function vorbereiten(f) {
+  if (f.bild) return f.bild;
+  const g = A.geraet();
+  const gr = PR.bildGrenzen(g.modell);
+  const r = await window.BOS_FOTO.verkleinern(f.datei, {
+    kanten: [gr.kante], kacheln: gr.kacheln, kachelPx: gr.kachelPx,
+    ziel: 3.5 * 1024 * 1024, regelMax: 7 * 1024 * 1024, qStart: 0.85, qMin: 0.6, qSchritt: 0.05
+  });
+  f.bild = { base64: await window.BOS_FOTO.alsBase64(r.blob), breite: r.breite, hoehe: r.hoehe, bytes: r.bytes };
+  f.status = 'verkleinert';
+  return f.bild;
+}
+async function lesenAlle() {
+  if (S.laeuft) return;
+  const schluessel = aktuellerSchluessel();
+  if (!schluessel) { $('geraetSheet').hidden = false; zeichneGeraet(); toast(t('kein_schluessel_start')); return; }
+  const g = A.geraet();
+  const offen = S.fotos.filter(function (f) { return f.status !== 'fertig'; });
+  if (!offen.length) return;
+  S.laeuft = true; S.gespeichert = false;
+  zeichneFotos();
+  const aufgaben = offen.map(function (f) {
+    return async function () {
+      try {
+        f.status = 'liest'; f.fehler = null; zeichneFotos();
+        const bild = await vorbereiten(f);
+        const erg = await A.lies({ schluessel: schluessel, modell: g.modell, effort: g.effort, bildBase64: bild.base64, mediaType: 'image/jpeg' });
+        f.ergebnis = { daten: erg.daten, usage: erg.usage, modell: erg.modell, dauerMs: erg.dauerMs, kosten: A.kosten(erg.usage, g.modell) };
+        f.seite = seiteAus(f, erg.daten);
+        f.status = 'fertig';
+      } catch (err) {
+        f.status = 'fehler';
+        f.fehler = err && err.art === 'foto_lesen' ? t('foto_lesen_fehler', { m: err.meldung }) : ((err && (err.meldung || err.message)) || String(err));
+        if (err && err.usage) f.ergebnis = { usage: err.usage, kosten: A.kosten(err.usage, g.modell) };
+      } finally {
+        zeichneFotos();
+      }
+    };
+  });
+  await A.nacheinander(aufgaben, A.GLEICHZEITIG);
+  S.laeuft = false;
+  zeichneFotos();
+  await bewerteUndZeichne();
+}
+function seiteAus(f, d) {
+  const seite = {
+    fotoId: f.id, istBackzettel: d.istBackzettel !== false,
+    abteilung: L.abteilungNorm(d.abteilung), seite: d.seite, kopfText: d.kopfText, kopf: L.kopf(d.kopfText),
+    lesbarkeit: d.lesbarkeit, hinweis: d.hinweis, zeilen: []
+  };
+  seite.zeilen = (d.zeilen || []).map(function (z) { return L.zeileAusAntwort(z, seite); });
+  return seite;
+}
+function zeichneKosten() {
+  let summe = 0, ca = false, da = false;
+  S.fotos.forEach(function (f) { if (f.ergebnis && f.ergebnis.kosten) { summe += f.ergebnis.kosten.dollar; ca = ca || f.ergebnis.kosten.ca; da = true; } });
+  $('kostenZeile').textContent = da ? (ca ? t('kosten_ca', { b: zahlText(summe, 3), s: PR.PREISE.stand }) : t('kosten', { b: zahlText(summe, 3) })) : '';
+}
+
+/* ===================== Bewerten ===================== */
+function aktiveSeiten() {
+  return S.fotos.filter(function (f) { return f.status === 'fertig' && f.seite && f.seite.istBackzettel && !f.verworfen; }).map(function (f) { return f.seite; });
+}
+function alleZeilen() {
+  const z = [];
+  aktiveSeiten().forEach(function (s) { s.zeilen.forEach(function (x) { z.push(x); }); });
+  return z;
+}
+async function ladeAltDok(datum) {
+  if (S.alt.datum === datum && S.alt.geladen) return;
+  S.alt = { datum: datum, dok: null, geladen: false, fehler: null };
+  try {
+    const snap = await window.db.collection('bos_events').doc('verbrauch_offiziell_' + datum).get();
+    S.alt.dok = snap.exists ? snap.data() : null;
+    S.alt.geladen = true;
+  } catch (err) {
+    S.alt.fehler = err;
+  }
+}
+let bewertungLauf = 0;
+async function bewerteUndZeichne() {
+  const meinLauf = ++bewertungLauf;
+  const seiten = aktiveSeiten();
+  const fertigeFotos = S.fotos.filter(function (f) { return f.status === 'fertig'; });
+  if (!fertigeFotos.length) { $('uebersichtKarte').hidden = !S.quittung; zeichneUebersicht(null); return; }
+  const lage = L.datumsLage(seiten, S.heute);
+  if (lage.backtag) await ladeAltDok(lage.backtag);
+  if (lage.backtag && !S.tageFehler) {
+    // Abweichung je bekanntem Produkt — alles in EINEM Durchgang (ein Lesevorgang des Topfs)
+    const zeilen = alleZeilen().filter(function (z) { return !z.verworfen; });
+    try {
+      await V.durchgang(async function () {
+        for (const z of zeilen) {
+          const zu = L.ordneZu(z, S.index);
+          if (zu.art !== 'produkt' || z.anzahl === null) continue;
+          const schl = zu.produkt.legacyKey + '|' + z.anzahl + '|' + z.charge + '|' + lage.backtag;
+          if (S.abw[schl]) continue;
+          try {
+            S.abw[schl] = await V.pruefeBackzettelWert({ db: window.db, produkt: zu.produkt, wochentag: lage.wochentag, backtag: lage.backtag, stueck: z.anzahl, charge: z.charge, einstellungen: S.einst || undefined });
+          } catch (err) {
+            S.abw[schl] = { pruefungAktiv: false, grund: 'fehler', meldung: err.meldung || err.message };
+          }
+        }
+      });
+    } catch (err) {
+      zeigeFehler(t('g_pruefung_fehler', { m: err.meldung || err.message }), err);
+    }
+  }
+  if (meinLauf !== bewertungLauf) return;
+  $('uebersichtKarte').hidden = false;
+  zeichneUebersicht(lage);
+}
+
+/* Bewertung einer Zeile: Farbe, Gründe, Eintrag fürs Dokument. */
+function bewerte(z, lage, doppelteArt) {
+  const r = { farbe: 'ok', gruende: [], eintrag: null, zuordnung: null, produkt: null, abw: null };
+  if (z.verworfen) { r.farbe = 'verworfen'; r.gruende.push(t('g_verworfen')); return r; }
+  const pz = L.pruefeZeile(z);
+  const zu = L.ordneZu(z, S.index);
+  r.zuordnung = zu.art; r.produkt = zu.produkt || null; r.zu = zu;
+  // N2: alle Produkte mit dieser Nummer — damit die Logik den Artikel aus den anderen Töpfen räumt
+  const lks = z.artNr ? (S.index[z.artNr] || []).map(function (p) { return p.legacyKey; }).filter(Boolean) : [];
+  pz.rot.forEach(function (g) {
+    if (g === 'p1_falsch') r.gruende.push(t('g_p1_falsch', { a: zahlText(z.anzahl), c: zahlText(z.charge), soll: zahlText(pz.p1.soll), b: zahlText(z.bleche) }));
+    else r.gruende.push(t('g_' + g));
+  });
+  let rot = pz.rot.length > 0;
+  if (z.bestaetigt && pz.p1 && !pz.p1.ok && z.anzahl !== null) r.gruende.push(t('g_bestaetigt'));
+  if (zu.art === 'konflikt') { rot = true; r.gruende.push(t('g_konflikt_produkt', { namen: zu.produkte.map(function (p) { return p.name || p.legacyKey; }).join(', ') })); }
+  if (z.artNr && doppelteArt[z.artNr] > 1) { rot = true; r.gruende.push(t('g_doppelt_durchgang')); }
+  let hinweis = false, gelb = false, ruhig = false;
+  pz.hinweise.forEach(function (h) {
+    hinweis = true;
+    if (h === 'sorten_summe') r.gruende.push(t('g_sorten_summe', { s: zahlText(pz.sorten.summe), a: zahlText(z.anzahl) }));
+    else if (h === 'abteilung') r.gruende.push(t('g_abteilung', { k: L.kreisAbteilung(z.artNr), abt: z.abteilung }));
+    else r.gruende.push(t('g_' + h));
+  });
+  // Eintrag + Prüfungen je Art
+  if (zu.art === 'produkt') {
+    const p = zu.produkt;
+    const ch = L.pruefeCharge(z, p);
+    if (ch) { hinweis = true; r.gruende.push(ch.produkt ? t('g_charge', { z: zahlText(ch.zettel), p: zahlText(ch.produkt) }) : t('g_charge_leer', { z: zahlText(ch.zettel) })); }
+    const schl = p.legacyKey + '|' + z.anzahl + '|' + z.charge + '|' + (lage && lage.backtag);
+    const a = S.abw[schl] || null;
+    r.abw = a;
+    const altAus = S.alt.dok && S.alt.dok.ausgeschlossen && Object.prototype.hasOwnProperty.call(S.alt.dok.ausgeschlossen, p.legacyKey) ? S.alt.dok.ausgeschlossen[p.legacyKey] : null;
+    const auffaellig = !!(a && a.pruefungAktiv && a.auffaellig);
+    const zaehltNicht = z.zaehltNicht !== null ? z.zaehltNicht : (auffaellig || !!altAus);
+    if (a && a.pruefungAktiv && a.auffaellig) {
+      gelb = true;
+      const w = { heute: zahlText(z.anzahl, 0), wt: lage.wochentag, schnitt: zahlText(a.schnittStueck, 0), db: zahlText(a.deltaBleche, 1), dp: zahlText(a.deltaProzent * 100, 0) };
+      r.gruende.push(zaehltNicht ? t('g_abweichung', w) : t('g_abweichung_zaehlt', w));
+    } else if (zaehltNicht) {
+      gelb = true; r.gruende.push(t('g_zaehlt_nicht_hand'));
+    }
+    if (a && !a.pruefungAktiv) {
+      if (a.grund === 'zu_wenig') r.gruende.push(t('g_zu_wenig', { n: a.anzahl }));
+      else if (a.grund === 'keine_charge') r.gruende.push(t('g_keine_charge'));
+      else if (a.grund === 'fehler') r.gruende.push(t('g_pruefung_fehler', { m: a.meldung }));
+    }
+    if (zu.wahl === false && zu.vorschlag) r.gruende.push(t('g_keine_bestellung_hand', { m: zahlText(z.kundeMenge, 0) }));
+    r.eintrag = { art: 'produkt', key: p.legacyKey, anzahl: z.anzahl, name: p.name || z.name, zaehltNicht: zaehltNicht,
+      grund: (auffaellig || altAus === 'abweichung') ? 'abweichung' : 'von_hand', entscheidung: z.entscheidung, sorten: z.sorten, artNr: z.artNr, legacyKeys: lks };
+  } else if (zu.art === 'bestellung') {
+    const n = lage && lage.backtag ? L.vorkommen(S.tage, z.artNr, 'bestellungen', lage.backtag) : 0;
+    if (zu.bekannt) {
+      // N1: bekanntes Produkt als Bestellung → ruhiger Hinweis unter „Bitte ansehen“ (ein Fehlgriff kostet einen Schnitt-Wert)
+      hinweis = true;
+      r.gruende.push(t(zu.wahl === true ? 'g_bestellung_bekannt_hand' : 'g_bestellung_bekannt'));
+    } else {
+      ruhig = true;
+      r.gruende.push(t(zu.wahl === true ? 'g_bestellung_hand' : 'g_bestellung', { n: n }));
+    }
+    r.eintrag = { art: 'bestellung', key: z.artNr, anzahl: z.anzahl, name: z.name, entscheidung: z.entscheidung, sorten: z.sorten, artNr: z.artNr, legacyKeys: lks };
+  } else if (zu.art === 'ohneProdukt' || zu.art === 'kein_stueck') {
+    ruhig = true;
+    if (zu.art === 'kein_stueck') r.gruende.push(t('g_kein_stueck', { name: zu.produkt.name || zu.produkt.legacyKey }));
+    r.gruende.push(t('g_unbekannt', { n: lage && lage.backtag ? L.vorkommen(S.tage, z.artNr, 'ohneProdukt', lage.backtag) : 0 }));
+    if (zu.wahl === false && zu.vorschlag) r.gruende.push(t('g_keine_bestellung_hand', { m: zahlText(z.kundeMenge, 0) }));
+    r.eintrag = { art: 'ohneProdukt', key: z.artNr, anzahl: z.anzahl, name: z.name, charge: z.charge, entscheidung: z.entscheidung, sorten: z.sorten, artNr: z.artNr, legacyKeys: lks };
+  } else if (zu.art === 'ohne_nummer') {
+    rot = true;
+  }
+  r.farbe = rot ? 'rot' : gelb ? 'gelb' : hinweis ? 'hinweis' : ruhig ? 'ruhig' : 'ok';
+  if (rot) r.eintrag = null;
+  return r;
+}
+
+/* ===================== Übersicht ===================== */
+function artText(art) { return art === 'bestellung' ? t('art_bestellung') : art === 'ohneProdukt' ? t('art_ohneProdukt') : t('art_produkt'); }
+let letzteAuswertung = null;
+function auswerten(lage) {
+  const zeilen = alleZeilen();
+  const doppelteArt = {};
+  zeilen.forEach(function (z) { if (!z.verworfen && z.artNr) doppelteArt[z.artNr] = (doppelteArt[z.artNr] || 0) + 1; });
+  const bew = new Map();
+  zeilen.forEach(function (z) { bew.set(z.id, bewerte(z, lage, doppelteArt)); });
+  const eintraege = [];
+  zeilen.forEach(function (z) { const b = bew.get(z.id); if (b.eintrag && b.eintrag.anzahl !== null) eintraege.push(b.eintrag); });
+  const konfl = (S.alt.dok && !L.importTag(S.alt.dok)) ? L.konflikte(S.alt.dok, eintraege) : [];
+  // Konflikte an die Zeilen hängen (rot, bis entschieden)
+  konfl.forEach(function (k) {
+    zeilen.forEach(function (z) {
+      const b = bew.get(z.id);
+      if (b.eintrag !== k.eintrag) return;
+      const w = { bisher: zahlText(k.bisher), jetzt: zahlText(k.jetzt), ba: artText(k.bisherArt || k.art), ja: artText(k.art) };
+      // N2: Topfwechsel („bisher: Produkt 20 · jetzt: Kundenbestellung 20“) wie ein geänderter Wert
+      const vor = k.wechsel ? 'g_wechsel' : null;
+      if (z.entscheidung === 'bisher') b.gruende.push(t(vor ? 'g_wechsel_bisher' : 'g_entschieden_bisher', w));
+      else if (z.entscheidung === 'jetzt') b.gruende.push(t(vor ? 'g_wechsel_jetzt' : 'g_entschieden_jetzt', w));
+      else { b.gruende.unshift(t(vor || 'g_konflikt_bisher', w)); b.farbe = 'rot'; b.konflikt = true; }
+    });
+  });
+  // „auf dem Zettel“ = jede nicht verworfene Zeile mit bekannter Nummer, egal ob Produkt, Bestellung oder rot
+  // (sonst hieße ein als Kundenbestellung gekennzeichnetes Produkt „Seite vergessen?“ — Nachtrag 1)
+  const heuteKeys = [];
+  zeilen.forEach(function (z) { if (!z.verworfen && z.artNr) (S.index[z.artNr] || []).forEach(function (p) { if (p.legacyKey) heuteKeys.push(p.legacyKey); }); });
+  const abteilungen = {};
+  aktiveSeiten().forEach(function (s) { if (s.abteilung) abteilungen[s.abteilung] = true; });
+  let fehlt = { aktiv: false, vergleichstage: 0, fehlt: [] };
+  if (lage && lage.backtag && !S.tageFehler) {
+    fehlt = L.fehltListe({ tage: S.tage, backtag: lage.backtag, produkte: S.produkte, heuteAbteilungen: Object.keys(abteilungen), heuteKeys: heuteKeys,
+      istBacktag: function (p, i) { try { return window.BOS_PRODUKTE.backtagIndizes(p)[i] !== false; } catch (e) { return true; } } });
+  }
+  const zaehl = { rot: 0, gelb: 0, unbekannt: 0, bestellungen: 0, produkte: 0, zaehltNicht: 0, ohne: 0 };
+  zeilen.forEach(function (z) {
+    const b = bew.get(z.id);
+    if (b.farbe === 'rot') zaehl.rot++;
+    if (b.farbe === 'gelb') zaehl.gelb++;
+    if (b.eintrag && b.eintrag.art === 'ohneProdukt') zaehl.unbekannt++;
+    if (b.eintrag && b.eintrag.art === 'bestellung') zaehl.bestellungen++;
+    if (b.eintrag && b.eintrag.art === 'produkt') { zaehl.produkte++; if (b.eintrag.zaehltNicht) zaehl.zaehltNicht++; }
+  });
+  const doppelSeiten = L.doppelteSeiten(S.fotos.filter(function (f) { return f.status === 'fertig' && f.seite && f.seite.istBackzettel; })
+    .map(function (f) { return { fotoId: f.id, nr: f.nr, abteilung: f.seite.abteilung, seite: f.seite.seite, verworfen: f.verworfen }; }));
+  // Sperren
+  const sperre = [];
+  if (S.laeuft) sperre.push(t('sperre_laeuft'));
+  if (S.fotos.some(function (f) { return f.status !== 'fertig'; })) sperre.push(t('sperre_foto'));
+  if (!lage || !lage.backtag || lage.probleme.length) sperre.push(t('sperre_datum'));
+  if (doppelSeiten.length) sperre.push(t('sperre_doppelt'));
+  if (zaehl.rot) sperre.push(t('sperre_rot', { n: zaehl.rot }));
+  if (lage && lage.backtag && !S.alt.geladen) sperre.push(t('sperre_bestand'));
+  if (S.alt.dok && L.importTag(S.alt.dok)) sperre.push(t('sperre_import'));
+  if (!eintraege.length) sperre.push(t('sperre_leer'));
+  letzteAuswertung = { lage: lage, zeilen: zeilen, bew: bew, eintraege: eintraege, fehlt: fehlt, zaehl: zaehl, doppelSeiten: doppelSeiten, sperre: sperre, abteilungen: Object.keys(abteilungen).sort(function (a, b) { return a.localeCompare(b, 'de'); }) };
+  return letzteAuswertung;
+}
+function zeileKnopf(z, b) {
+  const p = b.produkt;
+  const name = (p && p.name) || z.name || '?';
+  const zahl = z.anzahl === null ? '?' : zahlText(z.anzahl, 0);
+  return '<button type="button" class="bz-z ' + b.farbe + '" data-zeile="' + esc(z.id) + '">' +
+    '<span class="bz-zname">' + esc(name) + ' <span class="bz-faint">' + esc(z.artNr || z.artNrText || '–') + '</span></span>' +
+    '<span class="bz-zzahl">' + esc(zahl) + '</span>' +
+    (b.gruende.length ? '<span class="bz-zgrund">' + b.gruende.map(esc).join(' · ') + '</span>' : '') + '</button>';
+}
+function zeichneUebersicht(lage) {
+  const el = $('uebersichtInhalt');
+  if (S.quittung && !S.fotos.length) {
+    el.innerHTML = '<p class="bz-ok">' + esc(S.quittung) + '</p>';
+    return;
+  }
+  if (!lage) { el.innerHTML = ''; return; }
+  const a = auswerten(lage);
+  let html = '';
+  // Kopf
+  const z = a.zaehl;
+  html += '<div class="bz-summe"><span>' + esc(t('kopf_summe', { tag: lage.backtag ? datumKurz(lage.backtag) : '?', seiten: aktiveSeiten().length, zeilen: a.zeilen.filter(function (x) { return !x.verworfen; }).length })) + '</span>' +
+    '<span class="' + (z.rot ? 'bz-rot' : 'bz-ok') + '">' + (z.rot ? '✕ ' : '✓ ') + esc(t('z_rot', { n: z.rot })) + '</span>' +
+    '<span class="' + (z.gelb ? 'bz-warn' : '') + '">' + (z.gelb ? '⚠︎ ' : '') + esc(t('z_gelb', { n: z.gelb })) + '</span>' +
+    '<span>' + esc(t('z_unbekannt', { n: z.unbekannt })) + '</span><span>' + esc(t('z_bestellungen', { n: z.bestellungen })) + '</span>' +
+    (a.fehlt.fehlt.length ? '<span class="bz-warn">⚠︎ ' + esc(t('z_fehlt', { n: a.fehlt.fehlt.length })) + '</span>' : '') + '</div>';
+  // Datum, Bestand, Import
+  lage.probleme.forEach(function (p) {
+    const f = S.fotos.find(function (x) { return x.id === p.fotoId; });
+    if (p.grund === 'mehrere_backtage') html += '<p class="bz-fehlbox">' + esc(t('datum_mehrere', { liste: p.daten.map(datumKurz).join(', ') })) + '</p>';
+    else if (p.grund === 'wochentag') html += '<p class="bz-fehlbox">' + esc(t('datum_wt', { i: f ? f.nr : '?', wt: p.wtKurz, d: p.datum })) + '</p>';
+    else html += '<p class="bz-fehlbox">' + esc(t('datum_kein', { i: f ? f.nr : '?', g: p.grund })) + '</p>';
+  });
+  if (lage.rueckfrage) html += '<p class="bz-warnbox">' + esc(t(lage.rueckfrage.grund === 'alt' ? 'datum_rueck_alt' : 'datum_rueck_zukunft', { tag: datumKurz(lage.backtag), n: lage.rueckfrage.tage })) + '</p>';
+  if (S.alt.fehler) html += '<p class="bz-fehlbox">' + esc(t('bestand_fehler', { m: S.alt.fehler.message })) + '</p>';
+  if (S.alt.dok && L.importTag(S.alt.dok)) html += '<p class="bz-fehlbox">' + esc(t('import_tag', { tag: datumKurz(lage.backtag) })) + '</p>';
+  else if (S.alt.dok) html += '<p class="bz-hinweis">' + esc(t('bestand_tag', { tag: datumKurz(lage.backtag), seiten: seitenText(S.alt.dok.seiten) })) + '</p>';
+  if (S.tageFehler) html += '<p class="bz-warnbox">' + esc(S.tageFehler.meldung || S.tageFehler.message) + ' ' + esc(t('index_folge')) + '</p>';
+  // Doppelte Seiten
+  a.doppelSeiten.forEach(function (d) {
+    html += '<div class="bz-warnbox"><p>' + esc(t('doppelt_titel', { abt: d.abteilung, s: d.seite, n: d.seiten.length })) + '</p><div class="bz-zeile">' +
+      d.seiten.map(function (s) { return '<button type="button" class="bos-btn bz-btn" data-doppelt-gilt="' + esc(s.fotoId) + '">' + esc(t('doppelt_wahl', { i: s.nr })) + '</button>'; }).join('') + '</div></div>';
+  });
+  // Reiter je Abteilung
+  const abts = a.abteilungen;
+  if (!S.reiter || (S.reiter !== '__alle' && abts.indexOf(S.reiter) === -1)) S.reiter = '__alle';
+  html += '<div class="bz-reiter" role="tablist">' + ['__alle'].concat(abts).map(function (r) {
+    return '<button type="button" class="bos-btn' + (S.reiter === r ? ' aktiv' : '') + '" data-reiter="' + esc(r) + '">' + esc(r === '__alle' ? t('alles') : r) + '</button>';
+  }).join('') + '</div>';
+  const imReiter = function (zz) { return S.reiter === '__alle' || zz.abteilung === S.reiter; };
+  // Seiten-Kästchen
+  html += '<div class="bz-seiten">' + aktiveSeiten().filter(function (s) { return S.reiter === '__alle' || s.abteilung === S.reiter; })
+    .map(function (s) { return '<span class="bz-seite">' + esc((s.abteilung || '?') + ' S.' + (s.seite === null ? '?' : s.seite)) + ' ✓</span>'; }).join('') + '</div>';
+  // Auffälliges oben, Rest eingeklappt
+  const sichtbar = a.zeilen.filter(imReiter);
+  const rang = { rot: 0, gelb: 1, hinweis: 2, ruhig: 3, verworfen: 4, ok: 5 };
+  // E17: oben nur Auffälliges (rot, Abweichung, Hinweis, verworfen); unbekannte Zeilen und
+  // Bestellungen („ruhig“) und die Zeilen in Ordnung stehen eingeklappt darunter.
+  const auff = sichtbar.filter(function (zz) { const f = a.bew.get(zz.id).farbe; return f !== 'ok' && f !== 'ruhig'; })
+    .sort(function (x, y) { return rang[a.bew.get(x.id).farbe] - rang[a.bew.get(y.id).farbe]; });
+  const ruhig = sichtbar.filter(function (zz) { return a.bew.get(zz.id).farbe === 'ruhig'; });
+  const ok = sichtbar.filter(function (zz) { return a.bew.get(zz.id).farbe === 'ok'; });
+  html += '<div class="bz-unterkopf">' + esc(t('auffaellig')) + '</div>';
+  html += auff.length ? '<div class="bz-liste">' + auff.map(function (zz) { return zeileKnopf(zz, a.bew.get(zz.id)); }).join('') + '</div>' : '<p class="bz-ok">' + esc(t('keine_auffaelligen')) + '</p>';
+  // fehlt
+  const fehltHier = a.fehlt.fehlt.filter(function (f) { return S.reiter === '__alle' || f.abteilung === S.reiter; });
+  if (fehltHier.length) {
+    html += '<div class="bz-unterkopf">' + esc(t('fehlt_titel')) + '</div><div class="bz-liste">' + fehltHier.map(function (f) {
+      return '<div class="bz-warnbox">⚠︎ ' + esc(t('fehlt_zeile', { name: f.produkt.name || f.produkt.legacyKey, an: f.an, von: f.von, wt: lage.wochentag })) + '</div>';
+    }).join('') + '</div>';
+  } else if (!a.fehlt.aktiv && lage.backtag && !S.tageFehler) {
+    html += '<p class="bz-faint">' + esc(t('fehlt_kaltstart', { n: L.FEHLT_MINDEST, wt: lage.wochentag, v: a.fehlt.vergleichstage })) + '</p>';
+  }
+  if (ruhig.length) html += '<details class="bz-auf"><summary>' + esc(t('ruhig_zeilen', { n: ruhig.length })) + '</summary><div class="bz-liste">' + ruhig.map(function (zz) { return zeileKnopf(zz, a.bew.get(zz.id)); }).join('') + '</div></details>';
+  if (ok.length) html += '<details class="bz-auf"><summary>' + esc(t('in_ordnung', { n: ok.length })) + '</summary><div class="bz-liste">' + ok.map(function (zz) { return zeileKnopf(zz, a.bew.get(zz.id)); }).join('') + '</div></details>';
+  // Sperre, Knöpfe
+  if (a.sperre.length) html += '<p class="bz-warnbox">' + esc(t('sperre', { liste: a.sperre.join(' · ') })) + '</p>';
+  html += '<div class="bz-zeile" style="margin-top:var(--bos-space-sm);">' +
+    '<button type="button" class="bos-btn bos-btn--amber bz-btn" id="speichernBtn"' + (a.sperre.length || S.speichertGerade ? ' disabled' : '') + '>' + esc(S.speichertGerade ? t('speichert') : t('speichern_btn')) + '</button>' +
+    '<button type="button" class="bos-btn bz-btn" id="kopierenBtn">' + esc(t('ergebnis_kopieren')) + '</button>' +
+    (S.gespeichert ? '<button type="button" class="bos-btn bz-btn" id="neuBtn">' + esc(t('neuer_durchgang')) + '</button>' : '') + '</div>';
+  if (S.quittung) html += '<p class="bz-ok" style="margin-top:8px;">' + esc(S.quittung) + '</p>';
+  el.innerHTML = html;
+}
+$('uebersichtInhalt').addEventListener('click', function (ev) {
+  const r = ev.target.closest('[data-reiter]');
+  if (r) { S.reiter = r.getAttribute('data-reiter'); zeichneUebersicht(letzteAuswertung && letzteAuswertung.lage); return; }
+  const d = ev.target.closest('[data-doppelt-gilt]');
+  if (d) {
+    const gilt = S.fotos.find(function (f) { return f.id === d.getAttribute('data-doppelt-gilt'); });
+    S.fotos.forEach(function (f) {
+      if (f !== gilt && f.status === 'fertig' && f.seite && gilt.seite && f.seite.abteilung === gilt.seite.abteilung && f.seite.seite === gilt.seite.seite) f.verworfen = true;
+    });
+    gilt.verworfen = false;
+    zeichneFotos(); bewerteUndZeichne(); return;
+  }
+  const zk = ev.target.closest('[data-zeile]');
+  if (zk) { oeffneZeile(zk.getAttribute('data-zeile')); return; }
+  if (ev.target.id === 'speichernBtn') { oeffneSpeichern(); return; }
+  if (ev.target.id === 'kopierenBtn') { kopiereErgebnis(); return; }
+  if (ev.target.id === 'neuBtn') { neuerDurchgang(); return; }
+});
+
+/* ===================== Zeile bearbeiten ===================== */
+function findeZeile(id) { return alleZeilen().find(function (z) { return z.id === id; }) || null; }
+function oeffneZeile(id) {
+  const z = findeZeile(id); if (!z || !letzteAuswertung) return;
+  S.zeileOffen = id;
+  const b = letzteAuswertung.bew.get(id) || { gruende: [], farbe: 'ok' };
+  const p = b.produkt;
+  $('zeileTitel').textContent = ((p && p.name) || z.name || '?') + ' · ' + (z.artNr || z.artNrText || '–');
+  let html = '';
+  const zu = b.zu || {};
+  html += '<p class="bz-dim">' + esc(p ? t('zs_produkt', { name: p.name || p.legacyKey }) : t('zs_kein_produkt')) + '</p>';
+  if (b.zuordnung === 'bestellung') html += '<p class="bz-dim">' + esc(zu.wahl === true ? t('zs_bestellung_hand') : t('zs_bestellung', { m: zahlText(z.kundeMenge, 0) })) + '</p>';
+  else if (zu.wahl === false && zu.vorschlag) html += '<p class="bz-dim">' + esc(t('zs_keine_bestellung_hand', { m: zahlText(z.kundeMenge, 0) })) + '</p>';
+  if (!p && b.zuordnung !== 'bestellung') html += '<p class="bz-faint">' + esc(t('zs_stufe2')) + '</p>';
+  html += '<div class="bz-zweispaltig"><div class="bz-feld"><label for="zsArtNr">' + esc(t('zs_artnr')) + '</label><input class="bos-input" id="zsArtNr" inputmode="numeric" value="' + esc(z.artNr || z.artNrText || '') + '"></div>' +
+    '<div class="bz-feld"><label for="zsAnzahl">' + esc(t('zs_anzahl')) + '</label><input class="bos-input" id="zsAnzahl" inputmode="decimal" value="' + esc(z.anzahl === null ? '' : String(z.anzahl)) + '"></div></div>';
+  html += '<p class="bz-faint">' + esc(t('zs_zettel', { b: zahlText(z.bleche), c: zahlText(z.charge), abt: z.abteilung || '?', s: z.seite === null ? '?' : z.seite })) + '</p>';
+  html += '<p id="zsFehler" class="bz-rot" role="alert"></p>';
+  if (b.gruende.length) html += '<ul class="bz-gruende">' + b.gruende.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul>';
+  $('zeileInhalt').innerHTML = html;
+  // Knöpfe
+  const pz = L.pruefeZeile(z);
+  const k = [];
+  k.push('<button type="button" class="bos-btn bos-btn--amber bz-btn" data-z="uebernehmen">' + esc(t('zs_uebernehmen')) + '</button>');
+  if (!z.verworfen && pz.p1 && !pz.p1.ok && z.anzahl !== null && !z.bestaetigt) k.push('<button type="button" class="bos-btn bz-btn" data-z="stimmt">' + esc(t('zs_stimmt')) + '</button>');
+  if (b.eintrag && b.eintrag.art === 'produkt') k.push('<button type="button" class="bos-btn bz-btn" data-z="zaehlt">' + esc(b.eintrag.zaehltNicht ? t('zs_zaehlt') : t('zs_zaehlt_nicht')) + '</button>');
+  // N1: Umschalter Kundenbestellung ↔ normales Produkt (auch ohne Kunde-Block, auch bei unbekannter Nummer)
+  if (!z.verworfen && z.artNr) {
+    const istBest = b.zuordnung === 'bestellung';
+    k.push('<button type="button" class="bos-btn bz-btn" data-z="bestellung">' +
+      esc(!istBest ? t('zs_als_bestellung') : (zu.bekannt ? t('zs_als_produkt') : t('zs_keine_bestellung'))) + '</button>');
+  }
+  if (b.konflikt || z.entscheidung) {
+    k.push('<button type="button" class="bos-btn bz-btn" data-z="bisher">' + esc(t('zs_bisher')) + '</button>');
+    k.push('<button type="button" class="bos-btn bz-btn" data-z="jetzt">' + esc(t('zs_jetzt')) + '</button>');
+  }
+  k.push('<button type="button" class="bos-btn bz-btn" data-z="verwerfen">' + esc(z.verworfen ? t('zs_aufnehmen') : t('zs_verwerfen')) + '</button>');
+  k.push('<button type="button" class="bos-btn bz-btn" data-z="zu">' + esc(t('schliessen')) + '</button>');
+  $('zeileKnoepfe').innerHTML = k.join('');
+  const f = S.fotos.find(function (x) { return x.id === z.fotoId; });
+  $('zeileBild').src = f ? f.url : '';
+  $('zeileBild').alt = f ? 'Foto ' + f.nr : t('zs_kein_foto');
+  $('zeileBildRahmen').classList.toggle('gross', S.bildGross);
+  $('bildGrossBtn').textContent = S.bildGross ? t('verkleinern_ansicht') : t('vergroessern');
+  $('zeileSheet').hidden = false;
+}
+$('bildGrossBtn').addEventListener('click', function () {
+  S.bildGross = !S.bildGross;
+  $('zeileBildRahmen').classList.toggle('gross', S.bildGross);
+  $('bildGrossBtn').textContent = S.bildGross ? t('verkleinern_ansicht') : t('vergroessern');
+});
+$('zeileKnoepfe').addEventListener('click', function (ev) {
+  const b = ev.target.closest('[data-z]'); if (!b) return;
+  const z = findeZeile(S.zeileOffen); if (!z) { $('zeileSheet').hidden = true; return; }
+  const was = b.getAttribute('data-z');
+  if (was === 'zu') { $('zeileSheet').hidden = true; return; }
+  if (was === 'uebernehmen') {
+    const artRoh = $('zsArtNr').value.trim(), anzRoh = $('zsAnzahl').value.trim();
+    const art = L.artNrNorm(artRoh);
+    if (artRoh && !art) { $('zsFehler').textContent = t('zs_artnr_ungueltig'); return; }
+    const anz = L.zahl(anzRoh);
+    if (anzRoh && anz === null) { $('zsFehler').textContent = t('zs_anzahl_ungueltig'); return; }
+    if (art !== z.artNr || anz !== z.anzahl) { z.bestaetigt = false; z.zaehltNicht = null; z.entscheidung = null; }
+    if (art !== z.artNr) z.kundenbestellung = null;   // anderer Artikel → wieder automatisch
+    z.artNr = art; z.anzahl = anz;
+  }
+  if (was === 'stimmt') z.bestaetigt = true;
+  if (was === 'zaehlt') {
+    const bew = letzteAuswertung.bew.get(z.id);
+    z.zaehltNicht = !(bew && bew.eintrag && bew.eintrag.zaehltNicht);
+  }
+  if (was === 'bestellung') {
+    // Ulfs Wahl; stimmt sie mit dem Vorschlag überein, gilt wieder „automatisch“ (null)
+    const neu = L.ordneZu(z, S.index).art !== 'bestellung';
+    z.kundenbestellung = neu === L.bestellungVorschlag(z) ? null : neu;
+    z.entscheidung = null;   // ein „bisher / jetzt“ gehört zum alten Topf
+  }
+  if (was === 'bisher') z.entscheidung = 'bisher';
+  if (was === 'jetzt') z.entscheidung = 'jetzt';
+  if (was === 'verwerfen') z.verworfen = !z.verworfen;
+  S.gespeichert = false;
+  $('zeileSheet').hidden = true;
+  bewerteUndZeichne();
+});
+
+/* ===================== Speichern ===================== */
+function oeffneSpeichern() {
+  const a = letzteAuswertung; if (!a || a.sperre.length) return;
+  const zaehl = a.zaehl;
+  const sorten = a.eintraege.filter(function (e) { return e.sorten && e.sorten.length; }).length;
+  let html = '<p><b>' + esc(t('sp_zeile', { tag: datumKurz(a.lage.backtag), p: zaehl.produkte, n: zaehl.zaehltNicht, o: zaehl.unbekannt, b: zaehl.bestellungen })) + '</b></p>';
+  if (sorten) html += '<p class="bz-dim">' + esc(t('sp_sorten', { n: sorten })) + '</p>';
+  if (a.lage.rueckfrage) html += '<p class="bz-warnbox">' + esc(t(a.lage.rueckfrage.grund === 'alt' ? 'datum_rueck_alt' : 'datum_rueck_zukunft', { tag: datumKurz(a.lage.backtag), n: a.lage.rueckfrage.tage })) + '</p>';
+  html += '<p class="bz-faint">' + esc(t('sp_erklaerung')) + '</p><p id="spFehler" class="bz-rot" role="alert"></p>';
+  $('speichernInhalt').innerHTML = html;
+  $('speichernJaBtn').disabled = false;
+  $('speichernSheet').hidden = false;
+}
+$('speichernNeinBtn').addEventListener('click', function () { $('speichernSheet').hidden = true; });
+function stempel(dok) {
+  if (!dok) return 'leer';
+  const z = dok.zuletztBearbeitet;
+  if (z && typeof z.toMillis === 'function') return 'ms' + z.toMillis();
+  return 'inhalt' + JSON.stringify(dok.produkte || {}) + JSON.stringify(dok.ausgeschlossen || {});
+}
+function mitZeitlimit(versprechen, ms) {
+  let uhr;
+  return Promise.race([versprechen, new Promise(function (_, nein) {
+    uhr = setTimeout(function () { const e = new Error('Zeitlimit'); e.code = 'zeitlimit'; nein(e); }, ms);
+  })]).then(function (w) { clearTimeout(uhr); return w; }, function (e) { clearTimeout(uhr); throw e; });
+}
+const SPEICHER_ZEITLIMIT_MS = 30000;
+$('speichernJaBtn').addEventListener('click', async function () {
+  const a = letzteAuswertung; if (!a || a.sperre.length || S.speichertGerade) return;
+  S.speichertGerade = true; $('speichernJaBtn').disabled = true; $('spFehler').textContent = t('speichert');
+  const datum = a.lage.backtag;
+  const g = A.geraet();
+  const ref = window.db.collection('bos_events').doc('verbrauch_offiziell_' + datum);
+  const erwartet = stempel(S.alt.dok);
+  const modell = (S.fotos.find(function (f) { return f.ergebnis && f.ergebnis.modell; }) || {}).ergebnis;
+  try {
+    await mitZeitlimit(window.db.runTransaction(async function (tx) {
+      const snap = await tx.get(ref);
+      const jetzt = snap.exists ? snap.data() : null;
+      if (stempel(jetzt) !== erwartet) { const e = new Error(t('sp_konflikt')); e.code = 'konflikt'; throw e; }
+      const dok = L.baueTagesdokument(jetzt, a.eintraege, {
+        datum: datum, modell: modell ? modell.modell : g.modell, promptFassung: PR.FASSUNG,
+        serverZeit: firebase.firestore.FieldValue.serverTimestamp(),
+        seiten: aktiveSeiten().map(function (s) { return { abteilung: s.abteilung, seite: s.seite }; })
+      });
+      tx.set(ref, dok);   // GANZES Dokument, ohne merge (B11, Bauplan §3.5)
+    }), SPEICHER_ZEITLIMIT_MS);
+    const z = a.zaehl;
+    S.quittung = t('gespeichert', { p: z.produkte, n: z.zaehltNicht, o: z.unbekannt, b: z.bestellungen, tag: datumKurz(datum) });
+    S.gespeichert = true;
+    $('speichernSheet').hidden = true;
+    V.vergissOffizielle();
+    S.alt = { datum: null, dok: null, geladen: false, fehler: null };
+    S.abw = {};
+    await ladeTage();
+    zeichneStand();
+    await bewerteUndZeichne();
+    toast(S.quittung);
+  } catch (err) {
+    let m;
+    if (err && err.code === 'konflikt') m = t('sp_konflikt');
+    else if (err && err.art === 'import_tag') m = err.message;
+    else if (err && err.code === 'permission-denied') m = t('sp_perm', { k: S.kennung || '?' });
+    else if (err && err.code === 'unavailable') m = t('sp_netz');
+    else if (err && err.code === 'zeitlimit') m = t('sp_zeit', { s: SPEICHER_ZEITLIMIT_MS / 1000 });
+    else m = t('sp_fehler', { m: ((err && err.code) ? err.code + ' — ' : '') + ((err && err.message) || String(err)) });
+    $('spFehler').textContent = m;
+    zeigeFehler(m, err);
+    if (err && err.code === 'konflikt') { S.alt = { datum: null, dok: null, geladen: false, fehler: null }; }
+  } finally {
+    S.speichertGerade = false;
+    $('speichernJaBtn').disabled = false;
+    zeichneUebersicht(letzteAuswertung && letzteAuswertung.lage);
+  }
+});
+function neuerDurchgang() {
+  S.fotos.forEach(function (f) { URL.revokeObjectURL(f.url); });
+  S.fotos = []; S.abw = {}; S.reiter = null; S.gespeichert = false;
+  S.alt = { datum: null, dok: null, geladen: false, fehler: null };
+  zeichneFotos();
+  $('uebersichtKarte').hidden = !S.quittung;
+  zeichneUebersicht(null);
+}
+
+/* ===================== Ergebnis kopieren (Vergleichslauf §4.3a) ===================== */
+function kopiereErgebnis() {
+  const g = A.geraet();
+  const daten = {
+    art: 'backzettel_ergebnis', promptFassung: PR.FASSUNG, modell: g.modell, gruendlichkeit: g.effort,
+    kosten: S.fotos.reduce(function (s, f) { return s + (f.ergebnis && f.ergebnis.kosten ? f.ergebnis.kosten.dollar : 0); }, 0),
+    seiten: S.fotos.filter(function (f) { return f.ergebnis && f.ergebnis.daten; }).map(function (f) {
+      return { foto: f.nr, dauerMs: f.ergebnis.dauerMs, usage: f.ergebnis.usage, daten: f.ergebnis.daten };
+    })
+  };
+  const text = sauber(JSON.stringify(daten));
+  const zeigen = function () { $('speichernInhalt').innerHTML = '<textarea class="bos-input" rows="8" readonly>' + esc(text) + '</textarea>'; $('speichernJaBtn').disabled = true; $('speichernSheet').hidden = false; toast(t('kopieren_geht_nicht')); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast(t('kopiert')); }, zeigen);
+  else zeigen();
+}
+
+/* ===================== Hilfe (Text = BACKZETTEL_ERFASSUNG_DOKU.md §7) ===================== */
+const HILFE = [
+  ['Wofür ist diese Seite?', 'Hier fotografierst du die Backzettel einer Nacht. BOS lässt die Fotos von einer KI (Claude) auslesen, rechnet jede Zeile nach und speichert die Stückzahlen in den Backzettel-Topf. Aus diesem Topf rechnet BOS den Durchschnitt je Wochentag, wenn ein Produkt in der Produktkarte auf „Backzettel“ steht.'],
+  ['Was brauche ich?', 'Einmalig einen eigenen API-Schlüssel von Anthropic. Lege dafür in der Anthropic-Console einen eigenen Workspace an und gib ihm ein niedriges Ausgabenlimit. Den Schlüssel trägst du oben rechts unter ⚙ Gerät ein. Er bleibt nur auf diesem Gerät, geht nur an Anthropic und nie in die Datenbank. Unter ⚙ siehst du nur die letzten vier Zeichen. „Schlüssel löschen“ entfernt ihn vom Gerät; widerrufen kannst du ihn in der Anthropic-Console.'],
+  ['Wie fotografiere ich?', 'Eine Seite pro Foto, die Kopfzeile mit „Backzettel für …“ muss drauf sein. Gerade von oben, ohne Schatten, die ganze Tabelle im Bild. „📷 Foto aufnehmen“ nimmt ein Foto auf; tippe es einfach für jede Seite erneut. „🖼 Aus der Galerie“ nimmt mehrere Fotos auf einmal. Unten in der Leiste kannst du jedes Foto wieder entfernen.'],
+  ['Was passiert beim Auslesen?', 'Jedes Foto wird einzeln gelesen, höchstens drei gleichzeitig. Ein unscharfes Foto verdirbt nur seine eigene Seite: Es bekommt ein ⚠︎ oder ✕ mit Grund, du entfernst es, fotografierst die Seite neu und liest noch einmal. Die schon gelesenen Seiten bleiben stehen. Die Fotos werden nirgends gespeichert. Ist eine Seite zweimal da, fragt BOS, welches Foto gilt.'],
+  ['Was rechnet BOS nach?', 'Für jede Zeile: Anzahl geteilt durch Charge muss die gedruckten Bleche ergeben. Stimmt das nicht, ist die Zeile rot (✕): Dann hat die KI sich verlesen. Tippe die Zeile an, vergleiche mit dem Foto (Vergrößern) und korrigiere die Anzahl, oder bestätige mit „Wert stimmt so“. Außerdem prüft BOS, dass alle Fotos denselben Backtag haben (das Datum oben links, nicht das Druckdatum oben rechts) und der Wochentag zum Datum passt.'],
+  ['Was heißen die Farben?', '✕ Rot: muss geklärt werden, sonst geht Speichern nicht. ⚠︎ Abweichung: Der Wert weicht stark vom Durchschnitt desselben Wochentags ab — mindestens 3 Bleche UND mindestens 20 % (einstellbar im Verbrauch-Einstellungs-Editor, Reiter Backzettel). So eine Zeile steht vorab auf „zählt nicht für den Schnitt“. Ist der Wert echt (neue Filiale, Aktion), tippe sie an und stelle sie auf „zählt“. 💡 Hinweis: etwas zum Ansehen, z. B. die Charge auf dem Zettel passt nicht zur Produktkarte. Graue Zeilen (eingeklappt): unbekannte Artikelnummern und Kundenbestellungen mit unbekannter Nummer — sie werden still mitgespeichert, zählen aber nicht für den Schnitt. Ein bekanntes Produkt, das als Kundenbestellung gilt, steht dagegen als 💡 Hinweis oben.'],
+  ['Kundenbestellungen', 'Steht unter einer Zeile ein Kunde-Block und ist die bestellte Menge gleich der Anzahl, schlägt BOS „Kundenbestellung“ vor. Ist die Menge kleiner als die Anzahl, bleibt es ein normales Produkt. Eine Kundenbestellung zählt nicht für den Schnitt und löst nie „fehlt“ aus. Du kannst jede Zeile selbst umstellen: Zeile antippen, dann „Als Kundenbestellung kennzeichnen“ oder „Normales Produkt“ (bei unbekannter Nummer „Keine Kundenbestellung“). Das geht auch ohne Kunde-Block, denn die Kommentare auf dem Zettel sind nicht immer zuverlässig. Deine Wahl geht vor. Ist ein bekanntes Produkt eine Kundenbestellung, steht es unter „Bitte ansehen“: Hat die KI die Kunde-Menge falsch gelesen, würde sonst still ein Wert im Schnitt fehlen. Unbekannte Bestellungen stehen eingeklappt. „kam n× in den letzten 4 Wochen“ zeigt, wie oft so eine Zeile schon da war — das Übernehmen als Produkt kommt in Stufe 2.'],
+  ['Heute nicht auf dem Zettel', 'Steht ein Produkt an diesem Wochentag sonst fast immer auf dem Zettel (an 3 der letzten 4 erfassten gleichen Wochentage), fehlt heute aber, obwohl seine Abteilung erfasst ist, fragt BOS: „Seite vergessen?“. Das sperrt das Speichern nicht. Die Prüfung beginnt, sobald drei gleiche Wochentage erfasst sind.'],
+  ['Mehrere Durchgänge am selben Tag', 'Du kannst z. B. erst die Konditorei und später die Brote erfassen. Beim zweiten Mal wird der gespeicherte Tag ergänzt. Steht ein Produkt schon mit einer anderen Zahl drin, zeigt BOS „bisher / jetzt“ und du entscheidest. Dasselbe gilt, wenn ein Artikel die Art wechselt, zum Beispiel bisher als Produkt gespeichert und jetzt Kundenbestellung: „bisher: Produkt 20 · jetzt: Kundenbestellung 20“. Gespeichert wird er danach nur an einer Stelle. Nichts wird still überschrieben.'],
+  ['Was wird gespeichert?', 'Nur die Stückzahl je Produkt, dazu still die Sorten unter GESAMT-Zeilen, unbekannte Zeilen und Kundenbestellungen. Ausreißer bekommen „zählt nicht“ und bleiben trotzdem sichtbar gespeichert. Für Tage aus dem alten BOS1 (bis 24.05.2026) wird nichts ergänzt. Ein Backtag, der mehr als 7 Tage zurück oder mehr als 2 Tage in der Zukunft liegt, wird vor dem Speichern angezeigt.'],
+  ['Kosten', 'Jede Seite kostet ein paar Cent bei Anthropic. Die Übersicht zeigt die Kosten des Durchgangs aus den Angaben der Antworten (bei Haiku nur „ca.“). Unter ⚙ Gerät kannst du das Modell (Haiku, Sonnet, Opus) und die Gründlichkeit wählen: kleiner und niedriger ist günstiger, kann aber mehr rote Zeilen bringen.'],
+  ['Fehlermeldungen', 'Jeder Fehler steht oben mit Grund: Schlüssel ungültig, Limit erreicht, Anthropic überlastet, kein Netz, keine Berechtigung beim Speichern. Fehlt der Datenbank ein Index, steht in der Stand-Karte ein Link „Index anlegen“: einmal antippen, „Index erstellen“ wählen, ein paar Minuten warten, Seite neu laden.'],
+  ['Ferien und Feiertage', 'Beim Backzettel zählen Schulferien ganz normal mit. Feiertage (und ein Betriebsurlaub, falls einer eingetragen ist) fließen nicht in den Durchschnitt ein.']
+];
+$('hilfeBtn').addEventListener('click', function () {
+  $('hilfeInhalt').innerHTML = HILFE.map(function (h) { return '<h3>' + esc(h[0]) + '</h3><p>' + esc(h[1]) + '</p>'; }).join('');
+  $('hilfeSheet').hidden = false;
+});
+$('hilfeZuBtn').addEventListener('click', function () { $('hilfeSheet').hidden = true; });
+
+/* ===================== Ungespeichert (Checkliste §7b) ===================== */
+(function (pruef, laeuft) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: laeuft }); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return !S.gespeichert && S.fotos.some(function (f) { return f.status === 'fertig'; }); },
+   function () { return S.speichertGerade || S.laeuft; });
+
+start().catch(function (err) { zeigeFehler(t('unbehandelt', { m: (err && (err.meldung || err.message)) || String(err) }), err); });
+})();
+</script>
+</body>
+</html>

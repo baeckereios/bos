@@ -41,6 +41,9 @@
      <script src="bos_access_guard.js"></script>
      ... restlicher Seiteninhalt ...
    ================================================================ */
+/* ERGÄNZT 19.10.2026 (Backzettel-Erfassung Stufe 1): "backzettel_erfassung"
+   nur bei admin — Registry roles ['admin'], sonst fail-open für alle.
+   SESSION_2026-10-19_BACKZETTEL_STUFE1_BAU.md */
 /* KORREKTUR 20.09.2026 (Etappe 3.2): schichtplaner_offizieller_plan bei
    backstube und konditorei entfernt. Der offizielle Plan ist ein
    Führungswerkzeug; die Rollenunterscheidung lag bisher clientseitig IN
@@ -181,6 +184,7 @@ window.BOS_PERMISSIONS = {
     "verbrauch_einstellungen_editor": true,
     "verbrauch_manuell": true,
     "verbrauch_werkstatt": true,
+    "backzettel_erfassung": true,
     "zeitkontext_editor": true,
     "schnellrechner": true,
     "konten_verwaltung": true,

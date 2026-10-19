@@ -47,6 +47,24 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-10-19 · 02:37 · Nacharbeit Zeitlimit (K86, K87; Kontroll-Chat 02:20) · Fehlerbehebung
+      K86 (Ulf: „Nur zurück, wenn keiner tippt“): Greift das Zeitlimit, nachdem
+      die Seite schon angefasst wurde (Tipp, Klick, Taste, Eingabe seit dem Laden,
+      oder Feld mit Fokus nicht leer), bleibt der Platz (html.crumble-platz,
+      Kreis-Symbol im 84-px-Kasten) — die Spalte springt nicht mehr unter dem
+      Finger. Der Autofokus der Seite zählt nicht. Sonst zurück wie bisher.
+      K87: Prüfzeile kurz gefasst und im Bild (Schrift notfalls bis 9 px kleiner).
+      SESSION_2026-10-19_CRUMBLE_TUER_ZEITLIMIT_BAU.md (§7)
+    2026-10-19 · 01:18 · Zeitlimit und Prüfschalter für Crumble (#62 Stufe 1f, Nachtrag;
+      Anweisung Kontroll-Chat 01:05) · Fehlerbehebung
+      Nach dem GitSync zeigte die Tür in der PWA Platz über der Karte, aber
+      keinen Crumble (Zwischenspeicher: neue index.html, alte 1e-Tür-Datei).
+      Der Lader schaltet jetzt nach 8 s ohne Loch zurück (mit-crumble weg,
+      später Ankommendes wird nicht mehr gezeigt), eine Tür-Datei ohne Stand
+      sofort. ?crumble=pruefen (merkt sich das Gerät, ?crumble=normal löscht)
+      zeigt unter der Spalte eine graue Zeile mit Schalter, Stand, Ladeschritten
+      und dem Grund. Anmeldeweg unverändert.
+      SESSION_2026-10-19_CRUMBLE_TUER_ZEITLIMIT_BAU.md
     2026-10-18 · 15:28 · Loch-Crumble in der Karte (#62 Stufe 1f; Anweisung Kontroll-Chat
       14:50, Bauplan 15:04, Go 15:15) · Feature
       Anmelden und „Mobile Ansicht“ nebeneinander (div.knopfreihe; Mobil-Knopf bricht
@@ -350,10 +368,12 @@
   /* Stufe 1f (K77/K78): mit Crumble (Klasse aus der Kopfzeile) ist der Symbolkasten von Anfang an 84 px,
      das alte Kreis-Symbol (52 px) steht mittig darin, bis die Büsten da sind; 20 px Abstand zum Text;
      über der Karte fest 74 px Platz für die Blase (Ulf 15:15: „Finde ich sogar gut, dass es fest ist“).
-     Das Loch selbst zeichnet hamster_figur/loch/loch.css. */
-  html.mit-crumble .einblick { gap: 20px; position: relative; margin-top: var(--tuer-blasenraum, 74px); }
-  html.mit-crumble .einblick-symbol { flex: 0 0 84px; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; }
-  html.mit-crumble .einblick-symbol svg { width: 52px; height: 52px; flex: 0 0 52px; }
+     Das Loch selbst zeichnet hamster_figur/loch/loch.css.
+     K86 (19.10.): html.crumble-platz hält denselben Platz, wenn das Zeitlimit greift, nachdem schon getippt wurde
+     (Lader unten) — mit-crumble ist dann weg (die Tür-Datei steigt aus), der Platz bleibt, nichts springt. */
+  html.mit-crumble .einblick, html.crumble-platz .einblick { gap: 20px; position: relative; margin-top: var(--tuer-blasenraum, 74px); }
+  html.mit-crumble .einblick-symbol, html.crumble-platz .einblick-symbol { flex: 0 0 84px; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; }
+  html.mit-crumble .einblick-symbol svg, html.crumble-platz .einblick-symbol svg { width: 52px; height: 52px; flex: 0 0 52px; }
   .einblick-symbol .kreis-sat {
     transform-origin: 26px 26px;
     animation: einblick-kreisen 7s linear infinite;
@@ -427,6 +447,19 @@
     font-size: var(--bos-font-xs);
     color: var(--bos-text-faint);
     word-break: break-word;
+  }
+
+  /* K84 (19.10.): Prüfzeile (?crumble=pruefen) — unter der Spalte im unteren Innenabstand, absolut,
+     damit sie nichts verschiebt (die Spalte ist senkrecht zentriert).
+     K87 (19.10.): kurz gefasst, 4 px unter der Wechsel-Zeile, Zeilenhöhe 1,25 (zwei Zeilen passen bei 360 × 640
+     in den sichtbaren Rest von 34 px); reicht es trotzdem nicht, macht der Lader die Schrift schrittweise
+     kleiner (passeZeile, bis 9 px) — die Zeile bleibt im Bild und verlängert die Seite nie. */
+  .mitte { position: relative; }
+  .tuer-pruef {
+    position: absolute; left: 0; right: 0; top: calc(100% - 6vh + 4px);
+    margin: 0; text-align: center; pointer-events: none;
+    font-family: var(--bos-font-body); font-size: var(--bos-font-xs); line-height: 1.25;
+    color: var(--bos-text-faint); opacity: .85;
   }
 
   .wechsel {
@@ -933,22 +966,153 @@
     beobachteAnmeldung();
   }
 
-  /* --- Türsteher nachladen (18.10.2026, #62 Stufe 1e) -------------
+  /* --- Crumble nachladen (18.10.2026, #62 Stufe 1e/1f; Zeitlimit und Prüfschalter 19.10.) ----
      Erst nach 'load' und im Leerlauf, als async-Skript — das Formular ist
      längst bedienbar. Aus, wenn das letzte Konto an diesem Gerät Crumble
      ausgeschaltet hatte (Gerätewert vom Launcher). Ladefehler: ein Hinweis
-     in der Konsole, sonst nichts. */
+     in der Konsole, sonst nichts (F1).
+     ZEITLIMIT (K83, 19.10.): Steht 8 s nach dem Start des Laders das Loch
+     nicht (.einblick-symbol ohne Klasse loch), geht die Tür zurück wie vor 1f
+     (mit-crumble weg) und was danach noch ankommt, wird in dieser Seitenansicht
+     nicht mehr gezeigt. Anlass: nach einem GitSync lieferte der Zwischenspeicher
+     bis zu 10 Minuten eine alte bos_tuer_crumble.js (1e) zur neuen Tür — Platz
+     über der Karte, aber kein Crumble (Ulf 19.10., 00:56). Eine Tür-Datei ohne
+     Stand (BOS_TUER_CRUMBLE.stand) gilt als fremd → sofort zurück.
+     PRÜFSCHALTER (K84): ?crumble=pruefen merkt sich das Gerät (localStorage
+     bos_crumble_pruefen = '1', gilt auch in der PWA), ?crumble=normal löscht.
+     Dann steht unter der Wechsel-Zeile eine kleine graue Zeile: Schalter,
+     Stand der Tür-Datei, Ladeschritte, bei Ausfall der Grund mit der echten
+     Meldung. Ohne Schalter bleibt alles still. Nichts davon im Anmeldeweg.
+     NUR ZURÜCK, WENN KEINER TIPPT (K86, 19.10., Ulf): Greift das Zeitlimit, nachdem
+     jemand die Seite schon angefasst hat (Tipp/Klick/Taste/Eingabe seit dem Laden,
+     oder das Feld mit dem Fokus ist nicht leer), bleibt der Platz stehen
+     (html.crumble-platz statt mit-crumble, Kreis-Symbol im 84-px-Kasten) — sonst
+     spränge die senkrecht zentrierte Spalte unter dem Finger um bis zu 35 px.
+     Der Fokus, den die Seite selbst beim Öffnen ins Kennungsfeld setzt, zählt
+     NICHT als Anfassen (sonst bliebe der Platz bei jedem Zeitlimit stehen).
+     Ladefehler (404, kaputt) und die Tür-Datei ohne Stand schalten weiter sofort
+     zurück (K86: „bleiben wie geliefert“). */
   try {
+    var LIMIT_MS = 8000;
+    var wurzel = document.documentElement;
+    var lesen = function (k) { try { return window.localStorage ? localStorage.getItem(k) : null; } catch (e) { return undefined; } };
+    var pruefen = false;
+    try {
+      var q = (location.search.match(/[?&]crumble=([a-z]+)/) || [])[1];
+      if (q === 'pruefen') localStorage.setItem('bos_crumble_pruefen', '1');
+      if (q === 'normal') localStorage.removeItem('bos_crumble_pruefen');
+      pruefen = q === 'pruefen' || (q !== 'normal' && localStorage.getItem('bos_crumble_pruefen') === '1');
+    } catch (e) { pruefen = /[?&]crumble=pruefen/.test(location.search); }
+    var schalterWert = lesen('bos_crumble_tuer');
+    var L = window.BOS_TUER_LADEN = {
+      start: 0, abgebrochen: false, fertig: false, grund: '', stand: '',
+      schritte: { datei: false, css: false, texte: false, buesten: 0, buestenSoll: 11, eingesetzt: false },
+      melde: function (schritt, wert) { L.schritte[schritt] = wert; zeile(); },
+      fehler: function (text) { if (!L.grund) L.grund = text; zeile(); },
+      fertigMeldung: function () { L.fertig = true; L.ms = Math.round(performance.now() - L.start); zeile(); },
+      pruefen: pruefen
+    };
+    /* K86: Hat jemand die Seite schon angefasst? (ab hier, also vor 'load'; nur solange das Zeitlimit offen ist) */
+    var angefasst = '';
+    var ANFASSEN = ['pointerdown', 'touchstart', 'mousedown', 'keydown', 'input', 'paste'];
+    var merkeAnfassen = function (e) { if (!angefasst) angefasst = e.type; };
+    var anfassenAus = function () { ANFASSEN.forEach(function (t) { document.removeEventListener(t, merkeAnfassen, true); }); };
+    if (schalterWert !== 'aus') ANFASSEN.forEach(function (t) { document.addEventListener(t, merkeAnfassen, { capture: true, passive: true }); });
+    var feldMitInhalt = function () {
+      var a = document.activeElement;
+      return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.value);
+    };
+    var zeileEl = null;
+    /* K87: Zeile bleibt im Bild — reicht der Platz bis zum unteren Fensterrand (bzw. bis zum Seitenende, wenn die
+       Spalte ohnehin länger ist als das Fenster) nicht, wird die Schrift schrittweise kleiner, bis 9 px. */
+    var passeZeile = function () {
+      if (!zeileEl) return;
+      try {
+        zeileEl.style.fontSize = '';
+        var y = window.pageYOffset || 0, zr = zeileEl.getBoundingClientRect();
+        var raum = document.querySelector('.raum'), raumUnten = raum ? raum.getBoundingClientRect().bottom + y : document.documentElement.scrollHeight;
+        var grenze = (zr.top + y < window.innerHeight ? Math.min(window.innerHeight, raumUnten) : raumUnten) - 2;
+        var px = parseFloat(getComputedStyle(zeileEl).fontSize) || 11;
+        while (zeileEl.getBoundingClientRect().bottom + y > grenze && px - 0.5 >= 9) { px -= 0.5; zeileEl.style.fontSize = px + 'px'; }
+      } catch (e) {}
+    };
+    var zeile = function () {
+      if (!pruefen) return;
+      try {
+        if (!zeileEl) {
+          zeileEl = document.createElement('p');
+          zeileEl.className = 'tuer-pruef'; zeileEl.id = 'tuerPruef'; zeileEl.setAttribute('role', 'status');
+          var mitte = document.querySelector('.mitte'); (mitte || document.body).appendChild(zeileEl);
+          window.addEventListener('resize', passeZeile);
+        }
+        /* K87: kurz — „Crumble · Tür 1f · CSS ✓ · Texte ✓ · 11/11 · geladen in 66 ms“; Schalter nur, wenn er nicht auf „nicht gesetzt (gilt als an)“ steht */
+        var t = 'Crumble';
+        if (schalterWert === undefined) t += ' · Speicher gesperrt (gilt als an)';
+        else if (schalterWert !== null) t += ' · Schalter: ' + schalterWert;
+        if (schalterWert === 'aus') { zeileEl.textContent = t + ' · an diesem Gerät ausgeschaltet — nichts geladen'; passeZeile(); return; }
+        var st = L.schritte;
+        t += ' · Tür ' + (L.stand || (st.datei ? 'geladen' : (L.start ? 'lädt …' : 'wartet auf load')));
+        /* Bei Ausfall statt der Schritte nur der Grund (er nennt den fehlenden Schritt); Pfad ohne „hamster_figur/“ — die Konsole hat ihn ganz */
+        if (L.grund && !L.fertig) { t += ' · NICHT GELADEN: ' + L.grund.replace(/hamster_figur\//g, ''); zeileEl.textContent = t; passeZeile(); return; }
+        t += ' · CSS ' + (st.css ? '✓' : '–') + ' · Texte ' + (st.texte ? '✓' : '–') + ' · ' + st.buesten + '/' + st.buestenSoll;
+        if (L.fertig) t += ' · geladen in ' + L.ms + ' ms';
+        zeileEl.textContent = t;
+        passeZeile();
+      } catch (e) {}
+    };
+    var fehlt = function () {
+      var st = L.schritte;
+      if (!st.datei) return 'bos_tuer_crumble.js';
+      if (!st.css) return 'hamster_figur/loch/loch.css';
+      if (!st.texte) return 'hamster_figur/loch/loch.json';
+      if (st.buesten < st.buestenSoll) return 'Büsten (' + st.buesten + '/' + st.buestenSoll + ')' + (st.wartetAuf ? ', zuletzt offen: ' + st.wartetAuf : '');
+      return 'Einsetzen in die Karte';
+    };
+    var zurueck = function (grund, platzBleibt) {
+      if (L.abgebrochen || L.fertig || L.grund) return;   // schon ausgefallen und gemeldet (z. B. 404) — keine zweite Konsolenzeile
+      L.abgebrochen = true;
+      if (platzBleibt) { L.platzBleibt = true; wurzel.classList.add('crumble-platz'); }   // K86: erst den Platz halten, dann mit-crumble weg — kein Sprung
+      wurzel.classList.remove('mit-crumble');
+      try { var bs = document.querySelectorAll('.bos-tuer-buehne'); for (var i = 0; i < bs.length; i++) bs[i].parentNode.removeChild(bs[i]); } catch (e) {}   // Bühne einer alten 1e-Datei
+      var c = window.BOS_TUER_CRUMBLE;
+      if (!c || !c.stand) window.BOS_TUER_CRUMBLE = { fall: function () {}, stand: 'abgeschaltet', _zustand: function () { return { bereit: false, abgeschaltet: true }; } };   // kommt die Datei noch, steigt sie sofort aus
+      console.warn('[tuer-crumble] ' + grund + ' — die Tür läuft ohne Crumble' + (platzBleibt ? ', der Platz bleibt (es wurde schon getippt: ' + platzBleibt + ').' : '.'));
+      L.fehler(grund + (platzBleibt ? ' · Platz bleibt (es wurde schon getippt)' : ''));
+    };
+    var statusVon = function (url, wenn) {   // nur im Prüfmodus: HTTP-Status nachfragen (script/link geben keinen)
+      if (!pruefen || !window.fetch) return wenn('');
+      fetch(url, { method: 'HEAD', cache: 'no-store' }).then(function (r) { wenn('HTTP ' + r.status); }).catch(function (e) { wenn((e && e.message) || 'Netzfehler'); });
+    };
+    L.statusVon = statusVon;
     var ladeTuerCrumble = function () {
-      try { if (window.localStorage && localStorage.getItem('bos_crumble_tuer') === 'aus') return; } catch (e) { /* Speicher gesperrt: an */ }
+      if (schalterWert === 'aus') { zeile(); return; }
+      L.start = performance.now(); zeile();
+      /* Platzhalter OHNE Stand vor dem Laden: Eine alte 1e-Datei (prüft nur „gibt es BOS_TUER_CRUMBLE?“) steigt damit sofort
+         aus — keine Bühne, kein Modul, keine eigene Konsolenzeile. Die 1f-Datei ersetzt den Platzhalter (sie prüft auf .stand). */
+      if (!window.BOS_TUER_CRUMBLE) window.BOS_TUER_CRUMBLE = { fall: function () {}, _zustand: function () { return { bereit: false, platzhalter: true }; } };
       var s = document.createElement('script');
       s.src = 'bos_tuer_crumble.js';
       s.async = true;
+      s.onload = function () {
+        L.schritte.datei = true;
+        var c = window.BOS_TUER_CRUMBLE;
+        if (!L.abgebrochen && (!c || !c.stand)) zurueck('Tür-Datei ohne Stand (älterer Stand im Zwischenspeicher? nach einem GitSync bis 10 min möglich)');
+        else { L.stand = (c && c.stand) || ''; zeile(); }
+      };
       s.onerror = function () {
+        if (L.abgebrochen) return;
+        L.abgebrochen = true;
+        wurzel.classList.remove('mit-crumble');   // Stufe 1f: Platz über der Karte zurück
         console.warn('[tuer-crumble] bos_tuer_crumble.js nicht ladbar — die Tür läuft ohne Crumble.');
-        document.documentElement.classList.remove('mit-crumble');   // Stufe 1f: Platz über der Karte zurück
+        statusVon('bos_tuer_crumble.js', function (st) { L.fehler('bos_tuer_crumble.js nicht ladbar' + (st ? ' (' + st + ')' : '')); });
       };
       document.body.appendChild(s);
+      setTimeout(function () {
+        anfassenAus();
+        if (document.querySelector('.einblick-symbol.loch')) return;
+        var wie = angefasst || (feldMitInhalt() ? 'Feld mit Fokus nicht leer' : '');   // K86
+        zurueck('Zeitlimit ' + (LIMIT_MS / 1000) + ' s — es fehlte: ' + fehlt(), wie);
+      }, LIMIT_MS);
     };
     var spaeter = function () {
       if (window.requestIdleCallback) window.requestIdleCallback(ladeTuerCrumble, { timeout: 1500 });

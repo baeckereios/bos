@@ -376,6 +376,22 @@ window.BOS_APPS = [
     // selbst läuft über adminReauth(Passwort), nicht über den Seiten-PIN.
   },
   {
+    id: 'backzettel_erfassung',
+    bereich: 'verbrauch',
+    name: 'Backzettel erfassen',
+    icon: '📸',
+    color: '#8b5cf6',
+    url: 'backzettel/backzettel_erfassung.html',
+    status: 'live',
+    roles: ['admin']
+    // NEU 19.10.2026 (Backzettel-Erfassung Stufe 1): Backzettel fotografieren, per
+    // Claude-API auslesen, nachrechnen, in den Backzettel-Topf (verbrauch_offiziell)
+    // speichern. Nur Rolle admin (Ulf E1/E13; admin haben backstube02 und
+    // systempflege, U4). Matrix-Zeile in bos_permissions.js (admin) Pflicht, sonst
+    // fail-open. Schreiben schützt die Regel (RK §4: nur Planung). Kein `direkt`.
+    // Details: backzettel/BACKZETTEL_ERFASSUNG_DOKU.md.
+  },
+  {
     id: 'zeitkontext_editor',
     bereich: 'produktion',
     name: 'Zeitkontext & Hamster',

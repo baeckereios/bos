@@ -52,6 +52,9 @@
    reicht auch das nicht, wächst der Platz einmalig (--tuer-blasenraum).
 
    CHANGELOG
+     2026-10-19 · 01:18 · Nachtrag 1f (Kontroll-Chat 01:05): K83/K84 — stand '1f' (index.html erkennt eine fremde
+       Tür-Datei), Ladeschritte an BOS_TUER_LADEN (Zeitlimit, Prüfzeile), steigt still aus, wenn index.html schon
+       zurückgeschaltet hat oder html.mit-crumble fehlt; Prüfmodus: HTTP-Status fehlender Dateien in der Meldung.
      2026-10-18 · 21:20 · Nacharbeit 1f (Kontroll-Chat 20:54): K82 — kein einzelnes Wort allein in der letzten
        Blasenzeile (CSS text-wrap: pretty in loch.css; ohne Unterstützung schrittweise schmaler), Blase danach auf die
        längste Zeile zugeschnitten.
@@ -63,7 +66,7 @@
    ================================================================ */
 (function () {
   'use strict';
-  if (window.BOS_TUER_CRUMBLE) return;
+  if (window.BOS_TUER_CRUMBLE && window.BOS_TUER_CRUMBLE.stand) return;   // schon da, oder index.html hat abgeschaltet (Platzhalter mit Stand); der Platzhalter OHNE Stand vom Lader wird ersetzt
 
   var BASIS = 'hamster_figur/loch/';
   var RESERVE_LUFT = 16;   // Blase: 12 px über der Karte + 4 px Abstand nach oben
@@ -78,10 +81,17 @@
   var wenigBewegung = false;
   try { wenigBewegung = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
 
+  /* K83/K84 (19.10.): Ladestand an index.html melden (BOS_TUER_LADEN: Zeitlimit, Prüfzeile). Fehlt das Objekt (ältere
+     index.html), geht alles wie bisher. Hat index.html schon abgebrochen (Zeitlimit), steigt diese Datei still aus. */
+  var L = window.BOS_TUER_LADEN || null;
+  function melde(schritt, wert) { try { if (L && L.melde) L.melde(schritt, wert); } catch (e) {} }
+  function abgebrochen() { return !!(L && L.abgebrochen) || !document.documentElement.classList.contains('mit-crumble'); }
   function warne(was, fehler) {
     if (kaputt) return;
     kaputt = true;
-    console.warn('[tuer-crumble] ' + was + ' — die Tür läuft ohne Crumble.', fehler || '');
+    var still = !!(L && L.abgebrochen);   // index.html hat schon gemeldet (Zeitlimit) — keine zweite Konsolenzeile
+    if (!still) console.warn('[tuer-crumble] ' + was + ' — die Tür läuft ohne Crumble.', fehler || '');
+    try { if (L && L.fehler && !still) L.fehler(was + (fehler && fehler.message && was.indexOf(fehler.message) < 0 ? ' — ' + fehler.message : '')); } catch (e) {}
     [tTipp, tErster, tZurueck, tBlinzel, tSchlaf, tLachen].forEach(function (t) { clearTimeout(t); });
     try { if (symbol && altesSymbol && symbol.classList.contains('loch')) { symbol.classList.remove('loch'); symbol.innerHTML = altesSymbol; } } catch (e) {}
     try { if (blase && blase.parentNode) blase.parentNode.removeChild(blase); } catch (e) {}
@@ -95,8 +105,11 @@
     return new Promise(function (ok, nein) {
       var l = document.createElement('link');
       l.rel = 'stylesheet'; l.href = BASIS + 'loch.css'; l.setAttribute('data-tuer-crumble', '1');
-      l.onload = function () { ok(); };
-      l.onerror = function () { nein(new Error('loch.css nicht ladbar')); };
+      l.onload = function () { melde('css', true); ok(); };
+      l.onerror = function () {
+        if (L && L.pruefen && L.statusVon) L.statusVon(BASIS + 'loch.css', function (st) { nein(new Error('loch.css nicht ladbar' + (st ? ' (' + st + ')' : ''))); });
+        else nein(new Error('loch.css nicht ladbar'));
+      };
       document.head.appendChild(l);
     });
   }
@@ -107,10 +120,13 @@
     }).then(function (d) {
       if (!d || !d.buesten || !d.reaktionen || !d.oeffnen || !d.tipps) throw new Error('loch.json unvollständig');
       daten = d;
+      melde('texte', true);
     });
   }
   function ladeBuesten() {
     var namen = Object.keys(daten.buesten).filter(function (n) { return daten.buesten[n].tuer !== false; });   // herzen: nicht an der Tür (O22)
+    var da = 0, offen = namen.slice();
+    melde('buestenSoll', namen.length); melde('wartetAuf', offen.map(function (n) { return daten.buesten[n].datei; }).join(', '));
     return Promise.all(namen.map(function (n) {
       var img = new Image();
       img.alt = ''; img.className = 'loch__buste'; img.setAttribute('data-buste', n); img.draggable = false;
@@ -118,7 +134,15 @@
       img.src = BASIS + daten.buesten[n].datei;
       bilder[n] = img;
       return (img.decode ? img.decode() : new Promise(function (ok, nein) { img.onload = ok; img.onerror = nein; }))
-        .catch(function () { throw new Error('Büste nicht ladbar: ' + daten.buesten[n].datei); });
+        .then(function () {
+          da++; offen.splice(offen.indexOf(n), 1);
+          melde('wartetAuf', offen.map(function (x) { return daten.buesten[x].datei; }).join(', ')); melde('buesten', da);
+        })
+        .catch(function () {
+          var datei = daten.buesten[n].datei;
+          if (L && L.pruefen && L.statusVon) return new Promise(function (ok, nein) { L.statusVon(BASIS + datei, function (st) { nein(new Error('Büste nicht ladbar: ' + datei + (st ? ' (' + st + ')' : ''))); }); });
+          throw new Error('Büste nicht ladbar: ' + datei);
+        });
     }));
   }
 
@@ -349,6 +373,7 @@
 
   /* ---------- Start ---------- */
   window.BOS_TUER_CRUMBLE = {
+    stand: '1f',   // K83: index.html erkennt daran eine passende Tür-Datei (eine 1e-Datei hat keinen Stand → sofort zurück)
     fall: function (k) { try { fall(k); } catch (e) { warne('Reaktion fehlgeschlagen', e); } },
     /* nur für Prüfwerkzeuge */
     _zustand: function () {
@@ -360,15 +385,21 @@
     _sage: function (buste, text) { if (bereit) { clearTimeout(tZurueck); zeige(buste); blaseText(text); } }
   };
   try {
+    melde('datei', true);
+    if (abgebrochen()) { kaputt = true; if (!(L && L.abgebrochen)) warne('Tür ohne Platz für Crumble (html.mit-crumble fehlt — index.html älter?)'); return; }
     verdrahteEingabe();
     if (!window.fetch || !window.Promise) throw new Error('Browser ohne fetch/Promise');
     Promise.all([ladeCss(), ladeDaten()]).then(function () {
       if (kaputt) return;
+      if (abgebrochen()) { warne('Zeitlimit überschritten'); return; }
       tipps = daten.tipps.slice();
       return ladeBuesten();
     }).then(function () {
       if (kaputt) return;
+      if (abgebrochen()) { warne('Zeitlimit überschritten'); return; }   // K83: was nach dem Zurückschalten ankommt, wird nicht mehr gezeigt
       setzeEin();
+      melde('eingesetzt', true);
+      try { if (L && L.fertigMeldung) L.fertigMeldung(); } catch (e) {}
       bereit = true;
       window.addEventListener('resize', legeSpitze);
       planeBlinzeln();

@@ -35,9 +35,9 @@
       "bezeichnung": "Artikelnummer",
       "status": "bestätigt",
       "typ": "string oder null",
-      "beschreibung": "Die Artikelnummer aus dem Warenwirtschaftssystem. Bei 18 Produkten (v. a. komplette Schlawiner-Familie) bewusst leer (null) — das ist eine bekannte, akzeptierte Lücke aus dem Altsystem, keine Fehleingabe und nichts, was automatisch aufgefüllt werden sollte.",
-      "beispiel": "4021 oder null",
-      "genutztVon": ["Stammdaten-Anzeige"]
+      "beschreibung": "Die Artikelnummer aus dem Warenwirtschaftssystem. Bei 18 Produkten (v. a. komplette Schlawiner-Familie) bewusst leer (null) — das ist eine bekannte, akzeptierte Lücke aus dem Altsystem, keine Fehleingabe und nichts, was automatisch aufgefüllt werden sollte. Seit 19.10.2026 ist sie der Schlüssel der Backzettel-Erfassung: Eine Zeile vom Backzettel wird NUR über die Artikelnummer einem Produkt zugeordnet, nie über den Namen. Auf den Zetteln ist sie sechsstellig. Ein Produkt ohne Artikelnummer bekommt keine Backzettel-Zahlen; tragen zwei Produkte dieselbe Nummer, meldet die Erfassung das rot, statt zu raten.",
+      "beispiel": "123456 oder null",
+      "genutztVon": ["Stammdaten-Anzeige", "backzettel/backzettel_erfassung.html (Zuordnung Backzettel-Zeile → Produkt, seit 19.10.2026)"]
     },
 
     "station": {

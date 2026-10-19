@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-19 · 17:32 · Backzettel-Erfassung Stufe 1 (Freigabe KC 09:47, B3/B4): Reiter Backzettel mit neuer Karte „Prüfung beim Erfassen“ (erfassungSchwelleBleche, erfassungSchwelleProzent; Vorgabe 3 Bleche / 20 %, Ulf E18). Die alten Felder Relative/Absolute Mindestabweichung wirken beim Backzettel nicht (Hinweis im Reiter). Hilfe: Backzettel = alte BOS1-Zahlen + neue Erfassung, Schulferien zählen beim Backzettel mit, Zeitfenster gilt wieder (Nebenwirkung auf „Aus Backzettel übernehmen“). SESSION_2026-10-19_BACKZETTEL_STUFE1_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Auswahl- und Kalender-Tönungen folgen dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:26 · Beschriftung (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Reiter heißen „Mitschrift“ (Datentopf manuell) und „Backzettel“ (Datentopf offiziell), Hilfe entsprechend und um den Richtwert ergänzt (der hat keine Einstellungen). Werte in Datenbank, Datei und Code unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-05 · 08:34 · Produkte aus Firestore (Stufe 1): Namens-Nachschlagen über ../bos_produkte.js (Sicht „alle“) statt fetch(produkt_config.json); „von N aktiven Produkten“ zählt nur aktive; Ladefehler sichtbar in der Meldezeile. Fachlogik unverändert. SESSION_2026-10-05_PRODUKTE_AUS_FIRESTORE_STUFE1.md -->
@@ -333,7 +334,8 @@
 
     <h3>Wofür sind die Tabs "Mitschrift" und "Backzettel"?</h3>
     <p>Es gibt zwei getrennte Quellen für Verbrauchsdaten: die Mitschrift (die laufende Erfassung im System) und
-    den Backzettel (die alten, übernommenen Backzettel-Zahlen). Beide werden nie miteinander vermischt — jede hat
+    den Backzettel (die Zahlen von den Backzetteln: die alten aus BOS1 und seit 19.10.2026 die mit „Backzettel erfassen“
+    fotografierten). Beide werden nie miteinander vermischt — jede hat
     ihre eigenen Einstellungen, damit man sie unabhängig voneinander anpassen kann. Welche Quelle für ein Produkt
     gilt, steht in der Produkt-Karte (Reiter Bedarf). Die dritte Quelle, der Richtwert, ist eine feste Zahl je
     Wochentag am Produkt und hat hier keine Einstellungen.</p>
@@ -351,6 +353,18 @@
     (toleranter). Niedrigere Werte = sie erscheint öfter (empfindlicher). Ausführliche Herleitung dieser
     Zwei-Bedingungen-Logik: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md.</p>
 
+    <h3>Was ist „Prüfung beim Erfassen“ (nur Reiter Backzettel)?</h3>
+    <p>Beim Erfassen eines Backzettels vergleicht BOS jede Zeile mit dem Durchschnitt desselben Wochentags. Weicht sie
+    gleichzeitig um mindestens so viele Bleche UND um mindestens so viel Prozent ab, wird sie gelb markiert und zählt
+    vorab nicht für den Schnitt (in der Übersicht mit einem Tipp umkehrbar). Startwerte: 3 Bleche und 20 %. Die beiden
+    Felder „Relative/Absolute Mindestabweichung“ darüber wirken beim Backzettel nicht.</p>
+
+    <h3>Backzettel: Ferien, Feiertage und Zeitfenster</h3>
+    <p>Beim Backzettel zählen Schulferien ganz normal mit; Feiertage und ein eingetragener Betriebsurlaub zählen nicht. Seit
+    19.10.2026 gilt auch beim Backzettel das Zeitfenster (Suchfenster bei Stichprobe, Zeitraum bei Kontiguierlich): Ältere
+    Tage zählen nicht mehr. Das gilt auch für den Knopf „Aus Backzettel übernehmen“ in der Produktkarte — wer dort ältere
+    Tage braucht, stellt das Suchfenster vorher höher.</p>
+
     <h3>Was zeigt der Datenbestand?</h3>
     <p>Ganz oben in jedem Tab: wie viele Tage in diesem Datentopf tatsächlich in der Datenbank stehen, für
     welchen Zeitraum, und (aufklappbar) wie viele Tage mit Wert es pro Produkt gibt. Das ist unabhängig von den
@@ -361,8 +375,8 @@
     <p>Markierte Tage liegen im aktuell berechneten Fenster — bei Kontiguierlich exakt, bei Stichprobe nur der
     Suchbereich (die tatsächlichen Datenpunkte hängen vom jeweiligen Produkt ab). Auf einen markierten Tag tippen
     schließt ihn manuell aus der Berechnung aus, mit optionalem Grund — nochmal tippen nimmt ihn wieder auf. Blau
-    markierte Tage sind Feiertage/Ferien (nur zur Orientierung, die fließen ohnehin schon automatisch nicht mit
-    ein).</p>
+    markierte Tage sind Feiertage/Ferien (nur zur Orientierung). Feiertage fließen ohnehin nicht mit ein, Ferien bei der
+    Mitschrift auch nicht — beim Backzettel zählen Ferien seit 19.10.2026 mit.</p>
 
     <h3>Wie speichere ich meine Änderungen?</h3>
     <p>Diese Seite kann nicht direkt ins Repository schreiben (statisches Hosting). Über die Knöpfe unten die
@@ -498,11 +512,32 @@
           <input type="number" id="${pfx}-schwelleAbsolut" min="0" max="1000">
           <div class="feld-erklaerung" id="${pfx}-schwelleErklaerung">
             Ein Wert gilt nur als auffällig, wenn er GLEICHZEITIG die absolute UND die relative Schwelle reißt —
-            nicht nur eine davon. Details: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md, Abschnitt "AND-Logik".
+            nicht nur eine davon. Details: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md, Abschnitt "AND-Logik".${datentopf === 'offiziell' ? `
+            <br><strong>Beim Backzettel wirken diese beiden Felder nicht</strong> — dort gilt die Karte „Prüfung beim Erfassen“ darunter.` : ''}
           </div>
         </div>
       </div>
-
+${datentopf === 'offiziell' ? `
+      <div class="karte">
+        <div class="feld-label-zeile">
+          <span class="feld-label">Prüfung beim Erfassen</span>
+          <button class="hilfe-knopf" data-erklaerung="${pfx}-erfassungErklaerung" type="button">?</button>
+        </div>
+        <div class="feld-erklaerung" id="${pfx}-erfassungErklaerung">
+          Gilt für „Backzettel erfassen“: Eine Zeile wird als Abweichung markiert (und zählt vorab nicht für den Schnitt),
+          wenn sie GLEICHZEITIG um mindestens so viele Bleche UND um mindestens so viel Prozent vom Durchschnitt
+          desselben Wochentags abweicht. Bleche = Stück geteilt durch die Charge auf dem Zettel. Startwerte: 3 Bleche und 20 %.
+        </div>
+        <div class="feld-zeile">
+          <div class="feld-label-zeile"><span class="feld-label">Abweichung mindestens (Bleche)</span></div>
+          <input type="number" id="${pfx}-erfassungSchwelleBleche" min="0" max="100" step="0.5">
+        </div>
+        <div class="feld-zeile">
+          <div class="feld-label-zeile"><span class="feld-label">Abweichung mindestens (%)</span></div>
+          <input type="number" id="${pfx}-erfassungSchwelleProzent" min="1" max="100">
+        </div>
+      </div>
+` : ''}
       <div class="karte">
         <div class="feld-label-zeile">
           <span class="feld-label">Zeitraum &amp; Tage ausschließen</span>
@@ -566,6 +601,16 @@
     bindZahl('minStichprobe', 'minStichprobe');
     bindZahl('schwelleProzent', 'schwelleProzent', v => v / 100);
     bindZahl('schwelleAbsolut', 'schwelleAbsolut');
+    // 19.10.2026 (Backzettel-Erfassung): eigene Schwellen in Blechen und Prozent, nur Reiter Backzettel.
+    // Fehlen sie in der Datei, gelten die Startwerte (3 Bleche, 20 %) — sie landen dann beim Herunterladen mit in der Datei.
+    if (datentopf === 'offiziell') {
+      if (!Number.isFinite(Number(e.erfassungSchwelleBleche))) e.erfassungSchwelleBleche = 3;
+      if (!Number.isFinite(Number(e.erfassungSchwelleProzent))) e.erfassungSchwelleProzent = 0.20;
+      qs(pfx + '-erfassungSchwelleBleche').value = e.erfassungSchwelleBleche;
+      qs(pfx + '-erfassungSchwelleProzent').value = Math.round(e.erfassungSchwelleProzent * 100);
+      bindZahl('erfassungSchwelleBleche', 'erfassungSchwelleBleche');
+      bindZahl('erfassungSchwelleProzent', 'erfassungSchwelleProzent', v => v / 100);
+    }
 
     panel.querySelectorAll('.hilfe-knopf').forEach(btn => {
       btn.addEventListener('click', () => {

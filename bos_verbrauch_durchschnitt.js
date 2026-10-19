@@ -125,6 +125,42 @@
  *   Dokumente nur einmal, und Lesefehler werden gesammelt und am Ende
  *   geworfen statt still zu [] zu werden. Nur die Sammel-Knöpfe im Editor
  *   nutzen ihn; ohne durchgang() ist alles wie vorher (#65 bleibt offen).
+ * 19.10.2026 · 17:32 — BACKZETTEL-ERFASSUNG Stufe 1 (Kern-Datei, Freigabe
+ *   Ulf E19 08:28; Bauplan SESSION_2026-10-19_BACKZETTEL_STUFE1_BAU.md,
+ *   FREIGABE_2026-10-19_BACKZETTEL_STUFE1_BAUPLAN.md 09:47, B2–B5). Nur der
+ *   Backzettel-Topf; Mitschrift, Richtwert, Einheiten, pruefeAusreisser()
+ *   unverändert. Neu bzw. geändert:
+ *   - F1: Der Topf wird NEUESTE zuerst gelesen (orderBy datum desc + limit).
+ *     Vorher limit() ohne Sortierung = die ÄLTESTEN 400 Tage (Firestore
+ *     sortiert dann nach Dokument-ID) — nach ~1 Jahr täglicher Erfassung
+ *     wären neue Zettel still nicht mehr in den Schnitt gegangen. Braucht
+ *     EINMAL einen Index (bos_events: type ↑, datum ↓); fehlt er, kommt ein
+ *     sichtbarer Fehler mit Link (Art 'index_fehlt'), kein stilles [].
+ *   - Leseflut (Bauplan Fund 2, Ulf 09:15): EINE gemeinsame Abfrage
+ *     (_offizielleDokumente). Gleichzeitige Aufrufer teilen sie, das Ergebnis
+ *     bleibt OFFIZIELL_MERKEN_MS (60 s) gemerkt; ein FEHLER wird nicht gemerkt
+ *     (B2). vergissOffizielle() leert den Speicher (nach dem Speichern).
+ *     Station mit 15 Backzettel-Produkten: 1 statt 105 Abrufe, gleiche Zahlen.
+ *   - #65 nur für diesen Topf: holeOffizielleWerte() WIRFT einen eingeordneten
+ *     Fehler (art, meldung, code, original, link) statt still [] zu liefern.
+ *     holeManuelleWerte() bleibt wie es ist (nicht beauftragt).
+ *   - F2: Werte, deren legacyKey im Feld `ausgeschlossen` des Tages steht,
+ *     zählen nicht (Alttage ohne das Feld unverändert).
+ *   - B3 (Ulf U2): Schulferien zählen beim Backzettel MIT; nur Feiertage und
+ *     Betriebsurlaub fliegen raus. BOS_IST_BESONDERER_TAG() meldet Ferien und
+ *     Betriebsurlaub beide als 'ferien' — der Betriebsurlaub wird deshalb
+ *     getrennt über window.BOS_FEIERTAGE.betriebsurlaub erkannt.
+ *   - B4 (Ulf U3, O8): Das Zeitfenster gilt wieder, wie bei der Mitschrift:
+ *     Stichprobe nur innerhalb suchfensterWochen, Kontiguierlich innerhalb
+ *     kontiguierlichTage. Der alte Grund („einmaliger Import, nie wieder
+ *     frisch“) stimmt seit der Erfassung nicht mehr.
+ *   - B5: Tage NACH heute zählen nie (Test-Dokumente, falsch gelesenes Jahr).
+ *   - Neu holeOffizielleTage(db): die Tagesdokumente selbst, neueste zuerst
+ *     (Erfassungs-Seite: Startstand, „fehlt“, „kam n×“). Dieselbe Abfrage.
+ *   - Neu pruefeBackzettelWert(): Abweichung in Blechen UND Prozent (AND),
+ *     Schwellen erfassungSchwelleBleche / erfassungSchwelleProzent.
+ *   - holeEinstellungen(): Klassen-Standard um diese zwei Schwellen ergänzt
+ *     (3 Bleche, 20 %, Ulf E18 08:25).
  *
  * EINHEITEN (Stand 13.10.2026, Baustelle #64):
  *   Regel: jede Bedarfszahl verlässt diesen Host in der `einheit` des
@@ -252,6 +288,15 @@ window.BOS_VERBRAUCH = {
 
   // 15.10.2026 (#63): laufender Durchgang (siehe durchgang()), sonst null.
   _durchgang: null,
+
+  // 19.10.2026 (Backzettel Stufe 1, Fund 2 / B2): gemeinsame Abfrage des
+  // Backzettel-Topfs außerhalb eines Durchgangs. { db, zeit, laeuft, promise }
+  OFFIZIELL_MERKEN_MS: 60000,
+  _offiziellSpeicher: null,
+  // Startwerte der Abweichungsprüfung beim Erfassen (Ulf E18, 19.10., 08:25):
+  // in BLECHEN laut Zettel (Stück ÷ Charge) UND in Prozent.
+  ERFASSUNG_SCHWELLE_BLECHE: 3,
+  ERFASSUNG_SCHWELLE_PROZENT: 0.20,
   WT_LANG: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'],
 
   /**
@@ -333,7 +378,10 @@ window.BOS_VERBRAUCH = {
       minStichprobe: this.MIN_STICHPROBE,
       schwelleProzent: this.SCHWELLE_PROZENT,
       schwelleAbsolut: this.SCHWELLE_ABSOLUT,
-      ausgeschlosseneTage: []
+      ausgeschlosseneTage: [],
+      // 19.10.2026: nur der Backzettel-Erfassung (pruefeBackzettelWert) — additiv
+      erfassungSchwelleBleche: this.ERFASSUNG_SCHWELLE_BLECHE,
+      erfassungSchwelleProzent: this.ERFASSUNG_SCHWELLE_PROZENT
     });
 
     // Ebene 1: Eigene lokale Einstellungen, profilgebunden, nur wenn aktiv.
@@ -455,17 +503,27 @@ window.BOS_VERBRAUCH = {
   },
 
   /**
-   * Bisherige Werte aus dem OFFIZIELLEN Datentopf — Gegenstück zu
-   * holeManuelleWerte(), aber anderes Dokumentschema. Neu 31.08.2026,
-   * gebaut gegen das echte Schema aus verbrauch_einstellungen_editor.html
-   * (ladeDatenbestand()), NICHT aus eigener Annahme rekonstruiert:
+   * Bisherige Werte aus dem BACKZETTEL-Topf (type 'verbrauch_offiziell') —
+   * Gegenstück zu holeManuelleWerte(), anderes Dokumentschema:
    *   { type: 'verbrauch_offiziell', datum: 'YYYY-MM-DD',
-   *     produkte: { '<legacyKey>_stueck': zahl, '<legacyKey>_bleche': zahl, … } }
-   * Migrierte historische Daten aus backmengen_db.json (einmaliger Import,
-   * siehe PRODUKT_CONFIG_SYNC_DOKU.md/import_dokumentation.md) — anders als
-   * verbrauch_manuell KEIN eigener wochentag-String pro Dokument, nur datum.
-   * Wochentag wird deshalb clientseitig berechnet, kein serverseitiger
-   * .where('wochentag',...)-Filter möglich.
+   *     produkte: { '<legacyKey>': Stück, … },          // legacyKey endet auf _stueck
+   *     ausgeschlossen: { '<legacyKey>': 'abweichung'|'von_hand' } }   // seit 19.10.2026
+   * Der Wochentag wird aus `datum` abgeleitet (Alttage aus dem Import führen
+   * ihn nicht verlässlich), deshalb kein serverseitiger Wochentag-Filter.
+   *
+   * Stand 19.10.2026 (Backzettel-Erfassung Stufe 1) — was zählt NICHT:
+   *   - Tage nach heute (B5)
+   *   - Feiertage und Betriebsurlaub (Datei-Ebene); Schulferien ZÄHLEN (B3)
+   *   - Tage aus einstellungen.ausgeschlosseneTage (Kalender im Editor)
+   *   - Tage außerhalb des Zeitfensters (B4): Stichprobe = suchfensterWochen,
+   *     Kontiguierlich = kontiguierlichTage — wie bei der Mitschrift
+   *   - ein Produkt, das am Tag in `ausgeschlossen` steht (F2)
+   * Stichprobe: die stichprobeAnzahl NEUESTEN Werte des Produkts.
+   * Lesefehler werden NICHT mehr verschluckt (#65 für diesen Topf): die
+   * Funktion wirft den eingeordneten Fehler aus _offizielleDokumente().
+   *
+   * ~~31.08.2026: kein orderBy, kein Zeitfenster („einmaliger Import, nie
+   * wieder frisch“)~~ — beides seit 19.10.2026 überholt (F1, O8/B4).
    *
    * @param {firebase.firestore.Firestore} db
    * @param {string} legacyKey
@@ -474,78 +532,155 @@ window.BOS_VERBRAUCH = {
    * @returns {Promise<number[]>}
    */
   async holeOffizielleWerte(db, legacyKey, wochentag, einstellungen) {
-    const modus            = einstellungen?.modus ?? 'stichprobe';
-    const stichprobeAnzahl = einstellungen?.stichprobeAnzahl ?? 6;
-    // suchfensterWochen/kontiguierlichTage bewusst NICHT gelesen — siehe
-    // Kommentar weiter unten (kein Zeitfenster-Ausschluss für diesen
-    // Datentopf). 'kontiguierlich' bedeutet für verbrauch_offiziell damit
-    // schlicht "alle verfügbaren Werte, kein Anzahl-Deckel" — 'stichprobe'
-    // bleibt durch stichprobeAnzahl weiterhin auf die N neuesten begrenzt.
+    const modus              = einstellungen?.modus ?? 'stichprobe';
+    const stichprobeAnzahl   = einstellungen?.stichprobeAnzahl ?? 6;
+    const suchfensterTage    = (einstellungen?.suchfensterWochen ?? 12) * 7;
+    const kontiguierlichTage = einstellungen?.kontiguierlichTage ?? 28;
 
-    // JS Date.getDay()-Index (0=So…6=Sa) — bewusst NICHT der BOS-Index
-    // (Mo=0), weil hier direkt aus new Date().getDay() gelesen wird.
+    // JS Date.getDay()-Index (0=So…6=Sa) — bewusst NICHT der BOS-Index (Mo=0).
     const WT_JS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    const heute = this._heuteIso();
+
+    // Wirft bei Lesefehlern (eingeordnet, mit Index-Link) — kein stilles [].
+    const alle = await this._offizielleDokumente(db);
+    const docs = alle
+      .filter(data => !!data && typeof data.datum === 'string')
+      .slice()
+      .sort((a, b) => b.datum.localeCompare(a.datum)); // neueste zuerst (Abfrage tut das schon; sicher ist sicher)
 
     const werte = [];
-    try {
-      // KORRIGIERT (31.08.2026, dritter Fund im selben Live-Test): kein
-      // orderBy('datum') mehr — die Abfrage in verbrauch_einstellungen_
-      // editor.html (ladeDatenbestand(), NACHWEISLICH funktionierend, zeigt
-      // echte 36 Tage/116 Produkte) nutzt exakt denselben Filter OHNE
-      // orderBy. Ein fehlender Index für orderBy(datum) auf dieser Collection
-      // hätte die Abfrage still scheitern lassen — abgefangen vom catch
-      // unten, ohne sichtbaren Fehler, Ergebnis wäre in jedem Fall []
-      // gewesen. Sortierung jetzt clientseitig, damit "neueste zuerst" für
-      // stichprobeAnzahl weiterhin gilt.
-      // 15.10.2026: im Durchgang nur einmal gelesen (siehe durchgang()).
-      const snap = await this._abfrage('offiziell', () => db.collection('bos_events')
-        .where('type', '==', 'verbrauch_offiziell')
-        .limit(this.MAX_DOKUMENTE_SCAN)
-        .get());
+    docs.forEach(data => {
+      if (modus === 'stichprobe' && werte.length >= stichprobeAnzahl) return;
 
-      const docs = snap.docs
-        .map(doc => doc.data())
-        .filter(data => !!data.datum)
-        .sort((a, b) => b.datum.localeCompare(a.datum)); // neueste zuerst, ISO-Strings sortieren lexikalisch korrekt
+      if (data.datum > heute) return;                       // B5: Zukunft zählt nie
 
-      docs.forEach(data => {
-        if (modus === 'stichprobe' && werte.length >= stichprobeAnzahl) return;
+      const [jahr, monat, tag] = data.datum.split('-').map(Number);
+      const wt = WT_JS[new Date(jahr, monat - 1, tag).getDay()];
+      if (wt !== wochentag) return;
 
-        // Wochentag aus datum ableiten — lokal, kein UTC-Parsing (gleiches
-        // Off-by-one-Risiko wie in _tageSeit(), siehe dortiger Kommentar).
-        const [jahr, monat, tag] = data.datum.split('-').map(Number);
-        const wt = WT_JS[new Date(jahr, monat - 1, tag).getDay()];
-        if (wt !== wochentag) return;
+      if (this._feiertagOderBetriebsurlaub(data.datum)) return;   // B3
+      if (einstellungen?.ausgeschlosseneTage?.some(t => t.datum === data.datum)) return;
 
-        // Zeitkontext-Ausschluss — nur Datei-Ebene verfügbar. Offiziell-
-        // Dokumente führen kein eigenes besondererTag-Flag (anders als
-        // verbrauch_manuell), das Signal existiert für diesen Datentopf nicht.
-        if (window.BOS_IST_BESONDERER_TAG?.(data.datum)) return;
-        if (einstellungen?.ausgeschlosseneTage?.some(t => t.datum === data.datum)) return;
+      const alterTage = this._tageSeit(data.datum);               // B4
+      if (modus === 'kontiguierlich' && alterTage > kontiguierlichTage) return;
+      if (modus === 'stichprobe' && alterTage > suchfensterTage) return;
 
-        // KEIN Zeitfenster-Ausschluss über alterTage — anders als bei
-        // holeManuelleWerte() (Zeile ~311). Dort sinnvoll: laufende
-        // Erfassung, "letzte X Wochen" hält die Vergleichsbasis aktuell.
-        // Bei verbrauch_offiziell handelt es sich um einen EINMALIGEN
-        // historischen Import (backmengen_db.json, Stand 24.05.2026) — die
-        // Daten werden nie wieder "frisch". Ein rollierendes Suchfenster
-        // relativ zu "heute" würde mit fortschreitendem Datum irgendwann
-        // zwangsläufig alles ausschließen, unabhängig vom eingestellten
-        // Wert. stichprobeAnzahl begrenzt die Menge weiterhin (siehe oben),
-        // nur eben nicht zusätzlich nach "wie alt".
+      // F2: „zählt nicht“ für dieses Produkt an diesem Tag
+      if (data.ausgeschlossen && Object.prototype.hasOwnProperty.call(data.ausgeschlossen, legacyKey)) return;
 
-        // legacyKey enthält die Einheit bereits als Bestandteil des
-        // Schlüssels selbst (bestätigt gegen echte produkt_config.json,
-        // 31.08.2026: "hasenberger_stueck", "kaesebroetchen_stueck", …) —
-        // direkter Zugriff, kein Suffix-Anhang.
-        const wert = data.produkte?.[legacyKey];
-        if (typeof wert === 'number') werte.push(wert);
-      });
-    } catch (fehler) {
-      console.warn('BOS_VERBRAUCH.holeOffizielleWerte: Abfrage fehlgeschlagen, Check wird übersprungen.', fehler);
-      return [];
-    }
+      // legacyKey enthält die Einheit bereits (z. B. "hasenberger_stueck") —
+      // direkter Zugriff, kein Suffix-Anhang (Fix 31.08.2026).
+      const wert = data.produkte?.[legacyKey];
+      if (typeof wert === 'number') werte.push(wert);
+    });
     return werte;
+  },
+
+  /**
+   * Die Tagesdokumente des Backzettel-Topfs, neueste zuerst (Kopien der Daten).
+   * Neu 19.10.2026 für die Erfassungs-Seite (Startstand, „fehlt“, „kam n×“).
+   * Dieselbe Abfrage wie holeOffizielleWerte() — kein zweiter Weg, im
+   * Durchgang und außerhalb geteilt. Wirft eingeordnete Lesefehler.
+   * @returns {Promise<object[]>}
+   */
+  async holeOffizielleTage(db) {
+    const alle = await this._offizielleDokumente(db);
+    return alle
+      .filter(data => !!data && typeof data.datum === 'string')
+      .map(data => Object.assign({}, data))
+      .sort((a, b) => b.datum.localeCompare(a.datum));
+  },
+
+  /** Leert den gemerkten Backzettel-Topf (nach dem Speichern eines Tages). */
+  vergissOffizielle() { this._offiziellSpeicher = null; },
+
+  /**
+   * DIE eine Abfrage des Backzettel-Topfs (19.10.2026).
+   *  - neueste zuerst: orderBy('datum','desc') + limit (F1) — braucht den
+   *    Index type ↑ / datum ↓, sonst Fehler 'index_fehlt' mit Link
+   *  - im Durchgang: wie bisher einmal je Durchgang (_abfrage)
+   *  - außerhalb: gleichzeitige Aufrufer teilen die laufende Abfrage, das
+   *    Ergebnis bleibt OFFIZIELL_MERKEN_MS gemerkt; ein Fehler wird nicht
+   *    gemerkt — der nächste Aufruf fragt neu (B2)
+   * Liefert die Daten (doc.data()) als Liste.
+   */
+  _offizielleDokumente(db) {
+    const holen = () => {
+      const sp = this._offiziellSpeicher;
+      if (sp && sp.db === db && (sp.laeuft || Date.now() - sp.zeit < this.OFFIZIELL_MERKEN_MS)) {
+        return sp.promise;
+      }
+      const eintrag = { db, zeit: Date.now(), laeuft: true, promise: null };
+      this._offiziellSpeicher = eintrag;
+      let anfrage;
+      try {
+        anfrage = Promise.resolve(db.collection('bos_events')
+          .where('type', '==', 'verbrauch_offiziell')
+          .orderBy('datum', 'desc')
+          .limit(this.MAX_DOKUMENTE_SCAN)
+          .get());
+      } catch (fehler) {
+        anfrage = Promise.reject(fehler);
+      }
+      eintrag.promise = anfrage.then(snap => {
+        eintrag.laeuft = false;
+        eintrag.zeit = Date.now();
+        return snap.docs.map(doc => doc.data());
+      }, fehler => {
+        if (this._offiziellSpeicher === eintrag) this._offiziellSpeicher = null;   // B2: Fehler nicht merken
+        throw this._lesefehler(fehler, 'Backzettel');
+      });
+      return eintrag.promise;
+    };
+    return this._abfrage('offiziell', holen);
+  },
+
+  /**
+   * Ordnet einen Lesefehler ein (Muster einordnen() aus bos_meldungen.js).
+   * Ergebnis: Error mit message (Klartext + Code + Originalmeldung, damit
+   * Seiten, die nur e.message zeigen, den Grund nennen), art, meldung, code,
+   * original und bei fehlendem Index link.
+   */
+  _lesefehler(fehler, topf) {
+    if (fehler && fehler.art && fehler.meldung) return fehler;   // schon eingeordnet
+    const code = (fehler && fehler.code) || '';
+    const roh = String((fehler && fehler.message) || fehler || '');
+    let art = 'fehler', meldung = 'Unerwarteter Fehler beim Lesen.', link = null;
+    if (code === 'permission-denied') { art = 'keine_berechtigung'; meldung = 'Die Datenbank hat das Lesen abgelehnt (Konto freigeschaltet? angemeldet?).'; }
+    else if (code === 'unavailable') { art = 'kein_netz'; meldung = 'Keine Verbindung zum Server (WLAN?).'; }
+    else if (code === 'deadline-exceeded') { art = 'zeitlimit'; meldung = 'Der Server hat nicht rechtzeitig geantwortet.'; }
+    else if (code === 'resource-exhausted') { art = 'kontingent'; meldung = 'Das Tageskontingent der Datenbank ist aufgebraucht.'; }
+    else if (code === 'unauthenticated') { art = 'nicht_angemeldet'; meldung = 'Nicht angemeldet — bitte an der Tür anmelden.'; }
+    else if (code === 'failed-precondition' && /index/i.test(roh)) {
+      art = 'index_fehlt';
+      const m = roh.match(/https:\/\/console\.firebase\.google\.com\/[^\s)"']+/);
+      link = m ? m[0] : null;
+      meldung = 'Die Datenbank braucht für den ' + topf + ' einmalig einen Index (bos_events: type aufsteigend, datum absteigend). ' +
+        (link ? 'Den Link öffnen, „Index erstellen“ wählen, ein paar Minuten warten, dann neu laden.' : 'In der Firebase-Konsole unter Firestore → Indexe anlegen.');
+    }
+    const e = new Error('Lesefehler ' + topf + ': ' + meldung + (code ? ' [' + code + ']' : '') + (roh ? ' — ' + roh : ''));
+    e.art = art; e.meldung = meldung; e.code = code; e.original = fehler; e.link = link;
+    return e;
+  },
+
+  /** Heute als 'JJJJ-MM-TT', LOKAL gebildet (nie toISOString — UTC-Falle 0–2 Uhr). */
+  _heuteIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  },
+
+  /**
+   * B3 (19.10.2026): Feiertag oder Betriebsurlaub? Schulferien nicht.
+   * BOS_IST_BESONDERER_TAG() (bos_zeitkontext_referenz.js) meldet Ferien UND
+   * Betriebsurlaub als typ 'ferien'; der Betriebsurlaub wird deshalb hier
+   * getrennt über window.BOS_FEIERTAGE.betriebsurlaub erkannt. Fehlt die
+   * Referenzdatei, wird nichts ausgeschlossen (wie bisher).
+   */
+  _feiertagOderBetriebsurlaub(datum) {
+    const info = (typeof window !== 'undefined' && window.BOS_IST_BESONDERER_TAG) ? window.BOS_IST_BESONDERER_TAG(datum) : null;
+    if (info && info.typ === 'feiertag') return true;
+    const bu = (typeof window !== 'undefined' && window.BOS_FEIERTAGE && window.BOS_FEIERTAGE.betriebsurlaub) || [];
+    return bu.some(f => f && f.von && f.bis && datum >= f.von && datum <= f.bis);
   },
 
   /**
@@ -768,5 +903,67 @@ window.BOS_VERBRAUCH = {
       absDelta,
       pctDelta
     };
+  },
+
+  /**
+   * Abweichungsprüfung beim ERFASSEN eines Backzettels (19.10.2026,
+   * Backzettel Stufe 1; Kompendium E4, E5, E12, E18). Gegenstück zu
+   * pruefeAusreisser() (Mitschrift), bewusst eigene Funktion: anderer Topf,
+   * Schwelle in BLECHEN laut Zettel statt in Einheiten des Topfs (F3).
+   * Der Schnitt kommt über holeOffizielleWerte() — dieselbe Leseleitung wie
+   * an den Stationen (Fenster, Feiertage, „zählt nicht“, Zukunft). Der
+   * Backtag selbst ist aus dem Vergleich genommen (Bauplan Fund 5: ein
+   * zweiter Durchgang am selben Tag vergliche sonst gegen sich selbst).
+   *
+   * AND-Logik (RosinenBatzen-Fall, nicht verhandelbar): auffällig nur, wenn
+   * Abweichung in Blechen ≥ erfassungSchwelleBleche UND in Prozent ≥
+   * erfassungSchwelleProzent. Unter minStichprobe Werten keine Prüfung.
+   *
+   * Bleche = Stück ÷ Charge der Zettelzeile (P1 hat sie gerade bestätigt,
+   * F6: = stueckProBlech). Ohne lesbare Charge über die Einheit des Produkts
+   * (BOS_PRODUKTE.stueckInEinheit, nur Träger-Produkte). Geht beides nicht:
+   * keine Prüfung, grund 'keine_charge'.
+   *
+   * @param {object} a
+   * @param {firebase.firestore.Firestore} a.db
+   * @param {object} a.produkt     aus BOS_PRODUKTE.lade() (legacyKey, einheit, stueckProBlech)
+   * @param {string} a.wochentag   z. B. "Samstag"
+   * @param {string} a.backtag     'JJJJ-MM-TT' — wird aus dem Vergleich genommen
+   * @param {number} a.stueck      gelesene Anzahl
+   * @param {number|null} a.charge Charge der Zettelzeile
+   * @param {object} [a.einstellungen]  sonst holeEinstellungen('offiziell')
+   * @returns {Promise<{pruefungAktiv: boolean, grund?: string, auffaellig?: boolean,
+   *   schnittStueck?: number, anzahl: number, deltaStueck?: number, deltaBleche?: number,
+   *   deltaProzent?: number, blecheQuelle?: 'zettel'|'produkt', schwelleBleche: number, schwelleProzent: number}>}
+   */
+  async pruefeBackzettelWert(a) {
+    const einst = a.einstellungen || await this.holeEinstellungen('offiziell');
+    const schwelleBleche = Number.isFinite(Number(einst.erfassungSchwelleBleche)) ? Number(einst.erfassungSchwelleBleche) : this.ERFASSUNG_SCHWELLE_BLECHE;
+    const schwelleProzent = Number.isFinite(Number(einst.erfassungSchwelleProzent)) ? Number(einst.erfassungSchwelleProzent) : this.ERFASSUNG_SCHWELLE_PROZENT;
+    const minStichprobe = Number.isFinite(Number(einst.minStichprobe)) ? Number(einst.minStichprobe) : this.MIN_STICHPROBE;
+    const ohneBacktag = Object.assign({}, einst, {
+      ausgeschlosseneTage: (einst.ausgeschlosseneTage || []).concat(a.backtag ? [{ datum: a.backtag, grund: 'erfassung' }] : [])
+    });
+    const werte = await this.holeOffizielleWerte(a.db, a.produkt.legacyKey, a.wochentag, ohneBacktag);
+    const basis = { anzahl: werte.length, schwelleBleche, schwelleProzent };
+    if (werte.length < minStichprobe) return Object.assign({ pruefungAktiv: false, grund: 'zu_wenig' }, basis);
+
+    const schnitt = werte.reduce((s, w) => s + w, 0) / werte.length;
+    const deltaStueck = Math.abs(a.stueck - schnitt);
+    let deltaBleche = null, blecheQuelle = null;
+    if (typeof a.charge === 'number' && a.charge > 0) {
+      deltaBleche = deltaStueck / a.charge; blecheQuelle = 'zettel';
+    } else if (a.produkt) {
+      const P = (typeof window !== 'undefined' && window.BOS_PRODUKTE) || null;
+      const e = P && typeof P.einheit === 'function' ? P.einheit(a.produkt) : null;
+      if (e && e.art === 'traeger' && e.hatFaktor) { deltaBleche = P.stueckInEinheit(deltaStueck, a.produkt); blecheQuelle = 'produkt'; }
+    }
+    if (deltaBleche === null) return Object.assign({ pruefungAktiv: false, grund: 'keine_charge', schnittStueck: schnitt }, basis);
+
+    const deltaProzent = schnitt === 0 ? (deltaStueck > 0 ? 1 : 0) : deltaStueck / schnitt;
+    // Rundungsrauschen (z. B. 2,9999999 Bleche) nicht über die Schwelle kippen lassen
+    const r = x => Math.round(x * 1e9) / 1e9;
+    const auffaellig = (r(deltaBleche) >= schwelleBleche) && (r(deltaProzent) >= schwelleProzent);   // AND, nie OR
+    return Object.assign({ pruefungAktiv: true, auffaellig, schnittStueck: schnitt, deltaStueck, deltaBleche, deltaProzent, blecheQuelle }, basis);
   }
 };

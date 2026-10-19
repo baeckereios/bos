@@ -19,6 +19,8 @@
     "schwelleProzent": 0.3,
     "schwelleAbsolut": 5,
     "ausgeschlosseneTage": [],
-    "_kommentar": "Vorbereitet für den künftigen zweiten Datentopf (verbrauch_offiziell) — es existiert noch keine konsumierende Logik dafür, siehe BOS_ZEITKONTEXT_DOKU.md und BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md. Werte hier sind Platzhalter, identisch zu 'manuell'."
+    "erfassungSchwelleBleche": 3,
+    "erfassungSchwelleProzent": 0.2,
+    "_kommentar": "Backzettel-Topf (verbrauch_offiziell). Gelesen von holeOffizielleWerte() (Modus, Fenster, Mindeststichprobe, ausgeschlosseneTage) und seit 19.10.2026 von der Backzettel-Erfassung: erfassungSchwelleBleche/erfassungSchwelleProzent (Abweichung in Blechen laut Zettel UND Prozent, Ulf 19.10.2026). schwelleAbsolut/schwelleProzent haben für diesen Topf weiterhin keinen Leser."
   }
 }
