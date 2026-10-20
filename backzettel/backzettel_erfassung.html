@@ -31,6 +31,10 @@
       Dazu: „Heute nicht auf dem Zettel“ kennt jetzt jede Zeile mit bekannter
       Nummer (auch Bestellung oder rot) — sonst hieße eine als Bestellung
       gekennzeichnete Zeile „Seite vergessen?“.
+    2026-10-20 · 06:59 · v3 · Herkunft der Einstellungen (Verbrauch aufräumen,
+      Freigabe KC 06:20): Stand-Karte zeigt eine Zeile, woher die Einstellungen
+      kommen (BOS_VERBRAUCH.einstellungenHerkunft(): Datenbank mit Stand /
+      Gerät / Datei / Startwerte, mit Grund). Sonst nichts geändert.
 -->
 <head>
 <meta charset="UTF-8">
@@ -471,6 +475,9 @@ function zeichneStand() {
       }).join('') + '</ul>';
     }
   }
+  // 20.10.2026: woher die Einstellungen (Schwellen, Fenster) kommen — nie still
+  const hk = V && typeof V.einstellungenHerkunft === 'function' ? V.einstellungenHerkunft() : null;
+  if (hk) html += '<p id="einstHerkunft" class="' + (hk.warnung ? 'bz-warn' : 'bz-dim') + '">' + esc(hk.text) + '</p>';
   el.innerHTML = html;
   el.classList.remove('bz-dim');
 }

@@ -335,35 +335,61 @@ window.BOS_APPS = [
     roles: ['admin']
   },
   {
+    /* NEU 20.10.2026 (Verbrauch aufräumen, Ulf E26 / U1 / U2 06:20): Hub für
+       alles rund um den Verbrauch — Mitschrift (die „alternative Erfassung“,
+       Ulf 20.10., 05:56), Backzettel erfassen, Einstellungen, Werkstatt.
+       Rollen = Vereinigung der Kinder; die Kinder behalten ihre eigenen
+       roles, Kollegen sehen im Hub deshalb nur die Mitschrift. Kinder-Namen
+       ohne „Verbrauch“ (steht am Hub); id/url/direkt der Kinder unverändert
+       (Schilder, NFC, bos_code_adressen.json). launcher.html zieht installierte
+       Kinder einmal in den Hub um (HUB_UMZUEGE). */
+    id: 'verbrauch',
+    bereich: 'verbrauch',
+    name: 'Verbrauch',
+    icon: '📊',
+    color: '#c07a10',
+    url: null,
+    status: 'live',
+    type: 'hub',
+    roles: ['backstube', 'konditorei', 'produktionsleitung', 'admin']
+  },
+  {
     id: 'verbrauch_einstellungen_editor',
     bereich: 'verbrauch',
-    name: 'Verbrauch-Einstellungen',
+    name: 'Einstellungen',
     icon: '🎚️',
     color: '#8b5cf6',
     url: 'verbrauch_einstellungen/verbrauch_einstellungen_editor.html',
     status: 'live',
+    hub: 'verbrauch',
     roles: ['admin']
+    // 20.10.2026: Name „Verbrauch-Einstellungen“ → „Einstellungen“ (im Hub, U1); Kind von 'verbrauch'.
   },
   {
     id: 'verbrauch_manuell',
     bereich: 'verbrauch',
-    name: 'Verbrauch (Mitschrift)',
+    name: 'Mitschrift',
     icon: '📝',
     color: '#c07a10',
     url: 'verbrauch/verbrauch_manuell.html',
     direkt: 'anmeldung',
     status: 'live',
+    hub: 'verbrauch',
     roles: ['backstube', 'konditorei', 'produktionsleitung', 'admin']
+    // 20.10.2026: Name „Verbrauch (Mitschrift)“ → „Mitschrift“ (U1); Kind von 'verbrauch'.
+    // id, url und direkt unverändert — QR/Chip-Adresse bleibt gültig.
   },
   {
     id: 'verbrauch_werkstatt',
     bereich: 'verbrauch',
-    name: 'Verbrauch-Werkstatt',
+    name: 'Werkstatt',
     icon: '🛠️',
     color: '#8b5cf6',
     url: 'verbrauch/verbrauch_werkstatt.html',
     status: 'live',
+    hub: 'verbrauch',
     roles: ['admin']
+    // 20.10.2026: Name „Verbrauch-Werkstatt“ → „Werkstatt“ (U1); Kind von 'verbrauch'.
     // NEU 04.09.2026. Admin-Werkzeug zum Ansehen/Korrigieren/Löschen
     // einzelner bos_events-Dokumente — aktuell nur type: 'verbrauch_manuell',
     // bewusst als Parameter im Code gebaut (Ulf-Entscheidung 04.09.2026: Weg
@@ -383,7 +409,9 @@ window.BOS_APPS = [
     color: '#8b5cf6',
     url: 'backzettel/backzettel_erfassung.html',
     status: 'live',
+    hub: 'verbrauch',
     roles: ['admin']
+    // 20.10.2026: Kind von 'verbrauch' (Name bleibt).
     // NEU 19.10.2026 (Backzettel-Erfassung Stufe 1): Backzettel fotografieren, per
     // Claude-API auslesen, nachrechnen, in den Backzettel-Topf (verbrauch_offiziell)
     // speichern. Nur Rolle admin (Ulf E1/E13; admin haben backstube02 und

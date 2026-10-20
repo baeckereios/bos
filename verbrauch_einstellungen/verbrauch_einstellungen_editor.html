@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-20 · 06:59 · Einstellungen in der Datenbank (Verbrauch aufräumen, Freigabe KC 06:20, V1–V6): Die Seite liest verbrauch_einstellungen/system IMMER vom Server, zeigt oben die Herkunft, „Speichern“ schreibt direkt (Sicherung der Vorversion + Stand + 1, Regel RK §24), Erst-Füllung „Aus der Datei in die Datenbank übernehmen“ mit Vergleich, Vorversionen (letzte 10) mit „Diesen Stand zurückholen“, Prüfung jedes Felds vor dem Speichern (Grenzen = Rechner = Regel; leeres Feld wird nicht mehr still 0), Hinweis „Notfall-Kopie veraltet“, Ungespeichert-Schutz, Grund ausgeschlossener Tage umgewandelt und auf 100 Zeichen begrenzt. Reiter Backzettel: „Relative/Absolute Mindestabweichung“ ausgeblendet (Werte bleiben). „Als Datei herunterladen“ bleibt als Notfall-Kopie. SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md -->
 <!-- 2026-10-19 · 17:32 · Backzettel-Erfassung Stufe 1 (Freigabe KC 09:47, B3/B4): Reiter Backzettel mit neuer Karte „Prüfung beim Erfassen“ (erfassungSchwelleBleche, erfassungSchwelleProzent; Vorgabe 3 Bleche / 20 %, Ulf E18). Die alten Felder Relative/Absolute Mindestabweichung wirken beim Backzettel nicht (Hinweis im Reiter). Hilfe: Backzettel = alte BOS1-Zahlen + neue Erfassung, Schulferien zählen beim Backzettel mit, Zeitfenster gilt wieder (Nebenwirkung auf „Aus Backzettel übernehmen“). SESSION_2026-10-19_BACKZETTEL_STUFE1_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Auswahl- und Kalender-Tönungen folgen dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:26 · Beschriftung (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Reiter heißen „Mitschrift“ (Datentopf manuell) und „Backzettel“ (Datentopf offiziell), Hilfe entsprechend und um den Richtwert ergänzt (der hat keine Einstellungen). Werte in Datenbank, Datei und Code unverändert. SESSION_2026-10-14_RICHTWERT_BAU.md -->
@@ -22,6 +23,9 @@
   BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md §3) — zwei Tabs (Manuell/Offiziell,
   siehe SESSION_2026-08-29_DURCHSCHNITTSBERECHNUNG_ZEITKONTEXT.md §3.1).
 
+  ÜBERHOLT SEIT 20.10.2026: Die Seite schreibt jetzt direkt in die Datenbank
+  (verbrauch_einstellungen/system, mit Sicherung). Die Datei ist nur noch
+  Notfall-Kopie. Der folgende Absatz ist der alte Stand:
   KEIN LIVE-SCHREIBZUGRIFF auf Dateien — GitHub Pages ist statisches
   Hosting, ein Browser kann Repo-Dateien nicht direkt verändern. Diese
   Seite lädt die aktuell deployte bos_verbrauch_einstellungen.json (oder
@@ -211,6 +215,23 @@
   }
 
   .warnbox { background: var(--ve-warnung-bg); border: 1px solid var(--ve-warnung); border-radius: 8px; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); font-size: var(--bos-font-sm, 13px); margin-top: var(--bos-space-xs, 10px); }
+  /* 20.10.2026: Hinweis (Warnfarbe, nicht Fehler-Rot; Checkliste §3a), Herkunft, Speichern, Vergleich, Vorversionen */
+  .hinweisbox { background: color-mix(in srgb, var(--bos-warn) 14%, transparent); border: 1px solid var(--bos-warn); border-radius: 8px; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); font-size: var(--bos-font-sm, 13px); margin-top: var(--bos-space-xs, 10px); }
+  .herkunft-zeile { font-size: var(--bos-font-sm, 13px); }
+  .herkunft-zeile strong { font-family: var(--ve-font-label); }
+  .feld-fehler { color: var(--ve-warnung); font-size: var(--bos-font-xs, 12px); margin-top: var(--bos-space-3xs, 4px); }
+  input.ungueltig { border-color: var(--ve-warnung); }
+  .aenderung-liste { font-size: var(--bos-font-sm, 13px); color: var(--ve-text-schwach); margin: 0 0 var(--bos-space-xs, 10px); padding-left: 18px; }
+  .speicher-meldung { font-size: var(--bos-font-sm, 13px); margin-top: var(--bos-space-xs, 8px); }
+  .speicher-meldung.ok { color: var(--bos-green); }
+  .vergleich { width: 100%; border-collapse: collapse; font-size: var(--bos-font-sm, 13px); }
+  .vergleich th, .vergleich td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--ve-rand); vertical-align: top; }
+  .vergleich tr.anders td { background: color-mix(in srgb, var(--bos-warn) 14%, transparent); }
+  .vv-zeile { display: flex; justify-content: space-between; align-items: center; gap: var(--bos-space-xs, 8px); padding: 6px 0; border-bottom: 1px solid var(--ve-rand); font-size: var(--bos-font-sm, 13px); }
+  .vv-zeile:last-child { border-bottom: none; }
+  .zweit-btn { background: var(--ve-oberflaeche-2); border: 1px solid var(--ve-rand); color: var(--ve-text); font-family: var(--ve-font-label); font-weight: 700; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
+  .zweit-btn[disabled], .primaer-btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .feld-hinweis { font-size: var(--bos-font-sm, 13px); color: var(--ve-text-schwach); margin: 0 0 var(--bos-space-sm, 12px); }
   .infobox { background: var(--ve-info-bg); border: 1px solid var(--ve-info-text); border-radius: 8px; padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); font-size: var(--bos-font-sm, 13px); margin-top: var(--bos-space-xs, 10px); }
 
   /* Kalender (29.08.2026) */
@@ -312,6 +333,9 @@
     <button class="icon-btn" id="hilfeOeffnen" type="button" aria-label="Hilfe">❓</button>
   </div>
 
+  <div id="herkunft" class="karte herkunft-zeile" aria-live="polite">Lädt die Einstellungen vom Server …</div>
+  <div id="erstfuellung" class="karte" hidden></div>
+
   <div class="tab-leiste">
     <button class="tab-btn aktiv" data-tab="manuell" type="button">Mitschrift</button>
     <button class="tab-btn" data-tab="offiziell" type="button">Backzettel</button>
@@ -321,9 +345,32 @@
   <div class="tab-panel aktiv" id="tab-manuell" data-datentopf="manuell"></div>
   <div class="tab-panel" id="tab-offiziell" data-datentopf="offiziell"></div>
 
-  <button class="export-btn" id="jsonAnzeigen" type="button">System-Standard als JSON anzeigen</button>
-  <button class="export-btn" id="jsonHerunterladen" type="button">Als Datei herunterladen</button>
+  <div class="karte" id="speicherleiste" hidden>
+    <ul class="aenderung-liste" id="aenderungen"></ul>
+    <div id="speicherFehler" class="warnbox" hidden role="alert"></div>
+    <button class="primaer-btn" id="speichernBtn" type="button" disabled>Speichern</button>
+    <div id="speicherMeldung" class="speicher-meldung" role="status"></div>
+  </div>
+
+  <details class="karte" id="vorversionenKarte" hidden>
+    <summary class="feld-label">Vorversionen (die letzten 10)</summary>
+    <div id="vorversionen" style="margin-top:8px;">Lädt …</div>
+  </details>
+
+  <button class="export-btn" id="jsonAnzeigen" type="button">Einstellungen als JSON anzeigen</button>
+  <button class="export-btn" id="jsonHerunterladen" type="button">Als Datei herunterladen (Notfall-Kopie)</button>
   <pre id="jsonAusgabe" hidden></pre>
+</div>
+
+<!-- Vergleich vor Erst-Füllung / Zurückholen (20.10.2026) -->
+<div id="vergleichSheet" class="bottom-sheet" hidden>
+  <div class="bottom-sheet-inhalt">
+    <h2 id="vergleichTitel">Vergleich</h2>
+    <div id="vergleichInhalt"></div>
+    <div id="vergleichFehler" class="warnbox" hidden role="alert"></div>
+    <button class="primaer-btn" id="vergleichJa" type="button" style="margin-top:12px;">Übernehmen</button>
+    <button class="export-btn" id="vergleichNein" type="button">Abbrechen</button>
+  </div>
 </div>
 
 <!-- Hilfe-Bottom-Sheet -->
@@ -357,7 +404,8 @@
     <p>Beim Erfassen eines Backzettels vergleicht BOS jede Zeile mit dem Durchschnitt desselben Wochentags. Weicht sie
     gleichzeitig um mindestens so viele Bleche UND um mindestens so viel Prozent ab, wird sie gelb markiert und zählt
     vorab nicht für den Schnitt (in der Übersicht mit einem Tipp umkehrbar). Startwerte: 3 Bleche und 20 %. Die beiden
-    Felder „Relative/Absolute Mindestabweichung“ darüber wirken beim Backzettel nicht.</p>
+    Felder „Relative/Absolute Mindestabweichung“ wirken beim Backzettel nicht und sind deshalb im Reiter Backzettel
+    ausgeblendet (seit 20.10.2026; ihre Werte bleiben gespeichert).</p>
 
     <h3>Backzettel: Ferien, Feiertage und Zeitfenster</h3>
     <p>Beim Backzettel zählen Schulferien ganz normal mit; Feiertage und ein eingetragener Betriebsurlaub zählen nicht. Seit
@@ -379,9 +427,21 @@
     Mitschrift auch nicht — beim Backzettel zählen Ferien seit 19.10.2026 mit.</p>
 
     <h3>Wie speichere ich meine Änderungen?</h3>
-    <p>Diese Seite kann nicht direkt ins Repository schreiben (statisches Hosting). Über die Knöpfe unten die
-    fertige Datei anzeigen oder herunterladen, dann von Hand ins Projekt legen (ersetzt <code>bos_verbrauch_
-    einstellungen.json</code> im Root).</p>
+    <p>Mit „Speichern“ unten. Es gilt sofort, ohne Datei und ohne GitSync. Die alte Version wird dabei automatisch
+    gesichert. Stationen und Schnellrechner übernehmen die neuen Werte, sobald sie neu geöffnet oder neu geladen werden;
+    in ihrer Statuszeile steht der Stand. Vor dem Speichern prüft die Seite jedes Feld: ein leeres Feld oder ein Wert
+    außerhalb der Grenzen wird rot markiert und sperrt das Speichern. Speichern dürfen nur Konten mit Rolle admin.</p>
+
+    <h3>Woher kommen die Einstellungen?</h3>
+    <p>Oben steht es immer: aus der Datenbank (mit Stand, Zeit und Konto), oder — solange die Datenbank noch leer ist —
+    aus der Datei. Ist die Datenbank leer, übernimmst du die Werte einmal mit „Aus der Datei in die Datenbank übernehmen“;
+    vorher zeigt die Seite, was übernommen wird. Die Datei <code>bos_verbrauch_einstellungen.json</code> ist danach nur
+    noch Notfall-Kopie: Sie gilt nur, wenn die Datenbank nicht antwortet und auf dem Gerät keine Kopie liegt. Weicht sie
+    von der Datenbank ab, sagt die Seite das; dann bei Gelegenheit „Als Datei herunterladen“ und per GitSync ablegen.</p>
+
+    <h3>Vorversionen</h3>
+    <p>Unten stehen die letzten 10 gesicherten Stände mit Zeit und Konto. „Diesen Stand zurückholen“ zeigt vorher, was
+    sich ändert, und speichert den alten Stand dann als neuen Stand (auch das wird gesichert).</p>
   </div>
 </div>
 
@@ -389,6 +449,9 @@
      Markierung). Kein Firebase nötig — anders als bei der früheren
      Rechenhilfe wird hier nichts aus Firestore gelesen. -->
 <script src="../bos_zeitkontext_referenz.js"></script>
+<!-- 20.10.2026: Rechner (Grenzen, Prüfung, Collection-Namen, Gerätekopie) und Ungespeichert-Schutz -->
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_ungespeichert.js"></script>
 
 <script>
 (function () {
@@ -403,8 +466,66 @@
   const zustand = {
     einstellungen: { manuell: KLASSEN_STANDARD(), offiziell: KLASSEN_STANDARD() },
     produkte: [],
-    datenbestand: { manuell: null, offiziell: null } // null = noch nicht geladen
+    datenbestand: { manuell: null, offiziell: null }, // null = noch nicht geladen
+    // 20.10.2026: Datenbank
+    quelle: 'laden',          // 'laden' | 'datenbank' | 'leer' | 'fehler'
+    serverRoh: null,          // rohes Serverdokument (für Sicherung „vorher“, Stand)
+    serverFehler: null,
+    datei: null, dateiFehler: null,
+    regel: 'unbekannt',       // 'ok' | 'alt' | 'unbekannt'
+    basis: null,              // JSON der geladenen Felder (Änderungserkennung)
+    speichertGerade: false,
+    konflikt: false,
+    speicherFehlerText: null,  // letzte Ablehnung — bleibt sichtbar bis zum nächsten Versuch
+    vorversionen: null, vorversionenFehler: null
   };
+  const V = window.BOS_VERBRAUCH;
+  const TOEPFE = ['manuell', 'offiziell'];
+  const TOPF_NAME = { manuell: 'Mitschrift', offiziell: 'Backzettel' };
+  const FELD_NAME = {
+    modus: 'Modus', stichprobeAnzahl: 'Anzahl Werte', suchfensterWochen: 'Suchfenster (Wochen)',
+    kontiguierlichTage: 'Zeitraum (Tage)', minStichprobe: 'Mindest-Stichprobe', schwelleProzent: 'Relative Mindestabweichung',
+    schwelleAbsolut: 'Absolute Mindestabweichung', ausgeschlosseneTage: 'Ausgeschlossene Tage',
+    erfassungSchwelleBleche: 'Erfassen: Abweichung (Bleche)', erfassungSchwelleProzent: 'Erfassen: Abweichung (%)'
+  };
+  const PROZENT_FELDER = ['schwelleProzent', 'erfassungSchwelleProzent'];
+  const REGEL_FASSUNG = 'verbrauch-einstellungen-2026-10-20';
+  const REGEL_DATEI = 'firestore_regeln_2026-10-20_verbrauch_einstellungen.rules';
+  const SPEICHER_ZEITLIMIT_MS = 30000;
+
+  function esc(t) { return String(t === null || t === undefined ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function mitZeitlimit(p, ms) {
+    let uhr;
+    return Promise.race([p, new Promise((_, nein) => { uhr = setTimeout(() => { const e = new Error('keine Antwort nach ' + Math.round(ms / 1000) + ' s'); e.code = 'zeitlimit'; nein(e); }, ms); })])
+      .then(w => { clearTimeout(uhr); return w; }, e => { clearTimeout(uhr); throw e; });
+  }
+  function kennung() {
+    try { const n = firebase.auth().currentUser; return n && n.email ? n.email.split('@')[0] : null; } catch (e) { return null; }
+  }
+  function fehlerText(e) { return (e && e.code ? e.code + ' — ' : '') + ((e && e.message) || String(e)); }
+  function felderVon(topf) { return V.nurEinstellungsFelder(zustand.einstellungen[topf], topf); }
+  function aktuelleBloecke() { return { manuell: felderVon('manuell'), offiziell: felderVon('offiziell') }; }
+  function istGeaendert() { return zustand.basis !== null && JSON.stringify(aktuelleBloecke()) !== zustand.basis; }
+  function alleFehler() {
+    const f = [];
+    TOEPFE.forEach(t => V.pruefeEinstellungsBlock(felderVon(t), t).forEach(x => f.push({ topf: t, feld: x.feld, grund: x.grund })));
+    return f;
+  }
+  function wertText(feld, w) {
+    if (w === null || w === undefined || (typeof w === 'number' && Number.isNaN(w))) return '(leer)';
+    if (feld === 'ausgeschlosseneTage') return Array.isArray(w) ? w.length + ' Tag(e)' + (w.length ? ': ' + w.map(x => x && x.datum).join(', ') : '') : String(w);
+    if (PROZENT_FELDER.indexOf(feld) !== -1 && typeof w === 'number') return Math.round(w * 10000) / 100 + ' %';
+    return String(w);
+  }
+  /* Liste der geänderten Felder zwischen zwei Blöcke-Paaren */
+  function unterschiede(alt, neu) {
+    const out = [];
+    TOEPFE.forEach(t => V.einstellungsFelder(t).forEach(k => {
+      const a = alt && alt[t] ? alt[t][k] : undefined, n = neu && neu[t] ? neu[t][k] : undefined;
+      if (JSON.stringify(a) !== JSON.stringify(n)) out.push({ topf: t, feld: k, alt: a, neu: n });
+    }));
+    return out;
+  }
 
   const el = {};
 
@@ -499,6 +620,8 @@
           </div>
         </div>
 
+${datentopf === 'offiziell' ? `
+        <p class="feld-hinweis" id="${pfx}-schwellenHinweis">Die Abweichung beim Erfassen stellst du unten unter „Prüfung beim Erfassen“ ein.</p>` : `
         <div class="feld-zeile">
           <div class="feld-label-zeile">
             <span class="feld-label">Relative Mindestabweichung (%)</span>
@@ -512,10 +635,9 @@
           <input type="number" id="${pfx}-schwelleAbsolut" min="0" max="1000">
           <div class="feld-erklaerung" id="${pfx}-schwelleErklaerung">
             Ein Wert gilt nur als auffällig, wenn er GLEICHZEITIG die absolute UND die relative Schwelle reißt —
-            nicht nur eine davon. Details: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md, Abschnitt "AND-Logik".${datentopf === 'offiziell' ? `
-            <br><strong>Beim Backzettel wirken diese beiden Felder nicht</strong> — dort gilt die Karte „Prüfung beim Erfassen“ darunter.` : ''}
+            nicht nur eine davon. Details: BOS_VERBRAUCH_DURCHSCHNITT_DOKU.md, Abschnitt "AND-Logik".
           </div>
-        </div>
+        </div>`}
       </div>
 ${datentopf === 'offiziell' ? `
       <div class="karte">
@@ -560,13 +682,22 @@ ${datentopf === 'offiziell' ? `
       </div>
     `;
 
-    // Werte einsetzen
-    qs(pfx + '-stichprobeAnzahl').value = e.stichprobeAnzahl;
-    qs(pfx + '-suchfensterWochen').value = e.suchfensterWochen;
-    qs(pfx + '-kontiguierlichTage').value = e.kontiguierlichTage;
-    qs(pfx + '-minStichprobe').value = e.minStichprobe;
-    qs(pfx + '-schwelleProzent').value = Math.round(e.schwelleProzent * 100);
-    qs(pfx + '-schwelleAbsolut').value = e.schwelleAbsolut;
+    // Werte einsetzen (20.10.2026: die zwei Schwellen gibt es im Reiter Backzettel nicht mehr — Werte bleiben im Zustand)
+    const setze = (id, w) => { const el = qs(pfx + '-' + id); if (el) el.value = (w === null || w === undefined || Number.isNaN(w)) ? '' : w; };
+    setze('stichprobeAnzahl', e.stichprobeAnzahl);
+    setze('suchfensterWochen', e.suchfensterWochen);
+    setze('kontiguierlichTage', e.kontiguierlichTage);
+    setze('minStichprobe', e.minStichprobe);
+    setze('schwelleProzent', typeof e.schwelleProzent === 'number' ? Math.round(e.schwelleProzent * 10000) / 100 : null);
+    setze('schwelleAbsolut', e.schwelleAbsolut);
+    // Grenzen der Eingabefelder aus EINER Quelle (V3): BOS_VERBRAUCH.EINSTELLUNGEN_FELDER (= Regel veBlock)
+    V.einstellungsFelder(datentopf).forEach(k => {
+      const el = qs(pfx + '-' + k), d = V.EINSTELLUNGEN_FELDER[k];
+      if (!el || d.min === undefined) return;
+      const f = PROZENT_FELDER.indexOf(k) !== -1 ? 100 : 1;
+      el.min = String(Math.round(d.min * f * 100) / 100); el.max = String(Math.round(d.max * f * 100) / 100);
+      if (d.art === 'ganz') el.step = '1';
+    });
 
     function setzeModusUI(modus) {
       qs(pfx + '-modus-stichprobe-label').classList.toggle('gewaehlt', modus === 'stichprobe');
@@ -582,24 +713,29 @@ ${datentopf === 'offiziell' ? `
         zustand.einstellungen[datentopf].modus = radio.value;
         setzeModusUI(radio.value);
         renderKalender(datentopf);
+        aktualisiereLeiste();
       });
     });
 
     const bindZahl = (id, feld, transform, rueckTransform) => {
-      qs(pfx + '-' + id).addEventListener('input', ev => {
-        const roh = Number(ev.target.value);
-        if (Number.isNaN(roh)) return;
-        zustand.einstellungen[datentopf][feld] = transform ? transform(roh) : roh;
+      const el = qs(pfx + '-' + id);
+      if (!el) return;   // ausgeblendetes Feld (Reiter Backzettel)
+      el.addEventListener('input', ev => {
+        // 20.10.2026 (Fund 5): ein leeres Feld ist NICHT 0 (Number('') wäre 0) — es bleibt leer und sperrt das Speichern
+        const text = String(ev.target.value).trim();
+        const roh = text === '' ? NaN : Number(text);
+        zustand.einstellungen[datentopf][feld] = Number.isNaN(roh) ? null : (transform ? transform(roh) : roh);
         if (['stichprobeAnzahl', 'suchfensterWochen', 'kontiguierlichTage'].includes(feld)) {
           renderKalender(datentopf);
         }
+        aktualisiereLeiste();
       });
     };
     bindZahl('stichprobeAnzahl', 'stichprobeAnzahl');
     bindZahl('suchfensterWochen', 'suchfensterWochen');
     bindZahl('kontiguierlichTage', 'kontiguierlichTage');
     bindZahl('minStichprobe', 'minStichprobe');
-    bindZahl('schwelleProzent', 'schwelleProzent', v => v / 100);
+    bindZahl('schwelleProzent', 'schwelleProzent', v => Math.round(v * 100) / 10000);
     bindZahl('schwelleAbsolut', 'schwelleAbsolut');
     // 19.10.2026 (Backzettel-Erfassung): eigene Schwellen in Blechen und Prozent, nur Reiter Backzettel.
     // Fehlen sie in der Datei, gelten die Startwerte (3 Bleche, 20 %) — sie landen dann beim Herunterladen mit in der Datei.
@@ -609,7 +745,7 @@ ${datentopf === 'offiziell' ? `
       qs(pfx + '-erfassungSchwelleBleche').value = e.erfassungSchwelleBleche;
       qs(pfx + '-erfassungSchwelleProzent').value = Math.round(e.erfassungSchwelleProzent * 100);
       bindZahl('erfassungSchwelleBleche', 'erfassungSchwelleBleche');
-      bindZahl('erfassungSchwelleProzent', 'erfassungSchwelleProzent', v => v / 100);
+      bindZahl('erfassungSchwelleProzent', 'erfassungSchwelleProzent', v => Math.round(v * 100) / 10000);
     }
 
     panel.querySelectorAll('.hilfe-knopf').forEach(btn => {
@@ -655,6 +791,9 @@ ${datentopf === 'offiziell' ? `
    */
   function berechneFenster(einstellungen) {
     const heute = heuteISO();
+    // 20.10.2026: leeres/ungültiges Feld → kein Fenster (statt „NaN-NaN-NaN“)
+    const zahlOk = x => typeof x === 'number' && Number.isFinite(x) && x >= 1;
+    if (einstellungen.modus === 'kontiguierlich' ? !zahlOk(einstellungen.kontiguierlichTage) : !zahlOk(einstellungen.suchfensterWochen)) return null;
     if (einstellungen.modus === 'kontiguierlich') {
       return { von: addTage(heute, -(einstellungen.kontiguierlichTage - 1)), bis: heute, exakt: true };
     }
@@ -670,6 +809,7 @@ ${datentopf === 'offiziell' ? `
     if (!container) return; // Panel evtl. noch nicht gerendert
 
     const fenster = berechneFenster(e);
+    if (!fenster) { container.innerHTML = '<div class="kal-hinweis">Kein Fenster — erst eine gültige Zahl eintragen.</div>'; renderAusschlussListe(datentopf); return; }
     const heute = new Date();
 
     // Anzahl anzuzeigender Monate: vom aktuellen Monat zurück bis zum
@@ -743,11 +883,13 @@ ${datentopf === 'offiziell' ? `
     if (idx > -1) {
       e.ausgeschlosseneTage.splice(idx, 1);
     } else {
-      const grund = prompt('Grund für den Ausschluss (optional):') ?? '';
+      let grund = prompt('Grund für den Ausschluss (optional, höchstens 100 Zeichen):') ?? '';
+      if (grund.length > 100) { grund = grund.slice(0, 100); alert('Der Grund war länger als 100 Zeichen und wurde gekürzt.'); }
       e.ausgeschlosseneTage.push({ datum: datumStr, grund });
       e.ausgeschlosseneTage.sort((a, b) => b.datum.localeCompare(a.datum));
     }
     renderKalender(datentopf);
+    aktualisiereLeiste();
   }
 
   function renderAusschlussListe(datentopf) {
@@ -761,9 +903,9 @@ ${datentopf === 'offiziell' ? `
     }
     liste.innerHTML = eintraege.map(x => `
       <div class="ausschluss-item">
-        <span class="ausschluss-datum">${x.datum}</span>
-        <span class="ausschluss-grund">${x.grund || '—'}</span>
-        <span class="ausschluss-entfernen" data-entfernen="${datentopf}|${x.datum}">✕</span>
+        <span class="ausschluss-datum">${esc(x.datum)}</span>
+        <span class="ausschluss-grund">${esc(x.grund || '—')}</span>
+        <span class="ausschluss-entfernen" data-entfernen="${esc(datentopf)}|${esc(x.datum)}">✕</span>
       </div>
     `).join('');
     liste.querySelectorAll('[data-entfernen]').forEach(btn => {
@@ -916,33 +1058,331 @@ ${datentopf === 'offiziell' ? `
   }
 
   /* -----------------------------------------------------------
-   * Laden/Export der System-Standard-Datei
+   * Laden: Datenbank (immer vom Server) und Datei (Erst-Füllung,
+   * Notfall-Kopie, Vergleich) — 20.10.2026
    * --------------------------------------------------------- */
   async function ladeEinstellungenDatei() {
+    zustand.datei = null; zustand.dateiFehler = null;
     try {
-      const antwort = await fetch('../bos_verbrauch_einstellungen.json');
+      const antwort = await fetch('../bos_verbrauch_einstellungen.json', { cache: 'no-store' });
+      if (!antwort.ok) throw new Error('HTTP ' + antwort.status);
       const datei = await antwort.json();
-      ['manuell', 'offiziell'].forEach(dt => {
-        if (datei[dt]) zustand.einstellungen[dt] = { ...KLASSEN_STANDARD(), ...datei[dt] };
-      });
+      const ohne = b => { if (!b || typeof b !== 'object') return null; const o = {}; Object.keys(b).forEach(k => { if (k.charAt(0) !== '_') o[k] = b[k]; }); return o; };
+      zustand.datei = { manuell: ohne(datei.manuell), offiziell: ohne(datei.offiziell) };
     } catch (fehler) {
-      console.warn('bos_verbrauch_einstellungen.json nicht ladbar, starte mit Klassen-Standard.', fehler);
+      // Fund 6: nicht mehr still — die Herkunft-Karte zeigt den Grund, die Erst-Füllung ist dann gesperrt
+      console.warn('bos_verbrauch_einstellungen.json nicht ladbar.', fehler);
+      zustand.dateiFehler = fehler;
     }
   }
 
-  function baueExportJson() {
-    return JSON.stringify({
-      _kommentar: 'System-Standard für die Durchschnittsberechnung (bos_verbrauch_durchschnitt.js). Erzeugt über verbrauch_einstellungen_editor.html.',
-      manuell: zustand.einstellungen.manuell,
-      offiziell: zustand.einstellungen.offiziell
-    }, null, 2);
+  async function ladeServer() {
+    zustand.serverFehler = null;
+    try {
+      if (!window.db) throw new Error('Datenbank nicht geladen (bos_firebase_config.js fehlt?)');
+      if (window.BOS_AUTH_READY) await window.BOS_AUTH_READY;
+      const snap = await mitZeitlimit(db.collection(V.EINSTELLUNGEN_COLLECTION).doc(V.EINSTELLUNGEN_DOK).get({ source: 'server' }), 15000);
+      zustand.serverRoh = snap.exists ? snap.data() : null;
+      zustand.quelle = snap.exists ? 'datenbank' : 'leer';
+    } catch (fehler) {
+      console.error('Verbrauch-Einstellungen: Datenbank nicht lesbar.', fehler);
+      zustand.serverRoh = null;
+      zustand.quelle = 'fehler';
+      zustand.serverFehler = fehler;
+    }
   }
 
+  async function pruefeRegel() {
+    try {
+      await mitZeitlimit(db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }), 15000);
+      zustand.regel = 'ok';
+    } catch (fehler) {
+      zustand.regel = fehler && fehler.code === 'permission-denied' ? 'alt' : 'unbekannt';
+      zustand.regelFehler = fehler;
+    }
+  }
+
+  /* Arbeitskopie aus Datenbank, sonst Datei, sonst Startwerten. */
+  function setzeArbeitskopie() {
+    const quelle = zustand.quelle === 'datenbank' ? zustand.serverRoh : (zustand.datei || {});
+    // tiefe Kopie: die Arbeitskopie darf den gelesenen Serverstand nie mitändern (Sicherung „vorher“ muss Feld für Feld stimmen)
+    TOEPFE.forEach(t => { zustand.einstellungen[t] = { ...KLASSEN_STANDARD(), ...JSON.parse(JSON.stringify((quelle && quelle[t]) || {})) }; });
+    const o = zustand.einstellungen.offiziell;
+    if (!Number.isFinite(Number(o.erfassungSchwelleBleche))) o.erfassungSchwelleBleche = 3;
+    if (!Number.isFinite(Number(o.erfassungSchwelleProzent))) o.erfassungSchwelleProzent = 0.20;
+    zustand.basis = JSON.stringify(aktuelleBloecke());
+  }
+
+  function renderHerkunft() {
+    const el = qs('herkunft');
+    const zwei = n => String(n).padStart(2, '0');
+    let html = '';
+    if (zustand.quelle === 'laden') html = 'Lädt die Einstellungen vom Server …';
+    else if (zustand.quelle === 'datenbank') {
+      const r = zustand.serverRoh;
+      const am = r.geaendertAm && r.geaendertAm.toDate ? r.geaendertAm.toDate() : null;
+      html = '<strong>Einstellungen aus der Datenbank</strong> · Stand ' + esc(r.stand) +
+        (am ? ' vom ' + zwei(am.getDate()) + '.' + zwei(am.getMonth() + 1) + '.' + am.getFullYear() + ', ' + zwei(am.getHours()) + ':' + zwei(am.getMinutes()) : '') +
+        (r.geaendertVon ? ' (' + esc(r.geaendertVon) + ')' : '');
+      if (zustand.dateiFehler) html += '<div class="hinweisbox">Die Notfall-Kopie (Datei) ist nicht ladbar: ' + esc(fehlerText(zustand.dateiFehler)) + '</div>';
+      else if (zustand.datei) {
+        const n = unterschiede(zustand.datei, { manuell: V.nurEinstellungsFelder(r.manuell, 'manuell'), offiziell: V.nurEinstellungsFelder(r.offiziell, 'offiziell') }).length;
+        if (n) html += '<div class="hinweisbox" id="dateiVeraltet">Die Notfall-Kopie (Datei) ist älter als die Datenbank: ' + n + ' Feld(er) anders — bei Gelegenheit unten „Als Datei herunterladen“ und per GitSync ablegen.</div>';
+      }
+    } else if (zustand.quelle === 'leer') {
+      html = '<strong>Noch gilt die Datei.</strong> Die Datenbank ist leer — einmal „Aus der Datei in die Datenbank übernehmen“ (gleich darunter).';
+      if (zustand.dateiFehler) html += '<div class="warnbox">Die Datei ist nicht ladbar (' + esc(fehlerText(zustand.dateiFehler)) + '). Die Felder zeigen die Startwerte des Programms; übernehmen ist gesperrt.</div>';
+    } else {
+      html = '<div class="warnbox" role="alert"><strong>Datenbank nicht lesbar:</strong> ' + esc(fehlerText(zustand.serverFehler)) +
+        '<br>Speichern ist gesperrt. Die Seiten rechnen solange mit der Kopie auf ihrem Gerät bzw. der Datei. „Als Datei herunterladen“ geht weiter.</div>';
+      if (zustand.datei) html += '<div class="herkunft-zeile" style="margin-top:6px;">Angezeigt: die Werte aus der Datei.</div>';
+    }
+    if (zustand.regel === 'alt') {
+      html += '<div class="warnbox" role="alert">Die eingesetzte Datenbank-Regel kennt die Verbrauch-Einstellungen noch nicht — <code>' + esc(REGEL_DATEI) + '</code> einsetzen. Bis dahin ist Speichern gesperrt.</div>';
+    }
+    el.innerHTML = html;
+    renderErstfuellung();
+  }
+
+  function renderErstfuellung() {
+    const el = qs('erstfuellung');
+    if (zustand.quelle !== 'leer') { el.hidden = true; el.innerHTML = ''; return; }
+    const grund = zustand.dateiFehler ? 'Datei nicht ladbar' : zustand.regel === 'alt' ? 'Regel noch nicht eingesetzt' : alleFehler().length ? 'erst die rot markierten Felder korrigieren' : '';
+    el.hidden = false;
+    el.innerHTML = '<div class="feld-label" style="margin-bottom:6px;">Erst-Füllung</div>' +
+      '<p class="feld-hinweis">Die Werte der Datei werden einmal in die Datenbank übernommen. Vorher siehst du, was übernommen wird. Danach speicherst du hier direkt.</p>' +
+      '<button class="primaer-btn" id="erstBtn" type="button"' + (grund ? ' disabled' : '') + '>Aus der Datei in die Datenbank übernehmen</button>' +
+      (grund ? '<div class="feld-hinweis" style="margin-top:6px;">Gesperrt: ' + esc(grund) + '.</div>' : '');
+    const b = qs('erstBtn');
+    if (b && !grund) b.addEventListener('click', zeigeErstfuellung);
+  }
+
+  /* ---- Vergleichs-Blatt ---- */
+  let vergleichAktion = null;
+  function zeigeVergleich(titel, html, knopf, aktion) {
+    qs('vergleichTitel').textContent = titel;
+    qs('vergleichInhalt').innerHTML = html;
+    qs('vergleichFehler').hidden = true;
+    qs('vergleichJa').textContent = knopf;
+    qs('vergleichJa').disabled = false;
+    vergleichAktion = aktion;
+    qs('vergleichSheet').hidden = false;
+  }
+  function vergleichTabelle(zeilen, kopfAlt, kopfNeu) {
+    return '<table class="vergleich"><thead><tr><th>Feld</th><th>' + esc(kopfAlt) + '</th><th>' + esc(kopfNeu) + '</th></tr></thead><tbody>' +
+      zeilen.map(z => '<tr class="' + (z.anders ? 'anders' : '') + '"><td>' + esc(TOPF_NAME[z.topf] + ': ' + (FELD_NAME[z.feld] || z.feld)) + '</td><td>' + esc(z.altText) + '</td><td>' + esc(z.neuText) + '</td></tr>').join('') +
+      '</tbody></table>';
+  }
+  function zeigeErstfuellung() {
+    const neu = aktuelleBloecke();
+    const zeilen = [];
+    TOEPFE.forEach(t => V.einstellungsFelder(t).forEach(k => {
+      const ausDatei = zustand.datei && zustand.datei[t] && zustand.datei[t][k] !== undefined ? zustand.datei[t][k] : undefined;
+      zeilen.push({ topf: t, feld: k, anders: JSON.stringify(ausDatei) !== JSON.stringify(neu[t][k]),
+        altText: ausDatei === undefined ? '(fehlt in der Datei)' : wertText(k, ausDatei),
+        neuText: wertText(k, neu[t][k]) + (ausDatei === undefined ? ' (Startwert)' : '') });
+    }));
+    const anders = zeilen.filter(z => z.anders).length;
+    zeigeVergleich('Aus der Datei übernehmen?',
+      '<p class="feld-hinweis">' + (anders ? anders + ' Feld(er) weichen von der Datei ab (markiert) — übernommen wird die rechte Spalte.' : 'Übernommen wird genau der Inhalt der Datei.') + ' Stand danach: 1.</p>' +
+      vergleichTabelle(zeilen, 'Datei', 'wird übernommen'),
+      'Übernehmen', () => schreibe('erstfuellung', neu));
+  }
+  qs('vergleichNein').addEventListener('click', () => { qs('vergleichSheet').hidden = true; vergleichAktion = null; });
+  qs('vergleichJa').addEventListener('click', async () => {
+    if (!vergleichAktion) return;
+    qs('vergleichJa').disabled = true;
+    const ok = await vergleichAktion();
+    if (ok) { qs('vergleichSheet').hidden = true; vergleichAktion = null; }
+    else qs('vergleichJa').disabled = false;
+  });
+
+  /* ---- Speicherleiste ---- */
+  function aktualisiereLeiste() {
+    const leiste = qs('speicherleiste');
+    if (!leiste) return;
+    // Feldfehler an den Eingaben
+    document.querySelectorAll('input.ungueltig').forEach(x => x.classList.remove('ungueltig'));
+    document.querySelectorAll('.feld-fehler').forEach(x => x.remove());
+    const fehler = alleFehler();
+    fehler.forEach(f => {
+      const el = qs(f.topf + '-' + f.feld);
+      if (el && el.tagName === 'INPUT') {
+        el.classList.add('ungueltig');
+        const d = document.createElement('div'); d.className = 'feld-fehler'; d.textContent = '✕ ' + f.grund; el.insertAdjacentElement('afterend', d);
+      }
+    });
+    if (zustand.quelle !== 'datenbank') { leiste.hidden = true; renderErstfuellung(); return; }
+    leiste.hidden = false;
+    const basis = JSON.parse(zustand.basis);
+    const diff = unterschiede(basis, aktuelleBloecke());
+    qs('aenderungen').innerHTML = diff.length
+      ? diff.map(d => '<li>' + esc(TOPF_NAME[d.topf] + ', ' + (FELD_NAME[d.feld] || d.feld) + ': ' + wertText(d.feld, d.alt) + ' → ' + wertText(d.feld, d.neu)) + '</li>').join('')
+      : '<li>Keine Änderungen.</li>';
+    const sperre = [];
+    if (fehler.length) sperre.push(fehler.length + ' Feld(er) ungültig: ' + fehler.slice(0, 3).map(f => TOPF_NAME[f.topf] + ' ' + (FELD_NAME[f.feld] || f.feld) + ' ' + f.grund).join('; '));
+    if (zustand.regel === 'alt') sperre.push('Regel noch nicht eingesetzt (' + REGEL_DATEI + ')');
+    const fe = qs('speicherFehler');
+    if (zustand.speicherFehlerText) { fe.hidden = false; fe.textContent = zustand.speicherFehlerText + (sperre.length && diff.length ? ' — Außerdem gesperrt: ' + sperre.join(' · ') : ''); }
+    else if (sperre.length && diff.length) { fe.hidden = false; fe.textContent = 'Speichern gesperrt: ' + sperre.join(' · '); }
+    else { fe.hidden = true; fe.textContent = ''; }
+    qs('speichernBtn').disabled = !diff.length || sperre.length > 0 || zustand.speichertGerade;
+    qs('speichernBtn').textContent = zustand.speichertGerade ? 'Speichert …' : (zustand.konflikt ? 'Neu laden, Eingaben behalten' : 'Speichern');
+    if (zustand.konflikt) qs('speichernBtn').disabled = zustand.speichertGerade;
+  }
+
+  /* ---- Schreiben: Sicherung + Dokument in EINER Batch (RK §24) ---- */
+  async function schreibe(aktion, bloecke) {
+    const meldung = qs('speicherMeldung');
+    const fehlerEl = qs('vergleichSheet').hidden ? qs('speicherFehler') : qs('vergleichFehler');
+    const k = kennung();
+    const zeig = t => { fehlerEl.hidden = false; fehlerEl.textContent = t; if (fehlerEl.id === 'speicherFehler') zustand.speicherFehlerText = t; };
+    zustand.speicherFehlerText = null;
+    for (const t of TOEPFE) {
+      const f = V.pruefeEinstellungsBlock(bloecke[t], t);
+      if (f.length) { zeig('Nicht gespeichert — ' + TOPF_NAME[t] + ': ' + f.map(x => (FELD_NAME[x.feld] || x.feld) + ' ' + x.grund).join('; ')); return false; }
+    }
+    if (!k) { zeig('Nicht gespeichert: keine Kennung — bist du angemeldet?'); return false; }
+    const vorher = aktion === 'erstfuellung' ? null : zustand.serverRoh;
+    const geladenerStand = vorher ? vorher.stand : 0;
+    zustand.speichertGerade = true; aktualisiereLeiste();
+    try {
+      const ts = firebase.firestore.FieldValue.serverTimestamp();
+      const b = db.batch();
+      const sRef = db.collection(V.EINSTELLUNGEN_SICHERUNGEN).doc();
+      b.set(sRef, { dokId: V.EINSTELLUNGEN_DOK, aktion: aktion, vorher: vorher, konto: k, ts: ts });
+      b.set(db.collection(V.EINSTELLUNGEN_COLLECTION).doc(V.EINSTELLUNGEN_DOK), {
+        manuell: V.nurEinstellungsFelder(bloecke.manuell, 'manuell'),     // V1: nur die acht Felder
+        offiziell: V.nurEinstellungsFelder(bloecke.offiziell, 'offiziell'),
+        stand: geladenerStand + 1, sicherungId: sRef.id, geaendertVon: k, geaendertAm: ts
+      });
+      await mitZeitlimit(b.commit(), SPEICHER_ZEITLIMIT_MS);
+    } catch (fehler) {
+      console.error('Verbrauch-Einstellungen: Speichern fehlgeschlagen.', fehler);
+      zustand.speichertGerade = false;
+      let text = 'Speichern fehlgeschlagen: ' + fehlerText(fehler);
+      if (fehler && fehler.code === 'permission-denied') {
+        // Konflikt oder Recht? Stand neu lesen
+        let jetzt = null;
+        try { const sn = await db.collection(V.EINSTELLUNGEN_COLLECTION).doc(V.EINSTELLUNGEN_DOK).get({ source: 'server' }); jetzt = sn.exists ? sn.data() : null; } catch (e2) { /* bleibt null */ }
+        if ((jetzt ? jetzt.stand : 0) !== geladenerStand) {
+          zustand.konflikt = true;
+          text = 'Inzwischen wurde gespeichert (anderes Gerät?) — jetzt Stand ' + (jetzt ? jetzt.stand : '–') + '. „Neu laden, Eingaben behalten“ holt den neuen Stand, deine Eingaben bleiben stehen; dann noch einmal speichern. (' + fehlerText(fehler) + ')';
+        } else if (zustand.regel === 'alt') {
+          text = 'Die Datenbank hat abgelehnt: Die eingesetzte Regel kennt die Verbrauch-Einstellungen noch nicht (' + REGEL_DATEI + '). (' + fehlerText(fehler) + ')';
+        } else {
+          text = 'Die Datenbank hat abgelehnt: Speichern dürfen nur Konten mit Rolle admin (backstube02, systempflege). Angemeldet als ' + k + '. (' + fehlerText(fehler) + ')';
+        }
+      } else if (fehler && (fehler.code === 'unavailable')) {
+        text = 'Keine Verbindung zum Server (WLAN?). Nichts wurde gespeichert. (' + fehlerText(fehler) + ')';
+      } else if (fehler && fehler.code === 'zeitlimit') {
+        text = 'Keine Bestätigung vom Server nach ' + (SPEICHER_ZEITLIMIT_MS / 1000) + ' s. Netz prüfen, dann die Seite neu laden und oben den Stand ansehen. (' + fehlerText(fehler) + ')';
+      }
+      zeig(text);
+      aktualisiereLeiste();
+      return false;
+    }
+    zustand.speichertGerade = false;
+    zustand.konflikt = false;
+    zustand.speicherFehlerText = null;
+    V.vergissEinstellungen();
+    await ladeServer();
+    if (zustand.quelle === 'datenbank') {
+      const r = zustand.serverRoh;
+      V._schreibeEinstellungsKopie({ stand: r.stand, geaendertAm: r.geaendertAm && r.geaendertAm.toMillis ? r.geaendertAm.toMillis() : null, geaendertVon: r.geaendertVon, manuell: r.manuell, offiziell: r.offiziell });
+    }
+    setzeArbeitskopie();
+    TOEPFE.forEach(renderDatentopfTab);
+    renderHerkunft();
+    qs('speicherFehler').hidden = true;
+    meldung.className = 'speicher-meldung ok';
+    meldung.textContent = '✓ ' + ({ erstfuellung: 'In die Datenbank übernommen', aendern: 'Gespeichert', zurueckholen: 'Vorversion zurückgeholt' }[aktion]) +
+      ' — Stand ' + (zustand.serverRoh ? zustand.serverRoh.stand : '?') + '. Stationen übernehmen es beim nächsten Öffnen.';
+    aktualisiereLeiste();
+    ladeVorversionen();
+    return true;
+  }
+
+  async function konfliktNeuLaden() {
+    const eingaben = JSON.parse(JSON.stringify(zustand.einstellungen));
+    await ladeServer();
+    if (zustand.quelle !== 'datenbank') { renderHerkunft(); aktualisiereLeiste(); return; }
+    setzeArbeitskopie();            // neue Basis = neuer Serverstand
+    zustand.einstellungen = eingaben;   // Eingaben bleiben stehen
+    zustand.konflikt = false;
+    zustand.speicherFehlerText = null;
+    TOEPFE.forEach(renderDatentopfTab);
+    renderHerkunft();
+    qs('speicherFehler').hidden = true;
+    aktualisiereLeiste();
+  }
+
+  function initSpeichern() {
+    qs('speichernBtn').addEventListener('click', () => {
+      if (zustand.konflikt) { konfliktNeuLaden(); return; }
+      qs('speicherMeldung').textContent = '';
+      schreibe('aendern', aktuelleBloecke());
+    });
+  }
+
+  /* ---- Vorversionen (K2): die letzten 10 Sicherungen ---- */
+  async function ladeVorversionen() {
+    const karte = qs('vorversionenKarte'), ziel = qs('vorversionen');
+    if (zustand.quelle !== 'datenbank') { karte.hidden = true; return; }
+    karte.hidden = false;
+    try {
+      const snap = await mitZeitlimit(db.collection(V.EINSTELLUNGEN_SICHERUNGEN).orderBy('ts', 'desc').limit(10).get({ source: 'server' }), 15000);
+      zustand.vorversionen = snap.docs.map(d => ({ id: d.id, daten: d.data() }));
+      zustand.vorversionenFehler = null;
+    } catch (fehler) {
+      console.error('Vorversionen nicht ladbar.', fehler);
+      zustand.vorversionen = null; zustand.vorversionenFehler = fehler;
+    }
+    renderVorversionen();
+  }
+  function renderVorversionen() {
+    const ziel = qs('vorversionen');
+    if (zustand.vorversionenFehler) { ziel.innerHTML = '<div class="warnbox">Vorversionen nicht ladbar: ' + esc(fehlerText(zustand.vorversionenFehler)) + '</div>'; return; }
+    const liste = zustand.vorversionen || [];
+    if (!liste.length) { ziel.innerHTML = '<div class="feld-hinweis">Noch keine Sicherung.</div>'; return; }
+    const zwei = n => String(n).padStart(2, '0');
+    const AKT = { erstfuellung: 'Erst-Füllung', aendern: 'gespeichert', zurueckholen: 'zurückgeholt' };
+    ziel.innerHTML = liste.map((v, i) => {
+      const d = v.daten, t = d.ts && d.ts.toDate ? d.ts.toDate() : null;
+      const wann = t ? zwei(t.getDate()) + '.' + zwei(t.getMonth() + 1) + '.' + t.getFullYear() + ', ' + zwei(t.getHours()) + ':' + zwei(t.getMinutes()) : '–';
+      const vorStand = d.vorher && d.vorher.stand !== undefined ? 'Stand ' + d.vorher.stand : 'leer';
+      const gueltig = d.vorher && !V.pruefeEinstellungsBlock(d.vorher.manuell, 'manuell').length && !V.pruefeEinstellungsBlock(d.vorher.offiziell, 'offiziell').length;
+      return '<div class="vv-zeile"><span>' + esc(wann) + ' · ' + esc(d.konto || '–') + ' · ' + esc(AKT[d.aktion] || d.aktion) + '<br><span class="feld-hinweis">davor: ' + esc(vorStand) + '</span></span>' +
+        (gueltig ? '<button class="zweit-btn" type="button" data-vv="' + i + '">Diesen Stand zurückholen</button>' : '<span class="feld-hinweis">' + (d.vorher ? 'nicht zurückholbar' : 'davor leer') + '</span>') + '</div>';
+    }).join('');
+    ziel.querySelectorAll('[data-vv]').forEach(b => b.addEventListener('click', () => zeigeZurueckholen(liste[Number(b.dataset.vv)])));
+  }
+  function zeigeZurueckholen(v) {
+    const r = zustand.serverRoh;
+    const jetzt = { manuell: V.nurEinstellungsFelder(r.manuell, 'manuell'), offiziell: V.nurEinstellungsFelder(r.offiziell, 'offiziell') };
+    const alt = { manuell: V.nurEinstellungsFelder(v.daten.vorher.manuell, 'manuell'), offiziell: V.nurEinstellungsFelder(v.daten.vorher.offiziell, 'offiziell') };
+    const diff = unterschiede(jetzt, alt);
+    const zeilen = diff.map(d => ({ topf: d.topf, feld: d.feld, anders: true, altText: wertText(d.feld, d.alt), neuText: wertText(d.feld, d.neu) }));
+    zeigeVergleich('Stand ' + v.daten.vorher.stand + ' zurückholen?',
+      (istGeaendert() ? '<div class="hinweisbox">Deine ungespeicherten Änderungen im Formular gehen dabei verloren.</div>' : '') +
+      '<p class="feld-hinweis">' + (diff.length ? diff.length + ' Feld(er) ändern sich. Gespeichert wird als neuer Stand ' + (r.stand + 1) + ' (auch das wird gesichert).' : 'Keine Unterschiede zum jetzigen Stand.') + '</p>' +
+      (diff.length ? vergleichTabelle(zeilen, 'jetzt', 'zurückgeholt') : ''),
+      'Zurückholen', () => schreibe('zurueckholen', alt));
+  }
+
+  function baueExportJson() {
+    const r = zustand.serverRoh;
+    return JSON.stringify({
+      _kommentar: 'Notfall-Kopie der Verbrauchs-Einstellungen (bos_verbrauch_durchschnitt.js). Gilt nur, solange die Datenbank (verbrauch_einstellungen/system) leer ist oder nicht antwortet und das Gerät keine Kopie hat. Erzeugt über verbrauch_einstellungen_editor.html' +
+        (zustand.quelle === 'datenbank' && !istGeaendert() ? ' aus Stand ' + r.stand + '.' : (istGeaendert() ? ' (mit ungespeicherten Änderungen).' : '.')),
+      manuell: felderVon('manuell'),
+      offiziell: felderVon('offiziell')
+    }, null, 2);
+  }
   function initExport() {
     qs('jsonAnzeigen').addEventListener('click', () => {
       const ausgabe = qs('jsonAusgabe');
       ausgabe.textContent = baueExportJson();
-      ausgabe.hidden = !ausgabe.hidden ? true : false;
       ausgabe.hidden = false;
     });
     qs('jsonHerunterladen').addEventListener('click', () => {
@@ -971,9 +1411,19 @@ ${datentopf === 'offiziell' ? `
     initTabs();
     initExport();
     initHilfe();
-    await Promise.all([ladeEinstellungenDatei(), ladeProdukte()]);
+    initSpeichern();
+    if (window.BOS_UNGESPEICHERT) window.BOS_UNGESPEICHERT.melde(() => istGeaendert(), { laeuft: () => zustand.speichertGerade });
+    if (!V || typeof V.pruefeEinstellungsBlock !== 'function') {
+      qs('herkunft').innerHTML = '<div class="warnbox" role="alert">Rechen-Modul nicht oder in einer alten Fassung geladen (bos_verbrauch_durchschnitt.js) — Seite neu laden. Speichern ist gesperrt.</div>';
+      return;
+    }
+    await Promise.all([ladeEinstellungenDatei(), ladeProdukte(), ladeServer(), pruefeRegel()]);
+    setzeArbeitskopie();
+    renderHerkunft();
     renderDatentopfTab('manuell');
     renderDatentopfTab('offiziell');
+    aktualisiereLeiste();
+    ladeVorversionen();
     // Datenbestand läuft unabhängig im Hintergrund weiter (Karte zeigt
     // bis dahin "Lädt Datenbestand …") — blockiert nicht den Rest der Seite.
     ladeDatenbestand('manuell');

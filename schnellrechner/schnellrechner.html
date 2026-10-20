@@ -1,6 +1,10 @@
 <!--
   schnellrechner.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-20 · 06:59 · v0.24 · Herkunft der Einstellungen (Verbrauch aufräumen, Freigabe KC 06:20, K4)
+    Zeile „gerechnet mit: …“ hängt an, woher die Verbrauchs-Einstellungen kommen (Stand N / vom Gerät / aus der
+    Datei / Startwerte; BOS_VERBRAUCH.einstellungenHerkunft()). Beim Richtwert nichts (keine Einstellungen).
+    SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md
   2026-10-15 · 10:55 · v0.23 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
     Knapp-Zeile und Warnkasten „teilweise Schätzung“ auf feste Warnfarbe --bos-warn; Status-Zeichen ✕ Lücke / ⚠ Knapp (vorher ⚠️ / ◌), Verlässlichkeit ✕ / ⚠. SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
   2026-10-15 · 01:26 · v0.22 · Richtwert und Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
@@ -715,6 +719,18 @@ async function srEinstellungenFuer(topf) {
 }
 function srQuelle() { return aktuellesProdukt ? window.BOS_PRODUKTE.bedarfsQuelle(aktuellesProdukt) : 'manuell'; }
 function srQuelleText() { return window.BOS_PRODUKTE.quelleText(srQuelle()); }
+// 20.10.2026 (K4): woher die Verbrauchs-Einstellungen kommen, hinter „gerechnet mit“ (Richtwert: keine Einstellungen)
+function srZeigeEinstellungsHerkunft() {
+  const el = document.getElementById('sr-quelle-hint');
+  const V = window.BOS_VERBRAUCH;
+  if (!aktuellesProdukt || srQuelle() === 'richtwert' || !V || typeof V.holeEinstellungenHerkunft !== 'function') return;
+  const fuer = aktuellesProdukt;
+  V.holeEinstellungenHerkunft().then(hk => {
+    if (!hk || aktuellesProdukt !== fuer) return;
+    el.textContent = 'gerechnet mit: ' + srQuelleText() + ' · ' + hk.kurz;
+    el.title = hk.warnung ? hk.text : '';
+  });
+}
 let zielOffset = 3;
 let letztesErgebnis = null;
 let srSondertageOffen = false; // Default eingeklappt, siehe CSS-Kommentar zu .sr-sondertage-kopf
@@ -1010,6 +1026,7 @@ function srProduktGewechselt() {
   document.getElementById('sr-bestand-einheit-hint').textContent = aktuellesProdukt ? 'in ' + srEinheitLabel() : '';
   document.getElementById('sr-fehlmenge-einheit-hint').textContent = aktuellesProdukt ? '(in ' + srEinheitLabel() + ')' : '';
   document.getElementById('sr-quelle-hint').textContent = aktuellesProdukt ? 'gerechnet mit: ' + srQuelleText() : '';   // 15.10.2026 (#63)
+  srZeigeEinstellungsHerkunft();
   document.getElementById('sr-ergebnis-inhalt').style.display = 'none';
   document.getElementById('sr-ergebnis-leer').style.display = 'block';
   if (aktuellesProdukt) srSyncBestand();

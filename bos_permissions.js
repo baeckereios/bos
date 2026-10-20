@@ -41,6 +41,10 @@
      <script src="bos_access_guard.js"></script>
      ... restlicher Seiteninhalt ...
    ================================================================ */
+/* ERGÄNZT 20.10.2026 (Verbrauch aufräumen, Hub „Verbrauch“, Ulf E26): "verbrauch"
+   (Hub-Kachel) bei backstube, konditorei, produktionsleitung, admin — genau
+   die Vereinigung der Rollen seiner Kinder (Registry roles). Die Kinder
+   behalten ihre Zeilen. SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md */
 /* ERGÄNZT 19.10.2026 (Backzettel-Erfassung Stufe 1): "backzettel_erfassung"
    nur bei admin — Registry roles ['admin'], sonst fail-open für alle.
    SESSION_2026-10-19_BACKZETTEL_STUFE1_BAU.md */
@@ -85,6 +89,7 @@ window.BOS_PERMISSIONS = {
     "freezer": true,
     "freezer_inventur": true,
     "verbrauch_manuell": true,
+    "verbrauch": true,
     "zeitkontext_editor": true,
     "schnellrechner": true,
     "produktionsplaner": true,
@@ -113,6 +118,7 @@ window.BOS_PERMISSIONS = {
     "freezer": true,
     "freezer_inventur": true,
     "verbrauch_manuell": true,
+    "verbrauch": true,
     "zeitkontext_editor": true,
     "schnellrechner": true,
     "produktionsplaner": true,
@@ -143,6 +149,7 @@ window.BOS_PERMISSIONS = {
   "verkaufsleitung": {},
   "produktionsleitung": {
     "verbrauch_manuell": true,
+    "verbrauch": true,
     "zeitkontext_editor": true,
     "schnellrechner": true,
     "wunschtag": true,
@@ -183,6 +190,7 @@ window.BOS_PERMISSIONS = {
     "produkt_config_sync": true,
     "verbrauch_einstellungen_editor": true,
     "verbrauch_manuell": true,
+    "verbrauch": true,
     "verbrauch_werkstatt": true,
     "backzettel_erfassung": true,
     "zeitkontext_editor": true,

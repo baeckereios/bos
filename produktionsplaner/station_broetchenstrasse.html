@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-10-20 · 06:59 · Herkunft der Einstellungen (Verbrauch aufräumen, Freigabe KC 06:20, K4): Statuszeile hängt an, woher die Verbrauchs-Einstellungen kommen („Einstellungen Stand N“ / „⚠︎ vom Gerät“ / „aus der Datei“ / „✕ Startwerte“, BOS_VERBRAUCH.einstellungenHerkunft()). Sonst nichts geändert. SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md -->
 <!-- 2026-10-17 · 04:59 · #77 Teil 2 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 04:57): Das ✕ im Launcher und das Neuladen fragen nach, wenn die Planung von der zuletzt geladenen bzw. eingereichten abweicht (Fingerabdruck planungsAbdruck(), ohne „Kette prüfen“; zurückgestellt = unverändert). Während des Einreichens Text „wird gerade gespeichert“. Über ../bos_ungespeichert.js, Rückfall auf eigenen beforeunload. Rechnung, Rendern, Einreichen-Inhalt unverändert. SESSION_2026-10-17_UNGESPEICHERT_STATIONEN_BAU.md -->
 <!-- 2026-10-15 · 19:56 · Farbprofile Stufe B (#72, Freigabe Kontroll-Chat 18:48): Zelle „von Hand“ mit gestricheltem Rand (F12, im Profil Stahl sonst kaum von „automatisch“ zu unterscheiden); Zahl „von Hand“ dunkel #60a5fa statt #1d4ed8 (Kontrast 2,3 → 5,7 bis 6,3 je Profil), hell unverändert; „⚠ min“ mit FE0E wie die übrigen Zeichen (F22). SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Knapp, Bestand-Hinweis, Bestand 0, „teilweise geschätzt“ und „noch nicht“ auf feste Warnfarbe --bos-warn; Akzent-Tönungen über color-mix; Status-Zeichen ✓ ⚠ ✕ (Lücke ✕ statt ⚠, Bestand 0 ⚠ statt ◌). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
@@ -540,7 +541,10 @@ window.addEventListener('load', async function() {
   // #77 Teil 2: erster Abdruck — alle startBestand-Schreibzugriffe (oben im .then) sind vorbei,
   // Karten gibt es noch keine. Froster mit dem Startwert: eine Wahl während des Ladens zählt als Eingabe.
   gemerkterAbdruck = planungsAbdruck(frosterStartwert);
-  setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText);
+  // 20.10.2026 (K4): Herkunft der Einstellungen (nur wenn ein Topf mit Einstellungen gelesen wurde)
+  var einstHk = window.BOS_VERBRAUCH && typeof window.BOS_VERBRAUCH.einstellungenHerkunft === 'function' ? window.BOS_VERBRAUCH.einstellungenHerkunft() : null;
+  setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText + (einstHk ? ' · ' + einstHk.kurz : ''));
+  if (einstHk && einstHk.warnung) { var bs = document.getElementById('brain-status'); bs.title = einstHk.text; bs.style.color = 'var(--bos-warn)'; }   // Warnfarbe statt Grün (§3a)
   renderAll();
 });
 

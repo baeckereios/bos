@@ -161,6 +161,19 @@
  *     Schwellen erfassungSchwelleBleche / erfassungSchwelleProzent.
  *   - holeEinstellungen(): Klassen-Standard um diese zwei Schwellen ergänzt
  *     (3 Bleche, 20 %, Ulf E18 08:25).
+ * 20.10.2026 · 06:59 — EINSTELLUNGEN IN DIE DATENBANK (Kern-Datei, Ulf
+ *   „Ja, beide“ 06:20; Bauplan SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md,
+ *   FREIGABE_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAUPLAN.md, V1–V6). Geändert nur
+ *   holeEinstellungen() (Quelle; Rückgabeform gleich, Kommentarfelder der
+ *   Datei fallen weg). Neu: EINSTELLUNGEN_FELDER (Grenzen = Editor = Regel),
+ *   einstellungsFelder(), nurEinstellungsFelder(), pruefeEinstellungsBlock(),
+ *   einstellungenHerkunft(), holeEinstellungenHerkunft(), vergissEinstellungen()
+ *   und die internen _einstellungenQuelle/_ladeEinstellungenQuelle/
+ *   _leseEinstellungenDok/_leseEinstellungenDatei/_leseEinstellungsKopie/
+ *   _schreibeEinstellungsKopie/_einstellungenGrund/_einstellungenHerkunftTexte.
+ *   Entfernt: Ebene „Eigene lokale Einstellungen“ (P2). Unverändert: die ganze
+ *   Rechnung (holeManuelleWerte, holeOffizielleWerte, pruefeAusreisser,
+ *   pruefeBackzettelWert, holeDurchschnitt, holeWochenbedarf, durchgang).
  *
  * EINHEITEN (Stand 13.10.2026, Baustelle #64):
  *   Regel: jede Bedarfszahl verlässt diesen Host in der `einheit` des
@@ -181,7 +194,21 @@
  *   speichert seit 29.08. bei Umschalter-Produkten in Trägern; die Stationen
  *   teilten sie trotzdem noch einmal (10 Bleche → 0,5 Blech).
  *
- * EINSTELLUNGEN-AUFLÖSUNG (Stand 29.08.2026):
+ * EINSTELLUNGEN-AUFLÖSUNG — NEU 20.10.2026 (Verbrauch aufräumen, Freigabe KC
+ * 06:20, Ulf: Kern-Datei „Ja, beide“): Reihenfolge jetzt
+ *   1. Datenbank verbrauch_einstellungen/system (einmal je Seite, geteilte
+ *      Anfrage, Zeitlimit 10 s; ein vorhandenes Dokument gilt GANZ oder gar
+ *      nicht — nie mit Datei oder Startwerten gemischt)
+ *   2. Gerätekopie (localStorage bos_verbrauch_einstellungen_geraetekopie),
+ *      nur wenn die Datenbank nicht antwortet oder das Dokument ungültig ist
+ *   3. Datei bos_verbrauch_einstellungen.json — Datenbank leer, oder keine
+ *      Kopie da (Notfall-Kopie, Ulf speichert im Editor)
+ *   4. Klassen-Konstanten
+ * Herkunft immer sichtbar: einstellungenHerkunft() / holeEinstellungenHerkunft().
+ * Die frühere Ebene „Eigene lokale Einstellungen“ ist ENTFERNT (kein Schreiber,
+ * keine Anzeige). Der folgende Absatz ist der alte Stand (zur Geschichte):
+ *
+ * ~~EINSTELLUNGEN-AUFLÖSUNG (Stand 29.08.2026):~~
  * holeEinstellungen(datentopf) löst die Berechnungs-Einstellungen nach
  * der in SESSION_2026-08-29_DURCHSCHNITTSBERECHNUNG_ZEITKONTEXT.md §3
  * festgelegten Reihenfolge auf:
@@ -257,6 +284,8 @@ window.BOS_VERBRAUCH = {
     }
   })(),
 
+  // UNGENUTZT seit 20.10.2026 (Ebene „Eigene lokale Einstellungen“ entfernt,
+  // P2). Name NICHT wiederverwenden — alte Geräte können das Objekt noch tragen.
   EINSTELLUNGEN_LOCALSTORAGE_KEY: 'bos_verbrauch_einstellungen_lokal',
 
   // Einmalig geladene System-Standard-Datei, danach aus dem Speicher bedient
@@ -363,8 +392,11 @@ window.BOS_VERBRAUCH = {
 
   /**
    * Löst die effektiven Berechnungs-Einstellungen für einen Datentopf auf
-   * (siehe Header, Abschnitt EINSTELLUNGEN-AUFLÖSUNG): Eigene lokale
-   * Einstellungen (falls aktiv) > System-Standard-Datei > Klassen-Konstanten.
+   * (siehe Header, Abschnitt EINSTELLUNGEN-AUFLÖSUNG, Stand 20.10.2026):
+   * Datenbank (verbrauch_einstellungen/system) > Gerätekopie (nur wenn die
+   * Datenbank nicht antwortet) > Datei (Datenbank leer, oder keine Kopie) >
+   * Klassen-Konstanten. Woher die Werte kamen: einstellungenHerkunft().
+   * Rückgabeform unverändert: { ...Klassen-Standard, ...Block }.
    *
    * @param {'manuell'|'offiziell'} datentopf
    * @returns {Promise<{modus: 'stichprobe'|'kontiguierlich', stichprobeAnzahl: number, suchfensterWochen: number, kontiguierlichTage: number, minStichprobe: number, schwelleProzent: number, schwelleAbsolut: number}>}
@@ -384,35 +416,271 @@ window.BOS_VERBRAUCH = {
       erfassungSchwelleProzent: this.ERFASSUNG_SCHWELLE_PROZENT
     });
 
-    // Ebene 1: Eigene lokale Einstellungen, profilgebunden, nur wenn aktiv.
+    // 20.10.2026: Die frühere Ebene 1 „Eigene lokale Einstellungen“
+    // (localStorage bos_verbrauch_einstellungen_lokal) ist entfernt — sie
+    // hatte keinen Schreiber und keine Anzeige (P2, SESSION_2026-10-20_
+    // VERBRAUCH_AUFRAEUMEN_BAU.md Fund 1). Ein altes Objekt wird nicht
+    // gelesen und nicht gelöscht.
+    const quelle = await this._einstellungenQuelle();
+    const block = quelle.bloecke && quelle.bloecke[datentopf];
+    if (block) return { ...klassenStandard(), ...block };
+    return klassenStandard();
+  },
+
+  /* ---------------- Einstellungen aus der Datenbank (20.10.2026) ----------------
+     Muster bos_produkte.js (Gerätekopie, Fehlerarten) und Backzettel B2
+     (geteilte Anfrage). EINMAL je Seite gelesen: alle gleichzeitigen Aufrufer
+     teilen sich die laufende Anfrage (die Stationen rufen holeEinstellungen
+     für alle Produkte gleichzeitig auf — Fund 2). Gilt bis zum Neuladen der
+     Seite oder vergissEinstellungen(). Nie still: einstellungenHerkunft(). */
+
+  /** Felder je Topf mit Grenzen — DIESELBEN wie im Editor (min/max) und in der
+   *  Regel (veBlock, RK §24). Prozent als Anteil (0,3 = 30 %). V3: die
+   *  Prüfdatei vergleicht alle drei maschinell. */
+  EINSTELLUNGEN_FELDER: {
+    modus: { art: 'wahl', werte: ['stichprobe', 'kontiguierlich'] },
+    stichprobeAnzahl: { art: 'ganz', min: 1, max: 50 },
+    suchfensterWochen: { art: 'ganz', min: 1, max: 52 },
+    kontiguierlichTage: { art: 'ganz', min: 1, max: 365 },
+    minStichprobe: { art: 'ganz', min: 1, max: 20 },
+    schwelleProzent: { art: 'zahl', min: 0.01, max: 1 },
+    schwelleAbsolut: { art: 'zahl', min: 0, max: 1000 },
+    ausgeschlosseneTage: { art: 'tage', max: 400, grundMax: 100 },
+    erfassungSchwelleBleche: { art: 'zahl', min: 0, max: 100, nurTopf: 'offiziell' },
+    erfassungSchwelleProzent: { art: 'zahl', min: 0.01, max: 1, nurTopf: 'offiziell' }
+  },
+  EINSTELLUNGEN_COLLECTION: 'verbrauch_einstellungen',
+  EINSTELLUNGEN_SICHERUNGEN: 'verbrauch_einstellungen_sicherungen',
+  EINSTELLUNGEN_DOK: 'system',
+  EINSTELLUNGEN_KOPIE_KEY: 'bos_verbrauch_einstellungen_geraetekopie',
+  EINSTELLUNGEN_ZEITLIMIT_MS: 10000,
+  _einstellungenQuelleP: null,
+  _einstellungenHerkunftWert: null,
+
+  /** Die Feldnamen eines Topfs (manuell: 8, offiziell: 10). */
+  einstellungsFelder(datentopf) {
+    return Object.keys(this.EINSTELLUNGEN_FELDER).filter(k => {
+      const n = this.EINSTELLUNGEN_FELDER[k].nurTopf;
+      return !n || n === datentopf;
+    });
+  },
+
+  /** Nur die erlaubten Felder eines Topfs (V1: im Block manuell nie die
+   *  Erfassungs-Schwellen, auch wenn der Klassen-Standard sie trägt). */
+  nurEinstellungsFelder(block, datentopf) {
+    const out = {};
+    this.einstellungsFelder(datentopf).forEach(k => { if (block && block[k] !== undefined) out[k] = block[k]; });
+    return out;
+  },
+
+  /**
+   * Prüft einen Block wie die Regel (veBlock): genau die Felder des Topfs,
+   * Typen, Grenzen; dazu die Einträge in ausgeschlosseneTage (das kann die
+   * Regel nicht). Liefert [] oder [{ feld, grund }].
+   */
+  pruefeEinstellungsBlock(block, datentopf) {
+    const fehler = [];
+    if (!block || typeof block !== 'object' || Array.isArray(block)) return [{ feld: null, grund: 'Block fehlt' }];
+    const felder = this.einstellungsFelder(datentopf);
+    Object.keys(block).forEach(k => { if (felder.indexOf(k) === -1) fehler.push({ feld: k, grund: 'unbekanntes Feld' }); });
+    felder.forEach(k => {
+      const d = this.EINSTELLUNGEN_FELDER[k];
+      const w = block[k];
+      if (w === undefined || w === null) { fehler.push({ feld: k, grund: 'fehlt' }); return; }
+      if (d.art === 'wahl') {
+        if (d.werte.indexOf(w) === -1) fehler.push({ feld: k, grund: 'unbekannter Wert „' + w + '“' });
+      } else if (d.art === 'ganz' || d.art === 'zahl') {
+        if (typeof w !== 'number' || !Number.isFinite(w)) fehler.push({ feld: k, grund: 'keine Zahl' });
+        else if (d.art === 'ganz' && !Number.isInteger(w)) fehler.push({ feld: k, grund: 'keine ganze Zahl' });
+        else if (w < d.min || w > d.max) fehler.push({ feld: k, grund: 'außerhalb ' + d.min + '–' + d.max });
+      } else if (d.art === 'tage') {
+        if (!Array.isArray(w)) { fehler.push({ feld: k, grund: 'keine Liste' }); return; }
+        if (w.length > d.max) fehler.push({ feld: k, grund: 'mehr als ' + d.max + ' Tage' });
+        w.forEach((t, i) => {
+          const ok = t && typeof t === 'object' && !Array.isArray(t)
+            && Object.keys(t).every(x => x === 'datum' || x === 'grund')
+            && typeof t.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.datum)
+            && (t.grund === undefined || (typeof t.grund === 'string' && t.grund.length <= d.grundMax));
+          if (!ok) fehler.push({ feld: k, grund: 'Eintrag ' + (i + 1) + ' ungültig (Datum JJJJ-MM-TT, Grund höchstens ' + d.grundMax + ' Zeichen)' });
+        });
+      }
+    });
+    return fehler;
+  },
+
+  /** Woher die Einstellungen dieser Seite kommen (null, solange nicht geladen).
+   *  { quelle: 'datenbank'|'geraetekopie'|'datei'|'konstanten', stand,
+   *    geaendertAm (ms|null), geaendertVon, leer, grund {art, meldung}|null,
+   *    dateiGrund, text, kurz, warnung } */
+  einstellungenHerkunft() {
+    const h = this._einstellungenHerkunftWert;
+    if (!h) return null;
+    return Object.assign({}, h, this._einstellungenHerkunftTexte(h));
+  },
+  /** Wie einstellungenHerkunft(), lädt aber vorher (für Anzeigen beim Start). */
+  async holeEinstellungenHerkunft() {
+    await this._einstellungenQuelle();
+    return this.einstellungenHerkunft();
+  },
+  /** Vergisst den gelesenen Stand dieser Seite (Editor nach dem Speichern). */
+  vergissEinstellungen() {
+    this._einstellungenQuelleP = null;
+    this._einstellungenHerkunftWert = null;
+  },
+
+  _einstellungenQuelle() {
+    if (!this._einstellungenQuelleP) {
+      this._einstellungenQuelleP = this._ladeEinstellungenQuelle().then(q => {
+        this._einstellungenHerkunftWert = q.herkunft;
+        if (q.herkunft.quelle !== 'datenbank') {
+          try { console.warn('BOS_VERBRAUCH.holeEinstellungen: ' + this._einstellungenHerkunftTexte(q.herkunft).text); } catch (e) { /* ohne Konsole */ }
+        }
+        return q;
+      });
+    }
+    return this._einstellungenQuelleP;
+  },
+
+  async _ladeEinstellungenQuelle() {
+    let dbGrund = null;
     try {
-      const launcherState = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
-      const profileId = launcherState?.activeProfileId;
-      if (profileId) {
-        const alle = JSON.parse(localStorage.getItem(this.EINSTELLUNGEN_LOCALSTORAGE_KEY) || '{}');
-        const eintrag = alle?.[profileId]?.[datentopf];
-        if (eintrag?.aktiv === true && eintrag.einstellungen) {
-          return { ...klassenStandard(), ...eintrag.einstellungen };
+      const dok = await this._leseEinstellungenDok();
+      if (!dok.existiert) {
+        // Datenbank leer → Datei (bis zur Erst-Füllung im Editor)
+        const leer = { art: 'leer', meldung: 'Die Datenbank ist noch leer.' };
+        try {
+          return { bloecke: await this._leseEinstellungenDatei(), herkunft: { quelle: 'datei', leer: true, grund: leer } };
+        } catch (e2) {
+          return { bloecke: null, herkunft: { quelle: 'konstanten', leer: true, grund: leer, dateiGrund: this._einstellungenGrund(e2) } };
         }
       }
-    } catch (fehler) {
-      console.warn('BOS_VERBRAUCH.holeEinstellungen: localStorage nicht lesbar, weiter mit System-Standard.', fehler);
-    }
-
-    // Ebene 2: System-Standard-Datei, einmalig geladen und zwischengespeichert.
-    try {
-      if (!this._einstellungenDateiCache) {
-        const antwort = await fetch(this._EINSTELLUNGEN_URL);
-        this._einstellungenDateiCache = await antwort.json();
+      const d = dok.daten || {};
+      const fm = this.pruefeEinstellungsBlock(d.manuell, 'manuell');
+      const fo = this.pruefeEinstellungsBlock(d.offiziell, 'offiziell');
+      if (!fm.length && !fo.length && Number.isInteger(d.stand)) {
+        const am = d.geaendertAm && typeof d.geaendertAm.toMillis === 'function' ? d.geaendertAm.toMillis() : null;
+        const herkunft = { quelle: 'datenbank', stand: d.stand, geaendertAm: am, geaendertVon: d.geaendertVon || null, grund: null };
+        this._schreibeEinstellungsKopie({ stand: d.stand, geaendertAm: am, geaendertVon: d.geaendertVon || null, manuell: d.manuell, offiziell: d.offiziell });
+        return { bloecke: { manuell: d.manuell, offiziell: d.offiziell }, herkunft };
       }
-      const block = this._einstellungenDateiCache?.[datentopf];
-      if (block) return { ...klassenStandard(), ...block };
+      // „ganz oder gar nicht“: ein unvollständiges Dokument wird nie mit Startwerten aufgefüllt
+      const erste = fm.map(f => 'Mitschrift ' + f.feld + ': ' + f.grund).concat(fo.map(f => 'Backzettel ' + f.feld + ': ' + f.grund));
+      if (!Number.isInteger(d.stand)) erste.push('stand fehlt');
+      dbGrund = { art: 'unvollstaendig', meldung: 'Datenbank-Dokument unvollständig oder ungültig: ' + erste.slice(0, 3).join('; ') };
     } catch (fehler) {
-      console.warn('BOS_VERBRAUCH.holeEinstellungen: Datei nicht ladbar, Fallback auf Klassen-Standard.', fehler);
+      dbGrund = this._einstellungenGrund(fehler);
     }
+    const kopie = this._leseEinstellungsKopie();
+    if (kopie) {
+      return { bloecke: { manuell: kopie.manuell, offiziell: kopie.offiziell },
+        herkunft: { quelle: 'geraetekopie', stand: kopie.stand, geaendertAm: kopie.geaendertAm, geaendertVon: kopie.geaendertVon, grund: dbGrund } };
+    }
+    try {
+      return { bloecke: await this._leseEinstellungenDatei(), herkunft: { quelle: 'datei', leer: false, grund: dbGrund } };
+    } catch (e3) {
+      return { bloecke: null, herkunft: { quelle: 'konstanten', leer: false, grund: dbGrund, dateiGrund: this._einstellungenGrund(e3) } };
+    }
+  },
 
-    // Ebene 3: unterster Boden, funktioniert auch ganz ohne Datei.
-    return klassenStandard();
+  async _leseEinstellungenDok() {
+    const w = typeof window !== 'undefined' ? window : {};
+    const db = w.db;
+    if (!db || typeof db.collection !== 'function') {
+      const e = new Error('Datenbank nicht geladen (die Seite bindet bos_firebase_config.js nicht ein)');
+      e.art = 'nicht_geladen'; e.meldung = e.message;
+      throw e;
+    }
+    let uhr = null;
+    const zeit = new Promise((_, nein) => {
+      uhr = setTimeout(() => { const e = new Error('keine Antwort nach ' + (this.EINSTELLUNGEN_ZEITLIMIT_MS / 1000) + ' s'); e.code = 'deadline-exceeded'; nein(e); }, this.EINSTELLUNGEN_ZEITLIMIT_MS);
+    });
+    const lesen = (async () => {
+      if (w.BOS_AUTH_READY) {
+        try { await w.BOS_AUTH_READY; } catch (e) { const f = new Error((e && e.message) || String(e)); f.code = 'unauthenticated'; throw f; }
+      }
+      return db.collection(this.EINSTELLUNGEN_COLLECTION).doc(this.EINSTELLUNGEN_DOK).get();
+    })();
+    try {
+      const snap = await Promise.race([lesen, zeit]);
+      if (snap && snap.metadata && snap.metadata.fromCache) {
+        const e = new Error('Antwort nur aus dem Zwischenspeicher des Geräts'); e.code = 'unavailable'; throw e;
+      }
+      const existiert = typeof snap.exists === 'function' ? snap.exists() : !!snap.exists;
+      return { existiert, daten: existiert ? snap.data() : null };
+    } finally {
+      clearTimeout(uhr);
+    }
+  },
+
+  async _leseEinstellungenDatei() {
+    if (!this._einstellungenDateiCache) {
+      const antwort = await fetch(this._EINSTELLUNGEN_URL);
+      if (antwort && antwort.ok === false) throw new Error('bos_verbrauch_einstellungen.json nicht ladbar (HTTP ' + antwort.status + ')');
+      this._einstellungenDateiCache = await antwort.json();
+    }
+    const c = this._einstellungenDateiCache || {};
+    // Kommentarfelder (_kommentar) der Datei gehören nicht zu den Einstellungen
+    const ohneKommentar = b => {
+      if (!b || typeof b !== 'object') return null;
+      const o = {};
+      Object.keys(b).forEach(k => { if (k.charAt(0) !== '_') o[k] = b[k]; });
+      return o;
+    };
+    return { manuell: ohneKommentar(c.manuell), offiziell: ohneKommentar(c.offiziell) };
+  },
+
+  _leseEinstellungsKopie() {
+    try {
+      if (typeof localStorage === 'undefined' || !localStorage) return null;
+      const k = JSON.parse(localStorage.getItem(this.EINSTELLUNGEN_KOPIE_KEY) || 'null');
+      if (!k || !Number.isInteger(k.stand)) return null;
+      if (this.pruefeEinstellungsBlock(k.manuell, 'manuell').length || this.pruefeEinstellungsBlock(k.offiziell, 'offiziell').length) return null;
+      return k;
+    } catch (e) {
+      return null;
+    }
+  },
+  /** Gerätekopie schreiben — nur aus einem vorhandenen, gültigen Dokument
+   *  (Leseweg oben, Editor nach dem Speichern). */
+  _schreibeEinstellungsKopie(k) {
+    try {
+      if (typeof localStorage === 'undefined' || !localStorage) return;
+      localStorage.setItem(this.EINSTELLUNGEN_KOPIE_KEY, JSON.stringify({
+        stand: k.stand, geaendertAm: k.geaendertAm || null, geaendertVon: k.geaendertVon || null,
+        gelesenAm: Date.now(), manuell: k.manuell, offiziell: k.offiziell
+      }));
+    } catch (e) { /* ohne Speicher geht es auch — dann gibt es eben keine Kopie */ }
+  },
+
+  _einstellungenGrund(fehler) {
+    if (fehler && fehler.art === 'nicht_geladen') return { art: 'nicht_geladen', meldung: fehler.message };
+    if (fehler && !fehler.code && !fehler.art) return { art: 'fehler', meldung: String((fehler && fehler.message) || fehler) };
+    const e = this._lesefehler(fehler, 'Einstellungen');
+    let meldung = e.message.replace(/^Lesefehler Einstellungen: /, '');
+    if (e.art === 'keine_berechtigung') meldung += ' — ist die Regel vom 20.10.2026 schon eingesetzt?';
+    return { art: e.art, meldung };
+  },
+
+  _einstellungenHerkunftTexte(h) {
+    const zwei = n => String(n).padStart(2, '0');
+    const wann = ms => { if (!ms) return ''; const d = new Date(ms); return ' vom ' + zwei(d.getDate()) + '.' + zwei(d.getMonth() + 1) + '., ' + zwei(d.getHours()) + ':' + zwei(d.getMinutes()); };
+    const g = h.grund && h.grund.meldung ? h.grund.meldung : '';
+    if (h.quelle === 'datenbank') {
+      return { text: 'Einstellungen aus der Datenbank · Stand ' + h.stand + wann(h.geaendertAm) + (h.geaendertVon ? ' (' + h.geaendertVon + ')' : ''),
+        kurz: 'Einstellungen Stand ' + h.stand, warnung: false };
+    }
+    if (h.quelle === 'geraetekopie') {
+      return { text: '⚠︎ Einstellungen vom Gerät (Stand ' + h.stand + wann(h.geaendertAm) + ') — Datenbank nicht erreichbar: ' + g,
+        kurz: '⚠︎ Einstellungen vom Gerät', warnung: true };
+    }
+    if (h.quelle === 'datei') {
+      return h.leer
+        ? { text: 'Einstellungen aus der Datei — die Datenbank ist noch leer (Einstellungs-Editor: „Aus der Datei in die Datenbank übernehmen“)', kurz: 'Einstellungen aus der Datei', warnung: false }
+        : { text: '⚠︎ Einstellungen aus der Datei — Datenbank nicht erreichbar, keine Kopie auf diesem Gerät: ' + g, kurz: '⚠︎ Einstellungen aus der Datei', warnung: true };
+    }
+    const dg = h.dateiGrund && h.dateiGrund.meldung ? h.dateiGrund.meldung : '';
+    return { text: '✕ Einstellungen: Startwerte aus dem Programm — weder Datenbank noch Datei erreichbar: ' + g + ' / ' + dg,
+      kurz: '✕ Einstellungen: Startwerte', warnung: true };
   },
 
   /**

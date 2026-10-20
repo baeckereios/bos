@@ -1,5 +1,5 @@
 {
-  "_kommentar": "System-Standard für die Durchschnittsberechnung (bos_verbrauch_durchschnitt.js). Erzeugt über verbrauch_einstellungen_editor.html.",
+  "_kommentar": "NOTFALL-KOPIE (seit 20.10.2026). Die Einstellungen stehen in der Datenbank (verbrauch_einstellungen/system) und werden im Einstellungs-Editor gespeichert. Diese Datei gilt nur, solange die Datenbank leer ist (bis zur Erst-Füllung im Editor) oder nicht antwortet und das Gerät keine Kopie hat. Erneuern: im Editor „Als Datei herunterladen“, dann GitSync.",
   "manuell": {
     "modus": "stichprobe",
     "stichprobeAnzahl": 6,

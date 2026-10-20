@@ -19,6 +19,20 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-20 · 06:59 · v3.7 · Feature (Verbrauch aufräumen, Hub „Verbrauch“; Freigabe KC 06:20, Ulf
+      „Ja, beide“, V5)
+      - Neu HUB_UMZUEGE = ['verbrauch'] und hubUmzug(d), aufgerufen in getActiveProfileData()
+        wie die übrigen Migrationen. Kacheln, die neu in einen Hub wandern, verschwinden sonst
+        vom Startbildschirm (renderGrid zeigt keine Hub-Kinder), der Hub erscheint nicht (nicht
+        installiert), und ihr alter Platz bleibt als unsichtbare Sperre (isAreaFree prüft alle
+        Plätze). Der Umzug — NUR für Kinder, die das Konto sehen darf:
+          · steht ein sichtbares Kind in installed und der Hub nicht, ersetzt der Hub das erste
+            dieser Kinder (nach order) an SEINER Stelle in installed und übernimmt dessen Platz;
+          · die übrigen sichtbaren Kinder fliegen aus installed (sobald der Hub installiert ist);
+          · die Plätze der Kinder werden gelöscht — außer bei einem installierten Kind, das das
+            Konto (noch) nicht sieht (Rolle noch nicht bekannt: nichts anfassen).
+        Einmalig von selbst (danach steht kein Kind mehr in installed). order bleibt unverändert.
+        Kein Umzug für alte Hubs, keine allgemeine Hub-Sichtbarkeit (Freigabe K3/§5).
     2026-10-18 · 11:43 · v3.6 · Feature (Crumble #62 Stufe 1e: Begrüßungen; Bauplan 10:06, Go 10:22)
       - Der Hörer 'hamster-figur:fehler' zeigt auch detail.name: „Name für die
         Begrüßung nicht lesbar: <err.message>“ in der Crumble-Zeile der Einstellungen
@@ -1104,11 +1118,48 @@
     if (!('backstoreHinweisGesehen' in d)) { d.backstoreHinweisGesehen = false; migriert = true; }
     if (!d.symbolpaket) { d.symbolpaket = 'hell'; migriert = true; } // Migration: neu 05.09.2026, siehe SESSION_2026-09-05_SYMBOLPAKET.md — bestehende Profile behalten das bisherige Aussehen (helle Schrift)
     if (!d.iconStil) { d.iconStil = 'emoji'; migriert = true; } // Migration: neu 05.09.2026, siehe SESSION_2026-09-05_BLOBMOJI.md — bestehende Profile behalten natives Emoji
+    if (hubUmzug(d)) migriert = true; // Migration: neu 20.10.2026, Umzug ins Hub „Verbrauch“ (siehe hubUmzug)
     // Sofort persistieren statt auf die nächste renderGrid()-Auto-Platzierung zu
     // warten: der BackStore-Satellit liest denselben localStorage-Key direkt aus
     // einem eigenen IFRAME und muss dieselbe migrierte Form vorfinden.
     if (migriert) saveState();
     return d;
+  }
+
+  /* ---------------- Umzug ins Hub (20.10.2026, Verbrauch aufräumen, V5) ----------------
+     Feste Liste — NICHT für alle Hubs (alte Hubs könnten sonst Startbildschirme
+     verändern, die niemand angefasst hat). Siehe CHANGELOG v3.7. */
+  var HUB_UMZUEGE = ['verbrauch'];
+  function hubUmzug(d) {
+    var apps = window.BOS_APPS || [];
+    var geaendert = false;
+    if (!d || !Array.isArray(d.installed) || !d.positions) return false;
+    HUB_UMZUEGE.forEach(function (hubId) {
+      var hub = apps.find(function (a) { return a.id === hubId && a.type === 'hub'; });
+      if (!hub) return;
+      var kinder = apps.filter(function (a) { return a.hub === hubId; });
+      var sieht = function (app) { try { return isVisibleForRole(app); } catch (e) { return false; } };
+      var sichtbareInstallierte = kinder.filter(function (a) { return d.installed.indexOf(a.id) !== -1 && sieht(a); }).map(function (a) { return a.id; });
+      if (sichtbareInstallierte.length && d.installed.indexOf(hubId) === -1 && sieht(hub)) {
+        var reihe = (d.order || []).filter(function (id) { return sichtbareInstallierte.indexOf(id) !== -1; });
+        var erstes = reihe.length ? reihe[0] : sichtbareInstallierte[0];
+        d.installed[d.installed.indexOf(erstes)] = hubId;          // an SEINER Stelle, keine andere Reihenfolge
+        if (d.positions[erstes] && !d.positions[hubId]) d.positions[hubId] = d.positions[erstes];
+        geaendert = true;
+      }
+      if (d.installed.indexOf(hubId) !== -1) {
+        var vorher = d.installed.length;
+        d.installed = d.installed.filter(function (id) { return sichtbareInstallierte.indexOf(id) === -1; });
+        if (d.installed.length !== vorher) geaendert = true;
+      }
+      kinder.forEach(function (a) {
+        if (!d.positions[a.id]) return;
+        if (d.installed.indexOf(a.id) !== -1 && !sieht(a)) return;   // Rolle (noch) unbekannt: nichts anfassen
+        delete d.positions[a.id];
+        geaendert = true;
+      });
+    });
+    return geaendert;
   }
 
   /* ---------------- Apps: zusammenführen + Rollen-Filter ---------------- */
