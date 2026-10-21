@@ -5,6 +5,7 @@
   Doku:  teigecke/TEIGECKE_REZEPTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit „Orte“)
   CHANGELOG
+    2026-10-21 · 07:29 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen; wer sie eingesetzt hätte, hätte neuere Regeln hinausgeworfen. Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
     2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
       Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
       (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
@@ -173,7 +174,7 @@ const HAKEN_FUER = {
   teigecke_teigwerte: 'teige', teigecke_zutaten: 'wagen'
 };
 const REGEL_FASSUNG = 'teigecke-nacht-2026-10-08';   /* Rezeptmengen, gruppe (RK §18) + langzeit (RK §19) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 const VORSTUFEN_VORSCHLAG = ['Quellstück', 'Brühstück', 'Kochstück', 'Vorteig'];
 const PROBE_BROTE = 60;   /* Proberechnung in der Zusammenfassung (Anweisung §4 B5) */
 const SCHRITTE = 5;

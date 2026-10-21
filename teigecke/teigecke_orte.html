@@ -5,6 +5,7 @@
   Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
   CHANGELOG
+    2026-10-21 · 07:29 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen; wer sie eingesetzt hätte, hätte neuere Regeln hinausgeworfen. Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
     2026-10-16 · 17:51 · v0.3b · Nur Texte (Teigrechner Stufe 1, Freigabe KC 16:37 Teil H)
       Die Nachtseite heißt „BrotTeigRechner“ (Ulf 16.10., 16:36): Rücksprung und
       Hilfe nachgezogen. Nebenfund berichtigt: „Teige liest … ein“ nannte noch die
@@ -159,7 +160,7 @@ const HAKEN_FUER = {
   teigecke_orte: 'wagen', teigecke_zutaten: 'wagen'
 };
 const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* seit 08.10.2026: die Seite schreibt das Feld gruppe (RK §18) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 /* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
    Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
 try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }

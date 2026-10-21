@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-21 · 07:29 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen; wer sie eingesetzt hätte, hätte neuere Regeln hinausgeworfen. Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md -->
 <!-- 2026-10-20 · 06:59 · Einstellungen in der Datenbank (Verbrauch aufräumen, Freigabe KC 06:20, V1–V6): Die Seite liest verbrauch_einstellungen/system IMMER vom Server, zeigt oben die Herkunft, „Speichern“ schreibt direkt (Sicherung der Vorversion + Stand + 1, Regel RK §24), Erst-Füllung „Aus der Datei in die Datenbank übernehmen“ mit Vergleich, Vorversionen (letzte 10) mit „Diesen Stand zurückholen“, Prüfung jedes Felds vor dem Speichern (Grenzen = Rechner = Regel; leeres Feld wird nicht mehr still 0), Hinweis „Notfall-Kopie veraltet“, Ungespeichert-Schutz, Grund ausgeschlossener Tage umgewandelt und auf 100 Zeichen begrenzt. Reiter Backzettel: „Relative/Absolute Mindestabweichung“ ausgeblendet (Werte bleiben). „Als Datei herunterladen“ bleibt als Notfall-Kopie. SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md -->
 <!-- 2026-10-19 · 17:32 · Backzettel-Erfassung Stufe 1 (Freigabe KC 09:47, B3/B4): Reiter Backzettel mit neuer Karte „Prüfung beim Erfassen“ (erfassungSchwelleBleche, erfassungSchwelleProzent; Vorgabe 3 Bleche / 20 %, Ulf E18). Die alten Felder Relative/Absolute Mindestabweichung wirken beim Backzettel nicht (Hinweis im Reiter). Hilfe: Backzettel = alte BOS1-Zahlen + neue Erfassung, Schulferien zählen beim Backzettel mit, Zeitfenster gilt wieder (Nebenwirkung auf „Aus Backzettel übernehmen“). SESSION_2026-10-19_BACKZETTEL_STUFE1_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Auswahl- und Kalender-Tönungen folgen dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
@@ -490,7 +491,7 @@
   };
   const PROZENT_FELDER = ['schwelleProzent', 'erfassungSchwelleProzent'];
   const REGEL_FASSUNG = 'verbrauch-einstellungen-2026-10-20';
-  const REGEL_DATEI = 'firestore_regeln_2026-10-20_verbrauch_einstellungen.rules';
+  const REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';
   const SPEICHER_ZEITLIMIT_MS = 30000;
 
   function esc(t) { return String(t === null || t === undefined ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }

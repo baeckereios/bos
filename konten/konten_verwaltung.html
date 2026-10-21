@@ -7,6 +7,30 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-21 · 07:29 · v-Zugangsblatt-QR-1 · Feature (Freigabe Kontroll-Chat 06:47)
+      Zugangsblatt mit Schnellzugriffen: bis zu 6 QR-Codes unter der Anleitung,
+      Auswahl aus der NFC-/QR-Zentrale (nfc_einstellungen/zugangsblatt, RK §25,
+      gelesen über adminFirestore). Je Person nur die Ziele, die sie öffnen darf
+      (BOS_NFC_QR_LOGIK.zielErlaubt mit BOS_ACCESS.can, Haken über
+      BOS_KONTO_PROFIL.hakenAus, am GESPEICHERTEN Konto). Die Codes laden beim
+      Öffnen des Dialogs (ladeZugangsCodes, Dialog-Nummer gegen späte
+      Antworten), eine Zeile im Dialog nennt Anzahl, Namen und was fehlt.
+      Passwort setzen und Drucken hängen NIE daran: jeder Fehler = Blatt ohne
+      Codes + Grund mit err.message. Lokal (BOS_QR.darfAusgeben) ohne Codes.
+      Block und CSS aus nfc_qr_logik.js (zugangsCodesHTML, ZUGANG_CSS; Code
+      genau 30 mm, dieselbe Funktion wie die Vorschau der Zentrale).
+      Neu eingebunden: ../bos_konto_profil.js, ../bos_qr.js, ../qrcode.min.js,
+      ../nfc_qr/nfc_qr_logik.js. Hilfe „Wie ändere ich ein Passwort?“ ergänzt.
+      SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
+    2026-10-21 · 04:05 · v-Passwort-2 · Gestaltung (Nachtrag 1, Kontroll-Chat 21.10., 03:52)
+      Beide Passwort-Dialoge (Zugangsblatt, Admin-Passwort ändern) im Stil der
+      Konto-Karte: eigene Klassen pw-overlay/pw-fenster mit Innenabstand aus den
+      Tokens, bis 560 px breit, Kopf mit Titel und Unterzeile, Knöpfe mind. 48 px
+      hoch und ohne Umbruch; „Drucken“ groß oben, darunter „Schließen“ |
+      „Fertig (ohne Druck)“, unter 440 px untereinander. .bos-panel und
+      bos_design_tokens.css unverändert. Keine Logik und keine Texte geändert
+      (nur der Titel des Zugangsblatts in Titel und Unterzeile geteilt).
+      Anlass: Ulf am Tablet („Enges Fenster“); die Lücke steckte seit 27.09. darin.
     2026-10-20 · 16:32 · v-Passwort-1 · Feature (Passwort setzen; Go Kontroll-Chat 16:04, Auflagen N1–N3)
       Zugangsblatt: Schritt 1 heißt „Passwort setzen“. Das erzeugte Passwort
       steht in einem Feld (text, ohne form, autocomplete/autocorrect aus),
@@ -279,6 +303,29 @@
   .hidden { display: none !important; }
   /* NEU 20.10.2026 (Passwort setzen): gesperrte Knöpfe in den Passwort-Dialogen sichtbar grau — „Drucken“ vor dem Setzen. */
   #zugangsDialog button:disabled, #adminPasswortDialog button:disabled { opacity: .4; cursor: not-allowed; }
+  /* NEU 21.10.2026 (Nachtrag 1): Fenster der beiden Passwort-Dialoge wie die Konto-Karte —
+     Innenabstand aus den Tokens, breiter, Knöpfe ohne Umbruch. Bewusst eigene Klassen,
+     .bos-panel bleibt unverändert (nutzen viele Seiten). */
+  .pw-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,.75); display: flex; padding: var(--bos-space-md, 18px); overflow-y: auto; box-sizing: border-box; }
+  .pw-fenster { margin: auto; width: 100%; max-width: 560px; box-sizing: border-box; padding: var(--bos-space-lg, 22px) var(--bos-space-lg, 24px);
+    display: flex; flex-direction: column; gap: var(--bos-space-sm, 14px); border-radius: var(--bos-radius-lg); box-shadow: var(--bos-shadow-lg); }
+  .pw-kopf { display: flex; flex-direction: column; gap: var(--bos-space-3xs, 3px); padding-bottom: var(--bos-space-xs, 9px); border-bottom: 1px solid var(--bos-border); }
+  .pw-titel { font-family: var(--bos-font-display); font-size: var(--bos-font-xl, 1.4rem); line-height: 1.2; }
+  .pw-sub { font-size: var(--bos-font-xs, .78rem); color: var(--bos-text-dim); font-family: monospace; overflow-wrap: anywhere; }
+  .pw-fenster p { margin: 0; line-height: 1.45; font-size: var(--bos-font-sm, .88rem); }
+  .pw-fenster p.pw-klein { font-size: var(--bos-font-xs, .78rem); color: var(--bos-text-faint); }
+  .pw-fenster code { overflow-wrap: anywhere; }
+  .pw-fenster .bos-btn { min-height: 48px; white-space: nowrap; }
+  .pw-feld { font-family: monospace; font-size: 1.6rem; letter-spacing: .08em; text-align: center; padding: var(--bos-space-xs, 9px); border: 1px dashed var(--bos-amber); width: 100%; box-sizing: border-box; }
+  .pw-hinweis { padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); border: 1px solid var(--bos-warn, var(--bos-amber)); border-radius: var(--bos-radius-sm, 8px); color: var(--bos-warn, var(--bos-amber)); font-size: var(--bos-font-sm, .85rem); line-height: 1.4; }
+  .pw-meldung { font-size: var(--bos-font-sm, .85rem); line-height: 1.4; overflow-wrap: anywhere; }
+  .pw-meldung:empty { display: none; }
+  .pw-label { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 6px); font-size: var(--bos-font-sm, .88rem); }
+  .pw-label .bos-input { width: 100%; box-sizing: border-box; min-height: 44px; }
+  /* Drucken groß oben, darunter Schließen | Fertig (ohne Druck); sehr schmal untereinander */
+  .pw-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bos-space-xs, 9px); padding-top: var(--bos-space-xs, 9px); border-top: 1px solid var(--bos-border); }
+  .pw-knoepfe .pw-haupt { grid-column: 1 / -1; order: -1; }
+  @media (max-width: 440px) { .pw-knoepfe { grid-template-columns: 1fr; } }
 
   input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--bos-amber); cursor: pointer; }
   select.bos-input { width: auto; min-width: 160px; }
@@ -628,6 +675,11 @@
 <script src="../bos_launcher_roles.js"></script>
 <script src="../bos_farbprofile.js"></script>   <!-- NEU 15.10.2026, #72 Stufe B: Profilliste für „🎨 Farbprofil“ -->
 <script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
+<!-- NEU 21.10.2026 (Zugangsblatt-Schnellzugriffe): Haken des Kontos, Adresse/QR/Sperre, Auswahl und Druckblock -->
+<script src="../bos_konto_profil.js"></script>
+<script src="../bos_qr.js"></script>
+<script src="../qrcode.min.js"></script>
+<script src="../nfc_qr/nfc_qr_logik.js"></script>
 
 <script>
 // ==========================================================================
@@ -652,7 +704,7 @@ var helpData = {
     },
     {
       heading: "Wie ändere ich ein Passwort?",
-      text: "Konto-Karte öffnen, Reiter „Konto“, „Zugangsblatt drucken …“. Das vorgeschlagene Passwort stehen lassen (selbst getippt kann sich die Tastatur des Geräts das Wort merken) und „Passwort jetzt setzen“ tippen. Erst wenn „✓ gesetzt“ dasteht, lässt sich drucken; gedruckt wird genau das gesetzte Passwort. Danach steht es nur auf dem Blatt — nirgends im System, auch Firebase hebt nur einen unlesbaren Fingerabdruck davon auf. Ist es das Konto, mit dem dieses Gerät angemeldet ist, meldet sich das Gerät spätestens nach etwa einer Stunde ab; dann an der Tür mit dem neuen Passwort anmelden. Das Passwort des Generalschlüssels (damit öffnest du diese Seite) änderst du in dessen Konto-Karte mit „Admin-Passwort ändern …“ — es kommt nie auf ein Blatt. Ist es vergessen oder meldet die Seite „Passwort-Function nicht erreichbar“, hilft die Anleitung zur Passwort-Function (FUNCTIONS_EINRICHTUNG_ANLEITUNG.md): Kapitel „Laufzeit wechseln“ und Anhang Notfall."
+      text: "Konto-Karte öffnen, Reiter „Konto“, „Zugangsblatt drucken …“. Das vorgeschlagene Passwort stehen lassen (selbst getippt kann sich die Tastatur des Geräts das Wort merken) und „Passwort jetzt setzen“ tippen. Erst wenn „✓ gesetzt“ dasteht, lässt sich drucken; gedruckt wird genau das gesetzte Passwort. Danach steht es nur auf dem Blatt — nirgends im System, auch Firebase hebt nur einen unlesbaren Fingerabdruck davon auf. Ist es das Konto, mit dem dieses Gerät angemeldet ist, meldet sich das Gerät spätestens nach etwa einer Stunde ab; dann an der Tür mit dem neuen Passwort anmelden. Das Passwort des Generalschlüssels (damit öffnest du diese Seite) änderst du in dessen Konto-Karte mit „Admin-Passwort ändern …“ — es kommt nie auf ein Blatt. Ist es vergessen oder meldet die Seite „Passwort-Function nicht erreichbar“, hilft die Anleitung zur Passwort-Function (FUNCTIONS_EINRICHTUNG_ANLEITUNG.md): Kapitel „Laufzeit wechseln“ und Anhang Notfall. Unter der Anleitung stehen bis zu 6 Schnellzugriffe als QR-Code, ausgewählt in NFC & QR im Reiter „Zugangsblatt“; aufs Blatt kommen nur die, die diese Person öffnen darf. Eine Zeile im Fenster sagt vor dem Drucken, welche es sind und was fehlt. Klemmt es dabei (kein Netz, Regel fehlt, Ziel gibt es nicht mehr), kommt das Blatt trotzdem, nur ohne diese Codes. Läuft die Seite nicht unter der Online-Adresse, gibt es keine Codes."
     },
     {
       heading: "„Steht diese Person im Schichtplan?“ — was soll ich wählen?",
@@ -1728,23 +1780,24 @@ function oeffneZugangsblatt(kontoId) {
   var nr = zugangsNr;
   var d = document.createElement('div');
   d.id = 'zugangsDialog';
-  d.setAttribute('style', 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;');
-  d.innerHTML = '<div class="bos-panel" style="max-width:460px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
-    '<div style="font-weight:700;">Zugangsblatt · ' + esc(zugangsName(k)) + ' · ' + esc(kontoId) + '</div>' +
-    '<p style="margin:0;font-size:.85rem;">1. Passwort setzen für <code>' + esc(kontoId) + '@baeckereios.intern</code>:</p>' +
-    '<input type="text" id="zugangsPw" class="bos-input"' + OHNE_SPEICHERN + ' style="font-family:monospace;font-size:1.5rem;letter-spacing:.08em;text-align:center;padding:8px;border:1px dashed var(--bos-amber);">' +
-    '<p style="margin:0;font-size:.76rem;color:var(--bos-text-faint);">Am besten das Vorgeschlagene lassen: Selbst getippt kann sich die Tastatur des Geräts das Wort merken. Mindestens ' + passwortMin() + ' Zeichen.</p>' +
+  d.className = 'pw-overlay';
+  d.innerHTML = '<div class="bos-panel pw-fenster" role="dialog" aria-modal="true" aria-labelledby="zugangsTitel">' +
+    '<div class="pw-kopf"><div class="pw-titel" id="zugangsTitel">Zugangsblatt</div><div class="pw-sub">' + esc(zugangsName(k)) + ' · ' + esc(kontoId) + '</div></div>' +
+    '<p>1. Passwort setzen für <code>' + esc(kontoId) + '@baeckereios.intern</code>:</p>' +
+    '<input type="text" id="zugangsPw" class="bos-input pw-feld"' + OHNE_SPEICHERN + '>' +
+    '<p class="pw-klein">Am besten das Vorgeschlagene lassen: Selbst getippt kann sich die Tastatur des Geräts das Wort merken. Mindestens ' + passwortMin() + ' Zeichen.</p>' +
     (istGeraeteKonto(kontoId)
-      ? '<div id="zugangsGeraet" role="note" style="padding:8px 10px;border:1px solid var(--bos-warn, var(--bos-amber));border-radius:var(--bos-radius-sm, 8px);color:var(--bos-warn, var(--bos-amber));font-size:.82rem;">⚠ Dieses Gerät wird danach abgemeldet, spätestens in etwa einer Stunde. Dann an der Tür mit dem neuen Passwort anmelden.</div>'
+      ? '<div id="zugangsGeraet" role="note" class="pw-hinweis">⚠ Dieses Gerät wird danach abgemeldet, spätestens in etwa einer Stunde. Dann an der Tür mit dem neuen Passwort anmelden.</div>'
       : '') +
     '<button type="button" class="bos-btn bos-btn--amber" id="zugangsSetzen">Passwort jetzt setzen</button>' +
-    '<div id="zugangsMeldung" role="status" style="font-size:.82rem;"></div>' +
+    '<div id="zugangsMeldung" role="status" class="pw-meldung"></div>' +
     '<button type="button" class="bos-btn hidden" id="zugangsNeuAnmelden">Neu anmelden</button>' +
-    '<p style="margin:0;font-size:.85rem;">2. Dann drucken. Das Passwort wird nirgends gespeichert und ist weg, sobald dieses Fenster zu ist.</p>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-      '<button type="button" class="bos-btn" id="zugangsAbbrechen" style="flex:1;">Schließen</button>' +
-      '<button type="button" class="bos-btn" id="zugangsFertig" style="flex:1;" disabled>Fertig (ohne Druck)</button>' +
-      '<button type="button" class="bos-btn bos-btn--amber" id="zugangsDrucken" style="flex:1;" disabled>Drucken</button>' +
+    '<p>2. Dann drucken. Das Passwort wird nirgends gespeichert und ist weg, sobald dieses Fenster zu ist.</p>' +
+    '<div id="zugangsCodes" class="pw-meldung" role="status"></div>' +
+    '<div class="pw-knoepfe">' +
+      '<button type="button" class="bos-btn" id="zugangsAbbrechen">Schließen</button>' +
+      '<button type="button" class="bos-btn" id="zugangsFertig" disabled>Fertig (ohne Druck)</button>' +
+      '<button type="button" class="bos-btn bos-btn--amber pw-haupt" id="zugangsDrucken" disabled>Drucken</button>' +
     '</div></div>';
   document.body.appendChild(d);
   var feld = d.querySelector('#zugangsPw');
@@ -1761,6 +1814,7 @@ function oeffneZugangsblatt(kontoId) {
     oeffneAdminAuth({ typ: 'oeffnen' });
   });
   zugangsKnopfStand();
+  ladeZugangsCodes(k, nr);   // NEU 21.10.2026: getrennt, der Passwort-Ablauf wartet nie darauf
 }
 // Knopf „Passwort jetzt setzen“ nur bei genug Zeichen und solange nicht gesetzt.
 function zugangsKnopfStand() {
@@ -1843,32 +1897,103 @@ function zugangsFehlerText(err) {
   }
   return { text: 'Nicht gesetzt: ' + msg + roh };
 }
-function zugangsblattDruckHTML(k, pw) {
+// codes (NEU 21.10.2026) = [{ name, hubName, qrSvg }] aus ladeZugangsCodes; leer = Blatt wie bisher.
+function zugangsblattDruckHTML(k, pw, codes) {
   var e = function (t) { return esc(String(t)); };
+  var L = window.BOS_NFC_QR_LOGIK;
+  var block = '', css = '';
+  try { if (L && codes && codes.length) { block = L.zugangsCodesHTML(codes); css = L.ZUGANG_CSS; } }
+  catch (err) { console.error('[Konten & Rollen] Schnellzugriffe nicht ins Blatt gesetzt', err); block = ''; css = ''; }
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Zugangsblatt</title>' +
-    '<style>@page{size:A4;margin:20mm}body{font-family:sans-serif;color:#000}h1{font-size:20pt;margin:0 0 12mm}' +
+    '<style>@page{size:A4;margin:20mm}body{font-family:sans-serif;color:#000;margin:0}h1{font-size:20pt;margin:0 0 12mm}' +
     'table{border-collapse:collapse;font-size:14pt}td{padding:4mm 6mm 4mm 0;vertical-align:top}.pw{font-family:monospace;font-size:18pt;letter-spacing:.08em}' +
-    'ol{font-size:12pt;line-height:1.6;margin-top:10mm}.klein{font-size:10pt;color:#444;margin-top:12mm}</style></head><body>' +
+    'ol{font-size:12pt;line-height:1.6;margin-top:10mm}.klein{font-size:10pt;color:#444;margin-top:' + (block ? '7mm' : '12mm') + '}' + css + '</style></head><body>' +
     '<h1>BäckereiOS · Zugang</h1><table>' +
     '<tr><td>Name</td><td><b>' + e(zugangsName(k)) + '</b></td></tr>' +
     '<tr><td>Kennung</td><td><b>' + e(k.id) + '</b></td></tr>' +
     '<tr><td>Passwort</td><td class="pw">' + e(pw) + '</td></tr></table>' +
     '<ol><li>Die Tür von BäckereiOS öffnen (Adresse: siehe Aushang).</li><li>Kennung und Passwort eingeben.</li>' +
     '<li>Erscheint „Noch nicht freigeschaltet“: Ulf Bescheid geben.</li></ol>' +
+    block +
     '<p class="klein">Blatt nicht liegen lassen. Bei Verlust: Ulf setzt ein neues Passwort, das alte gilt dann nicht mehr.</p>' +
     '<p class="klein">Probe-Anmeldung durchgeführt: ☐</p></body></html>';
 }
 function druckeZugangsblatt(k) {
   if (!zugangsPasswort) return;   // Schwelle: ohne gesetztes Passwort kein Blatt
+  // Schnellzugriffe: was JETZT fertig ist. Laden sie noch, kommt das Blatt ohne (nie warten).
+  var codes = (zugangsCodes.nr === zugangsNr && zugangsCodes.stand === 'fertig') ? zugangsCodes.codes : [];
+  var ohneWeil = zugangsCodes.nr === zugangsNr && zugangsCodes.stand === 'lade' ? ' Ohne Schnellzugriffe gedruckt: Sie waren noch nicht geladen.' : '';
   var f = document.createElement('iframe');
   f.id = 'zugangsDruck';
   f.setAttribute('style', 'position:fixed;width:0;height:0;border:0;visibility:hidden;');
   document.body.appendChild(f);
   var doc = f.contentWindow.document;
-  doc.open(); doc.write(zugangsblattDruckHTML(k, zugangsPasswort)); doc.close();
-  var fertig = function () { schliesseZugangsblatt(); var z = document.getElementById('zStatus-' + k.id); if (z) z.textContent = 'Gedruckt. Jetzt die Probe-Anmeldung mit dem Blatt an der Tür.'; };
+  doc.open(); doc.write(zugangsblattDruckHTML(k, zugangsPasswort, codes)); doc.close();
+  var fertig = function () { schliesseZugangsblatt(); var z = document.getElementById('zStatus-' + k.id); if (z) z.textContent = 'Gedruckt. Jetzt die Probe-Anmeldung mit dem Blatt an der Tür.' + ohneWeil; };
   try { f.contentWindow.focus(); f.contentWindow.print(); } catch (err) { console.error('[Konten & Rollen] Druck fehlgeschlagen', err); alert('Druck fehlgeschlagen: ' + err.message); }
   setTimeout(fertig, 500);
+}
+
+// ---- Schnellzugriffe auf dem Zugangsblatt (21.10.2026) ----
+// Auswahl aus der NFC-/QR-Zentrale (nfc_einstellungen/zugangsblatt, RK §25).
+// Lädt beim Öffnen des Dialogs, getrennt vom Passwort. Jeder Fehler führt zu
+// „Blatt ohne Codes + Grund“, nie zu einem nicht gedruckten Passwort.
+var zugangsCodes = { nr: -1, stand: 'aus', codes: [] };
+var ZUGANGS_ZEITLIMIT_MS = 10000;
+function zugangsCodesZeile(nr, text, art) {
+  if (nr !== zugangsNr) return;
+  var el = document.getElementById('zugangsCodes'); if (!el) return;
+  el.className = 'pw-meldung' + (art === 'fehler' ? ' status-err' : '');
+  el.style.color = art === 'hinweis' ? 'var(--bos-warn, var(--bos-amber))' : '';
+  el.textContent = text;
+}
+var ZUGANGS_GRUND = { fehlt: 'Ziel gibt es nicht mehr', nicht_waehlbar: 'nicht mehr für den Direktaufruf freigegeben',
+  kein_recht: 'für dieses Konto nicht freigegeben', zu_viele: 'mehr als 6 gespeichert', qr: 'Code nicht erzeugbar' };
+async function ladeZugangsCodes(k, nr) {
+  zugangsCodes = { nr: nr, stand: 'lade', codes: [] };
+  var fertig = function (codes, text, art) {
+    if (nr !== zugangsNr) return;
+    zugangsCodes = { nr: nr, stand: 'fertig', codes: codes };
+    zugangsCodesZeile(nr, text, art);
+  };
+  zugangsCodesZeile(nr, 'Schnellzugriffe werden geladen …', '');
+  try {
+    var L = window.BOS_NFC_QR_LOGIK, Q = window.BOS_QR;
+    if (!L || !Q || !window.BOS_ACCESS || !window.BOS_KONTO_PROFIL || !window.BOS_APPS) {
+      var e0 = new Error('Skripte für die Schnellzugriffe fehlen (nfc_qr_logik.js, bos_qr.js, bos_access.js, bos_konto_profil.js oder bos_app_registry.js). Seite hart neu laden.'); e0.code = 'bos/skripte'; throw e0;
+    }
+    // Die Sperre: lokal kein Code (bos_qr.js, ohne Schalter)
+    if (!Q.darfAusgeben(window.location.href)) { fertig([], 'Diese Seite läuft nicht unter der Online-Adresse von BäckereiOS: Das Blatt kommt ohne Schnellzugriffe.', 'hinweis'); return; }
+    var Z = L.ZUGANGSBLATT, uhr;
+    var zeit = new Promise(function (_, nein) { uhr = setTimeout(function () { var e = new Error('Zeitlimit ' + (ZUGANGS_ZEITLIMIT_MS / 1000) + ' s überschritten'); e.code = 'zeitlimit'; nein(e); }, ZUGANGS_ZEITLIMIT_MS); });
+    var snap;
+    try { snap = await Promise.race([window.BOS_ACCOUNTS.adminFirestore().collection(Z.COLLECTION).doc(Z.DOC).get({ source: 'server' }), zeit]); }
+    finally { clearTimeout(uhr); }
+    if (nr !== zugangsNr) return;
+    if (!snap.exists) { fertig([], 'Noch keine Schnellzugriffe ausgewählt (NFC & QR, Reiter „Zugangsblatt“). Das Blatt kommt ohne.', 'hinweis'); return; }
+    var ausw = L.zugangAusDokument(snap.data(), null);
+    var haken = window.BOS_KONTO_PROFIL.hakenAus(k);   // gespeichertes Konto, nicht ungespeicherte Haken der Karte
+    var erg = L.zugangsblattZiele(ausw.ziele, window.BOS_APPS, function (ziel) { return L.zielErlaubt(ziel, k, window.BOS_ACCESS.can, haken); });
+    var codes = [], weg = erg.weg.slice();
+    erg.drucken.forEach(function (ziel) {
+      try {
+        var adr = Q.adresse(ziel.url);
+        if (!Q.darfAusgeben(adr)) throw new Error('keine Online-Adresse: ' + adr);
+        codes.push({ id: ziel.id, name: ziel.name, hubName: ziel.hubName || '', adresse: adr, qrSvg: Q.qrFuer(adr) });
+      } catch (e) { weg.push({ id: ziel.id, name: ziel.name, grund: 'qr', meldung: e.message }); }
+    });
+    var text = codes.length + (codes.length === 1 ? ' Schnellzugriff' : ' Schnellzugriffe') + ' aufs Blatt' +
+      (codes.length ? ': ' + codes.map(function (c) { return c.name; }).join(', ') + '.' : '.');
+    if (weg.length) text += ' Nicht drauf: ' + weg.map(function (w) { return w.name + ' (' + (ZUGANGS_GRUND[w.grund] || w.grund) + (w.meldung ? ': ' + w.meldung : '') + ')'; }).join(' · ') + '.';
+    fertig(codes, text, weg.length ? 'hinweis' : '');
+  } catch (err) {
+    if (nr !== zugangsNr) return;
+    console.error('[Konten & Rollen] Schnellzugriffe nicht geladen', (err && err.code) || '', (err && err.message) || String(err));
+    var c = (err && err.code) || '';
+    var grund = c === 'permission-denied' ? 'Die Regel für die Schnellzugriffe (RK §25) ist wohl noch nicht eingesetzt. '
+      : (c === 'unavailable' || c === 'zeitlimit') ? 'Kein Netz oder keine Antwort der Datenbank. ' : '';
+    fertig([], 'Schnellzugriffe nicht geladen, das Blatt kommt ohne Codes. ' + grund + '[' + (c || 'ohne Code') + ': ' + ((err && err.message) || String(err)) + ']', 'fehler');
+  }
 }
 // Passwort weg: Variable überschrieben, Felder geleert, Dialoge und Druckrahmen
 // entfernt, Dialog-Nummer weiter (späte Antworten prallen ab). Schließt auch den
@@ -1877,6 +2002,7 @@ function druckeZugangsblatt(k) {
 function schliesseZugangsblatt() {
   zugangsPasswort = null;
   zugangsNr++;
+  zugangsCodes = { nr: -1, stand: 'aus', codes: [] };
   var d = document.getElementById('zugangsDialog');
   if (d) { var feld = d.querySelector('#zugangsPw'); if (feld) feld.value = ''; d.remove(); }
   var f = document.getElementById('zugangsDruck'); if (f) f.remove();
@@ -1893,22 +2019,22 @@ function oeffneAdminPasswortDialog() {
   schliesseZugangsblatt();
   var nr = adminPwNr;
   var feldHTML = function (id, text) {
-    return '<label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">' + text +
+    return '<label class="pw-label">' + text +
       '<input type="password" id="' + id + '" class="bos-input"' + OHNE_SPEICHERN + '></label>';
   };
   var d = document.createElement('div');
   d.id = 'adminPasswortDialog';
-  d.setAttribute('style', 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;');
-  d.innerHTML = '<div class="bos-panel" style="max-width:440px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
-    '<div style="font-weight:700;">Admin-Passwort ändern</div>' +
-    '<p style="margin:0;font-size:.82rem;color:var(--bos-text-dim);">Das Passwort, mit dem diese Seite geöffnet wird. Es kommt nie auf ein Blatt.</p>' +
+  d.className = 'pw-overlay';
+  d.innerHTML = '<div class="bos-panel pw-fenster" role="dialog" aria-modal="true" aria-labelledby="apTitel">' +
+    '<div class="pw-kopf"><div class="pw-titel" id="apTitel">Admin-Passwort ändern</div><div class="pw-sub">Generalschlüssel</div></div>' +
+    '<p style="color:var(--bos-text-dim);">Das Passwort, mit dem diese Seite geöffnet wird. Es kommt nie auf ein Blatt.</p>' +
     feldHTML('apBisher', 'Bisheriges Passwort') +
     feldHTML('apNeu1', 'Neues Passwort (mindestens ' + passwortMin() + ' Zeichen)') +
     feldHTML('apNeu2', 'Neues Passwort wiederholen') +
-    '<div id="apHinweis" style="font-size:.78rem;color:var(--bos-text-faint);"></div>' +
+    '<div id="apHinweis" class="pw-meldung" style="color:var(--bos-text-faint);"></div>' +
     '<button type="button" class="bos-btn bos-btn--amber" id="apAendern" disabled>Passwort ändern</button>' +
-    '<div id="apMeldung" role="status" style="font-size:.82rem;"></div>' +
-    '<button type="button" class="bos-btn" id="apSchliessen">Schließen</button>' +
+    '<div id="apMeldung" role="status" class="pw-meldung"></div>' +
+    '<div class="pw-knoepfe" style="grid-template-columns:1fr;"><button type="button" class="bos-btn" id="apSchliessen">Schließen</button></div>' +
   '</div>';
   document.body.appendChild(d);
   ['apBisher', 'apNeu1', 'apNeu2'].forEach(function (id) { d.querySelector('#' + id).addEventListener('input', adminPasswortKnopfStand); });

@@ -6,6 +6,7 @@
   Gerüst: ../teigecke/teigecke_seite.js + ../teigecke/teigecke_seite.css (gemeinsam mit der Teigecke)
   Logik:  teigrechner_logik.js (Rechnung, Formular), ../teigecke/teigecke_logik.js (Kennung, Umhängen)
   CHANGELOG
+    2026-10-21 · 07:29 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen; wer sie eingesetzt hätte, hätte neuere Regeln hinausgeworfen. Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
     2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
       Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
       (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
@@ -160,7 +161,7 @@ const FELDER = { teigrechner_teige: T.FELDER_TEIG.slice() };
 /* Ein Haken für alles, was diese Seite schreibt. Produkte (ausTeig) schreibt die Rolle admin. */
 const HAKEN_FUER = { teigrechner_teige: 'weitere' };
 const REGEL_FASSUNG = 'teigrechner-2026-10-16';
-const REGEL_DATEI = 'firestore_regeln_2026-10-16_teigrechner.rules';
+const REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';
 const REITER = T.STATIONEN_REITER.concat(['Nachtschicht']);
 const TREFFER_MAX = 12;
 

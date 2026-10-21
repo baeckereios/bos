@@ -77,6 +77,11 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-10-21 · 07:29 · v-Zugangsblatt-QR-1 · Feature (nur Zusatz)
+       adminKennung(): Kennung (Teil vor dem @) der angemeldeten Admin-Sitzung,
+       sonst null. Die NFC-/QR-Zentrale schreibt sie als geaendertVon, die
+       Regeln verlangen geaendertVon == kennung() (RK §15, §25).
+       nfc_qr/_protokolle/SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
      2026-10-20 · 16:32 · v-Passwort-1 · Feature (Passwort setzen; Go Kontroll-Chat 16:04)
        Nur Zusätze, keine bestehende Funktion geändert:
        setzePasswort(kennung, passwort) ruft die Cloud Function
@@ -216,6 +221,19 @@ window.BOS_ACCOUNTS = (function () {
    */
   async function adminReauthEnde() {
     return holeAdminApp().auth().signOut();
+  }
+
+  /**
+   * NEU 21.10.2026: Kennung der angemeldeten Admin-Sitzung (Teil vor dem @),
+   * sonst null. Für geaendertVon == kennung() in den Regeln (RK §15, §25).
+   */
+  function adminKennung() {
+    try {
+      var n = holeAdminApp().auth().currentUser;
+      return n && n.email ? String(n.email).split('@')[0].toLowerCase() : null;
+    } catch (e) {
+      return null;
+    }
   }
 
   /**
@@ -532,6 +550,7 @@ window.BOS_ACCOUNTS = (function () {
     adminReauthEnde: adminReauthEnde,
     adminAngemeldet: adminAngemeldet,
     adminFirestore: adminFirestore,
+    adminKennung: adminKennung,
     setzePasswort: setzePasswort,
     aendereAdminPasswort: aendereAdminPasswort,
     PASSWORT_MIN: PASSWORT_MIN,

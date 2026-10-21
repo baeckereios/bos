@@ -13,9 +13,17 @@
   nfc_sammelblaetter (Regel RK §15: lesen und schreiben nur Generalschlüssel).
 
   DATENBANK DARF AUSFALLEN: Liste, Adresse, Einzelschild und Chips laufen
-  weiter, wenn Firebase nicht lädt, nicht antwortet oder ablehnt. Nur der
-  Bereich „Sammelblätter“ zeigt dann den Grund. Bitte so lassen: kein
-  Datenbank-Aufruf außerhalb des Sammelblatt-Teils.
+  weiter, wenn Firebase nicht lädt, nicht antwortet oder ablehnt. Nur die
+  Bereiche „Sammelblätter“ und „Zugangsblatt“ zeigen dann den Grund. Bitte so
+  lassen: kein Datenbank-Aufruf außerhalb dieser zwei Teile.
+
+  GENERALSCHLÜSSEL (seit 21.10.2026): Beide Datenbank-Teile laufen NUR über
+  die Zweit-App bos-admin (BOS_ACCOUNTS.adminReauth / adminFirestore, dieselbe
+  Mechanik wie die Kontenverwaltung). Vor der Anmeldung macht die Seite gar
+  keinen Datenbank-Aufruf. Abmeldung: 🔒, beim Verlassen der Seite und nach
+  5 Minuten ohne Eingabe. Dabei wird NICHTS verworfen (die Daten sind nur ids,
+  nicht geheim); „Speichern“ ohne Sitzung fragt erst nach dem Passwort.
+  Kein Speicherwert im Browser: auch der Reiter wird nicht gemerkt.
 
   DIE SPERRE: Drucken und Chip beschreiben gehen nur, wenn die Seite über
   https und nicht lokal läuft (BOS_QR.darfAusgeben). Die Prüfung sitzt IN
@@ -29,6 +37,16 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-21 · 07:29 · v2.0 · Feature (Zugangsblatt-Schnellzugriffe, Freigabe KC 06:47)
+      Zwei Reiter: „Schilder & Chips“ (der bisherige Inhalt, unverändert) und
+      „Zugangsblatt“ (höchstens 6 Ziele in Reihenfolge, nur aus waehlbareZiele,
+      Vorschau mit derselben Funktion wie der Druck, Speichern mit Rückfrage in
+      einer Transaktion, „Ziel gibt es nicht mehr“, Ungespeichert-Schutz).
+      Generalschlüssel-Anmeldung über die Zweit-App für Sammelblätter UND
+      Zugangsblatt (Weiche B, Ulf bestätigt). geaendertVon = Kennung der
+      Admin-Sitzung (BOS_ACCOUNTS.adminKennung; die Regeln verlangen ==
+      kennung()). Regelfassung nfc-qr-2026-10-21, REGEL_DATEI 21.10.
+      SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
     2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
       Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
       (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
@@ -150,6 +168,12 @@
   .zusatz-reihe { display: flex; gap: var(--bos-space-xs, 9px); margin-top: var(--bos-space-xs, 9px); flex-wrap: wrap; align-items: center; }
   .zusatz-reihe .bos-input { flex: 1; min-width: 10rem; width: auto; }
   .marke.offen { border-color: var(--bos-warn, var(--bos-amber, #c07a10)); color: var(--bos-warn-bright, var(--bos-amber-bright, #e0973a)); }
+  .reiter-reihe { display: flex; gap: var(--bos-space-xs, 9px); flex-wrap: wrap; margin: 0 0 var(--bos-space-sm, 14px); }
+  .admin-leiste { display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm, 14px); flex-wrap: wrap; }
+  .admin-leiste.an { border-color: var(--bos-green, #4caf7d); }
+  .zb-vorschau { background: #fff; color: #000; border-radius: var(--bos-radius-sm, 6px); padding: 6mm; overflow-x: auto; }
+  .zb-vorschau-innen { width: 170mm; max-width: none; }
+  .zb-vorschau .zb-codes { margin-top: 0; }
   .warte { font-size: 2.6rem; text-align: center; margin: 10px 0; animation: puls 1.2s infinite; }
   @keyframes puls { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
   /* pointer-events: none — sonst fängt eine lange Meldung fünf Sekunden lang die Tipper auf die Knöpfe darunter ab (Fund im Ablauftest, 04.10.2026) */
@@ -193,7 +217,15 @@
   </div>
 
   <div id="sperrHinweis" class="hinweis sperre" role="status" hidden></div>
+  <div id="adminLeiste" class="hinweis admin-leiste" role="status"></div>
+  <div id="leerlaufStreifen" class="hinweis sperre" role="alert" hidden></div>
 
+  <div class="reiter-reihe" role="tablist">
+    <button type="button" class="bos-btn bos-btn--amber" role="tab" id="reiterBtnSchilder" data-aktion="reiter" data-id="schilder" data-i18n="reiter_schilder">Schilder &amp; Chips</button>
+    <button type="button" class="bos-btn" role="tab" id="reiterBtnZugang" data-aktion="reiter" data-id="zugang" data-i18n="reiter_zugang">Zugangsblatt</button>
+  </div>
+
+  <div id="reiterSchilder">
   <h2 class="abschnitt" data-i18n="abschnitt_chip">Chip prüfen</h2>
   <div class="karte" id="chipBereich"></div>
 
@@ -210,6 +242,14 @@
       <button type="button" class="bos-btn" disabled data-i18n="planung_kaertchen">🚧 Maschinen-Kärtchen · in Planung</button>
     </div>
     <div class="klein" style="margin-top:8px" data-i18n="planung_text">Kommt in der nächsten Baustufe: kleine Kärtchen für Maschinen, zum Ausschneiden.</div>
+  </div>
+  </div>
+
+  <div id="reiterZugang" hidden>
+    <h2 class="abschnitt" data-i18n="abschnitt_zugang">Schnellzugriffe auf dem Zugangsblatt</h2>
+    <div class="karte" id="zugangBereich"></div>
+    <h2 class="abschnitt" data-i18n="abschnitt_vorschau">Vorschau: unterer Teil des Blatts</h2>
+    <div class="karte" id="zugangVorschau"></div>
   </div>
 </div>
 
@@ -260,6 +300,19 @@
   </div>
 </div>
 
+<div id="anmeldeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="anmeldeTitel">
+    <h2 id="anmeldeTitel" data-i18n="anmelde_titel">Mit Generalschlüssel anmelden</h2>
+    <p class="klein" data-i18n="anmelde_text">Gespeicherte Sammelblätter und das Zugangsblatt gehören dem Generalschlüssel. Das Passwort wird nirgends gespeichert; die Anmeldung gilt nur, solange diese Seite offen ist.</p>
+    <input type="password" class="bos-input" id="anmeldePw" placeholder="Admin-Passwort" aria-label="Admin-Passwort">
+    <div id="anmeldeFehler" class="sheet-fehler" role="alert"></div>
+    <div class="sheet-knoepfe">
+      <button type="button" class="bos-btn" id="anmeldeZuBtn" data-i18n="abbrechen">Abbrechen</button>
+      <button type="button" class="bos-btn bos-btn--amber" id="anmeldeOkBtn" data-i18n="anmelde_ok">Anmelden</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" role="status" hidden></div>
 
 <script>
@@ -275,8 +328,11 @@ const NFC_ZEITLIMIT_MS = 30000;   /* wie im alten Programm */
 /* Regelstand-Probe (RK §13/§15): die Seite liest bos_regelstand/<Fassung>.
    Lehnt die Datenbank ab, ist die eingesetzte Regel älter als diese Seite.
    REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft). */
-const REGEL_FASSUNG = 'nfc-qr-2026-10-04';
-const REGEL_DATEI = 'firestore_regeln_2026-10-08_teigecke_nacht.rules';
+const REGEL_FASSUNG = 'nfc-qr-2026-10-21';   /* seit 21.10.2026: Block nfc_einstellungen (RK §25) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';
+const A = window.BOS_ACCOUNTS;
+const LEERLAUF_MS = 5 * 60 * 1000;   /* wie die Kontenverwaltung (N-15, Ulf: 5 Minuten) */
+const VORWARNUNG_MS = 60 * 1000;
 const DB_ZEITLIMIT_MS = 10000;
 
 /* ---------- i18n (Checkliste §6) ---------- */
@@ -417,7 +473,57 @@ const I18N_DE = {
   sp_kein_netz: 'Keine Verbindung zur Datenbank. Das Blatt bleibt hier offen, später noch einmal speichern.',
   sp_zeit: 'Die Datenbank hat nicht geantwortet (10 Sekunden gewartet). Ob gespeichert wurde, ist unklar: Seite neu laden und nachsehen.',
   sp_konflikt: 'Dieses Blatt wurde inzwischen woanders geändert. Es wurde NICHT überschrieben. Zurück zu „Alle Blätter“, das Blatt neu öffnen und die Änderung dort noch einmal machen.',
-  sp_form: 'Das Blatt kann so nicht gespeichert werden:'
+  sp_form: 'Das Blatt kann so nicht gespeichert werden:',
+  reiter_schilder: 'Schilder & Chips',
+  reiter_zugang: 'Zugangsblatt',
+  admin_ab_text: 'Gespeicherte Sammelblätter und das Zugangsblatt brauchen den Generalschlüssel.',
+  admin_an_text: '🔑 Generalschlüssel angemeldet',
+  admin_anmelden: 'Mit Generalschlüssel anmelden',
+  admin_abmelden: '🔒 Abmelden',
+  admin_leerlauf_ab: 'Der Generalschlüssel hat sich nach 5 Minuten ohne Eingabe abgemeldet. Was du bearbeitet hast, steht noch da.',
+  admin_alt: 'bos_accounts.js ist zu alt (adminKennung fehlt). Seite hart neu laden oder die neue Datei hochladen.',
+  leerlauf_streifen: '⏳ Keine Eingabe seit {min} Minuten. Der Generalschlüssel meldet sich in {s} s ab. Tippen zum Weiterarbeiten. Was du bearbeitest, bleibt stehen.',
+  anmelde_titel: 'Mit Generalschlüssel anmelden',
+  anmelde_text: 'Gespeicherte Sammelblätter und das Zugangsblatt gehören dem Generalschlüssel. Das Passwort wird nirgends gespeichert; die Anmeldung gilt nur, solange diese Seite offen ist.',
+  anmelde_ok: 'Anmelden',
+  anmelde_falsch: 'Admin-Passwort stimmt nicht.',
+  anmelde_leer: 'Bitte das Admin-Passwort eingeben.',
+  db_abgemeldet: 'Gespeicherte Blätter: erst oben mit dem Generalschlüssel anmelden. Liste, Adressen, Einzelschild und Chips gehen ohne.',
+  abschnitt_zugang: 'Schnellzugriffe auf dem Zugangsblatt',
+  abschnitt_vorschau: 'Vorschau: unterer Teil des Blatts',
+  zugang_erklaerung: 'Diese Ziele stehen als QR-Code unter der Anleitung jedes Zugangsblatts, das die Kontenverwaltung druckt. Höchstens {max}, in dieser Reihenfolge. Je Person kommen nur die Ziele aufs Blatt, die ihre Rolle öffnen darf; „BOS öffnen“ und Seiten ohne Anmeldung immer.',
+  zugang_abgemeldet: 'Die Auswahl gehört dem Generalschlüssel: erst oben anmelden.',
+  zugang_lade: 'Lade die gespeicherte Auswahl …',
+  zugang_keine: 'Noch keine Auswahl gespeichert. Das Zugangsblatt kommt dann ohne Schnellzugriffe.',
+  zugang_stand: 'Gespeichert am {am} von „{von}“',
+  zugang_leer: 'Noch kein Ziel gewählt. Unten eines hinzufügen.',
+  zugang_zaehler: '{n} von {max} Zielen',
+  zugang_dazu: 'Hinzufügen',
+  zugang_wahl: 'Ziel wählen …',
+  zugang_voll: 'Höchstens {max} Ziele: Auf dem Zugangsblatt ist für mehr kein Platz (jeder Code 3 cm). Erst eines entfernen.',
+  zugang_doppelt: 'Dieses Ziel steht schon in der Auswahl.',
+  zugang_speichern: 'Speichern',
+  zugang_verwerfen: 'Änderungen verwerfen',
+  zugang_gespeichert: 'Auswahl gespeichert.',
+  err_zugang_speichern: 'Auswahl wurde NICHT gespeichert',
+  zugang_tot_speichern: 'Erst die rot markierten Zeilen entfernen: Ziele, die es nicht mehr gibt, werden nicht gespeichert.',
+  zugang_form: 'Die Auswahl kann so nicht gespeichert werden:',
+  zf_liste: 'Die Auswahl ist nicht lesbar.',
+  zf_max_ziele: 'Mehr als 6 Ziele.',
+  zf_id_form: 'Ein Eintrag ist keine Ziel-Kennung (zum Beispiel eine Adresse).',
+  zf_doppelt: 'Ein Ziel steht doppelt.',
+  zugang_konflikt: 'Die Auswahl wurde inzwischen woanders geändert. Sie wurde NICHT überschrieben. Seite neu laden und die Änderung dort noch einmal machen.',
+  zugang_regel_alt: 'Regeln passen nicht zu dieser Seite: Die Datenbank kennt die Fassung „{fassung}“ nicht. Die Auswahl geht erst, wenn in der Firebase-Konsole die Regeldatei „{datei}“ eingesetzt ist.',
+  zugang_kein_recht: 'Keine Berechtigung: Die Auswahl darf nur der Generalschlüssel lesen und speichern, oder die eingesetzte Regel ist älter als diese Seite.',
+  zugang_kein_netz: 'Die Datenbank ist gerade nicht erreichbar (kein Netz oder keine Antwort).',
+  zugang_fehler: 'Die Datenbank hat einen Fehler gemeldet.',
+  zugang_vorschau_hinweis: 'So sieht der untere Teil des Blatts aus (Originalgröße am Drucker: jeder Code 3 cm). Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf.',
+  zugang_vorschau_lokal: 'Diese Seite läuft nicht unter der Online-Adresse: Die Vorschau zeigt Platzhalter statt Codes. Die Kontenverwaltung druckt dann ebenfalls ohne Codes.',
+  zugang_vorschau_leer: 'Keine Ziele gewählt: Das Zugangsblatt kommt ohne Schnellzugriffe.',
+  frage_zugang_titel: 'Auswahl speichern?',
+  frage_zugang_text: 'Die Auswahl ({n} Ziele) gilt ab sofort für jedes neu gedruckte Zugangsblatt. Schon gedruckte Blätter ändern sich nicht.',
+  frage_zugang_ja: 'Ja, speichern',
+  frage_zugang_zeile: '„{name}“ aus der Auswahl nehmen?'
 };
 function t(key, werte) {
   let s = Object.prototype.hasOwnProperty.call(I18N_DE, key) ? I18N_DE[key] : key;
@@ -461,7 +567,10 @@ function toast(text) {
 
 /* ---------- Zustand ---------- */
 const S = { chip: null, nfcAbbruch: null, nfcLaeuft: false, schildZielId: null,
-  kennung: null, db: { zustand: 'lade', meldung: '', blaetter: [] }, blatt: null, blattSauber: null, blattMeldung: '', speichert: false };
+  kennung: null, db: { zustand: 'abgemeldet', meldung: '', blaetter: [] }, blatt: null, blattSauber: null, blattMeldung: '', speichert: false,
+  reiter: 'schilder', adminHinweis: '', nachAnmeldung: null, letzteEingabe: Date.now(),
+  /* Zugangsblatt: gespeichert = Stand der Datenbank; ziele/basisDa/basisAm = Editor und der Stand, auf dem er beruht */
+  zugang: { zustand: 'abgemeldet', meldung: '', gespeichert: null, ziele: [], basisDa: false, basisAm: null, sauber: '[]', hinweis: '', speichert: false } };
 
 function apps() { return window.BOS_APPS || []; }
 function eingebettet() { try { return window.self !== window.top; } catch (e) { return true; } }
@@ -714,7 +823,10 @@ function mitZeitlimit(promise) {
 function zeitMs(wert) { return wert && typeof wert.toMillis === 'function' ? wert.toMillis() : (typeof wert === 'number' ? wert : null); }
 function blattInhalt(b) { return JSON.stringify({ standort: b.standort, ausstattung: b.ausstattung, zeilen: b.zeilen }); }
 function blattGeaendert() { return !!S.blatt && blattInhalt(S.blatt) !== S.blattSauber; }
-function blattCol() { return window.db.collection(L.SAMMELBLATT.COLLECTION); }
+/* Datenbank NUR über die Zweit-App (Generalschlüssel), seit 21.10.2026 */
+function adb() { return A.adminFirestore(); }
+function adminAn() { try { return !!A && typeof A.adminAngemeldet === 'function' && A.adminAngemeldet(); } catch (e) { return false; } }
+function blattCol() { return adb().collection(L.SAMMELBLATT.COLLECTION); }
 
 /* Zustand der Datenbank für diesen Bereich:
    'lade' | 'bereit' | 'regel_alt' | 'kein_admin' | 'kein_netz' | 'nicht_geladen' | 'fehler' */
@@ -730,33 +842,40 @@ async function ladeBlaetter() {
   liste.sort(function (a, b) { return String(a.standort).localeCompare(String(b.standort), 'de'); });
   S.db = { zustand: 'bereit', meldung: '', blaetter: liste };
 }
+function dbZustandAus(err) {
+  const c = err && err.code;
+  return c === 'permission-denied' ? 'kein_admin' : (c === 'unavailable' || c === 'zeitlimit') ? 'kein_netz' : 'fehler';
+}
+/* Startet beide Datenbank-Teile. Ohne Generalschlüssel: KEIN Aufruf. */
 async function starteDatenbank() {
-  S.db = { zustand: 'lade', meldung: '', blaetter: [] };
   document.getElementById('regelLeiste').hidden = true;
-  renderBlatt();
-  if (typeof firebase === 'undefined' || !window.db || !window.BOS_AUTH_READY) { dbFehler('nicht_geladen', new Error('Firebase oder bos_firebase_config.js nicht geladen')); return; }
-  try {
-    const nutzer = await mitZeitlimit(window.BOS_AUTH_READY);
-    S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
-  } catch (err) { dbFehler(err && err.code === 'zeitlimit' ? 'kein_netz' : 'fehler', err); return; }
+  if (!adminAn()) {
+    S.db = { zustand: 'abgemeldet', meldung: '', blaetter: S.db.blaetter || [] };
+    S.zugang.zustand = 'abgemeldet'; S.zugang.meldung = '';
+    renderBlatt(); renderZugang(); return;
+  }
+  S.db = { zustand: 'lade', meldung: '', blaetter: [] };
+  S.zugang.zustand = 'lade'; S.zugang.meldung = '';
+  renderBlatt(); renderZugang();
+  if (typeof firebase === 'undefined') { dbFehler('nicht_geladen', new Error('Firebase nicht geladen')); zugangFehlerZustand('fehler', new Error('Firebase nicht geladen')); return; }
+  S.kennung = A.adminKennung();
   /* Regelstand-Probe: kennt die eingesetzte Regel die Fassung dieser Seite? */
   try {
-    await mitZeitlimit(window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }));
+    await mitZeitlimit(adb().collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }));
   } catch (err) {
     if (err && err.code === 'permission-denied') {
       const el = document.getElementById('regelLeiste');
       el.textContent = t('db_regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
       el.hidden = false;
-      dbFehler('regel_alt', err); return;
+      dbFehler('regel_alt', err); zugangFehlerZustand('regel_alt', err); return;
     }
     /* anderer Grund (kein Netz …): das Laden unten meldet ihn genauer */
     console.warn('[NFC & QR] Regelstand nicht prüfbar:', err && err.message);
   }
-  try { await ladeBlaetter(); renderBlatt(); }
-  catch (err) {
-    const c = err && err.code;
-    dbFehler(c === 'permission-denied' ? 'kein_admin' : (c === 'unavailable' || c === 'zeitlimit') ? 'kein_netz' : 'fehler', err);
-  }
+  await Promise.all([
+    ladeBlaetter().then(renderBlatt, function (err) { dbFehler(dbZustandAus(err), err); }),
+    ladeZugang().then(renderZugang, function (err) { zugangFehlerZustand(dbZustandAus(err), err); })
+  ]);
 }
 
 /* ---------- Rückfrage: zwei Knöpfe, keine Vorauswahl (Checkliste §11) ---------- */
@@ -780,6 +899,8 @@ function zeilenName(z) {
 function renderBlattUebersicht() {
   const d = S.db;
   if (d.zustand === 'lade') return '<div class="klein" id="blattLade">' + esc(t('blatt_lade')) + '</div>';
+  if (d.zustand === 'abgemeldet') return '<div id="blattGrund"><b>' + esc(t('db_abgemeldet')) + '</b>' +
+    '<div class="knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="admin-anmelden">' + esc(t('admin_anmelden')) + '</button></div></div>';
   if (d.zustand !== 'bereit') {
     const text = d.zustand === 'regel_alt' ? t('db_regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI })
       : d.zustand === 'kein_admin' ? t('db_kein_admin', { kennung: S.kennung || '?' }) : t('db_' + d.zustand);
@@ -898,7 +1019,7 @@ function zeileWeg(i) {
 async function schreibeBlatt(blatt) {
   const neu = !blatt.id, ref = neu ? blattCol().doc() : blattCol().doc(blatt.id);
   const zeit = firebase.firestore.FieldValue.serverTimestamp();
-  await mitZeitlimit(window.db.runTransaction(async function (tx) {
+  await mitZeitlimit(adb().runTransaction(async function (tx) {
     const snap = await tx.get(ref);
     const konflikt = function () { const e = new Error('Blatt wurde seit dem Öffnen geändert'); e.code = 'konflikt'; return e; };
     if (neu ? snap.exists : (!snap.exists || zeitMs(snap.data().geaendertAm) !== blatt.geaendertAm)) throw konflikt();
@@ -916,6 +1037,8 @@ function speicherGrund(err) {
    Datenbank, nur weil jemand das Blatt wegnimmt. */
 async function speichereBlatt(entfernen) {
   if (!S.blatt || S.speichert) return false;
+  /* Ohne Generalschlüssel erst anmelden, danach geht es weiter. Der Editor bleibt stehen. */
+  if (!adminAn()) { oeffneAnmeldung(function () { speichereBlatt(entfernen); }); return false; }
   const gespeichert = S.blatt.id ? S.db.blaetter.filter(function (b) { return b.id === S.blatt.id; })[0] : null;
   if (entfernen && !gespeichert) return false;   /* ein nie gespeichertes Blatt gibt es in der Datenbank nicht */
   const kopie = JSON.parse(JSON.stringify(entfernen ? gespeichert : S.blatt));
@@ -984,6 +1107,243 @@ function druckeSammelblatt(blatt) {
   } catch (err) { zeigeFehler(t('err_drucken'), err); blattMelde(fehlerText(t('err_drucken'), err)); return false; }
 }
 
+
+/* ==================================================================
+   ZUGANGSBLATT (21.10.2026). Ein Dokument nfc_einstellungen/zugangsblatt
+   mit den ids der Ziele in Druckreihenfolge (≤ 6, RK §25). Gespeichert wird
+   nie eine Adresse. Die Kontenverwaltung liest es beim Druck.
+   ================================================================== */
+function zugangRef() { return adb().collection(L.ZUGANGSBLATT.COLLECTION).doc(L.ZUGANGSBLATT.DOC); }
+function zugangGeaendert() { return JSON.stringify(S.zugang.ziele) !== S.zugang.sauber; }
+function zugangEditorAusGespeichert() {
+  const g = S.zugang.gespeichert || L.zugangLeer();
+  S.zugang.ziele = g.ziele.slice(); S.zugang.basisDa = !!g.vorhanden; S.zugang.basisAm = g.geaendertAm;
+  S.zugang.sauber = JSON.stringify(S.zugang.ziele);
+}
+async function ladeZugang() {
+  const snap = await mitZeitlimit(zugangRef().get({ source: 'server' }));
+  S.zugang.gespeichert = snap.exists ? L.zugangAusDokument(snap.data(), zeitMs(snap.data().geaendertAm)) : L.zugangLeer();
+  S.zugang.zustand = 'bereit'; S.zugang.meldung = '';
+  /* Ungespeicherte Änderungen im Editor bleiben stehen (z. B. nach dem Leerlauf neu angemeldet) */
+  if (!zugangGeaendert()) zugangEditorAusGespeichert();
+}
+function zugangFehlerZustand(zustand, err) {
+  S.zugang.zustand = zustand; S.zugang.meldung = err && (err.message || err.code) ? (err.message || err.code) : '';
+  console.error('[NFC & QR] Zugangsblatt: ' + zustand, err);
+  renderZugang();
+}
+function zugangMelde(text) { S.zugang.hinweis = text || ''; const el = document.getElementById('zugangMeldung'); if (el) el.textContent = S.zugang.hinweis; }
+function datumZeit(ms) {
+  if (ms == null) return '?';
+  const d = new Date(ms);   /* lokal, nie toISOString() */
+  return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear() + ', ' +
+    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function renderZugang() {
+  const el = document.getElementById('zugangBereich'); if (!el) return;
+  const Z = L.ZUGANGSBLATT, z = S.zugang;
+  let html = '<div class="klein" style="margin-bottom:10px">' + esc(t('zugang_erklaerung', { max: Z.MAX_ZIELE })) + '</div>';
+  if (z.zustand === 'abgemeldet' && !zugangGeaendert() && !z.gespeichert) {
+    html += '<div id="zugangGrund"><b>' + esc(t('zugang_abgemeldet')) + '</b><div class="knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="admin-anmelden">' + esc(t('admin_anmelden')) + '</button></div></div>';
+    el.innerHTML = html; renderZugangVorschau(); return;
+  }
+  if (z.zustand === 'lade') { el.innerHTML = html + '<div class="klein" id="zugangLade">' + esc(t('zugang_lade')) + '</div>'; renderZugangVorschau(); return; }
+  if (z.zustand !== 'bereit' && z.zustand !== 'abgemeldet') {
+    const text = z.zustand === 'regel_alt' ? t('zugang_regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI })
+      : z.zustand === 'kein_admin' ? t('zugang_kein_recht') : z.zustand === 'kein_netz' ? t('zugang_kein_netz') : t('zugang_fehler');
+    html += '<div id="zugangGrund"><b>' + esc(text) + '</b>' +
+      (z.meldung ? '<div class="klein" style="margin-top:6px">' + esc(t('db_meldung')) + ' <span id="zugangDbMeldung">' + esc(z.meldung) + '</span></div>' : '') +
+      '<div class="knoepfe"><button type="button" class="bos-btn" data-aktion="db-nochmal">' + esc(t('db_nochmal')) + '</button></div></div>';
+    el.innerHTML = html; renderZugangVorschau(); return;
+  }
+  const g = z.gespeichert;
+  const p = L.zugangPruefung(z.ziele, apps()), tot = {};
+  p.tote.forEach(function (x) { tot[x.index] = x; });
+  html += '<div class="knoepfe" style="margin-top:0"><span class="marke' + (zugangGeaendert() ? ' offen' : '') + '" id="zugangStandMarke">' +
+      esc(t(zugangGeaendert() ? 'blatt_ungespeichert' : 'blatt_gespeichert_stand')) + '</span>' +
+    '<span class="klein" id="zugangStand">' + esc(g && g.vorhanden ? t('zugang_stand', { am: datumZeit(g.geaendertAm), von: g.geaendertVon || '?' }) : t('zugang_keine')) + '</span></div>';
+  if (!z.ziele.length) html += '<div class="klein" style="margin-top:10px">' + esc(t('zugang_leer')) + '</div>';
+  z.ziele.forEach(function (id, i) {
+    const ziel = L.zielNachId(apps(), id);
+    html += '<div class="blatt-zeile' + (tot[i] ? ' tot' : '') + '" data-zugang="' + i + '">' +
+      '<button type="button" class="bos-btn klein-btn" data-aktion="zugang-hoch" data-i="' + i + '" aria-label="' + esc(t('blatt_hoch')) + '"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+      '<button type="button" class="bos-btn klein-btn" data-aktion="zugang-runter" data-i="' + i + '" aria-label="' + esc(t('blatt_runter')) + '"' + (i === z.ziele.length - 1 ? ' disabled' : '') + '>▼</button>' +
+      '<div class="inhalt">' + (tot[i] ? '⚠ ' + esc(t('blatt_tot_' + tot[i].grund, { id: String(id), name: tot[i].name })) : (ziel ? esc((ziel.icon ? ziel.icon + ' ' : '') + L.anzeigeName(ziel)) : esc(String(id)))) + '</div>' +
+      '<button type="button" class="bos-btn klein-btn gefahr" data-aktion="zugang-weg" data-i="' + i + '" aria-label="' + esc(t('blatt_zeile_weg')) + '">✕</button></div>';
+  });
+  const voll = z.ziele.length >= Z.MAX_ZIELE;
+  html += '<div class="blatt-meldung" id="zugangMeldung" role="alert">' + esc(z.hinweis || '') + '</div>' +
+    '<div class="klein" id="zugangZaehler">' + esc(t('zugang_zaehler', { n: z.ziele.length, max: Z.MAX_ZIELE })) + (voll ? ' · ' + esc(t('zugang_voll', { max: Z.MAX_ZIELE })) : '') + '</div>' +
+    '<div class="zusatz-reihe"><select class="bos-input" id="zugangWahl"' + (voll ? ' disabled' : '') + '><option value="">' + esc(t('zugang_wahl')) + '</option>' +
+    L.waehlbareZiele(apps()).filter(function (zz) { return z.ziele.indexOf(zz.id) === -1; })
+      .map(function (zz) { return '<option value="' + esc(zz.id) + '">' + esc(L.anzeigeName(zz)) + '</option>'; }).join('') + '</select>' +
+    '<button type="button" class="bos-btn" data-aktion="zugang-dazu" id="zugangDazuBtn"' + (voll ? ' disabled' : '') + '>' + esc(t('zugang_dazu')) + '</button></div>' +
+    '<div class="sheet-knoepfe">' +
+    (zugangGeaendert() ? '<button type="button" class="bos-btn" data-aktion="zugang-verwerfen">' + esc(t('zugang_verwerfen')) + '</button>' : '') +
+    '<button type="button" class="bos-btn bos-btn--amber" data-aktion="zugang-speichern" id="zugangSpeichernBtn"' + (z.speichert ? ' disabled' : '') + '>' + esc(t('zugang_speichern')) + '</button></div>';
+  el.innerHTML = html;
+  renderZugangVorschau();
+}
+/* Vorschau mit DERSELBEN Funktion wie der Druck in der Kontenverwaltung */
+function renderZugangVorschau() {
+  const el = document.getElementById('zugangVorschau'); if (!el) return;
+  if (!document.getElementById('zugangCss')) {
+    const st = document.createElement('style'); st.id = 'zugangCss'; st.textContent = L.ZUGANG_CSS; document.head.appendChild(st);
+  }
+  const ziele = S.zugang.ziele.map(function (id) { return L.zielNachId(apps(), id); }).filter(Boolean);
+  if (!ziele.length) { el.innerHTML = '<div class="klein" id="zugangVorschauLeer">' + esc(t('zugang_vorschau_leer')) + '</div>'; return; }
+  const codes = ziele.map(function (ziel) {
+    let qrSvg = '';
+    if (darf()) { try { qrSvg = Q.qrFuer(adresseFuer(ziel)); } catch (err) { zeigeFehler(t('err_unerwartet'), err); } }
+    return { name: ziel.name, hubName: ziel.hubName || '', qrSvg: qrSvg };
+  });
+  el.innerHTML = '<div class="klein" style="margin-bottom:8px">' + esc(t(darf() ? 'zugang_vorschau_hinweis' : 'zugang_vorschau_lokal')) + '</div>' +
+    '<div class="zb-vorschau" id="zugangVorschauBlatt"><div class="zb-vorschau-innen">' + L.zugangsCodesHTML(codes) + '</div></div>';
+}
+function zugangDazu() {
+  const id = document.getElementById('zugangWahl').value;
+  if (!id) { zugangMelde(t('f_ziel_wahl')); return; }
+  /* Ziele kommen NUR aus waehlbareZiele(): auch eine von Hand untergeschobene id wird abgelehnt */
+  if (!L.zielNachId(apps(), id)) { zugangMelde(t('blatt_tot_fehlt', { id: id })); return; }
+  if (S.zugang.ziele.indexOf(id) !== -1) { zugangMelde(t('zugang_doppelt')); return; }
+  if (S.zugang.ziele.length >= L.ZUGANGSBLATT.MAX_ZIELE) { zugangMelde(t('zugang_voll', { max: L.ZUGANGSBLATT.MAX_ZIELE })); return; }
+  S.zugang.ziele.push(id); S.zugang.hinweis = ''; renderZugang();
+}
+function zugangVerschieben(i, richtung) { S.zugang.ziele = L.verschiebeZeile(S.zugang.ziele, i, richtung); renderZugang(); }
+function zugangWeg(i) {
+  const id = S.zugang.ziele[i]; if (id === undefined) return;
+  const ziel = L.zielNachId(apps(), id);
+  frage(t('frage_zeile_titel'), t('frage_zugang_zeile', { name: ziel ? L.anzeigeName(ziel) : String(id) }), [
+    { text: t('frage_ja_entfernen'), klasse: 'gefahr', tun: function () { S.zugang.ziele.splice(i, 1); S.zugang.hinweis = ''; renderZugang(); } },
+    { text: t('frage_nein') }
+  ]);
+}
+function zugangVerwerfen() {
+  frage(t('frage_verlassen_titel'), t('frage_verlassen_text'), [
+    { text: t('frage_verwerfen'), klasse: 'gefahr', tun: function () { zugangEditorAusGespeichert(); S.zugang.hinweis = ''; renderZugang(); } },
+    { text: t('frage_bleiben') }
+  ]);
+}
+/* In einer Transaktion: Hat sich die Auswahl seit dem Laden geändert, wird
+   NICHT geschrieben, sondern gemeldet. */
+async function schreibeZugang(ziele, basisDa, basisAm) {
+  const ref = zugangRef(), zeit = firebase.firestore.FieldValue.serverTimestamp();
+  await mitZeitlimit(adb().runTransaction(async function (tx) {
+    const snap = await tx.get(ref);
+    const konflikt = function () { const e = new Error('Auswahl wurde seit dem Laden geändert'); e.code = 'konflikt'; return e; };
+    if (basisDa ? (!snap.exists || zeitMs(snap.data().geaendertAm) !== basisAm) : snap.exists) throw konflikt();
+    tx.set(ref, L.zugangDokument(ziele, S.kennung, zeit));
+  }));
+}
+function speichereZugang() {
+  if (S.zugang.speichert) return;
+  if (!adminAn()) { oeffneAnmeldung(speichereZugang); return; }
+  const ziele = S.zugang.ziele.slice();
+  const f = L.zugangFehler(ziele);
+  if (f.length) { zugangMelde(t('zugang_form') + ' ' + f.map(function (k) { return t('zf_' + k); }).join(' ')); return; }
+  if (!L.zugangPruefung(ziele, apps()).ok) { zugangMelde(t('zugang_tot_speichern')); return; }
+  frage(t('frage_zugang_titel'), t('frage_zugang_text', { n: ziele.length }), [
+    { text: t('frage_zugang_ja'), klasse: 'bos-btn--amber', tun: function () { zugangWirklichSpeichern(ziele); } },
+    { text: t('frage_nein') }
+  ]);
+}
+async function zugangWirklichSpeichern(ziele) {
+  S.zugang.speichert = true;
+  const btn = document.getElementById('zugangSpeichernBtn'); if (btn) btn.disabled = true;
+  try {
+    S.kennung = A.adminKennung();
+    await schreibeZugang(ziele, S.zugang.basisDa, S.zugang.basisAm);
+    await ladeZugang();
+    zugangEditorAusGespeichert();
+    S.zugang.speichert = false; S.zugang.hinweis = '';
+    renderZugang(); toast(t('zugang_gespeichert'));
+  } catch (err) {
+    S.zugang.speichert = false;
+    const c = err && err.code;
+    const grund = t(c === 'konflikt' ? 'zugang_konflikt' : c === 'permission-denied' ? 'zugang_kein_recht' : (c === 'unavailable' || c === 'zeitlimit') ? 'zugang_kein_netz' : 'zugang_fehler');
+    renderZugang();
+    zugangMelde(grund + ' (' + t('db_meldung') + ' ' + (err && (err.message || err.code) || err) + ')');
+    zeigeFehler(t('err_zugang_speichern') + ': ' + grund, err);
+  }
+}
+
+/* ---------- Generalschlüssel-Anmeldung (Zweit-App bos-admin) ---------- */
+function renderAdmin() {
+  const el = document.getElementById('adminLeiste'); if (!el) return;
+  const an = adminAn();
+  el.className = 'hinweis admin-leiste' + (an ? ' an' : '');
+  el.innerHTML = an
+    ? '<span id="adminStatus">' + esc(t('admin_an_text')) + '</span><button type="button" class="bos-btn" data-aktion="admin-abmelden">' + esc(t('admin_abmelden')) + '</button>'
+    : '<span id="adminStatus">' + esc(S.adminHinweis || t('admin_ab_text')) + '</span><button type="button" class="bos-btn bos-btn--amber" data-aktion="admin-anmelden">' + esc(t('admin_anmelden')) + '</button>';
+}
+function oeffneAnmeldung(danach) {
+  S.nachAnmeldung = typeof danach === 'function' ? danach : null;
+  const f = document.getElementById('anmeldePw'); f.value = '';
+  document.getElementById('anmeldeFehler').textContent = '';
+  document.getElementById('anmeldeOkBtn').disabled = false;
+  document.getElementById('anmeldeSheet').hidden = false;
+  f.focus();
+}
+async function anmelden() {
+  const feld = document.getElementById('anmeldePw'), fehler = document.getElementById('anmeldeFehler'), knopf = document.getElementById('anmeldeOkBtn');
+  const pw = feld.value; feld.value = '';   /* Passwort sofort aus dem Feld */
+  if (!pw) { fehler.textContent = t('anmelde_leer'); return; }
+  if (!A || typeof A.adminReauth !== 'function' || typeof A.adminKennung !== 'function') { fehler.textContent = t('admin_alt'); return; }
+  knopf.disabled = true;
+  try {
+    await A.adminReauth(pw);
+    document.getElementById('anmeldeSheet').hidden = true;
+    S.adminHinweis = ''; S.letzteEingabe = Date.now();
+    renderAdmin();
+    await starteDatenbank();
+    const weiter = S.nachAnmeldung; S.nachAnmeldung = null;
+    if (weiter) weiter();
+  } catch (err) {
+    const c = (err && err.code) || '';
+    console.error('[NFC & QR] Generalschlüssel-Anmeldung fehlgeschlagen', c, err && err.message);
+    fehler.textContent = (c === 'auth/invalid-credential' || c === 'auth/wrong-password' || c === 'auth/invalid-login-credentials')
+      ? t('anmelde_falsch') : ((c ? c + ' — ' : '') + ((err && err.message) || String(err)));
+  } finally { knopf.disabled = false; }
+}
+/* Abmelden verwirft NICHTS: Editor und Liste bleiben stehen (nur ids, nicht geheim). */
+function abmelden(hinweis) {
+  try { A.adminReauthEnde().catch(function (f) { console.error('[NFC & QR] Abmelden fehlgeschlagen', f); }); } catch (e) { /* nichts zu tun */ }
+  S.adminHinweis = hinweis || '';
+  document.getElementById('leerlaufStreifen').hidden = true;
+  S.db.zustand = 'abgemeldet'; S.zugang.zustand = 'abgemeldet';
+  renderAdmin(); renderBlatt(); renderZugang();
+}
+/* Leerlauf: Zeitstempel statt langem setTimeout (Muster der Kontenverwaltung).
+   [Vorschlag] Kommt ein dritter Aufrufer, gehört der Zähler nach bos_accounts.js. */
+['pointerdown', 'keydown', 'input', 'wheel', 'touchstart', 'scroll'].forEach(function (typ) {
+  window.addEventListener(typ, function () { S.letzteEingabe = Date.now(); const st = document.getElementById('leerlaufStreifen'); if (st) st.hidden = true; }, { passive: true, capture: true });
+});
+function pruefeLeerlauf() {
+  if (!adminAn()) return;
+  const vergangen = Date.now() - S.letzteEingabe, st = document.getElementById('leerlaufStreifen');
+  if (vergangen >= LEERLAUF_MS) { abmelden(t('admin_leerlauf_ab')); return; }
+  if (vergangen >= LEERLAUF_MS - VORWARNUNG_MS) {
+    st.textContent = t('leerlauf_streifen', { min: Math.floor(vergangen / 60000), s: Math.max(0, Math.ceil((LEERLAUF_MS - vergangen) / 1000)) });
+    st.hidden = false;
+  } else st.hidden = true;
+}
+setInterval(pruefeLeerlauf, 5000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) pruefeLeerlauf(); });
+window.addEventListener('pagehide', function () { try { if (A) A.adminReauthEnde(); } catch (e) { /* nichts zu tun */ } });
+window.addEventListener('pageshow', function (e) { if (e.persisted) abmelden(''); });
+
+/* ---------- Reiter (kein Speicherwert im Browser: Start immer „Schilder & Chips“) ---------- */
+function zeigeReiter(id) {
+  S.reiter = id === 'zugang' ? 'zugang' : 'schilder';
+  document.getElementById('reiterSchilder').hidden = S.reiter !== 'schilder';
+  document.getElementById('reiterZugang').hidden = S.reiter !== 'zugang';
+  document.getElementById('reiterBtnSchilder').className = 'bos-btn' + (S.reiter === 'schilder' ? ' bos-btn--amber' : '');
+  document.getElementById('reiterBtnZugang').className = 'bos-btn' + (S.reiter === 'zugang' ? ' bos-btn--amber' : '');
+  document.getElementById('reiterBtnSchilder').setAttribute('aria-selected', String(S.reiter === 'schilder'));
+  document.getElementById('reiterBtnZugang').setAttribute('aria-selected', String(S.reiter === 'zugang'));
+  if (S.reiter === 'zugang') renderZugang();
+}
+
 /* ---------- Hilfe (kanonisch: NFC_QR_ZENTRALE_DOKU.md, Abschnitt Nutzer-Hilfetext) ---------- */
 const helpData = [
   { heading: 'Wofür ist diese Seite?', text: 'Hier entstehen die Abkürzungen in die echte Backstube: QR-Codes auf Schildern und NFC-Chips. Wer so einen Code scannt oder sein Handy an einen Chip hält, landet direkt auf der richtigen Seite von BäckereiOS, ohne erst zu suchen. Ein Code ist immer nur eine Adresse. Persönlich wird es erst durch die Anmeldung. Deshalb dürfen alle Schilder und Chips offen hängen.' },
@@ -994,9 +1354,11 @@ const helpData = [
   { heading: 'Chip beschreiben', text: '„📡 Chip beschreiben“ schreibt die Adresse des Ziels auf einen NFC-Chip. Das geht nur am Handy in Chrome (Android) mit eingeschaltetem NFC. Auf den Knopf tippen, dann den Chip ruhig an die Rückseite des Handys halten, bis die Bestätigung kommt. Was vorher auf dem Chip stand, wird überschrieben. Chips bleiben überschreibbar, es gibt keinen Schreibschutz. Einen Chip beschreiben geht auch ganz ohne Schild.' },
   { heading: 'Chip prüfen', text: '„📡 Chip prüfen“ liest einen Chip aus und sagt, wohin er führt. Es gibt drei Ergebnisse: Er führt zu einem Ziel in diesem BOS. Oder er führt in dieses BOS, aber das Ziel gibt es nicht mehr (dann den Chip neu beschreiben). Oder er führt nicht in dieses BOS (dann hat jemand ihn überschrieben, oder es ist ein fremder Chip). Führt der Chip zu einem wählbaren Ziel, kannst du ihn mit „Auf einen anderen Chip kopieren“ verdoppeln. Bei Zielen, die zu einer Gruppe gehören, steht am Bildschirm die Gruppe davor, zum Beispiel „Froster · Ziele“. Auf dem gedruckten Schild und Blatt steht nur der Name.' },
   { heading: 'Sammelblatt: ein Standort, mehrere Ziele', text: 'Ein Sammelblatt ist ein Blatt DIN A4 hoch für eine Stelle, an der man mehrere Dinge braucht, zum Beispiel die Backstubentür. Mit „＋ Neues Blatt“ legst du eines an: Standort eintippen (das ist nur der Name der Stelle, er steht groß oben), wählen, ob je Zeile ein QR-Code, ein Chip-Feld oder beides stehen soll, dann Ziele aus der Liste hinzufügen. Dazwischen kannst du Überschriften setzen. Mit ▲ und ▼ schiebst du eine Zeile hoch oder runter, mit ✕ nimmst du sie weg (mit Rückfrage). Auf ein Blatt passen höchstens 7 Ziele und 2 Überschriften, damit jeder Code mindestens 3 cm breit bleibt. Wird es mehr, sagt die Seite das, und du legst ein zweites Blatt an. Code und Chip-Feld wechseln von Zeile zu Zeile die Seite. Das ist Absicht: So erwischt das Handy nicht den Chip der Nachbarzeile.' },
-  { heading: 'Sammelblatt speichern und nachdrucken', text: 'Ein Blatt wird erst mit „Speichern“ gesichert. Solange oben „⚠\uFE0E ungespeicherte Änderungen“ steht, ist nichts gesichert, und die Seite fragt nach, bevor du das Blatt verlässt. Gespeicherte Blätter liegen in der Datenbank, nicht auf diesem Gerät: Du findest sie von jedem Gerät aus wieder und druckst sie mit „🖨 Drucken“ einfach nach. Gedruckt wird immer nur der gespeicherte Stand: Hast du ein Blatt geändert, erst speichern, dann drucken. Gespeichert wird nur, welche Ziele auf dem Blatt stehen, nie eine Adresse. Die Adresse entsteht erst beim Drucken. Ändert sich die Adresse von BäckereiOS, druckst du das Blatt einfach neu. „Blatt entfernen“ nimmt ein Blatt aus der Liste; Änderungen, die du davor nicht gespeichert hast, verfallen dabei. Speichern und lesen darf diese Blätter nur das Systempflege-Konto. Wurde ein Blatt inzwischen woanders geändert, überschreibt die Seite nichts, sondern meldet es.' },
+  { heading: 'Sammelblatt speichern und nachdrucken', text: 'Ein Blatt wird erst mit „Speichern“ gesichert. Solange oben „⚠\uFE0E ungespeicherte Änderungen“ steht, ist nichts gesichert, und die Seite fragt nach, bevor du das Blatt verlässt. Gespeicherte Blätter liegen in der Datenbank, nicht auf diesem Gerät: Du findest sie von jedem Gerät aus wieder und druckst sie mit „🖨 Drucken“ einfach nach. Gedruckt wird immer nur der gespeicherte Stand: Hast du ein Blatt geändert, erst speichern, dann drucken. Gespeichert wird nur, welche Ziele auf dem Blatt stehen, nie eine Adresse. Die Adresse entsteht erst beim Drucken. Ändert sich die Adresse von BäckereiOS, druckst du das Blatt einfach neu. „Blatt entfernen“ nimmt ein Blatt aus der Liste; Änderungen, die du davor nicht gespeichert hast, verfallen dabei. Speichern und lesen darf diese Blätter nur das Systempflege-Konto. Wurde ein Blatt inzwischen woanders geändert, überschreibt die Seite nichts, sondern meldet es. Dafür meldest du dich oben mit dem Generalschlüssel an (siehe „Generalschlüssel“).' },
   { heading: 'Ziel gibt es nicht mehr', text: 'Verschwindet ein Programm aus BäckereiOS oder ist es nicht mehr für den Direktaufruf freigegeben, merkt die Zentrale das beim Laden von selbst: In der Übersicht steht am Blatt eine rote Meldung, im Blatt ist die Zeile rot markiert. So ein Blatt lässt sich nicht drucken, bis du die Zeile entfernt oder durch ein anderes Ziel ersetzt hast. Ein Blatt mit einem Code, der ins Leere führt, soll gar nicht erst entstehen. Denk auch an das Blatt, das schon hängt: abnehmen und neu drucken.' },
-  { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips.' },
+  { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips. Im Reiter „Zugangsblatt“ steht der Grund genauso über der Auswahl.' },
+  { heading: 'Generalschlüssel', text: 'Gespeicherte Sammelblätter und die Auswahl für das Zugangsblatt gehören dem Generalschlüssel, wie die Kontenverwaltung. Oben steht dafür „Mit Generalschlüssel anmelden“: das Admin-Passwort eingeben, dann sind beide Teile da, auch am Alltagstablet. Das Passwort wird nirgends gespeichert. Die Anmeldung endet mit „🔒 Abmelden“, beim Verlassen der Seite und von selbst nach 5 Minuten ohne Eingabe (eine Minute vorher erscheint ein Hinweis). Dabei geht nichts verloren: Was du gerade bearbeitest, bleibt stehen, und „Speichern“ fragt dann erst noch einmal nach dem Passwort. Liste, Adressen, Einzelschild und Chips gehen ganz ohne Anmeldung.' },
+  { heading: 'Zugangsblatt: Schnellzugriffe', text: 'Im Reiter „Zugangsblatt“ wählst du höchstens 6 Ziele, die als QR-Code unter der Anleitung jedes Zugangsblatts stehen, das die Kontenverwaltung druckt, zum Beispiel „BOS öffnen“, Wunschtag und Urlaub. Mit ▲ und ▼ legst du die Reihenfolge fest, mit ✕ nimmst du ein Ziel heraus (mit Rückfrage). Darunter zeigt die Vorschau den unteren Teil des Blatts, jeder Code ist auf Papier 3 cm groß. Erst „Speichern“ sichert die Auswahl (mit Rückfrage); sie gilt dann für jedes neu gedruckte Blatt. Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf: Ein Azubi ohne Recht auf den Produktionsplaner bekommt diesen Code nicht, „BOS öffnen“ und Seiten ohne Anmeldung bekommt jeder. Gibt es ein Ziel nicht mehr, ist die Zeile rot; erst entfernen, dann speichern. Gespeichert wird nur, welche Ziele es sind, nie eine Adresse. Solange BäckereiOS nicht online läuft, zeigt die Vorschau Platzhalter, und das Zugangsblatt kommt ohne Codes.' },
   { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },
   { heading: 'Wenn etwas nicht klappt', text: 'Jeder Fehler steht oben in einem roten Kasten, mit der Ursache in normaler Sprache und der Meldung des Geräts dahinter. Bei Chips heißt das meistens: NFC am Handy ist aus, die Erlaubnis für den Browser fehlt, oder der Chip wurde zu früh weggezogen. Ein fehlender Code ist kein Notfall: Alles bleibt auch über den Launcher erreichbar.' },
   { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser. Einer davon gehört in die Teigecke: „Teigecke · Vorbereitungen“ steht in der Liste direkt unter „BrotTeigRechner“ (früher „Teigecke Nacht“) und öffnet den BrotTeigRechner gleich im Reiter „Vorbereitungen“ — als QR-Schild oder Chip, wie jedes andere Ziel.' }
@@ -1033,6 +1395,15 @@ document.addEventListener('click', function (e) {
     case 'blatt-entfernen': blattEntfernen(); break;
     case 'blatt-drucken': druckeSammelblatt(S.blatt); break;
     case 'blatt-drucken-liste': druckeSammelblatt(S.db.blaetter.filter(function (b) { return b.id === id; })[0]); break;
+    case 'reiter': zeigeReiter(id); break;
+    case 'admin-anmelden': oeffneAnmeldung(null); break;
+    case 'admin-abmelden': abmelden(''); break;
+    case 'zugang-dazu': zugangDazu(); break;
+    case 'zugang-hoch': zugangVerschieben(Number(el.getAttribute('data-i')), -1); break;
+    case 'zugang-runter': zugangVerschieben(Number(el.getAttribute('data-i')), 1); break;
+    case 'zugang-weg': zugangWeg(Number(el.getAttribute('data-i'))); break;
+    case 'zugang-speichern': speichereZugang(); break;
+    case 'zugang-verwerfen': zugangVerwerfen(); break;
   }
 });
 /* Standort und Ausstattung: in den Zustand übernehmen, ohne neu zu zeichnen
@@ -1057,7 +1428,7 @@ document.getElementById('frageKnoepfe').addEventListener('click', function (e) {
 (function (pruef) {
   if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
   window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
-})(function () { return blattGeaendert(); });
+})(function () { return blattGeaendert() || zugangGeaendert(); });   /* 21.10.2026: + Zugangsblatt */
 document.getElementById('hilfeBtn').addEventListener('click', oeffneHilfe);
 document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
 document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').hidden = true; });
@@ -1069,6 +1440,9 @@ document.getElementById('schildDruckBtn').addEventListener('click', function () 
   }
 });
 document.getElementById('chipAbbrechenBtn').addEventListener('click', function () { if (S.nfcAbbruch) S.nfcAbbruch.abort(); });
+document.getElementById('anmeldeZuBtn').addEventListener('click', function () { document.getElementById('anmeldePw').value = ''; S.nachAnmeldung = null; document.getElementById('anmeldeSheet').hidden = true; });
+document.getElementById('anmeldeOkBtn').addEventListener('click', anmelden);
+document.getElementById('anmeldePw').addEventListener('keydown', function (e) { if (e.key === 'Enter') anmelden(); });
 
 /* ---------- Start ---------- */
 (function start() {
@@ -1078,7 +1452,7 @@ document.getElementById('chipAbbrechenBtn').addEventListener('click', function (
     if (!Q) throw new Error('bos_qr.js nicht geladen');
     if (!Q.wurzel()) throw new Error('bos_qr.js: Wurzel von BOS nicht bestimmbar');
     if (!window.BOS_APPS) throw new Error('bos_app_registry.js nicht geladen');
-    render();
+    render(); renderAdmin(); zeigeReiter('schilder');
   } catch (err) { zeigeFehler(t('err_laden'), err); return; }
   /* Datenbank zuletzt und getrennt: ihr Fehler darf den Rest nicht aufhalten */
   starteDatenbank().catch(function (err) { dbFehler('fehler', err); });

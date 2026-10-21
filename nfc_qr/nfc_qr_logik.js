@@ -19,6 +19,15 @@
    bos_code_adressen.json.
 
    CHANGELOG
+     2026-10-21 · 07:29 · v1.4 · Feature (Zugangsblatt-Schnellzugriffe, rein additiv)
+       ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_BAUPLAN.md, Freigabe KC 06:47.
+       Neu: ZUGANGSBLATT (Grenzen, Felder, ID-Muster), zugangLeer,
+       zugangFehler, zugangPruefung, zugangDokument, zugangAusDokument,
+       zielErlaubt (Rollenfilter über BOS_ACCESS.can, vom Aufrufer
+       übergeben), zugangsblattZiele, zugangsCodesHTML, ZUGANG_CSS.
+       qrGenau() bekommt einen optionalen zweiten Parameter (CSS-Klasse);
+       ohne ihn liefert es wie bisher die Klasse sb-qr (Sammelblatt
+       unverändert, test_nfc_qr.js vergleicht).
      2026-10-08 · 14:17 · v1.3 · Feature (zweites festes Ziel, Teigecke)
        ANWEISUNG_2026-10-08_TEIGECKE_NACHTRAG_NACHT.md Teil D, Bauplan
        SESSION_2026-10-08_TEIGECKE_NACHTRAG_NACHT_BAU.md §2.5 (KC 13:26 frei).
@@ -405,13 +414,13 @@
   function standortKlasse(text) { var n = String(text || '').length; return n <= 12 ? 'xl' : n <= 18 ? 'l' : n <= 28 ? 'm' : 's'; }
   /* QR so einpassen, dass der CODE SELBST (ohne Ruhezone) genau 30 mm
      breit ist. Die Ruhezone (4 Module) ragt in den weißen Rand der Zeile. */
-  function qrGenau(svg) {
+  function qrGenau(svg, klasse) {
     var m = /viewBox="0 0 (\d+) (\d+)"/.exec(String(svg || ''));
     if (!m) return '';
     var ganz = Number(m[1]), code = ganz - 8;
     if (!(code > 0)) return '';
     var breite = 30 * ganz / code, rand = 30 * 4 / code;
-    return '<div class="sb-qr">' + String(svg).replace('<svg ', '<svg style="width:' + breite.toFixed(3) + 'mm;height:' + breite.toFixed(3) + 'mm;margin:-' + rand.toFixed(3) + 'mm" ') + '</div>';
+    return '<div class="' + (klasse || 'sb-qr') + '">' + String(svg).replace('<svg ', '<svg style="width:' + breite.toFixed(3) + 'mm;height:' + breite.toFixed(3) + 'mm;margin:-' + rand.toFixed(3) + 'mm" ') + '</div>';
   }
   /* Sammelblatt A4 hoch. blatt: { standort, ausstattung, zeilen }.
      o: { ziele: { id: { name, hubName, qrSvg, adresse } }, stand }.
@@ -467,6 +476,125 @@
     '.sb-name{font-family:Georgia,serif;font-size:20pt;font-weight:900;line-height:1.05;max-height:15mm;overflow:hidden;overflow-wrap:anywhere;}' +
     '.sb-adresse{font-family:monospace;font-size:6.5pt;color:#555;margin-top:1.2mm;overflow-wrap:anywhere;max-height:6mm;overflow:hidden;}' +
     '.sb-fuss{height:6mm;display:flex;justify-content:space-between;align-items:flex-end;font-size:8pt;font-weight:700;color:#555;border-top:.3mm solid #999;}';
+
+
+  /* ================================================================
+     ZUGANGSBLATT (21.10.2026): Schnellzugriffe unter der Anleitung des
+     Zugangsblatts der Kontenverwaltung. Ulf, 21.10., 05:41: „bei NFC
+     zentrale einen zweiten Tab mit Zugangsblatt und dort wählt man aus
+     maximal 6 qr Codes aus die auf das Zugangsblatt kommen.“
+     Gespeichert wird EIN Dokument nfc_einstellungen/zugangsblatt mit den
+     ids der Ziele in Druckreihenfolge, NIE eine Adresse, nie ein Name.
+     Grenzen und Felder stehen genauso in der Firestore-Regel (RK §25):
+     MAX_ZIELE = size() <= 6 und sechs zbId-Aufrufe, ID_MUSTER = matches(),
+     FELDER = hasOnly. test_nfc_qr.js vergleicht beides mit --regeln=<Datei>.
+     Wer hier dreht, muss die Regel, ZUGANG_CSS (Raster 3 × 2) und die
+     Prüfbilder mitziehen.
+     ================================================================ */
+  var ZUGANGSBLATT = {
+    COLLECTION: 'nfc_einstellungen', DOC: 'zugangsblatt', MAX_ZIELE: 6,
+    /* muss 1:1 zur hasOnly-Liste der Regel passen */
+    FELDER: ['ziele', 'geaendertVon', 'geaendertAm'],
+    /* muss 1:1 zum matches() in zbId der Regel passen */
+    ID_MUSTER: '^[a-z0-9_]{1,40}$'
+  };
+  var ID_RE = new RegExp(ZUGANGSBLATT.ID_MUSTER);
+  function zugangLeer() { return { ziele: [], geaendertVon: '', geaendertAm: null, vorhanden: false }; }
+  /* Form der Auswahl: Liste der Fehler-Schlüssel (leer = in Ordnung).
+     Sagt nichts darüber, ob es die Ziele noch gibt (dafür zugangPruefung). */
+  function zugangFehler(ziele) {
+    if (!Array.isArray(ziele)) return ['liste'];
+    var f = [], gesehen = {};
+    if (ziele.length > ZUGANGSBLATT.MAX_ZIELE) f.push('max_ziele');
+    ziele.forEach(function (id) {
+      if (typeof id !== 'string' || !ID_RE.test(id)) { if (f.indexOf('id_form') === -1) f.push('id_form'); return; }
+      if (gesehen[id] && f.indexOf('doppelt') === -1) f.push('doppelt');
+      gesehen[id] = true;
+    });
+    return f;
+  }
+  /* „Ziel gibt es nicht mehr“, wie blattPruefung. */
+  function zugangPruefung(ziele, apps) {
+    var wahl = {}, alle = {}, tote = [];
+    waehlbareZiele(apps).forEach(function (z) { wahl[z.id] = z; });
+    (apps || []).forEach(function (a) { if (a) alle[a.id] = a; });
+    (Array.isArray(ziele) ? ziele : []).forEach(function (id, i) {
+      if (wahl[id]) return;
+      tote.push({ index: i, zielId: id, grund: alle[id] ? 'nicht_waehlbar' : 'fehlt', name: alle[id] ? alle[id].name : '' });
+    });
+    return { ok: tote.length === 0, tote: tote };
+  }
+  /* Genau die Felder, die die Regel erlaubt. zeit = serverTimestamp(). */
+  function zugangDokument(ziele, kennung, zeit) {
+    return { ziele: (ziele || []).map(function (id) { return String(id); }), geaendertVon: kennung, geaendertAm: zeit };
+  }
+  /* Dokument → Auswahl der Seite. Unbekanntes wird nicht erfunden: ein
+     Eintrag, der keine id ist, bleibt stehen und fällt in zugangFehler auf. */
+  function zugangAusDokument(d, zeitMs) {
+    d = d || {};
+    return { ziele: Array.isArray(d.ziele) ? d.ziele.slice() : [], geaendertVon: d.geaendertVon || '',
+      geaendertAm: zeitMs == null ? null : zeitMs, vorhanden: true };
+  }
+  /* Darf dieses Konto das Ziel öffnen? Die EINE Rechte-Frage bleibt
+     BOS_ACCESS.can (vom Aufrufer als can übergeben, hier nicht nachgebaut).
+     „BOS öffnen“ immer, offene Seiten immer; ein festes Ziel mit „seite“
+     fragt nach seiner Seite. Rolle, Ausnahmen und Haken gelten nur bei
+     freigeschaltet (wie bos_konto_profil.js). kontoHaken = hakenAus(konto). */
+  function zielErlaubt(ziel, konto, can, kontoHaken) {
+    if (!ziel) return false;
+    if (ziel.id === ZIEL_BOS.id) return true;
+    if (ziel.direkt === 'offen') return true;
+    if (!konto || konto.freigeschaltet !== true || typeof can !== 'function') return false;
+    var fest = FESTE_ZIELE.filter(function (f) { return f.id === ziel.id; })[0];
+    var appId = fest && fest.seite ? fest.seite : ziel.id;
+    return !!can(appId, konto.role || null, konto.overrides || {}, kontoHaken || {});
+  }
+  /* Was kommt aufs Blatt? ziele = gespeicherte ids, darf(ziel) = Rechte-
+     Frage für die Person. Rückgabe: { drucken: [ziel], weg: [{ id, name,
+     grund: 'fehlt' | 'nicht_waehlbar' | 'kein_recht' | 'zu_viele' }] }.
+     Reihenfolge wie gespeichert. */
+  function zugangsblattZiele(ziele, apps, darf) {
+    var wahl = {}, alle = {}, drucken = [], weg = [];
+    waehlbareZiele(apps).forEach(function (z) { wahl[z.id] = z; });
+    (apps || []).forEach(function (a) { if (a) alle[a.id] = a; });
+    (Array.isArray(ziele) ? ziele : []).forEach(function (id, i) {
+      var name = wahl[id] ? wahl[id].name : (alle[id] ? alle[id].name : String(id));
+      if (i >= ZUGANGSBLATT.MAX_ZIELE) { weg.push({ id: id, name: name, grund: 'zu_viele' }); return; }
+      if (!wahl[id]) { weg.push({ id: id, name: name, grund: alle[id] ? 'nicht_waehlbar' : 'fehlt' }); return; }
+      if (typeof darf === 'function' && !darf(wahl[id])) { weg.push({ id: id, name: name, grund: 'kein_recht' }); return; }
+      drucken.push(wahl[id]);
+    });
+    return { drucken: drucken, weg: weg };
+  }
+  function zbNamenKlasse(name) { var n = String(name || '').length; return n <= 14 ? 'l' : n <= 24 ? 'm' : 's'; }
+  /* Block „Schnellzugriff“ für das Zugangsblatt. codes = [{ name, qrSvg }];
+     ohne qrSvg erscheint ein Platzhalter „QR (erst online)“ (Vorschau
+     lokal). Bei 0 Codes kein Block. Der Code ist genau 30 mm breit (qrGenau),
+     der Name ohne Gruppe (papierName, GRUPPE_AUF_PAPIER). Druck und Vorschau
+     der Zentrale benutzen diese EINE Funktion. */
+  function zugangsCodesHTML(codes) {
+    codes = (codes || []).slice(0, ZUGANGSBLATT.MAX_ZIELE);
+    if (!codes.length) return '';
+    return '<section class="zb-codes"><div class="zb-titel">Schnellzugriff</div>' +
+      '<div class="zb-satz">Mit der Handy-Kamera scannen. Nach der Anmeldung bist du direkt dort.</div>' +
+      '<div class="zb-raster">' + codes.map(function (c) {
+        var qr = c.qrSvg ? qrGenau(c.qrSvg, 'zb-qr') : '';
+        var name = papierName(c);
+        return '<div class="zb-zelle">' + (qr || '<div class="zb-platz">QR (erst online)</div>') +
+          '<div class="zb-name zb-name-' + zbNamenKlasse(name) + '">' + esc(name) + '</div></div>';
+      }).join('') + '</div></section>';
+  }
+  var ZUGANG_CSS =
+    '.zb-codes,.zb-codes *{box-sizing:border-box;}' +
+    '.zb-codes{margin-top:7mm;border-top:.4mm solid #000;padding-top:3mm;page-break-inside:avoid;break-inside:avoid;color:#000;font-family:Arial,Helvetica,sans-serif;}' +
+    '.zb-titel{font-size:13pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}' +
+    '.zb-satz{font-size:10pt;color:#333;margin:1mm 0 4mm;}' +
+    '.zb-raster{display:grid;grid-template-columns:repeat(3,1fr);column-gap:6mm;row-gap:5mm;}' +
+    '.zb-zelle{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;}' +
+    '.zb-qr{width:30mm;height:30mm;overflow:visible;flex:0 0 auto;}.zb-qr svg{display:block;}' +
+    '.zb-platz{width:30mm;height:30mm;border:.4mm dashed #888;display:flex;align-items:center;justify-content:center;font-size:8pt;color:#666;}' +
+    '.zb-name{margin-top:2.5mm;font-family:Georgia,serif;font-weight:900;line-height:1.1;max-width:100%;overflow-wrap:anywhere;}' +
+    '.zb-name-l{font-size:13pt;}.zb-name-m{font-size:11pt;}.zb-name-s{font-size:9pt;}';
 
   /* ---------- Wächter (für test_nfc_qr.js) ----------
      datei = Inhalt von bos_code_adressen.json. Liefert die Abweichungen
@@ -524,7 +652,10 @@
     gruppe: gruppe, anzeigeName: anzeigeName, papierGruppe: papierGruppe, papierName: papierName,
     SAMMELBLATT: SAMMELBLATT, blattLeer: blattLeer, blattFehler: blattFehler, blattPruefung: blattPruefung,
     darfZeileDazu: darfZeileDazu, verschiebeZeile: verschiebeZeile, blattDokument: blattDokument, blattAusDokument: blattAusDokument,
-    sammelblattHTML: sammelblattHTML, SAMMELBLATT_CSS: SAMMELBLATT_CSS
+    sammelblattHTML: sammelblattHTML, SAMMELBLATT_CSS: SAMMELBLATT_CSS,
+    ZUGANGSBLATT: ZUGANGSBLATT, zugangLeer: zugangLeer, zugangFehler: zugangFehler, zugangPruefung: zugangPruefung,
+    zugangDokument: zugangDokument, zugangAusDokument: zugangAusDokument, zielErlaubt: zielErlaubt,
+    zugangsblattZiele: zugangsblattZiele, zugangsCodesHTML: zugangsCodesHTML, ZUGANG_CSS: ZUGANG_CSS
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_NFC_QR_LOGIK = api;
