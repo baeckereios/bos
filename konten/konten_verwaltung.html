@@ -7,6 +7,19 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-21 · 11:07 · v-BackStore-Texte · Umbau (#110 BackStore wie ein App Store,
+      Bauplan freigegeben KC 10:27, Teile D und E)
+      Bereiche der Reiter „Zugriffe“/„Rechte“ kommen aus der Registry
+      (BOS_BEREICHE, BOS_BEREICH_VON) statt aus einer eigenen Liste; neue
+      Reihenfolge Produktion · Verbrauch · Allgemein · Verwaltung · Vertrieb &
+      Filiale. Keine App wechselt die Gruppe (alle 49 rollen-gesteuerten tragen
+      bereich). Fund F8: das Ersatzobjekt für „nicht mehr in Registry“ trägt
+      bereich 'sonstiges', damit es nicht still unter „Allgemein“ landet.
+      Zugangsblatt: die Beschreibung unter jedem Schnellzugriff ist der
+      Kurztext aus der Datenbank (backstore_texte, RK §26, gelesen über
+      adminFirestore mit bos_backstore_texte.js). Laden die Texte nicht, kommt
+      das Blatt mit Namen, und der Dialog sagt den Grund (nie auf dem Papier).
+      REGEL_DATEI gibt es hier nicht. SESSION_2026-10-21_BACKSTORE_APPSTORE_BAU.md
     2026-10-21 · 08:38 · v-Zugangsblatt-QR-2 · Gestaltung (Nachtrag 1, Kontroll-Chat 08:17)
       ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_NACHTRAG1.md. Die Zeile
       „Probe-Anmeldung durchgeführt: ☐“ ist vom Blatt (Ulf 08:14). Die
@@ -690,6 +703,7 @@
 <script src="../bos_qr.js"></script>
 <script src="../qrcode.min.js"></script>
 <script src="../nfc_qr/nfc_qr_logik.js"></script>
+<script src="../bos_backstore_texte.js"></script>   <!-- NEU 21.10.2026, #110: Kurztexte fürs Zugangsblatt -->
 
 <script>
 // ==========================================================================
@@ -800,16 +814,12 @@ var geaendert = false;
 // NEU 05.09.2026, siehe SESSION_2026-09-05_KONTEN_ROLLEN_KARTE_KONZEPT.md —
 // reine Anzeige-Gruppierung für die Karten (Konto-Karte Tab "Zugriffe",
 // Rollen-Karte Tab "Rechte"). Quelle: bereich-Feld in bos_app_registry.js.
-// 'sonstiges' fängt Satelliten ohne (noch) gesetztes Feld sichtbar auf,
+// 'sonstiges' fängt Satelliten mit unbekanntem Wert sichtbar auf,
 // statt sie verschwinden zu lassen — gleiches Prinzip wie ladeGatedApps().
-var BEREICHE = [
-  { id: 'verwaltung', label: 'Verwaltung' },
-  { id: 'produktion', label: 'Produktion' },
-  { id: 'verbrauch', label: 'Verbrauch' },
-  { id: 'vertrieb_filiale', label: 'Vertrieb & Filiale' },
-  { id: 'allgemein', label: 'Allgemein' },
-  { id: 'sonstiges', label: 'Sonstiges' }
-];
+// SEIT 21.10.2026 (#110): Liste und Regel stehen EINMAL in der Registry
+// (BOS_BEREICHE, BOS_BEREICH_VON: ohne Feld → allgemein, unbekannt →
+// sonstiges); BackStore und NFC-Zentrale lesen dieselbe.
+var BEREICHE = window.BOS_BEREICHE || [];
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -822,7 +832,7 @@ function esc(s) {
 // Eine Mechanik, zwei Aufrufer, statt zwei separate Render-Funktionen.
 function bereichsGruppenHTML(checksObj, handlerName) {
   return BEREICHE.map(function (b) {
-    var apps = gatedApps.filter(function (a) { return (a.bereich || 'sonstiges') === b.id; });
+    var apps = gatedApps.filter(function (a) { return window.BOS_BEREICH_VON(a) === b.id; });
     if (!apps.length) return '';
     var zeilen = apps.map(function (a) {
       var checked = !!checksObj[a.id];
@@ -832,7 +842,7 @@ function bereichsGruppenHTML(checksObj, handlerName) {
         '<span class="zugriff-name">' + esc(a.name) + '</span>' +
       '</label>';
     }).join('');
-    return '<div class="bereich-gruppe"><h3>' + b.label + '</h3><div class="zugriff-grid">' + zeilen + '</div></div>';
+    return '<div class="bereich-gruppe"><h3>' + esc(b.titel) + '</h3><div class="zugriff-grid">' + zeilen + '</div></div>';
   }).join('');
 }
 
@@ -864,7 +874,8 @@ function ladeGatedApps() {
     return ia - ib || a.localeCompare(b);
   });
   gatedApps = ids.map(function (id) {
-    return registryById[id] || { id: id, name: id + ' (nicht mehr in Registry)', icon: '⚠️' };
+    // 21.10.2026 (#110, F8): bereich ausdrücklich 'sonstiges' — ohne Feld hieße es jetzt „allgemein“
+    return registryById[id] || { id: id, name: id + ' (nicht mehr in Registry)', icon: '⚠️', bereich: 'sonstiges' };
   });
 }
 function ladePermissions() {
@@ -1986,18 +1997,36 @@ async function ladeZugangsCodes(k, nr) {
     var ausw = L.zugangAusDokument(snap.data(), null);
     var haken = window.BOS_KONTO_PROFIL.hakenAus(k);   // gespeichertes Konto, nicht ungespeicherte Haken der Karte
     var erg = L.zugangsblattZiele(ausw.ziele, window.BOS_APPS, function (ziel) { return L.zielErlaubt(ziel, k, window.BOS_ACCESS.can, haken); });
+    // 21.10.2026 (#110): Beschreibungen = Kurztexte aus der Datenbank (RK §26). Hängt nie
+    // am Blatt: schlägt das Laden fehl, kommen die Codes mit Namen, der Grund steht hier im Dialog.
+    var zbTexte = null, textGrund = '';
+    if (erg.drucken.length) {
+      try {
+        if (!window.BOS_BACKSTORE_TEXTE) throw Object.assign(new Error('bos_backstore_texte.js nicht geladen — Seite hart neu laden'), { code: 'bos/skripte' });
+        zbTexte = await window.BOS_BACKSTORE_TEXTE.ladeAlle(window.BOS_ACCOUNTS.adminFirestore());
+      } catch (et) {
+        if (nr !== zugangsNr) return;
+        console.error('[Konten & Rollen] App-Texte fürs Zugangsblatt nicht geladen', (et && et.code) || '', (et && et.message) || String(et));
+        var tc = (et && et.code) || '';
+        textGrund = (tc === 'permission-denied' ? 'Die Regel für die App-Texte (RK §26, firestore_regeln_2026-10-21_backstore.rules) ist wohl noch nicht eingesetzt. '
+          : (tc === 'unavailable' || tc === 'zeitlimit') ? 'Kein Netz oder keine Antwort der Datenbank. ' : '') +
+          '[' + (tc || 'ohne Code') + ': ' + ((et && et.message) || String(et)) + ']';
+      }
+      if (nr !== zugangsNr) return;
+    }
     var codes = [], weg = erg.weg.slice();
     erg.drucken.forEach(function (ziel) {
       try {
         var adr = Q.adresse(ziel.url);
         if (!Q.darfAusgeben(adr)) throw new Error('keine Online-Adresse: ' + adr);
-        codes.push({ id: ziel.id, name: ziel.name, hubName: ziel.hubName || '', adresse: adr, qrSvg: Q.qrFuer(adr), beschreibung: L.zielBeschreibung(ziel, window.BOS_APPS) });
+        codes.push({ id: ziel.id, name: ziel.name, hubName: ziel.hubName || '', adresse: adr, qrSvg: Q.qrFuer(adr), beschreibung: L.zielBeschreibung(ziel, window.BOS_APPS, zbTexte) });
       } catch (e) { weg.push({ id: ziel.id, name: ziel.name, grund: 'qr', meldung: e.message }); }
     });
     var text = codes.length + (codes.length === 1 ? ' Schnellzugriff' : ' Schnellzugriffe') + ' aufs Blatt' +
       (codes.length ? ': ' + codes.map(function (c) { return c.name; }).join(', ') + '.' : '.');
     if (weg.length) text += ' Nicht drauf: ' + weg.map(function (w) { return w.name + ' (' + (ZUGANGS_GRUND[w.grund] || w.grund) + (w.meldung ? ': ' + w.meldung : '') + ')'; }).join(' · ') + '.';
-    fertig(codes, text, weg.length ? 'hinweis' : '');
+    if (textGrund && codes.length) text += ' Beschreibungen nicht geladen, die Codes kommen nur mit Namen: ' + textGrund;
+    fertig(codes, text, weg.length || (textGrund && codes.length) ? 'hinweis' : '');
   } catch (err) {
     if (nr !== zugangsNr) return;
     console.error('[Konten & Rollen] Schnellzugriffe nicht geladen', (err && err.code) || '', (err && err.message) || String(err));

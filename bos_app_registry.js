@@ -1,6 +1,13 @@
 /* ================================================================
    BäckereiOS · Satellite — App-Registry
    ================================================================
+   CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-10-21 · 11:07 · #110 BackStore wie ein App Store
+       (Bauplan freigegeben KC 10:27). Neu: BOS_BEREICHE und
+       BOS_BEREICH_VON am Dateiende (eine Liste der Bereiche für BackStore,
+       Kontenverwaltung und NFC-/QR-Zentrale). Feld beschreibung aus dem
+       Kopf entfernt (Texte in der Datenbank). Kein App-Eintrag geändert.
+   ----------------------------------------------------------------
    Neuen Satelliten andocken = hier einen Eintrag hinzufügen.
    Der Launcher-Code selbst wird dafür NICHT angefasst.
 
@@ -46,17 +53,19 @@
               renderGrid(), keine Zugriffsprüfung (die läuft weiter
               separat über roles/BOS_ACCESS.can()).
      bereich — NEU (05.09.2026, siehe SESSION_2026-09-05_KONTEN_ROLLEN_
-              KARTE_KONZEPT.md). Nur bei Satelliten mit roles-Feld
-              gepflegt (reine Anzeige-Gruppierung, keine Zugriffs-
-              wirkung). Gruppiert die Rechte-Ansicht in konten_
-              verwaltung.html (Konto-Karte, Tab "Zugriffe", und Rollen-
-              Karte, Tab "Rechte") — vorher eine ungegliederte Liste
-              aller gatedApps. Werte: 'verwaltung' | 'produktion' |
-              'verbrauch' | 'vertrieb_filiale' | 'allgemein'. Fehlt
-              das Feld bei einem gated Satelliten, landet er sichtbar
-              unter "Sonstiges" statt zu verschwinden (siehe BEREICHE
-              in konten_verwaltung.html) — gleiches Fail-visible-Prinzip
-              wie bei ladeGatedApps().
+              KARTE_KONZEPT.md). Reine Anzeige-Gruppierung, keine Zugriffs-
+              wirkung. Werte: die ids aus BOS_BEREICHE unten ('produktion' |
+              'verbrauch' | 'allgemein' | 'verwaltung' | 'vertrieb_filiale').
+              SEIT 21.10.2026 (#110, BackStore wie ein App Store): EINE Liste
+              und EINE Regel für alle drei Leser — BackStore, Kontenverwaltung
+              (Reiter „Zugriffe“/„Rechte“) und NFC-/QR-Zentrale lesen
+              BOS_BEREICHE (Reihenfolge, Titel) und BOS_BEREICH_VON(app):
+              fehlt das Feld → 'allgemein' (die offenen Werkzeuge), unbekannter
+              Wert → sichtbar unter 'sonstiges' statt zu verschwinden. Vorher
+              hatten Kontenverwaltung und Zentrale je eine eigene Liste mit
+              eigener Reihenfolge, und „ohne bereich“ hieß dort „sonstiges“,
+              hier „allgemein“. Neuer bereich: Eintrag in BOS_BEREICHE, sonst
+              nichts.
      direkt — NEU (03.10.2026, 14:47, siehe nfc_qr/NFC_QR_ZENTRALE_DOKU.md).
               optional. Sagt, ob die Seite einen QR-Code oder NFC-Chip
               bekommen darf, also ohne Launcher direkt aufrufbar ist.
@@ -83,18 +92,11 @@
               Reiter „Zugriffe“ der Kontenverwaltung — die Haken stehen dort
               in den Stammdaten. Die Datenbank-Regel muss dieselben Haken
               prüfen, sonst ist die Kachel ein Schild ohne Schloss.
-     beschreibung — NEU (21.10.2026, 08:38, ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_
-              NACHTRAG1.md). optional. EIN Satz, was man dort macht. Der
-              BackStore zeigt ihn künftig (eigene Baustelle, „näher an einen
-              echten AppStore“, Ulf 21.10.); das Zugangsblatt der Konten-
-              verwaltung übernimmt ihn schon jetzt unter dem Namen des
-              Schnellzugriffs (nfc_qr_logik.js, zielBeschreibung). Fehlt das
-              Feld bei einem Hub-Kind, gilt der Text des Hubs (Feld hub);
-              fehlt auch der, steht nur der Name. Höchstens 160 Zeichen
-              (ZUGANG_DRUCK.BESCHREIBUNG_MAX, passt auf dem Blatt in zwei
-              Zeilen); test_nfc_qr.js prüft jeden Eintrag. Stand 21.10.:
-              noch KEIN Eintrag trägt einen Text, die Texte kommen mit der
-              BackStore-Baustelle.
+     (beschreibung — 21.10.2026, 08:38 bis 21.10.2026 (#110): ENTFERNT.
+              Die App-Texte (kurz, lang, Verlauf) stehen in der Datenbank
+              (backstore_texte, RK §26) und werden im BackStore gepflegt, nicht
+              hier. Das Zugangsblatt liest sie über bos_backstore_texte.js.
+              test_nfc_qr.js prüft, dass kein Eintrag das Feld wieder trägt.)
    ================================================================ */
 
 window.BOS_APPS = [
@@ -943,3 +945,27 @@ window.BOS_APPS = [
     roles: ['admin', 'backstube', 'konditorei']
   }
 ];
+
+/* ================================================================
+   BEREICHE — Reihenfolge und Überschriften der Gruppen (21.10.2026, #110)
+   ================================================================
+   EINE Stelle für BackStore, Kontenverwaltung und NFC-/QR-Zentrale
+   (vorher zwei Listen mit verschiedener Reihenfolge). Reihenfolge laut
+   KC 21.10., 09:43 (ohne Widerspruch Ulfs). 'sonstiges' bleibt am Ende
+   und fängt unbekannte Werte sichtbar auf.
+   ================================================================ */
+window.BOS_BEREICHE = [
+  { id: 'produktion', titel: 'Produktion' },
+  { id: 'verbrauch', titel: 'Verbrauch' },
+  { id: 'allgemein', titel: 'Allgemein' },
+  { id: 'verwaltung', titel: 'Verwaltung' },
+  { id: 'vertrieb_filiale', titel: 'Vertrieb & Filiale' },
+  { id: 'sonstiges', titel: 'Sonstiges' }
+];
+/* Bereich eines Eintrags: ohne Feld → 'allgemein', unbekannt → 'sonstiges'. */
+window.BOS_BEREICH_VON = function (app) {
+  var b = app && app.bereich;
+  if (!b) return 'allgemein';
+  for (var i = 0; i < window.BOS_BEREICHE.length; i++) if (window.BOS_BEREICHE[i].id === b) return b;
+  return 'sonstiges';
+};

@@ -19,6 +19,17 @@
    bos_code_adressen.json.
 
    CHANGELOG
+     2026-10-21 · 11:07 · v1.6 · Umbau (#110 BackStore wie ein App Store,
+       Bauplan freigegeben KC 10:27, Teile D und E).
+       BEREICHE: keine eigene Liste mehr — Reihenfolge und Titel aus
+       bos_app_registry.js (BOS_BEREICHE, BOS_BEREICH_VON), gelesen beim Aufruf
+       (test_nfc_qr.js lädt diese Datei vor der Registry). Neue Reihenfolge:
+       Produktion · Verbrauch · Allgemein · Verwaltung · Vertrieb & Filiale.
+       zielBeschreibung(ziel, apps, texte): Texte aus der Datenbank (texte =
+       { appId: Rohdaten }, geladen über bos_backstore_texte.js), Rückfall
+       eigener Text → Seite → Ordner. BEWUSSTE UMKEHR: „Vorbereitungen“ nimmt
+       jetzt den Text ihrer Seite (BrotTeigRechner), erst dann den Ordner.
+       FESTE_ZIELE ohne Feld beschreibung.
      2026-10-21 · 08:38 · v1.5 · Feature (Zugangsblatt: Liste im Wechsel, Beschreibung)
        ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_NACHTRAG1.md (KC 08:17, Ulf 08:14/08:17).
        zugangsCodesHTML setzt eine Zeile je Ziel, der Code wechselt links/
@@ -99,39 +110,38 @@
   function hubNamen(apps) { var h = {}; (apps || []).forEach(function (a) { if (a && a.type === 'hub') h[a.id] = a.name; }); return h; }
 
   /* Das eine Ziel, das nicht in der Registry steht. */
-  var ZIEL_BOS = { id: 'bos_oeffnen', name: 'BOS öffnen', icon: '🏠', url: 'launcher.html', direkt: 'anmeldung', fest: true, beschreibung: '' };
+  var ZIEL_BOS = { id: 'bos_oeffnen', name: 'BOS öffnen', icon: '🏠', url: 'launcher.html', direkt: 'anmeldung', fest: true };
   /* Zweites festes Ziel (08.10.2026, Konzept Punkt 68): der Reiter
      „Vorbereitungen“ der Teigecke Nacht, als QR/Chip in der Teigecke. Steht
      auch in bos_code_adressen.json („fest“) — die Adresse darf nach dem
      ersten Druck nie mehr geändert werden. Gruppe (hubName) kommt aus der
      Registry der Seite, nicht von Hand. */
   var ZIEL_TEIGECKE_VORBEREITUNGEN = { id: 'teigecke_vorbereitungen', name: 'Vorbereitungen', icon: '🥣',
-    url: 'teigecke/teigecke_nacht.html?reiter=vorbereitungen', direkt: 'anmeldung', fest: true, seite: 'teigecke_nacht', beschreibung: '' };
+    url: 'teigecke/teigecke_nacht.html?reiter=vorbereitungen', direkt: 'anmeldung', fest: true, seite: 'teigecke_nacht' };
   var FESTE_ZIELE = [ZIEL_BOS, ZIEL_TEIGECKE_VORBEREITUNGEN];
 
-  /* Reihenfolge und Überschriften der Gruppen. Werte wie das Feld
-     „bereich“ der Registry; Einträge ohne bereich (die offenen Werkzeuge)
-     landen unter „allgemein“, unbekannte Werte sichtbar unter „sonstiges“. */
-  var BEREICHE = [
-    { id: 'allgemein', titel: 'Allgemein' },
-    { id: 'produktion', titel: 'Produktion' },
-    { id: 'verbrauch', titel: 'Verbrauch' },
-    { id: 'vertrieb_filiale', titel: 'Vertrieb & Filiale' },
-    { id: 'verwaltung', titel: 'Verwaltung' },
-    { id: 'sonstiges', titel: 'Sonstiges' }
-  ];
+  /* Reihenfolge und Überschriften der Gruppen: seit 21.10.2026 (#110) EINE
+     Liste in bos_app_registry.js (BOS_BEREICHE) samt Regel BOS_BEREICH_VON
+     (ohne bereich → allgemein, unbekannt → sonstiges). Gelesen beim Aufruf,
+     nicht beim Laden. Fehlt die Registry, wirft das sichtbar statt still
+     eine eigene Reihenfolge zu erfinden. */
+  /* Global zur Aufrufzeit: in Node kann window erst nach dieser Datei entstehen. */
+  function glob(name) { return global[name] !== undefined ? global[name] : (typeof window !== 'undefined' ? window[name] : undefined); }
+  function bereiche() {
+    if (!Array.isArray(glob('BOS_BEREICHE')) || typeof glob('BOS_BEREICH_VON') !== 'function') throw new Error('bos_app_registry.js fehlt (BOS_BEREICHE)');
+    return glob('BOS_BEREICHE');
+  }
 
   /* Liste für die Zentrale. Einträge ohne Adresse (Hubs, „geplant“,
      Einstellungen) erscheinen nicht. Wählbar ist, wer das Feld direkt
      trägt; alle anderen stehen mit Grund da. */
   function zielListe(apps) {
-    var bekannt = {}; BEREICHE.forEach(function (b) { bekannt[b.id] = true; });
+    var liste = bereiche();
     var hubName = hubNamen(apps);
     var gruppen = {};
     (apps || []).forEach(function (a) {
       if (!a || !a.url) return;
-      var b = a.bereich || 'allgemein';
-      if (!bekannt[b]) b = 'sonstiges';
+      var b = glob('BOS_BEREICH_VON')(a);
       var waehlbar = a.direkt === 'anmeldung' || a.direkt === 'offen';
       (gruppen[b] = gruppen[b] || []).push({
         id: a.id, name: a.name, icon: a.icon || '', url: a.url, direkt: waehlbar ? a.direkt : null,
@@ -151,7 +161,7 @@
           hubName: s.hubName, waehlbar: s.waehlbar, grund: s.waehlbar ? '' : s.grund, fest: true });
       });
     });
-    return BEREICHE.filter(function (b) { return gruppen[b.id]; }).map(function (b) {
+    return liste.filter(function (b) { return gruppen[b.id]; }).map(function (b) {
       return { bereich: b.id, titel: b.titel, eintraege: gruppen[b.id] };
     });
   }
@@ -586,23 +596,25 @@
      20 mm (Anweisung KC). ZEILEN_ABSTAND_MM = senkrechter Abstand zwischen
      zwei Codes (Zeile 1 links, Zeile 2 rechts …), damit das Handy nicht den
      Nachbarcode erwischt. BESCHREIBUNG_MAX = längster Text, der in der
-     kleinsten Stufe noch in zwei Zeilen passt (ausgemessen); test_nfc_qr.js
-     prüft jede beschreibung der Registry dagegen. */
+     kleinsten Stufe noch in zwei Zeilen passt (ausgemessen). Seit 21.10.2026
+     (#110) gleich der Grenze des Kurztexts (bos_backstore_texte.js GRENZEN.KURZ
+     und Regel RK §26); test_nfc_qr.js vergleicht beide. */
   var ZUGANG_DRUCK = { CODE_MM: 22, ZEILEN_ABSTAND_MM: 6, BESCHREIBUNG_MAX: 160 };
-  /* Ein Satz zum Ziel für das Papier: Feld beschreibung der Registry; fehlt
-     es, das des Hubs (Feld hub). Feste Ziele: ihr eigenes Feld, sonst der
-     Hub ihrer Seite (Vorbereitungen → Hub der Teigecke Nacht). Fehlt alles:
-     '' (dann steht nur der Name, keine leere Zeile). */
-  function zielBeschreibung(ziel, apps) {
-    if (!ziel) return '';
-    var nachId = {}; (apps || []).forEach(function (a) { if (a && a.id) nachId[a.id] = a; });
-    function text(x) { return x && typeof x.beschreibung === 'string' ? x.beschreibung.trim() : ''; }
-    var fest = FESTE_ZIELE.filter(function (f) { return f.id === ziel.id; })[0];
-    var eintrag = fest || nachId[ziel.id];
-    var eigen = text(eintrag);
-    if (eigen) return eigen;
-    var traeger = fest ? (fest.seite ? nachId[fest.seite] : null) : eintrag;
-    return traeger && traeger.hub ? text(nachId[traeger.hub]) : '';
+  /* Ein Satz zum Ziel für das Papier (seit 21.10.2026, #110): der Kurztext
+     aus der Datenbank (backstore_texte, im BackStore gepflegt). texte =
+     { appId: Rohdaten }, geladen vom Aufrufer über bos_backstore_texte.js.
+     Rückfall: eigener Text → bei festen Zielen der Text ihrer Seite → Text
+     des Ordners (Feld hub). BEWUSSTE UMKEHR gegenüber NT1: „Vorbereitungen“
+     nimmt zuerst den Text des BrotTeigRechners, nicht den der Teigecke.
+     Ohne texte oder ohne Treffer: '' (dann steht nur der Name). Die eine
+     Rückfall-Mechanik steht in bos_backstore_texte.js (kurzMitRueckfall). */
+  function zielBeschreibung(ziel, apps, texte) {
+    if (!ziel || !texte) return '';
+    var T = glob('BOS_BACKSTORE_TEXTE');
+    if (!T) throw new Error('bos_backstore_texte.js fehlt');
+    var seiteVon = {};
+    FESTE_ZIELE.forEach(function (f) { if (f.seite) seiteVon[f.id] = f.seite; });
+    return T.kurzMitRueckfall(texte, ziel.id, apps, seiteVon);
   }
   function zbNamenKlasse(name) { var n = String(name || '').length; return n <= 28 ? 'l' : n <= 44 ? 'm' : 's'; }
   function zbTextKlasse(text) { var n = String(text || '').length; return n <= 90 ? 'l' : n <= 125 ? 'm' : 's'; }
@@ -690,7 +702,7 @@
   }
 
   var api = {
-    esc: esc, ohneZusatz: ohneZusatz, ZIEL_BOS: ZIEL_BOS, BEREICHE: BEREICHE,
+    esc: esc, ohneZusatz: ohneZusatz, ZIEL_BOS: ZIEL_BOS, bereiche: bereiche,
     ZIEL_TEIGECKE_VORBEREITUNGEN: ZIEL_TEIGECKE_VORBEREITUNGEN, FESTE_ZIELE: FESTE_ZIELE,
     zielListe: zielListe, waehlbareZiele: waehlbareZiele, zielNachId: zielNachId,
     chipErgebnis: chipErgebnis, decodeUrlRecord: decodeUrlRecord, adresseAusNachricht: adresseAusNachricht,

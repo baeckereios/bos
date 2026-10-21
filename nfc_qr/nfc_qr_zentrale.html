@@ -37,6 +37,16 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-21 · 11:07 · v2.2 · Umbau (#110 BackStore wie ein App Store, Bauplan
+      freigegeben KC 10:27, Teile D und E)
+      Vorschau im Reiter „Zugangsblatt“: Beschreibung = Kurztext aus der Datenbank
+      (backstore_texte, RK §26), geladen nach der Generalschlüssel-Anmeldung in
+      starteDatenbank() über adb() (ladeTexte, bos_backstore_texte.js). Laden die
+      Texte nicht, zeigt die Vorschau die Namen und darüber den Grund. Gruppen der
+      Zielliste in der Reihenfolge der Registry (BOS_BEREICHE; Allgemein jetzt an
+      dritter Stelle). REGEL_DATEI → firestore_regeln_2026-10-21_backstore.rules;
+      REGEL_FASSUNG bleibt (die Zentrale selbst braucht die neue Regel nicht).
+      Hilfetext unverändert. SESSION_2026-10-21_BACKSTORE_APPSTORE_BAU.md
     2026-10-21 · 08:38 · v2.1 · Gestaltung (Zugangsblatt Nachtrag 1, Kontroll-Chat 08:17)
       Vorschau zeigt die Liste im Wechsel (zugangsCodesHTML, Code 22 mm) mit der
       Beschreibung aus der Registry (zielBeschreibung, Texte folgen mit dem
@@ -206,6 +216,7 @@
 <script src="../qrcode.min.js"></script>
 <script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 <script src="nfc_qr_logik.js"></script>
+<script src="../bos_backstore_texte.js"></script>   <!-- NEU 21.10.2026, #110: Kurztexte für die Vorschau -->
 
 <div class="seite">
   <header class="kopf">
@@ -335,7 +346,7 @@ const NFC_ZEITLIMIT_MS = 30000;   /* wie im alten Programm */
    Lehnt die Datenbank ab, ist die eingesetzte Regel älter als diese Seite.
    REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft). */
 const REGEL_FASSUNG = 'nfc-qr-2026-10-21';   /* seit 21.10.2026: Block nfc_einstellungen (RK §25) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';
+const REGEL_DATEI = 'firestore_regeln_2026-10-21_backstore.rules';
 const A = window.BOS_ACCOUNTS;
 const LEERLAUF_MS = 5 * 60 * 1000;   /* wie die Kontenverwaltung (N-15, Ulf: 5 Minuten) */
 const VORWARNUNG_MS = 60 * 1000;
@@ -526,6 +537,10 @@ const I18N_DE = {
   zugang_vorschau_hinweis: 'So sieht der untere Teil des Blatts aus (Originalgröße am Drucker: jeder Code 2,2 cm, abwechselnd links und rechts). Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf.',
   zugang_vorschau_lokal: 'Diese Seite läuft nicht unter der Online-Adresse: Die Vorschau zeigt Platzhalter statt Codes. Die Kontenverwaltung druckt dann ebenfalls ohne Codes.',
   zugang_vorschau_leer: 'Keine Ziele gewählt: Das Zugangsblatt kommt ohne Schnellzugriffe.',
+  zugang_texte_lade: 'Beschreibungen werden geladen …',
+  zugang_texte_fehler: 'Beschreibungen nicht geladen, die Vorschau zeigt nur die Namen (auf dem Blatt ebenso): {grund}',
+  zugang_texte_regel: 'Die Regel für die App-Texte (RK §26) ist wohl noch nicht eingesetzt.',
+  zugang_texte_netz: 'Kein Netz oder keine Antwort der Datenbank.',
   frage_zugang_titel: 'Auswahl speichern?',
   frage_zugang_text: 'Die Auswahl ({n} Ziele) gilt ab sofort für jedes neu gedruckte Zugangsblatt. Schon gedruckte Blätter ändern sich nicht.',
   frage_zugang_ja: 'Ja, speichern',
@@ -576,7 +591,9 @@ const S = { chip: null, nfcAbbruch: null, nfcLaeuft: false, schildZielId: null,
   kennung: null, db: { zustand: 'abgemeldet', meldung: '', blaetter: [] }, blatt: null, blattSauber: null, blattMeldung: '', speichert: false,
   reiter: 'schilder', adminHinweis: '', nachAnmeldung: null, letzteEingabe: Date.now(),
   /* Zugangsblatt: gespeichert = Stand der Datenbank; ziele/basisDa/basisAm = Editor und der Stand, auf dem er beruht */
-  zugang: { zustand: 'abgemeldet', meldung: '', gespeichert: null, ziele: [], basisDa: false, basisAm: null, sauber: '[]', hinweis: '', speichert: false } };
+  zugang: { zustand: 'abgemeldet', meldung: '', gespeichert: null, ziele: [], basisDa: false, basisAm: null, sauber: '[]', hinweis: '', speichert: false },
+  /* 21.10.2026 (#110): Kurztexte für die Vorschau — stand 'aus' | 'lade' | 'bereit' | 'fehler' */
+  texte: { stand: 'aus', daten: null, grund: '' } };
 
 function apps() { return window.BOS_APPS || []; }
 function eingebettet() { try { return window.self !== window.top; } catch (e) { return true; } }
@@ -880,8 +897,25 @@ async function starteDatenbank() {
   }
   await Promise.all([
     ladeBlaetter().then(renderBlatt, function (err) { dbFehler(dbZustandAus(err), err); }),
-    ladeZugang().then(renderZugang, function (err) { zugangFehlerZustand(dbZustandAus(err), err); })
+    ladeZugang().then(renderZugang, function (err) { zugangFehlerZustand(dbZustandAus(err), err); }),
+    ladeTexte()
   ]);
+}
+/* 21.10.2026 (#110): Kurztexte für die Vorschau, über die Zweit-App (istAdmin()
+   darf lesen, RK §26). Ein Fehler hier sperrt nichts: Vorschau mit Namen + Grund. */
+async function ladeTexte() {
+  S.texte = { stand: 'lade', daten: null, grund: '' }; renderZugangVorschau();
+  try {
+    if (!window.BOS_BACKSTORE_TEXTE) throw Object.assign(new Error('bos_backstore_texte.js nicht geladen — Seite hart neu laden'), { code: 'bos/skripte' });
+    const daten = await window.BOS_BACKSTORE_TEXTE.ladeAlle(adb(), DB_ZEITLIMIT_MS);
+    S.texte = { stand: 'bereit', daten: daten, grund: '' };
+  } catch (err) {
+    console.error('[NFC & QR] App-Texte nicht geladen', err);
+    const c = err && err.code;
+    S.texte = { stand: 'fehler', daten: null, grund: (c === 'permission-denied' ? t('zugang_texte_regel') + ' ' : (c === 'unavailable' || c === 'zeitlimit') ? t('zugang_texte_netz') + ' ' : '') +
+      '[' + (c || 'ohne Code') + ': ' + ((err && err.message) || String(err)) + ']' };
+  }
+  renderZugangVorschau();
 }
 
 /* ---------- Rückfrage: zwei Knöpfe, keine Vorauswahl (Checkliste §11) ---------- */
@@ -1201,9 +1235,11 @@ function renderZugangVorschau() {
   const codes = ziele.map(function (ziel) {
     let qrSvg = '';
     if (darf()) { try { qrSvg = Q.qrFuer(adresseFuer(ziel)); } catch (err) { zeigeFehler(t('err_unerwartet'), err); } }
-    return { name: ziel.name, hubName: ziel.hubName || '', qrSvg: qrSvg, beschreibung: L.zielBeschreibung(ziel, apps()) };
+    return { name: ziel.name, hubName: ziel.hubName || '', qrSvg: qrSvg, beschreibung: L.zielBeschreibung(ziel, apps(), S.texte.daten) };
   });
-  el.innerHTML = '<div class="klein" style="margin-bottom:8px">' + esc(t(darf() ? 'zugang_vorschau_hinweis' : 'zugang_vorschau_lokal')) + '</div>' +
+  const textZeile = S.texte.stand === 'lade' ? '<div class="klein" id="zugangTexte" style="margin-bottom:8px">' + esc(t('zugang_texte_lade')) + '</div>'
+    : S.texte.stand === 'fehler' ? '<div class="klein" id="zugangTexte" role="alert" style="margin-bottom:8px;color:var(--bos-warn, var(--bos-amber))">⚠︎ ' + esc(t('zugang_texte_fehler', { grund: S.texte.grund })) + '</div>' : '';
+  el.innerHTML = textZeile + '<div class="klein" style="margin-bottom:8px">' + esc(t(darf() ? 'zugang_vorschau_hinweis' : 'zugang_vorschau_lokal')) + '</div>' +
     '<div class="zb-vorschau" id="zugangVorschauBlatt"><div class="zb-vorschau-innen">' + L.zugangsCodesHTML(codes) + '</div></div>';
 }
 function zugangDazu() {

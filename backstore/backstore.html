@@ -1,6 +1,36 @@
 <!--
   backstore.html — BäckereiOS V2
   ------------------------------------------------------------
+  2026-10-21 · 11:07 · v1.0 · Umbau (#110 BackStore wie ein App Store;
+    Konzept _ideen/2026-10-21_BACKSTORE_APPSTORE.md, Anweisung KC 09:51,
+    Bauplan freigegeben KC 10:27 mit Auflagen A1–A4)
+    Zweigeteilt: links die Apps nach Bereichen (BOS_BEREICHE der Registry)
+    mit ✓ (installiert) und • (Verlauf-Eintrag der letzten 14 Tage), rechts
+    die Seite der App: Name, Knopf, Zahlen zur Entwicklung, Kurz- und
+    Langtext, Bestandteile (aufklappbar), Verlauf, gesperrt/geplant mit
+    Erklärung. Unter SCHMAL_UNTER_PX (640) Fensterbreite Liste und Seite im
+    Wechsel mit „← Zurück“ (nach der Fensterbreite, nicht nach dem Gerät).
+    Der BackStore selbst steht in der Liste („immer da“, kein Knopf).
+    TEXTE IN DER DATENBANK (backstore_texte, RK §26) über bos_backstore_texte.js.
+    Stift nur für Rolle admin (Profil über BOS_PROFIL_LOOKUP; die Tür ist die
+    Regel): Kurz (höchstens 160, Zähler), Lang, Verlauf anlegen/ändern/
+    löschen, auch für Bestandteile und die festen Ziele des Zugangsblatts
+    (Gruppe „Nur auf dem Zugangsblatt“, nur Admin). Speichern = Sicherung +
+    Text in einem Batch; „Ältere Fassungen“ (letzte 10) zurückholen.
+    Lücken-Hinweis „X Apps ohne Kurztext“ und Erst-Füllung „Texte aus Datei
+    anlegen“ (Datei-Auswahl; legt nur Apps ohne Dokument an, eine je Batch).
+    INSTALLIEREN/ENTFERNEN UNVERÄNDERT (profileData.installed, positions,
+    localStorage bos_launcher_state_v2, storage-Event des Launchers) und in
+    einem eigenen Skriptblock VOR der Datenbank: Liste, ✓, Installieren und
+    Entfernen gehen auch ohne Texte, ohne Netz und ohne Firebase.
+    Fehler mit err.message sichtbar (oben), dazu window.onerror und
+    unhandledrejection. Alles aus der Datenbank geht durch bsEscapeHtml.
+    Hilfe neu, kanonisch in BACKSTORE_DOKU.md §8.
+    Siehe backstore/_protokolle/SESSION_2026-10-21_BACKSTORE_APPSTORE_BAU.md.
+    [Die älteren Absätze unten bleiben als Geschichte. Überholt seit #110:
+    „Beschreibungstext pro App“ ist gebaut; „Sortierung folgt der Registry“
+    gilt jetzt INNERHALB eines Bereichs; der BackStore steht im Katalog
+    (ohne Knopf).]
   2026-10-16 · 07:54 · v0.3 · Feature (Einstellungen für alle, #38; Freigabe
     Kontroll-Chat 07:26)
     Katalog zeigt keine Einträge mit type 'system' mehr (die Einstellungen
@@ -113,25 +143,29 @@
 
 <style>
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
   body {
     margin: 0;
     background: var(--bos-bg);
     color: var(--bos-text);
     font-family: var(--bos-font-body, 'Barlow', sans-serif);
-    min-height: 100vh;
+    display: flex; flex-direction: column;
   }
 
-  /* ── Kopfleiste (identisches Muster zu taschenrechner.html) ── */
+  /* ── Kopfleiste (Muster taschenrechner.html) ── */
   .bs-header {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm, 14px);
     padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); background: var(--bos-surface);
-    border-bottom: 1px solid var(--bos-border);
+    border-bottom: 1px solid var(--bos-border); flex-shrink: 0;
   }
   .bs-title {
     font-family: var(--bos-font-display, 'Fraunces'); font-weight: 900;
     font-size: var(--bos-font-xl, 1.3rem); letter-spacing: 0.3px;
   }
   .bs-title span { color: var(--bos-blue); font-style: italic; }
+  .bs-kopf-rechts { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); }
+  .bs-count { color: var(--bos-text-faint); font-family: var(--bos-font-label); font-size: var(--bos-font-xs, 0.76rem); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
   .bs-help-btn {
     width: var(--bos-space-xl, 32px); height: var(--bos-space-xl, 32px);
     border-radius: 50%; border: none;
@@ -139,46 +173,65 @@
     cursor: pointer; box-shadow: var(--bos-shadow-sm); flex-shrink: 0;
   }
 
-  .bs-intro {
-    max-width: 1000px; margin: var(--bos-space-md, 18px) auto 0; padding: 0 var(--bos-space-sm, 16px);
-    display: flex; align-items: baseline; justify-content: space-between; gap: var(--bos-space-sm, 14px);
-    flex-wrap: wrap;
+  /* ── Meldungen oben ── */
+  .bs-fehler, .bs-hinweis, .bs-luecken {
+    margin: var(--bos-space-xs, 8px) var(--bos-space-sm, 14px) 0; padding: var(--bos-space-xs, 8px) var(--bos-space-sm, 12px);
+    border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm, .85rem); line-height: 1.45; flex-shrink: 0;
   }
-  .bs-intro p { margin: 0; color: var(--bos-text-dim); font-size: var(--bos-font-sm, 0.88rem); max-width: 60ch; }
-  .bs-count { color: var(--bos-text-faint); font-family: var(--bos-font-label); font-size: var(--bos-font-xs, 0.76rem); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  .bs-fehler { background: color-mix(in srgb, var(--bos-red) 14%, transparent); border: 1px solid color-mix(in srgb, var(--bos-red) 45%, transparent); color: var(--bos-text); white-space: pre-line; }
+  .bs-hinweis { background: var(--bos-surface); border: 1px solid var(--bos-border); color: var(--bos-text-dim); }
+  .bs-hinweis.warn { border-color: var(--bos-warn, var(--bos-amber)); color: var(--bos-text); }
+  .bs-hinweis .bs-roh, .bs-fehler .bs-roh { font-size: var(--bos-font-xs, .74rem); color: var(--bos-text-faint); word-break: break-word; }
+  .bs-luecken { background: color-mix(in srgb, var(--bos-warn, #d6a84a) 10%, transparent); border: 1px solid var(--bos-warn, var(--bos-amber)); color: var(--bos-text); }
+  .bs-luecken summary { cursor: pointer; font-weight: 700; }
+  .bs-luecken ul { margin: 6px 0; padding-left: 1.2em; color: var(--bos-text-dim); }
 
   .bs-noprofile {
     max-width: 640px; margin: var(--bos-space-xl, 40px) auto; padding: var(--bos-space-lg, 22px);
-    text-align: center; color: var(--bos-text-dim); display: none;
+    text-align: center; color: var(--bos-text-dim);
   }
 
-  /* ── Katalog-Grid ───────────────────────────────────────── */
-  .bs-grid {
-    max-width: 1000px; margin: var(--bos-space-md, 18px) auto var(--bos-space-xl, 40px); padding: 0 var(--bos-space-sm, 16px);
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--bos-space-sm, 14px);
+  /* ── Store: zwei Spalten ── */
+  .bs-store {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 280px) 1fr;
+    border-top: 1px solid var(--bos-border); margin-top: var(--bos-space-xs, 8px);
   }
-  .bs-card {
-    background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md);
-    padding: var(--bos-space-sm, 14px); display: flex; flex-direction: column; gap: var(--bos-space-xs, 9px);
-    transition: border-color var(--bos-transition-fast);
+  .bs-liste { overflow-y: auto; border-right: 1px solid var(--bos-border); background: var(--bos-bg-soft, var(--bos-bg)); padding-bottom: var(--bos-space-lg, 20px); }
+  .bs-seite { overflow-y: auto; padding: var(--bos-space-md, 18px) var(--bos-space-md, 20px) var(--bos-space-xl, 40px); min-width: 0; }
+  body.bs-schmal .bs-store { grid-template-columns: 1fr; }
+  body.bs-schmal .bs-liste { border-right: none; }
+  body.bs-schmal.bs-zeige-liste .bs-seite, body.bs-schmal.bs-zeige-seite .bs-liste { display: none; }
+
+  .bs-gruppe-titel {
+    font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-xs, .74rem); text-transform: uppercase;
+    letter-spacing: .06em; color: var(--bos-amber); padding: var(--bos-space-sm, 14px) var(--bos-space-sm, 14px) var(--bos-space-3xs, 4px);
   }
-  .bs-card--locked { opacity: .62; }
-  .bs-card__icon {
-    width: 48px; height: 48px; border-radius: var(--bos-radius-md); display: flex; align-items: center;
-    justify-content: center; font-size: 1.5rem; flex-shrink: 0;
+  .bs-eintrag {
+    display: flex; align-items: center; gap: var(--bos-space-xs, 9px); width: 100%; text-align: left; cursor: pointer;
+    background: transparent; border: none; border-left: 3px solid transparent; color: var(--bos-text);
+    padding: 8px var(--bos-space-sm, 14px); min-height: var(--bos-tap-min, 44px); font: inherit;
   }
-  .bs-card__body { flex: 1; }
-  .bs-card__name {
-    font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-md, 0.95rem);
-    display: flex; align-items: center; gap: var(--bos-space-2xs, 6px); flex-wrap: wrap;
-  }
-  .bs-card__badge {
+  .bs-eintrag:hover { background: var(--bos-surface); }
+  .bs-eintrag.aktiv { background: var(--bos-surface); border-left-color: var(--bos-amber); }
+  .bs-eintrag__icon { width: 30px; height: 30px; border-radius: var(--bos-radius-sm); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0; }
+  .bs-eintrag__name { flex: 1; min-width: 0; font-family: var(--bos-font-label); font-weight: 600; font-size: var(--bos-font-md, .95rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-eintrag__zusatz { font-size: var(--bos-font-2xs, .62rem); text-transform: uppercase; letter-spacing: .04em; color: var(--bos-text-faint); }
+  .bs-neu { color: var(--bos-amber); font-size: 1.3rem; line-height: 1; }
+  .bs-ok { color: var(--bos-green); font-weight: 900; }
+  .bs-eintrag--gesperrt .bs-eintrag__name { color: var(--bos-text-faint); }
+
+  /* ── App-Seite ── */
+  .bs-zurueck { margin-bottom: var(--bos-space-sm, 12px); display: none; }
+  body.bs-schmal .bs-zurueck { display: inline-flex; }
+  .bs-kopf { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); flex-wrap: wrap; }
+  .bs-kopf__icon { width: 56px; height: 56px; border-radius: var(--bos-radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; }
+  .bs-kopf__text { flex: 1; min-width: 160px; }
+  .bs-kopf__name { font-family: var(--bos-font-display, 'Fraunces'); font-weight: 900; font-size: var(--bos-font-2xl, 1.5rem); line-height: 1.15; }
+  .bs-zahlen { color: var(--bos-text-faint); font-size: var(--bos-font-sm, .84rem); margin-top: 2px; }
+  .bs-badge {
     font-family: var(--bos-font-label); font-size: var(--bos-font-2xs, 0.62rem); text-transform: uppercase;
     letter-spacing: .04em; color: var(--bos-text-faint); border: 1px solid var(--bos-border-strong);
-    border-radius: 999px; padding: .1em .55em; font-weight: 700;
-  }
-  .bs-card__rolehint {
-    font-size: var(--bos-font-xs, 0.74rem); color: var(--bos-text-faint); margin-top: var(--bos-space-3xs, 3px);
+    border-radius: 999px; padding: .1em .55em; font-weight: 700; margin-left: 6px; vertical-align: middle;
   }
   .bs-card__btn {
     font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
@@ -192,21 +245,52 @@
   .bs-card__btn--installed { background: transparent; border-color: var(--bos-green); color: var(--bos-green); }
   .bs-card__btn--installed:hover { background: color-mix(in srgb, var(--bos-green) 12%, transparent); }
   .bs-card__btn--locked { background: transparent; color: var(--bos-text-faint); cursor: not-allowed; }
+  .bs-card__rolehint { font-size: var(--bos-font-xs, 0.74rem); color: var(--bos-text-faint); margin-top: var(--bos-space-3xs, 3px); }
+  .bs-knopf-feld { text-align: right; }
+  .bs-kurz { font-size: var(--bos-font-lg, 1.08rem); font-weight: 600; line-height: 1.45; margin: var(--bos-space-md, 18px) 0 var(--bos-space-xs, 8px); }
+  .bs-lang { color: var(--bos-text-dim); line-height: 1.6; white-space: pre-line; margin: 0 0 var(--bos-space-md, 18px); }
+  .bs-leer { color: var(--bos-text-faint); font-style: italic; margin: var(--bos-space-md, 18px) 0; }
+  .bs-abschnitt { font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-sm, .84rem); text-transform: uppercase; letter-spacing: .05em; color: var(--bos-amber); margin: var(--bos-space-lg, 22px) 0 var(--bos-space-2xs, 6px); }
+  .bs-teil { border: 1px solid var(--bos-border); border-radius: var(--bos-radius-sm); margin-bottom: 6px; background: var(--bos-surface); }
+  .bs-teil__kopf { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; background: transparent; border: none; color: var(--bos-text); cursor: pointer; padding: 10px 12px; font: inherit; min-height: var(--bos-tap-min, 44px); }
+  .bs-teil__name { font-family: var(--bos-font-label); font-weight: 700; }
+  .bs-teil__kurz { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .86rem); margin-top: 2px; }
+  .bs-teil__pfeil { margin-left: auto; color: var(--bos-text-faint); }
+  .bs-teil__innen { padding: 0 12px 12px 12px; border-top: 1px dashed var(--bos-border); }
+  .bs-schloss { font-size: var(--bos-font-xs, .74rem); color: var(--bos-text-faint); margin-left: 6px; }
+  .bs-verlauf { list-style: none; margin: 0; padding: 0; }
+  .bs-verlauf li { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--bos-border); font-size: var(--bos-font-sm, .88rem); }
+  .bs-verlauf__datum { color: var(--bos-text-faint); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 6.2em; }
+  .bs-verlauf__teil { font-family: var(--bos-font-label); font-weight: 700; color: var(--bos-text-dim); }
+  .bs-gemeinsam { font-size: var(--bos-font-xs, .76rem); color: var(--bos-text-faint); margin: 4px 0; }
 
-  /* ── Hilfe-Sheet, identisches Muster zu taschenrechner.html ── */
-  #bs-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
-  #bs-hilfe-inhalt-wrap { background: var(--bos-surface); border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; max-width:680px; margin:40px auto 0; padding: var(--bos-space-lg, 20px) var(--bos-space-md, 18px) var(--bos-space-xl, 40px); min-height:50vh; }
+  /* ── Bearbeiten (nur Admin) ── */
+  .bs-stift { margin-top: var(--bos-space-sm, 12px); }
+  .bs-edit { border: 1px solid var(--bos-amber); border-radius: var(--bos-radius-md); padding: var(--bos-space-sm, 14px); margin: var(--bos-space-sm, 12px) 0; background: var(--bos-surface); }
+  .bs-edit h3 { margin: 0 0 8px; font-family: var(--bos-font-label); font-size: var(--bos-font-md, 1rem); }
+  .bs-feld { margin-bottom: 12px; }
+  .bs-feld label { display: flex; justify-content: space-between; font-size: var(--bos-font-xs, .76rem); text-transform: uppercase; letter-spacing: .05em; color: var(--bos-amber); font-weight: 700; margin-bottom: 4px; }
+  .bs-zaehler { color: var(--bos-text-faint); font-weight: 400; text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .bs-edit textarea, .bs-edit input[type="text"], .bs-edit input[type="date"] { width: 100%; font: inherit; }
+  .bs-edit textarea { resize: vertical; }
+  .bs-vz { display: grid; grid-template-columns: 9.5em 1fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .bs-vz-fehler { font-size: var(--bos-font-xs, .74rem); color: var(--bos-red); grid-column: 1 / -1; }
+  .bs-edit-fehler { color: var(--bos-red); font-size: var(--bos-font-sm, .84rem); margin: 6px 0; white-space: pre-line; }
+  .bs-edit-ok { color: var(--bos-green); font-size: var(--bos-font-sm, .84rem); margin: 6px 0; }
+  .bs-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .bs-fassung { display: flex; gap: 10px; align-items: center; justify-content: space-between; border-bottom: 1px dashed var(--bos-border); padding: 6px 0; font-size: var(--bos-font-sm, .86rem); }
+
+  /* ── Blätter (Erst-Füllung, Rückfragen, Hilfe) ── */
+  .bs-sheet { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; overflow-y: auto; }
+  .bs-sheet__innen { background: var(--bos-surface); border-radius: var(--bos-radius-lg) var(--bos-radius-lg) 0 0; max-width: 680px; margin: 40px auto 0; padding: var(--bos-space-lg, 20px) var(--bos-space-md, 18px) var(--bos-space-xl, 40px); min-height: 40vh; }
+  .bs-sheet__titel { font-family: var(--bos-font-display); font-weight: 900; font-size: var(--bos-font-xl, 1.25rem); margin-bottom: 8px; }
+  .bs-sheet ul { padding-left: 1.2em; color: var(--bos-text-dim); font-size: var(--bos-font-sm, .86rem); max-height: 40vh; overflow-y: auto; }
   .bs-hilfe-schritt { margin-bottom: var(--bos-space-md, 18px); padding-bottom: var(--bos-space-sm, 14px); border-bottom:1px dashed var(--bos-border); }
   .bs-hilfe-titel { font-weight:900; color: var(--bos-blue); margin-bottom: var(--bos-space-3xs, 5px); }
   .bs-hilfe-text { font-size: var(--bos-font-sm, 0.85rem); line-height:1.6; color: var(--bos-text-dim); white-space: pre-line; }
-  .bs-hilfe-schliessen {
-    font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
-    background: var(--bos-blue); color: #fff; border: none; border-radius: var(--bos-radius-sm);
-    padding: var(--bos-space-2xs, 0.65em) var(--bos-space-sm, 1.3em); cursor: pointer; margin-top: var(--bos-space-sm, 14px);
-  }
 </style>
 </head>
-<body>
+<body class="bs-zeige-liste">
 
 <!-- ═══ Pflicht-Block Body-Anfang (§2 Checkliste) ═══ -->
 <script>var BOS_APP_ID = 'backstore';</script>
@@ -216,31 +300,94 @@
 <script src="../bos_permissions.js"></script>
 <script src="../bos_access.js"></script>
 <script src="../bos_access_guard.js"></script>
+<!-- NEU 21.10.2026 (#110): feste Ziele des Zugangsblatts, Texte-Mechanik, Ungespeichert-Schutz -->
+<script src="../nfc_qr/nfc_qr_logik.js"></script>
+<script src="../bos_backstore_texte.js"></script>
+<script src="../bos_ungespeichert.js"></script>
 
 <div class="bs-header">
   <div class="bs-title">Back<span>Store</span></div>
-  <button class="bs-help-btn" onclick="bsOeffneHilfe()">?</button>
+  <div class="bs-kopf-rechts">
+    <span class="bs-count" id="bsCount"></span>
+    <button class="bs-help-btn" id="bsHilfeKnopf" type="button" aria-label="Hilfe">?</button>
+  </div>
 </div>
 
-<div class="bs-intro">
-  <p>Hol dir die Apps, die du brauchst — und entfern sie wieder, wenn du sie nicht mehr brauchst. Nichts geht dabei verloren, du kannst jederzeit neu installieren.</p>
-  <span class="bs-count" id="bsCount"></span>
+<div class="bs-fehler" id="bsFehler" role="alert" hidden></div>
+<div class="bs-hinweis" id="bsTexteHinweis" role="status" hidden></div>
+<div class="bs-luecken" id="bsLuecken" hidden></div>
+
+<div class="bs-noprofile" id="bsNoProfile" hidden></div>
+
+<div class="bs-store" id="bsStore">
+  <nav class="bs-liste" id="bsListe" aria-label="Apps"></nav>
+  <main class="bs-seite" id="bsSeite"></main>
 </div>
 
-<div class="bs-noprofile" id="bsNoProfile">Kein aktives Profil gefunden. Bitte über den Launcher ein Profil auswählen.</div>
+<input type="file" id="bsDatei" accept=".json,application/json" hidden>
 
-<div class="bs-grid" id="bsGrid"></div>
+<!-- ── Erst-Füllung / Zurückholen / Rückfrage: ein Blatt, wechselnder Inhalt ── -->
+<div class="bs-sheet" id="bsBlatt" hidden>
+  <div class="bs-sheet__innen" role="dialog" aria-modal="true" aria-labelledby="bsBlattTitel">
+    <div class="bs-sheet__titel" id="bsBlattTitel"></div>
+    <div id="bsBlattInhalt"></div>
+    <div class="bs-edit-fehler" id="bsBlattFehler" hidden></div>
+    <div class="bs-knoepfe" id="bsBlattKnoepfe"></div>
+  </div>
+</div>
 
 <!-- ── Hilfe-Sheet ── -->
-<div id="bs-hilfe-modal">
-  <div id="bs-hilfe-inhalt-wrap">
+<div class="bs-sheet" id="bs-hilfe-modal" hidden>
+  <div class="bs-sheet__innen">
     <div id="bs-hilfe-inhalt"></div>
-    <button class="bs-hilfe-schliessen" onclick="bsSchliesseHilfe()">Schließen</button>
+    <button class="bos-btn bos-btn--amber" id="bsHilfeZu" type="button">Schließen</button>
   </div>
 </div>
 
 <script>
-// ── Geteilter Launcher-State (gleicher localStorage-Key wie launcher.html) ──
+/* ==================================================================
+   BLOCK 1 — Liste, Seite, Installieren/Entfernen. Hängt NIE an der
+   Datenbank: kein firebase, kein window.db in diesem Block.
+   ================================================================== */
+
+/* ---------- Fehler auf den Bildschirm (Checkliste §7a) ---------- */
+function bsZeigeFehler(text, err) {
+  var el = document.getElementById('bsFehler');
+  var zeile = text + (err ? '\n' + ((err && err.code) ? err.code + ': ' : '') + ((err && err.message) || String(err)) : '');
+  el.textContent = el.hidden || !el.textContent ? zeile : el.textContent + '\n' + zeile;
+  el.hidden = false;
+  console.error('[BackStore] ' + text, err || '');
+}
+window.onerror = function (msg, quelle, zeile) { bsZeigeFehler('Unerwarteter Fehler: ' + msg + (quelle ? ' (' + String(quelle).split('/').pop() + ':' + zeile + ')' : '')); };
+window.addEventListener('unhandledrejection', function (e) { bsZeigeFehler('Unerwarteter Fehler (Promise)', e && e.reason); });
+
+/* ---------- i18n (Checkliste §6) ---------- */
+var I18N_DE = {
+  kein_profil: 'Kein aktives Profil gefunden. Bitte über den Launcher ein Profil auswählen.',
+  zurueck: '← Zurück',
+  installieren: 'Installieren', installiert: '✓ Installiert', immer_da: 'immer da',
+  rolle_fehlt: 'Rolle fehlt', haken_fehlt: 'Haken fehlt',
+  haken_hinweis: 'Freigabe einzeln je Person — Ulf fragen',
+  benoetigt: 'Benötigt: ',
+  geplant: 'geplant', ordner: 'Ordner', nur_blatt: 'Nur auf dem Zugangsblatt',
+  nur_blatt_hinweis: 'Steht nur auf dem Zugangsblatt, nicht im Launcher. Der Text erscheint unter dem QR-Code.',
+  immer_da_hinweis: 'Der BackStore ist immer auf deinem Desktop.',
+  darin: 'Darin', was_ist_neu: 'Was ist neu', kein_text: 'Zu dieser App gibt es noch keinen Text.',
+  texte_lade: 'Beschreibungen werden geladen …',
+  gemeinsam: 'Langtext und Verlauf gemeinsam mit {name}.',
+  schloss: '🔒 deine Rolle öffnet diese Seite nicht',
+  entfernen_frage: 'Diese App wirklich deinstallieren? Du kannst sie jederzeit hier wieder installieren, es geht nichts verloren.',
+  hilfe_zu: 'Schließen'
+};
+function t(key, werte) {
+  var s = Object.prototype.hasOwnProperty.call(I18N_DE, key) ? I18N_DE[key] : key;
+  if (werte) Object.keys(werte).forEach(function (k) { s = s.split('{' + k + '}').join(String(werte[k])); });
+  return s;
+}
+
+/* ---------- Geteilter Launcher-State (gleicher localStorage-Key wie launcher.html) ----------
+   UNVERÄNDERT aus v0.3 (16.10.2026): bsLoadState, bsSaveState, bsGetProfileData,
+   bsEscapeHtml, bsHexToRgba, bsRoleLabel, bsCatalogApps. */
 var BS_STORAGE_KEY = 'bos_launcher_state_v2';
 
 function bsLoadState() {
@@ -286,43 +433,6 @@ function bsHexToRgba(hex, alpha) {
 function bsRoleLabel(roles) {
   return (roles || []).map(function (r) { return r.charAt(0).toUpperCase() + r.slice(1); }).join(', ');
 }
-
-function bsRenderCard(app, data, role, kontoOverrides, kontoHaken) {
-  var installed = data.installed.indexOf(app.id) !== -1;
-  var erlaubt = window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, role, kontoOverrides, kontoHaken) : true;
-  // 10.10.2026: Haken-Seiten (Registry-Feld haken) hängen an einem Haken im Konto, nicht an der Rolle.
-  var hakenSeite = !!(app.haken && app.haken.length);
-  var iconBg = bsHexToRgba(app.color, 0.20);
-
-  var badges = '';
-  if (app.status === 'geplant') badges += '<span class="bs-card__badge">geplant</span>';
-  if (app.type === 'hub') badges += '<span class="bs-card__badge">mehrere Funktionen</span>';
-
-  var btnHtml, roleHint = '';
-  if (installed) {
-    btnHtml = '<button class="bs-card__btn bs-card__btn--installed" data-action="uninstall" data-id="' + app.id + '">✓ Installiert</button>';
-  } else if (erlaubt) {
-    btnHtml = '<button class="bs-card__btn bs-card__btn--install" data-action="install" data-id="' + app.id + '">Installieren</button>';
-  } else {
-    if (hakenSeite) {
-      btnHtml = '<button class="bs-card__btn bs-card__btn--locked" disabled>Haken fehlt</button>';
-      roleHint = '<div class="bs-card__rolehint">Freigabe einzeln je Person — Ulf fragen</div>';
-    } else {
-      btnHtml = '<button class="bs-card__btn bs-card__btn--locked" disabled>Rolle fehlt</button>';
-      roleHint = '<div class="bs-card__rolehint">Benötigt: ' + bsEscapeHtml(bsRoleLabel(app.roles)) + '</div>';
-    }
-  }
-
-  return '<div class="bs-card' + (!installed && !erlaubt ? ' bs-card--locked' : '') + '">' +
-      '<div class="bs-card__icon" style="background:' + iconBg + ';color:' + bsEscapeHtml(app.color || '#c07a10') + ';">' + bsEscapeHtml(app.icon || '▫️') + '</div>' +
-      '<div class="bs-card__body">' +
-        '<div class="bs-card__name">' + bsEscapeHtml(app.name) + badges + '</div>' +
-        roleHint +
-      '</div>' +
-      btnHtml +
-    '</div>';
-}
-
 function bsCatalogApps() {
   // Hub-Kind-Kacheln (a.hub gesetzt) tauchen wie im echten Grid nicht
   // einzeln auf. Gepinnte Kacheln (aktuell nur der BackStore selbst)
@@ -331,35 +441,219 @@ function bsCatalogApps() {
   return (window.BOS_APPS || []).filter(function (a) { return !a.hub && !a.pinned && a.type !== 'system'; });
 }
 
-function bsRender() {
-  var state = bsLoadState();
-  var grid = document.getElementById('bsGrid');
-  var noProfile = document.getElementById('bsNoProfile');
-  var countEl = document.getElementById('bsCount');
+/* ---------- Zustand der Seite ---------- */
+var SCHMAL_UNTER_PX = 640;   /* Stellschraube: darunter Liste und Seite im Wechsel */
+var BS = {
+  gewaehlt: null,             /* id der rechts gezeigten App */
+  offen: {},                  /* aufgeklappte Bestandteile */
+  texte: { stand: 'aus', daten: {}, grund: '', art: '' },   /* 'aus' | 'lade' | 'bereit' | 'fehler' */
+  edit: null,                 /* { id, basis, inhalt, fehler, meldung, ok, fassungen } — nur Admin */
+  speichert: false
+};
+var T = window.BOS_BACKSTORE_TEXTE;
+var LOGIK = window.BOS_NFC_QR_LOGIK;
 
-  var data = bsGetProfileData(state);
-  if (!data) {
-    grid.innerHTML = '';
-    countEl.textContent = '';
-    noProfile.style.display = 'block';
-    return;
-  }
-  noProfile.style.display = 'none';
-
-  var profile = window.BOS_PROFIL_LOOKUP.findeAktiv(state);
-  var role = profile ? profile.role : null;
-  var kontoOverrides = profile ? profile.kontoOverrides : null;
-  var kontoHaken = profile ? profile.kontoHaken : null;
-
-  var apps = bsCatalogApps();
-  grid.innerHTML = apps.map(function (a) { return bsRenderCard(a, data, role, kontoOverrides, kontoHaken); }).join('');
-  // 16.10.2026: nur IDs zählen, die im Katalog stehen (eigene Kacheln und
-  // ein altes 'settings' in installed zählten vorher mit).
-  var imKatalog = apps.filter(function (a) { return data.installed.indexOf(a.id) !== -1; }).length;
-  countEl.textContent = imKatalog + ' von ' + apps.length + ' installiert';
+function bsProfil() { return window.BOS_PROFIL_LOOKUP ? window.BOS_PROFIL_LOOKUP.findeAktiv(bsLoadState()) : null; }
+function bsIstAdmin() { var p = bsProfil(); return !!(p && p.role === 'admin'); }
+function bsApps() { return window.BOS_APPS || []; }
+function bsAppNachId(id) { return bsApps().filter(function (a) { return a.id === id; })[0] || null; }
+function bsFeste() { return LOGIK && LOGIK.FESTE_ZIELE ? LOGIK.FESTE_ZIELE : []; }
+function bsFestNachId(id) { return bsFeste().filter(function (f) { return f.id === id; })[0] || null; }
+function bsEintragNachId(id) { return bsAppNachId(id) || bsFestNachId(id); }
+/* Anzeigename; feste Ziele mit Gruppe wie in der NFC-Zentrale („Teigecke · Vorbereitungen“) */
+function bsName(a) {
+  if (!a) return '';
+  if (bsAppNachId(a.id)) return a.name;
+  var s = a.seite ? bsAppNachId(a.seite) : null, h = s && s.hub ? bsAppNachId(s.hub) : null;
+  return (h ? h.name + ' · ' : '') + a.name;
+}
+function bsHeute() { return T ? T.datumHeute() : ''; }
+function bsDarf(app) {
+  var p = bsProfil();
+  return window.BOS_ACCESS ? window.BOS_ACCESS.can(app.id, p ? p.role : null, p ? p.kontoOverrides : null, p ? p.kontoHaken : null) : true;
 }
 
-document.getElementById('bsGrid').addEventListener('click', function (e) {
+/* Liste: Bereiche in Registry-Reihenfolge, darin die Apps (ohne Hub-Kinder und Systemeinträge;
+   der BackStore steht mit „immer da“ dabei). Admin: Gruppe „Nur auf dem Zugangsblatt“ am Ende. */
+function bsListenGruppen() {
+  var apps = bsApps().filter(function (a) { return !a.hub && a.type !== 'system'; });
+  var gruppen = (window.BOS_BEREICHE || []).map(function (b) {
+    return { id: b.id, titel: b.titel, eintraege: apps.filter(function (a) { return window.BOS_BEREICH_VON(a) === b.id; }) };
+  }).filter(function (g) { return g.eintraege.length; });
+  if (bsIstAdmin() && bsFeste().length) gruppen.push({ id: 'nur_blatt', titel: t('nur_blatt'), eintraege: bsFeste() });
+  return gruppen;
+}
+function bsZahlen(id) { return T && BS.texte.stand === 'bereit' ? T.zahlen(BS.texte.daten, id, bsApps(), bsHeute()) : null; }
+
+function bsRenderListe(data) {
+  var html = '';
+  bsListenGruppen().forEach(function (g) {
+    html += '<div class="bs-gruppe-titel">' + bsEscapeHtml(g.titel) + '</div>';
+    g.eintraege.forEach(function (a) {
+      var fest = g.id === 'nur_blatt';
+      var installiert = !fest && data.installed.indexOf(a.id) !== -1;
+      var gesperrt = !fest && !a.pinned && !installiert && !bsDarf(a);
+      var z = bsZahlen(a.id);
+      var zusatz = a.pinned ? t('immer_da') : a.status === 'geplant' ? t('geplant') : '';
+      html += '<button type="button" class="bs-eintrag' + (BS.gewaehlt === a.id ? ' aktiv' : '') + (gesperrt ? ' bs-eintrag--gesperrt' : '') + '" data-waehle="' + bsEscapeHtml(a.id) + '">' +
+        '<span class="bs-eintrag__icon" style="background:' + bsHexToRgba(a.color, 0.20) + ';">' + bsEscapeHtml(a.icon || '▫️') + '</span>' +
+        '<span class="bs-eintrag__name">' + bsEscapeHtml(bsName(a)) + (zusatz ? ' <span class="bs-eintrag__zusatz">' + bsEscapeHtml(zusatz) + '</span>' : '') + '</span>' +
+        (z && z.neu ? '<span class="bs-neu" title="neu in den letzten 14 Tagen" aria-label="neu">•</span>' : '') +
+        (installiert ? '<span class="bs-ok" title="installiert" aria-label="installiert">✓</span>' : '') +
+        '</button>';
+    });
+  });
+  document.getElementById('bsListe').innerHTML = html;
+}
+
+/* Knopf rechts — dieselben Zustände und Texte wie die Karte der v0.3 */
+function bsKnopfHTML(app, data) {
+  if (app.pinned) return '<div class="bs-card__rolehint">' + bsEscapeHtml(t('immer_da_hinweis')) + '</div>';
+  var installed = data.installed.indexOf(app.id) !== -1;
+  var erlaubt = bsDarf(app);
+  // 10.10.2026: Haken-Seiten (Registry-Feld haken) hängen an einem Haken im Konto, nicht an der Rolle.
+  var hakenSeite = !!(app.haken && app.haken.length);
+  if (installed) return '<button class="bs-card__btn bs-card__btn--installed" data-action="uninstall" data-id="' + bsEscapeHtml(app.id) + '">' + t('installiert') + '</button>';
+  if (erlaubt) return '<button class="bs-card__btn bs-card__btn--install" data-action="install" data-id="' + bsEscapeHtml(app.id) + '">' + t('installieren') + '</button>';
+  if (hakenSeite) return '<button class="bs-card__btn bs-card__btn--locked" disabled>' + t('haken_fehlt') + '</button><div class="bs-card__rolehint">' + t('haken_hinweis') + '</div>';
+  return '<button class="bs-card__btn bs-card__btn--locked" disabled>' + t('rolle_fehlt') + '</button><div class="bs-card__rolehint">' + t('benoetigt') + bsEscapeHtml(bsRoleLabel(app.roles)) + '</div>';
+}
+
+function bsVerlaufHTML(verlauf) {
+  if (!verlauf || !verlauf.length) return '';
+  var heute = bsHeute();
+  return '<ul class="bs-verlauf">' + T.verlaufSortiert(verlauf).map(function (e) {
+    return '<li><span class="bs-verlauf__datum">' + bsEscapeHtml(T.anzeigeDatum(e.datum)) + '</span><span>' +
+      (e.teil ? '<span class="bs-verlauf__teil">' + bsEscapeHtml(e.teil) + ':</span> ' : '') + bsEscapeHtml(e.text) +
+      (T.istNeu(e.datum, heute) ? ' <span class="bs-neu" aria-label="neu">•</span>' : '') + '</span></li>';
+  }).join('') + '</ul>';
+}
+/* „Was ist neu“ eines Ordners: eigener Verlauf + der seiner Seiten (mit Namen davor), gemeinsamer
+   Text (wieBei) einmal — dieselbe Menge, die die Zahlen zählen (Skizze Konzept §3.1). */
+function bsVerlaufGesamt(app) {
+  var r = bsTexteVon(app.id), aus = r ? r.verlauf.slice() : [], quellen = {};
+  if (r) quellen[r.quelle] = true;
+  if (app.type === 'hub') T.kinder(bsApps(), app.id).forEach(function (k) {
+    var kr = bsTexteVon(k.id);
+    if (!kr || quellen[kr.quelle]) return;
+    quellen[kr.quelle] = true;
+    var name = kr.quelle !== k.id ? (bsEintragNachId(kr.quelle) || k).name : k.name;
+    kr.verlauf.forEach(function (e) { aus.push({ datum: e.datum, text: e.text, teil: name }); });
+  });
+  return aus;
+}
+function bsTexteVon(id) { return T && BS.texte.stand === 'bereit' ? T.aufgeloest(BS.texte.daten, id) : null; }
+function bsGemeinsamHTML(r) {
+  if (!r || !r.wieBei) return '';
+  var z = bsEintragNachId(r.wieBei);
+  return '<div class="bs-gemeinsam">' + bsEscapeHtml(t('gemeinsam', { name: z ? z.name : r.wieBei })) + '</div>';
+}
+
+function bsRenderSeite(data) {
+  var el = document.getElementById('bsSeite');
+  var id = BS.gewaehlt;
+  var app = id ? bsEintragNachId(id) : null;
+  if (!app) { el.innerHTML = ''; return; }
+  var fest = !!bsFestNachId(id) && !bsAppNachId(id);
+  var r = bsTexteVon(id);
+  var z = bsZahlen(id);
+  var html = '<button type="button" class="bos-btn bs-zurueck" data-aktion="zurueck">' + t('zurueck') + '</button>';
+  html += '<div class="bs-kopf"><div class="bs-kopf__icon" style="background:' + bsHexToRgba(app.color, 0.20) + ';">' + bsEscapeHtml(app.icon || '▫️') + '</div>' +
+    '<div class="bs-kopf__text"><div class="bs-kopf__name">' + bsEscapeHtml(bsName(app)) +
+    (app.type === 'hub' ? '<span class="bs-badge">' + t('ordner') + '</span>' : '') +
+    (app.status === 'geplant' ? '<span class="bs-badge">' + t('geplant') + '</span>' : '') + '</div>' +
+    '<div class="bs-zahlen" id="bsZahlen">' + bsEscapeHtml(T ? T.zahlenText(z, app.status === 'geplant') : '') + '</div></div>' +
+    '<div class="bs-knopf-feld">' + (fest ? '<div class="bs-card__rolehint">' + bsEscapeHtml(t('nur_blatt_hinweis')) + '</div>' : bsKnopfHTML(app, data)) + '</div></div>';
+  if (BS.texte.stand === 'lade') html += '<p class="bs-leer">' + t('texte_lade') + '</p>';
+  else if (r && (r.kurz || r.lang)) {
+    if (r.kurz) html += '<p class="bs-kurz" id="bsKurz">' + bsEscapeHtml(r.kurz) + '</p>';
+    if (r.lang) html += '<p class="bs-lang" id="bsLang">' + bsEscapeHtml(r.lang) + '</p>';
+    html += bsGemeinsamHTML(r);
+  } else if (BS.texte.stand === 'bereit') html += '<p class="bs-leer">' + t('kein_text') + '</p>';
+  if (window.bsStiftHTML) html += window.bsStiftHTML(id);
+  var teile = app.type === 'hub' ? T.kinder(bsApps(), app.id) : [];
+  if (teile.length) {
+    html += '<div class="bs-abschnitt">' + t('darin') + '</div>';
+    teile.forEach(function (k) {
+      var kr = bsTexteVon(k.id);
+      var auf = !!BS.offen[k.id];
+      html += '<div class="bs-teil"><button type="button" class="bs-teil__kopf" data-klappe="' + bsEscapeHtml(k.id) + '" aria-expanded="' + auf + '">' +
+        '<span>' + bsEscapeHtml(k.icon || '') + '</span><span><span class="bs-teil__name">' + bsEscapeHtml(k.name) + '</span>' +
+        (bsDarf(k) ? '' : '<span class="bs-schloss">' + t('schloss') + '</span>') +
+        (kr && kr.kurz ? '<div class="bs-teil__kurz">' + bsEscapeHtml(kr.kurz) + '</div>' : '') + '</span>' +
+        '<span class="bs-teil__pfeil">' + (auf ? '▲' : '▼') + '</span></button>';
+      if (auf) {
+        html += '<div class="bs-teil__innen">' + (kr && kr.lang ? '<p class="bs-lang">' + bsEscapeHtml(kr.lang) + '</p>' : '') + bsGemeinsamHTML(kr) +
+          bsVerlaufHTML(kr ? kr.verlauf : []) + (window.bsStiftHTML ? window.bsStiftHTML(k.id) : '') + '</div>';
+      }
+      html += '</div>';
+    });
+  }
+  var gesamt = bsVerlaufGesamt(app);
+  if (gesamt.length) html += '<div class="bs-abschnitt">' + t('was_ist_neu') + '</div>' + bsVerlaufHTML(gesamt);
+  el.innerHTML = html;
+}
+
+function bsSchmal() { return window.innerWidth < SCHMAL_UNTER_PX; }
+function bsRender() {
+  var state = bsLoadState();
+  var data = bsGetProfileData(state);
+  var noProfile = document.getElementById('bsNoProfile');
+  var countEl = document.getElementById('bsCount');
+  if (!data) {
+    document.getElementById('bsStore').hidden = true;
+    countEl.textContent = '';
+    noProfile.textContent = t('kein_profil');
+    noProfile.hidden = false;
+    return;
+  }
+  noProfile.hidden = true;
+  document.getElementById('bsStore').hidden = false;
+  // 16.10.2026: nur IDs zählen, die im Katalog stehen (eigene Kacheln und
+  // ein altes 'settings' in installed zählten vorher mit).
+  var apps = bsCatalogApps();
+  var imKatalog = apps.filter(function (a) { return data.installed.indexOf(a.id) !== -1; }).length;
+  countEl.textContent = imKatalog + ' von ' + apps.length + ' installiert';   /* wie v0.3 (_PRUEF_einstellungen_fuer_alle.js E19) */
+  if (BS.gewaehlt && !bsEintragNachId(BS.gewaehlt)) BS.gewaehlt = null;
+  if (BS.gewaehlt && bsFestNachId(BS.gewaehlt) && !bsAppNachId(BS.gewaehlt) && !bsIstAdmin()) BS.gewaehlt = null;
+  if (!BS.gewaehlt && !bsSchmal()) { var g = bsListenGruppen()[0]; BS.gewaehlt = g ? g.eintraege[0].id : null; }
+  document.body.classList.toggle('bs-schmal', bsSchmal());
+  bsRenderListe(data);
+  bsRenderSeite(data);
+  if (window.bsRenderOben) window.bsRenderOben();
+}
+function bsZeige(ansicht) {
+  document.body.classList.toggle('bs-zeige-liste', ansicht === 'liste');
+  document.body.classList.toggle('bs-zeige-seite', ansicht === 'seite');
+}
+
+/* App wählen — mit Rückfrage, wenn im Stift noch Ungespeichertes steht */
+function bsWaehle(id) {
+  var weiter = function () {
+    BS.gewaehlt = id; BS.offen = {};
+    if (window.bsEditVerwerfen) window.bsEditVerwerfen();
+    bsZeige('seite'); bsRender();
+    document.getElementById('bsSeite').scrollTop = 0;
+  };
+  if (window.bsEditGeaendert && window.bsEditGeaendert()) {
+    if (window.bsFrage) { window.bsFrage('Ungespeicherte Änderungen', 'Im Stift steht noch etwas, das nicht gespeichert ist. Verwerfen und die andere App öffnen?', 'Verwerfen', weiter); return; }
+    if (!confirm('Ungespeicherte Änderungen verwerfen?')) return;
+  }
+  weiter();
+}
+
+/* Klicks: Installieren/Entfernen (Mechanik unverändert aus v0.3), wählen, zurück, aufklappen */
+document.getElementById('bsStore').addEventListener('click', function (e) {
+  var w = e.target.closest('[data-waehle]');
+  if (w) { bsWaehle(w.getAttribute('data-waehle')); return; }
+  var k = e.target.closest('[data-klappe]');
+  if (k) { var kid = k.getAttribute('data-klappe'); BS.offen[kid] = !BS.offen[kid]; bsRender(); return; }
+  var z = e.target.closest('[data-aktion="zurueck"]');
+  if (z) {
+    var weg = function () { if (window.bsEditVerwerfen) window.bsEditVerwerfen(); bsZeige('liste'); bsRender(); };
+    if (window.bsEditGeaendert && window.bsEditGeaendert() && window.bsFrage) { window.bsFrage('Ungespeicherte Änderungen', 'Verwerfen und zur Liste?', 'Verwerfen', weg); return; }
+    weg(); return;
+  }
   var btn = e.target.closest('button[data-action]');
   if (!btn) return;
   var id = btn.dataset.id;
@@ -372,7 +666,7 @@ document.getElementById('bsGrid').addEventListener('click', function (e) {
   if (action === 'install') {
     if (data.installed.indexOf(id) === -1) data.installed.push(id);
   } else if (action === 'uninstall') {
-    if (!confirm('Diese App wirklich deinstallieren? Du kannst sie jederzeit hier wieder installieren, es geht nichts verloren.')) return;
+    if (!confirm(t('entfernen_frage'))) return;
     data.installed = data.installed.filter(function (x) { return x !== id; });
     delete data.positions[id]; // sonst bliebe eine leere Zelle dauerhaft reserviert
   } else {
@@ -388,26 +682,412 @@ document.getElementById('bsGrid').addEventListener('click', function (e) {
 window.addEventListener('storage', function (e) {
   if (e.key === BS_STORAGE_KEY) bsRender();
 });
+/* Schmal/breit nach der Fensterbreite des Store-Fensters, nicht nach dem Gerät */
+var bsWarSchmal = null;
+window.addEventListener('resize', function () {
+  var s = bsSchmal();
+  if (s === bsWarSchmal) return;
+  bsWarSchmal = s;
+  if (!s && !BS.gewaehlt) bsZeige('liste');
+  bsRender();
+});
 
-// ── Hilfe-Sheet ──
+// ── Hilfe-Sheet (kanonisch: BACKSTORE_DOKU.md §8) ──
 var BS_HILFE_SCHRITTE = [
-  ['Wofür ist der BackStore?', 'Hier holst du dir die Apps auf deinen Desktop, die du wirklich brauchst — dein Desktop startet leer (bis auf den BackStore selbst) und füllt sich nur durch das, was du hier installierst.'],
-  ['Installieren', 'Tippe bei einer App auf „Installieren" — sie erscheint danach auf deinem Desktop. Wo genau, sucht sich der Launcher automatisch aus.'],
-  ['Deinstallieren', 'Tippe bei einer installierten App auf „✓ Installiert", um sie wieder zu entfernen. Es geht dabei nichts verloren — du kannst sie jederzeit hier erneut installieren.'],
-  ['„Rolle fehlt"', 'Manche Apps sind an eine bestimmte Rolle gebunden. Fehlt dir diese Rolle, siehst du die App trotzdem — so weißt du, was es gibt — kannst sie aber erst installieren, sobald der Admin dir die passende Rolle zuweist.'],
-  ['„Haken fehlt"', 'Ein paar Apps gibt Ulf einzeln je Person frei, unabhängig von der Rolle (zum Beispiel die Reparaturanfrage). Bekommst du den Haken, starte den Launcher einmal neu — dann lässt sich die App hier installieren.']
+  ['Wofür ist der BackStore?', 'Hier holst du dir die Apps auf deinen Desktop, die du wirklich brauchst. Dein Desktop startet leer (bis auf den BackStore selbst) und füllt sich nur durch das, was du hier installierst. Zu jeder App gibt es eine eigene Seite: was sie kann, für wen sie ist und was sich zuletzt getan hat.'],
+  ['Liste und App-Seite', 'Links stehen alle Apps, sortiert nach Bereichen: Produktion, Verbrauch, Allgemein, Verwaltung, Vertrieb & Filiale. Tippe eine App an, dann erscheint rechts ihre Seite. Ist das Fenster schmal, zum Beispiel am Handy, siehst du zuerst nur die Liste. Die App-Seite füllt dann das ganze Fenster, und „← Zurück“ bringt dich zur Liste.'],
+  ['Die Zeichen in der Liste', '✓ heißt: Die App ist auf deinem Desktop. Ein Punkt • heißt: Bei dieser App hat sich in den letzten 14 Tagen etwas getan. Was genau, steht unten auf ihrer Seite unter „Was ist neu“.'],
+  ['Installieren', 'Tippe auf der App-Seite auf „Installieren“. Die App erscheint auf deinem Desktop, den Platz sucht sich der Launcher selbst aus.'],
+  ['Deinstallieren', 'Tippe auf „✓ Installiert“, um die App wieder vom Desktop zu nehmen. Es geht dabei nichts verloren, du kannst sie jederzeit hier neu installieren.'],
+  ['Ordner und ihre Seiten', 'Manche Apps sind Ordner mit mehreren Seiten, zum Beispiel der Froster. Unter „Darin“ steht jede Seite mit einem Satz. Tippe eine an, dann klappen ihre Beschreibung und ihr Verlauf auf. Ein Schloss 🔒 heißt: Diese Seite öffnet deine Rolle nicht.'],
+  ['Zahlen unter dem Namen', 'Unter dem Namen steht, seit wann es die App gibt und wie oft sie verbessert wurde, zum Beispiel „live seit 16.08.2026 · 9 Updates · zuletzt 15.10.“. Gezählt wird jeder Eintrag im Verlauf der App und ihrer Seiten, die erste Fassung mitgezählt.'],
+  ['„Rolle fehlt“', 'Manche Apps sind an eine bestimmte Rolle gebunden. Fehlt dir diese Rolle, siehst du die App trotzdem, damit du weißt, was es gibt. Installieren kannst du sie erst, sobald der Admin dir die passende Rolle zuweist.'],
+  ['„Haken fehlt“', 'Ein paar Apps gibt Ulf einzeln je Person frei, unabhängig von der Rolle (zum Beispiel die Reparaturanfrage). Bekommst du den Haken, starte den Launcher einmal neu. Dann lässt sich die App hier installieren.'],
+  ['Wenn oben ein Hinweis steht', 'Die Beschreibungen kommen aus der Datenbank. Steht oben ein Hinweis, konnten sie nicht geladen werden; dahinter steht der Grund, zum Beispiel kein Netz. Installieren und Deinstallieren gehen trotzdem, es fehlen dann nur die Texte.'],
+  ['Nur für den Admin: Texte pflegen', 'Mit ✎ bearbeitest du Kurztext, Langtext und Verlauf einer App, auch die Seiten in einem Ordner und die zwei Ziele, die nur auf dem Zugangsblatt stehen. Der Kurztext ist ein Satz mit höchstens 160 Zeichen. Das Feld nimmt nicht mehr an, und er steht auch auf dem Zugangsblatt. Der Verlauf hat je Eintrag ein Datum und eine Zeile, nur was für Kollegen zählt. Die vier Stationen im Produktionsplaner teilen sich Langtext und Verlauf, beides bearbeitest du bei Rondo. Erst „Speichern“ schreibt in die Datenbank, vorher wird die alte Fassung gesichert. Hat inzwischen jemand anderes gespeichert, sagt die Seite es dir und überschreibt nichts.'],
+  ['Nur für den Admin: Ältere Fassungen', 'Beim Bearbeiten zeigt „Ältere Fassungen“ die letzten 10 Stände dieser App. „Diese Fassung zurückholen“ zeigt vorher, was sich ändert, und speichert sie als neue Fassung. Dabei geht nichts verloren.'],
+  ['Nur für den Admin: Apps ohne Text', 'Oben steht, wie viele Apps noch keinen Kurztext haben; antippen zeigt, welche. „Texte aus Datei anlegen“ liest eine Texte-Datei aus einer Lieferung ein, zeigt vorher genau, was angelegt wird, und legt nur Texte für Apps an, die noch keinen haben. Ein vorhandener Text wird dabei nie überschrieben.']
 ];
 function bsOeffneHilfe() {
   var inhalt = document.getElementById('bs-hilfe-inhalt');
   inhalt.innerHTML = BS_HILFE_SCHRITTE.map(function (s) {
     return '<div class="bs-hilfe-schritt"><div class="bs-hilfe-titel">' + s[0] + '</div><div class="bs-hilfe-text">' + s[1] + '</div></div>';
   }).join('');
-  document.getElementById('bs-hilfe-modal').style.display = 'block';
+  document.getElementById('bs-hilfe-modal').hidden = false;
 }
-function bsSchliesseHilfe() { document.getElementById('bs-hilfe-modal').style.display = 'none'; }
+function bsSchliesseHilfe() { document.getElementById('bs-hilfe-modal').hidden = true; }
+document.getElementById('bsHilfeKnopf').addEventListener('click', bsOeffneHilfe);
+document.getElementById('bsHilfeZu').addEventListener('click', bsSchliesseHilfe);
 
-// ── Start ──
+// ── Start Block 1 ──
+try {
+  if (!T) throw new Error('bos_backstore_texte.js nicht geladen — Liste geht, Texte nicht. Seite hart neu laden.');
+} catch (err) { bsZeigeFehler('Teil der Seite fehlt', err); }
+bsWarSchmal = bsSchmal();
+bsZeige(bsSchmal() ? 'liste' : 'seite');
 bsRender();
+</script>
+
+<!-- ═══ BLOCK 2 — Texte aus der Datenbank. Fällt das aus, läuft Block 1 weiter. ═══ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script>
+/* Regelstand-Probe (RK §13): die Seite liest bos_regelstand/<Fassung>.
+   REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft alle elf Stellen). */
+var REGEL_FASSUNG = 'backstore-2026-10-21';   /* RK §26 */
+var REGEL_DATEI = 'firestore_regeln_2026-10-21_backstore.rules';
+var SPEICHER_ZEITLIMIT_MS = 30000;
+
+function bsKennung() {
+  try { var n = firebase.auth().currentUser; return n && n.email ? n.email.split('@')[0] : null; } catch (e) { return null; }
+}
+function bsDb() { return (typeof firebase !== 'undefined' && window.db) ? window.db : null; }
+
+/* ---------- Oben: Hinweis zum Laden, Lücken für den Admin ---------- */
+function bsHinweis(html, warn) {
+  var el = document.getElementById('bsTexteHinweis');
+  if (!html) { el.hidden = true; el.innerHTML = ''; return; }
+  el.className = 'bs-hinweis' + (warn ? ' warn' : '');
+  el.innerHTML = html; el.hidden = false;
+}
+window.bsRenderOben = function () {
+  var tx = BS.texte;
+  if (tx.stand === 'fehler') bsHinweis('⚠︎ ' + bsEscapeHtml(tx.grund) + ' Installieren und Deinstallieren gehen weiter.' + (tx.roh ? '<div class="bs-roh">' + bsEscapeHtml(tx.roh) + '</div>' : ''), true);
+  else if (tx.stand === 'bereit' && tx.regelAlt) bsHinweis('⚠︎ Die eingesetzte Datenbank-Regel kennt die BackStore-Texte noch nicht — <code>' + bsEscapeHtml(REGEL_DATEI) + '</code> einsetzen. Bis dahin ist Speichern gesperrt.', true);
+  else bsHinweis('');
+  var lu = document.getElementById('bsLuecken');
+  if (!bsIstAdmin() || tx.stand !== 'bereit') { lu.hidden = true; lu.innerHTML = ''; return; }
+  var ids = T.bekannteIds(bsApps(), bsFeste());
+  var fehlt = T.luecken(tx.daten, ids);
+  if (!fehlt.length) { lu.hidden = true; lu.innerHTML = ''; return; }
+  lu.innerHTML = '<details><summary>⚠︎ ' + fehlt.length + (fehlt.length === 1 ? ' App ohne Kurztext' : ' Apps ohne Kurztext') + '</summary><ul>' +
+    fehlt.map(function (id) { var a = bsEintragNachId(id); return '<li>' + bsEscapeHtml(a ? bsName(a) : id) + ' <span class="bs-roh">(' + bsEscapeHtml(id) + ')</span></li>'; }).join('') + '</ul></details>' +
+    '<div class="bs-knoepfe"><button type="button" class="bos-btn bos-btn--amber" id="bsDateiKnopf">Texte aus Datei anlegen</button></div>';
+  lu.hidden = false;
+  document.getElementById('bsDateiKnopf').onclick = function () { var f = document.getElementById('bsDatei'); f.value = ''; f.click(); };
+};
+
+/* ---------- Laden ---------- */
+async function bsLadeTexte(ruhig) {
+  var db = bsDb();
+  if (!db) { BS.texte = { stand: 'fehler', daten: {}, grund: 'Datenbank nicht geladen (Firebase fehlt — kein Netz beim Öffnen?). Die Beschreibungen fehlen.', roh: '' }; bsRender(); return; }
+  if (!ruhig) { BS.texte = { stand: 'lade', daten: {}, grund: '' }; bsRender(); }
+  try {
+    if (window.BOS_AUTH_READY) await window.BOS_AUTH_READY;
+    var daten = await T.ladeAlle(db);
+    var regelAlt = false;
+    try { await T.mitZeitlimit(db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }), 15000); }
+    catch (e2) { regelAlt = e2 && e2.code === 'permission-denied'; if (!regelAlt) console.warn('[BackStore] Regelstand nicht prüfbar', e2); }
+    BS.texte = { stand: 'bereit', daten: daten, grund: '', regelAlt: regelAlt };
+  } catch (err) {
+    console.error('[BackStore] Texte nicht geladen', err);
+    var art = T.fehlerArt(err), grund;
+    if (art === 'berechtigung') {
+      /* Konto gesperrt oder Regel alt? Das eigene Konto-Dokument darf jeder mit Kennung lesen (RK §13 Grenze F1). */
+      var gesperrt = false;
+      try { var k = bsKennung(); if (k) { var s = await T.mitZeitlimit(db.collection('bos_accounts').doc(k).get({ source: 'server' }), 10000); gesperrt = !s.exists || s.data().freigeschaltet !== true; } }
+      catch (e3) { console.warn('[BackStore] Konto nicht lesbar', e3); }
+      grund = gesperrt ? 'Dein Konto ist noch nicht freigeschaltet. Die Beschreibungen siehst du danach.'
+        : 'Die Beschreibungen sind gesperrt: Die Datenbank-Regel ist noch nicht eingesetzt (' + REGEL_DATEI + ').';
+    } else if (art === 'netz') grund = 'Kein Netz: Die Beschreibungen konnten nicht geladen werden.';
+    else if (art === 'zeitlimit') grund = 'Keine Antwort der Datenbank: Die Beschreibungen konnten nicht geladen werden.';
+    else grund = 'Die Beschreibungen konnten nicht geladen werden.';
+    BS.texte = { stand: 'fehler', daten: {}, grund: grund, roh: T.fehlerText(err) };
+  }
+  bsRender();
+}
+
+/* ---------- Rückfrage-Blatt ---------- */
+function bsBlatt(titel, inhaltHTML, knoepfe) {
+  document.getElementById('bsBlattTitel').textContent = titel;
+  document.getElementById('bsBlattInhalt').innerHTML = inhaltHTML;
+  var f = document.getElementById('bsBlattFehler'); f.hidden = true; f.textContent = '';
+  var kn = document.getElementById('bsBlattKnoepfe');
+  kn.innerHTML = '';
+  knoepfe.forEach(function (k) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'bos-btn' + (k.amber ? ' bos-btn--amber' : '');
+    b.textContent = k.text; if (k.id) b.id = k.id; b.disabled = !!k.aus;
+    b.onclick = function () { if (k.tun) k.tun(b); else bsBlattZu(); };
+    kn.appendChild(b);
+  });
+  document.getElementById('bsBlatt').hidden = false;
+}
+function bsBlattZu() { document.getElementById('bsBlatt').hidden = true; }
+function bsBlattFehler(text) { var f = document.getElementById('bsBlattFehler'); f.textContent = text; f.hidden = false; }
+window.bsFrage = function (titel, text, ja, tun) {
+  bsBlatt(titel, '<p>' + bsEscapeHtml(text) + '</p>', [{ text: 'Weiterarbeiten' }, { text: ja, amber: true, tun: function () { bsBlattZu(); tun(); } }]);
+};
+
+/* ---------- Stift (nur Rolle admin; die Tür ist die Regel RK §26) ---------- */
+function bsServerDoc(id) { return BS.texte.daten && BS.texte.daten[id] ? BS.texte.daten[id] : null; }
+function bsInhaltJSON(inh) { return JSON.stringify({ kurz: inh.kurz, lang: inh.lang, verlauf: inh.verlauf, wieBei: inh.wieBei || '' }); }
+window.bsEditGeaendert = function () { return !!BS.edit && bsInhaltJSON(BS.edit.inhalt) !== BS.edit.basis; };
+window.bsEditVerwerfen = function () { BS.edit = null; };
+window.bsStiftHTML = function (id) {
+  if (!bsIstAdmin() || BS.texte.stand !== 'bereit') return '';
+  if (!BS.edit || BS.edit.id !== id) return '<div class="bs-stift"><button type="button" class="bos-btn" data-stift="' + bsEscapeHtml(id) + '">✎ Texte bearbeiten</button></div>';
+  var e = BS.edit, inh = e.inhalt, G = T.GRENZEN;
+  var fehler = T.pruefeInhalt(id, inh, bsHeute());
+  var html = '<div class="bs-edit" id="bsEdit"><h3>✎ ' + bsEscapeHtml(bsName(bsEintragNachId(id)) || id) + '</h3>' +
+    '<div class="bs-feld"><label for="bsKurzFeld">Kurztext <span class="bs-zaehler" id="bsKurzZaehler">' + inh.kurz.length + ' / ' + G.KURZ + '</span></label>' +
+    '<textarea class="bos-input" id="bsKurzFeld" rows="2" maxlength="' + G.KURZ + '">' + bsEscapeHtml(inh.kurz) + '</textarea></div>';
+  if (inh.wieBei) {
+    var z = bsEintragNachId(inh.wieBei);
+    html += '<div class="bs-gemeinsam">' + bsEscapeHtml(t('gemeinsam', { name: z ? z.name : inh.wieBei })) + ' Dort bearbeiten: <button type="button" class="bos-btn" data-stift="' + bsEscapeHtml(inh.wieBei) + '">✎ ' + bsEscapeHtml(z ? z.name : inh.wieBei) + '</button></div>';
+  } else {
+    html += '<div class="bs-feld"><label for="bsLangFeld">Langtext <span class="bs-zaehler" id="bsLangZaehler">' + inh.lang.length + ' / ' + G.LANG + '</span></label>' +
+      '<textarea class="bos-input" id="bsLangFeld" rows="6" maxlength="' + G.LANG + '">' + bsEscapeHtml(inh.lang) + '</textarea></div>' +
+      '<div class="bs-feld"><label>Verlauf <span class="bs-zaehler">' + inh.verlauf.length + ' / ' + G.VERLAUF + ' Einträge, das Neueste oben</span></label>' +
+      '<button type="button" class="bos-btn" data-vz="neu">＋ Eintrag</button><div style="margin-top:8px">' +
+      inh.verlauf.map(function (v, i) {
+        var vf = T.pruefeInhalt(id, { kurz: '', lang: '', verlauf: [v] }, bsHeute());
+        return '<div class="bs-vz"><input type="date" class="bos-input" data-vz-datum="' + i + '" value="' + bsEscapeHtml(v.datum) + '">' +
+          '<input type="text" class="bos-input" data-vz-text="' + i + '" maxlength="' + G.VERLAUF_TEXT + '" value="' + bsEscapeHtml(v.text) + '">' +
+          '<button type="button" class="bos-btn" data-vz-weg="' + i + '" aria-label="Eintrag löschen">✕</button>' +
+          (vf.length ? '<div class="bs-vz-fehler">✕ ' + bsEscapeHtml(vf.map(function (x) { return x.grund; }).join(' · ')) + '</div>' : '') + '</div>';
+      }).join('') + '</div></div>';
+  }
+  var geaendert = window.bsEditGeaendert();
+  var sperre = [];
+  if (fehler.length) sperre.push(fehler.map(function (f) { return f.feld + ': ' + f.grund; }).join(' · '));
+  if (BS.texte.regelAlt) sperre.push('Regel noch nicht eingesetzt (' + REGEL_DATEI + ')');
+  html += (e.meldung ? '<div class="bs-edit-fehler" id="bsEditFehler" role="alert">' + bsEscapeHtml(e.meldung) + '</div>' : '') +
+    (sperre.length && geaendert ? '<div class="bs-edit-fehler" id="bsEditSperre">Speichern gesperrt: ' + bsEscapeHtml(sperre.join(' · ')) + '</div>' : '') +
+    '<div class="bs-knoepfe">' +
+    '<button type="button" class="bos-btn bos-btn--amber" data-edit="speichern"' + (!geaendert || sperre.length || BS.speichert ? ' disabled' : '') + '>' + (BS.speichert ? 'Speichert …' : e.konflikt ? 'Neu laden, Eingaben behalten' : 'Speichern') + '</button>' +
+    '<button type="button" class="bos-btn" data-edit="verwerfen">' + (geaendert ? 'Verwerfen' : 'Schließen') + '</button>' +
+    (bsServerDoc(id) ? '<button type="button" class="bos-btn" data-edit="fassungen">Ältere Fassungen</button>' : '') + '</div>' +
+    (e.fassungen ? bsFassungenHTML(e.fassungen) : '') + '</div>';
+  return html;
+};
+function bsBeginneEdit(id) {
+  var roh = bsServerDoc(id);
+  var inh = roh ? T.inhaltAus(roh) : { kurz: '', lang: '', verlauf: [] };
+  inh.verlauf = T.verlaufSortiert(inh.verlauf);   /* im Stift das Neueste oben */
+  BS.edit = { id: id, inhalt: inh, basis: bsInhaltJSON(inh), meldung: '', konflikt: false, fassungen: null };
+}
+/* Eingaben übernehmen, ohne neu zu zeichnen (Fokus bleibt im Feld) */
+document.getElementById('bsSeite').addEventListener('input', function (ev) {
+  if (!BS.edit) return;
+  var x = ev.target, inh = BS.edit.inhalt;
+  if (x.id === 'bsKurzFeld') { inh.kurz = x.value; document.getElementById('bsKurzZaehler').textContent = x.value.length + ' / ' + T.GRENZEN.KURZ; }
+  else if (x.id === 'bsLangFeld') { inh.lang = x.value; document.getElementById('bsLangZaehler').textContent = x.value.length + ' / ' + T.GRENZEN.LANG; }
+  else if (x.hasAttribute('data-vz-text')) inh.verlauf[Number(x.getAttribute('data-vz-text'))].text = x.value;
+  else if (x.hasAttribute('data-vz-datum')) inh.verlauf[Number(x.getAttribute('data-vz-datum'))].datum = x.value;
+  else return;
+  bsKnoepfeAktualisieren();
+});
+/* Nach dem Tippen: Knöpfe und Fehler neu, ohne die Felder anzufassen */
+var bsKnopfUhr = null;
+function bsKnoepfeAktualisieren() {
+  clearTimeout(bsKnopfUhr);
+  bsKnopfUhr = setTimeout(function () {
+    var akt = document.activeElement, aid = akt && (akt.id || akt.getAttribute('data-vz-text') !== null && 'vzt' + akt.getAttribute('data-vz-text') || akt.getAttribute('data-vz-datum') !== null && 'vzd' + akt.getAttribute('data-vz-datum'));
+    var pos = akt && typeof akt.selectionStart === 'number' ? akt.selectionStart : null;
+    bsRender();
+    var neu = null;
+    if (aid === 'bsKurzFeld' || aid === 'bsLangFeld') neu = document.getElementById(aid);
+    else if (aid && aid.indexOf('vzt') === 0) neu = document.querySelector('[data-vz-text="' + aid.slice(3) + '"]');
+    else if (aid && aid.indexOf('vzd') === 0) neu = document.querySelector('[data-vz-datum="' + aid.slice(3) + '"]');
+    if (neu) { neu.focus(); if (pos !== null && typeof neu.setSelectionRange === 'function') try { neu.setSelectionRange(pos, pos); } catch (e) { /* Datumsfeld */ } }
+  }, 600);
+}
+document.getElementById('bsSeite').addEventListener('click', function (ev) {
+  var s = ev.target.closest('[data-stift]');
+  if (s) {
+    var sid = s.getAttribute('data-stift');
+    var los = function () { bsBeginneEdit(sid); if (bsAppNachId(sid) && bsAppNachId(sid).hub && BS.gewaehlt !== sid) BS.offen[sid] = true; bsRender(); };
+    if (window.bsEditGeaendert()) { window.bsFrage('Ungespeicherte Änderungen', 'Im Stift steht noch etwas, das nicht gespeichert ist. Verwerfen?', 'Verwerfen', los); return; }
+    los(); return;
+  }
+  if (!BS.edit) return;
+  var inh = BS.edit.inhalt;
+  if (ev.target.closest('[data-vz="neu"]')) { inh.verlauf.unshift({ datum: bsHeute(), text: '' }); bsRender(); return; }
+  var w = ev.target.closest('[data-vz-weg]');
+  if (w) { inh.verlauf.splice(Number(w.getAttribute('data-vz-weg')), 1); bsRender(); return; }
+  var b = ev.target.closest('[data-edit]');
+  if (!b) return;
+  var was = b.getAttribute('data-edit');
+  if (was === 'verwerfen') {
+    if (window.bsEditGeaendert()) { window.bsFrage('Verwerfen?', 'Deine Änderungen an diesem Text gehen verloren.', 'Verwerfen', function () { BS.edit = null; bsRender(); }); return; }
+    BS.edit = null; bsRender(); return;
+  }
+  if (was === 'speichern') { if (BS.edit.konflikt) bsKonfliktNeuLaden(); else bsSpeichere(); return; }
+  if (was === 'fassungen') bsLadeFassungen();
+});
+
+function bsSpeicherFehlerText(err, id, geladenSid) {
+  var c = err && err.code;
+  if (c === 'permission-denied') return null;   /* Grund klärt bsSpeichere selbst */
+  if (c === 'unavailable') return 'Keine Verbindung zum Server (WLAN?). Nichts wurde gespeichert. ' + T.fehlerText(err);
+  if (c === 'zeitlimit') return 'Keine Bestätigung vom Server nach ' + (SPEICHER_ZEITLIMIT_MS / 1000) + ' s. Netz prüfen, dann die Seite neu laden und nachsehen. ' + T.fehlerText(err);
+  return 'Speichern fehlgeschlagen. ' + T.fehlerText(err);
+}
+/* Ein Batch: Sicherung + Text (bos_backstore_texte.js schreibe). vorher = Serverstand
+   Feld für Feld (zugleich Sperrzettel), beim Anlegen null. */
+async function bsSpeichere() {
+  var e = BS.edit; if (!e || BS.speichert) return;
+  var id = e.id, k = bsKennung(), db = bsDb();
+  var inh = { kurz: e.inhalt.kurz, lang: e.inhalt.lang, verlauf: e.inhalt.verlauf.slice().reverse() };   /* gespeichert: Ältestes zuerst */
+  if (e.inhalt.wieBei) inh.wieBei = e.inhalt.wieBei;
+  var f = T.pruefeInhalt(id, inh, bsHeute());
+  if (f.length) { e.meldung = 'Nicht gespeichert: ' + f.map(function (x) { return x.feld + ' ' + x.grund; }).join(' · '); bsRender(); return; }
+  if (!k || !db) { e.meldung = 'Nicht gespeichert: keine Anmeldung oder keine Datenbank — Seite neu laden.'; bsRender(); return; }
+  var vorher = bsServerDoc(id);
+  var aktion = vorher ? 'aendern' : 'anlegen';
+  BS.speichert = true; e.meldung = ''; bsRender();
+  try {
+    await T.mitZeitlimit(T.schreibe(db, firebase.firestore.FieldValue, id, inh, aktion, vorher, k), SPEICHER_ZEITLIMIT_MS);
+  } catch (err) {
+    console.error('[BackStore] Speichern fehlgeschlagen', err);
+    BS.speichert = false;
+    var text = bsSpeicherFehlerText(err);
+    if (text === null) {
+      var jetzt = null;
+      try { var sn = await db.collection(T.COLLECTION).doc(id).get({ source: 'server' }); jetzt = sn.exists ? sn.data() : null; } catch (e2) { /* bleibt null */ }
+      var gleich = (jetzt ? jetzt.sicherungId : null) === (vorher ? vorher.sicherungId : null);
+      if (!gleich) { e.konflikt = true; text = 'Inzwischen wurde dieser Text gespeichert (anderes Gerät?). „Neu laden, Eingaben behalten“ holt den neuen Stand, deine Eingaben bleiben stehen; dann noch einmal speichern. ' + T.fehlerText(err); }
+      else if (BS.texte.regelAlt) text = 'Die Datenbank hat abgelehnt: Die eingesetzte Regel kennt die BackStore-Texte noch nicht (' + REGEL_DATEI + '). ' + T.fehlerText(err);
+      else text = 'Die Datenbank hat abgelehnt: Texte speichern dürfen nur Konten mit Rolle admin (backstube02, systempflege). Angemeldet als ' + k + '. ' + T.fehlerText(err);
+    }
+    e.meldung = text; bsRender(); return;
+  }
+  BS.speichert = false;
+  BS.edit = null;
+  await bsLadeTexte(true);
+  bsHinweisKurz('✓ Gespeichert — gilt sofort, das Zugangsblatt nimmt es beim nächsten Druck.');
+}
+async function bsKonfliktNeuLaden() {
+  var e = BS.edit; if (!e) return;
+  var inh = JSON.parse(JSON.stringify(e.inhalt));
+  await bsLadeTexte(true);
+  if (!BS.edit) return;
+  var roh = bsServerDoc(e.id);
+  var neu = roh ? T.inhaltAus(roh) : { kurz: '', lang: '', verlauf: [] };
+  neu.verlauf = T.verlaufSortiert(neu.verlauf);
+  BS.edit = { id: e.id, inhalt: inh, basis: bsInhaltJSON(neu), meldung: 'Neuer Stand geladen, deine Eingaben stehen noch da. Jetzt noch einmal speichern.', konflikt: false, fassungen: null };
+  bsRender();
+}
+function bsHinweisKurz(text) {
+  var el = document.getElementById('bsTexteHinweis');
+  el.className = 'bs-hinweis'; el.textContent = text; el.hidden = false;
+  setTimeout(function () { window.bsRenderOben(); }, 4000);
+}
+
+/* ---------- Ältere Fassungen (Sicherungen dieser App, letzte 10) ---------- */
+function bsFassungenHTML(f) {
+  if (f.stand === 'lade') return '<p class="bs-leer">Ältere Fassungen werden geladen …</p>';
+  if (f.stand === 'fehler') return '<div class="bs-edit-fehler" role="alert">Ältere Fassungen nicht geladen: ' + bsEscapeHtml(f.grund) + '</div>';
+  if (!f.liste.length) return '<p class="bs-leer">Keine älteren Fassungen.</p>';
+  return '<div class="bs-abschnitt">Ältere Fassungen</div>' + f.liste.map(function (s, i) {
+    var d = s.ms ? new Date(s.ms) : null;
+    var wann = d ? T.anzeigeDatum(T.datumHeute(d)) + ', ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) : '?';
+    var was = { erstfuellung: 'Erst-Füllung', anlegen: 'angelegt', aendern: 'geändert', zurueckholen: 'zurückgeholt' }[s.aktion] || s.aktion;
+    return '<div class="bs-fassung"><span>Vor dem Speichern am ' + bsEscapeHtml(wann) + ' (' + bsEscapeHtml(was) + ', ' + bsEscapeHtml(s.konto || '?') + ')</span>' +
+      (s.vorher ? '<button type="button" class="bos-btn" data-fassung="' + i + '">Diese Fassung zurückholen</button>' : '<span class="bs-roh">davor gab es keinen Text</span>') + '</div>';
+  }).join('');
+}
+async function bsLadeFassungen() {
+  var e = BS.edit, db = bsDb(); if (!e || !db) return;
+  e.fassungen = { stand: 'lade', liste: [] }; bsRender();
+  try { e.fassungen = { stand: 'bereit', liste: await T.ladeSicherungen(db, e.id) }; }
+  catch (err) { console.error('[BackStore] Fassungen', err); e.fassungen = { stand: 'fehler', liste: [], grund: (T.fehlerArt(err) === 'berechtigung' ? 'nur Rolle admin darf sie lesen. ' : '') + T.fehlerText(err) }; }
+  if (BS.edit === e) bsRender();
+}
+document.getElementById('bsSeite').addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-fassung]');
+  if (!b || !BS.edit || !BS.edit.fassungen) return;
+  var s = BS.edit.fassungen.liste[Number(b.getAttribute('data-fassung'))];
+  if (!s || !s.vorher) return;
+  var id = BS.edit.id, alt = T.inhaltAus(s.vorher), jetzt = T.inhaltAus(bsServerDoc(id));
+  var zeile = function (n, a, j) { return '<tr><td>' + n + '</td><td>' + bsEscapeHtml(j) + '</td><td>' + bsEscapeHtml(a) + '</td></tr>'; };
+  bsBlatt('Diese Fassung zurückholen?',
+    '<p class="bs-hilfe-text">Links steht, was jetzt gilt, rechts, was zurückkommt. Gespeichert wird es als neue Fassung, der jetzige Stand bleibt gesichert.</p>' +
+    '<table style="width:100%;font-size:.85rem;border-collapse:collapse"><tr><th></th><th>jetzt</th><th>zurückholen</th></tr>' +
+    zeile('Kurz', alt.kurz, jetzt.kurz) + zeile('Lang', alt.lang.slice(0, 160) + (alt.lang.length > 160 ? ' …' : ''), jetzt.lang.slice(0, 160) + (jetzt.lang.length > 160 ? ' …' : '')) +
+    zeile('Verlauf', alt.verlauf.length + ' Einträge', jetzt.verlauf.length + ' Einträge') + '</table>',
+    [{ text: 'Abbrechen' }, { text: 'Zurückholen', amber: true, tun: async function (knopf) {
+      knopf.disabled = true;
+      var k = bsKennung(), db = bsDb();
+      try {
+        var inh = { kurz: alt.kurz, lang: alt.lang, verlauf: alt.verlauf };
+        if (alt.wieBei) inh.wieBei = alt.wieBei;
+        await T.mitZeitlimit(T.schreibe(db, firebase.firestore.FieldValue, id, inh, 'zurueckholen', bsServerDoc(id), k), SPEICHER_ZEITLIMIT_MS);
+      } catch (err) {
+        console.error('[BackStore] Zurückholen', err);
+        knopf.disabled = false;
+        bsBlattFehler('Nicht zurückgeholt: ' + (T.fehlerArt(err) === 'berechtigung' ? 'abgelehnt (Rolle admin? inzwischen geändert? Regel eingesetzt?) ' : '') + T.fehlerText(err));
+        return;
+      }
+      bsBlattZu(); BS.edit = null;
+      await bsLadeTexte(true);
+      bsHinweisKurz('✓ Ältere Fassung zurückgeholt.');
+    } }]);
+});
+
+/* ---------- Erst-Füllung: Texte aus Datei anlegen (nur Apps ohne Dokument) ---------- */
+document.getElementById('bsDatei').addEventListener('change', function () {
+  var datei = this.files && this.files[0];
+  if (!datei) return;
+  var r = new FileReader();
+  r.onerror = function () { bsZeigeFehler('Datei nicht lesbar', r.error); };
+  r.onload = function () {
+    var json;
+    try { json = JSON.parse(String(r.result)); }
+    catch (err) { bsBlatt('Texte aus Datei anlegen', '<p>Die Datei ist kein gültiges JSON: ' + bsEscapeHtml(err.message) + '</p>', [{ text: 'Schließen' }]); return; }
+    bsZeigeErstfuellung(json, datei.name);
+  };
+  r.readAsText(datei, 'utf-8');
+});
+function bsZeigeErstfuellung(json, name) {
+  var ids = T.bekannteIds(bsApps(), bsFeste());
+  var p = T.pruefeDatei(json, ids, BS.texte.daten, bsHeute());
+  var namen = function (l) { return l.map(function (id) { var a = bsEintragNachId(id); return '<li>' + bsEscapeHtml(a ? bsName(a) : id) + ' <span class="bs-roh">(' + bsEscapeHtml(id) + ')</span></li>'; }).join(''); };
+  var html = '<p class="bs-hilfe-text">Datei: <b>' + bsEscapeHtml(name) + '</b><br>' +
+    'Neu anlegen: <b id="bsEfNeu">' + p.neu.length + '</b> · schon vorhanden, bleibt unverändert: <b id="bsEfVorhanden">' + p.vorhanden.length + '</b> · unbekannt, übersprungen: <b id="bsEfUnbekannt">' + p.unbekannt.length + '</b></p>' +
+    (p.fehler.length ? '<div class="bs-edit-fehler" id="bsEfFehler">Die Datei hat Fehler, es wird nichts angelegt:\n' + bsEscapeHtml(p.fehler.slice(0, 20).join('\n')) + (p.fehler.length > 20 ? '\n… und ' + (p.fehler.length - 20) + ' weitere' : '') + '</div>' : '') +
+    (p.neu.length ? '<div class="bs-abschnitt">Wird angelegt</div><ul>' + namen(p.neu.map(function (x) { return x.id; })) + '</ul>' : '') +
+    (p.vorhanden.length ? '<div class="bs-abschnitt">Bleibt, wie es ist</div><ul>' + namen(p.vorhanden) + '</ul>' : '') +
+    (p.unbekannt.length ? '<div class="bs-abschnitt">Unbekannt, übersprungen</div><ul>' + namen(p.unbekannt) + '</ul>' : '') +
+    '<p class="bs-hilfe-text" id="bsEfStand"></p>';
+  bsBlatt('Texte aus Datei anlegen', html, [{ text: 'Abbrechen', id: 'bsEfAbbrechen' },
+    { text: 'Anlegen (' + p.neu.length + ')', amber: true, id: 'bsEfLos', aus: !!p.fehler.length || !p.neu.length || BS.texte.regelAlt, tun: function (knopf) { bsErstfuellung(p.neu, knopf); } }]);
+  if (BS.texte.regelAlt) bsBlattFehler('Gesperrt: Regel noch nicht eingesetzt (' + REGEL_DATEI + ').');
+}
+/* Eine App je Batch (Zugriffsgrenze RK §17: je eigener Sicherung 2 Pfade, 20 je Batch).
+   Bricht etwas ab, bleiben die geschafften; ein zweiter Lauf ergänzt den Rest. */
+async function bsErstfuellung(neu, knopf) {
+  var k = bsKennung(), db = bsDb();
+  if (!k || !db) { bsBlattFehler('Keine Anmeldung oder keine Datenbank — Seite neu laden.'); return; }
+  knopf.disabled = true;
+  var ab = document.getElementById('bsEfAbbrechen'); if (ab) ab.disabled = true;
+  var stand = document.getElementById('bsEfStand'), ok = 0, schief = [];
+  BS.speichert = true;
+  for (var i = 0; i < neu.length; i++) {
+    stand.textContent = 'Lege an … ' + (i + 1) + ' von ' + neu.length;
+    try { await T.mitZeitlimit(T.schreibe(db, firebase.firestore.FieldValue, neu[i].id, neu[i].inhalt, 'erstfuellung', null, k), SPEICHER_ZEITLIMIT_MS); ok++; }
+    catch (err) {
+      console.error('[BackStore] Erst-Füllung ' + neu[i].id, err);
+      schief.push(neu[i].id + ': ' + (T.fehlerArt(err) === 'berechtigung' ? 'abgelehnt (schon vorhanden? Rolle admin? Regel?) ' : '') + T.fehlerText(err));
+      if (T.fehlerArt(err) === 'netz' || T.fehlerArt(err) === 'zeitlimit') { schief.push('Abgebrochen: kein Netz. Später noch einmal — angelegt wird dann nur der Rest.'); break; }
+    }
+  }
+  BS.speichert = false;
+  stand.textContent = '✓ ' + ok + ' von ' + neu.length + ' angelegt.';
+  if (schief.length) bsBlattFehler(schief.join('\n'));
+  if (ab) { ab.disabled = false; ab.textContent = 'Schließen'; }
+  await bsLadeTexte(true);
+}
+
+/* ---------- Ungespeichert-Schutz (Checkliste §7b) ---------- */
+if (window.BOS_UNGESPEICHERT) window.BOS_UNGESPEICHERT.melde(function () { return window.bsEditGeaendert(); }, { laeuft: function () { return BS.speichert; } });
+else window.addEventListener('beforeunload', function (ev) { if (window.bsEditGeaendert() || BS.speichert) { ev.preventDefault(); ev.returnValue = ''; } });
+
+// ── Start Block 2 ──
+if (T) bsLadeTexte(false);
 </script>
 </body>
 </html>

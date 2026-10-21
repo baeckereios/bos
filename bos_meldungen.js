@@ -104,6 +104,7 @@
      'abgebrochen'        Hochladen vom Nutzer abgebrochen (verworfen)
 
    CHANGELOG
+     2026-10-21 · 11:07 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_backstore.rules (BackStore-Texte, #110, Bauplan freigegeben KC 10:27; elf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_BACKSTORE_APPSTORE_BAU.md
      2026-10-21 · 07:29 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen; wer sie eingesetzt hätte, hätte neuere Regeln hinausgeworfen. Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
      2026-10-12 · 01:57 · v0.3 · Feature (Reparaturanfrage Stufe 2, Fotos)
        Fotos: verkleinern, neueAnfrageId/neueEintragId, fotoHochladen (mit
@@ -130,7 +131,7 @@ window.BOS_MELDUNGEN = (function () {
   var TAG_MS = 24 * 60 * 60 * 1000;
   var SEITE = 20;
   var REGEL_FASSUNG = 'reparatur-2026-10-10';
-  var REGEL_DATEI = 'firestore_regeln_2026-10-21_zugangsblatt.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-10-21_backstore.rules';
   var GRENZEN = { text: 500, nachricht: 300, geraet: 60, name: 40, grund: 300 };
   var STATUS = ['gemeldet', 'gesehen', 'repariert'];
   var DRINGLICHKEIT = ['normal', 'dringend'];
