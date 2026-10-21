@@ -43,6 +43,10 @@
    neuLaden), bos_profil_lookup.js (Profil-Id für den Speicher).
 
    CHANGELOG
+     2026-10-20 · 10:09 · Zoom (K88; Anweisung Kontroll-Chat 09:25): passeBuehneAn() teilt Bildschirm-Pixel durch den
+       Zoomfaktor (currentCSSZoom bzw. gemessen) — bei 80/65 % stand die Bühne 10/14 px zu tief, die Füße hinter der
+       Taskleiste. Neu legen auch bei Zoomwechsel ohne Neuladen (MutationObserver data-zoom/style) und bei Maßänderung
+       des Schreibtischs (ResizeObserver); danach figur.passeAn().
      2026-10-18 · 13:07 · Nacharbeit 1e (Kontroll-Chat 12:53): K75 — Konto aus: begruesse()/begruesseMit()
        zählen nicht, merken keine IDs, lesen keinen Rufnamen (keine Fehlerzeile für ein abgeschaltetes Feature).
      2026-10-18 · 11:43 · Stufe 1e (K61, K67–K73; Bauplan 10:06, Go 10:22): Begrüßung nach
@@ -290,7 +294,7 @@ window.BOS_CRUMBLE_HOST = (function () {
     if (vorher !== null && vorher > 0 && offen === 0) figur.ereignis('alles_erledigt');
   }
 
-  /* ---------- Bühne und Knopf (K25/K26) ---------- */
+  /* ---------- Bühne und Knopf (K25/K26; Zoom K88) ---------- */
   function legeBuehneAn() {
     if (buehne || !optionen.schreibtisch) return;
     buehne = document.createElement('div');
@@ -299,16 +303,46 @@ window.BOS_CRUMBLE_HOST = (function () {
     optionen.schreibtisch.insertAdjacentElement('afterend', buehne);
     passeBuehneAn();
     window.addEventListener('resize', passeBuehneAn);
+    beobachteMasse();
   }
-  /* Lage der Bühne = Lage des Schreibtisch-Elements (Kopfleiste oben, Taskleiste unten) — so darf #78 die Maße ändern */
+  /* Lage der Bühne = Lage des Schreibtisch-Elements (Kopfleiste oben, Taskleiste unten) — so darf #78 die Maße ändern.
+     K88 (20.10.2026): Der Launcher zoomt per CSS (html[data-zoom="80"|"65"] { zoom }). getBoundingClientRect() und
+     innerWidth/innerHeight liefern Bildschirm-Pixel, style.top/… sind CSS-Pixel, die der Zoom noch einmal verkleinert —
+     ohne Umrechnung stand die Bühne bei 65 % 14 px zu tief (Füße hinter der Taskleiste, Ulfs Handy 09:22). Darum hier
+     alles durch den Zoomfaktor teilen. Faktor: currentCSSZoom (Chromium ≥ 128, Firefox, Safari 18); sonst gemessen
+     (Bildschirmbreite / CSS-Breite des Schreibtischs) — misst genau die Umrechnung, die gebraucht wird, und ergibt 1,
+     wo ein Browser beides gleich rechnet. */
+  function zoomVon(knoten) {
+    var z = knoten && knoten.currentCSSZoom;
+    if (typeof z === 'number' && z > 0) return z;
+    try { var w = knoten.offsetWidth, rw = knoten.getBoundingClientRect().width; if (w > 0 && rw > 0) return rw / w; } catch (e) {}
+    return 1;
+  }
+  function px(wert) { return (Math.round(wert * 100) / 100) + 'px'; }
   function passeBuehneAn() {
     if (!buehne || !optionen.schreibtisch) return;
     var r = optionen.schreibtisch.getBoundingClientRect();
+    var z = zoomVon(buehne.currentCSSZoom ? buehne : optionen.schreibtisch);
     var h = window.innerHeight || document.documentElement.clientHeight;
-    buehne.style.top = Math.round(r.top) + 'px';
-    buehne.style.bottom = Math.round(Math.max(0, h - r.bottom)) + 'px';
-    buehne.style.left = Math.round(r.left) + 'px';
-    buehne.style.right = Math.round(Math.max(0, (window.innerWidth || document.documentElement.clientWidth) - r.right)) + 'px';
+    var w = window.innerWidth || document.documentElement.clientWidth;
+    buehne.style.top = px(r.top / z);
+    buehne.style.bottom = px(Math.max(0, h - r.bottom) / z);
+    buehne.style.left = px(r.left / z);
+    buehne.style.right = px(Math.max(0, w - r.right) / z);
+    if (figur && figur.passeAn) figur.passeAn();   // Laufbreite in CSS-Pixeln hat sich mit dem Zoom geändert → Lage aus dem Anteil neu
+    if (schoner && schoner.passeAn) schoner.passeAn();
+  }
+  /* K88: Zoom ohne Neuladen (setZoom() setzt nur data-zoom, kein resize) und #78-Maßänderungen: ein Bildwechsel später neu legen.
+     MutationObserver auf <html> (data-zoom, style) + ResizeObserver auf dem Schreibtisch; beide optional. */
+  var tNeu = null;
+  function spaeterAnpassen() {
+    if (tNeu) return;
+    var f = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+    tNeu = f(function () { tNeu = null; passeBuehneAn(); });
+  }
+  function beobachteMasse() {
+    try { if (window.MutationObserver) new MutationObserver(spaeterAnpassen).observe(document.documentElement, { attributes: true, attributeFilter: ['data-zoom', 'style'] }); } catch (e) {}
+    try { if (window.ResizeObserver) new ResizeObserver(spaeterAnpassen).observe(optionen.schreibtisch); } catch (e) {}
   }
   /* T4 (Nachtrag 6, K48): Knopf im Tray unten rechts (erstes Kind, vor ⚙️ und 🌙); topbar/vor bleibt als Rückfall (Hülle, Satelliten). */
   function legeKnopfAn() {

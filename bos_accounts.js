@@ -77,6 +77,17 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-10-20 · 16:32 · v-Passwort-1 · Feature (Passwort setzen; Go Kontroll-Chat 16:04)
+       Nur Zusätze, keine bestehende Funktion geändert:
+       setzePasswort(kennung, passwort) ruft die Cloud Function
+       `setzePasswort` (europe-west3) über die Zweit-App bos-admin auf;
+       aendereAdminPasswort(bisher, neu) ändert das eigene Passwort des
+       Generalschlüssels ohne Function (Reauth, dann updatePassword).
+       Konstanten PASSWORT_MIN (8) und FUNCTIONS_REGION nach außen. Das
+       Functions-SDK (firebase-functions-compat.js) lädt nur die
+       Kontenverwaltung; fehlt es, kommt ein klarer Fehler. Andere Seiten
+       laden es nicht und rufen diese Funktionen nicht auf.
+       konten/_protokolle/SESSION_2026-10-20_PASSWORT_SETZEN_BAU.md
      2026-10-16 · 17:51 · v-Teigrechner-1 · Feature (Teigrechner Stufe 1, #67)
        Neues Feld weitereTeige (Haken „🥨 Weitere Teige pflegen“) und
        setzeWeitereTeigeRecht() nach dem Muster der Teigecke-Setzer. Eigener Haken,
@@ -422,6 +433,67 @@ window.BOS_ACCOUNTS = (function () {
     return holeAdminApp().firestore();
   }
 
+  /* ---------------------------------------------------------------
+     NEU 20.10.2026 — Passwort setzen (Kontenverwaltung)
+     ---------------------------------------------------------------
+     Das Passwort wird nirgends gespeichert und nirgends protokolliert:
+     es geht nur als Argument durch und wird an Firebase übergeben.
+     Stellschrauben: FUNCTIONS_REGION und der Name 'setzePasswort'
+     müssen zur Cloud Function passen (ausserhalb_des_repos/functions/),
+     PASSWORT_MIN zur Prüfung dort.
+     --------------------------------------------------------------- */
+  var FUNCTIONS_REGION = 'europe-west3';
+  var PASSWORT_MIN = 8;
+
+  function bosFehler(code, text) {
+    var e = new Error(text);
+    e.code = code;
+    return e;
+  }
+
+  /**
+   * Setzt das Passwort eines anderen BOS-Logins über die Cloud Function.
+   * Vorher muss die Admin-Sitzung stehen (adminReauth). Wirft mit
+   * code 'bos/admin-abgelaufen', 'bos/functions-sdk-fehlt',
+   * 'bos/zu-kurz' oder den Codes des Callable-Clients
+   * ('functions/permission-denied' …, details.grund aus der Function).
+   */
+  async function setzePasswort(kennung, passwort) {
+    if (typeof passwort !== 'string' || passwort.length < PASSWORT_MIN) {
+      throw bosFehler('bos/zu-kurz', 'Passwort zu kurz: mindestens ' + PASSWORT_MIN + ' Zeichen.');
+    }
+    if (!adminAngemeldet()) {
+      throw bosFehler('bos/admin-abgelaufen', 'Die Admin-Sitzung ist abgelaufen.');
+    }
+    var app = holeAdminApp();
+    if (typeof app.functions !== 'function') {
+      throw bosFehler('bos/functions-sdk-fehlt', 'firebase-functions-compat.js ist auf dieser Seite nicht geladen.');
+    }
+    var aufruf = app.functions(FUNCTIONS_REGION).httpsCallable('setzePasswort');
+    var antwort = await aufruf({ kennung: kennung, passwort: passwort });
+    return antwort && antwort.data;
+  }
+
+  /**
+   * Ändert das eigene Passwort des Generalschlüssels auf der angemeldeten
+   * Zweit-App: erst das bisherige prüfen (reauthenticateWithCredential),
+   * dann updatePassword. Keine Function nötig. Die laufende Admin-Sitzung
+   * bleibt bestehen, andere Sitzungen dieses Kontos enden.
+   */
+  async function aendereAdminPasswort(bisher, neu) {
+    if (typeof neu !== 'string' || neu.length < PASSWORT_MIN) {
+      throw bosFehler('bos/zu-kurz', 'Neues Passwort zu kurz: mindestens ' + PASSWORT_MIN + ' Zeichen.');
+    }
+    var nutzer = adminAngemeldet() ? holeAdminApp().auth().currentUser : null;
+    if (!nutzer) {
+      throw bosFehler('bos/admin-abgelaufen', 'Die Admin-Sitzung ist abgelaufen.');
+    }
+    var nachweis = firebase.auth.EmailAuthProvider.credential(nutzer.email, bisher);
+    await nutzer.reauthenticateWithCredential(nachweis);
+    await nutzer.updatePassword(neu);
+    return true;
+  }
+
   /**
    * Alle Konten. SEIT 26.09.2026 nur noch mit der Admin-Sitzung lesbar
    * (Regel: list nur istAdmin()) — Aufrufer übergeben adminFirestore(),
@@ -459,6 +531,10 @@ window.BOS_ACCOUNTS = (function () {
     adminReauth: adminReauth,
     adminReauthEnde: adminReauthEnde,
     adminAngemeldet: adminAngemeldet,
-    adminFirestore: adminFirestore
+    adminFirestore: adminFirestore,
+    setzePasswort: setzePasswort,
+    aendereAdminPasswort: aendereAdminPasswort,
+    PASSWORT_MIN: PASSWORT_MIN,
+    FUNCTIONS_REGION: FUNCTIONS_REGION
   };
 })();

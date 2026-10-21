@@ -33,6 +33,11 @@
  * Speichern (Sichtbarkeit, Position) macht der Host über die Option speicher { lese(), schreibe(o) }.
  *
  * CHANGELOG
+ *   2026-10-20 · 10:09 · Zoom (K89; Anweisung Kontroll-Chat 09:25): zoom() (currentCSSZoom bzw. gemessen) — Ziehen teilt den
+ *     Fingerweg (clientX) durch den Zoom (bei 65 % folgte Crumble nur 0,65 × dem Finger); Blase: Abstand Kopf/Wurzel,
+ *     Randkorrektur oben und seitlicher Schub von Bildschirm- in CSS-Pixel. API passeAn() (Host ruft sie nach neuer
+ *     Bühnenlage/Zoomwechsel). Spitze der Blase wandert um den seitlichen Schub zurück (--hf-spitze-schub, auch bei 100 %:
+ *     am Rand stand sie mit langen Texten neben dem Kopf). Laufen, Trefffläche und Schoner-Lage rechnen schon in CSS-Pixeln.
  *   2026-10-18 · 11:43 · Stufe 1e (Kontroll-Chat 09:49, Bauplan 10:06, Go 10:22): Optionen nurZustaende (K65, Tür lädt
  *     nur ihre 15 Bilder vorab), beiTipp (K63, Gastgeber übernimmt den Tipp), klasse (Zusatzklasse der Wurzel, hf--tuer);
  *     API ruhe(ms)/ruheBis() — keine automatische Nummer (Nachholweg K37) und kein Spaziergang bis zum Ende der
@@ -206,6 +211,21 @@ window.BOS_HAMSTER_FIGUR = (function () {
       }
     }
     function beiResize() { if (el.wurzel && xAnteil !== null) setzeX(xAnteil, true); }
+    /* K89 (20.10.2026): Zoomfaktor der Seite (Launcher: html[data-zoom] { zoom }). Bildschirm-Pixel (getBoundingClientRect,
+       clientX, innerWidth) müssen durch ihn geteilt werden, bevor sie in style.left/bottom/translate (CSS-Pixel) wandern.
+       currentCSSZoom, sonst gemessen am Container (Bildschirmbreite / CSS-Breite; kein transform darauf); 1 ohne Zoom. */
+    function zoom() {
+      var c = opt.container || el.wurzel, z = c && c.currentCSSZoom;
+      if (typeof z === 'number' && z > 0) return z;
+      try { var w = c.offsetWidth, rw = c.getBoundingClientRect().width; if (w > 0 && rw > 0) return rw / w; } catch (e) {}
+      return 1;
+    }
+    /** K88/K89: nach Zoomwechsel oder neuer Bühnenlage (Host) — Lage aus dem Anteil und eine stehende Blase neu legen. */
+    function passeAn() {
+      if (!el.wurzel) return;
+      if (aufLeiste && xAnteil !== null && !lauf && !zieh) setzeX(xAnteil, true);
+      if (el.blase && el.blase.classList.contains('hf__blase--an')) legeBlase();
+    }
     function masseKasten() {
       el.figur.style.height = opt.hoehe + 'px';
       el.figur.style.width = figW + 'px';
@@ -314,25 +334,31 @@ window.BOS_HAMSTER_FIGUR = (function () {
       var rand = 8;
       el.blase.style.bottom = Math.round(bottom) + 'px';
       var r = el.blase.getBoundingClientRect();
-      if (r.top < rand) el.blase.style.bottom = Math.round(bottom - (rand - r.top)) + 'px';
+      if (r.top < rand) el.blase.style.bottom = Math.round(bottom - (rand - r.top) / zoom()) + 'px';   // K89: Bildschirm → CSS
     }
     function legeBlase() {
       el.blase.style.transform = '';
+      el.blase.style.removeProperty('--hf-spitze-schub');
       if (!el.blase.classList.contains('hf__blase--an')) return;
       var rand = 8, breite = window.innerWidth || document.documentElement.clientWidth;
       if (aufLeiste) {
-        var img = aktivesBild(), wr = el.wurzel.getBoundingClientRect();
-        var kopf = img ? img.getBoundingClientRect().top : (wr.bottom - opt.hoehe);
+        var img = aktivesBild(), wr = el.wurzel.getBoundingClientRect(), z = zoom();
+        var kopf = img ? img.getBoundingClientRect().top : (wr.bottom - opt.hoehe * z);
         el.blase.style.right = 'auto';
         var bw = el.blase.offsetWidth;
         el.blase.style.left = Math.round(figW / 2 - bw / 2) + 'px';
-        blaseBottom = Math.max(opt.hoehe, wr.bottom - kopf) + luftBlase();
+        blaseBottom = Math.max(opt.hoehe, (wr.bottom - kopf) / z) + luftBlase();   // K89: Abstand in Bildschirm-Pixeln → CSS-Pixel
         setzeBlaseBottom(blaseBottom);
       }
       var r = el.blase.getBoundingClientRect(), schub = 0;
       if (r.left < rand) schub = rand - r.left;
       else if (r.right > breite - rand) schub = (breite - rand) - r.right;
-      if (schub) el.blase.style.transform = 'translateX(' + Math.round(schub) + 'px)';
+      if (schub) {
+        var schubCss = Math.round(schub / zoom());
+        el.blase.style.transform = 'translateX(' + schubCss + 'px)';   // K89: Schub in CSS-Pixeln
+        // K89: die Spitze bleibt über der Figur — sie wandert um den Schub zurück (höchstens bis 20 px vor die runde Ecke)
+        if (aufLeiste) { var grenze = Math.max(0, el.blase.offsetWidth / 2 - 20); el.blase.style.setProperty('--hf-spitze-schub', klemm(schubCss, -grenze, grenze) + 'px'); }
+      }
       stoppeBlaseFolgen();
       if (aufLeiste) { blaseFolgeBis = Date.now() + folgeMs(); blaseRaf = requestAnimationFrame(folgeBlase); }
     }
@@ -342,7 +368,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       var img = aktivesBild();
       if (img) {
         var wr = el.wurzel.getBoundingClientRect(), oben = img.getBoundingClientRect().top;
-        var noetig = (wr.bottom - oben) + luftBlase();
+        var noetig = (wr.bottom - oben) / zoom() + luftBlase();   // K89
         if (noetig > blaseBottom + 0.5) { blaseBottom = noetig; setzeBlaseBottom(noetig); }   // nur nach oben
       }
       blaseRaf = requestAnimationFrame(folgeBlase);
@@ -654,7 +680,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       el.figur.addEventListener('pointerdown', function (e) {
         if (!aktiv || !sichtbarIst || e.button) return;
         beruehrung();
-        zieh = { id: e.pointerId, x0: e.clientX, startLinks: parseFloat(el.wurzel.style.left) || 0, aktivGeworden: false };
+        zieh = { id: e.pointerId, x0: e.clientX, z: zoom(), startLinks: parseFloat(el.wurzel.style.left) || 0, aktivGeworden: false };   // K89: z für clientX → CSS
         try { el.figur.setPointerCapture(e.pointerId); } catch (x) {}
       });
       el.figur.addEventListener('pointermove', function (e) {
@@ -668,7 +694,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
           zeigeBild(Math.random() < 0.5 ? 'surprised' : 'tongue', true);
           melde('ziehen', { start: true });
         }
-        var b = laufBreite(), links = klemm(zieh.startLinks + dx, 0, b);
+        var b = laufBreite(), links = klemm(zieh.startLinks + dx / zieh.z, 0, b);   // K89: dx ist Bildschirm, left CSS — sonst bei 65 % nur 0,65 × Fingerweg
         el.wurzel.style.left = Math.round(links) + 'px';
         xAnteil = b ? links / b : 0;
       });
@@ -962,7 +988,7 @@ window.BOS_HAMSTER_FIGUR = (function () {
       setzeAusruestung: setzeAusruestung, setzeModus: setzeModus, setzeRolle: setzeRolle, zerstoere: zerstoere,
       registriere: registriere, auf: auf,
       sichtbar: sichtbar, istSichtbar: function () { return sichtbarIst; }, ladeGespeichert: ladeGespeichert,
-      laufe: laufe, setzeX: setzeX, x: function () { return xAnteil; },
+      laufe: laufe, setzeX: setzeX, x: function () { return xAnteil; }, passeAn: passeAn,
       setzeGroesse: setzeGroesse, groesse: function () { return opt.hoehe; },
       nummer: nummer, nummern: nummernListe, laufendeNummer: function () { return nummerAktiv ? nummerAktiv.name : null; },
       show: show, wecke: wecke,

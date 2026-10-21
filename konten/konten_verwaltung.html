@@ -7,6 +7,26 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-20 · 16:32 · v-Passwort-1 · Feature (Passwort setzen; Go Kontroll-Chat 16:04, Auflagen N1–N3)
+      Zugangsblatt: Schritt 1 heißt „Passwort setzen“. Das erzeugte Passwort
+      steht in einem Feld (text, ohne form, autocomplete/autocorrect aus),
+      „Passwort jetzt setzen“ ruft BOS_ACCOUNTS.setzePasswort (Cloud Function
+      über die Zweit-App). Drucken und „Fertig (ohne Druck)“ erst nach Erfolg;
+      danach ist das Feld nur lesbar und gedruckt wird der GESETZTE Wert. Fehler
+      im Dialog mit Code, Ursachen getrennt; Admin-Sitzung weg → „Neu anmelden“
+      (sperrt, bestehende Abfrage). Späte Antworten prallen an der Dialog-Nummer
+      ab. Hinweis beim eigenen Gerätekonto. „kopieren“ entfällt (Zwischenablage
+      wäre ein Speicherort; der alte Knopf schrieb das Passwort zudem in die
+      Statuszeile „Kopiert: …“, die nach dem Schließen stehen blieb).
+      Generalschlüssel: statt Zugangsblatt „Admin-Passwort ändern …“ (bisheriges,
+      neues zweimal, ohne Function), unabhängig von freigeschaltet.
+      Neu: Streifen „Laufzeit der Passwort-Function“ ab 01.01.2028 (Ulf 16:01),
+      Werte in FUNCTION_LAUFZEIT. Neues SDK firebase-functions-compat.js 10.12.2.
+      Hilfe: neuer Abschnitt „Wie ändere ich ein Passwort?“ (Notfallbefehl nur
+      in der Anleitung, N3), ein Satz in „Wofür ist diese Seite?“ ergänzt.
+      Kommentar Selbstaussperrung: alter Kontoname berichtigt.
+      Gesperrte Knöpfe in beiden Passwort-Dialogen sichtbar grau (CSS).
+      konten/_protokolle/SESSION_2026-10-20_PASSWORT_SETZEN_BAU.md
     2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
       Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
       (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
@@ -257,6 +277,8 @@
   .status-err { color: var(--bos-red); font-size: var(--bos-font-sm, .82rem); }
   .status-ok { color: var(--bos-green); font-size: var(--bos-font-sm, .82rem); }
   .hidden { display: none !important; }
+  /* NEU 20.10.2026 (Passwort setzen): gesperrte Knöpfe in den Passwort-Dialogen sichtbar grau — „Drucken“ vor dem Setzen. */
+  #zugangsDialog button:disabled, #adminPasswortDialog button:disabled { opacity: .4; cursor: not-allowed; }
 
   input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--bos-amber); cursor: pointer; }
   select.bos-input { width: auto; min-width: 160px; }
@@ -460,6 +482,7 @@
       <button class="bos-btn bos-btn--amber" id="entsperrenBtn">Mit Admin-Passwort öffnen</button>
     </div>
     <div id="adminInhalt" class="hidden">
+    <div id="laufzeitStreifen" class="hidden" role="status" style="margin-bottom:12px; padding:10px 14px; border:1px solid var(--bos-warn, var(--bos-amber)); border-radius:var(--bos-radius-sm, 8px); background:var(--bos-surface, #1c1a17); color:var(--bos-warn, var(--bos-amber)); font-weight:600; font-size:.88rem;"></div>
     <div class="tab-row" style="display:flex; gap:8px; margin-bottom:16px;">
       <button class="bos-btn bos-btn--amber tab-btn" data-tab="konten">Konten</button>
       <button class="bos-btn tab-btn" data-tab="rollen">Rollen &amp; Rechte</button>
@@ -598,6 +621,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>   <!-- NEU 20.10.2026: Passwort setzen (Cloud Function setzePasswort) -->
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_launcher_backgrounds.js"></script>
 <script src="../bos_accounts.js"></script>
@@ -620,11 +644,15 @@ var helpData = {
   sections: [
     {
       heading: "Wofür ist diese Seite?",
-      text: "Hier bereitest du neue Konten vor und weist Rollen zu. Die Anmeldung selbst (Kennung und Passwort) entsteht vorher in der Firebase-Konsole; eine Selbstregistrierung gibt es nicht mehr. Die Seite ist ein reines Admin-Werkzeug: sie zeigt erst nach dem Admin-Passwort etwas an, auch dem Alltagskonto mit Rolle Admin nicht."
+      text: "Hier bereitest du neue Konten vor und weist Rollen zu. Die Anmeldung selbst (Kennung und Passwort) entsteht vorher in der Firebase-Konsole; eine Selbstregistrierung gibt es nicht mehr. Das echte Passwort setzt du danach hier beim Zugangsblatt. Die Seite ist ein reines Admin-Werkzeug: sie zeigt erst nach dem Admin-Passwort etwas an, auch dem Alltagskonto mit Rolle Admin nicht."
     },
     {
       heading: "Wie lege ich ein neues Konto an?",
       text: "Oben „Neue Konten vorbereiten“: Bereich und Anzahl wählen, „Kennungen vorschlagen“. Die Seite nimmt die nächsten Nummern aus dem Kontenzähler — eine Kennung wird nie ein zweites Mal vergeben, auch keine gelöschte. Die Adressen legst du in der Firebase-Konsole mit einem Wegwerf-Passwort an und bestätigst hier. Danach steht der Rohling unter „Rohlinge“ und wird dort beschriftet. Sonderfälle außerhalb eines Musters (ein einzelnes Konto mit ganz eigener Kennung) laufen über die Firebase-Konsole: Login UND Dokument von Hand anlegen — und vorher prüfen, dass die Kennung nie vergeben war."
+    },
+    {
+      heading: "Wie ändere ich ein Passwort?",
+      text: "Konto-Karte öffnen, Reiter „Konto“, „Zugangsblatt drucken …“. Das vorgeschlagene Passwort stehen lassen (selbst getippt kann sich die Tastatur des Geräts das Wort merken) und „Passwort jetzt setzen“ tippen. Erst wenn „✓ gesetzt“ dasteht, lässt sich drucken; gedruckt wird genau das gesetzte Passwort. Danach steht es nur auf dem Blatt — nirgends im System, auch Firebase hebt nur einen unlesbaren Fingerabdruck davon auf. Ist es das Konto, mit dem dieses Gerät angemeldet ist, meldet sich das Gerät spätestens nach etwa einer Stunde ab; dann an der Tür mit dem neuen Passwort anmelden. Das Passwort des Generalschlüssels (damit öffnest du diese Seite) änderst du in dessen Konto-Karte mit „Admin-Passwort ändern …“ — es kommt nie auf ein Blatt. Ist es vergessen oder meldet die Seite „Passwort-Function nicht erreichbar“, hilft die Anleitung zur Passwort-Function (FUNCTIONS_EINRICHTUNG_ANLEITUNG.md): Kapitel „Laufzeit wechseln“ und Anhang Notfall."
     },
     {
       heading: "„Steht diese Person im Schichtplan?“ — was soll ich wählen?",
@@ -870,7 +898,7 @@ function roleName(roleId) {
 // ==========================================================================
 // Schutz vor Selbstaussperrung — 26.09.2026 (Ulfs Frage "Kann ich mich
 // selbst aussperren?"). Zwei Konten sind geschützt:
-//   - das Admin-Konto (verwaltung.k7x2, aus BOS_BV) — Tresorschlüssel
+//   - das Admin-Konto (Generalschlüssel, Kennung aus BOS_BV) — Tresorschlüssel
 //   - das Konto, mit dem dieses Gerät gerade angemeldet ist (Alltag)
 // Löschen oder die Rolle admin wegnehmen hieße: beim nächsten Öffnen
 // sperrt der Zugriffs-Guard diese Seite, der Weg zurück ginge nur noch
@@ -1645,8 +1673,25 @@ function beschriftenKlick(kontoId) {
 }
 
 // ---- Zugangsblatt (12.4, NF-47): Passwort nur im Druckdialog ----
-var zugangsPasswort = null;   // lebt nur, solange der Dialog offen ist
+// UMBAU 20.10.2026 (Passwort setzen): Das Passwort wird hier über die Cloud
+// Function gesetzt (BOS_ACCOUNTS.setzePasswort), nicht mehr in der Konsole.
+// Drucken erst nach Erfolg, gedruckt wird der GESETZTE Wert (zugangsPasswort),
+// nicht das, was gerade im Feld steht. Kein „kopieren“ mehr: Der Knopf war für
+// das Einfügen in die Konsole da, und die Zwischenablage (samt Verlauf der
+// Tastatur) wäre ein Speicherort. Nie gespeichert, nie protokolliert; Feld und
+// Variable werden beim Schließen, nach dem Druck, beim Sperren und in der
+// Leerlauf-Sperre geleert (schliesseZugangsblatt).
+var zugangsPasswort = null;   // NUR der erfolgreich gesetzte Wert; lebt nur, solange der Dialog offen ist
+var zugangsNr = 0;            // Dialog-Nummer: späte Antworten eines geschlossenen Dialogs prallen ab
 function zugangsblattHTML(k) {
+  // Generalschlüssel: nie ein Zugangsblatt, stattdessen „Admin-Passwort ändern“
+  // — unabhängig von freigeschaltet/Rohling.
+  if (istAdminKennung(k.id)) {
+    return '<div class="detail-section full"><div class="detail-feld"><label>Admin-Passwort</label>' +
+      '<button type="button" class="bos-btn" onclick="oeffneAdminPasswortDialog()">Admin-Passwort ändern …</button>' +
+      '<p style="color:var(--bos-text-faint); font-size:.76rem; margin-top:6px;">Das Passwort des Generalschlüssels, mit dem diese Seite geöffnet wird. Kommt nie auf ein Zugangsblatt.</p>' +
+    '</div></div>';
+  }
   if (k.freigeschaltet !== true || istRohling(k)) return '';
   return '<div class="detail-section full"><div class="detail-feld"><label>Zugangsblatt</label>' +
     '<button type="button" class="bos-btn" onclick="oeffneZugangsblatt(\'' + k.id + '\')">Zugangsblatt drucken …</button>' +
@@ -1664,27 +1709,139 @@ function zugangsName(k) {
   if (p) return anzeigeNamePerson(p.id);
   return k.name || k.id;
 }
+function passwortMin() {
+  return (window.BOS_ACCOUNTS && window.BOS_ACCOUNTS.PASSWORT_MIN) || 8;
+}
+// Ist das die Kennung, mit der DIESES Gerät angemeldet ist? (wie geschuetzteKonten)
+function istGeraeteKonto(kontoId) {
+  var ich = firebase.auth().currentUser;
+  return !!(ich && ich.email && String(ich.email).split('@')[0].toLowerCase() === kontoId);
+}
+// Eingabefeld ohne Passwort-Manager und ohne Wortvorschläge: kein <form>, kein
+// name, type="text" (sichtbar zum Abschreiben, lockt keinen Passwort-Manager).
+var OHNE_SPEICHERN = ' autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-form-type="other"';
 function oeffneZugangsblatt(kontoId) {
   var k = alleKonten.filter(function (x) { return x.id === kontoId; })[0];
   if (!k) return;
+  if (istAdminKennung(kontoId)) { oeffneAdminPasswortDialog(); return; }
   schliesseZugangsblatt();
-  zugangsPasswort = erzeugePasswort();
+  var nr = zugangsNr;
   var d = document.createElement('div');
   d.id = 'zugangsDialog';
-  d.setAttribute('style', 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;');
-  d.innerHTML = '<div class="bos-panel" style="max-width:440px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
+  d.setAttribute('style', 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;');
+  d.innerHTML = '<div class="bos-panel" style="max-width:460px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
     '<div style="font-weight:700;">Zugangsblatt · ' + esc(zugangsName(k)) + ' · ' + esc(kontoId) + '</div>' +
-    '<p style="margin:0;font-size:.85rem;">1. In der Firebase-Konsole für <code>' + esc(kontoId) + '@baeckereios.intern</code> genau dieses Passwort setzen:</p>' +
-    '<div id="zugangsPw" style="font-family:monospace;font-size:1.6rem;letter-spacing:.08em;text-align:center;padding:8px;border:1px dashed var(--bos-amber);"></div>' +
-    '<button type="button" class="bos-btn" id="zugangsKopieren">kopieren</button>' +
+    '<p style="margin:0;font-size:.85rem;">1. Passwort setzen für <code>' + esc(kontoId) + '@baeckereios.intern</code>:</p>' +
+    '<input type="text" id="zugangsPw" class="bos-input"' + OHNE_SPEICHERN + ' style="font-family:monospace;font-size:1.5rem;letter-spacing:.08em;text-align:center;padding:8px;border:1px dashed var(--bos-amber);">' +
+    '<p style="margin:0;font-size:.76rem;color:var(--bos-text-faint);">Am besten das Vorgeschlagene lassen: Selbst getippt kann sich die Tastatur des Geräts das Wort merken. Mindestens ' + passwortMin() + ' Zeichen.</p>' +
+    (istGeraeteKonto(kontoId)
+      ? '<div id="zugangsGeraet" role="note" style="padding:8px 10px;border:1px solid var(--bos-warn, var(--bos-amber));border-radius:var(--bos-radius-sm, 8px);color:var(--bos-warn, var(--bos-amber));font-size:.82rem;">⚠ Dieses Gerät wird danach abgemeldet, spätestens in etwa einer Stunde. Dann an der Tür mit dem neuen Passwort anmelden.</div>'
+      : '') +
+    '<button type="button" class="bos-btn bos-btn--amber" id="zugangsSetzen">Passwort jetzt setzen</button>' +
+    '<div id="zugangsMeldung" role="status" style="font-size:.82rem;"></div>' +
+    '<button type="button" class="bos-btn hidden" id="zugangsNeuAnmelden">Neu anmelden</button>' +
     '<p style="margin:0;font-size:.85rem;">2. Dann drucken. Das Passwort wird nirgends gespeichert und ist weg, sobald dieses Fenster zu ist.</p>' +
-    '<div style="display:flex;gap:8px;"><button type="button" class="bos-btn" id="zugangsAbbrechen" style="flex:1;">Schließen</button>' +
-    '<button type="button" class="bos-btn bos-btn--amber" id="zugangsDrucken" style="flex:1;">In der Konsole gesetzt — drucken</button></div></div>';
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<button type="button" class="bos-btn" id="zugangsAbbrechen" style="flex:1;">Schließen</button>' +
+      '<button type="button" class="bos-btn" id="zugangsFertig" style="flex:1;" disabled>Fertig (ohne Druck)</button>' +
+      '<button type="button" class="bos-btn bos-btn--amber" id="zugangsDrucken" style="flex:1;" disabled>Drucken</button>' +
+    '</div></div>';
   document.body.appendChild(d);
-  d.querySelector('#zugangsPw').textContent = zugangsPasswort;
-  d.querySelector('#zugangsKopieren').addEventListener('click', function () { kopiere(zugangsPasswort); });
-  d.querySelector('#zugangsAbbrechen').addEventListener('click', schliesseZugangsblatt);
+  var feld = d.querySelector('#zugangsPw');
+  feld.value = erzeugePasswort();
+  feld.addEventListener('input', function () { zugangsKnopfStand(); });
+  d.querySelector('#zugangsSetzen').addEventListener('click', function () { setzeZugangsPasswort(k, nr); });
+  d.querySelector('#zugangsAbbrechen').addEventListener('click', function () { zugangsSchliessenGefragt(); });
+  d.querySelector('#zugangsFertig').addEventListener('click', function () { zugangsSchliessenGefragt(); });
   d.querySelector('#zugangsDrucken').addEventListener('click', function () { druckeZugangsblatt(k); });
+  d.querySelector('#zugangsNeuAnmelden').addEventListener('click', function () {
+    schliesseZugangsblatt();
+    window.BOS_ACCOUNTS.adminReauthEnde().catch(function (f) { console.error('Konten-Verwaltung: Abmelden fehlgeschlagen', f); });
+    zeigeGesperrt('Admin-Sitzung abgelaufen — bitte neu anmelden. Danach das Zugangsblatt neu öffnen (es gibt ein neues Passwort).');
+    oeffneAdminAuth({ typ: 'oeffnen' });
+  });
+  zugangsKnopfStand();
+}
+// Knopf „Passwort jetzt setzen“ nur bei genug Zeichen und solange nicht gesetzt.
+function zugangsKnopfStand() {
+  var d = document.getElementById('zugangsDialog'); if (!d) return;
+  var feld = d.querySelector('#zugangsPw');
+  var knopf = d.querySelector('#zugangsSetzen');
+  if (zugangsPasswort !== null || d.getAttribute('data-zustand') === 'setzt') { knopf.disabled = true; return; }
+  knopf.disabled = feld.value.length < passwortMin();
+}
+// Nach Erfolg ohne Druck: nachfragen, sonst kennt niemand das Passwort.
+function zugangsSchliessenGefragt() {
+  if (zugangsPasswort !== null && !confirm('Das Passwort ist gesetzt, aber nicht gedruckt. Nach dem Schließen steht es nirgends mehr. Trotzdem schließen?')) return;
+  var gesetztFuer = zugangsPasswort !== null ? document.getElementById('zugangsDialog').getAttribute('data-konto') : null;
+  schliesseZugangsblatt();
+  if (gesetztFuer) { var z = document.getElementById('zStatus-' + gesetztFuer); if (z) z.textContent = '✓ Passwort gesetzt (ohne Druck).'; }
+}
+function setzeZugangsPasswort(k, nr) {
+  var d = document.getElementById('zugangsDialog'); if (!d || nr !== zugangsNr) return;
+  var feld = d.querySelector('#zugangsPw');
+  var meldung = d.querySelector('#zugangsMeldung');
+  var pw = feld.value;
+  if (pw.length < passwortMin()) {
+    meldung.className = 'status-err'; meldung.textContent = 'Passwort zu kurz: mindestens ' + passwortMin() + ' Zeichen. Nichts gesetzt.';
+    return;
+  }
+  d.setAttribute('data-zustand', 'setzt');
+  feld.readOnly = true;
+  d.querySelector('#zugangsSetzen').textContent = 'Setzt …';
+  d.querySelector('#zugangsNeuAnmelden').classList.add('hidden');
+  meldung.className = ''; meldung.textContent = '';
+  zugangsKnopfStand();
+  var arbeit;
+  try { arbeit = window.BOS_ACCOUNTS.setzePasswort(k.id, pw); }
+  catch (e) { arbeit = Promise.reject(e); }
+  arbeit.then(function () {
+    if (nr !== zugangsNr) return;   // Dialog inzwischen zu (Sperre, Schließen): Antwort verwerfen
+    zugangsPasswort = pw;
+    d.setAttribute('data-zustand', 'gesetzt');
+    d.setAttribute('data-konto', k.id);
+    d.querySelector('#zugangsSetzen').textContent = '✓ gesetzt';
+    meldung.className = 'status-ok';
+    meldung.textContent = '✓ Passwort für ' + k.id + ' gesetzt. Jetzt drucken.';
+    d.querySelector('#zugangsDrucken').disabled = false;
+    d.querySelector('#zugangsFertig').disabled = false;
+    zugangsKnopfStand();
+  }).catch(function (err) {
+    if (nr !== zugangsNr) return;
+    console.error('[Konten & Rollen] Passwort setzen fehlgeschlagen', (err && err.code) || '', (err && err.message) || String(err));
+    var f = zugangsFehlerText(err);
+    d.setAttribute('data-zustand', 'fehler');
+    feld.readOnly = false;
+    d.querySelector('#zugangsSetzen').textContent = 'Passwort jetzt setzen';
+    meldung.className = 'status-err';
+    meldung.textContent = f.text;
+    d.querySelector('#zugangsNeuAnmelden').classList.toggle('hidden', !f.neuAnmelden);
+    zugangsKnopfStand();
+  });
+}
+// Ursachen getrennt (F5): kein Netz und „Function nicht hochgeladen“ sehen für
+// den Browser oft gleich aus (functions/internal). Unterschieden wird über
+// navigator.onLine — eine Näherung, deshalb nennt der Text beide Möglichkeiten.
+function zugangsFehlerText(err) {
+  var code = (err && err.code) || '';
+  var grund = err && err.details && err.details.grund;
+  var msg = (err && err.message) || String(err);
+  var roh = ' [' + (code || 'ohne Code') + (grund ? ' · ' + grund : '') + ': ' + msg + ']';
+  if (code === 'bos/admin-abgelaufen' || code === 'functions/unauthenticated') {
+    return { text: 'Admin-Sitzung abgelaufen. Nichts gesetzt. „Neu anmelden“ sperrt die Seite und fragt das Admin-Passwort ab.' + roh, neuAnmelden: true };
+  }
+  if (code === 'bos/functions-sdk-fehlt') return { text: 'firebase-functions-compat.js ist nicht geladen. Seite hart neu laden. Nichts gesetzt.' + roh };
+  if (code === 'bos/zu-kurz') return { text: msg + ' Nichts gesetzt.' };
+  if (code === 'functions/permission-denied') return { text: msg + ' Ist die Kontenverwaltung mit dem Generalschlüssel geöffnet? Nichts gesetzt.' + roh };
+  if (grund) return { text: msg + ' Nichts gesetzt.' + roh };
+  if (code === 'functions/deadline-exceeded') return { text: 'Zeitlimit: Ob das Passwort gesetzt wurde, ist unklar. Erneut setzen ist harmlos.' + roh };
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return { text: 'Kein Netz. Nichts gesetzt.' + roh };
+  if (code === 'functions/not-found' || code === 'functions/internal' || code === 'functions/unavailable') {
+    var stufe = laufzeitStufe();
+    return { text: 'Passwort-Function nicht erreichbar. Noch nicht hochgeladen? Oder Netz weg. Nichts gesetzt.' +
+      (stufe === 'abgeschaltet' ? ' ' + laufzeitText(stufe) : '') + roh };
+  }
+  return { text: 'Nicht gesetzt: ' + msg + roh };
 }
 function zugangsblattDruckHTML(k, pw) {
   var e = function (t) { return esc(String(t)); };
@@ -1702,7 +1859,7 @@ function zugangsblattDruckHTML(k, pw) {
     '<p class="klein">Probe-Anmeldung durchgeführt: ☐</p></body></html>';
 }
 function druckeZugangsblatt(k) {
-  if (!zugangsPasswort) return;
+  if (!zugangsPasswort) return;   // Schwelle: ohne gesetztes Passwort kein Blatt
   var f = document.createElement('iframe');
   f.id = 'zugangsDruck';
   f.setAttribute('style', 'position:fixed;width:0;height:0;border:0;visibility:hidden;');
@@ -1713,11 +1870,146 @@ function druckeZugangsblatt(k) {
   try { f.contentWindow.focus(); f.contentWindow.print(); } catch (err) { console.error('[Konten & Rollen] Druck fehlgeschlagen', err); alert('Druck fehlgeschlagen: ' + err.message); }
   setTimeout(fertig, 500);
 }
-// Passwort weg: Variable überschrieben, Dialog und Druckrahmen entfernt.
+// Passwort weg: Variable überschrieben, Felder geleert, Dialoge und Druckrahmen
+// entfernt, Dialog-Nummer weiter (späte Antworten prallen ab). Schließt auch den
+// Dialog „Admin-Passwort ändern“ — derselbe Weg hängt an Sperre, Leerlauf und
+// pageshow (zeigeGesperrt).
 function schliesseZugangsblatt() {
   zugangsPasswort = null;
-  var d = document.getElementById('zugangsDialog'); if (d) d.remove();
+  zugangsNr++;
+  var d = document.getElementById('zugangsDialog');
+  if (d) { var feld = d.querySelector('#zugangsPw'); if (feld) feld.value = ''; d.remove(); }
   var f = document.getElementById('zugangsDruck'); if (f) f.remove();
+  schliesseAdminPasswortDialog();
+}
+
+// ---- Admin-Passwort ändern (20.10.2026, Passwort setzen Teil C) ----
+// Eigenes Passwort des Generalschlüssels, ohne Function: bisheriges prüfen
+// (Reauth), dann das neue (BOS_ACCOUNTS.aendereAdminPasswort). Drei
+// Passwortfelder ohne <form>, autocomplete="off" (nicht "new-password": das
+// lädt Chromes Passwort-Vorschlag samt Speichern ein).
+var adminPwNr = 0;
+function oeffneAdminPasswortDialog() {
+  schliesseZugangsblatt();
+  var nr = adminPwNr;
+  var feldHTML = function (id, text) {
+    return '<label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">' + text +
+      '<input type="password" id="' + id + '" class="bos-input"' + OHNE_SPEICHERN + '></label>';
+  };
+  var d = document.createElement('div');
+  d.id = 'adminPasswortDialog';
+  d.setAttribute('style', 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;');
+  d.innerHTML = '<div class="bos-panel" style="max-width:440px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
+    '<div style="font-weight:700;">Admin-Passwort ändern</div>' +
+    '<p style="margin:0;font-size:.82rem;color:var(--bos-text-dim);">Das Passwort, mit dem diese Seite geöffnet wird. Es kommt nie auf ein Blatt.</p>' +
+    feldHTML('apBisher', 'Bisheriges Passwort') +
+    feldHTML('apNeu1', 'Neues Passwort (mindestens ' + passwortMin() + ' Zeichen)') +
+    feldHTML('apNeu2', 'Neues Passwort wiederholen') +
+    '<div id="apHinweis" style="font-size:.78rem;color:var(--bos-text-faint);"></div>' +
+    '<button type="button" class="bos-btn bos-btn--amber" id="apAendern" disabled>Passwort ändern</button>' +
+    '<div id="apMeldung" role="status" style="font-size:.82rem;"></div>' +
+    '<button type="button" class="bos-btn" id="apSchliessen">Schließen</button>' +
+  '</div>';
+  document.body.appendChild(d);
+  ['apBisher', 'apNeu1', 'apNeu2'].forEach(function (id) { d.querySelector('#' + id).addEventListener('input', adminPasswortKnopfStand); });
+  d.querySelector('#apAendern').addEventListener('click', function () { aendereAdminPasswortKlick(nr); });
+  d.querySelector('#apSchliessen').addEventListener('click', schliesseAdminPasswortDialog);
+  adminPasswortKnopfStand();
+}
+function adminPasswortKnopfStand() {
+  var d = document.getElementById('adminPasswortDialog'); if (!d) return;
+  var bisher = d.querySelector('#apBisher').value, n1 = d.querySelector('#apNeu1').value, n2 = d.querySelector('#apNeu2').value;
+  var grund = '';
+  if (!bisher) grund = 'Bisheriges Passwort eingeben.';
+  else if (n1.length < passwortMin()) grund = 'Neues Passwort: mindestens ' + passwortMin() + ' Zeichen.';
+  else if (n1 !== n2) grund = 'Die beiden neuen Eingaben sind nicht gleich.';
+  else if (n1 === bisher) grund = 'Das neue Passwort ist das bisherige.';
+  d.querySelector('#apHinweis').textContent = grund;
+  d.querySelector('#apAendern').disabled = !!grund || d.getAttribute('data-zustand') === 'aendert';
+}
+function aendereAdminPasswortKlick(nr) {
+  var d = document.getElementById('adminPasswortDialog'); if (!d || nr !== adminPwNr) return;
+  var bisher = d.querySelector('#apBisher').value, neu = d.querySelector('#apNeu1').value;
+  var meldung = d.querySelector('#apMeldung');
+  d.setAttribute('data-zustand', 'aendert');
+  adminPasswortKnopfStand();
+  meldung.className = ''; meldung.textContent = 'Ändert …';
+  var arbeit;
+  try { arbeit = window.BOS_ACCOUNTS.aendereAdminPasswort(bisher, neu); }
+  catch (e) { arbeit = Promise.reject(e); }
+  bisher = null; neu = null;
+  arbeit.then(function () {
+    if (nr !== adminPwNr) return;
+    ['apBisher', 'apNeu1', 'apNeu2'].forEach(function (id) { d.querySelector('#' + id).value = ''; });
+    d.setAttribute('data-zustand', 'geaendert');
+    meldung.className = 'status-ok';
+    meldung.innerHTML = '<div style="padding:8px 10px;border:1px solid var(--bos-green);border-radius:var(--bos-radius-sm, 8px);">✓ Neues Passwort ab sofort für die Kontenverwaltung. <b>Gut aufbewahren — vergessen heißt: Notfallweg über Cloud Shell.</b></div>';
+    adminPasswortKnopfStand();
+  }).catch(function (err) {
+    if (nr !== adminPwNr) return;
+    console.error('[Konten & Rollen] Admin-Passwort ändern fehlgeschlagen', (err && err.code) || '', (err && err.message) || String(err));
+    d.removeAttribute('data-zustand');
+    var code = (err && err.code) || '';
+    var msg = (err && err.message) || String(err);
+    var roh = ' [' + (code || 'ohne Code') + ': ' + msg + ']';
+    var text;
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials') text = 'Bisheriges Passwort stimmt nicht. Nichts geändert.';
+    else if (code === 'auth/requires-recent-login') text = 'Firebase verlangt eine frische Anmeldung. Seite sperren (🔒), neu öffnen und gleich noch einmal versuchen. Nichts geändert.';
+    else if (code === 'auth/network-request-failed' || (typeof navigator !== 'undefined' && navigator.onLine === false)) text = 'Kein Netz. Nichts geändert.';
+    else if (code === 'auth/too-many-requests') text = 'Zu viele Versuche. Kurz warten, dann erneut. Nichts geändert.';
+    else if (code === 'auth/weak-password') text = 'Firebase lehnt das neue Passwort als zu schwach ab. Nichts geändert.';
+    else if (code === 'bos/admin-abgelaufen') text = 'Admin-Sitzung abgelaufen. Seite sperren (🔒) und neu öffnen. Nichts geändert.';
+    else if (code === 'bos/zu-kurz') text = msg + ' Nichts geändert.';
+    else text = 'Nicht geändert.';
+    meldung.className = 'status-err';
+    meldung.textContent = text + roh;
+    adminPasswortKnopfStand();
+  });
+}
+function schliesseAdminPasswortDialog() {
+  adminPwNr++;
+  var d = document.getElementById('adminPasswortDialog');
+  if (!d) return;
+  ['apBisher', 'apNeu1', 'apNeu2'].forEach(function (id) { var f = d.querySelector('#' + id); if (f) f.value = ''; });
+  d.remove();
+}
+
+// ---- Erinnerung: Laufzeit der Passwort-Function (20.10.2026, Ulf 16:01) ----
+// Die Cloud Function läuft bei Google auf Node 24 (Stellschraube NODE= im
+// Kopierkasten, ausserhalb_des_repos/functions/). Diese vier Werte nach JEDEM
+// Laufzeitwechsel nachziehen (Pflege-Register; Anleitung, Kapitel
+// „Laufzeit wechseln“). Datum lokal verglichen, nie über toISOString().
+var FUNCTION_LAUFZEIT = { node: 24, erinnernAb: '2028-01-01', abkuendigung: '2028-04-30', abschaltung: '2028-10-31' };
+function heuteLokal() {
+  var d = new Date();
+  var zwei = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + zwei(d.getMonth() + 1) + '-' + zwei(d.getDate());
+}
+function deDatum(iso) { var t = iso.split('-'); return t[2] + '.' + t[1] + '.' + t[0]; }
+function laufzeitStufe(heute) {
+  heute = heute || heuteLokal();
+  if (heute >= FUNCTION_LAUFZEIT.abschaltung) return 'abgeschaltet';
+  if (heute >= FUNCTION_LAUFZEIT.abkuendigung) return 'abgekuendigt';
+  if (heute >= FUNCTION_LAUFZEIT.erinnernAb) return 'erinnern';
+  return '';
+}
+function laufzeitText(stufe) {
+  var L = FUNCTION_LAUFZEIT, n = 'Node ' + L.node;
+  var anl = 'Anleitung zur Passwort-Function (FUNCTIONS_EINRICHTUNG_ANLEITUNG.md), Kapitel „Laufzeit wechseln“.';
+  if (stufe === 'erinnern') return '⏰ Die Passwort-Function läuft bei Google auf ' + n + '. Google kündigt ' + n + ' am ' + deDatum(L.abkuendigung) + ' ab — bitte vorher umstellen. ' + anl;
+  if (stufe === 'abgekuendigt') return '⚠ ' + n + ' ist seit dem ' + deDatum(L.abkuendigung) + ' abgekündigt. Neu hochladen geht vielleicht nicht mehr — jetzt umstellen. Am ' + deDatum(L.abschaltung) + ' hört die Passwort-Function auf zu laufen. ' + anl;
+  if (stufe === 'abgeschaltet') return '⛔ ' + n + ' ist seit dem ' + deDatum(L.abschaltung) + ' abgeschaltet: „Passwort jetzt setzen“ geht nicht mehr. Bis zur Umstellung: Notfallweg (dieselbe Anleitung, Anhang Notfall). Umstellen: ' + anl;
+  return '';
+}
+function zeigeLaufzeitStreifen() {
+  var st = document.getElementById('laufzeitStreifen'); if (!st) return;
+  var stufe = laufzeitStufe();
+  if (!stufe) { st.classList.add('hidden'); st.textContent = ''; return; }
+  var farbe = stufe === 'erinnern' ? 'var(--bos-warn, var(--bos-amber))' : 'var(--bos-red)';
+  st.style.borderColor = farbe; st.style.color = farbe;
+  st.setAttribute('data-stufe', stufe);
+  st.textContent = laufzeitText(stufe);
+  st.classList.remove('hidden');
 }
 
 function setzeVerknuepftePerson(kontoId, neuePersonId) {
@@ -1878,6 +2170,7 @@ function zeigeEntsperrt() {
   document.getElementById('sperrenBtn').classList.remove('hidden');
   letzteEingabe = Date.now();
   entsperrt = true;
+  zeigeLaufzeitStreifen();   // NEU 20.10.2026: Erinnerung Laufzeit der Passwort-Function
 }
 
 // ==========================================================================
