@@ -19,6 +19,17 @@
    bos_code_adressen.json.
 
    CHANGELOG
+     2026-10-21 · 08:38 · v1.5 · Feature (Zugangsblatt: Liste im Wechsel, Beschreibung)
+       ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_NACHTRAG1.md (KC 08:17, Ulf 08:14/08:17).
+       zugangsCodesHTML setzt eine Zeile je Ziel, der Code wechselt links/
+       rechts (wie beim Sammelblatt), daneben Name groß und darunter klein
+       die Beschreibung. Code 22 mm statt 30 mm (ZUGANG_DRUCK.CODE_MM, das
+       Blatt hält man in der Hand). qrGenau() bekommt die Größe als dritten
+       Parameter (ohne: 30 mm, Sammelblatt und Einzelschild unverändert).
+       Neu: ZUGANG_DRUCK (Codegröße, Höchstlänge Beschreibung) und
+       zielBeschreibung (Feld beschreibung der Registry, sonst das des Hubs;
+       feste Ziele: eigenes Feld, sonst der Hub ihrer Seite). Texte stehen
+       noch keine in der Registry (eigene Baustelle BackStore).
      2026-10-21 · 07:29 · v1.4 · Feature (Zugangsblatt-Schnellzugriffe, rein additiv)
        ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_BAUPLAN.md, Freigabe KC 06:47.
        Neu: ZUGANGSBLATT (Grenzen, Felder, ID-Muster), zugangLeer,
@@ -88,14 +99,14 @@
   function hubNamen(apps) { var h = {}; (apps || []).forEach(function (a) { if (a && a.type === 'hub') h[a.id] = a.name; }); return h; }
 
   /* Das eine Ziel, das nicht in der Registry steht. */
-  var ZIEL_BOS = { id: 'bos_oeffnen', name: 'BOS öffnen', icon: '🏠', url: 'launcher.html', direkt: 'anmeldung', fest: true };
+  var ZIEL_BOS = { id: 'bos_oeffnen', name: 'BOS öffnen', icon: '🏠', url: 'launcher.html', direkt: 'anmeldung', fest: true, beschreibung: '' };
   /* Zweites festes Ziel (08.10.2026, Konzept Punkt 68): der Reiter
      „Vorbereitungen“ der Teigecke Nacht, als QR/Chip in der Teigecke. Steht
      auch in bos_code_adressen.json („fest“) — die Adresse darf nach dem
      ersten Druck nie mehr geändert werden. Gruppe (hubName) kommt aus der
      Registry der Seite, nicht von Hand. */
   var ZIEL_TEIGECKE_VORBEREITUNGEN = { id: 'teigecke_vorbereitungen', name: 'Vorbereitungen', icon: '🥣',
-    url: 'teigecke/teigecke_nacht.html?reiter=vorbereitungen', direkt: 'anmeldung', fest: true, seite: 'teigecke_nacht' };
+    url: 'teigecke/teigecke_nacht.html?reiter=vorbereitungen', direkt: 'anmeldung', fest: true, seite: 'teigecke_nacht', beschreibung: '' };
   var FESTE_ZIELE = [ZIEL_BOS, ZIEL_TEIGECKE_VORBEREITUNGEN];
 
   /* Reihenfolge und Überschriften der Gruppen. Werte wie das Feld
@@ -412,14 +423,16 @@
   /* Schriftstufen so gewählt, dass auch lauter breite Buchstaben („W“) in die
      Zeile passen (im Ablauftest gemessen): nichts wird still abgeschnitten. */
   function standortKlasse(text) { var n = String(text || '').length; return n <= 12 ? 'xl' : n <= 18 ? 'l' : n <= 28 ? 'm' : 's'; }
-  /* QR so einpassen, dass der CODE SELBST (ohne Ruhezone) genau 30 mm
-     breit ist. Die Ruhezone (4 Module) ragt in den weißen Rand der Zeile. */
-  function qrGenau(svg, klasse) {
+  /* QR so einpassen, dass der CODE SELBST (ohne Ruhezone) genau mm breit
+     ist (ohne Angabe 30 mm: Sammelblatt, Einzelschild). Die Ruhezone
+     (4 Module) ragt in den weißen Rand der Zeile. */
+  function qrGenau(svg, klasse, mm) {
     var m = /viewBox="0 0 (\d+) (\d+)"/.exec(String(svg || ''));
     if (!m) return '';
     var ganz = Number(m[1]), code = ganz - 8;
     if (!(code > 0)) return '';
-    var breite = 30 * ganz / code, rand = 30 * 4 / code;
+    var w = typeof mm === 'number' && mm > 0 ? mm : 30;
+    var breite = w * ganz / code, rand = w * 4 / code;
     return '<div class="' + (klasse || 'sb-qr') + '">' + String(svg).replace('<svg ', '<svg style="width:' + breite.toFixed(3) + 'mm;height:' + breite.toFixed(3) + 'mm;margin:-' + rand.toFixed(3) + 'mm" ') + '</div>';
   }
   /* Sammelblatt A4 hoch. blatt: { standort, ausstattung, zeilen }.
@@ -488,7 +501,7 @@
      Grenzen und Felder stehen genauso in der Firestore-Regel (RK §25):
      MAX_ZIELE = size() <= 6 und sechs zbId-Aufrufe, ID_MUSTER = matches(),
      FELDER = hasOnly. test_nfc_qr.js vergleicht beides mit --regeln=<Datei>.
-     Wer hier dreht, muss die Regel, ZUGANG_CSS (Raster 3 × 2) und die
+     Wer hier dreht, muss die Regel, ZUGANG_CSS (Liste, 6 Zeilen) und die
      Prüfbilder mitziehen.
      ================================================================ */
   var ZUGANGSBLATT = {
@@ -566,35 +579,71 @@
     });
     return { drucken: drucken, weg: weg };
   }
-  function zbNamenKlasse(name) { var n = String(name || '').length; return n <= 14 ? 'l' : n <= 24 ? 'm' : 's'; }
-  /* Block „Schnellzugriff“ für das Zugangsblatt. codes = [{ name, qrSvg }];
-     ohne qrSvg erscheint ein Platzhalter „QR (erst online)“ (Vorschau
-     lokal). Bei 0 Codes kein Block. Der Code ist genau 30 mm breit (qrGenau),
-     der Name ohne Gruppe (papierName, GRUPPE_AUF_PAPIER). Druck und Vorschau
-     der Zentrale benutzen diese EINE Funktion. */
+  /* Druckmaße des Zugangsblatts (Nachtrag 1, 21.10.2026). Getrennt vom
+     Sammelblatt (30 mm, Wandschild aus einem Schritt Abstand): Das
+     Zugangsblatt hält man in der Hand. CODE_MM = Code ohne Ruhezone, im
+     Browser ausgemessen: 6 Zeilen samt Kopf auf einer A4-Seite. Nicht unter
+     20 mm (Anweisung KC). ZEILEN_ABSTAND_MM = senkrechter Abstand zwischen
+     zwei Codes (Zeile 1 links, Zeile 2 rechts …), damit das Handy nicht den
+     Nachbarcode erwischt. BESCHREIBUNG_MAX = längster Text, der in der
+     kleinsten Stufe noch in zwei Zeilen passt (ausgemessen); test_nfc_qr.js
+     prüft jede beschreibung der Registry dagegen. */
+  var ZUGANG_DRUCK = { CODE_MM: 22, ZEILEN_ABSTAND_MM: 6, BESCHREIBUNG_MAX: 160 };
+  /* Ein Satz zum Ziel für das Papier: Feld beschreibung der Registry; fehlt
+     es, das des Hubs (Feld hub). Feste Ziele: ihr eigenes Feld, sonst der
+     Hub ihrer Seite (Vorbereitungen → Hub der Teigecke Nacht). Fehlt alles:
+     '' (dann steht nur der Name, keine leere Zeile). */
+  function zielBeschreibung(ziel, apps) {
+    if (!ziel) return '';
+    var nachId = {}; (apps || []).forEach(function (a) { if (a && a.id) nachId[a.id] = a; });
+    function text(x) { return x && typeof x.beschreibung === 'string' ? x.beschreibung.trim() : ''; }
+    var fest = FESTE_ZIELE.filter(function (f) { return f.id === ziel.id; })[0];
+    var eintrag = fest || nachId[ziel.id];
+    var eigen = text(eintrag);
+    if (eigen) return eigen;
+    var traeger = fest ? (fest.seite ? nachId[fest.seite] : null) : eintrag;
+    return traeger && traeger.hub ? text(nachId[traeger.hub]) : '';
+  }
+  function zbNamenKlasse(name) { var n = String(name || '').length; return n <= 28 ? 'l' : n <= 44 ? 'm' : 's'; }
+  function zbTextKlasse(text) { var n = String(text || '').length; return n <= 90 ? 'l' : n <= 125 ? 'm' : 's'; }
+  /* Block „Schnellzugriff“ für das Zugangsblatt. codes = [{ name, qrSvg,
+     beschreibung }]; ohne qrSvg erscheint ein Platzhalter „QR (erst
+     online)“ (Vorschau lokal). Bei 0 Codes kein Block. Eine Zeile je Ziel,
+     der Code wechselt die Seite (Zeile 1 links, 2 rechts …), wie Code und
+     Chip-Feld beim Sammelblatt. Code ohne Ruhezone genau
+     ZUGANG_DRUCK.CODE_MM breit (qrGenau). Name ohne Gruppe (papierName,
+     GRUPPE_AUF_PAPIER), darunter die Beschreibung, nur wenn es eine gibt.
+     Druck und Vorschau der Zentrale benutzen diese EINE Funktion. */
   function zugangsCodesHTML(codes) {
     codes = (codes || []).slice(0, ZUGANGSBLATT.MAX_ZIELE);
     if (!codes.length) return '';
     return '<section class="zb-codes"><div class="zb-titel">Schnellzugriff</div>' +
       '<div class="zb-satz">Mit der Handy-Kamera scannen. Nach der Anmeldung bist du direkt dort.</div>' +
-      '<div class="zb-raster">' + codes.map(function (c) {
-        var qr = c.qrSvg ? qrGenau(c.qrSvg, 'zb-qr') : '';
+      '<div class="zb-liste">' + codes.map(function (c, i) {
+        var qr = c.qrSvg ? qrGenau(c.qrSvg, 'zb-qr', ZUGANG_DRUCK.CODE_MM) : '';
         var name = papierName(c);
-        return '<div class="zb-zelle">' + (qr || '<div class="zb-platz">QR (erst online)</div>') +
-          '<div class="zb-name zb-name-' + zbNamenKlasse(name) + '">' + esc(name) + '</div></div>';
+        var b = typeof c.beschreibung === 'string' ? c.beschreibung.trim() : '';
+        return '<div class="zb-zeile ' + (i % 2 === 0 ? 'zb-links' : 'zb-rechts') + '">' + (qr || '<div class="zb-platz">QR (erst online)</div>') +
+          '<div class="zb-text"><div class="zb-name zb-name-' + zbNamenKlasse(name) + '">' + esc(name) + '</div>' +
+          (b ? '<div class="zb-beschreibung zb-beschreibung-' + zbTextKlasse(b) + '">' + esc(b) + '</div>' : '') + '</div></div>';
       }).join('') + '</div></section>';
   }
+  var ZB_MM = ZUGANG_DRUCK.CODE_MM + 'mm';
   var ZUGANG_CSS =
     '.zb-codes,.zb-codes *{box-sizing:border-box;}' +
-    '.zb-codes{margin-top:7mm;border-top:.4mm solid #000;padding-top:3mm;page-break-inside:avoid;break-inside:avoid;color:#000;font-family:Arial,Helvetica,sans-serif;}' +
+    '.zb-codes{margin-top:4mm;border-top:.4mm solid #000;padding-top:2.5mm;page-break-inside:avoid;break-inside:avoid;color:#000;font-family:Arial,Helvetica,sans-serif;}' +
     '.zb-titel{font-size:13pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}' +
-    '.zb-satz{font-size:10pt;color:#333;margin:1mm 0 4mm;}' +
-    '.zb-raster{display:grid;grid-template-columns:repeat(3,1fr);column-gap:6mm;row-gap:5mm;}' +
-    '.zb-zelle{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;}' +
-    '.zb-qr{width:30mm;height:30mm;overflow:visible;flex:0 0 auto;}.zb-qr svg{display:block;}' +
-    '.zb-platz{width:30mm;height:30mm;border:.4mm dashed #888;display:flex;align-items:center;justify-content:center;font-size:8pt;color:#666;}' +
-    '.zb-name{margin-top:2.5mm;font-family:Georgia,serif;font-weight:900;line-height:1.1;max-width:100%;overflow-wrap:anywhere;}' +
-    '.zb-name-l{font-size:13pt;}.zb-name-m{font-size:11pt;}.zb-name-s{font-size:9pt;}';
+    '.zb-satz{font-size:10pt;color:#333;margin:.8mm 0 2.5mm;}' +
+    '.zb-liste{display:flex;flex-direction:column;row-gap:' + ZUGANG_DRUCK.ZEILEN_ABSTAND_MM + 'mm;}' +
+    '.zb-zeile{display:flex;align-items:center;gap:6mm;min-height:' + ZB_MM + ';}' +
+    '.zb-rechts{flex-direction:row-reverse;}.zb-rechts .zb-text{text-align:right;}' +
+    '.zb-qr{width:' + ZB_MM + ';height:' + ZB_MM + ';overflow:visible;flex:0 0 ' + ZB_MM + ';}.zb-qr svg{display:block;}' +
+    '.zb-platz{width:' + ZB_MM + ';height:' + ZB_MM + ';flex:0 0 ' + ZB_MM + ';border:.4mm dashed #888;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7pt;color:#666;}' +
+    '.zb-text{flex:1;min-width:0;}' +
+    '.zb-name{font-family:Georgia,serif;font-weight:900;line-height:1.1;overflow-wrap:anywhere;}' +
+    '.zb-name-l{font-size:16pt;}.zb-name-m{font-size:13pt;}.zb-name-s{font-size:11pt;}' +
+    '.zb-beschreibung{margin-top:1mm;line-height:1.25;color:#333;overflow-wrap:anywhere;}' +
+    '.zb-beschreibung-l{font-size:10pt;}.zb-beschreibung-m{font-size:9pt;}.zb-beschreibung-s{font-size:8pt;}';
 
   /* ---------- Wächter (für test_nfc_qr.js) ----------
      datei = Inhalt von bos_code_adressen.json. Liefert die Abweichungen
@@ -655,7 +704,8 @@
     sammelblattHTML: sammelblattHTML, SAMMELBLATT_CSS: SAMMELBLATT_CSS,
     ZUGANGSBLATT: ZUGANGSBLATT, zugangLeer: zugangLeer, zugangFehler: zugangFehler, zugangPruefung: zugangPruefung,
     zugangDokument: zugangDokument, zugangAusDokument: zugangAusDokument, zielErlaubt: zielErlaubt,
-    zugangsblattZiele: zugangsblattZiele, zugangsCodesHTML: zugangsCodesHTML, ZUGANG_CSS: ZUGANG_CSS
+    zugangsblattZiele: zugangsblattZiele, zugangsCodesHTML: zugangsCodesHTML, ZUGANG_CSS: ZUGANG_CSS,
+    ZUGANG_DRUCK: ZUGANG_DRUCK, zielBeschreibung: zielBeschreibung, qrGenau: qrGenau
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_NFC_QR_LOGIK = api;

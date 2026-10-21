@@ -7,6 +7,15 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-21 · 08:38 · v-Zugangsblatt-QR-2 · Gestaltung (Nachtrag 1, Kontroll-Chat 08:17)
+      ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_NACHTRAG1.md. Die Zeile
+      „Probe-Anmeldung durchgeführt: ☐“ ist vom Blatt (Ulf 08:14). Die
+      Schnellzugriffe stehen als Liste im Wechsel (Code links/rechts, Name,
+      darunter die Beschreibung aus der Registry, wenn es eine gibt; Block aus
+      nfc_qr_logik.js, Code 22 mm). Mit Codes ist der Kopf etwas gestrafft
+      (Abstände, Passwort weiter 18 pt), ohne Codes bleibt das Blatt wie es war.
+      ladeZugangsCodes gibt je Code die Beschreibung mit (zielBeschreibung).
+      SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
     2026-10-21 · 07:29 · v-Zugangsblatt-QR-1 · Feature (Freigabe Kontroll-Chat 06:47)
       Zugangsblatt mit Schnellzugriffen: bis zu 6 QR-Codes unter der Anleitung,
       Auswahl aus der NFC-/QR-Zentrale (nfc_einstellungen/zugangsblatt, RK §25,
@@ -18,7 +27,8 @@
       Passwort setzen und Drucken hängen NIE daran: jeder Fehler = Blatt ohne
       Codes + Grund mit err.message. Lokal (BOS_QR.darfAusgeben) ohne Codes.
       Block und CSS aus nfc_qr_logik.js (zugangsCodesHTML, ZUGANG_CSS; Code
-      genau 30 mm, dieselbe Funktion wie die Vorschau der Zentrale).
+      genau 30 mm, seit Nachtrag 1 22 mm; dieselbe Funktion wie die Vorschau
+      der Zentrale).
       Neu eingebunden: ../bos_konto_profil.js, ../bos_qr.js, ../qrcode.min.js,
       ../nfc_qr/nfc_qr_logik.js. Hilfe „Wie ändere ich ein Passwort?“ ergänzt.
       SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
@@ -1897,7 +1907,8 @@ function zugangsFehlerText(err) {
   }
   return { text: 'Nicht gesetzt: ' + msg + roh };
 }
-// codes (NEU 21.10.2026) = [{ name, hubName, qrSvg }] aus ladeZugangsCodes; leer = Blatt wie bisher.
+// codes (NEU 21.10.2026) = [{ name, hubName, qrSvg, beschreibung }] aus ladeZugangsCodes; leer = Blatt wie bisher.
+// Mit Codes: Kopf gestrafft (Nachtrag 1), damit 6 Zeilen auf die Seite passen; Passwort bleibt 18 pt.
 function zugangsblattDruckHTML(k, pw, codes) {
   var e = function (t) { return esc(String(t)); };
   var L = window.BOS_NFC_QR_LOGIK;
@@ -1907,7 +1918,8 @@ function zugangsblattDruckHTML(k, pw, codes) {
   return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Zugangsblatt</title>' +
     '<style>@page{size:A4;margin:20mm}body{font-family:sans-serif;color:#000;margin:0}h1{font-size:20pt;margin:0 0 12mm}' +
     'table{border-collapse:collapse;font-size:14pt}td{padding:4mm 6mm 4mm 0;vertical-align:top}.pw{font-family:monospace;font-size:18pt;letter-spacing:.08em}' +
-    'ol{font-size:12pt;line-height:1.6;margin-top:10mm}.klein{font-size:10pt;color:#444;margin-top:' + (block ? '7mm' : '12mm') + '}' + css + '</style></head><body>' +
+    'ol{font-size:12pt;line-height:1.6;margin-top:10mm}.klein{font-size:10pt;color:#444;margin-top:' + (block ? '4mm' : '12mm') + '}' +
+    (block ? 'h1{margin-bottom:4mm}td{padding:1.5mm 6mm 1.5mm 0}ol{line-height:1.35;margin-top:3mm;margin-bottom:0}.klein{margin-bottom:0}' : '') + css + '</style></head><body>' +
     '<h1>BäckereiOS · Zugang</h1><table>' +
     '<tr><td>Name</td><td><b>' + e(zugangsName(k)) + '</b></td></tr>' +
     '<tr><td>Kennung</td><td><b>' + e(k.id) + '</b></td></tr>' +
@@ -1916,7 +1928,7 @@ function zugangsblattDruckHTML(k, pw, codes) {
     '<li>Erscheint „Noch nicht freigeschaltet“: Ulf Bescheid geben.</li></ol>' +
     block +
     '<p class="klein">Blatt nicht liegen lassen. Bei Verlust: Ulf setzt ein neues Passwort, das alte gilt dann nicht mehr.</p>' +
-    '<p class="klein">Probe-Anmeldung durchgeführt: ☐</p></body></html>';
+    '</body></html>';
 }
 function druckeZugangsblatt(k) {
   if (!zugangsPasswort) return;   // Schwelle: ohne gesetztes Passwort kein Blatt
@@ -1979,7 +1991,7 @@ async function ladeZugangsCodes(k, nr) {
       try {
         var adr = Q.adresse(ziel.url);
         if (!Q.darfAusgeben(adr)) throw new Error('keine Online-Adresse: ' + adr);
-        codes.push({ id: ziel.id, name: ziel.name, hubName: ziel.hubName || '', adresse: adr, qrSvg: Q.qrFuer(adr) });
+        codes.push({ id: ziel.id, name: ziel.name, hubName: ziel.hubName || '', adresse: adr, qrSvg: Q.qrFuer(adr), beschreibung: L.zielBeschreibung(ziel, window.BOS_APPS) });
       } catch (e) { weg.push({ id: ziel.id, name: ziel.name, grund: 'qr', meldung: e.message }); }
     });
     var text = codes.length + (codes.length === 1 ? ' Schnellzugriff' : ' Schnellzugriffe') + ' aufs Blatt' +

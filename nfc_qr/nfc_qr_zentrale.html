@@ -37,6 +37,12 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-21 · 08:38 · v2.1 · Gestaltung (Zugangsblatt Nachtrag 1, Kontroll-Chat 08:17)
+      Vorschau zeigt die Liste im Wechsel (zugangsCodesHTML, Code 22 mm) mit der
+      Beschreibung aus der Registry (zielBeschreibung, Texte folgen mit dem
+      BackStore). Texte „3 cm“ auf 2,2 cm angepasst (zugang_voll,
+      zugang_vorschau_hinweis, Hilfe „Zugangsblatt: Schnellzugriffe“).
+      Sammelblatt unverändert (30 mm).
     2026-10-21 · 07:29 · v2.0 · Feature (Zugangsblatt-Schnellzugriffe, Freigabe KC 06:47)
       Zwei Reiter: „Schilder & Chips“ (der bisherige Inhalt, unverändert) und
       „Zugangsblatt“ (höchstens 6 Ziele in Reihenfolge, nur aus waehlbareZiele,
@@ -500,7 +506,7 @@ const I18N_DE = {
   zugang_zaehler: '{n} von {max} Zielen',
   zugang_dazu: 'Hinzufügen',
   zugang_wahl: 'Ziel wählen …',
-  zugang_voll: 'Höchstens {max} Ziele: Auf dem Zugangsblatt ist für mehr kein Platz (jeder Code 3 cm). Erst eines entfernen.',
+  zugang_voll: 'Höchstens {max} Ziele: Auf dem Zugangsblatt ist für mehr kein Platz (jeder Code 2,2 cm). Erst eines entfernen.',
   zugang_doppelt: 'Dieses Ziel steht schon in der Auswahl.',
   zugang_speichern: 'Speichern',
   zugang_verwerfen: 'Änderungen verwerfen',
@@ -517,7 +523,7 @@ const I18N_DE = {
   zugang_kein_recht: 'Keine Berechtigung: Die Auswahl darf nur der Generalschlüssel lesen und speichern, oder die eingesetzte Regel ist älter als diese Seite.',
   zugang_kein_netz: 'Die Datenbank ist gerade nicht erreichbar (kein Netz oder keine Antwort).',
   zugang_fehler: 'Die Datenbank hat einen Fehler gemeldet.',
-  zugang_vorschau_hinweis: 'So sieht der untere Teil des Blatts aus (Originalgröße am Drucker: jeder Code 3 cm). Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf.',
+  zugang_vorschau_hinweis: 'So sieht der untere Teil des Blatts aus (Originalgröße am Drucker: jeder Code 2,2 cm, abwechselnd links und rechts). Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf.',
   zugang_vorschau_lokal: 'Diese Seite läuft nicht unter der Online-Adresse: Die Vorschau zeigt Platzhalter statt Codes. Die Kontenverwaltung druckt dann ebenfalls ohne Codes.',
   zugang_vorschau_leer: 'Keine Ziele gewählt: Das Zugangsblatt kommt ohne Schnellzugriffe.',
   frage_zugang_titel: 'Auswahl speichern?',
@@ -1195,7 +1201,7 @@ function renderZugangVorschau() {
   const codes = ziele.map(function (ziel) {
     let qrSvg = '';
     if (darf()) { try { qrSvg = Q.qrFuer(adresseFuer(ziel)); } catch (err) { zeigeFehler(t('err_unerwartet'), err); } }
-    return { name: ziel.name, hubName: ziel.hubName || '', qrSvg: qrSvg };
+    return { name: ziel.name, hubName: ziel.hubName || '', qrSvg: qrSvg, beschreibung: L.zielBeschreibung(ziel, apps()) };
   });
   el.innerHTML = '<div class="klein" style="margin-bottom:8px">' + esc(t(darf() ? 'zugang_vorschau_hinweis' : 'zugang_vorschau_lokal')) + '</div>' +
     '<div class="zb-vorschau" id="zugangVorschauBlatt"><div class="zb-vorschau-innen">' + L.zugangsCodesHTML(codes) + '</div></div>';
@@ -1358,7 +1364,7 @@ const helpData = [
   { heading: 'Ziel gibt es nicht mehr', text: 'Verschwindet ein Programm aus BäckereiOS oder ist es nicht mehr für den Direktaufruf freigegeben, merkt die Zentrale das beim Laden von selbst: In der Übersicht steht am Blatt eine rote Meldung, im Blatt ist die Zeile rot markiert. So ein Blatt lässt sich nicht drucken, bis du die Zeile entfernt oder durch ein anderes Ziel ersetzt hast. Ein Blatt mit einem Code, der ins Leere führt, soll gar nicht erst entstehen. Denk auch an das Blatt, das schon hängt: abnehmen und neu drucken.' },
   { heading: 'Wenn die Datenbank nicht mitspielt', text: 'Fehlt das Netz, lehnt die Datenbank ab oder passen die Regeln nicht zu dieser Seite, steht der Grund im Bereich „Sammelblätter“, mit der Meldung der Datenbank dahinter. Alles andere auf dieser Seite geht weiter: die Liste, Adressen kopieren, Einzelschild und Chips. Im Reiter „Zugangsblatt“ steht der Grund genauso über der Auswahl.' },
   { heading: 'Generalschlüssel', text: 'Gespeicherte Sammelblätter und die Auswahl für das Zugangsblatt gehören dem Generalschlüssel, wie die Kontenverwaltung. Oben steht dafür „Mit Generalschlüssel anmelden“: das Admin-Passwort eingeben, dann sind beide Teile da, auch am Alltagstablet. Das Passwort wird nirgends gespeichert. Die Anmeldung endet mit „🔒 Abmelden“, beim Verlassen der Seite und von selbst nach 5 Minuten ohne Eingabe (eine Minute vorher erscheint ein Hinweis). Dabei geht nichts verloren: Was du gerade bearbeitest, bleibt stehen, und „Speichern“ fragt dann erst noch einmal nach dem Passwort. Liste, Adressen, Einzelschild und Chips gehen ganz ohne Anmeldung.' },
-  { heading: 'Zugangsblatt: Schnellzugriffe', text: 'Im Reiter „Zugangsblatt“ wählst du höchstens 6 Ziele, die als QR-Code unter der Anleitung jedes Zugangsblatts stehen, das die Kontenverwaltung druckt, zum Beispiel „BOS öffnen“, Wunschtag und Urlaub. Mit ▲ und ▼ legst du die Reihenfolge fest, mit ✕ nimmst du ein Ziel heraus (mit Rückfrage). Darunter zeigt die Vorschau den unteren Teil des Blatts, jeder Code ist auf Papier 3 cm groß. Erst „Speichern“ sichert die Auswahl (mit Rückfrage); sie gilt dann für jedes neu gedruckte Blatt. Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf: Ein Azubi ohne Recht auf den Produktionsplaner bekommt diesen Code nicht, „BOS öffnen“ und Seiten ohne Anmeldung bekommt jeder. Gibt es ein Ziel nicht mehr, ist die Zeile rot; erst entfernen, dann speichern. Gespeichert wird nur, welche Ziele es sind, nie eine Adresse. Solange BäckereiOS nicht online läuft, zeigt die Vorschau Platzhalter, und das Zugangsblatt kommt ohne Codes.' },
+  { heading: 'Zugangsblatt: Schnellzugriffe', text: 'Im Reiter „Zugangsblatt“ wählst du höchstens 6 Ziele, die als QR-Code unter der Anleitung jedes Zugangsblatts stehen, das die Kontenverwaltung druckt, zum Beispiel „BOS öffnen“, Wunschtag und Urlaub. Mit ▲ und ▼ legst du die Reihenfolge fest, mit ✕ nimmst du ein Ziel heraus (mit Rückfrage). Darunter zeigt die Vorschau den unteren Teil des Blatts: Die Codes stehen untereinander, abwechselnd links und rechts, jeder ist auf Papier 2,2 cm groß, daneben der Name und, wenn es eine gibt, eine kurze Beschreibung. Erst „Speichern“ sichert die Auswahl (mit Rückfrage); sie gilt dann für jedes neu gedruckte Blatt. Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf: Ein Azubi ohne Recht auf den Produktionsplaner bekommt diesen Code nicht, „BOS öffnen“ und Seiten ohne Anmeldung bekommt jeder. Gibt es ein Ziel nicht mehr, ist die Zeile rot; erst entfernen, dann speichern. Gespeichert wird nur, welche Ziele es sind, nie eine Adresse. Solange BäckereiOS nicht online läuft, zeigt die Vorschau Platzhalter, und das Zugangsblatt kommt ohne Codes.' },
   { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },
   { heading: 'Wenn etwas nicht klappt', text: 'Jeder Fehler steht oben in einem roten Kasten, mit der Ursache in normaler Sprache und der Meldung des Geräts dahinter. Bei Chips heißt das meistens: NFC am Handy ist aus, die Erlaubnis für den Browser fehlt, oder der Chip wurde zu früh weggezogen. Ein fehlender Code ist kein Notfall: Alles bleibt auch über den Launcher erreichbar.' },
   { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser. Einer davon gehört in die Teigecke: „Teigecke · Vorbereitungen“ steht in der Liste direkt unter „BrotTeigRechner“ (früher „Teigecke Nacht“) und öffnet den BrotTeigRechner gleich im Reiter „Vorbereitungen“ — als QR-Schild oder Chip, wie jedes andere Ziel.' }

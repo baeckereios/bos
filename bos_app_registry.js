@@ -83,6 +83,18 @@
               Reiter „Zugriffe“ der Kontenverwaltung — die Haken stehen dort
               in den Stammdaten. Die Datenbank-Regel muss dieselben Haken
               prüfen, sonst ist die Kachel ein Schild ohne Schloss.
+     beschreibung — NEU (21.10.2026, 08:38, ANWEISUNG_2026-10-21_ZUGANGSBLATT_QR_
+              NACHTRAG1.md). optional. EIN Satz, was man dort macht. Der
+              BackStore zeigt ihn künftig (eigene Baustelle, „näher an einen
+              echten AppStore“, Ulf 21.10.); das Zugangsblatt der Konten-
+              verwaltung übernimmt ihn schon jetzt unter dem Namen des
+              Schnellzugriffs (nfc_qr_logik.js, zielBeschreibung). Fehlt das
+              Feld bei einem Hub-Kind, gilt der Text des Hubs (Feld hub);
+              fehlt auch der, steht nur der Name. Höchstens 160 Zeichen
+              (ZUGANG_DRUCK.BESCHREIBUNG_MAX, passt auf dem Blatt in zwei
+              Zeilen); test_nfc_qr.js prüft jeden Eintrag. Stand 21.10.:
+              noch KEIN Eintrag trägt einen Text, die Texte kommen mit der
+              BackStore-Baustelle.
    ================================================================ */
 
 window.BOS_APPS = [
