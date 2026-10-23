@@ -203,6 +203,21 @@
       ]
     },
 
+    "werdegang": {
+      "bezeichnung": "Werdegang (Maschinen)",
+      "status": "neu 23.10.2026 (Maschinenseite Stufe A, #115/#116; Ulf M20 17:46)",
+      "typ": "Liste von Maschinen-Kennungen (Text, z. B. [\"stikkenofen\"]) oder nicht vorhanden",
+      "beschreibung": "Welche Maschinen das Produkt durchläuft, in der Reihenfolge, in der es durch die Backstube geht (Ulfs Bild: Kneter → Rondo/Rheon/Brötchenstraße → Brötchenpresse → König → Stikkenofen oder Etagenofen). Die Kennung ist der feste Name der Maschine (Firestore maschinen, Dokument-ID) und ändert sich nie. Gepflegt im Produkt-Editor, Reiter Backinformationen, nur mit Rolle admin, über den normalen Speicherweg mit Sicherung. Die Seite „Maschinen“ zeigt bei jeder Maschine die Produkte, deren Werdegang durch sie führt; die Angaben dazu (beim Stikkenofen Programm Ganz, Programm Halb, Hinweis) liegen NICHT am Produkt, sondern bei der Maschine (Firestore maschinen_angaben) und werden dort von den Maschinenführern gepflegt. Fliegt eine Maschine aus dem Werdegang, verschwindet das Produkt dort, seine Angaben bleiben gespeichert. Leerer Werdegang = Feld fehlt. Steht eine Kennung im Werdegang, die es nicht (mehr) gibt, zeigt der Editor sie mit ⚠ an. Unabhängig von „station“, „pressenGroesse“ und „ausTeig“ — nichts wird daraus abgeleitet. Der Import im Sync-Werkzeug behält das Feld, wenn eine ältere Datei es nicht kennt.",
+      "beispiel": "[\"stikkenofen\"]",
+      "genutztVon": [
+        "produkt_config/produkt_config_editor.html (Reiter Backinformationen)",
+        "maschinenseite/maschinenseite.html (Backprogramme, Editor)",
+        "maschinenseite/maschinen_logik.js",
+        "maschinenseite/maschinen_ansicht.js",
+        "produkt_config/produkt_config_sync.html (Import behält das Feld)"
+      ]
+    },
+
     "reihenfolge": {
       "bezeichnung": "Reihenfolge in der Liste (nur Datenbank)",
       "status": "neu 05.10.2026 (Produkte aus Firestore, Stufe 1)",

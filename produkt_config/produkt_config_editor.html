@@ -3,6 +3,19 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-23 · 23:04 · Werdegang (Maschinenseite Stufe A, #115/#116; Bauplan Go Kontroll-Chat 22:22, Kern-Freigabe Ulf 18:09)
+      Neues Produktfeld werdegang (Liste von Maschinen-Kennungen) im Reiter
+      Backinformationen unter „Aus Teig“: Maschinen mit ▲ ▼ ✕, „＋ Maschine“
+      aus den angelegten (nicht ausgeblendeten) Maschinen. Unbekannte Kennung
+      bleibt mit ⚠ stehen (nur ✕), ausgeblendete Maschine mit ⚠. Maschinenliste
+      nicht lesbar: Werdegang nur angezeigt, Grund am Feld. Leerer Werdegang =
+      Feld entfernt (wie ausTeig). Laden über ../maschinenseite/maschinen_logik.js
+      (BOS_MASCHINEN.ladeMaschinen). Speichern unverändert (Sicherung + Stand).
+      REGEL_FASSUNG_EDITOR → maschinen-2026-10-23, REGEL_DATEI_EDITOR →
+      firestore_regeln_2026-10-23_maschinen.rules (die alte Regel lehnt
+      werdegang mit hasOnly ab). Hilfe: „Backprogramm“ im ersten Abschnitt war
+      falsch (kein solches Feld) → „Werdegang“; neuer Abschnitt „Was ist der
+      Werdegang?“. SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
     2026-10-21 · 11:07 · Nur REGEL_DATEI_EDITOR: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_backstore.rules (BackStore-Texte, #110, Bauplan freigegeben KC 10:27; elf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_BACKSTORE_APPSTORE_BAU.md
     2026-10-21 · 07:29 · Nur REGEL_DATEI_EDITOR: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4; Fund F4b: die zehnte Stelle, eigener Name). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen. Fassung und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
     2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
@@ -263,6 +276,11 @@
   .detail-section.two { grid-template-columns:1fr 1fr; }
   .detail-section:last-child { border-bottom:none; }
   .detail-feld { display:flex; flex-direction:column; gap:6px; }
+  .wg-zeile { display:flex; align-items:center; gap:6px; padding:4px 0; border-bottom:1px solid var(--border); }
+  .wg-zeile.wg-warn .wg-name { color:var(--bos-warn, var(--amber)); }
+  .wg-nr { width:1.6em; text-align:center; color:var(--text-dim); font-weight:700; }
+  .wg-name { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+  .wg-btn { min-width:40px; min-height:40px; padding:0 8px; }
   .detail-feld label { font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--amber); font-weight:700; }
   .detail-feld select, .detail-feld input {
     background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text);
@@ -520,6 +538,7 @@
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_produkte.js"></script>
 <script src="../bos_produkte_schreiben.js"></script>
+<script src="../maschinenseite/maschinen_logik.js"></script>   <!-- NEU 23.10.2026: Maschinenliste für den Werdegang -->
 <!-- 15.10.2026 (#63): Backzettel/Mitschrift lesen wie an der Station (dieselben
      Ausschlüsse: besondere Tage aus bos_zeitkontext_referenz.js), Froster-Bestand
      für den Hinweis beim Pausieren -->
@@ -553,8 +572,8 @@ var quelle = 'db';
 var geaenderteKarten = {};
 var SICH_COLLECTION = 'produkte_sicherungen';
 var STAND_COLLECTION = 'produkte_stand', STAND_DOK = 'aktuell';
-var REGEL_FASSUNG_EDITOR = 'richtwert-2026-10-14';   /* 15.10.2026 (#63): neue Produktfelder bedarfsQuelle, richtwert, pausiert */
-var REGEL_DATEI_EDITOR = 'firestore_regeln_2026-10-21_backstore.rules';
+var REGEL_FASSUNG_EDITOR = 'maschinen-2026-10-23';   /* 23.10.2026 (Maschinenseite): neues Produktfeld werdegang; vorher richtwert-2026-10-14 */
+var REGEL_DATEI_EDITOR = 'firestore_regeln_2026-10-23_maschinen.rules';
 var DB_FELDER = ['reihenfolge', 'geloescht', 'sicherungId'];
 var ERINNERUNG_TAGE = 30, ERINNERUNG_STAENDE = 5;
 
@@ -1519,6 +1538,64 @@ function aendereAusTeig(idx, wert) {
   markiereGeaendert(idx);
 }
 
+// NEU 23.10.2026 (Maschinenseite Stufe A): Werdegang = welche Maschinen das
+// Produkt durchläuft, in Reihenfolge. MASCHINEN_LISTE: null = lädt noch,
+// Array = geladen, { fehler } = Lesen fehlgeschlagen (Muster TEIG_LISTE).
+var MASCHINEN_LISTE = null;
+async function ladeMaschinenListe() {
+  try {
+    if (!window.BOS_MASCHINEN) throw new Error('maschinenseite/maschinen_logik.js ist nicht geladen');
+    await window.BOS_AUTH_READY;
+    MASCHINEN_LISTE = await window.BOS_MASCHINEN.ladeMaschinen(db);
+  } catch (err) {
+    console.error('[Produkt-Config] Maschinen laden:', err);
+    MASCHINEN_LISTE = { fehler: (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)) };
+  }
+  if (karteIdx !== null && karteAktiverTab === 'back' && !document.getElementById('karteOverlay').classList.contains('hidden')) renderKarte();
+}
+function kfWerdegang(wert) {
+  var liste = Array.isArray(wert) ? wert : [];
+  var kopf = '<div class="detail-feld"><label>Werdegang (Maschinen) ' + fhBtn('werdegang') + '</label>';
+  if (MASCHINEN_LISTE === null) return kopf + '<div class="readonly-wert">Maschinen werden geladen … (bisher: ' + esc(liste.join(' → ') || 'keine') + ')</div></div>';
+  if (!Array.isArray(MASCHINEN_LISTE)) {
+    return kopf + '<div class="readonly-wert">' + esc(liste.join(' → ') || 'keine') + ' — unverändert</div>' +
+      '<div style="color:var(--red);font-size:.75rem;margin-top:4px">⚠︎ Maschinenliste nicht lesbar: ' + esc(MASCHINEN_LISTE.fehler) + '</div></div>';
+  }
+  var zeilen = window.BOS_MASCHINEN.werdegangPruefen(liste, MASCHINEN_LISTE).map(function (z, i) {
+    var name = z.status === 'unbekannt' ? '⚠︎ ' + esc(z.id) + ' — Maschine nicht gefunden (gelöscht oder umbenannt?)'
+      : z.status === 'ausgeblendet' ? '⚠︎ ' + esc(z.name) + ' — ausgeblendet' : esc(z.name);
+    var hoch = '<button type="button" class="btn btn-outline wg-btn" onclick="werdegangSchiebe(karteIdx,' + i + ',-1)"' + (i === 0 || z.status !== 'ok' ? ' disabled' : '') + ' aria-label="nach vorn">▲</button>';
+    var runter = '<button type="button" class="btn btn-outline wg-btn" onclick="werdegangSchiebe(karteIdx,' + i + ',1)"' + (i === liste.length - 1 || z.status !== 'ok' ? ' disabled' : '') + ' aria-label="nach hinten">▼</button>';
+    var weg = '<button type="button" class="btn btn-outline wg-btn" onclick="werdegangWeg(karteIdx,' + i + ')" aria-label="aus dem Werdegang nehmen">✕</button>';
+    return '<div class="wg-zeile' + (z.status !== 'ok' ? ' wg-warn' : '') + '" data-werdegang="' + esc(z.id) + '"><span class="wg-nr">' + (i + 1) + '</span><span class="wg-name">' + name + '</span>' + hoch + runter + weg + '</div>';
+  }).join('');
+  var frei = MASCHINEN_LISTE.filter(function (m) { return m.geloescht !== true && liste.indexOf(m.id) === -1; });
+  var dazu = frei.length
+    ? '<select id="werdegangDazu" onchange="werdegangDazu(karteIdx,this.value)"><option value="">＋ Maschine …</option>' + frei.map(function (m) { return '<option value="' + esc(m.id) + '">' + esc(m.name || m.id) + '</option>'; }).join('') + '</select>'
+    : '<div style="font-size:.75rem;color:var(--text-dim)">' + (MASCHINEN_LISTE.length ? 'Alle angelegten Maschinen stehen schon im Werdegang.' : 'Noch keine Maschine angelegt (Kachel „Maschinen“ → ＋ Maschine).') + '</div>';
+  return kopf + (zeilen || '<div class="readonly-wert">keine Maschine</div>') + dazu + '</div>';
+}
+function setzeWerdegang(idx, liste) {
+  if (liste.length) daten[idx].werdegang = liste; else delete daten[idx].werdegang;
+  markiereGeaendert(idx);
+  renderKarte();
+}
+function werdegangSchiebe(idx, i, r) {
+  var l = Array.isArray(daten[idx].werdegang) ? daten[idx].werdegang.slice() : [];
+  setzeWerdegang(idx, window.BOS_MASCHINEN.verschiebe(l, i, r));
+}
+function werdegangWeg(idx, i) {
+  var l = Array.isArray(daten[idx].werdegang) ? daten[idx].werdegang.slice() : [];
+  l.splice(i, 1);
+  setzeWerdegang(idx, l);
+}
+function werdegangDazu(idx, id) {
+  if (!id) return;
+  var l = Array.isArray(daten[idx].werdegang) ? daten[idx].werdegang.slice() : [];
+  if (l.indexOf(id) === -1) l.push(id);
+  setzeWerdegang(idx, l);
+}
+
 function kfCheckbox(feld, label, wert) {
   return '<div class="detail-feld checkbox-feld">' +
     '<input type="checkbox" id="kf_' + feld + '" ' + (wert === true ? 'checked' : '') +
@@ -1564,7 +1641,8 @@ var KARTEN_TABS = [
       return (
         '<div class="detail-section full"><div class="detail-feld"><label>BackTage ' + fhBtn('backTage') + '</label><div class="backtage-buttons">' + btHTML + '</div></div></div>' +
         '<div class="detail-section full">' + kfNumber('produktionsSchritt', 'Produktionsschritt (Bleche)', p.produktionsSchritt) + '</div>' +
-        '<div class="detail-section full">' + kfTeig(p.ausTeig) + '</div>'
+        '<div class="detail-section full">' + kfTeig(p.ausTeig) + '</div>' +
+        '<div class="detail-section full">' + kfWerdegang(p.werdegang) + '</div>'   /* 23.10.2026, Maschinenseite */
       );
     }
   },
@@ -2033,7 +2111,7 @@ var helpData = {
   sections: [
     {
       heading: "Wofür ist diese Seite?",
-      text: "Zum Bearbeiten der Produktliste — Namen, Kategorien, Backprogramm, Station, Froster-Zuständigkeit und mehr. Die Tabelle ist eine reine Übersicht zum Durchschauen; zum Bearbeiten auf ein Produkt tippen, dann öffnet sich die Produkt-Karte."
+      text: "Zum Bearbeiten der Produktliste — Namen, Kategorien, Werdegang (welche Maschinen das Produkt durchläuft), Station, Froster-Zuständigkeit und mehr. Die Tabelle ist eine reine Übersicht zum Durchschauen; zum Bearbeiten auf ein Produkt tippen, dann öffnet sich die Produkt-Karte."
     },
     {
       heading: "Wie navigiere ich durch die Produkte?",
@@ -2094,6 +2172,10 @@ var helpData = {
     {
       heading: "Was bedeutet „Aus Teig“?",
       text: "Im Reiter Backinformationen wählst du, aus welchem Teig ein Brot gemacht wird (z. B. kleine und große Korbbrote und Zwiebelbrote aus dem Korbbrot-Teig). Die Auswahl kommt aus den Teigen der Nacht (BrotTeigRechner) und — getrennt darunter — aus den Teigen der Stationen (Seite „Teige (Stationen)“). Ein Produkt gehört zu höchstens einem Teig. Die Nacht rechnet daraus nachts die Teigmenge, der Teigrechner die Teigmenge der Stationen. Die Teigecke liest die Zuordnung aus der Datenbank, sobald du speicherst. Lässt sich die Teigliste nicht laden, bleibt der bisherige Wert stehen und am Feld steht die Fehlermeldung."
+    },
+    {
+      heading: "Was ist der Werdegang?",
+      text: "Im Reiter Backinformationen, unter „Aus Teig“: welche Maschinen das Produkt durchläuft, in der Reihenfolge, in der es durch die Backstube geht (zum Beispiel Kneter → Rondo → Stikkenofen). Mit „＋ Maschine“ kommt eine Maschine hinten dazu, mit ▲ ▼ änderst du die Reihenfolge, mit ✕ nimmst du sie heraus. Zur Auswahl stehen nur Maschinen, die auf der Seite „Maschinen“ angelegt sind. Steht dort ⚠︎, gibt es die Maschine nicht mehr oder sie ist ausgeblendet — dann mit ✕ herausnehmen. Wofür: Die Seite „Maschinen“ zeigt bei jeder Maschine die Produkte, deren Werdegang durch sie führt, mit den Angaben, die ihre Maschinenführer pflegen (beim Stikkenofen die Backprogramme). Nimmst du eine Maschine heraus, verschwindet das Produkt dort, seine Angaben bleiben aber gespeichert. Gespeichert wird wie immer mit 💾, mit Sicherung der alten Fassung."
     }
   ]
 };
@@ -2121,6 +2203,7 @@ document.getElementById('helpSheet').addEventListener('click', function (e) {
 // Auto-Laden beim Start
 ladeFeldGlossar();
 ladeTeigListe();   // NEU 29.09.2026, Auswahl „Aus Teig“
+ladeMaschinenListe();   // NEU 23.10.2026, Werdegang
 ladeVonFirestore().catch(function () {});
 </script>
 </body>

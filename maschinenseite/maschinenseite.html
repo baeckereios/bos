@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark" data-farbschema="stahl">
+<!--
+  MODUL: maschinenseite/maschinenseite.html — Maschinen (Stufe A)
+  CHANGELOG
+    2026-10-23 · 23:04 · v1.0 · Neu (Maschinenseite Stufe A, #115/#116; Bauplan Go Kontroll-Chat 22:22)
+      Liste der Maschinen → Hauptseite der Maschine → Backprogramme (alle
+      Personenkonten), Editor (nur Maschinenführer), Verwalten (nur Rolle
+      admin). Farbe fest „Stahl“ (Ulf 22:22, Konzept Farbschema E3). Ofenwahl,
+      Reparaturknopf, Info-Karten und Chatfenster stehen nur als Text
+      „in Planung“ da (Stufe B). Daten: maschinen, maschinen_reihenfolge,
+      maschinen_angaben (RK §27) über maschinen_logik.js; Ansicht und Druck
+      über maschinen_ansicht.js. SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
+  Doku: maschinenseite/MASCHINENSEITE_DOKU.md (Nutzer-Hilfetext dort ist die Quelle)
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Maschinen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --ma-tap: max(52px, var(--bos-tap-min, 44px));
+    --ma-rot: var(--bos-red, #d6584a);
+    --ma-gruen: var(--bos-green, #4caf7d);
+    --ma-warn: var(--bos-warn, #d9a521);
+  }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; padding-bottom: 80px; background: var(--bos-bg); color: var(--bos-text); font-family: var(--bos-font-body); -webkit-tap-highlight-color: transparent; }
+  header { background: var(--bos-surface); border-bottom: 1px solid var(--bos-border); padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px); position: sticky; top: 0; z-index: 20; }
+  .kopf-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); }
+  .kopf-titel { flex: 1 1 0; min-width: 0; }
+  header h1 { margin: 0; font-size: var(--bos-font-xl, 1.3rem); overflow-wrap: anywhere; }
+  .eyebrow { font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: var(--bos-font-xs, .72rem); color: var(--bos-amber); }
+  .wer { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); margin-top: 2px; }
+  .abzeichen { display: inline-block; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 1px 8px; margin-left: 4px; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-2xs, .66rem); letter-spacing: .04em; text-transform: uppercase; color: var(--bos-text-dim); }
+  .rund-btn { min-width: var(--ma-tap); min-height: var(--ma-tap); font-size: 1.2rem; }
+  .bos-btn { min-height: 44px; }
+  .bos-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .leiste { margin: var(--bos-space-sm, 14px) var(--bos-space-md, 18px) 0; border-radius: var(--bos-radius-sm); padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); font-size: var(--bos-font-sm, .82rem); line-height: 1.5; background: var(--bos-surface); border-left: 4px solid var(--bos-amber); word-break: break-word; }
+  .leiste.rot { border-left-color: var(--ma-rot); }
+  #fehlerLeiste { border: 1px solid var(--ma-rot); border-left-width: 4px; }
+  #fehlerLeiste ul { margin: 4px 0 0; padding-left: 18px; }
+  #fehlerLeiste li { word-break: break-word; margin-bottom: 4px; }
+  .fehler-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+  .klein { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-faint); }
+  .dim { color: var(--bos-text-dim); }
+  .link-btn { background: none; border: none; color: var(--bos-amber-bright); font-family: var(--bos-font-label); font-weight: 700; cursor: pointer; padding: 8px 4px; min-height: 44px; font-size: var(--bos-font-sm, .82rem); }
+  main { padding: var(--bos-space-md, 18px); max-width: 960px; margin: 0 auto; }
+  .status { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); padding: var(--bos-space-sm, 14px) 0; }
+  .kasten { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); padding: var(--bos-space-md, 18px); line-height: 1.55; margin-bottom: var(--bos-space-sm, 12px); }
+  .kasten.rot { border-color: var(--ma-rot); border-left: 4px solid var(--ma-rot); }
+  .kasten.warn { border-left: 4px solid var(--ma-warn); }
+  .kasten h2, .kasten h3 { margin: 0 0 8px; font-family: var(--bos-font-display); }
+  .zurueck { margin-bottom: var(--bos-space-xs, 9px); }
+  .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--bos-space-sm, 12px) 0; align-items: center; }
+  .gross { min-height: 64px; font-size: var(--bos-font-md, 1rem); padding: 10px 20px; }
+  /* Liste der Maschinen */
+  .m-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .m-kachel { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px; padding: 14px 16px; background: var(--bos-surface); color: var(--bos-text); border: 1px solid var(--bos-border); border-left: 6px solid var(--bos-amber); border-radius: var(--bos-radius-md); text-align: left; font: inherit; cursor: pointer; }
+  .m-kachel:hover, .m-kachel:focus-visible { border-color: var(--bos-amber); outline: none; }
+  .m-kachel b { font-family: var(--bos-font-display); font-size: 1.15rem; }
+  .m-kachel.aus { opacity: .55; border-left-color: var(--bos-border-strong); }
+  /* Hauptseite */
+  .exemplare { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+  .chip { display: inline-block; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 3px 10px; font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim); }
+  .geplant { list-style: none; margin: 0; padding: 0; }
+  .geplant li { padding: 8px 10px; margin-bottom: 6px; border: 1px dashed var(--bos-border-strong); border-radius: var(--bos-radius-sm); color: var(--bos-text-faint); font-size: var(--bos-font-sm, .85rem); }
+  /* Schalter */
+  .wahl { display: inline-flex; border: 1px solid var(--bos-border-strong); border-radius: 999px; overflow: hidden; }
+  .wahl button { min-height: 44px; padding: 6px 16px; background: none; border: none; color: var(--bos-text-dim); font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .03em; cursor: pointer; font-size: var(--bos-font-sm, .85rem); }
+  .wahl button[aria-pressed="true"] { background: var(--bos-amber); color: #10161c; }
+  .heute-satz { margin: 4px 0 10px; font-weight: 600; color: var(--bos-amber-bright); }
+  /* Tabelle */
+  .tabelle-rahmen { overflow-x: auto; }
+  .ma-tabelle { width: 100%; border-collapse: collapse; font-size: var(--bos-font-md, .95rem); }
+  .ma-tabelle th, .ma-tabelle td { border-bottom: 1px solid var(--bos-border); padding: 8px 8px; text-align: left; vertical-align: top; }
+  .ma-tabelle thead th { font-family: var(--bos-font-label); text-transform: uppercase; letter-spacing: .05em; font-size: var(--bos-font-xs, .75rem); color: var(--bos-text-dim); border-bottom: 2px solid var(--bos-border-strong); }
+  .ma-tabelle .ma-nr { text-align: center; white-space: nowrap; width: 6.5em; font-weight: 800; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .ma-tabelle thead .ma-nr { font-size: var(--bos-font-xs, .75rem); }
+  .ma-tabelle .ma-produkt { font-weight: 600; }
+  .ma-tabelle .ma-text { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .88rem); line-height: 1.45; }
+  .ma-gruppe th { padding-top: 16px; font-family: var(--bos-font-label); text-transform: uppercase; letter-spacing: .08em; color: var(--bos-amber-bright); border-bottom: 1px solid var(--bos-amber); }
+  .ma-leer { color: var(--bos-text-faint); }
+  /* Editor */
+  .ed-karte { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); padding: 12px 14px; margin-bottom: 10px; }
+  .ed-karte.geaendert { border-color: var(--ma-warn); border-left: 4px solid var(--ma-warn); }
+  .ed-karte.pausiert { opacity: .62; }
+  .ed-kopf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ed-name { flex: 1 1 160px; font-weight: 700; font-size: 1.05rem; }
+  .pfeil { min-width: 44px; min-height: 44px; font-size: 1.1rem; padding: 0; }
+  .etikett { display: inline-block; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-2xs, .68rem); letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--bos-border-strong); color: var(--bos-text-dim); }
+  .etikett.neu { border-color: var(--bos-amber); color: var(--bos-amber-bright); }
+  .etikett.warn { border-color: var(--ma-warn); color: var(--ma-warn); }
+  .ed-felder { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+  .ed-felder .breit { grid-column: 1 / -1; }
+  .ed-feld label { display: block; font-size: var(--bos-font-xs, .75rem); color: var(--bos-text-dim); margin-bottom: 3px; }
+  .ed-feld input, .ed-feld textarea { width: 100%; }
+  .ed-feld input.nr { font-size: 1.2rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+  .ed-feld textarea { min-height: 64px; resize: vertical; }
+  .ed-feld .falsch { border-color: var(--ma-rot) !important; }
+  .ed-unter { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .ed-meldung { margin-top: 8px; padding: 8px 10px; border-left: 4px solid var(--ma-rot); background: var(--bos-surface-raised); border-radius: var(--bos-radius-sm); font-size: var(--bos-font-sm, .85rem); word-break: break-word; }
+  .ed-meldung.ok { border-left-color: var(--ma-gruen); }
+  details.frueher summary { cursor: pointer; color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); min-height: 36px; display: flex; align-items: center; }
+  .fr-eintrag { border-top: 1px solid var(--bos-border); padding: 6px 0; font-size: var(--bos-font-sm, .82rem); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .ed-leiste { position: sticky; top: 72px; z-index: 10; background: var(--bos-bg); padding: 6px 0; }
+  /* Verwalten */
+  .v-zeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .v-zeile .bos-input { flex: 1 1 180px; min-width: 0; }
+  .v-zeile select { min-height: 44px; }
+  .v-feld { margin-bottom: 14px; }
+  .v-feld > label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .fuehrer-liste label { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 2px 4px; }
+  .fuehrer-liste input { width: 22px; height: 22px; }
+  /* Hilfe, Toast */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 50; display: flex; align-items: flex-end; }
+  .sheet { background: var(--bos-surface); border-top: 1px solid var(--bos-border); border-radius: 18px 18px 0 0; padding: var(--bos-space-lg, 22px) var(--bos-space-md, 20px) calc(24px + env(safe-area-inset-bottom)); width: 100%; max-width: 640px; margin: 0 auto; max-height: 80vh; overflow-y: auto; }
+  .sheet h2 { font-family: var(--bos-font-display); margin: 0 0 12px; }
+  .sheet h3 { font-size: var(--bos-font-md, .95rem); margin: 14px 0 4px; }
+  .sheet p { color: var(--bos-text-dim); line-height: 1.55; margin: 0 0 8px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); width: max-content; max-width: 90vw; background: var(--bos-surface-raised); border: 1px solid var(--bos-amber); color: var(--bos-text); padding: 10px 16px; border-radius: 10px; z-index: 60; }
+  @media (max-width: 480px) {
+    main { padding: 12px; }
+    header h1 { font-size: 1.1rem; }
+    .ma-tabelle th, .ma-tabelle td { padding: 6px 4px; }
+    .ma-tabelle .ma-nr { width: 3.6em; font-size: 1.02rem; }
+    .ed-leiste { top: 64px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<!-- Einbindung Standalone-Satellit (Checkliste §2a), direkt aufrufbar (QR in Stufe B). -->
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'maschinenseite';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="../bos_produkte.js"></script>
+<script src="../bos_meldungen.js"></script>          <!-- nur BOS_MELDUNGEN.ich(): dein Name für „zuletzt geändert von“ -->
+<script src="../bos_namen.js"></script>              <!-- Verwalten: Namen zur Maschinenführer-Auswahl -->
+<script src="../teigecke/teigecke_logik.js"></script> <!-- nur backtag(): Wechsel um 12:00 -->
+<script src="../bos_druck.js"></script>
+<script src="../bos_ungespeichert.js"></script>
+<script src="maschinen_logik.js"></script>
+<script src="maschinen_ansicht.js"></script>
+
+<header>
+  <div class="kopf-zeile">
+    <div class="kopf-titel">
+      <div class="eyebrow" id="eyebrow">Maschinen</div>
+      <h1 class="bos-title" id="kopfTitel">Maschinen</h1>
+      <div class="wer" id="werZeile"></div>
+    </div>
+    <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="regelLeiste" class="leiste rot" role="alert" hidden></div>
+<div id="hinweisLeiste" class="leiste" role="status" hidden></div>
+<div id="fehlerLeiste" class="leiste rot" role="alert" hidden>
+  <div class="fehler-kopf"><span>⚠︎ Fehler</span>
+    <button type="button" class="link-btn" id="fehlerZuBtn">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+
+<main id="main">
+  <div class="status" id="ladeStatus">Einen Moment …</div>
+</main>
+
+<div id="hilfeSheet" class="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hilfeTitel">
+    <h2 id="hilfeTitel"></h2>
+    <div id="hilfeInhalt"></div>
+    <button type="button" class="bos-btn" id="hilfeZuBtn" style="width:100%;margin-top:12px;">Schließen</button>
+  </div>
+</div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Maschinen — Seite. Lesen und Schreiben NUR über window.BOS_MASCHINEN
+   (maschinen_logik.js), Ansicht und Druck über BOS_MASCHINEN_ANSICHT.
+   KEINE Daten im Code.
+   ================================================================== */
+const M = window.BOS_MASCHINEN;
+const A = window.BOS_MASCHINEN_ANSICHT;
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  titel: 'Maschinen', lade: 'Einen Moment …',
+  du_als: 'Du bist angemeldet als: {name}',
+  ab_admin: 'Admin', ab_fuehrer: 'Maschinenführer',
+  liste_titel: 'Maschinen', liste_leer: 'Noch keine Maschine angelegt.', liste_leer_admin: 'Noch keine Maschine angelegt. Mit „＋ Maschine“ fängst du an.',
+  neu_maschine: '＋ Maschine', ausgeblendet_titel: 'Ausgeblendete Maschinen ({n})',
+  exemplar_ein: '1 Exemplar', exemplare_n: '{n} Exemplare',
+  zurueck_liste: '‹ Alle Maschinen', zurueck_maschine: '‹ {name}',
+  k_programme: '📋 Backprogramme', k_editor: '✎ Editor', k_verwalten: '⚙︎ Verwalten',
+  nicht_fuehrer_admin: 'Du bist hier nicht als Maschinenführer eingetragen — deshalb kein Editor. Eintragen: „Verwalten“ → Maschinenführer.',
+  geplant_titel: '🚧 In Planung (kommt mit der nächsten Stufe)',
+  geplant_ofen: 'Ofen wählen (1 / 2 / 3 / 4 / alle)', geplant_reparatur: 'Reparatur melden — direkt für dieses Exemplar',
+  geplant_karten: 'Info-Karten der Maschinenführer', geplant_chat: 'Chatfenster für Hinweise und Beobachtungen',
+  m_unbekannt: 'Die Maschine „{id}“ gibt es nicht (oder sie ist ausgeblendet).',
+  m_unbekannt_admin: 'Als Admin kannst du sie unter „Alle Maschinen“ anlegen oder zurückholen.',
+  pr_titel: 'Backprogramme', s_reihenfolge: 'Backreihenfolge', s_warenart: 'Nach Warenart', f_alle: 'Alle', f_heute: 'Heute',
+  pr_drucken: '🖨 Backprogramme drucken', pr_leer: 'Noch kein Produkt läuft über diese Maschine. Der Werdegang wird in der Produkt-Config gepflegt (Produkt antippen → Reiter „Backinformationen“).',
+  pr_leer_heute: 'Heute hat kein Produkt dieser Maschine Backtag.',
+  pr_pause: '{n} Produkt(e) in Saison-Pause ausgeblendet: {namen}',
+  pr_nicht_heute: '{n} weitere Produkt(e) haben heute keinen Backtag.',
+  pr_stand: 'zuletzt geändert {zeit} von {name}', pr_stand_leer: 'noch nichts eingetragen',
+  ed_titel: 'Editor', ed_alle: '💾 Alle Änderungen speichern ({n})', ed_reihenfolge: '💾 Reihenfolge speichern',
+  ed_leer: 'Noch kein Produkt läuft über diese Maschine. Den Werdegang pflegt der Admin in der Produkt-Config.',
+  ed_speichern: '💾 Speichern', ed_speichert: 'Speichere …', ed_gespeichert: '✓ Gespeichert',
+  ed_zuletzt: 'zuletzt geändert von {name} am {zeit}', ed_noch_nichts: 'noch nichts eingetragen',
+  ed_neu: 'noch nicht einsortiert', ed_pausiert: 'Saison-Pause', ed_geaendert: '⚠︎ nicht gespeichert',
+  ed_frueher: 'Frühere Fassungen ({n})', ed_uebernehmen: 'in die Felder übernehmen',
+  ed_neu_laden: 'Neu laden, meine Eingaben behalten', ed_kein_fuehrer: 'Nur eingetragene Maschinenführer sehen den Editor.',
+  ed_reihenfolge_hinweis: 'Mit ▲ ▼ die Backreihenfolge ändern. Sie gilt für alle Produkte dieser Maschine und für Bildschirm und Druck.',
+  ed_reihenfolge_ok: '✓ Reihenfolge gespeichert', ed_unveraendert: 'Nichts geändert.',
+  ed_neu_geladen: 'Neu geladen. Deine Eingaben stehen noch — jetzt speichern.',
+  v_titel_neu: 'Neue Maschine', v_titel: 'Verwalten', v_kennung: 'Kennung', v_kennung_hilfe: 'Nur Kleinbuchstaben und Ziffern (z. B. stikkenofen). Steht später auf den QR-Kärtchen und lässt sich NIE mehr ändern.',
+  v_name: 'Name', v_exemplare: 'Exemplare', v_exemplare_hilfe: 'Jedes Exemplar hat eine feste Nummer; der Name lässt sich ändern. Entfernen kommt mit der nächsten Stufe.',
+  v_exemplar_neu: '＋ Exemplar', v_fuehrer: 'Maschinenführer', v_fuehrer_hilfe: 'Nur sie pflegen im Editor Werte und Backreihenfolge. Gespeichert wird die Kennung des Kontos, nicht der Name. Die Liste zeigt Personen mit verknüpftem Konto. Ob ein Konto als „Person“ freigegeben ist, steht in Konten & Rollen — ohne das kann der Maschinenführer nicht speichern.',
+  v_fuehrer_unbekannt: '⚠︎ {kennung} — keine Person mit diesem Konto gefunden',
+  v_felder: 'Felder im Editor', v_felder_hilfe: 'Diese Felder pflegen die Maschinenführer je Produkt; sie sind die Spalten der Backprogramme. Ein entferntes Feld verschwindet nur aus der Anzeige — die Werte bleiben gespeichert und sind wieder da, wenn du es neu anlegst.',
+  v_feld_neu: '＋ Feld', v_feld_id_neu: 'neu', art_text: 'Text', art_nummer: 'Nummer (nur Ziffern)',
+  v_speichern: '💾 Maschine speichern', v_ausblenden: 'Maschine ausblenden', v_zurueckholen: 'Maschine zurückholen',
+  v_ausblenden_frage: '„{name}“ ausblenden?\n\nSie verschwindet aus der Liste und aus dem Werdegang-Menü. Nichts wird gelöscht — Werte und Reihenfolge bleiben. Zurückholen geht jederzeit.',
+  v_gibts_schon: 'Die Kennung „{id}“ gibt es schon. Bitte eine andere wählen.',
+  v_gespeichert: '✓ Maschine gespeichert',
+  v_personen_fehler: 'Personen nicht lesbar — Maschinenführer lassen sich gerade nicht auswählen: {grund}',
+  zg_titel: 'Die Maschinenseite ist für persönliche Konten',
+  zg_ort: 'Dieses Konto ist als „Ort“ eingetragen (z. B. Tablet an der Wand). Bitte mit deinem eigenen Konto anmelden.',
+  zg_ohne_art: 'Bei deinem Konto ist keine Art eingetragen. Ulf fragen: Konten & Rollen → Konto → Freigabe → „Person“.',
+  zg_system: 'Der Generalschlüssel ist kein persönliches Konto.',
+  zg_gesperrt: 'Dein Konto ist nicht freigeschaltet — Ulf Bescheid geben.',
+  zg_kein_konto: 'Zu deiner Anmeldung gibt es kein Konto — Ulf Bescheid geben.',
+  zg_admin_hinweis: 'Du liest als Admin. Ohne Art „Person“ kannst du nicht als Maschinenführer speichern.',
+  regel_alt: '⚠︎ Die eingesetzte Datenbank-Regel kennt die Maschinenseite noch nicht (Fassung {fassung}). In der Firebase-Konsole {datei} einsetzen. Bis dahin geht hier nichts.',
+  err_unbehandelt: 'Unerwarteter Fehler', err_laden: '{was} laden', err_speichern: '{was} speichern', err_druck: 'Drucken',
+  w_maschinen: 'Maschinen', w_maschine: 'Maschine', w_produkte: 'Produkte', w_angaben: 'Angaben', w_reihenfolge: 'Reihenfolge', w_konto: 'Konto',
+  unge_frage: 'Es gibt ungespeicherte Änderungen. Trotzdem weg?'
+};
+function t(k, p) { let s = I18N_DE[k] !== undefined ? I18N_DE[k] : k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
+
+/* ---------- Hilfe (identisch mit MASCHINENSEITE_DOKU.md, Abschnitt „Nutzer-Hilfetext“) ---------- */
+const helpData = {
+  titel: 'Maschinen — so geht’s',
+  abschnitte: [
+    ['Wofür?', 'Jede Maschine hat hier ihre eigene Seite. In dieser ersten Stufe gibt es die Backprogramme: welches Produkt an dieser Maschine mit welchem Programm läuft und worauf man achten muss. Das ist für die Nacht, in der ein Kollege einspringt und schnell Bescheid wissen muss.'],
+    ['Wer sieht was?', 'Die Backprogramme sieht jeder mit einem persönlichen Konto. Ändern dürfen nur die Maschinenführer, die der Admin bei der Maschine eingetragen hat — über den Knopf „Editor“. Maschinen anlegen und Maschinenführer eintragen macht der Admin unter „Verwalten“. Tablets an der Wand (Konto-Art „Ort“) zeigen die Seite nicht, weil man sonst nicht sieht, wer etwas geändert hat.'],
+    ['Backprogramme', 'Oben zwei Schalter. „Backreihenfolge“ zeigt alles in der Reihenfolge, in der gebacken wird; „Nach Warenart“ fasst nach Warenart zusammen, innerhalb wieder in Backreihenfolge. „Alle“ zeigt jedes Produkt dieser Maschine, „Heute“ nur die mit heutigem Backtag. Ab 12 Uhr mittags gilt schon der nächste Backtag — darum steht über der Liste immer, welcher Tag gemeint ist. Ein Strich „–“ heißt: dafür gibt es nichts (zum Beispiel kein Programm für 3 Stikken). Produkte in Saison-Pause stehen nicht in der Liste; welche das sind, steht darunter. Das Gerät merkt sich, wie du die Schalter eingestellt hast.'],
+    ['Drucken', '„Backprogramme drucken“ druckt genau das, was gerade zu sehen ist — also auch nur „Heute“ oder „Nach Warenart“, wenn das eingestellt ist.'],
+    ['Editor (Maschinenführer)', 'Jedes Produkt dieser Maschine hat eine Karte mit den Feldern der Maschine (beim Stikkenofen: Programm Ganz = 3 Stikken, Programm Halb = 1–2 Stikken, Hinweis). Nummern gehen nur als Ziffern. Wer etwas ändert, sieht die Karte gelb mit „nicht gespeichert“ und speichert mit „Speichern“ an der Karte oder oben mit „Alle Änderungen speichern“. Unter jeder Karte steht klein, wer zuletzt geändert hat. Unter „Frühere Fassungen“ stehen die letzten 20 Stände; „in die Felder übernehmen“ holt einen davon zurück in die Felder, dann noch speichern.'],
+    ['Backreihenfolge', 'Im Editor mit ▲ ▼ verschieben, dann „Reihenfolge speichern“. Sie gilt für alle Produkte dieser Maschine, auf dem Bildschirm und auf dem Ausdruck. Ein Produkt, das neu über die Maschine läuft, steht hinten mit „noch nicht einsortiert“, bis jemand die Reihenfolge speichert.'],
+    ['Zwei gleichzeitig?', 'Hat jemand anders dasselbe Produkt gespeichert, während du getippt hast, speichert die Seite nicht über ihn drüber. Sie sagt, wer es war, und bietet „Neu laden, meine Eingaben behalten“ an. Danach siehst du seinen Stand unter „zuletzt geändert“ und kannst deine Eingaben prüfen und speichern.'],
+    ['Woher kommen die Produkte?', 'Welche Maschinen ein Produkt durchläuft, steht beim Produkt selbst — im „Werdegang“ (Produkt-Config, Reiter „Backinformationen“). Das pflegt der Admin. Fliegt eine Maschine aus dem Werdegang, verschwindet das Produkt hier, seine Werte bleiben aber gespeichert und sind wieder da, wenn es zurückkommt. Gelöscht wird hier nie etwas.'],
+    ['Was noch kommt', 'Ofen wählen, Reparatur melden, Info-Karten und das Chatfenster stehen ausgegraut auf der Seite der Maschine. Sie kommen mit der nächsten Stufe.'],
+    ['Wenn etwas schiefgeht', 'Fehler stehen oben rot, mit der Meldung der Datenbank. Steht dort, die Regel sei älter als die Seite, ist das Ulfs Sache (neue Regel einsetzen). Ohne Netz sagt die Seite „kein Netz“ — dann einfach gleich noch einmal. Kommt nach 15 Sekunden keine Antwort, kann das Gespeicherte trotzdem noch ankommen: erst nachsehen, dann wiederholen.']
+  ]
+};
+function oeffneHilfe() {
+  document.getElementById('hilfeTitel').textContent = helpData.titel;
+  document.getElementById('hilfeInhalt').innerHTML = helpData.abschnitte.map(function (a) { return '<h3>' + esc(a[0]) + '</h3><p>' + esc(a[1]) + '</p>'; }).join('');
+  document.getElementById('hilfeSheet').hidden = false;
+}
+document.getElementById('hilfeBtn').addEventListener('click', oeffneHilfe);
+document.getElementById('hilfeZuBtn').addEventListener('click', function () { document.getElementById('hilfeSheet').hidden = true; });
+document.getElementById('hilfeSheet').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+
+/* ---------- Werkzeuge ---------- */
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+let toastUhr = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastUhr); toastUhr = setTimeout(function () { el.hidden = true; }, 3800);
+}
+
+/* ---------- Fehler auf den Bildschirm (Checkliste §7a) ---------- */
+function zeigeFehler(was, err) {
+  console.error('[Maschinen]', was, err);
+  const e = (err && err.meldung) ? err : (M ? M.einordnen(err) : { meldung: String(err && err.message || err), original: '' });
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + esc(was) + ':</b> ' + esc(e.meldung) + (e.original ? ' <span class="klein">(' + esc(e.original) + ')</span>' : '');
+  document.getElementById('fehlerListe').appendChild(li);
+  document.getElementById('fehlerLeiste').hidden = false;
+}
+document.getElementById('fehlerZuBtn').addEventListener('click', function () {
+  document.getElementById('fehlerLeiste').hidden = true;
+  document.getElementById('fehlerListe').innerHTML = '';
+});
+window.onerror = function (msg, quelle, zeile, spalte, err) {
+  zeigeFehler(t('err_unbehandelt'), err || new Error(String(msg) + ' (' + (quelle || '') + ':' + (zeile || '') + ')'));
+};
+window.addEventListener('unhandledrejection', function (ev) { zeigeFehler(t('err_unbehandelt'), ev.reason); });
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, ich: null, konto: null, zugang: null, regel: 'unbekannt',
+  maschinen: null, produkte: null,
+  mid: null, ansicht: 'liste',
+  maschine: null, reihenfolge: null, angaben: null, geladenFuer: null,
+  ed: null,          // Editor: { eingabe: {key:{feld:wert}}, geaendert:{}, laeuft:{}, meldung:{}, konflikt:{}, folge:[keys], folgeGeaendert, veraltet:{} }
+  v: null,           // Verwalten: { neu, form, personen, personenFehler, geaendert, laeuft }
+  speichertAlle: false,
+  wahl: {}           // Backprogramme: { maschineId: { sortierung, filter } }
+};
+function maschineSichtbar(m) { return m && m.geloescht !== true; }
+function istAdmin() { return !!(S.zugang && S.zugang.admin); }
+function istFuehrerHier() { return !!(S.zugang && S.zugang.person && M.istFuehrer(S.maschine, S.kennung)); }
+
+/* ---------- Adresse = Zustand (?maschine=…&ansicht=…; kein #, die Tür schneidet ihn ab) ---------- */
+function ausAdresse() {
+  const p = new URLSearchParams(window.location.search);
+  S.mid = p.get('maschine') || null;
+  const a = p.get('ansicht') || '';
+  S.ansicht = !S.mid ? (a === 'neu' ? 'neu' : 'liste') : (['programme', 'editor', 'verwalten'].indexOf(a) !== -1 ? a : 'maschine');
+}
+function geheZu(mid, ansicht) {
+  if (ungespeichert() && !window.confirm(t('unge_frage'))) return;
+  verwirfEingaben();
+  const p = new URLSearchParams();
+  if (mid) p.set('maschine', mid);
+  if (ansicht && ansicht !== 'maschine' && ansicht !== 'liste') p.set('ansicht', ansicht);
+  const neu = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
+  try { history.pushState({}, '', neu); } catch (e) { /* ohne Verlauf: nur neu zeichnen */ }
+  ausAdresse(); zeige();
+}
+window.addEventListener('popstate', function () { verwirfEingaben(); ausAdresse(); zeige(); });
+
+/* ---------- Ungespeichert (Checkliste §7b) ---------- */
+function ungespeichert() {
+  const edOffen = S.ed && (Object.keys(S.ed.geaendert).length > 0 || S.ed.folgeGeaendert);
+  const vOffen = S.v && S.v.geaendert;
+  return !!(edOffen || vOffen);
+}
+function verwirfEingaben() { S.ed = null; S.v = null; }
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return S.speichertAlle || !!(S.ed && Object.keys(S.ed.laeuft).length) || !!(S.v && S.v.laeuft); } }); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return ungespeichert(); });
+
+/* ---------- Start ---------- */
+function setzeKopf(eyebrow, titel) {
+  document.getElementById('eyebrow').textContent = eyebrow;
+  document.getElementById('kopfTitel').textContent = titel;
+  document.title = 'BäckereiOS · ' + titel;
+}
+function werZeile() {
+  const el = document.getElementById('werZeile');
+  if (!S.ich) { el.textContent = ''; return; }
+  el.innerHTML = esc(t('du_als', { name: S.ich.name })) +
+    (istAdmin() ? '<span class="abzeichen">' + esc(t('ab_admin')) + '</span>' : '') +
+    (S.maschine && istFuehrerHier() ? '<span class="abzeichen">' + esc(t('ab_fuehrer')) + '</span>' : '');
+}
+async function start() {
+  ausAdresse();
+  if (!M || !A) { zeigeFehler('Start', new Error('maschinen_logik.js oder maschinen_ansicht.js ist nicht geladen.')); return; }
+  let nutzer;
+  try { nutzer = await window.BOS_AUTH_READY; } catch (e) { zeigeFehler(t('err_laden', { was: t('w_konto') }), e); return; }
+  if (!nutzer || !nutzer.email) { zeigeFehler(t('err_laden', { was: t('w_konto') }), new Error('Nicht angemeldet — bitte an der Tür anmelden.')); return; }
+  S.kennung = String(nutzer.email).split('@')[0].toLowerCase();
+  M.pruefeRegelstand().then(function (stand) {
+    S.regel = stand;
+    const el = document.getElementById('regelLeiste');
+    el.textContent = t('regel_alt', { fassung: M.REGEL_FASSUNG, datei: M.REGEL_DATEI });
+    el.hidden = stand !== 'alt';
+  });
+  try { S.konto = await M.ladeKonto(null, S.kennung); }
+  catch (e) { zeigeFehler(t('err_laden', { was: t('w_konto') }), e); document.getElementById('ladeStatus').textContent = ''; return; }
+  S.zugang = M.zugang(S.konto);
+  try { S.ich = window.BOS_MELDUNGEN ? await window.BOS_MELDUNGEN.ich() : { kennung: S.kennung, name: S.kennung, warnungen: [] }; }
+  catch (e) { S.ich = { kennung: S.kennung, name: S.kennung, warnungen: [] }; }
+  (S.ich.warnungen || []).forEach(function (w) { hinweis(w); });
+  werZeile();
+  if (!S.zugang.lesen) { zeigeZugang(); return; }
+  if (S.zugang.admin && !S.zugang.person) hinweis(t('zg_admin_hinweis'));
+  await ladeGrund();
+  zeige();
+}
+function hinweis(text) { const h = document.getElementById('hinweisLeiste'); h.textContent = (h.textContent ? h.textContent + ' · ' : '') + text; h.hidden = false; }
+function zeigeZugang() {
+  const g = S.zugang.grund;
+  const satz = g === 'ort' ? t('zg_ort') : g === 'ohne_art' ? t('zg_ohne_art') : g === 'system' ? t('zg_system') : g === 'gesperrt' ? t('zg_gesperrt') : t('zg_kein_konto');
+  setzeKopf(t('titel'), t('titel'));
+  document.getElementById('main').innerHTML = '<div class="kasten warn" id="zugangKasten"><h2>' + esc(t('zg_titel')) + '</h2><p>' + esc(satz) + '</p></div>';
+}
+async function ladeGrund() {
+  const aufgaben = [
+    M.ladeMaschinen().then(function (l) { S.maschinen = l; }, function (e) { S.maschinen = null; zeigeFehler(t('err_laden', { was: t('w_maschinen') }), e); }),
+    window.BOS_PRODUKTE.lade({ sicht: 'aktive' }).then(function (e) {
+      S.produkte = e.liste;
+      const h = window.BOS_PRODUKTE.hinweisText(e); if (h) hinweis(h);
+    }, function (e) { S.produkte = null; zeigeFehler(t('err_laden', { was: t('w_produkte') }), e); })
+  ];
+  await Promise.all(aufgaben);
+}
+/* Daten einer Maschine (Stammdaten frisch, Reihenfolge, Angaben). */
+async function ladeMaschinenDaten(mid) {
+  S.maschine = null; S.reihenfolge = null; S.angaben = null; S.geladenFuer = null;
+  try { S.maschine = await M.ladeMaschine(null, mid); }
+  catch (e) { zeigeFehler(t('err_laden', { was: t('w_maschine') }), e); return false; }
+  if (!S.maschine) return true;
+  const r = await Promise.all([
+    M.ladeReihenfolge(null, mid).then(function (d) { S.reihenfolge = d; return true; }, function (e) { zeigeFehler(t('err_laden', { was: t('w_reihenfolge') }), e); return false; }),
+    M.ladeAngaben(null, mid).then(function (d) { S.angaben = d; return true; }, function (e) { zeigeFehler(t('err_laden', { was: t('w_angaben') }), e); return false; })
+  ]);
+  S.geladenFuer = mid;
+  return r[0] && r[1];
+}
+
+/* ---------- Zeichnen ---------- */
+async function zeige() {
+  const main = document.getElementById('main');
+  if (S.ansicht === 'liste') { zeichneListe(); return; }
+  if (S.ansicht === 'neu') { if (!istAdmin()) { geheZu(null, 'liste'); return; } oeffneVerwalten(true); return; }
+  if (S.geladenFuer !== S.mid) {
+    main.innerHTML = '<div class="status">' + esc(t('lade')) + '</div>';
+    await ladeMaschinenDaten(S.mid);
+  }
+  werZeile();
+  if (!S.maschine || (!maschineSichtbar(S.maschine) && !(istAdmin() && S.ansicht === 'verwalten'))) { zeichneUnbekannt(); return; }
+  if (S.ansicht === 'programme') zeichneProgramme();
+  else if (S.ansicht === 'editor') { if (!istFuehrerHier()) { zeichneMaschine(t('ed_kein_fuehrer')); return; } oeffneEditor(); }
+  else if (S.ansicht === 'verwalten') { if (!istAdmin()) { zeichneMaschine(); return; } oeffneVerwalten(false); }
+  else zeichneMaschine();
+}
+function knopf(id, text, klasse, attr) { return '<button type="button" class="bos-btn ' + (klasse || '') + '" id="' + id + '"' + (attr || '') + '>' + esc(text) + '</button>'; }
+function exemplarText(m) { const n = M.exemplarSchluessel(m.exemplare).length; return n === 1 ? t('exemplar_ein') : t('exemplare_n', { n: n }); }
+
+function zeichneListe() {
+  setzeKopf(t('titel'), t('liste_titel'));
+  const main = document.getElementById('main');
+  if (S.maschinen === null) { main.innerHTML = ''; return; }
+  const sicht = S.maschinen.filter(maschineSichtbar), aus = S.maschinen.filter(function (m) { return !maschineSichtbar(m); });
+  let h = '';
+  if (istAdmin()) h += '<div class="knopfreihe">' + knopf('neuBtn', t('neu_maschine'), 'bos-btn--amber') + '</div>';
+  if (!sicht.length) h += '<div class="kasten" id="listeLeer">' + esc(istAdmin() ? t('liste_leer_admin') : t('liste_leer')) + '</div>';
+  else h += '<div class="m-liste">' + sicht.map(function (m) {
+    return '<button type="button" class="m-kachel" data-maschine="' + esc(m.id) + '"><b>' + esc(m.name || m.id) + '</b><span class="dim">' + esc(exemplarText(m)) + '</span>' +
+      (M.istFuehrer(m, S.kennung) && S.zugang.person ? '<span class="etikett neu">' + esc(t('ab_fuehrer')) + '</span>' : '') + '</button>';
+  }).join('') + '</div>';
+  if (istAdmin() && aus.length) h += '<details style="margin-top:18px"><summary class="dim">' + esc(t('ausgeblendet_titel', { n: aus.length })) + '</summary><div class="m-liste" style="margin-top:10px">' +
+    aus.map(function (m) { return '<button type="button" class="m-kachel aus" data-maschine="' + esc(m.id) + '" data-ansicht="verwalten"><b>' + esc(m.name || m.id) + '</b><span class="dim">' + esc(m.id) + '</span></button>'; }).join('') + '</div></details>';
+  main.innerHTML = h;
+  main.querySelectorAll('[data-maschine]').forEach(function (b) { b.addEventListener('click', function () { geheZu(b.getAttribute('data-maschine'), b.getAttribute('data-ansicht') || 'maschine'); }); });
+  const nb = document.getElementById('neuBtn'); if (nb) nb.addEventListener('click', function () { geheZu(null, 'neu'); });
+}
+function zeichneUnbekannt() {
+  setzeKopf(t('titel'), t('titel'));
+  document.getElementById('main').innerHTML = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_liste')) + '</button>' +
+    '<div class="kasten rot" id="unbekanntKasten"><p>' + esc(t('m_unbekannt', { id: S.mid })) + '</p>' + (istAdmin() ? '<p class="dim">' + esc(t('m_unbekannt_admin')) + '</p>' : '') + '</div>';
+  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(null, 'liste'); });
+}
+function zeichneMaschine(meldung) {
+  const m = S.maschine;
+  setzeKopf(t('titel'), m.name || m.id);
+  const ex = M.exemplarSchluessel(m.exemplare).map(function (k) { return '<span class="chip">' + esc(m.exemplare[k]) + '</span>'; }).join('');
+  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_liste')) + '</button>' +
+    (meldung ? '<div class="kasten warn">' + esc(meldung) + '</div>' : '') +
+    '<div class="exemplare">' + ex + '</div>' +
+    '<div class="knopfreihe">' + knopf('programmeBtn', t('k_programme'), 'bos-btn--amber gross') +
+    (istFuehrerHier() ? knopf('editorBtn', t('k_editor'), 'gross') : '') +
+    (istAdmin() ? knopf('verwaltenBtn', t('k_verwalten'), 'gross') : '') + '</div>';
+  if (istAdmin() && !istFuehrerHier()) h += '<p class="klein" id="keinFuehrerHinweis">' + esc(t('nicht_fuehrer_admin')) + '</p>';
+  /* A6: nur Text, ausgegraut, keine Knöpfe */
+  h += '<section class="kasten" style="margin-top:18px" id="geplant"><h3 class="dim">' + esc(t('geplant_titel')) + '</h3><ul class="geplant">' +
+    ['geplant_ofen', 'geplant_reparatur', 'geplant_karten', 'geplant_chat'].map(function (k) { return '<li>' + esc(t(k)) + '</li>'; }).join('') + '</ul></section>';
+  document.getElementById('main').innerHTML = h;
+  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(null, 'liste'); });
+  document.getElementById('programmeBtn').addEventListener('click', function () { geheZu(S.mid, 'programme'); });
+  const eb = document.getElementById('editorBtn'); if (eb) eb.addEventListener('click', function () { geheZu(S.mid, 'editor'); });
+  const vb = document.getElementById('verwaltenBtn'); if (vb) vb.addEventListener('click', function () { geheZu(S.mid, 'verwalten'); });
+}
+
+/* ---------- Backprogramme ---------- */
+function letzterStand() {
+  let best = null;
+  Object.keys(S.angaben || {}).forEach(function (k) { const d = S.angaben[k]; const ms = M.msVon(d.geaendertAm); if (ms !== null && (!best || ms > best.ms)) best = { ms: ms, d: d }; });
+  return best ? t('pr_stand', { zeit: M.zeitText(best.d.geaendertAm), name: best.d.geaendertVonName || best.d.geaendertVon }) : t('pr_stand_leer');
+}
+function ansichtDaten(wahl) {
+  return A.zeilen({ maschine: S.maschine, produkte: S.produkte || [], angaben: S.angaben || {}, reihenfolge: S.reihenfolge ? S.reihenfolge.produkte : [], sortierung: wahl.sortierung, filter: wahl.filter, jetzt: new Date() });
+}
+function zeichneProgramme() {
+  const m = S.maschine;
+  setzeKopf(m.name || m.id, t('pr_titel'));
+  /* Wahl im Speicher der Seite; der Gerätespeicher ist nur Komfort (fehlt er, gilt die Wahl bis zum Neuladen) */
+  if (!S.wahl[m.id]) S.wahl[m.id] = A.ansichtLaden(m.id);
+  const wahl = S.wahl[m.id];
+  let e;
+  try { e = ansichtDaten(wahl); } catch (err) { zeigeFehler(t('err_laden', { was: t('pr_titel') }), err); return; }
+  const schalter = function (gruppe, werte) {
+    return '<div class="wahl" role="group">' + werte.map(function (w) {
+      return '<button type="button" data-' + gruppe + '="' + w[0] + '" aria-pressed="' + (wahl[gruppe] === w[0]) + '">' + esc(w[1]) + '</button>';
+    }).join('') + '</div>';
+  };
+  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_maschine', { name: m.name || m.id })) + '</button>' +
+    '<div class="knopfreihe">' + schalter('sortierung', [['reihenfolge', t('s_reihenfolge')], ['warenart', t('s_warenart')]]) +
+    schalter('filter', [['alle', t('f_alle')], ['heute', t('f_heute')]]) + knopf('druckBtn', t('pr_drucken'), '', e.anzahl ? '' : ' disabled') + '</div>';
+  if (e.filter === 'heute') h += '<div class="heute-satz" id="heuteSatz">' + esc(e.heuteSatz) + '</div>';
+  const keineProdukte = !M.produkteDerMaschine(S.produkte || [], m.id).length;
+  if (!e.anzahl) h += '<div class="kasten" id="programmeLeer">' + esc(keineProdukte ? t('pr_leer') : (e.filter === 'heute' ? t('pr_leer_heute') : t('pr_leer'))) + '</div>';
+  else h += '<div class="tabelle-rahmen" id="programmeTabelle">' + A.tabelleHTML(e) + '</div>';
+  if (e.pausiertAusgeblendet.length) h += '<p class="klein" id="pauseZeile">' + esc(t('pr_pause', { n: e.pausiertAusgeblendet.length, namen: e.pausiertAusgeblendet.join(', ') })) + '</p>';
+  if (e.filter === 'heute' && e.nichtHeute) h += '<p class="klein">' + esc(t('pr_nicht_heute', { n: e.nichtHeute })) + '</p>';
+  h += '<p class="klein" id="standZeile">' + esc(letzterStand()) + '</p>';
+  document.getElementById('main').innerHTML = h;
+  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(S.mid, 'maschine'); });
+  document.querySelectorAll('[data-sortierung],[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (b.hasAttribute('data-sortierung')) wahl.sortierung = b.getAttribute('data-sortierung');
+      else wahl.filter = b.getAttribute('data-filter');
+      A.ansichtSpeichern(m.id, wahl); zeichneProgramme();
+    });
+  });
+  document.getElementById('druckBtn').addEventListener('click', function () {
+    try {
+      const d = A.druck(ansichtDaten(wahl), letzterStand());
+      if (!window.BOS_DRUCK) throw new Error('bos_druck.js ist nicht geladen.');
+      window.BOS_DRUCK.drucken({ inhaltHTML: d.inhaltHTML, appName: 'Maschinen', titel: d.titel, extraCSS: d.extraCSS, farbig: false });
+    } catch (err) { zeigeFehler(t('err_druck'), err); }
+  });
+}
+
+/* ---------- Editor (nur Maschinenführer) ---------- */
+function edProdukte() {
+  const eigene = M.produkteDerMaschine(S.produkte || [], S.mid);
+  return M.inReihenfolge(eigene, S.reihenfolge ? S.reihenfolge.produkte : []);
+}
+function oeffneEditor() {
+  if (!S.ed) {
+    const r = edProdukte();
+    S.ed = { eingabe: {}, geaendert: {}, laeuft: {}, meldung: {}, konflikt: {}, veraltet: {}, folge: r.liste.map(function (p) { return p.legacyKey; }), neu: r.neu, folgeGeaendert: false };
+  }
+  zeichneEditor();
+}
+function felder() { return S.maschine.felder || []; }
+function wertInEingabe(key, feldId) {
+  const e = S.ed.eingabe[key];
+  if (e && Object.prototype.hasOwnProperty.call(e, feldId)) return e[feldId];
+  const a = (S.angaben || {})[key];
+  return a && a.werte && a.werte[feldId] !== undefined ? a.werte[feldId] : '';
+}
+function zeichneEditor() {
+  const m = S.maschine;
+  setzeKopf(m.name || m.id, t('ed_titel'));
+  const pmap = {}; (S.produkte || []).forEach(function (p) { pmap[p.legacyKey] = p; });
+  const folge = S.ed.folge.filter(function (k) { return pmap[k]; });
+  const n = Object.keys(S.ed.geaendert).length;
+  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_maschine', { name: m.name || m.id })) + '</button>';
+  if (!folge.length) { h += '<div class="kasten" id="editorLeer">' + esc(t('ed_leer')) + '</div>'; document.getElementById('main').innerHTML = h; bindeZurueck(); return; }
+  h += '<div class="ed-leiste knopfreihe">' + knopf('alleBtn', t('ed_alle', { n: n }), 'bos-btn--amber', n && !S.speichertAlle ? '' : ' disabled') +
+    knopf('folgeBtn', t('ed_reihenfolge'), '', S.ed.folgeGeaendert && !S.ed.laeuft.__folge ? '' : ' disabled') + '<span class="klein" id="folgeMeldung"></span></div>' +
+    '<p class="klein">' + esc(t('ed_reihenfolge_hinweis')) + '</p>';
+  h += folge.map(function (k, i) { return karteHTML(pmap[k], i, folge.length); }).join('');
+  document.getElementById('main').innerHTML = h;
+  bindeZurueck();
+  bindeEditor();
+}
+function bindeZurueck() { document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(S.mid, 'maschine'); }); }
+function karteHTML(p, i, anzahl) {
+  const k = p.legacyKey, a = (S.angaben || {})[k], geaendert = !!S.ed.geaendert[k];
+  const kl = 'ed-karte' + (geaendert ? ' geaendert' : '') + (p.pausiert === true ? ' pausiert' : '');
+  let h = '<div class="' + kl + '" data-karte="' + esc(k) + '">' +
+    '<div class="ed-kopf"><button type="button" class="bos-btn pfeil" data-hoch="' + i + '" aria-label="nach oben"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+    '<button type="button" class="bos-btn pfeil" data-runter="' + i + '" aria-label="nach unten"' + (i === anzahl - 1 ? ' disabled' : '') + '>▼</button>' +
+    '<span class="ed-name">' + esc(p.name || k) + '</span>' +
+    (p.kategorie ? '<span class="etikett">' + esc(p.kategorie) + '</span>' : '') +
+    (S.ed.neu[k] ? '<span class="etikett neu">' + esc(t('ed_neu')) + '</span>' : '') +
+    (p.pausiert === true ? '<span class="etikett">' + esc(t('ed_pausiert')) + '</span>' : '') +
+    (geaendert ? '<span class="etikett warn">' + esc(t('ed_geaendert')) + '</span>' : '') + '</div>';
+  h += '<div class="ed-felder">' + felder().map(function (f) {
+    const id = 'f_' + k + '__' + f.id, v = wertInEingabe(k, f.id), falsch = M.pruefeWert(f, v);
+    if (f.art === 'nummer') return '<div class="ed-feld"><label for="' + esc(id) + '">' + esc(f.name) + '</label><input class="bos-input nr' + (falsch ? ' falsch' : '') + '" id="' + esc(id) + '" data-wert="' + esc(k) + '" data-feld="' + esc(f.id) + '" inputmode="numeric" pattern="[0-9]*" maxlength="' + M.SEITE.NUMMER_STELLEN + '" autocomplete="off" placeholder="–" value="' + esc(v) + '"></div>';
+    return '<div class="ed-feld breit"><label for="' + esc(id) + '">' + esc(f.name) + '</label><textarea class="bos-input' + (falsch ? ' falsch' : '') + '" id="' + esc(id) + '" data-wert="' + esc(k) + '" data-feld="' + esc(f.id) + '" maxlength="' + M.SEITE.TEXT + '" placeholder="–">' + esc(v) + '</textarea></div>';
+  }).join('') + '</div>';
+  h += '<div class="ed-unter"><span class="klein">' + esc(a ? t('ed_zuletzt', { name: a.geaendertVonName || a.geaendertVon, zeit: M.zeitText(a.geaendertAm) }) : t('ed_noch_nichts')) + '</span>' +
+    (geaendert ? '<button type="button" class="bos-btn bos-btn--amber" data-speichern="' + esc(k) + '"' + (S.ed.laeuft[k] || S.speichertAlle ? ' disabled' : '') + '>' + esc(S.ed.laeuft[k] ? t('ed_speichert') : t('ed_speichern')) + '</button>' : '') + '</div>';
+  const mel = S.ed.meldung[k];
+  if (mel) h += '<div class="ed-meldung' + (mel.ok ? ' ok' : '') + '" data-meldung="' + esc(k) + '">' + esc(mel.text) + (mel.original ? ' <span class="klein">(' + esc(mel.original) + ')</span>' : '') +
+    (S.ed.konflikt[k] ? '<div class="knopfreihe"><button type="button" class="bos-btn" data-neuladen="' + esc(k) + '">' + esc(t('ed_neu_laden')) + '</button></div>' : '') + '</div>';
+  const fr = a && Array.isArray(a.frueher) ? a.frueher : [];
+  if (fr.length) h += '<details class="frueher"><summary>' + esc(t('ed_frueher', { n: fr.length })) + '</summary>' + fr.map(function (e, j) {
+    const w = e.werte || {};
+    return '<div class="fr-eintrag"><span><b>' + esc(M.zeitText(e.am)) + '</b> · ' + esc(e.vonName || e.von) + '<br>' +
+      felder().map(function (f) { return esc(f.name) + ': ' + esc(w[f.id] !== undefined && w[f.id] !== '' ? w[f.id] : A.LEER); }).join(' · ') + '</span>' +
+      '<button type="button" class="bos-btn" data-uebernehmen="' + esc(k) + '" data-index="' + j + '">' + esc(t('ed_uebernehmen')) + '</button></div>';
+  }).join('') + '</details>';
+  return h + '</div>';
+}
+function markiere(k) {
+  const a = (S.angaben || {})[k];
+  const eingabe = {}; felder().forEach(function (f) { eingabe[f.id] = wertInEingabe(k, f.id); });
+  const neu = M.werteAus(felder(), eingabe, a ? a.werte : {});
+  if (M.werteGleich(neu, a ? a.werte || {} : {})) delete S.ed.geaendert[k]; else S.ed.geaendert[k] = true;
+}
+function bindeEditor() {
+  const main = document.getElementById('main');
+  main.querySelectorAll('[data-wert]').forEach(function (el) {
+    el.addEventListener('input', function () {
+      const k = el.getAttribute('data-wert'), f = el.getAttribute('data-feld');
+      if (el.inputMode === 'numeric' || el.classList.contains('nr')) { const s = el.value.replace(/[^0-9]/g, ''); if (s !== el.value) el.value = s; }
+      S.ed.eingabe[k] = S.ed.eingabe[k] || {}; S.ed.eingabe[k][f] = el.value;
+      const vorher = !!S.ed.geaendert[k];
+      markiere(k);
+      delete S.ed.meldung[k];
+      if (vorher !== !!S.ed.geaendert[k]) zeichneEditorBehalteFokus(el.id);
+      else { const ab = document.getElementById('alleBtn'); if (ab) { const n = Object.keys(S.ed.geaendert).length; ab.textContent = t('ed_alle', { n: n }); ab.disabled = !n || S.speichertAlle; } }
+    });
+  });
+  main.querySelectorAll('[data-hoch],[data-runter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const sicht = sichtbareFolge();
+      const i = Number(b.getAttribute(b.hasAttribute('data-hoch') ? 'data-hoch' : 'data-runter'));
+      const neu = M.verschiebe(sicht, i, b.hasAttribute('data-hoch') ? -1 : 1);
+      S.ed.folge = neu; S.ed.folgeGeaendert = true;
+      zeichneEditor();
+    });
+  });
+  main.querySelectorAll('[data-speichern]').forEach(function (b) { b.addEventListener('click', function () { speichereKarte(b.getAttribute('data-speichern')).then(zeichneEditor); }); });
+  main.querySelectorAll('[data-neuladen]').forEach(function (b) { b.addEventListener('click', function () { neuLaden(b.getAttribute('data-neuladen')); }); });
+  main.querySelectorAll('[data-uebernehmen]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const k = b.getAttribute('data-uebernehmen'), e = (S.angaben[k].frueher || [])[Number(b.getAttribute('data-index'))];
+      if (!e) return;
+      S.ed.eingabe[k] = {}; felder().forEach(function (f) { S.ed.eingabe[k][f.id] = e.werte && e.werte[f.id] !== undefined ? e.werte[f.id] : ''; });
+      markiere(k); delete S.ed.meldung[k]; zeichneEditor();
+    });
+  });
+  const ab = document.getElementById('alleBtn'); if (ab) ab.addEventListener('click', speichereAlle);
+  const fb = document.getElementById('folgeBtn'); if (fb) fb.addEventListener('click', speichereFolge);
+}
+function zeichneEditorBehalteFokus(id) {
+  const el = document.getElementById(id), pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : null;
+  zeichneEditor();
+  const neu = document.getElementById(id);
+  if (neu) { neu.focus(); if (pos !== null) try { neu.setSelectionRange(pos, pos); } catch (e) { /* number-Feld */ } }
+}
+function sichtbareFolge() {
+  const pmap = {}; (S.produkte || []).forEach(function (p) { pmap[p.legacyKey] = true; });
+  return S.ed.folge.filter(function (k) { return pmap[k]; });
+}
+async function speichereKarte(k) {
+  if (!S.ed || S.ed.laeuft[k]) return false;
+  const a = (S.angaben || {})[k] || null;
+  const eingabe = {}; felder().forEach(function (f) { eingabe[f.id] = wertInEingabe(k, f.id); });
+  const falsch = felder().map(function (f) { return M.pruefeWert(f, eingabe[f.id]); }).filter(Boolean);
+  if (falsch.length) { S.ed.meldung[k] = { text: falsch.join(' ') }; return false; }
+  const werte = M.werteAus(felder(), eingabe, a ? a.werte : {});
+  if (M.werteGleich(werte, a ? a.werte || {} : {})) { delete S.ed.geaendert[k]; S.ed.meldung[k] = { text: t('ed_unveraendert'), ok: true }; return true; }
+  S.ed.laeuft[k] = true; delete S.ed.konflikt[k]; zeichneEditor();
+  try {
+    let alt = a;
+    if (S.ed.veraltet[k]) { alt = await M.ladeAngabe(null, S.mid, k); S.angaben[k] = alt || undefined; delete S.ed.veraltet[k]; }
+    await M.speichereAngaben(null, S.mid, k, werte, alt, { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung });
+    delete S.ed.geaendert[k]; delete S.ed.eingabe[k];
+    try { const frisch = await M.ladeAngabe(null, S.mid, k); if (frisch) S.angaben[k] = frisch; else S.ed.veraltet[k] = true; }
+    catch (e2) { S.ed.veraltet[k] = true; }
+    S.ed.meldung[k] = { text: t('ed_gespeichert'), ok: true };
+    return true;
+  } catch (err) {
+    const e = await M.erklaere(null, err, { art: 'angaben', kennung: S.kennung, maschineId: S.mid, produktKey: k, altAm: a ? a.geaendertAm : null });
+    console.error('[Maschinen] Angaben speichern:', err);
+    S.ed.meldung[k] = { text: e.meldung, original: e.original };
+    if (e.art === 'konflikt') S.ed.konflikt[k] = e.jetzt;
+    return false;
+  } finally { delete S.ed.laeuft[k]; }
+}
+async function neuLaden(k) {
+  try {
+    const frisch = await M.ladeAngabe(null, S.mid, k);
+    if (frisch) S.angaben[k] = frisch; else delete S.angaben[k];
+    delete S.ed.konflikt[k]; delete S.ed.veraltet[k];
+    markiere(k);
+    S.ed.meldung[k] = { text: t('ed_neu_geladen'), ok: true };
+  } catch (err) { S.ed.meldung[k] = { text: M.einordnen(err).meldung, original: M.fehlerOriginal(err) }; }
+  zeichneEditor();
+}
+async function speichereAlle() {
+  if (S.speichertAlle) return;
+  S.speichertAlle = true;
+  const keys = sichtbareFolge().filter(function (k) { return S.ed.geaendert[k]; });
+  try {
+    for (let i = 0; i < keys.length; i++) {
+      const ok = await speichereKarte(keys[i]);
+      if (!ok) break;   // bei Fehler Stopp — der Grund steht an der Karte
+    }
+  } finally { S.speichertAlle = false; zeichneEditor(); }
+}
+async function speichereFolge() {
+  if (!S.ed || S.ed.laeuft.__folge) return;
+  S.ed.laeuft.__folge = true; zeichneEditor();
+  const el = function () { return document.getElementById('folgeMeldung'); };
+  try {
+    const liste = M.reihenfolgeNeu(S.reihenfolge ? S.reihenfolge.produkte : [], sichtbareFolge());
+    await M.speichereReihenfolge(null, S.mid, liste, { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung });
+    S.ed.folgeGeaendert = false; S.ed.neu = {};
+    try { S.reihenfolge = await M.ladeReihenfolge(null, S.mid); } catch (e2) { S.reihenfolge = { produkte: liste }; }
+    delete S.ed.laeuft.__folge; zeichneEditor(); if (el()) el().textContent = t('ed_reihenfolge_ok');
+  } catch (err) {
+    console.error('[Maschinen] Reihenfolge speichern:', err);
+    const e = await M.erklaere(null, err, { art: 'reihenfolge', kennung: S.kennung, maschineId: S.mid });
+    delete S.ed.laeuft.__folge; zeichneEditor();
+    zeigeFehler(t('err_speichern', { was: t('w_reihenfolge') }), e);
+  }
+}
+
+/* ---------- Verwalten (nur Rolle admin) ---------- */
+function oeffneVerwalten(neu) {
+  if (!S.v || S.v.neu !== neu) {
+    const m = neu ? null : S.maschine;
+    S.v = {
+      neu: neu, geaendert: false, laeuft: false, personen: null, personenFehler: '',
+      form: m ? { id: m.id, name: m.name || '', exemplare: JSON.parse(JSON.stringify(m.exemplare || {})), fuehrer: (m.fuehrer || []).slice(), felder: JSON.parse(JSON.stringify(m.felder || [])), geloescht: m.geloescht === true }
+        : { id: '', name: '', exemplare: { '1': '' }, fuehrer: [], felder: M.standardFelder(), geloescht: false }
+    };
+    ladePersonen();
+  }
+  zeichneVerwalten();
+}
+function ladePersonen() {
+  if (!window.BOS_NAMEN) { S.v.personenFehler = 'bos_namen.js ist nicht geladen.'; return; }
+  window.BOS_NAMEN.personenAlle(window.db).then(function (snap) {
+    const l = [];
+    snap.forEach(function (d) { const x = d.data() || {}; if (x.bosKontoId) l.push({ id: d.id, kennung: String(x.bosKontoId), name: window.BOS_NAMEN.anzeige(d.id), aktiv: x.aktiv !== false }); });
+    l.sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+    if (S.v) { S.v.personen = l; if (S.ansicht === 'verwalten' || S.ansicht === 'neu') zeichneVerwalten(); }
+  }, function (err) {
+    if (S.v) { S.v.personenFehler = M.fehlerOriginal(err); if (S.ansicht === 'verwalten' || S.ansicht === 'neu') zeichneVerwalten(); }
+  });
+}
+function vGeaendert() { S.v.geaendert = true; }
+function zeichneVerwalten() {
+  const v = S.v, f = v.form;
+  setzeKopf(v.neu ? t('titel') : (S.maschine.name || S.maschine.id), v.neu ? t('v_titel_neu') : t('v_titel'));
+  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(v.neu ? t('zurueck_liste') : t('zurueck_maschine', { name: S.maschine.name || S.maschine.id })) + '</button>';
+  h += '<div class="kasten">';
+  h += '<div class="v-feld"><label for="vKennung">' + esc(t('v_kennung')) + '</label>' + (v.neu
+    ? '<input class="bos-input" id="vKennung" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30" value="' + esc(f.id) + '" placeholder="stikkenofen"><div class="klein">' + esc(t('v_kennung_hilfe')) + '</div>'
+    : '<div><code>' + esc(f.id) + '</code></div>') + '</div>';
+  h += '<div class="v-feld"><label for="vName">' + esc(t('v_name')) + '</label><input class="bos-input" id="vName" maxlength="' + M.GRENZEN.NAME + '" value="' + esc(f.name) + '"></div>';
+  h += '<div class="v-feld"><label>' + esc(t('v_exemplare')) + '</label>' + M.exemplarSchluessel(f.exemplare).map(function (k) {
+    return '<div class="v-zeile"><span class="chip">' + esc(k) + '</span><input class="bos-input" data-exemplar="' + esc(k) + '" maxlength="' + M.SEITE.EXEMPLAR_NAME + '" value="' + esc(f.exemplare[k]) + '" placeholder="' + esc((f.name || 'Maschine') + ' ' + k) + '"></div>';
+  }).join('') + '<button type="button" class="bos-btn" id="vExemplarNeu"' + (M.exemplarSchluessel(f.exemplare).length >= M.GRENZEN.EXEMPLARE ? ' disabled' : '') + '>' + esc(t('v_exemplar_neu')) + '</button><div class="klein">' + esc(t('v_exemplare_hilfe')) + '</div></div>';
+  h += '<div class="v-feld"><label>' + esc(t('v_fuehrer')) + '</label><div class="fuehrer-liste" id="vFuehrer">';
+  if (v.personenFehler) h += '<div class="ed-meldung">' + esc(t('v_personen_fehler', { grund: v.personenFehler })) + '</div>';
+  else if (!v.personen) h += '<div class="klein">' + esc(t('lade')) + '</div>';
+  else {
+    const bekannt = {};
+    h += v.personen.map(function (p) {
+      bekannt[p.kennung] = true;
+      return '<label><input type="checkbox" data-fuehrer="' + esc(p.kennung) + '"' + (f.fuehrer.indexOf(p.kennung) !== -1 ? ' checked' : '') + '> ' + esc(p.name) + ' <span class="klein">(' + esc(p.kennung) + ')</span></label>';
+    }).join('');
+    h += f.fuehrer.filter(function (k) { return !bekannt[k]; }).map(function (k) {
+      return '<label><input type="checkbox" data-fuehrer="' + esc(k) + '" checked> ' + esc(t('v_fuehrer_unbekannt', { kennung: k })) + '</label>';
+    }).join('');
+  }
+  h += '</div><div class="klein">' + esc(t('v_fuehrer_hilfe')) + '</div></div>';
+  h += '<div class="v-feld"><label>' + esc(t('v_felder')) + '</label>' + f.felder.map(function (x, i) {
+    return '<div class="v-zeile"><input class="bos-input" data-feldname="' + i + '" maxlength="' + M.SEITE.FELD_NAME + '" value="' + esc(x.name) + '">' +
+      '<select class="bos-input" data-feldart="' + i + '" style="flex:0 0 auto;width:auto"><option value="text"' + (x.art === 'text' ? ' selected' : '') + '>' + esc(t('art_text')) + '</option><option value="nummer"' + (x.art === 'nummer' ? ' selected' : '') + '>' + esc(t('art_nummer')) + '</option></select>' +
+      '<button type="button" class="bos-btn pfeil" data-feldhoch="' + i + '"' + (i === 0 ? ' disabled' : '') + ' aria-label="nach oben">▲</button>' +
+      '<button type="button" class="bos-btn pfeil" data-feldrunter="' + i + '"' + (i === f.felder.length - 1 ? ' disabled' : '') + ' aria-label="nach unten">▼</button>' +
+      '<button type="button" class="bos-btn pfeil" data-feldweg="' + i + '"' + (f.felder.length <= 1 ? ' disabled' : '') + ' aria-label="Feld entfernen">✕</button>' +
+      '<span class="klein">' + esc(x.id || t('v_feld_id_neu')) + '</span></div>';
+  }).join('') + '<button type="button" class="bos-btn" id="vFeldNeu"' + (f.felder.length >= M.GRENZEN.FELDER ? ' disabled' : '') + '>' + esc(t('v_feld_neu')) + '</button><div class="klein">' + esc(t('v_felder_hilfe')) + '</div></div>';
+  h += '<div class="knopfreihe">' + knopf('vSpeichern', v.laeuft ? t('ed_speichert') : t('v_speichern'), 'bos-btn--amber', v.laeuft ? ' disabled' : '') +
+    (!v.neu ? knopf('vAusblenden', f.geloescht ? t('v_zurueckholen') : t('v_ausblenden'), '', v.laeuft ? ' disabled' : '') : '') + '</div>' +
+    '<div id="vMeldung"></div></div>';
+  document.getElementById('main').innerHTML = h;
+  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(v.neu ? null : S.mid, v.neu ? 'liste' : 'maschine'); });
+  const kid = document.getElementById('vKennung'); if (kid) kid.addEventListener('input', function () { f.id = kid.value.trim().toLowerCase(); vGeaendert(); });
+  document.getElementById('vName').addEventListener('input', function () { f.name = this.value; vGeaendert(); });
+  document.querySelectorAll('[data-exemplar]').forEach(function (el) { el.addEventListener('input', function () { f.exemplare[el.getAttribute('data-exemplar')] = el.value; vGeaendert(); }); });
+  document.getElementById('vExemplarNeu').addEventListener('click', function () { const k = M.naechsterExemplarSchluessel(f.exemplare); f.exemplare[k] = (f.name ? f.name + ' ' : '') + k; vGeaendert(); zeichneVerwalten(); });
+  document.querySelectorAll('[data-fuehrer]').forEach(function (el) {
+    el.addEventListener('change', function () {
+      const k = el.getAttribute('data-fuehrer');
+      f.fuehrer = f.fuehrer.filter(function (x) { return x !== k; });
+      if (el.checked) f.fuehrer.push(k);
+      vGeaendert();
+    });
+  });
+  document.querySelectorAll('[data-feldname]').forEach(function (el) { el.addEventListener('input', function () { f.felder[Number(el.getAttribute('data-feldname'))].name = el.value; vGeaendert(); }); });
+  document.querySelectorAll('[data-feldart]').forEach(function (el) { el.addEventListener('change', function () { f.felder[Number(el.getAttribute('data-feldart'))].art = el.value; vGeaendert(); }); });
+  document.querySelectorAll('[data-feldhoch],[data-feldrunter]').forEach(function (b) {
+    b.addEventListener('click', function () { const i = Number(b.getAttribute(b.hasAttribute('data-feldhoch') ? 'data-feldhoch' : 'data-feldrunter')); f.felder = M.verschiebe(f.felder, i, b.hasAttribute('data-feldhoch') ? -1 : 1); vGeaendert(); zeichneVerwalten(); });
+  });
+  document.querySelectorAll('[data-feldweg]').forEach(function (b) { b.addEventListener('click', function () { f.felder.splice(Number(b.getAttribute('data-feldweg')), 1); vGeaendert(); zeichneVerwalten(); }); });
+  document.getElementById('vFeldNeu').addEventListener('click', function () {
+    /* Kennung des Felds entsteht erst beim Speichern aus der Beschriftung (feldIdAus) und bleibt dann fest. */
+    f.felder.push({ id: '', name: '', art: 'text' });
+    vGeaendert(); zeichneVerwalten();
+    const neu = document.querySelector('[data-feldname="' + (f.felder.length - 1) + '"]'); if (neu) neu.focus();
+  });
+  document.getElementById('vSpeichern').addEventListener('click', function () { speichereVerwalten(false); });
+  const ab = document.getElementById('vAusblenden'); if (ab) ab.addEventListener('click', function () {
+    if (!f.geloescht && !window.confirm(t('v_ausblenden_frage', { name: f.name || f.id }))) return;
+    speichereVerwalten(true);
+  });
+}
+function vMeldung(text, ok, original) {
+  const el = document.getElementById('vMeldung');
+  if (el) el.innerHTML = '<div class="ed-meldung' + (ok ? ' ok' : '') + '">' + esc(text) + (original ? ' <span class="klein">(' + esc(original) + ')</span>' : '') + '</div>';
+}
+async function speichereVerwalten(umschalten) {
+  const v = S.v, f = v.form;
+  if (v.laeuft) return;
+  f.felder.forEach(function (x) { if (!x.id && String(x.name || '').trim()) x.id = M.feldIdAus(x.name, f.felder.map(function (y) { return y.id; }).filter(Boolean)); });
+  const eingabe = { id: f.id, name: f.name, exemplare: f.exemplare, fuehrer: f.fuehrer, felder: f.felder, geloescht: umschalten ? !f.geloescht : f.geloescht };
+  const fehler = M.pruefeMaschine(eingabe);
+  if (fehler.length) { vMeldung(fehler.join(' ')); return; }
+  v.laeuft = true; zeichneVerwalten();
+  try {
+    if (v.neu) {
+      const da = await M.ladeMaschine(null, f.id);
+      if (da) { v.laeuft = false; zeichneVerwalten(); vMeldung(t('v_gibts_schon', { id: f.id })); return; }
+    }
+    await M.speichereMaschine(null, eingabe, S.kennung);
+    v.geaendert = false; v.laeuft = false;
+    S.maschinen = await M.ladeMaschinen().catch(function () { return S.maschinen; });
+    S.geladenFuer = null; S.v = null;
+    const ziel = eingabe.id;
+    toast(t('v_gespeichert'));
+    geheZu(ziel, eingabe.geloescht ? 'verwalten' : 'maschine');
+  } catch (err) {
+    console.error('[Maschinen] Maschine speichern:', err);
+    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'maschine', kennung: S.kennung, maschineId: f.id });
+    v.laeuft = false; zeichneVerwalten(); vMeldung(e.meldung, false, e.original);
+  }
+}
+
+start().catch(function (err) { zeigeFehler('Start', err); });
+</script>
+</body>
+</html>

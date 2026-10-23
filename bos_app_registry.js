@@ -2,6 +2,9 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-10-23 · 23:04 · Maschinenseite Stufe A (Bauplan Go KC 22:22):
+       neuer Eintrag maschinenseite (Kachel „Maschinen“, Bereich Produktion,
+       fünf Rollen, direkt: 'anmeldung'). Sonst unverändert.
      2026-10-21 · 11:07 · #110 BackStore wie ein App Store
        (Bauplan freigegeben KC 10:27). Neu: BOS_BEREICHE und
        BOS_BEREICH_VON am Dateiende (eine Liste der Bereiche für BackStore,
@@ -512,6 +515,26 @@ window.BOS_APPS = [
     direkt: 'anmeldung',
     status: 'live',
     haken: ['reparaturLesen', 'reparaturMelden', 'reparaturBearbeiten']
+  },
+  {
+    id: 'maschinenseite',
+    // NEU 23.10.2026, Maschinenseite Stufe A (#115/#116; Ulf U1 22:22). Liste
+    // der Maschinen → Seite der Maschine → Backprogramme, Editor (nur
+    // Maschinenführer), Verwalten (nur Rolle admin). roles = Zeilen in
+    // bos_permissions.js (Registry = Matrix). Die Rolle entscheidet nur über
+    // die Kachel; das Schloss ist die Regel RK §27 (nur Konten der Art
+    // „Person“). Ort-Konten sehen die Kachel und bekommen auf der Seite
+    // einen Satz. direkt: per QR in Stufe B (?maschine=…). Adresse steht in
+    // bos_code_adressen.json — nie umbenennen. Details:
+    // maschinenseite/MASCHINENSEITE_DOKU.md.
+    bereich: 'produktion',
+    name: 'Maschinen',
+    icon: '🏭',
+    color: '#6cb4e4',
+    url: 'maschinenseite/maschinenseite.html',
+    direkt: 'anmeldung',
+    status: 'live',
+    roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung', 'haustechnik']
   },
   {
     id: 'konten_verwaltung',

@@ -3,6 +3,14 @@
 <!--
   MODUL: produkt_config/produkt_config_sync.html — Produkt-Config Sync
   CHANGELOG
+    2026-10-23 · 23:04 · Import behält auch den Werdegang (Maschinenseite Stufe A; Bauplan Go Kontroll-Chat 22:22, Kern-Freigabe Ulf 18:09)
+      DB_BEHALTEN_FELDER + 'werdegang': Eine Notfall-Kopie von vor dem
+      23.10.2026 kennt das Feld nicht; ohne diese Zeile hätte der nächste
+      Import still alle Werdegänge gelöscht (batch.set ersetzt das ganze
+      Dokument). Haken, Vorschau-Zeile und Hilfe nennen jetzt „Richtwert,
+      Quelle, Pause und Werdegang“. Ablehnungstext Grund (2) nennt die
+      aktuelle Regeldatei statt der vom 06.10. Sonst unverändert.
+      SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
     2026-10-15 · 01:28 · v-richtwert-1 · Import behält Richtwert, Quelle, Pause (Baustelle #63, B2/U1)
       SESSION_2026-10-14_RICHTWERT_BAU.md (Freigabe Kontroll-Chat 14.10., 19:19).
       Der Import ersetzt ganze Dokumente (batch.set). Eine ältere Notfall-Kopie
@@ -186,7 +194,7 @@
         <button id="importBtn" disabled>Vorschau gegen die Datenbank prüfen</button>
       </div>
       <div id="importBehaltenRow" class="row hidden">
-        <label><input type="checkbox" id="importBehaltenHaken" checked> Richtwert, Quelle und Pause aus der Datenbank behalten, wo sie in der Datei fehlen</label>
+        <label><input type="checkbox" id="importBehaltenHaken" checked> Richtwert, Quelle, Pause und Werdegang aus der Datenbank behalten, wo sie in der Datei fehlen</label>
       </div>
       <div id="importLoeschRow" class="row hidden">
         <label><input type="checkbox" id="importLoeschHaken"> Produkte, die nur in der Datenbank stehen, als gelöscht markieren</label>
@@ -267,7 +275,7 @@ var helpData = {
     },
     {
       heading: "Wichtig zu wissen",
-      text: "Vor jedem Einspielen sichert die Seite den ganzen bisherigen Stand als Sammel-Sicherung (unten, als Datei herunterladbar) — das ist der Rückweg. Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind. Eine Kopie von vor dem 15.10.2026 kennt Richtwert, Quelle und Pause (Saison-Pause) noch nicht: Die Vorschau sagt es in einer eigenen Zeile, und solange der Haken „aus der Datenbank behalten“ gesetzt ist (vorbelegt), bleiben diese drei aus der Datenbank stehen. Nimmst du ihn raus, werden sie mit zurückgedreht."
+      text: "Vor jedem Einspielen sichert die Seite den ganzen bisherigen Stand als Sammel-Sicherung (unten, als Datei herunterladbar) — das ist der Rückweg. Eine ALTE Notfall-Kopie einzuspielen dreht alle Änderungen seit dieser Kopie zurück. Die Vorschau zeigt vorher genau, was sich ändern würde — lesen, dann entscheiden. Produkte, die seit der Kopie neu angelegt wurden, stehen unter „neu nur in der Datenbank“; ohne Haken bleiben sie, wie sie sind. Eine Kopie von vor dem 15.10.2026 kennt Richtwert, Quelle und Pause (Saison-Pause) noch nicht, eine von vor dem 23.10.2026 den Werdegang (welche Maschinen ein Produkt durchläuft) nicht: Die Vorschau sagt es in einer eigenen Zeile, und solange der Haken „aus der Datenbank behalten“ gesetzt ist (vorbelegt), bleiben diese Felder aus der Datenbank stehen. Nimmst du ihn raus, werden sie mit zurückgedreht."
     }
   ]
 };
@@ -331,7 +339,7 @@ function fehlerText(err) {
 /* 15.10.2026 (#63, B2/U1): Felder, die eine ältere Datei noch nicht kennt. Fehlen sie in
    einer Datei-Zeile (fehlt — ein vorhandenes Feld, auch null, gilt wie geschrieben), werden
    sie aus der Datenbank übernommen, solange der Haken „behalten“ gesetzt ist. */
-var DB_BEHALTEN_FELDER = ['bedarfsQuelle', 'richtwert', 'pausiert'];
+var DB_BEHALTEN_FELDER = ['bedarfsQuelle', 'richtwert', 'pausiert', 'werdegang'];   /* + werdegang 23.10.2026 (Maschinenseite) */
 function mitBehalten(p, db) {
   if (!db || !p) return p;
   var o = null;
@@ -402,8 +410,8 @@ function vorschauHTML(v, anzahlDatei) {
   if (v.schonGeloescht) h += '<div style="margin-top:6px;color:var(--dim)">Schon gelöscht (bleiben so): ' + v.schonGeloescht + '</div>';
   if (v.fehlendeFelder && v.fehlendeFelder.length) {   /* 15.10.2026 (#63, B2) */
     var behalten = document.getElementById('importBehaltenHaken').checked;
-    h += '<div style="margin-top:6px;color:' + (behalten ? 'var(--amber)' : 'var(--red)') + '"><strong>Ältere Datei: bei ' + v.fehlendeFelder.length + ' Produkt(en) fehlen Richtwert, Quelle oder Pause</strong> (' + namen(v.fehlendeFelder) + ').<br>' +
-      (behalten ? 'Sie bleiben aus der Datenbank, wie sie sind (Haken unten).' : 'Ohne Haken werden sie in der Datenbank GELÖSCHT — die Produkte rechnen dann wieder mit der Mitschrift und laufen wieder.') + '</div>';
+    h += '<div style="margin-top:6px;color:' + (behalten ? 'var(--amber)' : 'var(--red)') + '"><strong>Ältere Datei: bei ' + v.fehlendeFelder.length + ' Produkt(en) fehlen Richtwert, Quelle, Pause oder Werdegang</strong> (' + namen(v.fehlendeFelder) + ').<br>' +
+      (behalten ? 'Sie bleiben aus der Datenbank, wie sie sind (Haken unten).' : 'Ohne Haken werden sie in der Datenbank GELÖSCHT — die Produkte rechnen dann wieder mit der Mitschrift, laufen wieder und verschwinden von den Maschinenseiten.') + '</div>';
   }
   return h;
 }
@@ -549,7 +557,7 @@ document.getElementById('importConfirmBtn').onclick = function () {
     console.error('[Produkt-Config Sync] Schreiben:', err);
     var code = (err && err.code) || '';
     setzeStatus(statusEl, '✗ ' + (code === 'permission-denied'
-      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel kennt Stand-Zettel oder Sammel-Sicherung noch nicht (einzusetzen: firestore_regeln_2026-10-06_produkte_sicherung.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
+      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel ist älter als diese Seite und kennt ein Feld der Datei noch nicht (einzusetzen: firestore_regeln_2026-10-23_maschinen.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
       : '') + fehlerText(err), 'err');
     zurueck();
   });

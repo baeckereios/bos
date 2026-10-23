@@ -41,6 +41,12 @@
      <script src="bos_access_guard.js"></script>
      ... restlicher Seiteninhalt ...
    ================================================================ */
+/* ERGÄNZT 23.10.2026 (Maschinenseite Stufe A, Ulf U1 22:22): "maschinenseite"
+   bei backstube, konditorei, produktionsleitung, admin und — als erster
+   Eintrag dieser Rolle — haustechnik. Gleich dem roles-Feld der Registry
+   (Registry = Matrix). Die Rolle entscheidet nur über die Kachel; das
+   Schloss ist die Regel (RK §27: nur Konten der Art „Person“).
+   SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md */
 /* ERGÄNZT 20.10.2026 (Verbrauch aufräumen, Hub „Verbrauch“, Ulf E26): "verbrauch"
    (Hub-Kachel) bei backstube, konditorei, produktionsleitung, admin — genau
    die Vereinigung der Rollen seiner Kinder (Registry roles). Die Kinder
@@ -112,7 +118,8 @@ window.BOS_PERMISSIONS = {
     "teigecke_orte": true,
     "teigecke_rezepte": true,
     "teigrechner_teige": true,
-    "teigrechner": true
+    "teigrechner": true,
+    "maschinenseite": true
   },
   "konditorei": {
     "freezer": true,
@@ -135,7 +142,8 @@ window.BOS_PERMISSIONS = {
     "freezer_ziele": true,
     "druckzentrale": true,
     "druckzentrale_fruehschicht": true,
-    "druckzentrale_absetz": true
+    "druckzentrale_absetz": true,
+    "maschinenseite": true
   },
   "verkauf": {
     "verkauf": true
@@ -145,6 +153,9 @@ window.BOS_PERMISSIONS = {
   },
   "fahrer": {
     "fahrer": true
+  },
+  "haustechnik": {
+    "maschinenseite": true
   },
   "verkaufsleitung": {},
   "produktionsleitung": {
@@ -176,7 +187,8 @@ window.BOS_PERMISSIONS = {
     "teigecke_orte": true,
     "teigecke_rezepte": true,
     "teigrechner_teige": true,
-    "teigrechner": true
+    "teigrechner": true,
+    "maschinenseite": true
   },
   "admin": {
     "freezer": true,
@@ -227,6 +239,7 @@ window.BOS_PERMISSIONS = {
     "teigecke_rezepte": true,
     "teigrechner_teige": true,
     "teigrechner": true,
-    "nfc_qr_zentrale": true
+    "nfc_qr_zentrale": true,
+    "maschinenseite": true
   }
 };
