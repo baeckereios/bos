@@ -1,8 +1,31 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark" data-farbschema="stahl">
 <!--
-  MODUL: maschinenseite/maschinenseite.html — Maschinen (Stufe A)
+  MODUL: maschinenseite/maschinenseite.html — Maschinen (Stufe A + B + Nachtrag Übersicht)
   CHANGELOG
+    2026-10-24 · 11:30 · v1.2 · Gestaltung (Nachtrag „Gesamtübersicht, Kopfleiste“, Go KC 24.10. 11:1x;
+      Kompendium M39–M41, K16, Ulf D1–D9). Keine Wahlseite mehr: Öffnen → Gesamtübersicht „Alle“.
+      Kopf mit fester Leiste (bleibt beim Scrollen): ‹ Maschinen bzw. ‹ <Maschine> auf den
+      Unterseiten, Ofenknöpfe Alle · 1 · 2 … als Filter (replaceState, nur der gewählte farbig,
+      Kurzname ofenKurz, bricht nie um), Werkzeuge im Kopf (Handy: bei mehreren nur Zeichen).
+      Drei Kästen Reparatur / Info-Karten / Chatfenster mit je einem Satz, Tablet ab 700 px
+      zwei Spalten, Knöpfe 40 px, kein „gross“. Schreiben unter „Alle“: Pflichtwahl „Gilt für“
+      ohne Vorauswahl, Senden erst danach (mit Grund). ?ofen=<gibt's nicht> → „Alle“ + Hinweis.
+      Neue Info-Karte immer „alle Öfen“. Editor-Leiste klebt unter --kopf-h statt 72 px.
+      Regel, Datenmodell, Rechte unverändert. SESSION_2026-10-24_MASCHINENSEITE_NACHTRAG_UEBERSICHT_BAU.md
+    2026-10-24 · 07:46 · v1.1 · Feature (Maschinenseite Stufe B, Bauplan Go Kontroll-Chat 24.10., 00:32)
+      Hauptseite der Maschine: Ofen wählen (keine Vorauswahl, ?ofen=1…12|alle,
+      Einzelmaschine ohne Auswahl), Reparaturknopf → reparaturanfrage.html?geraet=
+      <Exemplar> (unter „alle“ erst den Ofen wählen; ohne Melde-Haken ein Satz),
+      offene Reparaturanfragen des Ofens (BOS_MELDUNGEN.offen, nur wer mitlesen
+      darf), Info-Karten (lesen alle Personenkonten, pflegen die Maschinenführer
+      in „Karten bearbeiten“, ?ansicht=karten), Chatfenster (Notizen 40 Tage,
+      anpinnen/lösen jedes Personenkonto, löschen Schreiber und Admin, live).
+      Backprogramme/Editor/Verwalten schon vor der Ofenwahl (Ulf F2).
+      N1: „Reihenfolge speichern“ auch bei „noch nicht einsortiert“.
+      N2: Handy (≤ 480 px): Speichern-Leiste unten, schmal, nur bei Ungespeichertem.
+      Regel RK §28 (maschinen_notizen, maschinen_karten). „🚧 In Planung“ entfällt.
+      SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
     2026-10-23 · 23:04 · v1.0 · Neu (Maschinenseite Stufe A, #115/#116; Bauplan Go Kontroll-Chat 22:22)
       Liste der Maschinen → Hauptseite der Maschine → Backprogramme (alle
       Personenkonten), Editor (nur Maschinenführer), Verwalten (nur Rolle
@@ -40,10 +63,21 @@
   [hidden] { display: none !important; }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; padding-bottom: 80px; background: var(--bos-bg); color: var(--bos-text); font-family: var(--bos-font-body); -webkit-tap-highlight-color: transparent; }
-  header { background: var(--bos-surface); border-bottom: 1px solid var(--bos-border); padding: var(--bos-space-sm, 14px) var(--bos-space-md, 18px); position: sticky; top: 0; z-index: 20; }
-  .kopf-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); }
-  .kopf-titel { flex: 1 1 0; min-width: 0; }
-  header h1 { margin: 0; font-size: var(--bos-font-xl, 1.3rem); overflow-wrap: anywhere; }
+  /* Nachtrag Übersicht (D2, D3): der Kopf trägt die Leiste und bleibt beim Scrollen stehen */
+  header { background: var(--bos-surface); border-bottom: 1px solid var(--bos-border); padding: 8px var(--bos-space-md, 18px) 6px; position: sticky; top: 0; z-index: 20; }
+  .kopf-oben { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .kopf-oben .wer { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .kopf-zeile { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  header h1 { margin: 0; flex: 1 1 0; min-width: 0; font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kopf-werkzeuge { display: flex; gap: 6px; flex: none; }
+  header .bos-btn { min-height: 40px; padding: 4px 10px; font-size: var(--bos-font-sm, .85rem); white-space: nowrap; }
+  header .rund-btn { min-width: 40px; min-height: 40px; padding: 0; font-size: 1rem; }
+  .kopf-leiste { display: flex; align-items: center; gap: 10px; margin-top: 6px; min-width: 0; }
+  .kopf-leiste .zurueck { margin: 0; flex: none; white-space: nowrap; min-height: 40px; }
+  .ofen-filter { position: relative; display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1 1 auto; }
+  .ofen-filter::-webkit-scrollbar { display: none; }
+  .of { flex: none; min-width: 40px; min-height: 40px; max-width: 9.5em; padding: 2px 10px; border: 1px solid var(--bos-border-strong); background: none; color: var(--bos-text); border-radius: var(--bos-radius-sm, 8px); font-family: var(--bos-font-label); font-weight: 700; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .of[aria-pressed="true"] { background: var(--bos-amber); border-color: var(--bos-amber); color: #10161c; }
   .eyebrow { font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: var(--bos-font-xs, .72rem); color: var(--bos-amber); }
   .wer { font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); margin-top: 2px; }
   .abzeichen { display: inline-block; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 1px 8px; margin-left: 4px; font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-2xs, .66rem); letter-spacing: .04em; text-transform: uppercase; color: var(--bos-text-dim); }
@@ -67,7 +101,6 @@
   .kasten h2, .kasten h3 { margin: 0 0 8px; font-family: var(--bos-font-display); }
   .zurueck { margin-bottom: var(--bos-space-xs, 9px); }
   .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--bos-space-sm, 12px) 0; align-items: center; }
-  .gross { min-height: 64px; font-size: var(--bos-font-md, 1rem); padding: 10px 20px; }
   /* Liste der Maschinen */
   .m-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
   .m-kachel { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px; padding: 14px 16px; background: var(--bos-surface); color: var(--bos-text); border: 1px solid var(--bos-border); border-left: 6px solid var(--bos-amber); border-radius: var(--bos-radius-md); text-align: left; font: inherit; cursor: pointer; }
@@ -77,8 +110,55 @@
   /* Hauptseite */
   .exemplare { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
   .chip { display: inline-block; border: 1px solid var(--bos-border-strong); border-radius: 999px; padding: 3px 10px; font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim); }
-  .geplant { list-style: none; margin: 0; padding: 0; }
-  .geplant li { padding: 8px 10px; margin-bottom: 6px; border: 1px dashed var(--bos-border-strong); border-radius: var(--bos-radius-sm); color: var(--bos-text-faint); font-size: var(--bos-font-sm, .85rem); }
+  /* Stufe B: Reparatur, Info-Karten, Chatfenster */
+  a.bos-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; text-align: center; }
+  .ofen-wahl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 8px 0 10px; }
+  .ofen-btn { min-height: 72px; font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; padding: 8px; }
+  .abschnitt { margin-top: 22px; }
+  .abschnitt > h2 { font-family: var(--bos-font-display); font-size: 1.15rem; margin: 0 0 10px; }
+  /* Nachtrag Übersicht (D7, D8, D9): drei Kästen, kleiner, Tablet zwei Spalten */
+  .uebersicht .kasten { padding: 12px 14px; }
+  .uebersicht .kasten > h2 { font-size: 1.05rem; margin: 0 0 2px; }
+  .uebersicht .bos-btn { min-height: 40px; }
+  .satz { color: var(--bos-text-dim); font-size: var(--bos-font-sm, .85rem); margin: 0 0 10px; line-height: 1.45; }
+  .rep-kasten { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .rep-kasten > h2 { margin: 0 !important; }
+  .rep-kasten #reparaturBox, .rep-kasten #anfragenBox { min-width: 0; }
+  .rep-kasten #anfragenBox { flex: 1 1 260px; }
+  .rep-kasten .knopfreihe { margin: 0; }
+  .rep-kasten p { margin: 0; }
+  .rep-kasten #repWahl { margin: 8px 0 0; }
+  .rep-kasten #reparaturBox.offen { flex-basis: 100%; }
+  .rep-kasten .ofen-wahl { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .rep-kasten .ofen-wahl .ofen-btn { min-height: 44px; font-size: .95rem; }
+  .spalten { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .spalten > .kasten { margin-bottom: 0; }
+  @media (min-width: 700px) { .spalten { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+  .gilt-wahl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 6px; font-size: var(--bos-font-sm, .85rem); }
+  .gilt-wahl b { margin-right: 4px; }
+  .gilt-hinweis { color: var(--ma-warn); font-size: var(--bos-font-xs, .78rem); margin-top: 2px; }
+  .uebersicht .ik { padding: 10px 12px; }
+  .uebersicht .ik h3 { font-size: .98rem; }
+  .anfrage { display: block; padding: 9px 12px; margin-bottom: 6px; border-left: 4px solid var(--ma-rot); background: var(--bos-surface); border-radius: var(--bos-radius-sm); color: var(--bos-text); text-decoration: none; line-height: 1.45; font-size: var(--bos-font-sm, .88rem); }
+  .anfrage.gesehen { border-left-color: var(--ma-warn); }
+  .ik { background: var(--bos-surface); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-md); padding: 12px 14px; margin-bottom: 10px; }
+  .ik h3 { margin: 0 0 6px; font-size: 1.05rem; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .ik-text { white-space: pre-wrap; line-height: 1.5; overflow-wrap: anywhere; }
+  .ik.geaendert { border-color: var(--ma-warn); border-left: 4px solid var(--ma-warn); }
+  .ik-form .v-zeile select { flex: 0 0 auto; width: auto; }
+  .ik-form textarea { width: 100%; min-height: 110px; resize: vertical; }
+  .chat-eingabe textarea { width: 100%; min-height: 76px; resize: vertical; }
+  .pin-wahl { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+  .pin-wahl input { width: 22px; height: 22px; }
+  .notiz { border-top: 1px solid var(--bos-border); padding: 10px 2px; }
+  .notiz.pin { background: var(--bos-surface); border: 1px solid var(--bos-amber); border-radius: var(--bos-radius-sm); padding: 10px 12px; margin-bottom: 8px; }
+  .notiz-kopf { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; font-size: var(--bos-font-sm, .85rem); }
+  .notiz-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 6px; line-height: 1.5; }
+  .rest { color: var(--bos-text-faint); font-size: var(--bos-font-xs, .75rem); }
+  .rest.bald { color: var(--ma-warn); font-weight: 700; }
+  .notiz-knoepfe { display: flex; gap: 8px; flex-wrap: wrap; }
+  .notiz-knoepfe .bos-btn { min-height: 40px; padding: 4px 12px; }
+  .kurz { display: none; }
   /* Schalter */
   .wahl { display: inline-flex; border: 1px solid var(--bos-border-strong); border-radius: 999px; overflow: hidden; }
   .wahl button { min-height: 44px; padding: 6px 16px; background: none; border: none; color: var(--bos-text-dim); font-family: var(--bos-font-label); font-weight: 700; letter-spacing: .03em; cursor: pointer; font-size: var(--bos-font-sm, .85rem); }
@@ -117,7 +197,7 @@
   .ed-meldung.ok { border-left-color: var(--ma-gruen); }
   details.frueher summary { cursor: pointer; color: var(--bos-text-dim); font-size: var(--bos-font-sm, .82rem); min-height: 36px; display: flex; align-items: center; }
   .fr-eintrag { border-top: 1px solid var(--bos-border); padding: 6px 0; font-size: var(--bos-font-sm, .82rem); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-  .ed-leiste { position: sticky; top: 72px; z-index: 10; background: var(--bos-bg); padding: 6px 0; }
+  .ed-leiste { position: sticky; top: var(--kopf-h, 112px); z-index: 10; background: var(--bos-bg); padding: 6px 0; }   /* --kopf-h misst der Kopf selbst (Nachtrag) */
   /* Verwalten */
   .v-zeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .v-zeile .bos-input { flex: 1 1 180px; min-width: 0; }
@@ -135,10 +215,19 @@
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); width: max-content; max-width: 90vw; background: var(--bos-surface-raised); border: 1px solid var(--bos-amber); color: var(--bos-text); padding: 10px 16px; border-radius: 10px; z-index: 60; }
   @media (max-width: 480px) {
     main { padding: 12px; }
-    header h1 { font-size: 1.1rem; }
+    header h1 { font-size: 1.05rem; }
+    header { padding: 6px 12px 4px; }
+    .kopf-werkzeuge.viele .wort { display: none; }   /* F1/M41: zwei oder drei Werkzeuge → nur die Zeichen */
     .ma-tabelle th, .ma-tabelle td { padding: 6px 4px; }
     .ma-tabelle .ma-nr { width: 3.6em; font-size: 1.02rem; }
-    .ed-leiste { top: 64px; }
+    /* N2 (Ulf F7): Speichern-Leiste unten, schmal, nur wenn etwas ungespeichert ist */
+    .ed-leiste { position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 30; margin: 0; padding: 6px 10px calc(6px + env(safe-area-inset-bottom)); background: var(--bos-surface); border-top: 1px solid var(--bos-border-strong); flex-wrap: nowrap; }
+    .ed-leiste.leer { display: none; }
+    .ed-leiste .bos-btn { flex: 1 1 0; min-height: 42px; padding: 4px 8px; font-size: var(--bos-font-sm, .85rem); }
+    .ed-leiste #folgeMeldung { display: none; }
+    .ed-leiste .lang { display: none; }
+    .ed-leiste .kurz { display: inline; }
+    #toast { bottom: 76px; }   /* über der Speichern-Leiste */
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -155,7 +244,7 @@
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
 <script src="../bos_produkte.js"></script>
-<script src="../bos_meldungen.js"></script>          <!-- nur BOS_MELDUNGEN.ich(): dein Name für „zuletzt geändert von“ -->
+<script src="../bos_meldungen.js"></script>          <!-- BOS_MELDUNGEN.ich() (dein Name) und .offen() (offene Reparaturanfragen, Stufe B) -->
 <script src="../bos_namen.js"></script>              <!-- Verwalten: Namen zur Maschinenführer-Auswahl -->
 <script src="../teigecke/teigecke_logik.js"></script> <!-- nur backtag(): Wechsel um 12:00 -->
 <script src="../bos_druck.js"></script>
@@ -163,15 +252,14 @@
 <script src="maschinen_logik.js"></script>
 <script src="maschinen_ansicht.js"></script>
 
-<header>
+<header id="kopf">
+  <div class="kopf-oben"><span class="eyebrow" id="eyebrow">Maschinen</span><span class="wer" id="werZeile"></span></div>
   <div class="kopf-zeile">
-    <div class="kopf-titel">
-      <div class="eyebrow" id="eyebrow">Maschinen</div>
-      <h1 class="bos-title" id="kopfTitel">Maschinen</h1>
-      <div class="wer" id="werZeile"></div>
-    </div>
+    <h1 class="bos-title" id="kopfTitel">Maschinen</h1>
+    <div class="kopf-werkzeuge" id="kopfWerkzeuge"></div>
     <button type="button" class="bos-btn rund-btn" id="hilfeBtn" title="Hilfe" aria-label="Hilfe">❓</button>
   </div>
+  <nav class="kopf-leiste" id="kopfLeiste" aria-label="Navigation" hidden></nav>
 </header>
 
 <div id="regelLeiste" class="leiste rot" role="alert" hidden></div>
@@ -208,17 +296,40 @@ const A = window.BOS_MASCHINEN_ANSICHT;
 /* ---------- i18n (Checkliste §6) ---------- */
 const I18N_DE = {
   titel: 'Maschinen', lade: 'Einen Moment …',
-  du_als: 'Du bist angemeldet als: {name}',
+  du_als: '· {name}',
   ab_admin: 'Admin', ab_fuehrer: 'Maschinenführer',
   liste_titel: 'Maschinen', liste_leer: 'Noch keine Maschine angelegt.', liste_leer_admin: 'Noch keine Maschine angelegt. Mit „＋ Maschine“ fängst du an.',
   neu_maschine: '＋ Maschine', ausgeblendet_titel: 'Ausgeblendete Maschinen ({n})',
   exemplar_ein: '1 Exemplar', exemplare_n: '{n} Exemplare',
-  zurueck_liste: '‹ Alle Maschinen', zurueck_maschine: '‹ {name}',
+  zurueck_liste: '‹ Maschinen', zurueck_maschine: '‹ {name}',
   k_programme: '📋 Backprogramme', k_editor: '✎ Editor', k_verwalten: '⚙︎ Verwalten',
   nicht_fuehrer_admin: 'Du bist hier nicht als Maschinenführer eingetragen — deshalb kein Editor. Eintragen: „Verwalten“ → Maschinenführer.',
-  geplant_titel: '🚧 In Planung (kommt mit der nächsten Stufe)',
-  geplant_ofen: 'Ofen wählen (1 / 2 / 3 / 4 / alle)', geplant_reparatur: 'Reparatur melden — direkt für dieses Exemplar',
-  geplant_karten: 'Info-Karten der Maschinenführer', geplant_chat: 'Chatfenster für Hinweise und Beobachtungen',
+  filter_alle: 'Alle', filter_titel: 'Nach Ofen filtern', ofen_gibts_nicht: 'Ofen „{nr}“ gibt es an dieser Maschine nicht (mehr). Du siehst alle Öfen.',
+  rep_titel: 'Reparatur',
+  ik_satz: 'Eigenheiten und feste Infos zur Maschine. Pflegen die Maschinenführer.',
+  ik_satz_fuehrer: 'Feste Infos zur Maschine. Hier kannst du Eigenheiten und Infos zur Maschine verfassen.',
+  chat_satz: 'Kurze Nachricht an die anderen. Verschwindet nach 40 Tagen, außer sie ist angepinnt.',
+  chat_gilt_wahl: 'Gilt für:', chat_gilt_fehlt: 'Erst wählen, für welchen Ofen die Notiz gilt.',
+  rep_melden: '🔧 Reparatur melden', rep_melden_ofen: '🔧 Reparatur melden — {name}', rep_welcher: 'Welcher Ofen ist kaputt?',
+  rep_ohne: 'Kaputt? Sag es jemandem, der melden darf, oder schreib es ins Chatfenster.',
+  rep_offen: 'Schon gemeldet', rep_keine: 'Keine offene Reparaturanfrage für {wo}.', rep_lade: 'Offene Reparaturanfragen werden geladen …',
+  rep_zeile: '{name} · gemeldet am {zeit} · {status}', rep_fehler: 'Offene Reparaturanfragen nicht lesbar',
+  rep_hinweis_name: 'Gezählt werden Anfragen, deren Gerät genau „{name}“ heißt (wie aus dem Reparaturknopf).',
+  ik_titel: 'Info-Karten', ik_leer: 'Noch keine Info-Karten.', ik_bearbeiten: '✏️ Karten bearbeiten', ik_anlegen: '✏️ Karten anlegen',
+  ik_nur: 'nur {name}', ik_alle: 'alle Öfen', ik_zuletzt: 'zuletzt geändert von {name} am {zeit}', ik_kein_fuehrer: 'Info-Karten pflegen nur die eingetragenen Maschinenführer.',
+  ik_ed_titel: 'Info-Karten bearbeiten', ik_ed_hinweis: 'Jede Karte hat eine Überschrift und einen Text. „Gilt für“: alle Öfen oder nur einer. Mit ▲ ▼ die Reihenfolge ändern. Höchstens {max} Karten.',
+  ik_vorschlag: '＋ {titel}', ik_eigene: '＋ eigene Karte', ik_titel_feld: 'Überschrift', ik_gilt: 'Gilt für', ik_gilt_alle: 'alle Öfen',
+  ik_text_feld: 'Text', ik_speichern: '💾 Speichern', ik_loeschen: '🗑 Löschen', ik_verwerfen: 'verwerfen', ik_voll: 'Höchstens {max} Karten je Maschine.',
+  ik_loeschen_frage: 'Karte „{titel}“ löschen?\n\nSie ist dann für alle weg.', ik_gespeichert: '✓ Gespeichert', ik_geloescht: '✓ Karte gelöscht',
+  ik_neu: 'neu, noch nicht gespeichert',
+  chat_titel: 'Chatfenster', chat_gilt: 'gilt für {wo}', chat_platzhalter: 'Was sollen die anderen wissen?',
+  chat_pin: '📌 gleich anpinnen', chat_senden: 'Senden', chat_sendet: 'Sende …', chat_ok: '✓ Notiz gespeichert',
+  chat_nur_lesen: 'Schreiben, anpinnen und lösen nur mit persönlichem Konto.', chat_leer: 'Noch keine Notiz.', chat_lade: 'Notizen werden geladen …',
+  chat_fehler: 'Notizen nicht lesbar', chat_anpinnen: '📌 Anpinnen', chat_loesen: 'Lösen', chat_loeschen: '🗑 Löschen', chat_loeschen_admin: '🗑 Als Admin löschen',
+  chat_angepinnt: '📌 angepinnt von {name}', chat_gilt_alle: 'alle Öfen', chat_unterwegs: 'wird gespeichert …',
+  chat_loeschen_frage: 'Deine Notiz löschen?', chat_loeschen_admin_frage: 'Notiz von {name} als Admin löschen?',
+  chat_loesen_alt: 'Diese Notiz ist {tage} Tage alt. Gelöst verschwindet sie sofort und wird innerhalb eines Tages gelöscht. Trotzdem lösen?',
+  chat_zaehler: '{n} / {max}',
   m_unbekannt: 'Die Maschine „{id}“ gibt es nicht (oder sie ist ausgeblendet).',
   m_unbekannt_admin: 'Als Admin kannst du sie unter „Alle Maschinen“ anlegen oder zurückholen.',
   pr_titel: 'Backprogramme', s_reihenfolge: 'Backreihenfolge', s_warenart: 'Nach Warenart', f_alle: 'Alle', f_heute: 'Heute',
@@ -228,6 +339,7 @@ const I18N_DE = {
   pr_nicht_heute: '{n} weitere Produkt(e) haben heute keinen Backtag.',
   pr_stand: 'zuletzt geändert {zeit} von {name}', pr_stand_leer: 'noch nichts eingetragen',
   ed_titel: 'Editor', ed_alle: '💾 Alle Änderungen speichern ({n})', ed_reihenfolge: '💾 Reihenfolge speichern',
+  ed_alle_kurz: '💾 Alle ({n})', ed_reihenfolge_kurz: '💾 Reihenfolge',
   ed_leer: 'Noch kein Produkt läuft über diese Maschine. Den Werdegang pflegt der Admin in der Produkt-Config.',
   ed_speichern: '💾 Speichern', ed_speichert: 'Speichere …', ed_gespeichert: '✓ Gespeichert',
   ed_zuletzt: 'zuletzt geändert von {name} am {zeit}', ed_noch_nichts: 'noch nichts eingetragen',
@@ -255,9 +367,10 @@ const I18N_DE = {
   zg_gesperrt: 'Dein Konto ist nicht freigeschaltet — Ulf Bescheid geben.',
   zg_kein_konto: 'Zu deiner Anmeldung gibt es kein Konto — Ulf Bescheid geben.',
   zg_admin_hinweis: 'Du liest als Admin. Ohne Art „Person“ kannst du nicht als Maschinenführer speichern.',
-  regel_alt: '⚠︎ Die eingesetzte Datenbank-Regel kennt die Maschinenseite noch nicht (Fassung {fassung}). In der Firebase-Konsole {datei} einsetzen. Bis dahin geht hier nichts.',
+  regel_alt: '⚠︎ Die eingesetzte Datenbank-Regel ist älter als diese Seite (Fassung {fassung} fehlt). In der Firebase-Konsole {datei} einsetzen. Bis dahin gehen Info-Karten und Chatfenster nicht.',
   err_unbehandelt: 'Unerwarteter Fehler', err_laden: '{was} laden', err_speichern: '{was} speichern', err_druck: 'Drucken',
   w_maschinen: 'Maschinen', w_maschine: 'Maschine', w_produkte: 'Produkte', w_angaben: 'Angaben', w_reihenfolge: 'Reihenfolge', w_konto: 'Konto',
+  w_karten: 'Info-Karten', w_notiz: 'Notiz',
   unge_frage: 'Es gibt ungespeicherte Änderungen. Trotzdem weg?'
 };
 function t(k, p) { let s = I18N_DE[k] !== undefined ? I18N_DE[k] : k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
@@ -266,16 +379,22 @@ function t(k, p) { let s = I18N_DE[k] !== undefined ? I18N_DE[k] : k; if (p) Obj
 const helpData = {
   titel: 'Maschinen — so geht’s',
   abschnitte: [
-    ['Wofür?', 'Jede Maschine hat hier ihre eigene Seite. In dieser ersten Stufe gibt es die Backprogramme: welches Produkt an dieser Maschine mit welchem Programm läuft und worauf man achten muss. Das ist für die Nacht, in der ein Kollege einspringt und schnell Bescheid wissen muss.'],
-    ['Wer sieht was?', 'Die Backprogramme sieht jeder mit einem persönlichen Konto. Ändern dürfen nur die Maschinenführer, die der Admin bei der Maschine eingetragen hat — über den Knopf „Editor“. Maschinen anlegen und Maschinenführer eintragen macht der Admin unter „Verwalten“. Tablets an der Wand (Konto-Art „Ort“) zeigen die Seite nicht, weil man sonst nicht sieht, wer etwas geändert hat.'],
+    ['Wofür?', 'Jede Maschine hat hier ihre eigene Seite: auf einen Blick Reparatur, Info-Karten und Chatfenster, dazu die Backprogramme — welches Produkt an dieser Maschine mit welchem Programm läuft und worauf man achten muss. Das ist für die Nacht, in der ein Kollege einspringt und schnell Bescheid wissen muss.'],
+    ['Wer sieht was?', 'Alles hier sieht jeder mit einem persönlichen Konto. Backprogramme und Info-Karten ändern nur die Maschinenführer, die der Admin bei der Maschine eingetragen hat. Ins Chatfenster schreiben, anpinnen und lösen darf jedes persönliche Konto. Maschinen anlegen und Maschinenführer eintragen macht der Admin unter „Verwalten“. Tablets an der Wand (Konto-Art „Ort“) zeigen die Seite nicht, weil man sonst nicht sieht, wer etwas geschrieben hat.'],
+    ['Übersicht und Ofen-Filter', 'Wer eine Maschine öffnet — auch über das QR-Kärtchen am Ofen —, sieht sofort alles: Reparatur, Info-Karten und Chatfenster aller Öfen, jede Karte und jede Notiz mit dem Schild, für welchen Ofen sie gilt. Die Leiste oben bleibt beim Scrollen stehen. „‹ Maschinen“ führt zurück zur Liste; die Knöpfe „Alle · 1 · 2 · 3 · 4“ filtern: Unter „3“ steht alles für Ofen 3 und alles, was für alle Öfen gilt. Nur der gewählte Knopf ist farbig. Rechts oben stehen 📋 Backprogramme, ✎ Editor (Maschinenführer) und ⚙ Verwalten (Admin) — auf dem Handy nur die Zeichen, wenn es mehr als einer ist. Wer über das Kärtchen direkt hereinkommt, verlässt die Seite mit der Zurück-Taste des Geräts; zur Liste geht es mit „‹ Maschinen“. Hat eine Maschine nur ein Exemplar, gibt es keine Ofenknöpfe.'],
+    ['Reparatur melden', '„Reparatur melden“ öffnet die Reparaturanfrage, der Ofen ist schon eingetragen. Unter „Alle“ fragt die Seite zuerst, welcher Ofen kaputt ist. Wer keinen Melde-Haken hat, sieht statt des Knopfs: „Kaputt? Sag es jemandem, der melden darf, oder schreib es ins Chatfenster.“'],
+    ['Schon gemeldet?', 'Wer bei der Reparaturanfrage mitlesen darf, sieht neben dem Knopf die offenen Anfragen dieses Ofens (unter „Alle“: aller Öfen), mit Datum und ob sie schon gesehen sind. Antippen öffnet die Reparaturanfrage. Gezählt werden nur Anfragen, deren Gerät genau so heißt wie der Ofen hier — so trägt es der Knopf ein. Wer „Stikkenofen3“ von Hand tippt, taucht hier nicht auf. Wird ein Ofen umbenannt, fehlen seine alten Anfragen in dieser Liste; in der Reparaturanfrage stehen sie weiter.'],
+    ['Info-Karten', 'Hier halten die Maschinenführer fest, was man an der Maschine wissen muss, zum Beispiel „Kurz & wichtig“, „Eigenheiten“, „Einstellungen / Richtwerte“, „Reinigung“, „Bei Störung“. Eine Karte gilt für alle Öfen oder nur für einen; unter „3“ stehen die Karten für alle und die für Ofen 3. Maschinenführer ändern sie über „Karten bearbeiten“: Überschrift, „gilt für“ (eine neue Karte gilt zuerst für alle Öfen), Text, ▲ ▼ für die Reihenfolge, Löschen mit Rückfrage. Hat ein anderer dieselbe Karte inzwischen geändert, speichert die Seite nicht drüber und bietet „Neu laden, meine Eingaben behalten“ an.'],
+    ['Chatfenster', 'Für alles, was die anderen wissen sollen. Unter einem Ofen gilt deine Notiz für diesen Ofen. Unter „Alle“ wählst du über dem Textfeld zuerst, wofür sie gilt — „alle Öfen“ oder ein Ofen; vorher geht „Senden“ nicht, damit keine Notiz aus Versehen beim falschen Ofen landet. Jede Notiz zeigt Name, Uhrzeit und für welchen Ofen sie gilt. Unter „3“ stehen die Notizen von Ofen 3 und die für alle, unter „Alle“ alle. Angepinnte stehen oben, dann die neuesten. Ändern geht nicht — lieber löschen und neu schreiben.'],
+    ['Anpinnen und 40 Tage', 'Jede Notiz bleibt 40 Tage, dann verschwindet sie von selbst. Klein steht dabei „noch 12 Tage“, die letzten drei Tage deutlicher. Was wichtig bleibt, pinnt man an (📌): Angepinnte Notizen bleiben, bis jemand sie löst, und es steht dabei, wer angepinnt hat. Anpinnen und Lösen darf jedes persönliche Konto. Wird eine Notiz gelöst, die schon älter als 40 Tage ist, verschwindet sie sofort — die Seite fragt vorher.'],
+    ['Notiz löschen', 'Löschen darf nur, wer die Notiz geschrieben hat. Der Admin darf jede löschen, als Notbremse.'],
     ['Backprogramme', 'Oben zwei Schalter. „Backreihenfolge“ zeigt alles in der Reihenfolge, in der gebacken wird; „Nach Warenart“ fasst nach Warenart zusammen, innerhalb wieder in Backreihenfolge. „Alle“ zeigt jedes Produkt dieser Maschine, „Heute“ nur die mit heutigem Backtag. Ab 12 Uhr mittags gilt schon der nächste Backtag — darum steht über der Liste immer, welcher Tag gemeint ist. Ein Strich „–“ heißt: dafür gibt es nichts (zum Beispiel kein Programm für 3 Stikken). Produkte in Saison-Pause stehen nicht in der Liste; welche das sind, steht darunter. Das Gerät merkt sich, wie du die Schalter eingestellt hast.'],
     ['Drucken', '„Backprogramme drucken“ druckt genau das, was gerade zu sehen ist — also auch nur „Heute“ oder „Nach Warenart“, wenn das eingestellt ist.'],
-    ['Editor (Maschinenführer)', 'Jedes Produkt dieser Maschine hat eine Karte mit den Feldern der Maschine (beim Stikkenofen: Programm Ganz = 3 Stikken, Programm Halb = 1–2 Stikken, Hinweis). Nummern gehen nur als Ziffern. Wer etwas ändert, sieht die Karte gelb mit „nicht gespeichert“ und speichert mit „Speichern“ an der Karte oder oben mit „Alle Änderungen speichern“. Unter jeder Karte steht klein, wer zuletzt geändert hat. Unter „Frühere Fassungen“ stehen die letzten 20 Stände; „in die Felder übernehmen“ holt einen davon zurück in die Felder, dann noch speichern.'],
-    ['Backreihenfolge', 'Im Editor mit ▲ ▼ verschieben, dann „Reihenfolge speichern“. Sie gilt für alle Produkte dieser Maschine, auf dem Bildschirm und auf dem Ausdruck. Ein Produkt, das neu über die Maschine läuft, steht hinten mit „noch nicht einsortiert“, bis jemand die Reihenfolge speichert.'],
+    ['Editor (Maschinenführer)', 'Jedes Produkt dieser Maschine hat eine Karte mit den Feldern der Maschine (beim Stikkenofen: Programm Ganz = 3 Stikken, Programm Halb = 1–2 Stikken, Hinweis). Nummern gehen nur als Ziffern. Wer etwas ändert, sieht die Karte gelb mit „nicht gespeichert“ und speichert mit „Speichern“ an der Karte oder mit „Alle Änderungen speichern“ (auf dem Handy unten am Rand, solange etwas ungespeichert ist). Unter jeder Karte steht klein, wer zuletzt geändert hat. Unter „Frühere Fassungen“ stehen die letzten 20 Stände; „in die Felder übernehmen“ holt einen davon zurück in die Felder, dann noch speichern.'],
+    ['Backreihenfolge', 'Im Editor mit ▲ ▼ verschieben, dann „Reihenfolge speichern“. Sie gilt für alle Produkte dieser Maschine, auf dem Bildschirm und auf dem Ausdruck. Ein Produkt, das neu über die Maschine läuft, steht hinten mit „noch nicht einsortiert“, bis jemand die Reihenfolge speichert — das geht auch, ohne etwas zu verschieben.'],
     ['Zwei gleichzeitig?', 'Hat jemand anders dasselbe Produkt gespeichert, während du getippt hast, speichert die Seite nicht über ihn drüber. Sie sagt, wer es war, und bietet „Neu laden, meine Eingaben behalten“ an. Danach siehst du seinen Stand unter „zuletzt geändert“ und kannst deine Eingaben prüfen und speichern.'],
-    ['Woher kommen die Produkte?', 'Welche Maschinen ein Produkt durchläuft, steht beim Produkt selbst — im „Werdegang“ (Produkt-Config, Reiter „Backinformationen“). Das pflegt der Admin. Fliegt eine Maschine aus dem Werdegang, verschwindet das Produkt hier, seine Werte bleiben aber gespeichert und sind wieder da, wenn es zurückkommt. Gelöscht wird hier nie etwas.'],
-    ['Was noch kommt', 'Ofen wählen, Reparatur melden, Info-Karten und das Chatfenster stehen ausgegraut auf der Seite der Maschine. Sie kommen mit der nächsten Stufe.'],
-    ['Wenn etwas schiefgeht', 'Fehler stehen oben rot, mit der Meldung der Datenbank. Steht dort, die Regel sei älter als die Seite, ist das Ulfs Sache (neue Regel einsetzen). Ohne Netz sagt die Seite „kein Netz“ — dann einfach gleich noch einmal. Kommt nach 15 Sekunden keine Antwort, kann das Gespeicherte trotzdem noch ankommen: erst nachsehen, dann wiederholen.']
+    ['Woher kommen die Produkte?', 'Welche Maschinen ein Produkt durchläuft, steht beim Produkt selbst — im „Werdegang“ (Produkt-Config, Reiter „Backinformationen“). Das pflegt der Admin. Fliegt eine Maschine aus dem Werdegang, verschwindet das Produkt hier, seine Werte bleiben aber gespeichert und sind wieder da, wenn es zurückkommt.'],
+    ['Wenn etwas schiefgeht', 'Fehler stehen rot da, wo sie passiert sind — oben, an der Karte oder an der Notiz —, mit der Meldung der Datenbank. Steht dort, die Regel sei älter als die Seite, ist das Ulfs Sache (neue Regel einsetzen). Ohne Netz sagt die Seite „kein Netz“ — dann einfach gleich noch einmal. Kommt nach 15 Sekunden keine Antwort, kann das Gespeicherte trotzdem noch ankommen: erst nachsehen, dann wiederholen.']
   ]
 };
 function oeffneHilfe() {
@@ -327,7 +446,16 @@ const S = {
   ed: null,          // Editor: { eingabe: {key:{feld:wert}}, geaendert:{}, laeuft:{}, meldung:{}, konflikt:{}, folge:[keys], folgeGeaendert, veraltet:{} }
   v: null,           // Verwalten: { neu, form, personen, personenFehler, geaendert, laeuft }
   speichertAlle: false,
-  wahl: {}           // Backprogramme: { maschineId: { sortierung, filter } }
+  wahl: {},          // Backprogramme: { maschineId: { sortierung, filter } }
+  /* Stufe B */
+  ofen: null,        // aus der Adresse (?ofen=); gültig gemacht in ofenAktiv
+  ofenAktiv: null,
+  karten: null, kartenFehler: null,
+  notizen: null, notizFehler: null, anfragen: null, anfragenFehler: null,
+  live: {},          // { fuer: maschineId, n: abmelden Notizen, a: abmelden Anfragen }
+  repWahl: false,    // unter „alle“: Ofenfrage beim Reparaturknopf offen
+  chat: { entwurf: '', pin: false, gilt: null, laeuft: false, meldung: null, laeuftNotiz: {}, notizMeldung: {} },   // gilt: Pflichtwahl unter „Alle“ (D5)
+  ik: null           // Karten-Editor: { eingabe: {id:{titel,text,exemplar}}, geaendert:{}, laeuft:{}, meldung:{}, konflikt:{}, neu:[{tmp,titel,text,exemplar}] }
 };
 function maschineSichtbar(m) { return m && m.geloescht !== true; }
 function istAdmin() { return !!(S.zugang && S.zugang.admin); }
@@ -337,14 +465,18 @@ function istFuehrerHier() { return !!(S.zugang && S.zugang.person && M.istFuehre
 function ausAdresse() {
   const p = new URLSearchParams(window.location.search);
   S.mid = p.get('maschine') || null;
+  S.ofen = S.mid ? (p.get('ofen') || null) : null;
   const a = p.get('ansicht') || '';
-  S.ansicht = !S.mid ? (a === 'neu' ? 'neu' : 'liste') : (['programme', 'editor', 'verwalten'].indexOf(a) !== -1 ? a : 'maschine');
+  S.ansicht = !S.mid ? (a === 'neu' ? 'neu' : 'liste') : (['programme', 'editor', 'verwalten', 'karten'].indexOf(a) !== -1 ? a : 'maschine');
 }
-function geheZu(mid, ansicht) {
+/* ofen: undefined = bei derselben Maschine behalten; null = ohne (Gesamtübersicht „Alle“) */
+function geheZu(mid, ansicht, ofen) {
   if (ungespeichert() && !window.confirm(t('unge_frage'))) return;
   verwirfEingaben();
+  if (ofen === undefined) ofen = mid && mid === S.mid ? S.ofen : null;
   const p = new URLSearchParams();
   if (mid) p.set('maschine', mid);
+  if (mid && ofen) p.set('ofen', ofen);
   if (ansicht && ansicht !== 'maschine' && ansicht !== 'liste') p.set('ansicht', ansicht);
   const neu = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
   try { history.pushState({}, '', neu); } catch (e) { /* ohne Verlauf: nur neu zeichnen */ }
@@ -356,11 +488,13 @@ window.addEventListener('popstate', function () { verwirfEingaben(); ausAdresse(
 function ungespeichert() {
   const edOffen = S.ed && (Object.keys(S.ed.geaendert).length > 0 || S.ed.folgeGeaendert);
   const vOffen = S.v && S.v.geaendert;
-  return !!(edOffen || vOffen);
+  const chatOffen = !!String(S.chat.entwurf || '').trim();
+  const ikOffen = S.ik && (Object.keys(S.ik.geaendert).length > 0 || S.ik.neu.some(function (n) { return String(n.titel || '').trim() || String(n.text || '').trim(); }));
+  return !!(edOffen || vOffen || chatOffen || ikOffen);
 }
-function verwirfEingaben() { S.ed = null; S.v = null; }
+function verwirfEingaben() { S.ed = null; S.v = null; S.ik = null; S.chat.entwurf = ''; S.chat.pin = false; S.chat.gilt = null; S.chat.meldung = null; S.repWahl = false; }
 (function (pruef) {
-  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return S.speichertAlle || !!(S.ed && Object.keys(S.ed.laeuft).length) || !!(S.v && S.v.laeuft); } }); return; }
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return S.speichertAlle || !!(S.ed && Object.keys(S.ed.laeuft).length) || !!(S.v && S.v.laeuft) || S.chat.laeuft || !!(S.ik && Object.keys(S.ik.laeuft).length); } }); return; }
   window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
 })(function () { return ungespeichert(); });
 
@@ -370,6 +504,58 @@ function setzeKopf(eyebrow, titel) {
   document.getElementById('kopfTitel').textContent = titel;
   document.title = 'BäckereiOS · ' + titel;
 }
+/* Nachtrag Übersicht (D2, D3): Zurück und Ofen-Filter stehen in der Kopfleiste, die mit dem Kopf stehen bleibt.
+   o = null (keine Leiste) | { zurueck: Text, ziel: Funktion, filter: true (Ofenknöpfe der Übersicht) } */
+function setzeLeiste(o) {
+  const nav = document.getElementById('kopfLeiste');
+  if (!o) { nav.innerHTML = ''; nav.hidden = true; return; }
+  const m = S.maschine;
+  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(o.zurueck) + '</button>';
+  if (o.filter) {
+    h += '<div class="ofen-filter" id="ofenFilter" role="group" aria-label="' + esc(t('filter_titel')) + '">' +
+      ['alle'].concat(M.exemplarSchluessel(m.exemplare)).map(function (k) {
+        const an = k === S.ofenAktiv;
+        return '<button type="button" class="of" data-ofenfilter="' + esc(k) + '" aria-pressed="' + (an ? 'true' : 'false') + '" title="' + esc(k === 'alle' ? t('ik_alle') : M.ofenName(m, k)) + '">' +
+          esc(k === 'alle' ? t('filter_alle') : M.ofenKurz(m, k)) + '</button>';
+      }).join('') + '</div>';
+  }
+  nav.innerHTML = h; nav.hidden = false;
+  document.getElementById('zurueckBtn').addEventListener('click', o.ziel);
+  nav.querySelectorAll('[data-ofenfilter]').forEach(function (b) { b.addEventListener('click', function () { setzeFilter(b.getAttribute('data-ofenfilter')); }); });
+  const f = document.getElementById('ofenFilter'), a = f && f.querySelector('[aria-pressed="true"]');
+  if (f && a && a.offsetLeft + a.offsetWidth > f.clientWidth) f.scrollLeft = a.offsetLeft - 8;   /* bei 12 Öfen: der gewählte ist im Bild */
+}
+/* Ofenknopf = Filter (D4): kein Schritt im Verlauf (replaceState) — die Zurück-Taste des Geräts wirkt wie „‹ Maschinen“.
+   Liest nichts neu: Notizen und Anfragen laufen schon je Maschine live. Ein angefangener Entwurf bleibt;
+   „Gilt für“ wird wieder leer (unter „Alle“ also wieder Pflicht, D5). */
+function setzeFilter(k) {
+  S.ofen = k; S.chat.gilt = null; S.repWahl = false;
+  const p = new URLSearchParams(window.location.search);
+  if (k === 'alle') p.delete('ofen'); else p.set('ofen', k);
+  try { history.replaceState(history.state, '', window.location.pathname + '?' + p.toString()); } catch (e) { /* ohne Verlauf: nur neu zeichnen */ }
+  zeichneMaschine();
+}
+/* Werkzeuge im Kopf (Rechte wie bisher). Am Handy bei zwei oder drei Knöpfen nur die Zeichen (F1, M41). */
+function setzeWerkzeuge(an) {
+  const el = document.getElementById('kopfWerkzeuge');
+  if (!an) { el.innerHTML = ''; el.className = 'kopf-werkzeuge'; return; }
+  const l = [['programmeBtn', 'k_programme', 'programme']];
+  if (istFuehrerHier()) l.push(['editorBtn', 'k_editor', 'editor']);
+  if (istAdmin()) l.push(['verwaltenBtn', 'k_verwalten', 'verwalten']);
+  el.className = 'kopf-werkzeuge' + (l.length > 1 ? ' viele' : '');
+  el.innerHTML = l.map(function (x) {
+    const s = t(x[1]), i = s.indexOf(' ');
+    return '<button type="button" class="bos-btn" id="' + x[0] + '" title="' + esc(s.slice(i + 1)) + '" aria-label="' + esc(s.slice(i + 1)) + '"><span class="zeichen">' + esc(s.slice(0, i)) + '</span><span class="wort"> ' + esc(s.slice(i + 1)) + '</span></button>';
+  }).join('');
+  l.forEach(function (x) { document.getElementById(x[0]).addEventListener('click', function () { geheZu(S.mid, x[2]); }); });
+}
+/* Höhe des Kopfs für die Editor-Leiste (klebt darunter, auch wenn der Kopf umbricht oder gezoomt wird) */
+(function () {
+  const kopf = document.getElementById('kopf');
+  function miss() { document.documentElement.style.setProperty('--kopf-h', kopf.offsetHeight + 'px'); }
+  if (window.ResizeObserver) new ResizeObserver(miss).observe(kopf);
+  window.addEventListener('resize', miss); miss();
+})();
 function werZeile() {
   const el = document.getElementById('werZeile');
   if (!S.ich) { el.textContent = ''; return; }
@@ -406,7 +592,7 @@ function hinweis(text) { const h = document.getElementById('hinweisLeiste'); h.t
 function zeigeZugang() {
   const g = S.zugang.grund;
   const satz = g === 'ort' ? t('zg_ort') : g === 'ohne_art' ? t('zg_ohne_art') : g === 'system' ? t('zg_system') : g === 'gesperrt' ? t('zg_gesperrt') : t('zg_kein_konto');
-  setzeKopf(t('titel'), t('titel'));
+  setzeKopf(t('titel'), t('titel')); setzeLeiste(null); setzeWerkzeuge(false);
   document.getElementById('main').innerHTML = '<div class="kasten warn" id="zugangKasten"><h2>' + esc(t('zg_titel')) + '</h2><p>' + esc(satz) + '</p></div>';
 }
 async function ladeGrund() {
@@ -421,13 +607,15 @@ async function ladeGrund() {
 }
 /* Daten einer Maschine (Stammdaten frisch, Reihenfolge, Angaben). */
 async function ladeMaschinenDaten(mid) {
-  S.maschine = null; S.reihenfolge = null; S.angaben = null; S.geladenFuer = null;
+  S.maschine = null; S.reihenfolge = null; S.angaben = null; S.geladenFuer = null; S.karten = null; S.kartenFehler = null;
   try { S.maschine = await M.ladeMaschine(null, mid); }
   catch (e) { zeigeFehler(t('err_laden', { was: t('w_maschine') }), e); return false; }
   if (!S.maschine) return true;
   const r = await Promise.all([
     M.ladeReihenfolge(null, mid).then(function (d) { S.reihenfolge = d; return true; }, function (e) { zeigeFehler(t('err_laden', { was: t('w_reihenfolge') }), e); return false; }),
-    M.ladeAngaben(null, mid).then(function (d) { S.angaben = d; return true; }, function (e) { zeigeFehler(t('err_laden', { was: t('w_angaben') }), e); return false; })
+    M.ladeAngaben(null, mid).then(function (d) { S.angaben = d; return true; }, function (e) { zeigeFehler(t('err_laden', { was: t('w_angaben') }), e); return false; }),
+    /* Stufe B: Fehler beim Lesen der Karten steht im Kartenbereich, nicht oben (Stufe A geht weiter) */
+    M.ladeKarten(null, mid).then(function (l) { S.karten = l; return true; }, function (e) { S.kartenFehler = e; console.error('[Maschinen] Info-Karten laden:', e); return true; })
   ]);
   S.geladenFuer = mid;
   return r[0] && r[1];
@@ -436,7 +624,9 @@ async function ladeMaschinenDaten(mid) {
 /* ---------- Zeichnen ---------- */
 async function zeige() {
   const main = document.getElementById('main');
-  if (S.ansicht === 'liste') { zeichneListe(); return; }
+  if (!(S.ansicht === 'maschine' && S.live.fuer === S.mid)) stoppeLive();
+  if (S.ansicht !== 'maschine') setzeWerkzeuge(false);
+  if (S.ansicht === 'liste') { setzeLeiste(null); zeichneListe(); return; }
   if (S.ansicht === 'neu') { if (!istAdmin()) { geheZu(null, 'liste'); return; } oeffneVerwalten(true); return; }
   if (S.geladenFuer !== S.mid) {
     main.innerHTML = '<div class="status">' + esc(t('lade')) + '</div>';
@@ -447,6 +637,7 @@ async function zeige() {
   if (S.ansicht === 'programme') zeichneProgramme();
   else if (S.ansicht === 'editor') { if (!istFuehrerHier()) { zeichneMaschine(t('ed_kein_fuehrer')); return; } oeffneEditor(); }
   else if (S.ansicht === 'verwalten') { if (!istAdmin()) { zeichneMaschine(); return; } oeffneVerwalten(false); }
+  else if (S.ansicht === 'karten') { if (!istFuehrerHier()) { zeichneMaschine(t('ik_kein_fuehrer')); return; } oeffneKartenEditor(); }
   else zeichneMaschine();
 }
 function knopf(id, text, klasse, attr) { return '<button type="button" class="bos-btn ' + (klasse || '') + '" id="' + id + '"' + (attr || '') + '>' + esc(text) + '</button>'; }
@@ -471,30 +662,399 @@ function zeichneListe() {
   const nb = document.getElementById('neuBtn'); if (nb) nb.addEventListener('click', function () { geheZu(null, 'neu'); });
 }
 function zeichneUnbekannt() {
-  setzeKopf(t('titel'), t('titel'));
-  document.getElementById('main').innerHTML = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_liste')) + '</button>' +
+  setzeKopf(t('titel'), t('titel')); setzeWerkzeuge(false);
+  setzeLeiste({ zurueck: t('zurueck_liste'), ziel: function () { geheZu(null, 'liste'); } });
+  document.getElementById('main').innerHTML = '' +
     '<div class="kasten rot" id="unbekanntKasten"><p>' + esc(t('m_unbekannt', { id: S.mid })) + '</p>' + (istAdmin() ? '<p class="dim">' + esc(t('m_unbekannt_admin')) + '</p>' : '') + '</div>';
-  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(null, 'liste'); });
 }
 function zeichneMaschine(meldung) {
   const m = S.maschine;
   setzeKopf(t('titel'), m.name || m.id);
-  const ex = M.exemplarSchluessel(m.exemplare).map(function (k) { return '<span class="chip">' + esc(m.exemplare[k]) + '</span>'; }).join('');
-  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_liste')) + '</button>' +
-    (meldung ? '<div class="kasten warn">' + esc(meldung) + '</div>' : '') +
-    '<div class="exemplare">' + ex + '</div>' +
-    '<div class="knopfreihe">' + knopf('programmeBtn', t('k_programme'), 'bos-btn--amber gross') +
-    (istFuehrerHier() ? knopf('editorBtn', t('k_editor'), 'gross') : '') +
-    (istAdmin() ? knopf('verwaltenBtn', t('k_verwalten'), 'gross') : '') + '</div>';
-  if (istAdmin() && !istFuehrerHier()) h += '<p class="klein" id="keinFuehrerHinweis">' + esc(t('nicht_fuehrer_admin')) + '</p>';
-  /* A6: nur Text, ausgegraut, keine Knöpfe */
-  h += '<section class="kasten" style="margin-top:18px" id="geplant"><h3 class="dim">' + esc(t('geplant_titel')) + '</h3><ul class="geplant">' +
-    ['geplant_ofen', 'geplant_reparatur', 'geplant_karten', 'geplant_chat'].map(function (k) { return '<li>' + esc(t(k)) + '</li>'; }).join('') + '</ul></section>';
+  /* D1: keine Wahlseite — ohne ?ofen= die Gesamtübersicht „Alle“. Ein Ofen, den es nicht gibt: „Alle“ mit Hinweis (A5). */
+  let ofen = M.ofenNormal(m, S.ofen || 'alle'), fehlt = null;
+  if (!ofen) { fehlt = S.ofen; ofen = 'alle'; }
+  S.ofenAktiv = ofen;
+  setzeLeiste({ zurueck: t('zurueck_liste'), ziel: function () { geheZu(null, 'liste'); }, filter: !M.einzelOfen(m) });
+  setzeWerkzeuge(true);
+  let h = '<div class="uebersicht">' + (meldung ? '<div class="kasten warn">' + esc(meldung) + '</div>' : '') +
+    (fehlt ? '<div class="kasten warn" id="ofenFehlt">' + esc(t('ofen_gibts_nicht', { nr: fehlt })) + '</div>' : '') +
+    (istAdmin() && !istFuehrerHier() ? '<p class="klein" id="keinFuehrerHinweis">' + esc(t('nicht_fuehrer_admin')) + '</p>' : '') +
+    '<section class="kasten rep-kasten" id="reparaturKasten"><h2>' + esc(t('rep_titel')) + '</h2><div id="reparaturBox"></div><div id="anfragenBox"></div></section>' +
+    '<div class="spalten" id="spalten"><section class="kasten" id="kartenBox"></section><section class="kasten" id="chatBox"></section></div></div>';
   document.getElementById('main').innerHTML = h;
-  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(null, 'liste'); });
-  document.getElementById('programmeBtn').addEventListener('click', function () { geheZu(S.mid, 'programme'); });
-  const eb = document.getElementById('editorBtn'); if (eb) eb.addEventListener('click', function () { geheZu(S.mid, 'editor'); });
-  const vb = document.getElementById('verwaltenBtn'); if (vb) vb.addEventListener('click', function () { geheZu(S.mid, 'verwalten'); });
+  zeichneReparatur(); zeichneAnfragen(); zeichneKarten(); zeichneChat(); starteLive();
+}
+function ich() { return { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung }; }
+function fehlerText(e) { const x = (e && e.meldung) ? e : M.einordnen(e); return x.meldung + (x.original ? ' (' + x.original + ')' : ''); }
+function woText(ofen) { return ofen === 'alle' ? t('chat_gilt_alle') : M.ofenName(S.maschine, ofen); }
+
+/* ---------- Live: Notizen und offene Anfragen (nur auf der Hauptseite mit gewähltem Ofen) ---------- */
+function rechteRep() { return window.BOS_MELDUNGEN ? window.BOS_MELDUNGEN.rechteAus(S.konto, 'hausmeister') : { lesen: false, melden: false, bearbeiten: false }; }
+function stoppeLive() {
+  ['n', 'a'].forEach(function (k) { if (typeof S.live[k] === 'function') { try { S.live[k](); } catch (e) { /* schon weg */ } } });
+  S.live = {};
+}
+function starteLive() {
+  if (S.live.fuer === S.mid) return;
+  stoppeLive();
+  S.live.fuer = S.mid; S.notizen = null; S.notizFehler = null; S.anfragen = null; S.anfragenFehler = null;
+  try {
+    S.live.n = M.notizenLive(null, S.mid, function (l) { S.notizen = l; S.notizFehler = null; zeichneChatListe(); },
+      function (err) { console.error('[Maschinen] Notizen:', err); S.notizFehler = err; zeichneChatListe(); });
+  } catch (e) { S.notizFehler = e; zeichneChatListe(); }
+  if (rechteRep().lesen) {
+    try {
+      S.live.a = window.BOS_MELDUNGEN.offen('hausmeister', function (l) { S.anfragen = l; S.anfragenFehler = null; zeichneAnfragen(); },
+        function (err) { console.error('[Maschinen] offene Anfragen:', err); S.anfragenFehler = err; zeichneAnfragen(); });
+    } catch (e) { S.anfragenFehler = e; zeichneAnfragen(); }
+  }
+}
+/* Die Seite rechnet „noch n Tage“ mit der Uhr des Geräts; einmal je Minute neu zeichnen genügt. */
+setInterval(function () { if (S.ansicht === 'maschine' && S.ofenAktiv && document.getElementById('chatListe') && !document.hidden) zeichneChatListe(); }, 60000);
+
+/* ---------- Reparatur (K8: reparaturanfrage.html bleibt unverändert) ---------- */
+function zeichneReparatur() {
+  const el = document.getElementById('reparaturBox'); if (!el) return;
+  const m = S.maschine, ofen = S.ofenAktiv;
+  el.classList.toggle('offen', !!S.repWahl && ofen === 'alle');
+  if (!rechteRep().melden) { el.innerHTML = '<p class="klein" id="keinMelden">' + esc(t('rep_ohne')) + '</p>'; return; }
+  if (ofen !== 'alle') {
+    el.innerHTML = '<div class="knopfreihe"><a class="bos-btn bos-btn--amber" id="reparaturBtn" href="' + esc(M.reparaturAdresse(M.ofenName(m, ofen))) + '">' + esc(t('rep_melden_ofen', { name: M.ofenName(m, ofen) })) + '</a></div>';
+    return;
+  }
+  /* unter „alle“: erst den konkreten Ofen (ohne „alle“, E1) */
+  el.innerHTML = '<div class="knopfreihe">' + knopf('reparaturBtn', t('rep_melden'), 'bos-btn--amber', S.repWahl ? ' aria-expanded="true"' : ' aria-expanded="false"') + '</div>' +
+    (S.repWahl ? '<div class="kasten" id="repWahl"><b>' + esc(t('rep_welcher')) + '</b><div class="ofen-wahl">' +
+      M.exemplarSchluessel(m.exemplare).map(function (k) { return '<a class="bos-btn ofen-btn" data-repofen="' + esc(k) + '" href="' + esc(M.reparaturAdresse(m.exemplare[k])) + '">' + esc(m.exemplare[k]) + '</a>'; }).join('') +
+      '</div></div>' : '');
+  document.getElementById('reparaturBtn').addEventListener('click', function () { S.repWahl = !S.repWahl; zeichneReparatur(); });
+}
+function zeichneAnfragen() {
+  const el = document.getElementById('anfragenBox'); if (!el) return;
+  if (!rechteRep().lesen) { el.innerHTML = ''; return; }   /* ohne Mitlesen: nichts, auch kein Hinweis (E6) */
+  if (S.anfragenFehler) { el.innerHTML = '<div class="ed-meldung" id="anfragenFehler"><b>' + esc(t('rep_fehler')) + ':</b> ' + esc(fehlerText(S.anfragenFehler)) + '</div>'; return; }
+  if (S.anfragen === null) { el.innerHTML = '<p class="klein">' + esc(t('rep_lade')) + '</p>'; return; }
+  const l = M.offeneFuer(S.anfragen, S.maschine, S.ofenAktiv);
+  if (!l.length) { el.innerHTML = '<p class="klein" id="anfragenLeer">' + esc(t('rep_keine', { wo: S.ofenAktiv === 'alle' ? (S.maschine.name || S.maschine.id) : M.ofenName(S.maschine, S.ofenAktiv) })) + '</p>'; return; }
+  let wb = {}; try { wb = window.BOS_MELDUNGEN.woerterbuch('hausmeister'); } catch (e) { wb = {}; }
+  el.innerHTML = '<div id="anfragenListe"><div class="klein" style="margin-bottom:4px">' + esc(t('rep_offen')) + '</div>' + l.map(function (x) {
+    const kurz = String(x.m.text || ''); 
+    return '<a class="anfrage ' + esc(x.m.status) + '" href="../reparaturanfrage/reparaturanfrage.html"><b>' + esc(t('rep_zeile', { name: x.name, zeit: M.zeitText(x.m.erstellt), status: wb[x.m.status] || x.m.status })) + '</b>' +
+      (kurz ? '<br><span class="dim">' + esc(kurz.length > 90 ? kurz.slice(0, 88) + ' …' : kurz) + '</span>' : '') + '</a>';
+  }).join('') + '</div>';
+}
+
+/* ---------- Info-Karten (lesen) ---------- */
+function zeichneKarten() {
+  const el = document.getElementById('kartenBox'); if (!el) return;
+  const fuehrer = istFuehrerHier();
+  const kopf = '<h2>' + esc(t('ik_titel')) + '</h2><p class="satz" id="kartenSatz">' + esc(fuehrer ? t('ik_satz_fuehrer') : t('ik_satz')) + '</p>';
+  if (S.kartenFehler) { el.innerHTML = kopf + '<div class="ed-meldung" id="kartenFehler"><b>' + esc(t('err_laden', { was: t('w_karten') })) + ':</b> ' + esc(fehlerText(S.kartenFehler)) + '</div>'; return; }
+  if (S.karten === null) { el.innerHTML = kopf; return; }
+  const sicht = M.kartenFuer(S.karten, S.ofenAktiv);
+  let h = kopf;
+  if (!sicht.length) h += '<p class="klein" id="kartenLeer">' + esc(t('ik_leer')) + '</p>';
+  h += sicht.map(function (k) {
+    return '<article class="ik" data-ik="' + esc(k.id) + '"><h3>' + esc(k.titel) + '<span class="etikett">' + esc(k.exemplar !== 'alle' ? t('ik_nur', { name: M.ofenName(S.maschine, k.exemplar) }) : t('ik_alle')) + '</span>' + '</h3>' +
+      (k.text ? '<div class="ik-text">' + esc(k.text) + '</div>' : '') +
+      '<div class="klein" style="margin-top:6px">' + esc(t('ik_zuletzt', { name: k.geaendertVonName || k.geaendertVon, zeit: M.zeitText(k.geaendertAm) })) + '</div></article>';
+  }).join('');
+  if (fuehrer) h += '<div class="knopfreihe">' + knopf('kartenBearbeitenBtn', S.karten.length ? t('ik_bearbeiten') : t('ik_anlegen')) + '</div>';
+  el.innerHTML = h;
+  const kb = document.getElementById('kartenBearbeitenBtn'); if (kb) kb.addEventListener('click', function () { geheZu(S.mid, 'karten'); });
+}
+
+/* ---------- Chatfenster ---------- */
+function zeichneChat() {
+  const el = document.getElementById('chatBox'); if (!el) return;
+  const c = S.chat, max = M.GRENZEN_B.NOTIZ;
+  const pflicht = S.ofenAktiv === 'alle';   /* unter „Alle“: Pflichtwahl ohne Vorauswahl (D5) */
+  let h = '<h2>' + esc(t('chat_titel')) + '</h2><p class="satz" id="chatSatz">' + esc(t('chat_satz')) + '</p>';
+  if (S.zugang.person) {
+    h += '<div class="chat-eingabe" id="chatEingabe">' + (pflicht ? giltWahlHTML() : '<label class="klein" for="chatText">' + esc(t('chat_gilt', { wo: woText(S.ofenAktiv) })) + '</label>') +
+      '<textarea class="bos-input" id="chatText" maxlength="' + max + '" placeholder="' + esc(t('chat_platzhalter')) + '">' + esc(c.entwurf) + '</textarea>' +
+      '<div class="knopfreihe"><label class="pin-wahl"><input type="checkbox" id="chatPin"' + (c.pin ? ' checked' : '') + '> ' + esc(t('chat_pin')) + '</label>' +
+      '<span class="klein" id="chatZaehler">' + esc(t('chat_zaehler', { n: c.entwurf.length, max: max })) + '</span>' +
+      knopf('chatSenden', c.laeuft ? t('chat_sendet') : t('chat_senden'), 'bos-btn--amber', sendenGesperrt(c.entwurf) ? ' disabled' : '') + '</div>' +
+      (pflicht && !c.gilt ? '<div class="gilt-hinweis" id="giltHinweis">' + esc(t('chat_gilt_fehlt')) + '</div>' : '') +
+      (c.meldung ? '<div class="ed-meldung' + (c.meldung.ok ? ' ok' : '') + '" id="chatMeldung">' + esc(c.meldung.text) + (c.meldung.original ? ' <span class="klein">(' + esc(c.meldung.original) + ')</span>' : '') + '</div>' : '') + '</div>';
+  } else h += '<p class="klein" id="chatNurLesen">' + esc(t('chat_nur_lesen')) + '</p>';
+  h += '<div id="chatListe"></div>';
+  el.innerHTML = h;
+  const ta = document.getElementById('chatText');
+  if (ta) {
+    ta.addEventListener('input', function () {
+      c.entwurf = ta.value; if (c.meldung && c.meldung.ok) c.meldung = null;
+      document.getElementById('chatZaehler').textContent = t('chat_zaehler', { n: ta.value.length, max: max });
+      document.getElementById('chatSenden').disabled = sendenGesperrt(ta.value);
+    });
+    document.getElementById('chatPin').addEventListener('change', function () { c.pin = this.checked; });
+    el.querySelectorAll('[data-gilt]').forEach(function (b) { b.addEventListener('click', function () { c.gilt = b.getAttribute('data-gilt'); zeichneChat(); }); });
+    document.getElementById('chatSenden').addEventListener('click', sendeNotiz);
+  }
+  zeichneChatListe();
+}
+function giltWahlHTML() {
+  const m = S.maschine, g = S.chat.gilt;
+  return '<div class="gilt-wahl" id="giltWahl" role="group" aria-label="' + esc(t('chat_gilt_wahl')) + '"><b>' + esc(t('chat_gilt_wahl')) + '</b>' +
+    ['alle'].concat(M.exemplarSchluessel(m.exemplare)).map(function (k) {
+      return '<button type="button" class="of" data-gilt="' + esc(k) + '" aria-pressed="' + (g === k ? 'true' : 'false') + '" title="' + esc(k === 'alle' ? t('ik_alle') : M.ofenName(m, k)) + '">' +
+        esc(k === 'alle' ? t('ik_alle') : M.ofenKurz(m, k)) + '</button>';
+    }).join('') + '</div>';
+}
+function sendenGesperrt(text) { return S.chat.laeuft || !String(text || '').trim() || (S.ofenAktiv === 'alle' && !S.chat.gilt); }
+function notizHTML(n, jetzt) {
+  const pin = M.istAngepinnt(n), id = n.id, mel = S.chat.notizMeldung[id], laeuft = !!S.chat.laeuftNotiz[id];
+  const eigen = n.von === S.kennung;
+  let h = '<div class="notiz' + (pin ? ' pin' : '') + '" data-notiz="' + esc(id) + '"><div class="notiz-kopf"><b>' + esc(n.vonName || n.von) + '</b>' +
+    '<span class="klein">' + esc(M.zeitText(n.erstellt)) + '</span>' +
+    '<span class="etikett">' + esc(t('chat_gilt', { wo: woText(n.exemplar) })) + '</span>' +
+    (pin ? '<span class="klein">' + esc(t('chat_angepinnt', { name: n.angepinntVonName || n.angepinntVon || '' })) + '</span>'
+      : '<span class="rest' + (M.restDeutlich(n, jetzt) ? ' bald' : '') + '">' + esc(M.restText(n, jetzt)) + '</span>') +
+    (n._ausstehend ? '<span class="klein">' + esc(t('chat_unterwegs')) + '</span>' : '') + '</div>' +
+    '<div class="notiz-text">' + esc(n.text) + '</div>';
+  const knoepfe = [];
+  if (S.zugang.person && !n._ausstehend) knoepfe.push('<button type="button" class="bos-btn" data-pin="' + esc(id) + '" data-an="' + (pin ? '0' : '1') + '"' + (laeuft ? ' disabled' : '') + '>' + esc(pin ? t('chat_loesen') : t('chat_anpinnen')) + '</button>');
+  if (M.darfNotizLoeschen(n, S.kennung, S.zugang) && !n._ausstehend) knoepfe.push('<button type="button" class="bos-btn" data-weg="' + esc(id) + '"' + (laeuft ? ' disabled' : '') + '>' + esc(eigen && S.zugang.person ? t('chat_loeschen') : t('chat_loeschen_admin')) + '</button>');
+  if (knoepfe.length) h += '<div class="notiz-knoepfe">' + knoepfe.join('') + '</div>';
+  if (mel) h += '<div class="ed-meldung' + (mel.ok ? ' ok' : '') + '">' + esc(mel.text) + (mel.original ? ' <span class="klein">(' + esc(mel.original) + ')</span>' : '') + '</div>';
+  return h + '</div>';
+}
+function zeichneChatListe() {
+  const el = document.getElementById('chatListe'); if (!el) return;
+  if (S.notizFehler) { el.innerHTML = '<div class="ed-meldung" id="chatFehler"><b>' + esc(t('chat_fehler')) + ':</b> ' + esc(fehlerText(S.notizFehler)) + '</div>'; return; }
+  if (S.notizen === null) { el.innerHTML = '<p class="klein">' + esc(t('chat_lade')) + '</p>'; return; }
+  const jetzt = Date.now(), l = M.notizenFuer(S.notizen, S.ofenAktiv, jetzt);
+  if (!l.length) { el.innerHTML = '<p class="klein" id="chatLeer">' + esc(t('chat_leer')) + '</p>'; return; }
+  el.innerHTML = l.map(function (n) { return notizHTML(n, jetzt); }).join('');
+  el.querySelectorAll('[data-pin]').forEach(function (b) { b.addEventListener('click', function () { pinneNotiz(b.getAttribute('data-pin'), b.getAttribute('data-an') === '1'); }); });
+  el.querySelectorAll('[data-weg]').forEach(function (b) { b.addEventListener('click', function () { loescheNotiz(b.getAttribute('data-weg')); }); });
+}
+function notizNach(id) { return (S.notizen || []).filter(function (n) { return n.id === id; })[0] || null; }
+async function sendeNotiz() {
+  const c = S.chat;
+  if (c.laeuft) return;
+  const geprueft = M.pruefeNotizText(c.entwurf);
+  if (geprueft.fehler) { c.meldung = { text: geprueft.fehler }; zeichneChat(); return; }
+  const ofen = S.ofenAktiv === 'alle' ? c.gilt : S.ofenAktiv;   /* unter „Alle“: die Pflichtwahl (D5) */
+  if (!ofen) { c.meldung = { text: t('chat_gilt_fehlt') }; zeichneChat(); return; }
+  c.laeuft = true; c.meldung = null; zeichneChat();
+  try {
+    await M.notizAnlegen(null, { maschine: S.mid, exemplar: ofen, text: c.entwurf }, ich(), c.pin);
+    c.entwurf = ''; c.pin = false; c.gilt = null; c.meldung = { text: t('chat_ok'), ok: true };
+  } catch (err) {
+    console.error('[Maschinen] Notiz speichern:', err);
+    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'notiz', kennung: S.kennung, maschineId: S.mid, exemplar: ofen });
+    c.meldung = { text: e.meldung, original: e.original };
+  } finally { c.laeuft = false; }
+  zeichneChat();
+}
+async function pinneNotiz(id, anpinnen) {
+  const n = notizNach(id); if (!n || S.chat.laeuftNotiz[id]) return;
+  if (!anpinnen && M.loesenLoescht(n, Date.now()) && !window.confirm(t('chat_loesen_alt', { tage: M.alterTage(n, Date.now()) }))) return;
+  S.chat.laeuftNotiz[id] = true; delete S.chat.notizMeldung[id]; zeichneChatListe();
+  try { await M.notizPinnen(null, id, anpinnen, ich()); }
+  catch (err) {
+    console.error('[Maschinen] anpinnen/lösen:', err);
+    const e = err && err.code === 'weg' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'pinnen', kennung: S.kennung, maschineId: S.mid, exemplar: n.exemplar });
+    S.chat.notizMeldung[id] = { text: e.meldung, original: e.original };
+  } finally { delete S.chat.laeuftNotiz[id]; }
+  zeichneChatListe();
+}
+async function loescheNotiz(id) {
+  const n = notizNach(id); if (!n || S.chat.laeuftNotiz[id]) return;
+  const eigen = n.von === S.kennung && S.zugang.person;
+  if (!window.confirm(eigen ? t('chat_loeschen_frage') : t('chat_loeschen_admin_frage', { name: n.vonName || n.von }))) return;
+  S.chat.laeuftNotiz[id] = true; delete S.chat.notizMeldung[id]; zeichneChatListe();
+  try { await M.notizLoeschen(null, id); }
+  catch (err) {
+    console.error('[Maschinen] Notiz löschen:', err);
+    const e = await M.erklaere(null, err, { art: 'notiz_loeschen', kennung: S.kennung, maschineId: S.mid, notiz: n });
+    S.chat.notizMeldung[id] = { text: e.meldung, original: e.original };
+  } finally { delete S.chat.laeuftNotiz[id]; }
+  zeichneChatListe();
+}
+
+/* ---------- Info-Karten bearbeiten (nur Maschinenführer, ?ansicht=karten) ---------- */
+function oeffneKartenEditor() {
+  if (!S.ik) S.ik = { eingabe: {}, geaendert: {}, laeuft: {}, meldung: {}, konflikt: {}, neu: [] };
+  zeichneKartenEditor();
+}
+let ikZaehler = 0;
+function ikWert(k, feld) { const e = S.ik.eingabe[k.id]; return e && Object.prototype.hasOwnProperty.call(e, feld) ? e[feld] : k[feld]; }
+function ikMarkiere(k) {
+  const e = S.ik.eingabe[k.id] || {};
+  const anders = ['titel', 'text', 'exemplar'].some(function (f) { return Object.prototype.hasOwnProperty.call(e, f) && String(e[f]) !== String(k[f]); });
+  if (anders) S.ik.geaendert[k.id] = true; else delete S.ik.geaendert[k.id];
+}
+function giltSelect(attr, wert) {
+  const m = S.maschine;
+  return '<select class="bos-input" ' + attr + '><option value="alle"' + (wert === 'alle' ? ' selected' : '') + '>' + esc(t('ik_gilt_alle')) + '</option>' +
+    M.exemplarSchluessel(m.exemplare).map(function (x) { return '<option value="' + esc(x) + '"' + (String(wert) === x ? ' selected' : '') + '>' + esc(m.exemplare[x]) + '</option>'; }).join('') + '</select>';
+}
+function zeichneKartenEditor() {
+  const m = S.maschine, ik = S.ik, max = M.GRENZEN_B.KARTEN_MAX;
+  setzeKopf(m.name || m.id, t('ik_ed_titel'));
+  setzeLeiste({ zurueck: t('zurueck_maschine', { name: m.name || m.id }), ziel: function () { geheZu(S.mid, 'maschine'); } });
+  let h = '';
+  if (S.kartenFehler) { h += '<div class="ed-meldung" id="kartenFehler"><b>' + esc(t('err_laden', { was: t('w_karten') })) + ':</b> ' + esc(fehlerText(S.kartenFehler)) + '</div>'; document.getElementById('main').innerHTML = h; bindeZurueck(); return; }
+  const karten = M.kartenSortiert(S.karten || []), anzahl = karten.length + ik.neu.length, voll = anzahl >= max;
+  const vergeben = {}; karten.concat(ik.neu).forEach(function (k) { vergeben[String(k.titel || '').trim().toLowerCase()] = true; });
+  h += '<p class="klein">' + esc(t('ik_ed_hinweis', { max: max })) + '</p><div class="knopfreihe" id="ikVorschlaege">' +
+    M.KARTEN_VORSCHLAEGE.filter(function (v) { return !vergeben[v.toLowerCase()]; }).map(function (v) { return '<button type="button" class="bos-btn" data-vorschlag="' + esc(v) + '"' + (voll ? ' disabled' : '') + '>' + esc(t('ik_vorschlag', { titel: v })) + '</button>'; }).join('') +
+    '<button type="button" class="bos-btn" data-vorschlag=""' + (voll ? ' disabled' : '') + '>' + esc(t('ik_eigene')) + '</button></div>' +
+    (voll ? '<p class="klein">' + esc(t('ik_voll', { max: max })) + '</p>' : '');
+  h += ik.neu.map(function (n) { return ikFormHTML(n, true, -1, 0); }).join('');
+  h += karten.map(function (k, i) { return ikFormHTML(k, false, i, karten.length); }).join('');
+  if (!anzahl) h += '<div class="kasten" id="kartenLeer">' + esc(t('ik_leer')) + '</div>';
+  document.getElementById('main').innerHTML = h;
+  bindeZurueck();
+  bindeKartenEditor(karten);
+}
+function ikFormHTML(k, neu, i, anzahl) {
+  const id = neu ? k.tmp : k.id, ik = S.ik;
+  const titel = neu ? k.titel : ikWert(k, 'titel'), text = neu ? k.text : ikWert(k, 'text'), ex = neu ? k.exemplar : ikWert(k, 'exemplar');
+  const geaendert = neu || !!ik.geaendert[id], laeuft = !!ik.laeuft[id], mel = ik.meldung[id];
+  let h = '<div class="ik ik-form' + (geaendert ? ' geaendert' : '') + '" data-ikform="' + esc(id) + '">' +
+    '<div class="v-zeile">' + (neu ? '<span class="etikett neu">' + esc(t('ik_neu')) + '</span>' :
+      '<button type="button" class="bos-btn pfeil" data-ikhoch="' + i + '"' + (i === 0 || laeuft ? ' disabled' : '') + ' aria-label="nach oben">▲</button>' +
+      '<button type="button" class="bos-btn pfeil" data-ikrunter="' + i + '"' + (i === anzahl - 1 || laeuft ? ' disabled' : '') + ' aria-label="nach unten">▼</button>') +
+    (geaendert && !neu ? '<span class="etikett warn">' + esc(t('ed_geaendert')) + '</span>' : '') + '</div>' +
+    '<div class="v-feld"><label for="ikT_' + esc(id) + '">' + esc(t('ik_titel_feld')) + '</label><input class="bos-input" id="ikT_' + esc(id) + '" data-iktitel="' + esc(id) + '" maxlength="' + M.GRENZEN_B.TITEL + '" value="' + esc(titel) + '"></div>' +
+    '<div class="v-feld"><label>' + esc(t('ik_gilt')) + '</label><div class="v-zeile">' + giltSelect('data-ikgilt="' + esc(id) + '"', ex) + '</div></div>' +
+    '<div class="v-feld"><label for="ikX_' + esc(id) + '">' + esc(t('ik_text_feld')) + ' <span class="klein" data-ikzaehler="' + esc(id) + '">' + esc(t('chat_zaehler', { n: String(text || '').length, max: M.GRENZEN_B.KARTE })) + '</span></label>' +
+    '<textarea class="bos-input" id="ikX_' + esc(id) + '" data-iktext="' + esc(id) + '" maxlength="' + M.GRENZEN_B.KARTE + '">' + esc(text) + '</textarea></div>' +
+    '<div class="ed-unter"><span class="klein">' + (neu ? '' : esc(t('ik_zuletzt', { name: k.geaendertVonName || k.geaendertVon, zeit: M.zeitText(k.geaendertAm) }))) + '</span><span class="knopfreihe" style="margin:0">' +
+    (geaendert ? '<button type="button" class="bos-btn bos-btn--amber" data-iksave="' + esc(id) + '"' + (laeuft ? ' disabled' : '') + '>' + esc(laeuft ? t('ed_speichert') : t('ik_speichern')) + '</button>' : '') +
+    (neu ? '<button type="button" class="bos-btn" data-ikverwerfen="' + esc(id) + '">' + esc(t('ik_verwerfen')) + '</button>' : '<button type="button" class="bos-btn" data-ikweg="' + esc(id) + '"' + (laeuft ? ' disabled' : '') + '>' + esc(t('ik_loeschen')) + '</button>') +
+    '</span></div>';
+  if (mel) h += '<div class="ed-meldung' + (mel.ok ? ' ok' : '') + '">' + esc(mel.text) + (mel.original ? ' <span class="klein">(' + esc(mel.original) + ')</span>' : '') +
+    (ik.konflikt[id] ? '<div class="knopfreihe"><button type="button" class="bos-btn" data-ikneuladen="' + esc(id) + '">' + esc(t('ed_neu_laden')) + '</button></div>' : '') + '</div>';
+  return h + '</div>';
+}
+function ikFinde(id) {
+  const neu = S.ik.neu.filter(function (n) { return n.tmp === id; })[0];
+  if (neu) return { neu: true, k: neu };
+  const k = (S.karten || []).filter(function (x) { return x.id === id; })[0];
+  return k ? { neu: false, k: k } : null;
+}
+function ikSetze(id, feld, wert) {
+  const f = ikFinde(id); if (!f) return;
+  if (f.neu) f.k[feld] = wert;
+  else { S.ik.eingabe[id] = S.ik.eingabe[id] || {}; S.ik.eingabe[id][feld] = wert; ikMarkiere(f.k); }
+  if (S.ik.meldung[id] && S.ik.meldung[id].ok) delete S.ik.meldung[id];
+}
+function bindeKartenEditor(karten) {
+  const main = document.getElementById('main');
+  main.querySelectorAll('[data-vorschlag]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      ikZaehler++;
+      S.ik.neu.unshift({ tmp: 'neu' + ikZaehler, maschine: S.mid, titel: b.getAttribute('data-vorschlag'), text: '', exemplar: 'alle' });   /* K16: neue Karte immer „alle Öfen“, auch unter einem Filter */
+      zeichneKartenEditor();
+      const el = document.getElementById(b.getAttribute('data-vorschlag') ? 'ikX_neu' + ikZaehler : 'ikT_neu' + ikZaehler); if (el) el.focus();
+    });
+  });
+  main.querySelectorAll('[data-iktitel],[data-iktext]').forEach(function (el) {
+    el.addEventListener('input', function () {
+      const id = el.getAttribute('data-iktitel') || el.getAttribute('data-iktext'), feld = el.hasAttribute('data-iktitel') ? 'titel' : 'text';
+      const vorher = !!S.ik.geaendert[id];
+      ikSetze(id, feld, el.value);
+      if (feld === 'text') { const z = main.querySelector('[data-ikzaehler="' + id + '"]'); if (z) z.textContent = t('chat_zaehler', { n: el.value.length, max: M.GRENZEN_B.KARTE }); }
+      if (vorher !== !!S.ik.geaendert[id]) zeichneEditorFokus(el.id, zeichneKartenEditor);
+    });
+  });
+  main.querySelectorAll('[data-ikgilt]').forEach(function (el) { el.addEventListener('change', function () { ikSetze(el.getAttribute('data-ikgilt'), 'exemplar', el.value); zeichneKartenEditor(); }); });
+  main.querySelectorAll('[data-iksave]').forEach(function (b) { b.addEventListener('click', function () { speichereIk(b.getAttribute('data-iksave')); }); });
+  main.querySelectorAll('[data-ikverwerfen]').forEach(function (b) { b.addEventListener('click', function () { S.ik.neu = S.ik.neu.filter(function (n) { return n.tmp !== b.getAttribute('data-ikverwerfen'); }); zeichneKartenEditor(); }); });
+  main.querySelectorAll('[data-ikweg]').forEach(function (b) { b.addEventListener('click', function () { loescheIk(b.getAttribute('data-ikweg')); }); });
+  main.querySelectorAll('[data-ikneuladen]').forEach(function (b) { b.addEventListener('click', function () { neuLadenIk(b.getAttribute('data-ikneuladen')); }); });
+  main.querySelectorAll('[data-ikhoch],[data-ikrunter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const i = Number(b.getAttribute(b.hasAttribute('data-ikhoch') ? 'data-ikhoch' : 'data-ikrunter')), j = i + (b.hasAttribute('data-ikhoch') ? -1 : 1);
+      if (karten[i] && karten[j]) tauscheIk(karten[i], karten[j]);
+    });
+  });
+}
+function zeichneEditorFokus(id, zeichne) {
+  const el = document.getElementById(id), pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : null;
+  zeichne();
+  const neu = document.getElementById(id);
+  if (neu) { neu.focus(); if (pos !== null) try { neu.setSelectionRange(pos, pos); } catch (e) { /* kein Textfeld */ } }
+}
+async function ladeKartenNeu() {
+  try { S.karten = await M.ladeKarten(null, S.mid); S.kartenFehler = null; }
+  catch (e) { S.kartenFehler = e; }
+}
+async function speichereIk(id) {
+  const f = ikFinde(id); if (!f || S.ik.laeuft[id]) return;
+  const k = f.k, eingabe = f.neu
+    ? { maschine: S.mid, titel: k.titel, text: k.text, exemplar: k.exemplar, rang: M.naechsterRang(S.karten) }
+    : { maschine: S.mid, titel: ikWert(k, 'titel'), text: ikWert(k, 'text'), exemplar: ikWert(k, 'exemplar'), rang: k.rang };
+  const falsch = M.pruefeKarte(eingabe, S.maschine);
+  if (falsch.length) { S.ik.meldung[id] = { text: falsch.join(' ') }; zeichneKartenEditor(); return; }
+  S.ik.laeuft[id] = true; delete S.ik.konflikt[id]; delete S.ik.meldung[id]; zeichneKartenEditor();
+  let neueId = null;
+  try {
+    neueId = await M.speichereKarte(null, eingabe, f.neu ? null : k, ich(), S.maschine);
+    if (f.neu) S.ik.neu = S.ik.neu.filter(function (n) { return n.tmp !== id; });
+    else { delete S.ik.eingabe[id]; delete S.ik.geaendert[id]; }
+    await ladeKartenNeu();
+    S.ik.meldung[neueId] = { text: t('ik_gespeichert'), ok: true };
+  } catch (err) {
+    console.error('[Maschinen] Karte speichern:', err);
+    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'karte', kennung: S.kennung, maschineId: S.mid, karteId: f.neu ? null : k.id, altStand: f.neu ? null : k.stand });
+    S.ik.meldung[id] = { text: e.meldung, original: e.original };
+    if (e.art === 'konflikt' || e.art === 'karte_weg') S.ik.konflikt[id] = true;
+  } finally { delete S.ik.laeuft[id]; }
+  zeichneKartenEditor();
+}
+async function neuLadenIk(id) {
+  try {
+    const frisch = await M.ladeKarte(null, id);
+    const vorher = (S.karten || []).filter(function (x) { return x.id === id; })[0] || {};
+    S.karten = (S.karten || []).filter(function (x) { return x.id !== id; });
+    delete S.ik.konflikt[id];
+    if (frisch) {
+      S.karten.push(frisch); S.karten = M.kartenSortiert(S.karten); ikMarkiere(frisch);
+      S.ik.meldung[id] = { text: t('ed_neu_geladen'), ok: true };
+    } else {
+      /* inzwischen gelöscht: die Eingaben bleiben als neue Karte stehen */
+      const e = S.ik.eingabe[id] || {}; ikZaehler++;
+      const tmp = 'neu' + ikZaehler, w = function (f, std) { return e[f] !== undefined ? e[f] : (vorher[f] !== undefined ? vorher[f] : std); };
+      S.ik.neu.unshift({ tmp: tmp, maschine: S.mid, titel: w('titel', ''), text: w('text', ''), exemplar: w('exemplar', 'alle') });
+      delete S.ik.eingabe[id]; delete S.ik.geaendert[id]; delete S.ik.meldung[id];
+      S.ik.meldung[tmp] = { text: t('ed_neu_geladen'), ok: true };
+    }
+  } catch (err) { S.ik.meldung[id] = { text: M.einordnen(err).meldung, original: M.fehlerOriginal(err) }; }
+  zeichneKartenEditor();
+}
+async function loescheIk(id) {
+  const f = ikFinde(id); if (!f || f.neu || S.ik.laeuft[id]) return;
+  if (!window.confirm(t('ik_loeschen_frage', { titel: f.k.titel }))) return;
+  S.ik.laeuft[id] = true; zeichneKartenEditor();
+  try {
+    await M.loescheKarte(null, id);
+    delete S.ik.eingabe[id]; delete S.ik.geaendert[id]; delete S.ik.meldung[id];
+    await ladeKartenNeu();
+    toast(t('ik_geloescht'));
+  } catch (err) {
+    console.error('[Maschinen] Karte löschen:', err);
+    const e = await M.erklaere(null, err, { art: 'karte_loeschen', kennung: S.kennung, maschineId: S.mid, karteId: id, altStand: f.k.stand });
+    S.ik.meldung[id] = { text: e.meldung, original: e.original };
+  } finally { delete S.ik.laeuft[id]; }
+  zeichneKartenEditor();
+}
+async function tauscheIk(a, b) {
+  if (S.ik.laeuft[a.id] || S.ik.laeuft[b.id]) return;
+  S.ik.laeuft[a.id] = true; S.ik.laeuft[b.id] = true; zeichneKartenEditor();
+  try { await M.tauscheKarten(null, a, b, ich()); await ladeKartenNeu(); (S.karten || []).forEach(function (k) { if (S.ik.eingabe[k.id]) ikMarkiere(k); }); }
+  catch (err) {
+    console.error('[Maschinen] Karten tauschen:', err);
+    const e = await M.erklaere(null, err, { art: 'karte', kennung: S.kennung, maschineId: S.mid, karteId: a.id, altStand: a.stand });
+    S.ik.meldung[a.id] = { text: e.meldung, original: e.original };
+    if (e.art === 'konflikt' || e.art === 'karte_weg') S.ik.konflikt[a.id] = true;
+  } finally { delete S.ik.laeuft[a.id]; delete S.ik.laeuft[b.id]; }
+  zeichneKartenEditor();
 }
 
 /* ---------- Backprogramme ---------- */
@@ -509,6 +1069,7 @@ function ansichtDaten(wahl) {
 function zeichneProgramme() {
   const m = S.maschine;
   setzeKopf(m.name || m.id, t('pr_titel'));
+  setzeLeiste({ zurueck: t('zurueck_maschine', { name: m.name || m.id }), ziel: function () { geheZu(S.mid, 'maschine'); } });
   /* Wahl im Speicher der Seite; der Gerätespeicher ist nur Komfort (fehlt er, gilt die Wahl bis zum Neuladen) */
   if (!S.wahl[m.id]) S.wahl[m.id] = A.ansichtLaden(m.id);
   const wahl = S.wahl[m.id];
@@ -519,7 +1080,7 @@ function zeichneProgramme() {
       return '<button type="button" data-' + gruppe + '="' + w[0] + '" aria-pressed="' + (wahl[gruppe] === w[0]) + '">' + esc(w[1]) + '</button>';
     }).join('') + '</div>';
   };
-  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_maschine', { name: m.name || m.id })) + '</button>' +
+  let h = '' +
     '<div class="knopfreihe">' + schalter('sortierung', [['reihenfolge', t('s_reihenfolge')], ['warenart', t('s_warenart')]]) +
     schalter('filter', [['alle', t('f_alle')], ['heute', t('f_heute')]]) + knopf('druckBtn', t('pr_drucken'), '', e.anzahl ? '' : ' disabled') + '</div>';
   if (e.filter === 'heute') h += '<div class="heute-satz" id="heuteSatz">' + esc(e.heuteSatz) + '</div>';
@@ -530,7 +1091,6 @@ function zeichneProgramme() {
   if (e.filter === 'heute' && e.nichtHeute) h += '<p class="klein">' + esc(t('pr_nicht_heute', { n: e.nichtHeute })) + '</p>';
   h += '<p class="klein" id="standZeile">' + esc(letzterStand()) + '</p>';
   document.getElementById('main').innerHTML = h;
-  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(S.mid, 'maschine'); });
   document.querySelectorAll('[data-sortierung],[data-filter]').forEach(function (b) {
     b.addEventListener('click', function () {
       if (b.hasAttribute('data-sortierung')) wahl.sortierung = b.getAttribute('data-sortierung');
@@ -569,20 +1129,25 @@ function wertInEingabe(key, feldId) {
 function zeichneEditor() {
   const m = S.maschine;
   setzeKopf(m.name || m.id, t('ed_titel'));
+  setzeLeiste({ zurueck: t('zurueck_maschine', { name: m.name || m.id }), ziel: function () { geheZu(S.mid, 'maschine'); } });
   const pmap = {}; (S.produkte || []).forEach(function (p) { pmap[p.legacyKey] = p; });
   const folge = S.ed.folge.filter(function (k) { return pmap[k]; });
   const n = Object.keys(S.ed.geaendert).length;
-  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(t('zurueck_maschine', { name: m.name || m.id })) + '</button>';
+  let h = '';
   if (!folge.length) { h += '<div class="kasten" id="editorLeer">' + esc(t('ed_leer')) + '</div>'; document.getElementById('main').innerHTML = h; bindeZurueck(); return; }
-  h += '<div class="ed-leiste knopfreihe">' + knopf('alleBtn', t('ed_alle', { n: n }), 'bos-btn--amber', n && !S.speichertAlle ? '' : ' disabled') +
-    knopf('folgeBtn', t('ed_reihenfolge'), '', S.ed.folgeGeaendert && !S.ed.laeuft.__folge ? '' : ' disabled') + '<span class="klein" id="folgeMeldung"></span></div>' +
+  /* N1: Reihenfolge speichern geht auch, solange es „noch nicht einsortiert“ gibt (sonst bliebe die Marke bei einem einzigen Produkt für immer stehen) */
+  const folgeAktiv = (S.ed.folgeGeaendert || folge.some(function (k) { return S.ed.neu[k]; })) && !S.ed.laeuft.__folge;
+  /* N2: auf dem Handy klebt die Leiste unten und ist leer unsichtbar (Klasse leer) */
+  h += '<div class="ed-leiste knopfreihe' + (n || folgeAktiv ? '' : ' leer') + '" id="edLeiste"><button type="button" class="bos-btn bos-btn--amber" id="alleBtn"' + (n && !S.speichertAlle ? '' : ' disabled') + '>' + alleText(n) + '</button>' +
+    '<button type="button" class="bos-btn" id="folgeBtn"' + (folgeAktiv ? '' : ' disabled') + '><span class="lang">' + esc(t('ed_reihenfolge')) + '</span><span class="kurz">' + esc(t('ed_reihenfolge_kurz')) + '</span></button><span class="klein" id="folgeMeldung"></span></div>' +
     '<p class="klein">' + esc(t('ed_reihenfolge_hinweis')) + '</p>';
   h += folge.map(function (k, i) { return karteHTML(pmap[k], i, folge.length); }).join('');
   document.getElementById('main').innerHTML = h;
   bindeZurueck();
   bindeEditor();
 }
-function bindeZurueck() { document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(S.mid, 'maschine'); }); }
+function alleText(n) { return '<span class="lang">' + esc(t('ed_alle', { n: n })) + '</span><span class="kurz">' + esc(t('ed_alle_kurz', { n: n })) + '</span>'; }
+function bindeZurueck() { /* Zurück steht seit dem Nachtrag in der Kopfleiste (setzeLeiste) */ }
 function karteHTML(p, i, anzahl) {
   const k = p.legacyKey, a = (S.angaben || {})[k], geaendert = !!S.ed.geaendert[k];
   const kl = 'ed-karte' + (geaendert ? ' geaendert' : '') + (p.pausiert === true ? ' pausiert' : '');
@@ -630,7 +1195,7 @@ function bindeEditor() {
       markiere(k);
       delete S.ed.meldung[k];
       if (vorher !== !!S.ed.geaendert[k]) zeichneEditorBehalteFokus(el.id);
-      else { const ab = document.getElementById('alleBtn'); if (ab) { const n = Object.keys(S.ed.geaendert).length; ab.textContent = t('ed_alle', { n: n }); ab.disabled = !n || S.speichertAlle; } }
+      else { const ab = document.getElementById('alleBtn'); if (ab) { const n = Object.keys(S.ed.geaendert).length; ab.innerHTML = alleText(n); ab.disabled = !n || S.speichertAlle; } }
     });
   });
   main.querySelectorAll('[data-hoch],[data-runter]').forEach(function (b) {
@@ -721,7 +1286,7 @@ async function speichereFolge() {
     await M.speichereReihenfolge(null, S.mid, liste, { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung });
     S.ed.folgeGeaendert = false; S.ed.neu = {};
     try { S.reihenfolge = await M.ladeReihenfolge(null, S.mid); } catch (e2) { S.reihenfolge = { produkte: liste }; }
-    delete S.ed.laeuft.__folge; zeichneEditor(); if (el()) el().textContent = t('ed_reihenfolge_ok');
+    delete S.ed.laeuft.__folge; zeichneEditor(); if (el()) el().textContent = t('ed_reihenfolge_ok'); toast(t('ed_reihenfolge_ok'));
   } catch (err) {
     console.error('[Maschinen] Reihenfolge speichern:', err);
     const e = await M.erklaere(null, err, { art: 'reihenfolge', kennung: S.kennung, maschineId: S.mid });
@@ -758,7 +1323,8 @@ function vGeaendert() { S.v.geaendert = true; }
 function zeichneVerwalten() {
   const v = S.v, f = v.form;
   setzeKopf(v.neu ? t('titel') : (S.maschine.name || S.maschine.id), v.neu ? t('v_titel_neu') : t('v_titel'));
-  let h = '<button type="button" class="link-btn zurueck" id="zurueckBtn">' + esc(v.neu ? t('zurueck_liste') : t('zurueck_maschine', { name: S.maschine.name || S.maschine.id })) + '</button>';
+  setzeLeiste({ zurueck: v.neu ? t('zurueck_liste') : t('zurueck_maschine', { name: S.maschine.name || S.maschine.id }), ziel: function () { geheZu(v.neu ? null : S.mid, v.neu ? 'liste' : 'maschine'); } });
+  let h = '';
   h += '<div class="kasten">';
   h += '<div class="v-feld"><label for="vKennung">' + esc(t('v_kennung')) + '</label>' + (v.neu
     ? '<input class="bos-input" id="vKennung" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30" value="' + esc(f.id) + '" placeholder="stikkenofen"><div class="klein">' + esc(t('v_kennung_hilfe')) + '</div>'
@@ -793,7 +1359,6 @@ function zeichneVerwalten() {
     (!v.neu ? knopf('vAusblenden', f.geloescht ? t('v_zurueckholen') : t('v_ausblenden'), '', v.laeuft ? ' disabled' : '') : '') + '</div>' +
     '<div id="vMeldung"></div></div>';
   document.getElementById('main').innerHTML = h;
-  document.getElementById('zurueckBtn').addEventListener('click', function () { geheZu(v.neu ? null : S.mid, v.neu ? 'liste' : 'maschine'); });
   const kid = document.getElementById('vKennung'); if (kid) kid.addEventListener('input', function () { f.id = kid.value.trim().toLowerCase(); vGeaendert(); });
   document.getElementById('vName').addEventListener('input', function () { f.name = this.value; vGeaendert(); });
   document.querySelectorAll('[data-exemplar]').forEach(function (el) { el.addEventListener('input', function () { f.exemplare[el.getAttribute('data-exemplar')] = el.value; vGeaendert(); }); });

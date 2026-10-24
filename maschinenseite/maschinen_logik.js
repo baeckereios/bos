@@ -28,6 +28,26 @@
      Produktfeld werdegang [maschineId …] — schreibt der Produkt-Editor,
        nicht diese Datei.
 
+   STUFE B (24.10.2026, Regel RK §28, Fassung REGEL_FASSUNG):
+     maschinen_notizen/{auto}   Chatfenster — jedes Personenkonto
+       maschine, exemplar ("1"…"12" | "alle"), text (≤ 500), von, vonName,
+       erstellt (Serverzeit), fristStart (= erstellt; fehlt = angepinnt),
+       angepinntVon, angepinntVonName (nur solange angepinnt).
+       Gelöscht wird von der TTL-Richtlinie der Datenbank: Feld fristStart,
+       Versatz 40 Tage (Google-Cloud-Konsole bzw. Cloud Shell). Die Seite
+       blendet selbst nach FRIST_TAGE aus (K2) und rechnet NIE mit
+       fristStart, immer mit erstellt.
+       RÜCKFALL (a): FRIST_WEG = 'fenster' — Feld ablauf = erstellt + 40 Tage
+       (beim Anlegen aus der Gerätezeit, die Regel lässt ±1 h zu; beim Lösen
+       genau aus dem gelesenen erstellt, MIT Nanosekunden). Dazu gehört die
+       Regeldatei RUECKFALL.datei. Nur Konstante + Datei wechseln (Auflage B1).
+     maschinen_karten/{auto}    Info-Karten — nur Maschinenführer
+       maschine, exemplar, titel (≤ 60), text (≤ 2000), rang (0–99),
+       stand (1, dann genau +1 = Sperrzettel), geaendertVon,
+       geaendertVonName, geaendertAm.
+     Offene Reparaturanfragen: BOS_MELDUNGEN.offen() (bos_meldungen.js),
+       hier nur der Abgleich Gerät ↔ Exemplar-Name (geraetPasst).
+
    frueher (K12): Beim Speichern rutscht der BISHERIGE Serverstand vorn in
    die Liste, der Rest rutscht nach, ab 21 fällt der älteste weg. Die
    Regel prüft das Wort für Wort (msFolgt). Wer auf einem veralteten Stand
@@ -38,15 +58,33 @@
    dreht, dreht dort mit — und umgekehrt.
 
    CHANGELOG
+     2026-10-24 · 11:30 · v1.2 · Feature (Nachtrag Übersicht, Go KC 24.10. 11:1x, K16):
+       ofenKurz() für die Ofenknöpfe der Kopfleiste (rein, additiv). Sonst unverändert.
+       SESSION_2026-10-24_MASCHINENSEITE_NACHTRAG_UEBERSICHT_BAU.md
+     2026-10-24 · 07:46 · v1.1 · Feature (Maschinenseite Stufe B, Bauplan Go KC 24.10.,
+       00:32, Auflagen B1–B7): Ofen wählen, Reparatur-Link, Abgleich offener
+       Anfragen (geraetPasst), Notizen (Chatfenster, FRIST_WEG versatz|fenster),
+       Info-Karten (stand), erklaere() für notiz/karte. REGEL_FASSUNG
+       maschinen-b-2026-10-24, REGEL_DATEI …_2026-10-24_maschinen_b.rules.
+       SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
      2026-10-23 · 23:04 · v1.0 · Neu (Maschinenseite Stufe A, #115/#116;
        Bauplan Go KC 22:22, SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md)
    ================================================================ */
 (function (global) {
   'use strict';
 
-  var REGEL_FASSUNG = 'maschinen-2026-10-23';
-  var REGEL_DATEI = 'firestore_regeln_2026-10-23_maschinen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
-  var SAMMLUNG = { MASCHINEN: 'maschinen', REIHENFOLGE: 'maschinen_reihenfolge', ANGABEN: 'maschinen_angaben' };
+  /* Weg der Notiz-Frist (Auflage B1): 'versatz' = Weg (c), 40 Tage als Versatz der TTL-Richtlinie;
+     'fenster' = Rückfall (a), wenn die Konsole keinen Versatz anbietet. Nur zusammen mit der
+     Regeldatei wechseln (REGEL_DATEI bzw. RUECKFALL.datei). */
+  var FRIST_WEG = 'versatz';
+  var REGEL_FASSUNG = 'maschinen-b-2026-10-24';
+  var REGEL_DATEI = 'firestore_regeln_2026-10-24_maschinen_b.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+  var RUECKFALL = { fassung: 'maschinen-b-fenster-2026-10-24', datei: 'RUECKFALL_A_firestore_regeln_2026-10-24_maschinen_b.rules' };
+  if (FRIST_WEG === 'fenster') { REGEL_FASSUNG = RUECKFALL.fassung; REGEL_DATEI = RUECKFALL.datei; }
+  var FRIST_FELD = FRIST_WEG === 'fenster' ? 'ablauf' : 'fristStart';
+  var FRIST_TAGE = 40;
+  var TAG_MS = 86400000;
+  var SAMMLUNG = { MASCHINEN: 'maschinen', REIHENFOLGE: 'maschinen_reihenfolge', ANGABEN: 'maschinen_angaben', NOTIZEN: 'maschinen_notizen', KARTEN: 'maschinen_karten' };
   /* muss 1:1 zur Regel passen (RK §27) */
   var GRENZEN = {
     ID_MUSTER: '^[a-z0-9]{2,30}$', NAME: 40, EXEMPLARE: 12, FUEHRER: 20, FELDER: 12,
@@ -54,6 +92,9 @@
   };
   /* nur die Seite (Regel prüft Werte nicht einzeln, RK §27 A3) */
   var SEITE = { TEXT: 300, NUMMER_STELLEN: 4, EXEMPLAR_NAME: 40, FELD_NAME: 40, FELD_ID: 30 };
+  /* Stufe B — Regel RK §28 (Notiz 500, Titel 60, Karte 2000, rang 0–99, Name 40); Karten je Maschine zählt nur die Seite */
+  var GRENZEN_B = { NOTIZ: 500, TITEL: 60, KARTE: 2000, RANG_MAX: 99, KARTEN_MAX: 12 };
+  var KARTEN_VORSCHLAEGE = ['Kurz & wichtig', 'Eigenheiten', 'Einstellungen / Richtwerte', 'Reinigung', 'Bei Störung'];
   var FELD_ARTEN = ['text', 'nummer'];
   var ZEITLIMIT_MS = 15000;
   var ID_RE = new RegExp(GRENZEN.ID_MUSTER);
@@ -251,6 +292,157 @@
     });
   }
 
+
+  /* ================= Stufe B — rein (ohne Datenbank) ================= */
+
+  /* ---------- Ofen wählen ---------- */
+  /* gültige Wahl: ein Schlüssel aus exemplare oder 'alle'. Einzelmaschine: immer der eine Schlüssel. */
+  function ofenNormal(maschine, ofen) {
+    var s = exemplarSchluessel(maschine && maschine.exemplare);
+    if (s.length === 1) return s[0];
+    if (ofen === 'alle') return 'alle';
+    return s.indexOf(String(ofen || '')) !== -1 ? String(ofen) : null;
+  }
+  function einzelOfen(maschine) { var s = exemplarSchluessel(maschine && maschine.exemplare); return s.length === 1 ? s[0] : null; }
+  function ofenName(maschine, ofen) {
+    if (ofen === 'alle') return 'alle';
+    var ex = (maschine && maschine.exemplare) || {};
+    return text(ex[ofen]) || ('Nr. ' + ofen);
+  }
+  /* Nachtrag Übersicht (K16): Kurzname für die Ofenknöpfe. Beginnt der Exemplar-Name mit dem
+     Maschinennamen (Vergleich wie geraetNorm), zeigt der Knopf nur den Rest — vorne ohne
+     Leerzeichen und - – · : # . —, sonst (auch bei leerem Rest) den ganzen Namen.
+     „Stikkenofen 3“ → „3“, „Stikkenofen-Nord“ → „Nord“, „Ofen links“ → „Ofen links“.
+     Der volle Name bleibt überall sonst (Schild „gilt für“, Reparatur, title). */
+  function ofenKurz(maschine, ofen) {
+    if (ofen === 'alle') return 'alle';
+    var voll = ofenName(maschine, ofen);
+    var basis = geraetNorm(maschine && maschine.name);
+    var n = text(voll).replace(/\s+/g, ' ').trim();
+    if (!basis || n.toLocaleLowerCase('de').indexOf(basis) !== 0) return voll;
+    var rest = n.slice(basis.length).replace(/^[\s\-–·:#.]+/, '');
+    return rest || voll;
+  }
+  function reparaturAdresse(exemplarName) { return '../reparaturanfrage/reparaturanfrage.html?geraet=' + encodeURIComponent(text(exemplarName).trim()); }
+
+  /* ---------- Offene Reparaturanfragen (Auflage B5): DIE Stelle für den Abgleich ----------
+     Gerät der Anfrage (frei getippt oder aus ?geraet=) gegen den Namen des Exemplars:
+     Groß/Klein egal, Ränder und mehrfache Leerzeichen egal, sonst genau.
+     „Stikkenofen3“ ≠ „Stikkenofen 3“. Wird ein Exemplar umbenannt, passen die
+     alten Anfragen (mit dem alten Namen) nicht mehr — gewollt einfach (K8). */
+  function geraetNorm(s) { return text(s).replace(/\s+/g, ' ').trim().toLocaleLowerCase('de'); }
+  function geraetPasst(geraet, exemplarName) {
+    var a = geraetNorm(geraet), b = geraetNorm(exemplarName);
+    return a !== '' && a === b;
+  }
+  /* meldungen: Liste der offenen Anfragen (Kopf, wie BOS_MELDUNGEN.offen liefert).
+     Ergebnis: [{ m, schluessel, name }] nur für diese Maschine, unter ofen 'alle' für jedes Exemplar. */
+  function offeneFuer(meldungen, maschine, ofen) {
+    var ex = (maschine && maschine.exemplare) || {};
+    var schl = ofen === 'alle' ? exemplarSchluessel(ex) : [ofen];
+    var aus = [];
+    (meldungen || []).forEach(function (m) {
+      for (var i = 0; i < schl.length; i++) {
+        if (geraetPasst(m && m.geraet, ex[schl[i]])) { aus.push({ m: m, schluessel: schl[i], name: text(ex[schl[i]]) }); break; }
+      }
+    });
+    aus.sort(function (a, b) { return (msVon(b.m.erstellt) || 0) - (msVon(a.m.erstellt) || 0); });
+    return aus;
+  }
+
+  /* ---------- Notizen (Chatfenster) ---------- */
+  function istAngepinnt(n) { return !!n && !Object.prototype.hasOwnProperty.call(n, FRIST_FELD); }
+  /* Ende der 40 Tage in ms, aus erstellt (nie aus fristStart/ablauf). null = noch ohne Serverzeit. */
+  function fristEnde(n) { var e = msVon(n && n.erstellt); return e === null ? null : e + FRIST_TAGE * TAG_MS; }
+  function abgelaufen(n, jetztMs) { if (istAngepinnt(n)) return false; var f = fristEnde(n); return f !== null && f <= jetztMs; }
+  /* angefangene Tage, die noch bleiben (aufgerundet): frisch angelegt = 40, letzte 24 Stunden = 1 */
+  function restTage(n, jetztMs) { var f = fristEnde(n); if (f === null) return FRIST_TAGE; return Math.max(0, Math.ceil((f - jetztMs) / TAG_MS)); }
+  function restText(n, jetztMs) {
+    if (istAngepinnt(n)) return '';
+    var t = restTage(n, jetztMs);
+    return t === 1 ? 'noch 1 Tag' : 'noch ' + t + ' Tage';
+  }
+  function restDeutlich(n, jetztMs) { return !istAngepinnt(n) && restTage(n, jetztMs) <= 3; }
+  /* Alter in vollen Tagen (für die Rückfrage beim Lösen) */
+  function alterTage(n, jetztMs) { var e = msVon(n && n.erstellt); return e === null ? 0 : Math.floor((jetztMs - e) / TAG_MS); }
+  /* Lösen einer Notiz, die älter als FRIST_TAGE ist → verschwindet sofort (M2) */
+  function loesenLoescht(n, jetztMs) { return istAngepinnt(n) && alterTage(n, jetztMs) >= FRIST_TAGE; }
+  /* Sichtbar für die Wahl: unter 'alle' alles, sonst dieser Ofen und 'alle'. Angepinnte oben, dann neueste zuerst. */
+  function sichtbarFuer(exemplar, ofen) { return ofen === 'alle' || exemplar === 'alle' || exemplar === ofen; }
+  function notizenFuer(liste, ofen, jetztMs) {
+    return (liste || []).filter(function (n) { return n && sichtbarFuer(n.exemplar, ofen) && !abgelaufen(n, jetztMs); })
+      .sort(function (a, b) {
+        var pa = istAngepinnt(a) ? 1 : 0, pb = istAngepinnt(b) ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        var ea = msVon(a.erstellt), eb = msVon(b.erstellt);
+        if (ea === null) ea = Infinity; if (eb === null) eb = Infinity;   /* noch ohne Serverzeit = ganz neu */
+        return eb - ea;
+      });
+  }
+  function pruefeNotizText(roh) {
+    var s = text(roh).replace(/\r\n?/g, '\n').trim();
+    if (!s) return { text: '', fehler: 'Die Notiz ist leer.' };
+    if (s.length > GRENZEN_B.NOTIZ) return { text: s, fehler: 'Höchstens ' + GRENZEN_B.NOTIZ + ' Zeichen (jetzt ' + s.length + ').' };
+    return { text: s, fehler: null };
+  }
+  /* erstellt + 40 Tage als Zeitstempel, aus Sekunden und Nanosekunden (NICHT über toMillis —
+     sonst fehlen die Mikrosekunden und das Lösen scheitert an ==; nur Rückfall a). */
+  function plusFrist(ts, Zeitstempel) {
+    if (!ts || typeof ts.seconds !== 'number') throw new Error('Erstellzeit fehlt oder ist kein Zeitstempel.');
+    return new Zeitstempel(ts.seconds + FRIST_TAGE * 86400, ts.nanoseconds || 0);
+  }
+  /* neues Notiz-Dokument. zeit = Serverzeit-Platzhalter, jetztMs + Zeitstempel nur für den Rückfall. */
+  function notizDokument(e, ich, zeit, angepinnt, jetztMs, Zeitstempel) {
+    var d = { maschine: e.maschine, exemplar: String(e.exemplar), text: e.text, von: ich.kennung, vonName: vonName(ich), erstellt: zeit };
+    if (angepinnt) { d.angepinntVon = ich.kennung; d.angepinntVonName = vonName(ich); }
+    else if (FRIST_WEG === 'fenster') d.ablauf = Zeitstempel.fromMillis(jetztMs + FRIST_TAGE * TAG_MS);
+    else d.fristStart = zeit;
+    return d;
+  }
+  /* aus dem frisch gelesenen Server-Dokument: angepinnt bzw. gelöst. Die festen Felder
+     werden unverändert übernommen (erstellt als gelesener Zeitstempel). */
+  function notizBasis(alt) { return { maschine: alt.maschine, exemplar: alt.exemplar, text: alt.text, von: alt.von, vonName: alt.vonName, erstellt: alt.erstellt }; }
+  function notizAngepinnt(alt, ich) { var d = notizBasis(alt); d.angepinntVon = ich.kennung; d.angepinntVonName = vonName(ich); return d; }
+  function notizGeloest(alt, Zeitstempel) {
+    var d = notizBasis(alt);
+    if (FRIST_WEG === 'fenster') d.ablauf = plusFrist(alt.erstellt, Zeitstempel);
+    else d.fristStart = alt.erstellt;
+    return d;
+  }
+  function darfNotizLoeschen(n, kennung, zg) { return !!n && ((!!zg && zg.person && n.von === kennung) || (!!zg && zg.admin)); }
+
+  /* ---------- Info-Karten ---------- */
+  function pruefeKarte(e, maschine) {
+    var f = [];
+    var titel = text(e && e.titel).trim(), inhalt = text(e && e.text).replace(/\r\n?/g, '\n');
+    if (!titel) f.push('Überschrift fehlt.');
+    else if (titel.length > GRENZEN_B.TITEL) f.push('Überschrift: höchstens ' + GRENZEN_B.TITEL + ' Zeichen.');
+    if (inhalt.length > GRENZEN_B.KARTE) f.push('Text: höchstens ' + GRENZEN_B.KARTE + ' Zeichen (jetzt ' + inhalt.length + ').');
+    var ex = String(e && e.exemplar);
+    if (ex !== 'alle' && exemplarSchluessel(maschine && maschine.exemplare).indexOf(ex) === -1) f.push('„Gilt für“: diesen Ofen gibt es nicht.');
+    if (!(typeof (e && e.rang) === 'number' && Math.floor(e.rang) === e.rang && e.rang >= 0 && e.rang <= GRENZEN_B.RANG_MAX)) f.push('Reihenfolge ungültig.');
+    return f;
+  }
+  function karteDokument(e, alt, ich, zeit) {
+    return {
+      maschine: e.maschine, exemplar: String(e.exemplar), titel: text(e.titel).trim(),
+      text: text(e.text).replace(/\r\n?/g, '\n').replace(/\s+$/, ''), rang: e.rang,
+      stand: alt ? Number(alt.stand) + 1 : 1,
+      geaendertVon: ich.kennung, geaendertVonName: vonName(ich), geaendertAm: zeit
+    };
+  }
+  function kartenSortiert(liste) {
+    return (liste || []).slice().sort(function (a, b) { return (a.rang - b.rang) || text(a.titel).localeCompare(text(b.titel), 'de'); });
+  }
+  function kartenFuer(liste, ofen) { return kartenSortiert((liste || []).filter(function (k) { return k && sichtbarFuer(k.exemplar, ofen); })); }
+  function naechsterRang(liste) { var m = -1; (liste || []).forEach(function (k) { if (typeof k.rang === 'number' && k.rang > m) m = k.rang; }); return Math.min(m + 1, GRENZEN_B.RANG_MAX); }
+  /* Tauschen zweier Nachbarn: die zwei Ränge werden getauscht; sind sie gleich, bekommen sie zwei verschiedene. */
+  function rangTausch(a, b) {
+    if (a.rang !== b.rang) return { a: b.rang, b: a.rang };
+    var r = Math.min(a.rang, GRENZEN_B.RANG_MAX - 1);
+    return { a: r + 1, b: r };
+  }
+
   /* ---------- Konto ---------- */
   function kontoArt(konto) { var a = konto && konto.art; return a === 'person' || a === 'ort' || a === 'system' ? a : ''; }
   /* Darf dieses Konto die Maschinenseite lesen? (wie msLesen der Regel; Generalschlüssel erkennt die Seite nicht) */
@@ -361,9 +553,65 @@
     return mitZeitlimit(datenbank(db).collection(SAMMLUNG.REIHENFOLGE).doc(maschineId).set(reihenfolgeDokument(liste, ich, serverZeit())));
   }
 
+
+  /* ================= Stufe B — Datenbank ================= */
+  function Zeitstempel() { return global.firebase.firestore.Timestamp; }
+  function mitIdDaten(d) { var x = d.data({ serverTimestamps: 'estimate' }) || {}; x.id = d.id; x._ausstehend = !!(d.metadata && d.metadata.hasPendingWrites); return x; }
+  /* live: alle Notizen einer Maschine (ein Gleich-Filter, kein zusammengesetzter Index) */
+  function notizenLive(db, maschineId, cb, fehlerCb) {
+    return datenbank(db).collection(SAMMLUNG.NOTIZEN).where('maschine', '==', maschineId)
+      .onSnapshot({ includeMetadataChanges: true }, function (snap) {
+        var l = []; snap.forEach(function (d) { l.push(mitIdDaten(d)); });
+        cb(l, { ausCache: !!(snap.metadata && snap.metadata.fromCache) });
+      }, function (err) { if (fehlerCb) fehlerCb(err); });
+  }
+  function notizAnlegen(db, e, ich, angepinnt) {
+    var t = pruefeNotizText(e.text);
+    if (t.fehler) { var f = new Error(t.fehler); f.code = 'eingabe'; return Promise.reject(f); }
+    var d = notizDokument({ maschine: e.maschine, exemplar: e.exemplar, text: t.text }, ich, serverZeit(), angepinnt, Date.now(), Zeitstempel());
+    return mitZeitlimit(datenbank(db).collection(SAMMLUNG.NOTIZEN).add(d));
+  }
+  function ladeNotiz(db, id) {
+    return mitZeitlimit(datenbank(db).collection(SAMMLUNG.NOTIZEN).doc(id).get({ source: 'server' }))
+      .then(function (s) { return s.exists ? s.data() : null; });
+  }
+  /* anpinnen/lösen: erst frisch vom Server lesen (erstellt genau), dann das ganze Dokument schreiben */
+  function notizPinnen(db, id, anpinnen, ich) {
+    return ladeNotiz(db, id).then(function (alt) {
+      if (!alt) { var e = new Error('Die Notiz gibt es nicht mehr (gelöscht).'); e.code = 'weg'; throw e; }
+      var d = anpinnen ? notizAngepinnt(alt, ich) : notizGeloest(alt, Zeitstempel());
+      return mitZeitlimit(datenbank(db).collection(SAMMLUNG.NOTIZEN).doc(id).set(d));
+    });
+  }
+  function notizLoeschen(db, id) { return mitZeitlimit(datenbank(db).collection(SAMMLUNG.NOTIZEN).doc(id).delete()); }
+  function ladeKarten(db, maschineId) {
+    return mitZeitlimit(datenbank(db).collection(SAMMLUNG.KARTEN).where('maschine', '==', maschineId).get({ source: 'server' }))
+      .then(function (snap) { var l = []; snap.forEach(function (d) { var x = d.data() || {}; x.id = d.id; l.push(x); }); return kartenSortiert(l); });
+  }
+  function ladeKarte(db, id) {
+    return mitZeitlimit(datenbank(db).collection(SAMMLUNG.KARTEN).doc(id).get({ source: 'server' }))
+      .then(function (s) { if (!s.exists) return null; var x = s.data() || {}; x.id = s.id; return x; });
+  }
+  /* e = { id?, maschine, exemplar, titel, text, rang }, alt = Server-Dokument beim Laden (Sperrzettel stand) oder null */
+  function speichereKarte(db, e, alt, ich, maschine) {
+    var f = pruefeKarte(e, maschine);
+    if (f.length) { var x = new Error(f.join(' ')); x.code = 'eingabe'; return Promise.reject(x); }
+    var ref = alt ? datenbank(db).collection(SAMMLUNG.KARTEN).doc(alt.id) : datenbank(db).collection(SAMMLUNG.KARTEN).doc();
+    return mitZeitlimit(ref.set(karteDokument(e, alt, ich, serverZeit()))).then(function () { return ref.id; });
+  }
+  function loescheKarte(db, id) { return mitZeitlimit(datenbank(db).collection(SAMMLUNG.KARTEN).doc(id).delete()); }
+  /* zwei Karten tauschen: EIN Vorgang (Batch), beide stand +1 */
+  function tauscheKarten(db, a, b, ich) {
+    var r = rangTausch(a, b), d = datenbank(db), batch = d.batch(), zeit = serverZeit();
+    batch.set(d.collection(SAMMLUNG.KARTEN).doc(a.id), karteDokument({ maschine: a.maschine, exemplar: a.exemplar, titel: a.titel, text: a.text, rang: r.a }, a, ich, zeit));
+    batch.set(d.collection(SAMMLUNG.KARTEN).doc(b.id), karteDokument({ maschine: b.maschine, exemplar: b.exemplar, titel: b.titel, text: b.text, rang: r.b }, b, ich, zeit));
+    return mitZeitlimit(batch.commit());
+  }
+
   /* Nach einer Ablehnung den richtigen Grund finden (Checkliste §7a:
      „eine falsche Erklärung ist schlechter als keine“).
-     k = { art: 'angaben'|'reihenfolge'|'maschine', kennung, maschineId, produktKey, altAm } */
+     k = { art: 'angaben'|'reihenfolge'|'maschine'|'notiz'|'pinnen'|'notiz_loeschen'|'karte'|'karte_loeschen',
+           kennung, maschineId, produktKey, altAm, notiz (Stufe B), karteId, altStand } */
   function erklaere(db, err, k) {
     var basis = einordnen(err);
     if (basis.art !== 'keine_berechtigung') return Promise.resolve(basis);
@@ -373,11 +621,24 @@
       if (stand === 'alt') return g('regel_alt', 'Die Firestore-Regeln sind älter als diese Seite. In der Firebase-Konsole ' + REGEL_DATEI + ' einsetzen (Fassung ' + REGEL_FASSUNG + '). Nichts gespeichert.');
       return ladeKonto(db, k.kennung).then(function (konto) {
         var z = zugang(konto);
+        if (k.art === 'notiz_loeschen') {
+          if (z.admin) return g('abgelehnt', 'Die Datenbank hat das Löschen abgelehnt. Nichts gelöscht.');
+          if (!z.person) return g('keine_person', 'Löschen darf nur, wer die Notiz geschrieben hat (mit persönlichem Konto), oder ein Admin. Nichts gelöscht.');
+          if (k.notiz && k.notiz.von !== k.kennung) return g('nicht_deine', 'Diese Notiz hat ' + (k.notiz.vonName || k.notiz.von || 'jemand anderes') + ' geschrieben. Löschen darf nur, wer sie geschrieben hat, oder ein Admin. Nichts gelöscht.');
+          return g('abgelehnt', 'Die Datenbank hat das Löschen abgelehnt. Nichts gelöscht.');
+        }
         if (k.art === 'maschine') {
           if (!konto || konto.role !== 'admin') return g('kein_admin', 'Maschinen anlegen und ändern darf nur die Rolle Admin. Nichts gespeichert.');
           return g('abgelehnt', 'Die Datenbank hat die Maschine abgelehnt. Nichts gespeichert.');
         }
         if (!z.person) return g('keine_person', 'Dein Konto ist kein persönliches Konto (' + (z.grund === 'ort' ? 'eingetragen als „Ort“' : z.grund === 'ohne_art' ? 'keine Art eingetragen' : z.grund === 'system' ? 'Generalschlüssel' : 'nicht freigeschaltet') + '). Speichern dürfen nur eingetragene Maschinenführer mit persönlichem Konto. Ulf fragen (Konten & Rollen → Konto → Freigabe).');
+        if (k.art === 'notiz' || k.art === 'pinnen') {
+          return ladeMaschine(db, k.maschineId).then(function (m) {
+            if (!m || m.geloescht === true) return g('maschine_weg', 'Die Maschine gibt es nicht (mehr) oder sie ist ausgeblendet — dort schreibt niemand mehr. Nichts gespeichert.');
+            if (k.art === 'notiz' && k.exemplar !== 'alle' && exemplarSchluessel(m.exemplare).indexOf(String(k.exemplar)) === -1) return g('ofen_weg', 'Diesen Ofen gibt es bei der Maschine nicht (mehr). Ofen neu wählen. Nichts gespeichert.');
+            return g('abgelehnt', 'Die Datenbank hat die Notiz abgelehnt. Nichts gespeichert.' + (FRIST_WEG === 'fenster' ? ' Geht die Uhr dieses Geräts mehr als eine Stunde falsch? Uhrzeit auf „automatisch“ stellen.' : ''));
+          });
+        }
         return ladeMaschine(db, k.maschineId).then(function (m) {
           if (!istFuehrer(m, k.kennung)) return g('kein_fuehrer', m && m.geloescht === true ? 'Die Maschine ist ausgeblendet — dort speichert niemand mehr. Nichts gespeichert.' : 'Du bist bei dieser Maschine nicht (mehr) als Maschinenführer eingetragen. Nichts gespeichert. Admin fragen (Verwalten → Maschinenführer).');
           if (k.art === 'angaben') {
@@ -385,6 +646,14 @@
               var a = msVon(k.altAm), b = msVon(jetzt && jetzt.geaendertAm);
               if ((jetzt && !k.altAm) || (jetzt && a !== b)) return g('konflikt', 'Inzwischen hat ' + (jetzt.geaendertVonName || jetzt.geaendertVon || 'jemand') + ' hier gespeichert (' + zeitText(jetzt.geaendertAm) + '). Nichts gespeichert. Neu laden — deine Eingaben bleiben stehen.', { jetzt: jetzt });
               return g('abgelehnt', 'Die Datenbank hat die Angaben abgelehnt. Nichts gespeichert.');
+            });
+          }
+          if (k.art === 'karte' || k.art === 'karte_loeschen') {
+            if (!k.karteId) return g('abgelehnt', 'Die Datenbank hat die Karte abgelehnt. Nichts gespeichert.');
+            return ladeKarte(db, k.karteId).then(function (jetzt) {
+              if (!jetzt && k.altStand) return g('karte_weg', 'Die Karte hat inzwischen jemand gelöscht. Nichts gespeichert. Neu laden — deine Eingaben bleiben stehen.');
+              if (jetzt && Number(jetzt.stand) !== Number(k.altStand)) return g('konflikt', 'Inzwischen hat ' + (jetzt.geaendertVonName || jetzt.geaendertVon || 'jemand') + ' die Karte geändert (' + zeitText(jetzt.geaendertAm) + '). Nichts gespeichert. Neu laden — deine Eingaben bleiben stehen.', { jetzt: jetzt });
+              return g('abgelehnt', 'Die Datenbank hat die Karte abgelehnt. Nichts gespeichert.');
             });
           }
           return g('abgelehnt', 'Die Datenbank hat die Reihenfolge abgelehnt. Nichts gespeichert.');
@@ -410,7 +679,23 @@
     pruefeRegelstand: pruefeRegelstand, ladeKonto: ladeKonto, ladeMaschinen: ladeMaschinen, ladeMaschine: ladeMaschine,
     ladeReihenfolge: ladeReihenfolge, ladeAngaben: ladeAngaben, ladeAngabe: ladeAngabe,
     speichereMaschine: speichereMaschine, speichereAngaben: speichereAngaben, speichereReihenfolge: speichereReihenfolge,
-    erklaere: erklaere
+    erklaere: erklaere,
+    /* Stufe B */
+    FRIST_WEG: FRIST_WEG, FRIST_FELD: FRIST_FELD, FRIST_TAGE: FRIST_TAGE, RUECKFALL: RUECKFALL, GRENZEN_B: GRENZEN_B,
+    KARTEN_VORSCHLAEGE: KARTEN_VORSCHLAEGE,
+    ofenNormal: ofenNormal, einzelOfen: einzelOfen, ofenName: ofenName, reparaturAdresse: reparaturAdresse,
+    /* Nachtrag Übersicht */
+    ofenKurz: ofenKurz,
+    geraetNorm: geraetNorm, geraetPasst: geraetPasst, offeneFuer: offeneFuer,
+    istAngepinnt: istAngepinnt, fristEnde: fristEnde, abgelaufen: abgelaufen, restTage: restTage, restText: restText,
+    restDeutlich: restDeutlich, alterTage: alterTage, loesenLoescht: loesenLoescht, sichtbarFuer: sichtbarFuer,
+    notizenFuer: notizenFuer, pruefeNotizText: pruefeNotizText, plusFrist: plusFrist, notizDokument: notizDokument,
+    notizBasis: notizBasis, notizAngepinnt: notizAngepinnt, notizGeloest: notizGeloest, darfNotizLoeschen: darfNotizLoeschen,
+    pruefeKarte: pruefeKarte, karteDokument: karteDokument, kartenSortiert: kartenSortiert, kartenFuer: kartenFuer,
+    naechsterRang: naechsterRang, rangTausch: rangTausch,
+    notizenLive: notizenLive, notizAnlegen: notizAnlegen, ladeNotiz: ladeNotiz, notizPinnen: notizPinnen,
+    notizLoeschen: notizLoeschen, ladeKarten: ladeKarten, ladeKarte: ladeKarte, speichereKarte: speichereKarte,
+    loescheKarte: loescheKarte, tauscheKarten: tauscheKarten
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_MASCHINEN = api;

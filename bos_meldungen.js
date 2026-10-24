@@ -104,6 +104,7 @@
      'abgebrochen'        Hochladen vom Nutzer abgebrochen (verworfen)
 
    CHANGELOG
+     2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
      2026-10-23 · 23:04 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-23_maschinen.rules (Maschinenseite Stufe A, Bauplan Go KC 22:22, Freigabe Ulf 22:22; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
      2026-10-21 · 11:07 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_backstore.rules (BackStore-Texte, #110, Bauplan freigegeben KC 10:27; elf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_BACKSTORE_APPSTORE_BAU.md
      2026-10-21 · 07:29 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-21_zugangsblatt.rules (Zugangsblatt-Schnellzugriffe, Freigabe KC 21.10., 06:47, Auflage N4). Die alte Angabe hätte bei „Regel zu alt“ eine veraltete Datei empfohlen; wer sie eingesetzt hätte, hätte neuere Regeln hinausgeworfen. Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-21_ZUGANGSBLATT_QR_BAU.md
@@ -132,7 +133,7 @@ window.BOS_MELDUNGEN = (function () {
   var TAG_MS = 24 * 60 * 60 * 1000;
   var SEITE = 20;
   var REGEL_FASSUNG = 'reparatur-2026-10-10';
-  var REGEL_DATEI = 'firestore_regeln_2026-10-23_maschinen.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-10-24_maschinen_b.rules';
   var GRENZEN = { text: 500, nachricht: 300, geraet: 60, name: 40, grund: 300 };
   var STATUS = ['gemeldet', 'gesehen', 'repariert'];
   var DRINGLICHKEIT = ['normal', 'dringend'];

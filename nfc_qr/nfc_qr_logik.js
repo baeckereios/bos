@@ -19,6 +19,14 @@
    bos_code_adressen.json.
 
    CHANGELOG
+     2026-10-24 · 07:46 · v1.7 · Feature (Stufe 3 Maschinen-Kärtchen; Maschinenseite Stufe B,
+       Bauplan Go KC Maschinenseiten 24.10., 00:32, rein additiv).
+       Neu: KAERTCHEN (Maße, Grenzen), kaertchenZiele (aus der Datenbank-Liste
+       maschinen, ohne ausgeblendete; Adresse = Seite der Maschinenseite aus
+       der Registry + ?maschine=<kennung>), kaertchenListe (Anzahl je
+       Maschine), kaertchenHTML (A4 hoch, 8 je Blatt, Schnittlinien, QR 38 mm),
+       KAERTCHEN_CSS. Ein Code je Maschine bzw. Gruppe (E8). Nichts Bestehendes
+       geändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
      2026-10-21 · 11:07 · v1.6 · Umbau (#110 BackStore wie ein App Store,
        Bauplan freigegeben KC 10:27, Teile D und E).
        BEREICHE: keine eigene Liste mehr — Reihenfolge und Titel aus
@@ -701,6 +709,77 @@
     return login ? 'die Seite bindet bos_standalone_login.js ein, aber das Feld direkt fehlt' : '';
   }
 
+  /* ================================================================
+     MASCHINEN-KÄRTCHEN (Stufe 3, 24.10.2026). Ein Code je Maschine bzw.
+     Gruppe (Stikkenofen = ein Code für alle vier, E8 Maschinenseite).
+     Die Adresse ist die Seite „maschinenseite“ aus der Registry plus
+     ?maschine=<kennung>. Die Kennung ist nach dem Anlegen fest
+     (Maschinenseite Stufe A), die Adresse also auch (P4). Ziele kommen
+     aus der Datenbank (Sammlung maschinen), nie getippt (K3.5).
+     Druck: A4 hoch, 2 × 4 Kärtchen je 90 × 62 mm, Schnittlinien,
+     5 mm Rand für das Laminat, QR 38 mm (≥ 3 cm, K3.5). Ob gedruckt
+     werden DARF (online), entscheidet die Seite (darfAusgeben).
+     ================================================================ */
+  var KAERTCHEN = { APP_ID: 'maschinenseite', JE_BLATT: 8, MAX_ANZAHL: 10, QR_MM: 38, BREITE_MM: 90, HOEHE_MM: 62, ID_MUSTER: '^[a-z0-9]{2,30}$' };
+  var KAERTCHEN_ID_RE = new RegExp(KAERTCHEN.ID_MUSTER);
+  /* maschinen: [{ id, name, exemplare, geloescht }] (Datenbank), apps: Registry.
+     Ergebnis: [{ id, name, pfad, zusatz, exemplare }] nach Name; ausgeblendete und
+     ungültige Kennungen fehlen. Fehlt die Seite in der Registry: Fehler (kein Kärtchen ins Leere). */
+  function kaertchenZiele(maschinen, apps) {
+    var seite = (apps || []).filter(function (a) { return a && a.id === KAERTCHEN.APP_ID; })[0];
+    if (!seite || !seite.url) throw new Error('bos_app_registry.js: Eintrag „' + KAERTCHEN.APP_ID + '“ fehlt — ohne ihn gibt es keine Kärtchen');
+    if (seite.direkt !== 'anmeldung' && seite.direkt !== 'offen') throw new Error('„' + KAERTCHEN.APP_ID + '“ ist nicht für den Direktaufruf freigegeben (Registry-Feld direkt)');
+    return (maschinen || []).filter(function (m) { return m && m.geloescht !== true && typeof m.id === 'string' && KAERTCHEN_ID_RE.test(m.id); })
+      .map(function (m) {
+        var ex = m.exemplare && typeof m.exemplare === 'object' ? Object.keys(m.exemplare).length : 0;
+        return { id: m.id, name: String(m.name || m.id), pfad: ohneZusatz(seite.url), zusatz: '?maschine=' + encodeURIComponent(m.id), exemplare: ex };
+      })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+  }
+  /* wahl: [{ ziel, anzahl }] → flache Liste, jedes Kärtchen so oft wie gewünscht (1 … MAX_ANZAHL) */
+  function kaertchenListe(wahl) {
+    var aus = [];
+    (wahl || []).forEach(function (w) {
+      var n = Math.floor(Number(w && w.anzahl));
+      if (!(n >= 1)) return;
+      if (n > KAERTCHEN.MAX_ANZAHL) n = KAERTCHEN.MAX_ANZAHL;
+      for (var i = 0; i < n; i++) aus.push(w.ziel);
+    });
+    return aus;
+  }
+  function kaertchenNamenKlasse(name) { var n = String(name || '').length; return n <= 12 ? 'xl' : n <= 18 ? 'l' : n <= 28 ? 'm' : 's'; }
+  /* karten: [{ name, exemplare, qrSvg }], o: { stand }. Reine Textfunktion. */
+  function kaertchenHTML(karten, o) {
+    o = o || {};
+    var blaetter = [];
+    for (var i = 0; i < (karten || []).length; i += KAERTCHEN.JE_BLATT) blaetter.push(karten.slice(i, i + KAERTCHEN.JE_BLATT));
+    return blaetter.map(function (b) {
+      var zellen = b.map(function (k) {
+        var unter = k.exemplare > 1 ? 'Scannen → Ofen wählen' : 'Scannen → Seite der Maschine';
+        return '<div class="kk"><div class="kk-innen">' + qrGenau(k.qrSvg, 'kk-qr', KAERTCHEN.QR_MM) +
+          '<div class="kk-text"><div class="kk-name kk-name-' + kaertchenNamenKlasse(k.name) + '">' + esc(k.name) + '</div>' +
+          '<div class="kk-unter">' + esc(unter) + '</div>' +
+          '<div class="kk-fuss">Bäckerei<i>OS</i> · Maschinen</div></div></div></div>';
+      });
+      while (zellen.length < KAERTCHEN.JE_BLATT) zellen.push('<div class="kk kk-leer"></div>');
+      return '<section class="kk-blatt"><div class="kk-raster">' + zellen.join('') + '</div>' +
+        '<div class="kk-seitenfuss">Maschinen-Kärtchen · an den gestrichelten Linien schneiden, dann laminieren · Stand ' + esc(o.stand || '') + '</div></section>';
+    }).join('');
+  }
+  var KAERTCHEN_CSS =
+    '.kk-blatt{width:210mm;height:296mm;box-sizing:border-box;padding:20mm 15mm 0;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;page-break-after:always;break-after:page;overflow:hidden;}' +
+    '.kk-blatt:last-child{page-break-after:auto;break-after:auto;}.kk-blatt,.kk-blatt *{box-sizing:border-box;}' +
+    '.kk-raster{display:grid;grid-template-columns:90mm 90mm;grid-auto-rows:62mm;width:180mm;border-left:.25mm dashed #888;border-top:.25mm dashed #888;}' +
+    '.kk{width:90mm;height:62mm;border-right:.25mm dashed #888;border-bottom:.25mm dashed #888;}' +
+    '.kk-innen{width:100%;height:100%;padding:5mm;display:flex;align-items:center;gap:5mm;}' +
+    '.kk-qr{flex:0 0 38mm;width:38mm;height:38mm;overflow:visible;}.kk-qr svg{display:block;}' +
+    '.kk-text{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;height:100%;}' +
+    '.kk-name{font-family:Georgia,serif;font-weight:900;line-height:1.05;overflow-wrap:anywhere;max-height:30mm;overflow:hidden;}' +
+    '.kk-name-xl{font-size:20pt;}.kk-name-l{font-size:16pt;}.kk-name-m{font-size:13pt;}.kk-name-s{font-size:10pt;}' +
+    '.kk-unter{font-size:9pt;margin-top:3mm;color:#222;}' +
+    '.kk-fuss{font-size:7pt;margin-top:auto;color:#555;letter-spacing:.04em;}.kk-fuss i{font-style:normal;color:#888;}' +
+    '.kk-seitenfuss{margin-top:6mm;font-size:8pt;color:#555;}';
+
   var api = {
     esc: esc, ohneZusatz: ohneZusatz, ZIEL_BOS: ZIEL_BOS, bereiche: bereiche,
     ZIEL_TEIGECKE_VORBEREITUNGEN: ZIEL_TEIGECKE_VORBEREITUNGEN, FESTE_ZIELE: FESTE_ZIELE,
@@ -717,7 +796,9 @@
     ZUGANGSBLATT: ZUGANGSBLATT, zugangLeer: zugangLeer, zugangFehler: zugangFehler, zugangPruefung: zugangPruefung,
     zugangDokument: zugangDokument, zugangAusDokument: zugangAusDokument, zielErlaubt: zielErlaubt,
     zugangsblattZiele: zugangsblattZiele, zugangsCodesHTML: zugangsCodesHTML, ZUGANG_CSS: ZUGANG_CSS,
-    ZUGANG_DRUCK: ZUGANG_DRUCK, zielBeschreibung: zielBeschreibung, qrGenau: qrGenau
+    ZUGANG_DRUCK: ZUGANG_DRUCK, zielBeschreibung: zielBeschreibung, qrGenau: qrGenau,
+    KAERTCHEN: KAERTCHEN, kaertchenZiele: kaertchenZiele, kaertchenListe: kaertchenListe, kaertchenHTML: kaertchenHTML,
+    kaertchenNamenKlasse: kaertchenNamenKlasse, KAERTCHEN_CSS: KAERTCHEN_CSS
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_NFC_QR_LOGIK = api;

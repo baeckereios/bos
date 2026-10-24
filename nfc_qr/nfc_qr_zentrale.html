@@ -37,6 +37,15 @@
   (makeReadOnly wird nicht verwendet; Ulf, 03.10.2026).
 
   CHANGELOG
+    2026-10-24 · 07:46 · Stufe 3 Maschinen-Kärtchen (Maschinenseite Stufe B, Bauplan Go KC Maschinenseiten
+      24.10., 00:32, Weg a). Der ausgegraute Knopf „🚧 Maschinen-Kärtchen · in Planung“ wird zum
+      Abschnitt „Maschinen-Kärtchen“: Maschinen aus der Datenbank (Sammlung maschinen, über die
+      Zweit-App wie die Sammelblätter; istAdmin() darf lesen, RK §27), je Maschine Häkchen und
+      Anzahl (1–10, vorbelegt mit der Zahl der Exemplare), „Kärtchen drucken“ über bos_druck.js
+      (A4 hoch, 8 je Blatt, QR 38 mm, nfc_qr_logik.js kaertchenHTML). Kein freies Eintippen.
+      Lokal ausgegraut wie Schild und Sammelblatt (darfAusgeben). Fehler mit Meldung der Datenbank.
+      Hilfe-Abschnitt „Maschinen-Kärtchen“ neu. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
+    2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
     2026-10-23 · 23:04 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-23_maschinen.rules (Maschinenseite Stufe A, Bauplan Go KC 22:22, Freigabe Ulf 22:22; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
     2026-10-21 · 11:07 · v2.2 · Umbau (#110 BackStore wie ein App Store, Bauplan
       freigegeben KC 10:27, Teile D und E)
@@ -254,13 +263,8 @@
   <h2 class="abschnitt" data-i18n="abschnitt_ziele">Ziele</h2>
   <div id="zielBereich"></div>
 
-  <h2 class="abschnitt" data-i18n="abschnitt_planung">Weitere Druckvorlagen</h2>
-  <div class="karte">
-    <div class="knoepfe" style="margin-top:0">
-      <button type="button" class="bos-btn" disabled data-i18n="planung_kaertchen">🚧 Maschinen-Kärtchen · in Planung</button>
-    </div>
-    <div class="klein" style="margin-top:8px" data-i18n="planung_text">Kommt in der nächsten Baustufe: kleine Kärtchen für Maschinen, zum Ausschneiden.</div>
-  </div>
+  <h2 class="abschnitt" data-i18n="abschnitt_kaertchen">Maschinen-Kärtchen</h2>
+  <div class="karte" id="kaertchenBereich"></div>
   </div>
 
   <div id="reiterZugang" hidden>
@@ -347,7 +351,7 @@ const NFC_ZEITLIMIT_MS = 30000;   /* wie im alten Programm */
    Lehnt die Datenbank ab, ist die eingesetzte Regel älter als diese Seite.
    REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft). */
 const REGEL_FASSUNG = 'nfc-qr-2026-10-21';   /* seit 21.10.2026: Block nfc_einstellungen (RK §25) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-23_maschinen.rules';
+const REGEL_DATEI = 'firestore_regeln_2026-10-24_maschinen_b.rules';
 const A = window.BOS_ACCOUNTS;
 const LEERLAUF_MS = 5 * 60 * 1000;   /* wie die Kontenverwaltung (N-15, Ulf: 5 Minuten) */
 const VORWARNUNG_MS = 60 * 1000;
@@ -363,9 +367,13 @@ const I18N_DE = {
   abbrechen: 'Abbrechen',
   abschnitt_chip: 'Chip prüfen',
   abschnitt_ziele: 'Ziele',
-  abschnitt_planung: 'Weitere Druckvorlagen',
-  planung_kaertchen: '🚧 Maschinen-Kärtchen · in Planung',
-  planung_text: 'Kommt in der nächsten Baustufe: kleine Kärtchen für Maschinen, zum Ausschneiden.',
+  abschnitt_kaertchen: 'Maschinen-Kärtchen',
+  kk_text: 'Ein Code je Maschine bzw. Gruppe (beim Stikkenofen einer für alle vier). Er öffnet die Seite der Maschine, dort wählt man den Ofen. 8 Kärtchen je Blatt A4, an den gestrichelten Linien schneiden, dann laminieren.',
+  kk_abgemeldet: 'Die Maschinen liest die Zentrale mit dem Generalschlüssel: erst oben anmelden.',
+  kk_lade: 'Maschinen werden geladen …', kk_leer: 'Noch keine Maschine angelegt (Maschinenseite → ＋ Maschine).',
+  kk_fehler: 'Maschinen nicht lesbar', kk_regel: 'Die eingesetzte Regel kennt die Maschinen noch nicht (Maschinenseite, RK §27).',
+  kk_anzahl: 'Anzahl', kk_exemplare: '{n} Exemplar(e)', kk_drucken: '🖨 Kärtchen drucken ({n})', kk_keins: 'Erst mindestens eine Maschine ankreuzen.',
+  kk_lokal: 'Drucken erst, wenn BäckereiOS online läuft.',
   err_laden: 'Die Seite konnte nicht starten',
   err_kopieren: 'Adresse konnte nicht kopiert werden. Sie steht in der Zeile: lange drücken, markieren, kopieren',
   err_drucken: 'Schild konnte nicht gedruckt werden',
@@ -594,7 +602,9 @@ const S = { chip: null, nfcAbbruch: null, nfcLaeuft: false, schildZielId: null,
   /* Zugangsblatt: gespeichert = Stand der Datenbank; ziele/basisDa/basisAm = Editor und der Stand, auf dem er beruht */
   zugang: { zustand: 'abgemeldet', meldung: '', gespeichert: null, ziele: [], basisDa: false, basisAm: null, sauber: '[]', hinweis: '', speichert: false },
   /* 21.10.2026 (#110): Kurztexte für die Vorschau — stand 'aus' | 'lade' | 'bereit' | 'fehler' */
-  texte: { stand: 'aus', daten: null, grund: '' } };
+  texte: { stand: 'aus', daten: null, grund: '' },
+  /* 24.10.2026: Maschinen-Kärtchen — zustand 'abgemeldet' | 'lade' | 'bereit' | 'fehler'; wahl { id: { an, anzahl } } */
+  kk: { zustand: 'abgemeldet', meldung: '', code: '', ziele: [], wahl: {} } };
 
 function apps() { return window.BOS_APPS || []; }
 function eingebettet() { try { return window.self !== window.top; } catch (e) { return true; } }
@@ -684,7 +694,7 @@ function renderZiele() {
   });
   document.getElementById('zielBereich').innerHTML = html;
 }
-function render() { renderSperre(); renderChip(); renderZiele(); renderBlatt(); }
+function render() { renderSperre(); renderChip(); renderZiele(); renderBlatt(); renderKaertchen(); }
 
 /* ---------- Adresse kopieren (geht immer, auch lokal) ---------- */
 async function kopiereAdresse(id) {
@@ -876,7 +886,8 @@ async function starteDatenbank() {
   if (!adminAn()) {
     S.db = { zustand: 'abgemeldet', meldung: '', blaetter: S.db.blaetter || [] };
     S.zugang.zustand = 'abgemeldet'; S.zugang.meldung = '';
-    renderBlatt(); renderZugang(); return;
+    S.kk.zustand = 'abgemeldet';
+    renderBlatt(); renderZugang(); renderKaertchen(); return;
   }
   S.db = { zustand: 'lade', meldung: '', blaetter: [] };
   S.zugang.zustand = 'lade'; S.zugang.meldung = '';
@@ -899,7 +910,8 @@ async function starteDatenbank() {
   await Promise.all([
     ladeBlaetter().then(renderBlatt, function (err) { dbFehler(dbZustandAus(err), err); }),
     ladeZugang().then(renderZugang, function (err) { zugangFehlerZustand(dbZustandAus(err), err); }),
-    ladeTexte()
+    ladeTexte(),
+    ladeKaertchen()
   ]);
 }
 /* 21.10.2026 (#110): Kurztexte für die Vorschau, über die Zweit-App (istAdmin()
@@ -918,6 +930,86 @@ async function ladeTexte() {
   }
   renderZugangVorschau();
 }
+
+/* ==================================================================
+   MASCHINEN-KÄRTCHEN (Stufe 3, 24.10.2026). Maschinen aus der Datenbank
+   (über die Zweit-App), Adresse aus der Registry + ?maschine=<kennung>
+   (nfc_qr_logik.js kaertchenZiele). Gespeichert wird hier nichts.
+   ================================================================== */
+async function ladeKaertchen() {
+  S.kk.zustand = 'lade'; S.kk.meldung = ''; S.kk.code = ''; renderKaertchen();
+  try {
+    const snap = await mitZeitlimit(adb().collection('maschinen').get({ source: 'server' }));
+    const l = []; snap.forEach(function (d) { const x = d.data() || {}; x.id = d.id; l.push(x); });
+    S.kk.ziele = L.kaertchenZiele(l, apps());
+    S.kk.ziele.forEach(function (z) { if (!S.kk.wahl[z.id]) S.kk.wahl[z.id] = { an: false, anzahl: Math.max(1, Math.min(L.KAERTCHEN.MAX_ANZAHL, z.exemplare || 1)) }; });
+    S.kk.zustand = 'bereit';
+  } catch (err) {
+    console.error('[NFC & QR] Maschinen-Kärtchen: Maschinen nicht geladen', err);
+    S.kk.zustand = 'fehler'; S.kk.code = (err && err.code) || ''; S.kk.meldung = (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err));
+  }
+  renderKaertchen();
+}
+function kkGewaehlt() { return S.kk.ziele.filter(function (z) { const w = S.kk.wahl[z.id]; return w && w.an; }); }
+function kkAnzahl() { return L.kaertchenListe(kkGewaehlt().map(function (z) { return { ziel: z, anzahl: S.kk.wahl[z.id].anzahl }; })).length; }
+function renderKaertchen() {
+  const el = document.getElementById('kaertchenBereich'); if (!el) return;
+  const k = S.kk;
+  let html = '<div class="klein">' + esc(t('kk_text')) + '</div>';
+  if (k.zustand === 'abgemeldet') {
+    html += '<div id="kkGrund" style="margin-top:8px"><b>' + esc(t('kk_abgemeldet')) + '</b><div class="knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="admin-anmelden">' + esc(t('admin_anmelden')) + '</button></div></div>';
+  } else if (k.zustand === 'lade') {
+    html += '<div class="klein" style="margin-top:8px">' + esc(t('kk_lade')) + '</div>';
+  } else if (k.zustand === 'fehler') {
+    html += '<div class="hinweis rot" id="kkFehler" style="margin-top:8px"><b>' + esc(t('kk_fehler')) + ':</b> ' + (k.code === 'permission-denied' ? esc(t('kk_regel')) + ' ' : '') + esc(k.meldung) +
+      '<div class="knoepfe"><button type="button" class="bos-btn" data-aktion="kk-nochmal">' + esc(t('db_nochmal')) + '</button></div></div>';
+  } else if (!k.ziele.length) {
+    html += '<div class="klein" id="kkLeer" style="margin-top:8px">' + esc(t('kk_leer')) + '</div>';
+  } else {
+    html += '<div id="kkListe" style="margin-top:8px">' + k.ziele.map(function (z) {
+      const w = k.wahl[z.id];
+      return '<div class="zeile" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:48px">' +
+        '<label style="display:flex;align-items:center;gap:10px;flex:1 1 200px;min-height:44px"><input type="checkbox" data-kk-an="' + esc(z.id) + '"' + (w.an ? ' checked' : '') + ' style="width:22px;height:22px"> <b>' + esc(z.name) + '</b> <span class="klein">' + esc(t('kk_exemplare', { n: z.exemplare })) + '</span></label>' +
+        '<label class="klein" style="display:flex;align-items:center;gap:6px">' + esc(t('kk_anzahl')) + ' <input type="number" class="bos-input" data-kk-anzahl="' + esc(z.id) + '" min="1" max="' + L.KAERTCHEN.MAX_ANZAHL + '" value="' + esc(w.anzahl) + '" style="width:5em"></label></div>';
+    }).join('') + '</div>';
+    const n = kkAnzahl();
+    html += '<div class="knoepfe"><button type="button" class="bos-btn bos-btn--amber" data-aktion="kk-drucken" id="kkDruckBtn"' + (darf() && n ? '' : ' disabled') + '>' + esc(t('kk_drucken', { n: n })) + '</button></div>' +
+      (!darf() ? '<div class="klein">' + esc(t('kk_lokal')) + '</div>' : !n ? '<div class="klein">' + esc(t('kk_keins')) + '</div>' : '');
+  }
+  el.innerHTML = html;
+}
+function druckeKaertchen() {
+  if (!darf()) { toast(t('gesperrt_toast')); return false; }
+  try {
+    const liste = L.kaertchenListe(kkGewaehlt().map(function (z) { return { ziel: z, anzahl: S.kk.wahl[z.id].anzahl }; }));
+    if (!liste.length) { toast(t('kk_keins')); return false; }
+    if (!window.BOS_DRUCK) throw new Error('bos_druck.js nicht geladen');
+    const svg = {};
+    const karten = liste.map(function (z) {
+      if (!svg[z.id]) {
+        const adr = Q.adresse(z.pfad, z.zusatz);
+        if (!Q.darfAusgeben(adr)) throw new Error('Adresse ist keine Online-Adresse: ' + adr);
+        svg[z.id] = Q.qrFuer(adr);
+      }
+      return { name: z.name, exemplare: z.exemplare, qrSvg: svg[z.id] };
+    });
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: L.kaertchenHTML(karten, { stand: standHeute() }),
+      appName: 'NFC & QR', mitKopf: false, farbig: false,
+      extraCSS: L.KAERTCHEN_CSS + L.SCHILD_DRUCK_CSS, ausrichtung: 'portrait'
+    });
+    return true;
+  } catch (err) { zeigeFehler(t('err_drucken'), err); return false; }
+}
+document.addEventListener('change', function (e) {
+  const an = e.target.getAttribute && e.target.getAttribute('data-kk-an');
+  const anz = e.target.getAttribute && e.target.getAttribute('data-kk-anzahl');
+  if (an && S.kk.wahl[an]) { S.kk.wahl[an].an = e.target.checked; renderKaertchen(); }
+  if (anz && S.kk.wahl[anz]) {
+    let n = Math.floor(Number(e.target.value)); if (!(n >= 1)) n = 1; if (n > L.KAERTCHEN.MAX_ANZAHL) n = L.KAERTCHEN.MAX_ANZAHL;
+    S.kk.wahl[anz].anzahl = n; renderKaertchen();
+  }
+});
 
 /* ---------- Rückfrage: zwei Knöpfe, keine Vorauswahl (Checkliste §11) ---------- */
 let frageAktionen = [];
@@ -1353,8 +1445,8 @@ function abmelden(hinweis) {
   try { A.adminReauthEnde().catch(function (f) { console.error('[NFC & QR] Abmelden fehlgeschlagen', f); }); } catch (e) { /* nichts zu tun */ }
   S.adminHinweis = hinweis || '';
   document.getElementById('leerlaufStreifen').hidden = true;
-  S.db.zustand = 'abgemeldet'; S.zugang.zustand = 'abgemeldet';
-  renderAdmin(); renderBlatt(); renderZugang();
+  S.db.zustand = 'abgemeldet'; S.zugang.zustand = 'abgemeldet'; S.kk.zustand = 'abgemeldet';
+  renderAdmin(); renderBlatt(); renderZugang(); renderKaertchen();
 }
 /* Leerlauf: Zeitstempel statt langem setTimeout (Muster der Kontenverwaltung).
    [Vorschlag] Kommt ein dritter Aufrufer, gehört der Zähler nach bos_accounts.js. */
@@ -1404,6 +1496,7 @@ const helpData = [
   { heading: 'Zugangsblatt: Schnellzugriffe', text: 'Im Reiter „Zugangsblatt“ wählst du höchstens 6 Ziele, die als QR-Code unter der Anleitung jedes Zugangsblatts stehen, das die Kontenverwaltung druckt, zum Beispiel „BOS öffnen“, Wunschtag und Urlaub. Mit ▲ und ▼ legst du die Reihenfolge fest, mit ✕ nimmst du ein Ziel heraus (mit Rückfrage). Darunter zeigt die Vorschau den unteren Teil des Blatts: Die Codes stehen untereinander, abwechselnd links und rechts, jeder ist auf Papier 2,2 cm groß, daneben der Name und, wenn es eine gibt, eine kurze Beschreibung. Erst „Speichern“ sichert die Auswahl (mit Rückfrage); sie gilt dann für jedes neu gedruckte Blatt. Gedruckt werden je Person nur die Ziele, die ihre Rolle öffnen darf: Ein Azubi ohne Recht auf den Produktionsplaner bekommt diesen Code nicht, „BOS öffnen“ und Seiten ohne Anmeldung bekommt jeder. Gibt es ein Ziel nicht mehr, ist die Zeile rot; erst entfernen, dann speichern. Gespeichert wird nur, welche Ziele es sind, nie eine Adresse. Solange BäckereiOS nicht online läuft, zeigt die Vorschau Platzhalter, und das Zugangsblatt kommt ohne Codes.' },
   { heading: 'Chips gehen nicht im Launcher', text: 'Öffnest du diese Seite über die Kachel im Launcher, läuft sie eingebettet. Der Browser erlaubt NFC dann nicht. Die Seite zeigt in diesem Fall den Knopf „In eigenem Fenster öffnen“. Dort gehen die Chip-Funktionen. Liste, Adressen, Schilder und Sammelblätter gehen auch im Launcher.' },
   { heading: 'Wenn etwas nicht klappt', text: 'Jeder Fehler steht oben in einem roten Kasten, mit der Ursache in normaler Sprache und der Meldung des Geräts dahinter. Bei Chips heißt das meistens: NFC am Handy ist aus, die Erlaubnis für den Browser fehlt, oder der Chip wurde zu früh weggezogen. Ein fehlender Code ist kein Notfall: Alles bleibt auch über den Launcher erreichbar.' },
+  { heading: 'Maschinen-Kärtchen', text: 'Unten im Reiter „Schilder & Chips“ stehen alle Maschinen, die auf der Maschinenseite angelegt und nicht ausgeblendet sind. Jede Maschine bekommt einen Code, der ihre Seite öffnet — beim Stikkenofen einer für alle vier Öfen, gewählt wird dort. Häkchen setzen, Anzahl wählen (vorbelegt mit der Zahl der Exemplare, höchstens 10), „Kärtchen drucken“. Auf ein Blatt A4 passen 8 Kärtchen; an den gestrichelten Linien schneiden und laminieren. Der Code ist 3,8 cm breit. Die Maschinen liest die Zentrale mit dem Generalschlüssel. Wird eine Maschine ausgeblendet, führt ihr Kärtchen auf den Satz „gibt es nicht (oder ausgeblendet)“ — dann das Kärtchen abnehmen.' },
   { heading: 'Schilder der Teigecke', text: 'Die Schilder für Wagen und Orte der Teigecke mit der Zutatenliste druckst du weiter auf der Seite „Teigecke · Orte“, dort wo du die Zutaten siehst. Diese Zentrale druckt nur reine Wegweiser. Einer davon gehört in die Teigecke: „Teigecke · Vorbereitungen“ steht in der Liste direkt unter „BrotTeigRechner“ (früher „Teigecke Nacht“) und öffnet den BrotTeigRechner gleich im Reiter „Vorbereitungen“ — als QR-Schild oder Chip, wie jedes andere Ziel.' }
 ];
 function oeffneHilfe() {
@@ -1447,6 +1540,8 @@ document.addEventListener('click', function (e) {
     case 'zugang-weg': zugangWeg(Number(el.getAttribute('data-i'))); break;
     case 'zugang-speichern': speichereZugang(); break;
     case 'zugang-verwerfen': zugangVerwerfen(); break;
+    case 'kk-drucken': druckeKaertchen(); break;
+    case 'kk-nochmal': ladeKaertchen(); break;
   }
 });
 /* Standort und Ausstattung: in den Zustand übernehmen, ohne neu zu zeichnen
