@@ -58,6 +58,9 @@
    dreht, dreht dort mit — und umgekehrt.
 
    CHANGELOG
+     2026-10-24 · 13:41 · v1.3 · Feature (Nachtrag 2, Go KC 24.10. 13:28, M43): notizenSicht() —
+       angepinnte + die neuesten fünf, Rest „älter“ (rein, additiv). Sonst unverändert.
+       SESSION_2026-10-24_MASCHINENSEITE_NACHTRAG_2_BAU.md
      2026-10-24 · 11:30 · v1.2 · Feature (Nachtrag Übersicht, Go KC 24.10. 11:1x, K16):
        ofenKurz() für die Ofenknöpfe der Kopfleiste (rein, additiv). Sonst unverändert.
        SESSION_2026-10-24_MASCHINENSEITE_NACHTRAG_UEBERSICHT_BAU.md
@@ -379,6 +382,14 @@
         return eb - ea;
       });
   }
+  /* Nachtrag 2 (M43): Chatfenster zeigt die angepinnten und die neuesten n (Standard 5) der Sicht; der Rest
+     steht unter „ältere anzeigen“. Rechnet nur mit der Liste im Gerät — keine Lesezugriffe. */
+  var CHAT_NEUESTE = 5;
+  function notizenSicht(liste, ofen, jetztMs, n) {
+    var k = n === undefined || n === null ? CHAT_NEUESTE : n, pin = [], rest = [];
+    notizenFuer(liste, ofen, jetztMs).forEach(function (x) { (istAngepinnt(x) ? pin : rest).push(x); });
+    return { zeigen: pin.concat(rest.slice(0, k)), aelter: rest.slice(k) };
+  }
   function pruefeNotizText(roh) {
     var s = text(roh).replace(/\r\n?/g, '\n').trim();
     if (!s) return { text: '', fehler: 'Die Notiz ist leer.' };
@@ -686,6 +697,8 @@
     ofenNormal: ofenNormal, einzelOfen: einzelOfen, ofenName: ofenName, reparaturAdresse: reparaturAdresse,
     /* Nachtrag Übersicht */
     ofenKurz: ofenKurz,
+    /* Nachtrag 2 */
+    CHAT_NEUESTE: CHAT_NEUESTE, notizenSicht: notizenSicht,
     geraetNorm: geraetNorm, geraetPasst: geraetPasst, offeneFuer: offeneFuer,
     istAngepinnt: istAngepinnt, fristEnde: fristEnde, abgelaufen: abgelaufen, restTage: restTage, restText: restText,
     restDeutlich: restDeutlich, alterTage: alterTage, loesenLoescht: loesenLoescht, sichtbarFuer: sichtbarFuer,
