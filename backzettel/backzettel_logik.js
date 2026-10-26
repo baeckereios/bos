@@ -25,6 +25,10 @@
      anderswo(dok, eintrag)   wo derselbe Artikel im Tag in einem ANDEREN Topf steht (N2)
      konflikte(altDok, eintraege)   „bisher / jetzt“ — auch beim Topfwechsel (N2)
      baueTagesdokument(altDok, eintraege, opt)   das ganze neue Dokument
+     unbekannteArtikel(tage, index, indexGeloescht, heute)   Übersicht
+                              „Unbekannte Artikel“ (Stufe 2a C)
+     umzugTage(tage, artNr, key)   Tage mit ohneProdukt[artNr] (Stufe 2a B)
+     umzugTag(dok, opt)       ein Tag: ohneProdukt[artNr] → produkte[key]
 
    ZAHLEN-REGELN (Ulf/KC 19.10.2026): gespeichert wird nur Stück (E16);
    Bleche und Charge sind stille Kontrolle (P1), die Charge bleibt nur bei
@@ -49,7 +53,17 @@
 
    Datum nie über toISOString() (UTC-Falle zwischen 0 und 2 Uhr).
 
+   UMZUG (Stufe 2a B, Anweisung 26.10.2026 / E11): Wird ein Artikel nach-
+   träglich ein Produkt, ziehen seine Tage aus ohneProdukt in produkte um —
+   je Tag, nie über einen vorhandenen Wert, nie an einem BOS1-Tag,
+   wiederholbar (ein zweiter Lauf findet nichts mehr unter ohneProdukt).
+
    CHANGELOG
+     2026-10-26 · 07:33 · v3 · Stufe 2a „Produkt anlegen“ (Freigabe KC 06:20)
+       Neu, rein additiv: unbekannteArtikel(), umzugTage(), umzugTag(),
+       VORKOMMEN_TAGE gilt auch für „n× in 4 Wochen“ der Übersicht. Zuordnung
+       (ordneZu), konflikte, anderswo, baueTagesdokument unverändert.
+       Prüfung: _PRUEF_backzettel.js Teil U.
      2026-10-19 · 17:32 · v1 · Erstfassung (Backzettel Stufe 1)
        Freigabe KC 09:47 (B1–B12). Prüfung: _PRUEF_backzettel.js.
      2026-10-19 · 18:32 · v2 · Nachtrag 1 (KC 18:02)
@@ -476,6 +490,98 @@
     return dok;
   }
 
+  /* ---------- Stufe 2a: unbekannte Artikel und Umzug ----------
+     unbekannteArtikel: alle Nummern, die in den geladenen Tagen (ohne
+     BOS1-Tage) unter ohneProdukt stehen. Je Nummer: letzter Name und letzte Charge (vom
+     neuesten Tag), in4Wochen = Tage mit 0 ≤ heute − Datum < VORKOMMEN_TAGE
+     (künftige Tage nicht), insgesamt = alle geladenen Tage, zuletzt =
+     neuestes Datum. stand nach dem heutigen Produktindex:
+       'unbekannt'  keine aktive Nummer (dann ggf. geloescht: Produkt)
+       'produkt'    genau ein Produkt mit Stück-Schlüssel → Werte übernehmen
+       'konflikt'   zwei Produkte · 'kein_stueck' Schlüssel nicht in Stück
+     Sortiert: in4Wochen ↓, insgesamt ↓, zuletzt ↓, Nummer ↑. */
+  function unbekannteArtikel(tage, index, indexGeloescht, heute) {
+    var m = {};
+    (tage || []).forEach(function (t) {
+      if (!t || !t.datum || importTag(t) || !t.ohneProdukt || typeof t.ohneProdukt !== 'object') return;   // wie umzugTage: BOS1-Tage nie
+      Object.keys(t.ohneProdukt).forEach(function (nr) {
+        var w = t.ohneProdukt[nr] || {};
+        var e = m[nr] || (m[nr] = { artNr: nr, name: null, charge: null, zuletzt: null, in4Wochen: 0, insgesamt: 0 });
+        e.insgesamt++;
+        var d = heute ? tageZwischen(t.datum, heute) : null;
+        if (d !== null && d >= 0 && d < VORKOMMEN_TAGE) e.in4Wochen++;
+        if (!e.zuletzt || t.datum > e.zuletzt) { e.zuletzt = t.datum; e.name = w.name || e.name; e.charge = w.charge === undefined ? null : w.charge; }
+        else if (!e.name && w.name) e.name = w.name;
+      });
+    });
+    var liste = Object.keys(m).map(function (nr) {
+      var e = m[nr];
+      var treffer = (index && index[nr]) || [];
+      var gel = (indexGeloescht && indexGeloescht[nr]) || [];
+      if (treffer.length > 1) { e.stand = 'konflikt'; e.produkte = treffer; }
+      else if (treffer.length === 1) {
+        e.produkt = treffer[0];
+        e.stand = /_stueck$/.test(String(treffer[0].legacyKey || '')) ? 'produkt' : 'kein_stueck';
+      } else {
+        e.stand = 'unbekannt';
+        if (gel.length) e.geloescht = gel[0];
+      }
+      return e;
+    });
+    liste.sort(function (a, b) {
+      return (b.in4Wochen - a.in4Wochen) || (b.insgesamt - a.insgesamt) ||
+        String(b.zuletzt || '').localeCompare(String(a.zuletzt || '')) || a.artNr.localeCompare(b.artNr);
+    });
+    return liste;
+  }
+  /* Tage für den Umzug, neueste zuerst. BOS1-Tage nie. wertDa: für den
+     Schlüssel steht am Tag schon ein Wert in produkte (wird nie überschrieben). */
+  function umzugTage(tage, artNr, key) {
+    var out = [];
+    (tage || []).forEach(function (t) {
+      if (!t || !t.datum || importTag(t) || !hat(t.ohneProdukt, artNr)) return;
+      var w = t.ohneProdukt[artNr] || {};
+      out.push({ datum: t.datum, wochentag: wochentagLang(t.datum), anzahl: typeof w.anzahl === 'number' ? w.anzahl : null,
+        name: w.name || null, wertDa: !!key && hat(t.produkte, key), wert: key && hat(t.produkte, key) ? t.produkte[key] : null });
+    });
+    out.sort(function (a, b) { return b.datum.localeCompare(a.datum); });
+    return out;
+  }
+  /* Ein Tag (frisch gelesenes Dokument). opt: { artNr, key, zaehlt, serverZeit }.
+     Ergebnis { ergebnis, dok? , anzahl?, wert? }:
+       'umgezogen'        dok = das GANZE neue Dokument (transaction.set, B11):
+                          produkte[key] = Anzahl, ohneProdukt[artNr] weg (leeres
+                          Feld entfernt), zählt nicht → ausgeschlossen[key] =
+                          'von_hand', sonst ein alter Ausschluss des Schlüssels weg;
+                          zuletztBearbeitet = serverZeit. sorten/seiten/erfasstAm bleiben.
+       'schon_umgezogen'  ohneProdukt[artNr] gibt es nicht mehr → nichts schreiben
+       'wert_da'          produkte[key] gibt es schon → nichts schreiben
+       'import'           BOS1-Tag → nie
+       'fehlt'            kein Dokument / Eintrag ohne gültige Anzahl → nichts schreiben */
+  function umzugTag(dok, opt) {
+    if (!dok) return { ergebnis: 'fehlt' };
+    if (importTag(dok)) return { ergebnis: 'import' };
+    if (!hat(dok.ohneProdukt, opt.artNr)) return { ergebnis: 'schon_umgezogen' };
+    if (hat(dok.produkte, opt.key)) return { ergebnis: 'wert_da', wert: dok.produkte[opt.key] };
+    var w = dok.ohneProdukt[opt.artNr] || {};
+    var anzahl = w.anzahl;
+    if (typeof anzahl !== 'number' || !Number.isFinite(anzahl)) return { ergebnis: 'fehlt' };
+    function kopie(o) { var r = {}; Object.keys(o || {}).forEach(function (k) { r[k] = o[k]; }); return r; }
+    var neu = {};
+    Object.keys(dok).forEach(function (k) { neu[k] = dok[k]; });
+    neu.produkte = kopie(dok.produkte);
+    neu.ohneProdukt = kopie(dok.ohneProdukt);
+    neu.ausgeschlossen = kopie(dok.ausgeschlossen);
+    neu.produkte[opt.key] = anzahl;
+    delete neu.ohneProdukt[opt.artNr];
+    if (opt.zaehlt === false) neu.ausgeschlossen[opt.key] = 'von_hand';
+    else delete neu.ausgeschlossen[opt.key];
+    if (!Object.keys(neu.ohneProdukt).length) delete neu.ohneProdukt;
+    if (!Object.keys(neu.ausgeschlossen).length) delete neu.ausgeschlossen;
+    neu.zuletztBearbeitet = opt.serverZeit;
+    return { ergebnis: 'umgezogen', dok: neu, anzahl: anzahl };
+  }
+
   var L = {
     WT_LANG: WT_LANG, KREISE: KREISE,
     FEHLT_TAGE: FEHLT_TAGE, FEHLT_MINDEST: FEHLT_MINDEST, FEHLT_WOCHEN: FEHLT_WOCHEN,
@@ -486,7 +592,8 @@
     produktIndex: produktIndex, bestellungVorschlag: bestellungVorschlag, ordneZu: ordneZu, pruefeCharge: pruefeCharge,
     doppelteSeiten: doppelteSeiten, datumsLage: datumsLage,
     vorkommen: vorkommen, fehltListe: fehltListe, letzterBacktag: letzterBacktag,
-    anderswo: anderswo, konflikte: konflikte, importTag: importTag, baueTagesdokument: baueTagesdokument
+    anderswo: anderswo, konflikte: konflikte, importTag: importTag, baueTagesdokument: baueTagesdokument,
+    unbekannteArtikel: unbekannteArtikel, umzugTage: umzugTage, umzugTag: umzugTag
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = L;
   else wurzel.BOS_BACKZETTEL_LOGIK = L;

@@ -17,6 +17,22 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-10-26 · 04:55 · Fix (Ulf 26.10., 04:38–04:41, Tablet-Fotos; Bau-Doku
+      SESSION_2026-10-26_REPARATURANFRAGE_FEHLERMELDUNGEN_BAU.md)
+      - A: Nach „Anfrage senden“ kam „Laden Kennzeichen neu: Die Datenbank hat
+        abgelehnt (permission-denied)“. Ursache: Die neue Anfrage steht sofort in
+        der Liste (noch unterwegs zum Server), syncLetzte() abonnierte gleich ihren
+        jüngsten Verlaufseintrag — die Leseregel verlauf schaut im Kopf der Anfrage
+        nach, den der Server da noch nicht hatte → abgelehnt, Abo tot, „neu“ für
+        diese Anfrage bis zum Neuladen aus. Jetzt: neue Abos erst, wenn keine der
+        beiden Listen noch Unterwegs-Änderungen hat (die Liste meldet sich nach
+        der Bestätigung ohnehin neu). Sicherheitsnetz: wird ein Abo trotzdem
+        abgelehnt, zwei neue Anläufe (nach 2 s und 4 s), erst dann der Fehler.
+        Anführungszeichen im Fehlertext nicht mehr doppelt („Kennzeichen ‚neu‘“).
+      - B: „Fenster setzen/verschieben“ mit dem Datum, das schon steht, ist kein
+        Fehler mehr im roten Kasten: nichts wird gespeichert, ein Hinweis unten
+        sagt „Steht schon auf …“. Ohne Datum: „Erst ein Datum wählen.“
+        bos_meldungen.js unverändert (prüft weiter selbst), keine Regeländerung.
     2026-10-17 · 02:36 · #77 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 02:03)
       Der beforeunload-Zuhörer läuft jetzt über ../bos_ungespeichert.js
       (BOS_UNGESPEICHERT.melde) — dieselbe Bedingung, wörtlich. Neu: Auch das ✕
@@ -448,12 +464,14 @@ const I18N_DE = {
   neu_nachricht_aria: 'neue Rückfrage', neu_sonst_aria: 'neu seit dem letzten Reinschauen',
   s_gesehen: '👀 gesehen', s_repariert: '✓ repariert', s_aria: '{was}: {titel}',
   t_repariert: '✓ repariert —', t_zuruecknehmen: 'zurücknehmen', t_zurueck_ok: '↩ Zurückgenommen — wieder „gesehen“',
-  neu_was: 'Kennzeichen „neu“',
+  neu_was: 'Kennzeichen ‚neu‘',
   zurueck_aria: 'Zurück zum Posteingang',
   verwerfen_frage: 'Ungesendeten Text verwerfen?\n\nOK = verwerfen und zurück · Abbrechen = hierbleiben, der Text bleibt stehen.',
   merk_aus: 'Gerätespeicher nicht nutzbar — die Kennzeichen „neu“ sind auf diesem Gerät aus, sonst geht alles. Grund: {grund}',
   merk_kaputt: 'Der Gerätespeicher für „neu“ war beschädigt und ist neu angelegt — alles Bisherige gilt als gelesen. Grund: {grund}',
   err_laden: 'Laden „{was}“',
+  fenster_gleich: 'Steht schon auf {datum} — nichts geändert.',
+  fenster_ohne_datum: 'Erst ein Datum wählen.',
   err_unbehandelt: 'Unerwarteter Fehler',
   // Stufe 2: Fotos
   foto_knopf: '📷 Foto ({n}/{max})',
@@ -738,25 +756,48 @@ function planeRender() {
   renderGeplant = true;
   Promise.resolve().then(function () { renderGeplant = false; render(); });
 }
+/* Fix 26.10.2026 (A): Eine eben gemeldete Anfrage steht sofort in der Liste,
+   ist beim Server aber noch nicht angekommen. Die Leseregel für den Verlauf
+   schaut im Kopf der Anfrage nach (RK §20) — ein Abo in diesem Moment lehnt
+   der Server ab und beendet es. Deshalb: neue Abos erst, wenn keine der beiden
+   Listen mehr Unterwegs-Änderungen hat; nach der Bestätigung meldet sich die
+   Liste ohnehin noch einmal (includeMetadataChanges). Abgelehnt trotzdem
+   (anderes Rennen): bis zu LETZTE_VERSUCHE neue Anläufe, erst dann der Fehler. */
+const LETZTE_VERSUCHE = 2;
+function listenUnterwegs() {
+  return !!((S.verbindung.offen && S.verbindung.offen.ausstehend) || (S.verbindung.gruen && S.verbindung.gruen.ausstehend));
+}
+function abonniereLetzte(id, L) {
+  L.abo = M.neuesterEintrag(id, function (e) {
+    if (S.letzte[id] !== L) return;
+    L.e = e; L.bereit = true;
+    pflegeMerk();
+    planeRender();
+  }, function (err) {
+    if (S.letzte[id] !== L) return;
+    L.abo = null;                   // ein abgelehntes Abo ist beendet
+    if (err && err.art === 'keine_berechtigung' && L.versuche < LETZTE_VERSUCHE) {
+      L.versuche++;
+      console.error('[Reparaturanfrage] Kennzeichen neu abgelehnt, neuer Anlauf ' + L.versuche + ':', err);
+      L.uhr = setTimeout(function () { L.uhr = null; if (S.letzte[id] === L) abonniereLetzte(id, L); }, 2000 * L.versuche);
+      return;
+    }
+    if (S.letzteFehler) return;   // einmal zeigen, nicht je Anfrage
+    S.letzteFehler = true;
+    zeigeFehler(t('err_laden', { was: t('neu_was') }), err);
+  });
+}
 function syncLetzte() {
   const ids = sichtbareIds();
   Object.keys(S.letzte).forEach(function (id) {
-    if (!ids[id]) { const L = S.letzte[id]; if (L.abo) L.abo(); delete S.letzte[id]; }
+    if (!ids[id]) { const L = S.letzte[id]; if (L.uhr) clearTimeout(L.uhr); if (L.abo) L.abo(); delete S.letzte[id]; }
   });
+  if (listenUnterwegs()) return;   // Fix A: erst nach der Bestätigung durch den Server
   Object.keys(ids).forEach(function (id) {
     if (S.letzte[id]) return;
-    const L = { e: null, bereit: false, abo: null };
+    const L = { e: null, bereit: false, abo: null, versuche: 0, uhr: null };
     S.letzte[id] = L;              // vor dem Abo: die Antwort kann sofort kommen
-    L.abo = M.neuesterEintrag(id, function (e) {
-      if (S.letzte[id] !== L) return;
-      L.e = e; L.bereit = true;
-      pflegeMerk();
-      planeRender();
-    }, function (err) {
-      if (S.letzteFehler) return;   // einmal zeigen, nicht je Anfrage
-      S.letzteFehler = true;
-      zeigeFehler(t('err_laden', { was: t('neu_was') }), err);
-    });
+    abonniereLetzte(id, L);
   });
 }
 
@@ -967,7 +1008,13 @@ function renderAnfrage(main) {
   if (db) db.addEventListener('click', function () { aktion(function () { return M.dringlichkeit(k, k.dringlichkeit === 'dringend' ? 'normal' : 'dringend'); }); });
   const fb = document.getElementById('fensterBtn');
   if (fb) fb.addEventListener('click', function () {
-    aktion(function () { return M.fenster(k, wert('fensterDatum') || '', wert('fensterGrund') || ''); }, function () { setzeWert('fensterGrund', ''); });
+    // Fix 26.10.2026 (B): dasselbe Datum ist kein Fehler — nichts speichern, nur ein Hinweis
+    const datum = wert('fensterDatum') || '';
+    if (!S.arbeitet && datum === (k.fenster || '')) {
+      toast(datum ? t('fenster_gleich', { datum: M.fensterText(datum) }) : t('fenster_ohne_datum'));
+      return;
+    }
+    aktion(function () { return M.fenster(k, datum, wert('fensterGrund') || ''); }, function () { setzeWert('fensterGrund', ''); });
   });
   const fw = document.getElementById('fensterWegBtn');
   if (fw) fw.addEventListener('click', function () {

@@ -8,6 +8,10 @@
   Rechner: ../bos_verbrauch_durchschnitt.js (Schnitt, Abweichung, Tage des Topfs)
   Fotos: ../bos_foto.js (Verkleinern, Kopie aus bos_meldungen.js)
 
+  Anlegen: ../bos_produkte_anlegen.js (Schlüssel, Vorlage, KATEGORIEN — dieselbe
+          Mechanik wie „＋ Produkt“ in der Produkt-Config), geschrieben über
+          ../bos_produkte_schreiben.js (Sicherung + Produkt + Stand, RK §16/§17)
+
   Schreibt: bos_events/verbrauch_offiziell_<JJJJ-MM-TT> (Backzettel-Topf), per
   Transaktion als GANZES Dokument (bewusste Ausnahme von „nur anhängen“, B11:
   ein Dokument je Backtag, mehrere Durchgänge, ein zurückgenommener Ausschluss
@@ -31,6 +35,22 @@
       Dazu: „Heute nicht auf dem Zettel“ kennt jetzt jede Zeile mit bekannter
       Nummer (auch Bestellung oder rot) — sonst hieße eine als Bestellung
       gekennzeichnete Zeile „Seite vergessen?“.
+    2026-10-26 · 07:33 · v4 · Stufe 2a „Produkt anlegen“ (Anweisung KC 04:31,
+      Freigabe Bauplan KC 06:20 mit Auflage N1, Kern-Freigabe Ulf 06:43)
+      A: „＋ Als neues Produkt anlegen“ im Zeilen-Fenster (nur „ohne Produkt“),
+      Formular vorbefüllt (Name, ArtNr fest, Kategorie aus dem Nummernkreis,
+      Stück pro Blech = Charge), vorher frisch vom Server: Nummer schon an
+      einem aktiven/gelöschten Produkt → nicht anlegen. Danach Liste frisch,
+      Zuordnung neu — ohne neues Auslesen.
+      B: „Werte übernehmen“ — gespeicherte Tage ohneProdukt[artNr] → produkte
+      je Tag in einer Transaktion (zählt / zählt nicht), wiederholbar; danach
+      Topf, S.alt und Abweichung neu.
+      C: Stand-Karte „Unbekannte Artikel“ (eingeklappt, aus S.tage, ohne Lesen).
+      D: eigener Text für „Schlüssel nicht in Stück“; Hinweis bei gelöschtem
+      Produkt; Hilfe „Kundenbestellungen“ und neuer Abschnitt.
+      N1: Stand-Zettel der Produkte (ein Lesevorgang) bei Rückkehr auf die
+      Seite (visibilitychange, focus — höchstens alle 30 s) und VERBINDLICH
+      vor dem Speichern-Blatt; bei neuem Stand Liste frisch, neu bewerten.
     2026-10-20 · 06:59 · v3 · Herkunft der Einstellungen (Verbrauch aufräumen,
       Freigabe KC 06:20): Stand-Karte zeigt eine Zeile, woher die Einstellungen
       kommen (BOS_VERBRAUCH.einstellungenHerkunft(): Datenbank mit Stand /
@@ -55,6 +75,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_produkte.js"></script>
+<script src="../bos_produkte_schreiben.js"></script>
+<script src="../bos_produkte_anlegen.js"></script>
 
 <style>
   /* Vorsilbe bz-. Farben nur über Tokens; Status (rot/Warnung/grün) getrennt vom Akzent (Checkliste §3a). */
@@ -137,6 +159,19 @@
   #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--bos-surface-raised); border: 1px solid var(--bos-border-strong);
     padding: 10px 16px; border-radius: var(--bos-radius-md); z-index: 60; box-shadow: var(--bos-shadow-md); max-width: 92vw; }
   input.bos-input { min-height: var(--bos-tap-min); }
+  /* Stufe 2a */
+  details.bz-unb > summary { cursor: pointer; padding: 6px 0; font-family: var(--bos-font-label); font-weight: 700; }
+  .bz-unbliste { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .bz-unbliste li { border: 1px solid var(--bos-border); border-radius: var(--bos-radius-sm); padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; }
+  .bz-unbliste li .bz-unbtext { flex: 1 1 220px; font-size: var(--bos-font-sm); overflow-wrap: anywhere; }
+  .bz-unbliste li .bos-btn { min-height: 38px; padding: 4px 10px; }
+  .bz-umzug { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .bz-umzug li { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; border: 1px solid var(--bos-border); border-radius: var(--bos-radius-sm); padding: 6px 8px; font-size: var(--bos-font-sm); }
+  .bz-umzug li.grau { opacity: .55; }
+  .bz-umzug li .bz-zaehlwahl { display: flex; gap: 4px; }
+  .bz-umzug li .bz-zaehlwahl button.aktiv { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .bz-feldfehler { color: var(--bos-red); font-size: var(--bos-font-xs); min-height: 1em; }
+  select.bos-input { min-height: var(--bos-tap-min); }
   @media (max-width: 480px) { main { padding: var(--bos-space-sm); } .bz-zweispaltig { grid-template-columns: 1fr; } .bz-fotos { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -253,6 +288,29 @@
   </div>
 </div>
 
+<!-- Stufe 2a: Produkt anlegen (aus dem Zeilen-Fenster und aus „Unbekannte Artikel“) -->
+<div id="anlegenSheet" class="bz-overlay" hidden>
+  <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="anlegenTitel">
+    <h2 id="anlegenTitel" data-i18n="an_titel">Als neues Produkt anlegen</h2>
+    <div id="anlegenInhalt"></div>
+    <p id="anStatus" class="bz-dim" role="status"></p>
+    <div class="bz-sheetknoepfe">
+      <button type="button" class="bos-btn bos-btn--amber bz-btn" id="anJaBtn" data-i18n="an_ja">Anlegen</button>
+      <button type="button" class="bos-btn bz-btn" id="anNeinBtn" data-i18n="zurueck">Zurück</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stufe 2a: die gespeicherte Geschichte zieht ins Produkt um -->
+<div id="umzugSheet" class="bz-overlay" hidden>
+  <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="umzugTitel">
+    <h2 id="umzugTitel"></h2>
+    <div id="umzugInhalt"></div>
+    <p id="umzugStatus" class="bz-dim" role="status"></p>
+    <div class="bz-sheetknoepfe" id="umzugKnoepfe"></div>
+  </div>
+</div>
+
 <div id="hilfeSheet" class="bz-overlay" hidden>
   <div class="bz-sheet" role="dialog" aria-modal="true" aria-labelledby="hilfeTitel">
     <h2 id="hilfeTitel" data-i18n="hilfe_titel">Hilfe: Backzettel erfassen</h2>
@@ -325,7 +383,8 @@ const I18N_DE = {
   g_nummer_fehlt: '✕ Artikelnummer fehlt oder unlesbar', g_anzahl_fehlt: '✕ Anzahl fehlt oder unlesbar',
   g_p1_falsch: '✕ Prüfsumme: {a} ÷ {c} = {soll} Bleche, gelesen {b}', g_p1_nicht_pruefbar: '✕ Nicht nachrechenbar (Bleche oder Charge unlesbar)',
   g_bestaetigt: '✓ Von Hand bestätigt', g_konflikt_produkt: '✕ Zwei Produkte mit dieser Artikelnummer: {namen} — in der Produktkarte klären oder Zeile verwerfen',
-  g_kein_stueck: '⚠︎ Produkt „{name}“ führt seinen Schlüssel nicht in Stück — wird als „ohne Produkt“ gespeichert',
+  g_kein_stueck: '⚠︎ Produkt „{name}“ hat einen Schlüssel, der nicht auf „_stueck“ endet — der Backzettel-Topf zählt nur Stück. Wird als „ohne Produkt“ mitgespeichert; in der Produkt-Config klären.',
+  g_geloescht: 'Artikelnummer gehört zum gelöschten Produkt „{name}“ — wird still mitgespeichert · kam {n}× in den letzten 4 Wochen',
   g_doppelt_durchgang: '✕ Diese Artikelnummer steht zweimal in diesem Durchgang',
   g_abweichung: '⚠︎ Abweichung: heute {heute}, Schnitt {wt} {schnitt} ({db} Bleche, {dp} %) — zählt vorab nicht für den Schnitt',
   g_abweichung_zaehlt: '⚠︎ Abweichung: heute {heute}, Schnitt {wt} {schnitt} ({db} Bleche, {dp} %) — von Hand auf „zählt“ gestellt',
@@ -354,7 +413,42 @@ const I18N_DE = {
   zs_bestellung_hand: 'Kundenbestellung — von Hand gekennzeichnet', zs_keine_bestellung_hand: 'Keine Kundenbestellung — von Hand (Kunde-Menge {m} = Anzahl)',
   zs_als_bestellung: 'Als Kundenbestellung kennzeichnen', zs_als_produkt: 'Normales Produkt (keine Kundenbestellung)', zs_keine_bestellung: 'Keine Kundenbestellung',
   zs_kein_foto: 'Foto nicht mehr im Speicher.', zs_anzahl_ungueltig: 'Anzahl bitte als Zahl eintragen (z. B. 1170).', zs_artnr_ungueltig: 'Artikelnummer: nur Ziffern.',
-  zs_stufe2: '🚧 Produkt anlegen — in Planung (Stufe 2)',
+  zs_anlegen: '＋ Als neues Produkt anlegen', zs_umzug: 'Werte übernehmen ({n} Tage ohne Produkt)',
+  zs_geloescht: 'Gibt es als gelöschtes Produkt „{name}“ — in der Produkt-Config zurückholen.',
+  /* Stufe 2a: Produkt anlegen */
+  an_titel: 'Als neues Produkt anlegen', an_ja: 'Anlegen', an_laeuft: 'Lege an …',
+  an_name: 'Name', an_name_satz: 'Aus dem Namen entsteht der Produkt-Schlüssel. Der bleibt für immer — der Name selbst lässt sich später jederzeit ändern.',
+  an_schluessel: 'Schlüssel: {k}', an_schluessel_ausweich: 'Schlüssel: {k} (der naheliegende ist schon vergeben)',
+  an_artnr: 'Artikelnummer', an_kategorie: 'Kategorie', an_kat_waehlen: '— bitte wählen —',
+  an_kat_vorschlag: 'Vorschlag aus der Artikelnummer ({kreis}… = {kat}) — du kannst ihn ändern.', an_kat_kein: 'Kein Vorschlag für diese Nummer — bitte wählen.',
+  an_spb: 'Stück pro Blech', an_spb_satz: 'Vom Zettel (Charge). Leer lassen geht auch.',
+  an_rest: 'Station, Einheit, Backtage und alles andere pflegst du in der Produkt-Config. Bis dahin erscheint das Produkt nur dort und hier (und als Brot unter „Brote ohne Teig“ in Teige & Rezepte).',
+  an_ok: '✓ „{name}“ angelegt · Schlüssel {k} · Sicherung angelegt · Stand {stand}', an_ok_ausweich: ' (der naheliegende Schlüssel war schon vergeben)',
+  an_schon_da: 'Die Artikelnummer {nr} hat inzwischen das Produkt „{name}“ (anderes Gerät oder Produkt-Config?). Nichts angelegt — die Produktliste ist neu geladen.',
+  an_geloescht: 'Gibt es als gelöschtes Produkt „{name}“ — in der Produkt-Config zurückholen. Nichts angelegt.',
+  an_konflikt: 'Jemand hat inzwischen ein Produkt gespeichert (Stand {jetzt}, gelesen {gelesen}). Nichts angelegt — noch einmal „Anlegen“ tippen. ({m})',
+  an_perm: 'Die Datenbank hat abgelehnt: Produkte anlegen darf nur die Rolle admin. Angemeldet als {k}. ({m})',
+  an_netz: 'Keine Verbindung zum Server (WLAN?). Nichts angelegt. ({m})',
+  an_zeit: 'Keine Bestätigung vom Server nach {s} s. In der Produkt-Config nachsehen, ob das Produkt angelegt ist, bevor du es noch einmal versuchst.',
+  an_fehler: 'Anlegen fehlgeschlagen: {m}',
+  an_gesperrt: 'Anlegen geht gerade nicht: {m}',
+  /* Stufe 2a: Umzug */
+  um_titel: 'Werte übernehmen: {name}', um_erklaerung: 'An diesen Tagen ist {nr} unter „ohne Produkt“ gespeichert. Übernommen zählen sie im Durchschnitt von „{name}“ mit — „zählt nicht“ nimmt einen Tag heraus (z. B. Aktion, Fehllesung).',
+  um_tag: '{tag} · {anzahl} Stück', um_wert_da: '{tag} · {anzahl} Stück — für das Produkt steht schon {wert}, wird nicht überschrieben',
+  um_zaehlt: 'zählt', um_zaehlt_nicht: 'zählt nicht', um_keine: 'Keine gespeicherten Tage unter „ohne Produkt“ — nichts zu übernehmen.',
+  um_start: 'Übernehmen ({n} Tage)', um_spaeter: 'Später', um_laeuft: 'Übernehme … ({i}/{n})',
+  um_fertig: '✓ {n} Tag(e) übernommen ({x} zählt nicht)', um_schon: '{n} war(en) schon erledigt', um_wertda: '{n} ausgelassen (Wert schon da)', um_fehlt: '{n} nicht mehr vorhanden',
+  um_abbruch: '✕ Abgebrochen bei {tag}: {m}. Die übrigen Tage stehen weiter unter „ohne Produkt“ — später noch einmal „Übernehmen“.',
+  um_topf_fehler: 'Die gespeicherten Tage sind nicht lesbar: {m}',
+  /* Stufe 2a: Übersicht Unbekannte Artikel */
+  unb_titel: 'Unbekannte Artikel ({n})', unb_zeile: '{n4}× in 4 Wochen · {ng}× insgesamt · zuletzt {zuletzt} · Charge {charge}',
+  unb_anlegen: 'anlegen', unb_uebernehmen: 'Werte übernehmen', unb_geloescht: 'gelöschtes Produkt „{name}“ — in der Produkt-Config zurückholen',
+  unb_konflikt: 'zwei Produkte mit dieser Nummer — in der Produkt-Config klären', unb_kein_stueck: 'Produkt „{name}“, Schlüssel nicht in Stück — in der Produkt-Config klären',
+  unb_produkt: 'jetzt Produkt „{name}“', unb_leer: 'Keine unbekannten Artikel gespeichert.', unb_fehler: 'Unbekannte Artikel: nicht verfügbar — {m}',
+  unb_erklaerung: 'Nummern, die gespeichert sind, aber noch kein Produkt haben — die häufigsten zuerst.',
+  /* N1: Produktliste geändert? */
+  liste_neu: 'Produktliste neu geladen (Stand {n}) — Zeilen neu zugeordnet, ohne neues Auslesen.',
+  stand_pruef_fehler: 'Produktliste nicht prüfbar: {m}', sp_liste_ungeprueft: '⚠︎ Ob es neue Produkte gibt, war nicht prüfbar ({m}). Gespeichert wird mit der geladenen Produktliste.',
   hilfe_titel: 'Hilfe: Backzettel erfassen',
   unbehandelt: 'Unerwarteter Fehler: {m}', ungueltig_bild: 'Kein Bild: {n}',
   wt_kurz: 'So,Mo,Di,Mi,Do,Fr,Sa'
@@ -379,6 +473,7 @@ const $ = function (id) { return document.getElementById(id); };
 
 /* ===================== Fehler sichtbar (Checkliste §7a) ===================== */
 const L = window.BOS_BACKZETTEL_LOGIK, A = window.BOS_BACKZETTEL_API, PR = window.BOS_BACKZETTEL_PROMPT, V = window.BOS_VERBRAUCH;
+const M = window.BOS_PRODUKTE_ANLEGEN || null, W = window.BOS_PRODUKTE_SCHREIBEN || null;   // Stufe 2a
 function schluesselJetzt() { try { return A.geraet().schluessel; } catch (e) { return ''; } }
 function sauber(text) { return A ? A.entschaerfe(text, schluesselJetzt()) : String(text); }
 function zeigeFehler(text, err) {
@@ -412,7 +507,16 @@ const S = {
   speichertGerade: false,
   gespeichert: false,
   quittung: null,
-  zeileOffen: null
+  zeileOffen: null,
+  // Stufe 2a
+  indexGeloescht: {},   // artNr → gelöschte Produkte (Sicht „alle“, dieselbe Abfrage)
+  belegt: {},           // alle Schlüssel (aktiv + gelöscht) — nur für die Vorschau im Formular
+  produkteStand: null,  // Nummer des Stand-Zettels der geladenen Liste (N1)
+  standGeprueftAm: 0,
+  legtAn: false, zieheUm: false,
+  anlegen: null,        // { artNr, name, charge, zeileId }
+  umzug: null,          // { artNr, key, name, wahl: { datum: zählt? }, meldung, quittung }
+  unbOffen: false
 };
 let fotoZaehler = 0;
 
@@ -432,15 +536,24 @@ async function start() {
   await Promise.all([ladeProdukte(), ladeEinstellungen(), ladeTage()]);
   zeichneStand();
 }
-async function ladeProdukte() {
+async function ladeProdukte(opt) {
   try {
-    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'aktive', frisch: !!(opt && opt.frisch) });
     S.produkte = e.liste || [];
     S.index = L.produktIndex(S.produkte);
+    S.produkteStand = typeof e.standNummer === 'number' ? e.standNummer : null;
+    // Stufe 2a (P3): gelöschte Produkte kennen — dieselbe Abfrage, kein zweiter Lesevorgang.
+    // Die Zuordnung bleibt auf „aktive“ (S.index), unverändert.
+    try {
+      const alle = await window.BOS_PRODUKTE.lade({ sicht: 'alle' });
+      S.indexGeloescht = L.produktIndex((alle.liste || []).filter(function (p) { return p.geloescht === true; }));
+      S.belegt = {};
+      (alle.liste || []).forEach(function (p) { if (p.legacyKey) S.belegt[p.legacyKey] = true; });
+    } catch (e2) { S.indexGeloescht = {}; S.belegt = {}; S.produkte.forEach(function (p) { if (p.legacyKey) S.belegt[p.legacyKey] = true; }); }
     const h = window.BOS_PRODUKTE.hinweisText ? window.BOS_PRODUKTE.hinweisText(e) : null;
     if (h) toast(h);
   } catch (err) {
-    S.produkte = []; S.index = {};
+    S.produkte = []; S.index = {}; S.indexGeloescht = {};
     zeigeFehler(t('produkte_fehler', { m: (err && (err.meldung || err.message)) || String(err) }), err);
   }
 }
@@ -478,9 +591,45 @@ function zeichneStand() {
   // 20.10.2026: woher die Einstellungen (Schwellen, Fenster) kommen — nie still
   const hk = V && typeof V.einstellungenHerkunft === 'function' ? V.einstellungenHerkunft() : null;
   if (hk) html += '<p id="einstHerkunft" class="' + (hk.warnung ? 'bz-warn' : 'bz-dim') + '">' + esc(hk.text) + '</p>';
+  html += unbekannteHTML();
   el.innerHTML = html;
   el.classList.remove('bz-dim');
+  const d = $('unbBox');
+  if (d) d.addEventListener('toggle', function () { S.unbOffen = d.open; });
 }
+/* Stufe 2a C: „Unbekannte Artikel“ — aus den geladenen Tagen, ohne Lesevorgang, eingeklappt. */
+function unbekannteHTML() {
+  if (S.tageFehler) return '<p class="bz-faint" id="unbFehler">' + esc(t('unb_fehler', { m: S.tageFehler.meldung || S.tageFehler.message })) + '</p>';
+  const liste = L.unbekannteArtikel(S.tage, S.index, S.indexGeloescht, S.heute);
+  if (!liste.length) return '';
+  return '<details class="bz-unb" id="unbBox"' + (S.unbOffen ? ' open' : '') + '><summary>' + esc(t('unb_titel', { n: liste.length })) + '</summary>' +
+    '<p class="bz-faint">' + esc(t('unb_erklaerung')) + '</p><ul class="bz-unbliste">' + liste.map(function (u) {
+      const text = '<b>' + esc(u.name || '?') + '</b> <span class="bz-faint">' + esc(u.artNr) + '</span><br>' +
+        esc(t('unb_zeile', { n4: u.in4Wochen, ng: u.insgesamt, zuletzt: datumKurz(u.zuletzt), charge: u.charge === null || u.charge === undefined ? '–' : zahlText(u.charge) }));
+      let rechts = '';
+      if (u.stand === 'unbekannt' && u.geloescht) rechts = '<span class="bz-warn">' + esc(t('unb_geloescht', { name: u.geloescht.name || u.geloescht.legacyKey })) + '</span>';
+      else if (u.stand === 'unbekannt') rechts = '<button type="button" class="bos-btn bos-btn--amber" data-unb-anlegen="' + esc(u.artNr) + '">' + esc(t('unb_anlegen')) + '</button>';
+      else if (u.stand === 'produkt') rechts = '<span class="bz-dim">' + esc(t('unb_produkt', { name: u.produkt.name || u.produkt.legacyKey })) + '</span> <button type="button" class="bos-btn bos-btn--amber" data-unb-umzug="' + esc(u.artNr) + '">' + esc(t('unb_uebernehmen')) + '</button>';
+      else if (u.stand === 'konflikt') rechts = '<span class="bz-warn">' + esc(t('unb_konflikt')) + '</span>';
+      else rechts = '<span class="bz-warn">' + esc(t('unb_kein_stueck', { name: u.produkt.name || u.produkt.legacyKey })) + '</span>';
+      return '<li data-unb="' + esc(u.artNr) + '"><span class="bz-unbtext">' + text + '</span>' + rechts + '</li>';
+    }).join('') + '</ul></details>';
+}
+$('standInhalt').addEventListener('click', function (ev) {
+  const an = ev.target.closest('[data-unb-anlegen]');
+  if (an) {
+    const nr = an.getAttribute('data-unb-anlegen');
+    const u = L.unbekannteArtikel(S.tage, S.index, S.indexGeloescht, S.heute).find(function (x) { return x.artNr === nr; });
+    if (u) oeffneAnlegen({ artNr: nr, name: u.name, charge: u.charge, zeileId: null });
+    return;
+  }
+  const um = ev.target.closest('[data-unb-umzug]');
+  if (um) {
+    const nr = um.getAttribute('data-unb-umzug');
+    const tr = S.index[nr] || [];
+    if (tr.length === 1) oeffneUmzug(nr, tr[0]);
+  }
+});
 function seitenText(seiten) {
   const g = {};
   (seiten || []).forEach(function (s) { (g[s.abteilung] = g[s.abteilung] || []).push(s.seite); });
@@ -767,8 +916,12 @@ function bewerte(z, lage, doppelteArt) {
     r.eintrag = { art: 'bestellung', key: z.artNr, anzahl: z.anzahl, name: z.name, entscheidung: z.entscheidung, sorten: z.sorten, artNr: z.artNr, legacyKeys: lks };
   } else if (zu.art === 'ohneProdukt' || zu.art === 'kein_stueck') {
     ruhig = true;
+    const nVor = lage && lage.backtag ? L.vorkommen(S.tage, z.artNr, 'ohneProdukt', lage.backtag) : 0;
+    const gel = zu.art === 'ohneProdukt' ? (S.indexGeloescht[z.artNr] || [])[0] : null;
+    // Stufe 2a D: „kein_stueck“ ist KEINE unbekannte Nummer (F13) — ein Text, kein Widerspruch
     if (zu.art === 'kein_stueck') r.gruende.push(t('g_kein_stueck', { name: zu.produkt.name || zu.produkt.legacyKey }));
-    r.gruende.push(t('g_unbekannt', { n: lage && lage.backtag ? L.vorkommen(S.tage, z.artNr, 'ohneProdukt', lage.backtag) : 0 }));
+    else if (gel) r.gruende.push(t('g_geloescht', { name: gel.name || gel.legacyKey, n: nVor }));
+    else r.gruende.push(t('g_unbekannt', { n: nVor }));
     if (zu.wahl === false && zu.vorschlag) r.gruende.push(t('g_keine_bestellung_hand', { m: zahlText(z.kundeMenge, 0) }));
     r.eintrag = { art: 'ohneProdukt', key: z.artNr, anzahl: z.anzahl, name: z.name, charge: z.charge, entscheidung: z.entscheidung, sorten: z.sorten, artNr: z.artNr, legacyKeys: lks };
   } else if (zu.art === 'ohne_nummer') {
@@ -954,7 +1107,9 @@ function oeffneZeile(id) {
   html += '<p class="bz-dim">' + esc(p ? t('zs_produkt', { name: p.name || p.legacyKey }) : t('zs_kein_produkt')) + '</p>';
   if (b.zuordnung === 'bestellung') html += '<p class="bz-dim">' + esc(zu.wahl === true ? t('zs_bestellung_hand') : t('zs_bestellung', { m: zahlText(z.kundeMenge, 0) })) + '</p>';
   else if (zu.wahl === false && zu.vorschlag) html += '<p class="bz-dim">' + esc(t('zs_keine_bestellung_hand', { m: zahlText(z.kundeMenge, 0) })) + '</p>';
-  if (!p && b.zuordnung !== 'bestellung') html += '<p class="bz-faint">' + esc(t('zs_stufe2')) + '</p>';
+  // Stufe 2a: gelöschtes Produkt mit dieser Nummer → Hinweis statt Anlege-Knopf (P3)
+  const gelZ = b.zuordnung === 'ohneProdukt' && z.artNr ? (S.indexGeloescht[z.artNr] || [])[0] : null;
+  if (gelZ) html += '<p class="bz-warnbox" id="zsGeloescht">' + esc(t('zs_geloescht', { name: gelZ.name || gelZ.legacyKey })) + '</p>';
   html += '<div class="bz-zweispaltig"><div class="bz-feld"><label for="zsArtNr">' + esc(t('zs_artnr')) + '</label><input class="bos-input" id="zsArtNr" inputmode="numeric" value="' + esc(z.artNr || z.artNrText || '') + '"></div>' +
     '<div class="bz-feld"><label for="zsAnzahl">' + esc(t('zs_anzahl')) + '</label><input class="bos-input" id="zsAnzahl" inputmode="decimal" value="' + esc(z.anzahl === null ? '' : String(z.anzahl)) + '"></div></div>';
   html += '<p class="bz-faint">' + esc(t('zs_zettel', { b: zahlText(z.bleche), c: zahlText(z.charge), abt: z.abteilung || '?', s: z.seite === null ? '?' : z.seite })) + '</p>';
@@ -972,6 +1127,13 @@ function oeffneZeile(id) {
     const istBest = b.zuordnung === 'bestellung';
     k.push('<button type="button" class="bos-btn bz-btn" data-z="bestellung">' +
       esc(!istBest ? t('zs_als_bestellung') : (zu.bekannt ? t('zs_als_produkt') : t('zs_keine_bestellung'))) + '</button>');
+  }
+  // Stufe 2a A: nur bei „ohne Produkt“ (nicht bei Bestellung, kein_stueck, konflikt, ohne Nummer), nicht bei gelöschtem Produkt
+  if (!z.verworfen && z.artNr && b.zuordnung === 'ohneProdukt' && !gelZ) k.push('<button type="button" class="bos-btn bos-btn--amber bz-btn" data-z="anlegen">' + esc(t('zs_anlegen')) + '</button>');
+  // Stufe 2a B: Produkt da, aber noch Tage unter „ohne Produkt“ (z. B. über die Produkt-Config angelegt)
+  if (!z.verworfen && z.artNr && b.zuordnung === 'produkt' && p) {
+    const offen = L.umzugTage(S.tage, z.artNr, p.legacyKey).filter(function (x) { return !x.wertDa; }).length;
+    if (offen) k.push('<button type="button" class="bos-btn bz-btn" data-z="umzug">' + esc(t('zs_umzug', { n: offen })) + '</button>');
   }
   if (b.konflikt || z.entscheidung) {
     k.push('<button type="button" class="bos-btn bz-btn" data-z="bisher">' + esc(t('zs_bisher')) + '</button>');
@@ -997,6 +1159,13 @@ $('zeileKnoepfe').addEventListener('click', function (ev) {
   const z = findeZeile(S.zeileOffen); if (!z) { $('zeileSheet').hidden = true; return; }
   const was = b.getAttribute('data-z');
   if (was === 'zu') { $('zeileSheet').hidden = true; return; }
+  if (was === 'anlegen') { $('zeileSheet').hidden = true; oeffneAnlegen({ artNr: z.artNr, name: z.name, charge: z.charge, zeileId: z.id }); return; }
+  if (was === 'umzug') {
+    const pr = (S.index[z.artNr] || [])[0];
+    $('zeileSheet').hidden = true;
+    if (pr) oeffneUmzug(z.artNr, pr);
+    return;
+  }
   if (was === 'uebernehmen') {
     const artRoh = $('zsArtNr').value.trim(), anzRoh = $('zsAnzahl').value.trim();
     const art = L.artNrNorm(artRoh);
@@ -1027,13 +1196,19 @@ $('zeileKnoepfe').addEventListener('click', function (ev) {
 });
 
 /* ===================== Speichern ===================== */
-function oeffneSpeichern() {
+async function oeffneSpeichern() {
+  const a0 = letzteAuswertung; if (!a0 || a0.sperre.length || S.speichertGerade) return;
+  // N1 (Freigabe KC 06:20): VERBINDLICH vor dem Speichern — gibt es inzwischen neue Produkte
+  // (z. B. in der Produkt-Config im anderen Fenster angelegt)? Ein Lesevorgang; bei neuem
+  // Stand Liste frisch und neu bewerten. Fokus/Sichtbarkeit sind nur Komfort.
+  const pr = await pruefeProduktStand('speichern');
   const a = letzteAuswertung; if (!a || a.sperre.length) return;
   const zaehl = a.zaehl;
   const sorten = a.eintraege.filter(function (e) { return e.sorten && e.sorten.length; }).length;
   let html = '<p><b>' + esc(t('sp_zeile', { tag: datumKurz(a.lage.backtag), p: zaehl.produkte, n: zaehl.zaehltNicht, o: zaehl.unbekannt, b: zaehl.bestellungen })) + '</b></p>';
   if (sorten) html += '<p class="bz-dim">' + esc(t('sp_sorten', { n: sorten })) + '</p>';
   if (a.lage.rueckfrage) html += '<p class="bz-warnbox">' + esc(t(a.lage.rueckfrage.grund === 'alt' ? 'datum_rueck_alt' : 'datum_rueck_zukunft', { tag: datumKurz(a.lage.backtag), n: a.lage.rueckfrage.tage })) + '</p>';
+  if (pr && pr.fehler) html += '<p class="bz-warnbox" id="spListeUngeprueft">' + esc(t('sp_liste_ungeprueft', { m: fehlerKurz(pr.fehler) })) + '</p>';
   html += '<p class="bz-faint">' + esc(t('sp_erklaerung')) + '</p><p id="spFehler" class="bz-rot" role="alert"></p>';
   $('speichernInhalt').innerHTML = html;
   $('speichernJaBtn').disabled = false;
@@ -1110,6 +1285,256 @@ function neuerDurchgang() {
   zeichneUebersicht(null);
 }
 
+
+/* ===================== Stufe 2a: Produktliste aktuell? (N1) ===================== */
+function fehlerKurz(err) {
+  if (!err) return '?';
+  const m = err.meldung || err.message || String(err);
+  return (err.code && m.indexOf(err.code) === -1 ? err.code + ' — ' : '') + m;
+}
+const STAND_PRUEF_ABSTAND_MS = 30000;   // Fokus höchstens alle 30 s (Pflege-Register)
+/* Liest nur den Stand-Zettel der Produkte (ein Lesevorgang). Ist er neu, wird die Liste frisch
+   geladen und alles neu zugeordnet — ohne neues Auslesen. anlass: 'speichern' (verbindlich,
+   ungedrosselt) | 'sichtbar' | 'fokus' | 'nachholen' (Komfort, höchstens alle 30 s, nie während
+   etwas läuft; ein gedrosselter Fokus wird nach Ablauf der 30 s einmal nachgeholt). */
+let standNachholUhr = null;
+async function pruefeProduktStand(anlass) {
+  const beschaeftigt = S.laeuft || S.speichertGerade || S.legtAn || S.zieheUm;
+  if (anlass !== 'speichern') {
+    if (beschaeftigt) return { geprueft: false };
+    const seit = Date.now() - S.standGeprueftAm;
+    if (seit < STAND_PRUEF_ABSTAND_MS) {
+      // Gedrosselt, aber nicht verloren: Wer nach 10 s aus der Produkt-Config zurückkommt, bekommt die
+      // Prüfung, sobald die 30 s um sind (einmal, nicht je Fokus).
+      if (!standNachholUhr) standNachholUhr = setTimeout(function () { standNachholUhr = null; pruefeProduktStand('nachholen'); }, STAND_PRUEF_ABSTAND_MS - seit + 50);
+      return { geprueft: false, gedrosselt: true };
+    }
+  }
+  if (standNachholUhr) { clearTimeout(standNachholUhr); standNachholUhr = null; }
+  if (!window.db || !W) return { geprueft: false };
+  S.standGeprueftAm = Date.now();
+  try {
+    const snap = await mitZeitlimit(window.db.collection(W.STAND_COLLECTION).doc(W.STAND_DOK).get({ source: 'server' }), 10000);
+    const nr = snap && snap.exists && typeof snap.data().nummer === 'number' ? snap.data().nummer : null;
+    if (nr === S.produkteStand) return { geprueft: true, neu: false };
+    await ladeProdukte({ frisch: true });
+    zeichneStand();
+    await bewerteUndZeichne();
+    toast(t('liste_neu', { n: nr === null ? '–' : nr }));
+    return { geprueft: true, neu: true };
+  } catch (err) {
+    if (anlass === 'speichern') return { geprueft: false, fehler: err };
+    zeigeFehler(t('stand_pruef_fehler', { m: fehlerKurz(err) }), err);
+    return { geprueft: false, fehler: err };
+  }
+}
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') pruefeProduktStand('sichtbar'); });
+// Im Fenster-Launcher sind die Apps <iframe>s im selben Dokument — dort kommt kein
+// visibilitychange, wohl aber focus, wenn Ulf in dieses Fenster zurücktippt (N1).
+window.addEventListener('focus', function () { pruefeProduktStand('fokus'); });
+
+/* ===================== Stufe 2a A: Produkt anlegen ===================== */
+function oeffneAnlegen(a) {
+  if (!M || !W) { zeigeFehler(t('an_gesperrt', { m: 'bos_produkte_anlegen.js / bos_produkte_schreiben.js nicht geladen — Seite neu laden' })); return; }
+  S.anlegen = { artNr: a.artNr, name: a.name || '', charge: a.charge, zeileId: a.zeileId || null };
+  const vor = M.kategorieVorschlag(a.artNr);
+  let html = '';
+  html += '<div class="bz-feld"><label for="anName">' + esc(t('an_name')) + '</label><input class="bos-input" id="anName" autocomplete="off" value="' + esc(S.anlegen.name) + '">' +
+    '<span class="bz-faint">' + esc(t('an_name_satz')) + '</span><span class="bz-dim" id="anSchluessel"></span><span class="bz-feldfehler" id="anFehler_name"></span></div>';
+  html += '<div class="bz-feld"><label>' + esc(t('an_artnr')) + '</label><b id="anArtNr">' + esc(a.artNr) + '</b><span class="bz-feldfehler" id="anFehler_artNr"></span></div>';
+  html += '<div class="bz-feld"><label for="anKat">' + esc(t('an_kategorie')) + '</label><select class="bos-input" id="anKat">' +
+    (vor ? '' : '<option value="">' + esc(t('an_kat_waehlen')) + '</option>') +
+    M.KATEGORIEN.map(function (k) { return '<option value="' + esc(k) + '"' + (k === vor ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select>' +
+    '<span class="bz-faint" id="anKatHinweis">' + esc(vor ? t('an_kat_vorschlag', { kreis: String(a.artNr).slice(0, 2), kat: vor }) : t('an_kat_kein')) + '</span><span class="bz-feldfehler" id="anFehler_kategorie"></span></div>';
+  html += '<div class="bz-feld"><label for="anSpb">' + esc(t('an_spb')) + '</label><input class="bos-input" id="anSpb" inputmode="numeric" value="' + esc(a.charge === null || a.charge === undefined ? '' : String(a.charge)) + '">' +
+    '<span class="bz-faint">' + esc(t('an_spb_satz')) + '</span><span class="bz-feldfehler" id="anFehler_stueckProBlech"></span></div>';
+  html += '<p class="bz-hinweis">' + esc(t('an_rest')) + '</p>';
+  $('anlegenInhalt').innerHTML = html;
+  $('anStatus').textContent = ''; $('anStatus').className = 'bz-dim';
+  $('anJaBtn').disabled = false; $('anJaBtn').textContent = t('an_ja'); $('anJaBtn').hidden = false;
+  $('anNeinBtn').textContent = t('zurueck');
+  $('anName').addEventListener('input', zeigeSchluesselVorschau);
+  zeigeSchluesselVorschau();
+  $('anlegenSheet').hidden = false;
+}
+function zeigeSchluesselVorschau() {
+  const name = $('anName').value.trim();
+  if (!name) { $('anSchluessel').textContent = ''; return; }
+  try {
+    const k = M.eindeutigerSchluessel(name, S.belegt);
+    $('anSchluessel').textContent = k === M.slugify(name) ? t('an_schluessel', { k: k }) : t('an_schluessel_ausweich', { k: k });
+  } catch (e) { $('anSchluessel').textContent = e.message; }
+}
+function anlegenEingabe() {
+  return { name: $('anName').value, kategorie: $('anKat').value, artNr: S.anlegen.artNr, stueckProBlech: $('anSpb').value.trim() };
+}
+function zeigeAnStatus(text, art) { const el = $('anStatus'); el.textContent = text; el.className = art === 'ok' ? 'bz-ok' : art === 'fehler' ? 'bz-rot' : art === 'warn' ? 'bz-warn' : 'bz-dim'; }
+$('anNeinBtn').addEventListener('click', function () { if (S.legtAn) return; $('anlegenSheet').hidden = true; S.anlegen = null; });
+$('anJaBtn').addEventListener('click', function () { legeAn(); });
+async function legeAn() {
+  const a = S.anlegen; if (!a || S.legtAn) return;
+  ['name', 'artNr', 'kategorie', 'stueckProBlech'].forEach(function (f) { const el = $('anFehler_' + f); if (el) el.textContent = ''; });
+  const eingabe = anlegenEingabe();
+  try { M.neuesDokument(eingabe, { belegt: S.belegt, rohMap: {} }); }   // Eingabe vorab prüfen (Grund am Feld)
+  catch (e) { const el = e.feld ? $('anFehler_' + e.feld) : null; if (el) el.textContent = e.message; else zeigeAnStatus(e.message, 'fehler'); return; }
+  S.legtAn = true; $('anJaBtn').disabled = true; $('anJaBtn').textContent = t('an_laeuft'); zeigeAnStatus(t('an_laeuft'));
+  let gelesen = null;
+  try {
+    // 1. frisch vom Server, nie die Gerätekopie (wie der Editor, Z. 666–667: zwei Sichten, EINE Abfrage)
+    const e = await window.BOS_PRODUKTE.lade({ sicht: 'alle', nurServer: true, frisch: true });
+    const roh = await window.BOS_PRODUKTE.lade({ sicht: 'roh', nurServer: true });
+    // 2. Nummer schon vergeben? (dieselbe Normalisierung wie die Zuordnung)
+    const treffer = L.produktIndex(e.liste)[L.artNrNorm(a.artNr)] || [];
+    const aktiv = treffer.filter(function (p) { return p.geloescht !== true; });
+    const gel = treffer.filter(function (p) { return p.geloescht === true; });
+    if (aktiv.length) {
+      zeigeAnStatus(t('an_schon_da', { nr: a.artNr, name: aktiv[0].name || aktiv[0].legacyKey }), 'warn');
+      await nachAnlegen();
+      if (aktiv.length === 1 && /_stueck$/.test(String(aktiv[0].legacyKey || ''))) { $('anlegenSheet').hidden = true; oeffneUmzug(a.artNr, (S.index[L.artNrNorm(a.artNr)] || [aktiv[0]])[0]); }
+      return;
+    }
+    if (gel.length) { zeigeAnStatus(t('an_geloescht', { name: gel[0].name || gel[0].legacyKey }), 'warn'); return; }
+    // 3. Schlüssel und Dokument aus dem gemeinsamen Modul (wie „＋ Produkt“)
+    const belegt = {}, rohMap = {};
+    e.liste.forEach(function (p) { if (p.legacyKey) belegt[p.legacyKey] = true; });
+    roh.liste.forEach(function (d) { belegt[d.id] = true; rohMap[d.id] = d.daten; });
+    const nd = M.neuesDokument(eingabe, { belegt: belegt, rohMap: rohMap });
+    // 4. Stand frisch (wie Teigecke/Editor), dann der eine Schreibweg
+    const standSnap = await window.db.collection(W.STAND_COLLECTION).doc(W.STAND_DOK).get({ source: 'server' });
+    gelesen = standSnap.exists && typeof standSnap.data().nummer === 'number' ? standSnap.data().nummer : null;
+    const erg = await mitZeitlimit(W.schreibe({
+      kennung: S.kennung, geladenerStand: gelesen, standExistiert: standSnap.exists,
+      eintraege: [{ key: nd.key, inhalt: nd.inhalt, vorher: null, aktion: 'anlegen' }]
+    }), SPEICHER_ZEITLIMIT_MS);
+    // 5. Erfolg: Liste frisch, Zuordnung neu — KEIN neues Auslesen
+    zeigeAnStatus(t('an_ok', { name: nd.inhalt.name, k: nd.key, stand: erg.neuerStand }) + (nd.ausweich ? t('an_ok_ausweich') : ''), 'ok');
+    toast(t('an_ok', { name: nd.inhalt.name, k: nd.key, stand: erg.neuerStand }) + (nd.ausweich ? t('an_ok_ausweich') : ''));
+    await nachAnlegen();
+    const neu = (S.index[nd.inhalt.artNr] || []).find(function (p) { return p.legacyKey === nd.key; }) || { legacyKey: nd.key, name: nd.inhalt.name, artNr: nd.inhalt.artNr };
+    $('anlegenSheet').hidden = true;
+    oeffneUmzug(nd.inhalt.artNr, neu, t('an_ok', { name: nd.inhalt.name, k: nd.key, stand: erg.neuerStand }) + (nd.ausweich ? t('an_ok_ausweich') : ''));
+  } catch (err) {
+    let m;
+    if (err && err.feld) { const el = $('anFehler_' + err.feld); if (el) el.textContent = err.message; m = err.message; }
+    else if (err && err.code === 'permission-denied') {
+      m = t('an_perm', { k: S.kennung || '?', m: fehlerKurz(err) });
+      try {
+        const s2 = await window.db.collection(W.STAND_COLLECTION).doc(W.STAND_DOK).get({ source: 'server' });
+        const jetzt = s2.exists && typeof s2.data().nummer === 'number' ? s2.data().nummer : null;
+        if (gelesen !== null && jetzt !== gelesen) m = t('an_konflikt', { jetzt: jetzt, gelesen: gelesen, m: fehlerKurz(err) });
+      } catch (e3) { /* bleibt bei der Ablehnung */ }
+    }
+    else if (err && (err.code === 'unavailable' || err.art === 'kein_netz')) m = t('an_netz', { m: fehlerKurz(err) });
+    else if (err && err.code === 'zeitlimit') m = t('an_zeit', { s: SPEICHER_ZEITLIMIT_MS / 1000 });
+    else if (err && err.art && window.BOS_PRODUKTE.fehlerText) m = t('an_fehler', { m: window.BOS_PRODUKTE.fehlerText(err) });
+    else m = t('an_fehler', { m: fehlerKurz(err) });
+    zeigeAnStatus(m, 'fehler');
+    zeigeFehler(m, err);
+  } finally {
+    S.legtAn = false;
+    if (!$('anlegenSheet').hidden) { $('anJaBtn').disabled = false; $('anJaBtn').textContent = t('an_ja'); }
+  }
+}
+async function nachAnlegen() {
+  await ladeProdukte({ frisch: true });
+  zeichneStand();
+  await bewerteUndZeichne();
+}
+
+/* ===================== Stufe 2a B: Werte übernehmen (Umzug) ===================== */
+function oeffneUmzug(artNr, produkt, vorspann) {
+  S.umzug = { artNr: artNr, key: produkt.legacyKey, name: produkt.name || produkt.legacyKey, wahl: {}, meldung: null, quittung: null, vorspann: vorspann || null };
+  zeichneUmzug();
+  $('umzugSheet').hidden = false;
+}
+function zeichneUmzug() {
+  const u = S.umzug; if (!u) return;
+  $('umzugTitel').textContent = t('um_titel', { name: u.name });
+  let html = '';
+  if (u.vorspann) html += '<p class="bz-ok">' + esc(u.vorspann) + '</p>';
+  const tage = S.tageFehler ? [] : L.umzugTage(S.tage, u.artNr, u.key);
+  const offen = tage.filter(function (x) { return !x.wertDa; });
+  if (S.tageFehler) html += '<p class="bz-fehlbox">' + esc(t('um_topf_fehler', { m: fehlerKurz(S.tageFehler) })) + '</p>';
+  else if (!tage.length) html += '<p class="bz-dim" id="umzugLeer">' + esc(t('um_keine')) + '</p>';
+  else {
+    html += '<p class="bz-dim">' + esc(t('um_erklaerung', { nr: u.artNr, name: u.name })) + '</p><ul class="bz-umzug" id="umzugListe">' + tage.map(function (x) {
+      const tag = datumKurz(x.datum);
+      if (x.wertDa) return '<li class="grau" data-umzug-tag="' + esc(x.datum) + '">' + esc(t('um_wert_da', { tag: tag, anzahl: zahlText(x.anzahl, 0), wert: zahlText(x.wert, 0) })) + '</li>';
+      const zaehlt = u.wahl[x.datum] !== false;   // vorbelegt „zählt“ (K3)
+      return '<li data-umzug-tag="' + esc(x.datum) + '"><span>' + esc(t('um_tag', { tag: tag, anzahl: x.anzahl === null ? '?' : zahlText(x.anzahl, 0) })) + '</span>' +
+        '<span class="bz-zaehlwahl"><button type="button" class="bos-btn' + (zaehlt ? ' aktiv' : '') + '" data-umzug-wahl="1" aria-pressed="' + zaehlt + '">' + esc(t('um_zaehlt')) + '</button>' +
+        '<button type="button" class="bos-btn' + (!zaehlt ? ' aktiv' : '') + '" data-umzug-wahl="0" aria-pressed="' + !zaehlt + '">' + esc(t('um_zaehlt_nicht')) + '</button></span></li>';
+    }).join('') + '</ul>';
+  }
+  if (u.quittung) html += '<p class="bz-ok" id="umzugQuittung">' + esc(u.quittung) + '</p>';
+  if (u.meldung) html += '<p class="bz-fehlbox" id="umzugMeldung" role="alert">' + esc(u.meldung) + '</p>';
+  $('umzugInhalt').innerHTML = html;
+  $('umzugKnoepfe').innerHTML = (offen.length ? '<button type="button" class="bos-btn bos-btn--amber bz-btn" id="umzugStartBtn"' + (S.zieheUm ? ' disabled' : '') + '>' + esc(t('um_start', { n: offen.length })) + '</button>' : '') +
+    '<button type="button" class="bos-btn bz-btn" id="umzugZuBtn"' + (S.zieheUm ? ' disabled' : '') + '>' + esc(offen.length ? t('um_spaeter') : t('schliessen')) + '</button>';
+}
+$('umzugInhalt').addEventListener('click', function (ev) {
+  const b = ev.target.closest('[data-umzug-wahl]'); if (!b || S.zieheUm || !S.umzug) return;
+  const tag = b.closest('[data-umzug-tag]').getAttribute('data-umzug-tag');
+  S.umzug.wahl[tag] = b.getAttribute('data-umzug-wahl') === '1';
+  zeichneUmzug();
+});
+$('umzugKnoepfe').addEventListener('click', function (ev) {
+  if (ev.target.id === 'umzugZuBtn' && !S.zieheUm) { $('umzugSheet').hidden = true; S.umzug = null; return; }
+  if (ev.target.id === 'umzugStartBtn') fuehreUmzugAus();
+});
+async function fuehreUmzugAus() {
+  const u = S.umzug; if (!u || S.zieheUm) return;
+  const tage = L.umzugTage(S.tage, u.artNr, u.key).filter(function (x) { return !x.wertDa; });
+  if (!tage.length) return;
+  S.zieheUm = true; u.meldung = null; u.quittung = null; u.vorspann = null;
+  zeichneUmzug();
+  const z = { umgezogen: 0, zaehltNicht: 0, schon: 0, wertDa: 0, fehlt: 0 };
+  try {
+    for (let i = 0; i < tage.length; i++) {
+      const x = tage[i];
+      $('umzugStatus').textContent = t('um_laeuft', { i: i + 1, n: tage.length });
+      const zaehlt = u.wahl[x.datum] !== false;
+      const ref = window.db.collection('bos_events').doc('verbrauch_offiziell_' + x.datum);
+      let r;
+      try {
+        r = await mitZeitlimit(window.db.runTransaction(async function (tx) {
+          const snap = await tx.get(ref);
+          const erg = L.umzugTag(snap.exists ? snap.data() : null, { artNr: u.artNr, key: u.key, zaehlt: zaehlt, serverZeit: firebase.firestore.FieldValue.serverTimestamp() });
+          if (erg.ergebnis === 'umgezogen') tx.set(ref, erg.dok);   // GANZES Dokument, wie beim Speichern (B11)
+          return erg;
+        }), SPEICHER_ZEITLIMIT_MS);
+      } catch (err) {
+        const grund = err && err.code === 'permission-denied' ? t('sp_perm', { k: S.kennung || '?' }) + ' (' + fehlerKurz(err) + ')'
+          : err && err.code === 'zeitlimit' ? t('sp_zeit', { s: SPEICHER_ZEITLIMIT_MS / 1000 }) : fehlerKurz(err);
+        u.meldung = t('um_abbruch', { tag: datumKurz(x.datum), m: grund });
+        zeigeFehler(u.meldung, err);
+        break;
+      }
+      if (r.ergebnis === 'umgezogen') { z.umgezogen++; if (!zaehlt) z.zaehltNicht++; }
+      else if (r.ergebnis === 'schon_umgezogen') z.schon++;
+      else if (r.ergebnis === 'wert_da') z.wertDa++;
+      else z.fehlt++;   // 'fehlt' (BOS1-Tage stehen gar nicht erst in der Liste)
+    }
+  } finally {
+    // Immer — auch nach Abbruch: Topf, gespeicherter Stand des offenen Tages (Stempel!) und Abweichung neu.
+    const teile = [t('um_fertig', { n: z.umgezogen, x: z.zaehltNicht })];
+    if (z.schon) teile.push(t('um_schon', { n: z.schon }));
+    if (z.wertDa) teile.push(t('um_wertda', { n: z.wertDa }));
+    if (z.fehlt) teile.push(t('um_fehlt', { n: z.fehlt }));
+    u.quittung = teile.join(' · ');
+    V.vergissOffizielle();
+    S.abw = {};
+    S.alt = { datum: null, dok: null, geladen: false, fehler: null };
+    await ladeTage();
+    S.zieheUm = false;
+    $('umzugStatus').textContent = '';
+    zeichneStand();
+    await bewerteUndZeichne();
+    if (S.umzug === u) zeichneUmzug();
+    toast(u.quittung);
+  }
+}
+
 /* ===================== Ergebnis kopieren (Vergleichslauf §4.3a) ===================== */
 function kopiereErgebnis() {
   const g = A.geraet();
@@ -1134,7 +1559,8 @@ const HILFE = [
   ['Was passiert beim Auslesen?', 'Jedes Foto wird einzeln gelesen, höchstens drei gleichzeitig. Ein unscharfes Foto verdirbt nur seine eigene Seite: Es bekommt ein ⚠︎ oder ✕ mit Grund, du entfernst es, fotografierst die Seite neu und liest noch einmal. Die schon gelesenen Seiten bleiben stehen. Die Fotos werden nirgends gespeichert. Ist eine Seite zweimal da, fragt BOS, welches Foto gilt.'],
   ['Was rechnet BOS nach?', 'Für jede Zeile: Anzahl geteilt durch Charge muss die gedruckten Bleche ergeben. Stimmt das nicht, ist die Zeile rot (✕): Dann hat die KI sich verlesen. Tippe die Zeile an, vergleiche mit dem Foto (Vergrößern) und korrigiere die Anzahl, oder bestätige mit „Wert stimmt so“. Außerdem prüft BOS, dass alle Fotos denselben Backtag haben (das Datum oben links, nicht das Druckdatum oben rechts) und der Wochentag zum Datum passt.'],
   ['Was heißen die Farben?', '✕ Rot: muss geklärt werden, sonst geht Speichern nicht. ⚠︎ Abweichung: Der Wert weicht stark vom Durchschnitt desselben Wochentags ab — mindestens 3 Bleche UND mindestens 20 % (einstellbar im Verbrauch-Einstellungs-Editor, Reiter Backzettel). So eine Zeile steht vorab auf „zählt nicht für den Schnitt“. Ist der Wert echt (neue Filiale, Aktion), tippe sie an und stelle sie auf „zählt“. 💡 Hinweis: etwas zum Ansehen, z. B. die Charge auf dem Zettel passt nicht zur Produktkarte. Graue Zeilen (eingeklappt): unbekannte Artikelnummern und Kundenbestellungen mit unbekannter Nummer — sie werden still mitgespeichert, zählen aber nicht für den Schnitt. Ein bekanntes Produkt, das als Kundenbestellung gilt, steht dagegen als 💡 Hinweis oben.'],
-  ['Kundenbestellungen', 'Steht unter einer Zeile ein Kunde-Block und ist die bestellte Menge gleich der Anzahl, schlägt BOS „Kundenbestellung“ vor. Ist die Menge kleiner als die Anzahl, bleibt es ein normales Produkt. Eine Kundenbestellung zählt nicht für den Schnitt und löst nie „fehlt“ aus. Du kannst jede Zeile selbst umstellen: Zeile antippen, dann „Als Kundenbestellung kennzeichnen“ oder „Normales Produkt“ (bei unbekannter Nummer „Keine Kundenbestellung“). Das geht auch ohne Kunde-Block, denn die Kommentare auf dem Zettel sind nicht immer zuverlässig. Deine Wahl geht vor. Ist ein bekanntes Produkt eine Kundenbestellung, steht es unter „Bitte ansehen“: Hat die KI die Kunde-Menge falsch gelesen, würde sonst still ein Wert im Schnitt fehlen. Unbekannte Bestellungen stehen eingeklappt. „kam n× in den letzten 4 Wochen“ zeigt, wie oft so eine Zeile schon da war — das Übernehmen als Produkt kommt in Stufe 2.'],
+  ['Kundenbestellungen', 'Steht unter einer Zeile ein Kunde-Block und ist die bestellte Menge gleich der Anzahl, schlägt BOS „Kundenbestellung“ vor. Ist die Menge kleiner als die Anzahl, bleibt es ein normales Produkt. Eine Kundenbestellung zählt nicht für den Schnitt und löst nie „fehlt“ aus. Du kannst jede Zeile selbst umstellen: Zeile antippen, dann „Als Kundenbestellung kennzeichnen“ oder „Normales Produkt“ (bei unbekannter Nummer „Keine Kundenbestellung“). Das geht auch ohne Kunde-Block, denn die Kommentare auf dem Zettel sind nicht immer zuverlässig. Deine Wahl geht vor. Ist ein bekanntes Produkt eine Kundenbestellung, steht es unter „Bitte ansehen“: Hat die KI die Kunde-Menge falsch gelesen, würde sonst still ein Wert im Schnitt fehlen. Unbekannte Bestellungen stehen eingeklappt. „kam n× in den letzten 4 Wochen“ zeigt, wie oft so eine Zeile schon da war. Soll eine unbekannte Nummer ein Produkt werden, stell die Zeile auf „Keine Kundenbestellung“ und tippe dann „Als neues Produkt anlegen“. Tage, die schon als Kundenbestellung gespeichert sind, ziehen dabei nicht mit um.'],
+  ['Unbekannte Artikel als Produkt anlegen', 'Eine Zeile ohne Produkt (grau, eingeklappt) antippen, dann „＋ Als neues Produkt anlegen“. Das Formular ist vorbefüllt: Name vom Zettel (änderbar — aus ihm entsteht der Produkt-Schlüssel, der bleibt für immer), die Artikelnummer, die Kategorie aus der Nummer (11… Brötchen, 12… Brot, 13… Konditorei; du kannst sie ändern) und Stück pro Blech aus der Charge. Nach „Anlegen“ ist die Zeile sofort ein Produkt, ohne neues Auslesen; deine Korrekturen bleiben. Gibt es die Nummer schon an einem Produkt, legt BOS kein zweites an; ist es ein gelöschtes Produkt, holst du es in der Produkt-Config zurück. Gleich danach zeigt BOS die Tage, an denen der Artikel schon „ohne Produkt“ gespeichert ist: je Tag „zählt“ oder „zählt nicht“, dann „Übernehmen“. Erst dann rechnen diese Tage im Durchschnitt mit. Bricht das ab (Netz), stehen die übrigen Tage beim nächsten Mal wieder da; doppelt wird nichts. Alle unbekannten Nummern findest du in der Stand-Karte unter „Unbekannte Artikel“, die häufigsten zuerst. Hast du ein Produkt in der Produkt-Config angelegt, heißt der Knopf dort „Werte übernehmen“. Station, Einheit und Backtage pflegst du danach in der Produkt-Config; bis dahin erscheint das neue Produkt im Betrieb nirgends (ein Brot steht in „Teige & Rezepte“ unter „Brote ohne Teig“). Anlegen darf nur die Rolle admin.'],
   ['Heute nicht auf dem Zettel', 'Steht ein Produkt an diesem Wochentag sonst fast immer auf dem Zettel (an 3 der letzten 4 erfassten gleichen Wochentage), fehlt heute aber, obwohl seine Abteilung erfasst ist, fragt BOS: „Seite vergessen?“. Das sperrt das Speichern nicht. Die Prüfung beginnt, sobald drei gleiche Wochentage erfasst sind.'],
   ['Mehrere Durchgänge am selben Tag', 'Du kannst z. B. erst die Konditorei und später die Brote erfassen. Beim zweiten Mal wird der gespeicherte Tag ergänzt. Steht ein Produkt schon mit einer anderen Zahl drin, zeigt BOS „bisher / jetzt“ und du entscheidest. Dasselbe gilt, wenn ein Artikel die Art wechselt, zum Beispiel bisher als Produkt gespeichert und jetzt Kundenbestellung: „bisher: Produkt 20 · jetzt: Kundenbestellung 20“. Gespeichert wird er danach nur an einer Stelle. Nichts wird still überschrieben.'],
   ['Was wird gespeichert?', 'Nur die Stückzahl je Produkt, dazu still die Sorten unter GESAMT-Zeilen, unbekannte Zeilen und Kundenbestellungen. Ausreißer bekommen „zählt nicht“ und bleiben trotzdem sichtbar gespeichert. Für Tage aus dem alten BOS1 (bis 24.05.2026) wird nichts ergänzt. Ein Backtag, der mehr als 7 Tage zurück oder mehr als 2 Tage in der Zukunft liegt, wird vor dem Speichern angezeigt.'],
@@ -1153,7 +1579,7 @@ $('hilfeZuBtn').addEventListener('click', function () { $('hilfeSheet').hidden =
   if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: laeuft }); return; }
   window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
 })(function () { return !S.gespeichert && S.fotos.some(function (f) { return f.status === 'fertig'; }); },
-   function () { return S.speichertGerade || S.laeuft; });
+   function () { return S.speichertGerade || S.laeuft || S.legtAn || S.zieheUm; });
 
 start().catch(function (err) { zeigeFehler(t('unbehandelt', { m: (err && (err.meldung || err.message)) || String(err) }), err); });
 })();

@@ -3,6 +3,16 @@
 <!--
   MODUL: produkt_config/produkt_config_editor.html — Produkt-Config Editor
   CHANGELOG
+    2026-10-26 · 07:33 · Backzettel Stufe 2a „Produkt anlegen“ (Freigabe KC 06:20, Kern-Freigabe Ulf 06:43)
+      Nur Auslagern, Ergebnis gleich: KATEGORIEN, slugify(), die Vergabe in
+      eindeutigerSchluessel() und das leere Produkt aus neuesProdukt() kommen
+      aus dem neuen ../bos_produkte_anlegen.js (wörtlich kopiert; dieselbe
+      Mechanik nutzt der Backzettel). Welche Schlüssel belegt sind, bestimmt
+      weiter der Editor (daten, geloeschteSchluessel, dbGeloeschteSchluessel).
+      naechsteReihenfolge() bleibt hier (Speicherweg unabhängig vom Modul).
+      Fehlt das Modul: rote Statuszeile, „＋ Produkt“ gesperrt, Kategorien leer;
+      Laden/Speichern vorhandener Produkte unberührt. Gegenprobe alt/neu:
+      _PRUEF_produkte_anlegen.js. SESSION_2026-10-26_BACKZETTEL_STUFE2_PRODUKT_ANLEGEN_BAU.md
     2026-10-24 · 07:46 · Nur REGEL_DATEI_EDITOR: nennt jetzt firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Kern-Freigabe Ulf F6 24.10. 00:32; zwölf Stellen). REGEL_FASSUNG_EDITOR (maschinen-2026-10-23) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
     2026-10-23 · 23:04 · Werdegang (Maschinenseite Stufe A, #115/#116; Bauplan Go Kontroll-Chat 22:22, Kern-Freigabe Ulf 18:09)
       Neues Produktfeld werdegang (Liste von Maschinen-Kennungen) im Reiter
@@ -539,6 +549,7 @@
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_produkte.js"></script>
 <script src="../bos_produkte_schreiben.js"></script>
+<script src="../bos_produkte_anlegen.js"></script>   <!-- NEU 26.10.2026: Schlüssel, Vorlage, KATEGORIEN — gemeinsam mit dem Backzettel -->
 <script src="../maschinenseite/maschinen_logik.js"></script>   <!-- NEU 23.10.2026: Maschinenliste für den Werdegang -->
 <!-- 15.10.2026 (#63): Backzettel/Mitschrift lesen wie an der Station (dieselben
      Ausschlüsse: besondere Tage aus bos_zeitkontext_referenz.js), Froster-Bestand
@@ -550,7 +561,13 @@
 
 <script>
 var COLLECTION = 'produkte'; // seit 05.10.2026 gemessen, nicht mehr Annahme (PRODUKTE_KOMPENDIUM.md §2a)
-var KATEGORIEN = ['Brötchen','Brot','Konditorei','Fettgebäck','Snack','Schlawiner'];
+/* 26.10.2026 (Backzettel Stufe 2a): KATEGORIEN, Schlüssel und Vorlage eines neuen
+   Produkts stehen in ../bos_produkte_anlegen.js (eine Mechanik für Editor und
+   Backzettel). Fehlt die Datei, bleibt die Liste leer und „＋ Produkt“ gesperrt —
+   sichtbar in der Statuszeile, nie still mit falschen Kategorien. */
+var PRODUKT_NEU = window.BOS_PRODUKTE_ANLEGEN || null;
+var PRODUKT_NEU_FEHLT = '⚠ bos_produkte_anlegen.js nicht geladen — Seite neu laden (neue Fassung noch nicht vollständig online?). „＋ Produkt“ ist gesperrt, Kategorien fehlen; vorhandene Produkte laden und speichern geht.';
+var KATEGORIEN = PRODUKT_NEU ? PRODUKT_NEU.KATEGORIEN.slice() : [];
 var KAT_FARBEN = { 'Brötchen':'#c9932e','Brot':'#8b5a2b','Konditorei':'#6c3483','Fettgebäck':'#1a6b8a','Snack':'#4caf7d','Schlawiner':'#a8452e' };
 var daten = [];
 var geaendert = false;
@@ -688,6 +705,7 @@ async function ladeVonFirestore() {
     var ohneEinheit = daten.filter(hatEinheitLuecke).length;   // 13.10.2026 (#64): Lücken gleich beim Laden nennen
     richtwertRoh = {}; bzVorschlag = {}; frosterHinweis = {};   // 15.10.2026 (#63): gelten nur bis zum Neu-Laden
     status('✓ ' + daten.length + ' Produkte aus der Datenbank' + (Object.keys(gel).length ? ' (' + Object.keys(gel).length + ' gelöschte Schlüssel bleiben gesperrt)' : '') + (ohneEinheit ? ' · ' + ohneEinheit + ' ohne Einheit (Knopf „Nur ohne Einheit“)' : '') + zaehlerRichtwert() + warn, warn ? 'err' : 'ok');
+    if (!PRODUKT_NEU) status(PRODUKT_NEU_FEHLT, 'err');   /* 26.10.2026: nie still */
     return true;
   } catch (err) {
     console.error('[Produkt-Config] Laden:', err);
@@ -1759,11 +1777,8 @@ function aendere(idx, feld, wert) {
   markiereGeaendert(idx);
 }
 
-function slugify(name) {
-  return (name || 'produkt').toLowerCase()
-    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
-    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') + '_stueck';
-}
+/* 26.10.2026: steht jetzt in ../bos_produkte_anlegen.js (wörtlich kopiert). Name bleibt hier für die Aufrufer. */
+function slugify(name) { return PRODUKT_NEU.slugify(name); }
 
 // ── Schlüssel-Vergabe (NEU 28.09.2026, Teil B) ──────────────────────────
 // Der legacyKey bleibt für immer (Dokument-ID in Firestore, Schlüssel in der
@@ -1781,19 +1796,14 @@ function doppelteSchluessel(liste) {
   return Object.keys(doppelt).sort();
 }
 
+/* 26.10.2026: die Vergabe steht in ../bos_produkte_anlegen.js. Hier nur noch, WELCHE
+   Schlüssel belegt sind — dieselben drei Quellen wie bisher. */
 function eindeutigerSchluessel(name) {
   var belegt = {};
   daten.forEach(function (p) { if (p && p.legacyKey) belegt[p.legacyKey] = true; });
   Object.keys(geloeschteSchluessel).forEach(function (k) { belegt[k] = true; });
   Object.keys(dbGeloeschteSchluessel).forEach(function (k) { belegt[k] = true; });   // K2, seit 05.10.2026
-  var basis = slugify(name);                       // z. B. zwiebelbrot_500g_stueck
-  if (!belegt[basis]) return basis;
-  var stamm = basis.replace(/_stueck$/, '');       // Zähler VOR die gemeinsame Endung
-  for (var n = 2; n < 1000; n++) {
-    var kandidat = stamm + '_' + n + '_stueck';
-    if (!belegt[kandidat]) return kandidat;
-  }
-  throw new Error('Kein freier Schlüssel für „' + name + '“ gefunden (über 1000 Varianten belegt).');
+  return PRODUKT_NEU.eindeutigerSchluessel(name, belegt);
 }
 
 function zeigeDoppelWarnung() {
@@ -1808,6 +1818,7 @@ function zeigeDoppelWarnung() {
 }
 
 function neuesProdukt() {
+  if (!PRODUKT_NEU) { status(PRODUKT_NEU_FEHLT, 'err'); return; }   /* 26.10.2026: nie still */
   var kat = aktiveKat || 'Brötchen';
   var name = prompt('Name des neuen Produkts?\n\nAus dem Namen entsteht der Produkt-Schlüssel. Der bleibt für immer — der Name selbst lässt sich später jederzeit ändern.', '');
   if (name === null) return;                       // abgebrochen
@@ -1821,22 +1832,7 @@ function neuesProdukt() {
     status('⚠ ' + err.message, 'err');
     return;
   }
-  var neu = {
-    legacyKey: schluessel,
-    name: name,
-    kategorie: kat,
-    artNr: null,
-    station: null,
-    stueckProBlech: null,
-    produktionsSchritt: null,
-    einheit: null,   /* 13.10.2026, Nachtrag 1 (Fund N2): bewusst leer → erscheint unter „Nur ohne Einheit“ */
-    backTage: [],
-    hinweis: null,
-    frosterZustaendigkeit: '',
-    manuelleErfassung: false,
-    schnellrechnerRelevant: false,
-    nfcSeite: false
-  };
+  var neu = PRODUKT_NEU.vorlage({ legacyKey: schluessel, name: name, kategorie: kat });   /* 26.10.2026: Vorlage aus ../bos_produkte_anlegen.js */
   daten.push(neu);
   markiereGeaendert(daten.length - 1);
   aktiveKat = kat;
@@ -1872,7 +1868,10 @@ function ohneDbFelder(p) {
   Object.keys(p || {}).forEach(function (k) { if (DB_FELDER.indexOf(k) === -1) o[k] = p[k]; });
   return o;
 }
-/* reine Logik, geprüft in pruefe_editor_schluessel.js */
+/* reine Logik, geprüft in pruefe_editor_schluessel.js.
+   26.10.2026: BLEIBT bewusst hier (Speicherweg vorhandener Produkte darf nicht vom
+   neuen Modul abhängen, Freigabe KC 06:20 §5). Wortgleich mit
+   BOS_PRODUKTE_ANLEGEN.naechsteReihenfolge — _PRUEF_produkte_anlegen.js vergleicht beide. */
 function naechsteReihenfolge(rohMap) {
   var max = -1;
   Object.keys(rohMap || {}).forEach(function (k) { var r = rohMap[k] && rohMap[k].reihenfolge; if (typeof r === 'number' && r > max) max = r; });
