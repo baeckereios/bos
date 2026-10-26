@@ -19,6 +19,24 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-26 · 17:18 · v3.8 · Feature (Nachrichtenzentrale Stufe 1a, Zahl an der Kachel, #131;
+      Bauplan 17:01, Go Kontroll-Chat 17:07 mit Auflagen A1–A4; Kern-Datei-Freigabe Ulf 15:33)
+      - Lädt bos_kachel_zahlen.js (die Tafel: setze/lese/text/fuelle; vor der Registry).
+      - buildTileEl(): nur bei Registry-Feld zaehler: true ein
+        <span class="bos-tile__zahl" hidden> im Kachel-Symbol, sofort gefüllt mit
+        BOS_KACHEL_ZAHLEN.fuelle(span, lese(app.id)) — die Zahl überlebt so jedes
+        renderGrid() (Resize, storage, Profilwechsel, Fenster). Ohne zaehler kein
+        span, ohne Modul leeres hidden-span, kein Absturz. ✕-Knopf, Name,
+        Status unverändert.
+      - CSS .bos-tile__zahl (Status --bos-red wie die Taskboard-Zahl, 28 px/.9rem nach A2,
+        oben rechts am Symbol, pointer-events none) + .bos-tile__zahl[hidden]
+        (display:none — launcher.html hat keine [hidden]-Regel, Flex schlüge
+        sonst das Attribut). .bos-tile__icon bekommt position: relative.
+      - Prüfschalter in init() VOR BOS_BOOT.play (K-a): ?kachelzahl=<id>:<n>[,…]
+        → BOS_KACHEL_ZAHLEN.setze(); nur [a-z0-9_]-ids, ganze Zahlen; sonst still.
+        Ohne Parameter nichts. Vorbild Tür O24 (?crumble=pruefen).
+      - Sonst nichts geändert. Siehe nachrichtenzentrale/_protokolle/
+        SESSION_2026-10-26_NACHRICHTENZENTRALE_STUFE_1A_BAU.md.
     2026-10-20 · 06:59 · v3.7 · Feature (Verbrauch aufräumen, Hub „Verbrauch“; Freigabe KC 06:20, Ulf
       „Ja, beide“, V5)
       - Neu HUB_UMZUEGE = ['verbrauch'] und hubUmzug(d), aufgerufen in getActiveProfileData()
@@ -417,10 +435,31 @@
   }
 
   .bos-tile__icon {
+    position: relative;   /* 26.10.2026 (#131, 1a): Anker für die Zahl .bos-tile__zahl */
     width: var(--bos-tile-icon); height: var(--bos-tile-icon); border-radius: var(--bos-radius-md); display: flex; align-items: center;
     justify-content: center; font-size: var(--bos-tile-icon-font); flex-shrink: 0;
     transition: width var(--bos-transition-fast), height var(--bos-transition-fast), font-size var(--bos-transition-fast);
   }
+  /* 26.10.2026 (Nachrichtenzentrale Stufe 1a, #131): Zahl oben rechts am Kachel-Symbol.
+     Nur Kacheln mit Registry-Feld zaehler: true bekommen das span (buildTileEl), den
+     Inhalt schreibt bos_kachel_zahlen.js (fuelle: '' | n | '99+'). Statusfarbe --bos-red
+     wie die Zahl am Taskleisten-Knopf (bos_taskboard.js .bt-badge) — offene Posten,
+     färbt nie mit dem Profil um (Checkliste §3a). Bewusst größer als die Taskboard-Zahl:
+     Zoom 65 % (html[data-zoom]) schrumpft alles, die Zahl muss dort lesbar bleiben
+     (Prüfachse Zoom, Lehre KC Hamster 20.10.). 28 px / .9rem nach Auflage A2 (KC 17:07):
+     mit 24 px / .8rem war „99+“ auf dem 65-%-Bild nur knapp lesbar. Skaliert NICHT mit der Kachelgröße
+     (winzig…riesig), sitzt aber am Symbol und folgt dessen Rand.
+     pointer-events: none — ein Tipp auf die Zahl ist ein Tipp auf die Kachel.
+     [hidden]-Regel ist Pflicht: display:flex schlüge sonst das Attribut (Checkliste §13). */
+  .bos-tile__zahl {
+    position: absolute; top: -7px; right: -7px; min-width: 28px; height: 28px; padding: 0 7px;
+    border-radius: 999px; background: var(--bos-red); color: #fff;
+    font-family: var(--bos-font-label); font-weight: 800; font-size: .9rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--bos-bg); box-shadow: var(--bos-shadow-sm);
+    z-index: 2; pointer-events: none; box-sizing: border-box;
+  }
+  .bos-tile__zahl[hidden] { display: none; }
   /* Icon-Stil (NEU 05.09.2026, siehe SESSION_2026-09-05_BLOBMOJI.md):
      img.emoji-glyph ersetzt bei iconStil:'blobmoji' das reine Text-Emoji.
      1em/1em heißt: skaliert automatisch mit der font-size des jeweiligen
@@ -805,6 +844,7 @@
     <button class="bos-btn bos-btn--amber" id="helpCloseBtn" data-i18n="help.close" style="margin-top:.7rem;"></button>
   </div>
 
+  <script src="bos_kachel_zahlen.js"></script>   <!-- NEU 26.10.2026, #131 Stufe 1a: Tafel für Zahlen an Kacheln (zaehler: true), siehe buildTileEl(); keine Abhängigkeit, fehlt sie → Kacheln ohne Zahl -->
   <script src="bos_app_registry.js"></script>
   <script src="bos_launcher_roles.js"></script>
   <script src="bos_launcher_profiles.js"></script>
@@ -1328,11 +1368,21 @@
     var badge = app.custom ? '<button class="bos-tile__delete" data-role="delete" title="' + t('tile.delete') + '">✕</button>' : '';
     var statusLabel = app.status === 'geplant' ? '<div class="bos-tile__status">' + t('tile.planned') + '</div>' : '';
     var iconBg = hexToRgba(app.color, 0.20);
+    /* 26.10.2026 (Nachrichtenzentrale Stufe 1a, #131): Zahl an der Kachel. Nur Registry-
+       Einträge mit zaehler: true bekommen den Platz dafür — so kann kein Modul eine fremde
+       Kachel bemalen. Inhalt und Sichtbarkeit setzt bos_kachel_zahlen.js (die eine
+       Formatierstelle). Sofort aus der Tafel gefüllt, damit ein Neuzeichnen des Rasters
+       die Zahl nicht verliert. Fehlt das Modul: leeres hidden-span, kein Absturz. */
+    var zaehlt = app.zaehler === true;
+    var zahlSpan = zaehlt ? '<span class="bos-tile__zahl" hidden></span>' : '';
     el.innerHTML =
       badge +
-      '<div class="bos-tile__icon" style="background:' + iconBg + ';color:' + escapeHtml(app.color || '#c07a10') + ';">' + iconGlyphHTML(app.icon) + '</div>' +
+      '<div class="bos-tile__icon" style="background:' + iconBg + ';color:' + escapeHtml(app.color || '#c07a10') + ';">' + iconGlyphHTML(app.icon) + zahlSpan + '</div>' +
       '<div class="bos-tile__name">' + escapeHtml(app.name) + '</div>' +
       statusLabel;
+    if (zaehlt && window.BOS_KACHEL_ZAHLEN) {
+      window.BOS_KACHEL_ZAHLEN.fuelle(el.querySelector('.bos-tile__zahl'), window.BOS_KACHEL_ZAHLEN.lese(app.id));
+    }
     return el;
   }
   function buildAddTileEl() {
@@ -3052,6 +3102,23 @@
       zeigeStartHinweis('Diese Satelliten stehen in keiner Rechte-Matrix und sind ' +
         'für alle offen: ' + offen.join(', ') + '. Einträge in bos_permissions.js ergänzen.');
     };
+
+    /* PRÜFSCHALTER (26.10.2026, Nachrichtenzentrale Stufe 1a, #131; Vorbild Tür O24
+       ?crumble=pruefen): ?kachelzahl=<appId>:<n>[,<appId>:<n>…] schreibt die Zahlen VOR
+       dem ersten Raster an die Tafel (K-a, Go KC 17:07) — derselbe Weg, den ab Stufe 1c
+       das echte Modul nimmt: melden, bevor die Kacheln stehen; buildTileEl() holt die
+       Zahl beim Bauen. Nur ids aus [a-z0-9_], nur ganze Zahlen; alles andere wird still
+       übersprungen. Ohne Parameter passiert nichts; ohne Modul auch nichts (kein Fehler).
+       Bleibt drin: schadet nicht, zeigt die Mechanik am Tablet, bevor es Nachrichten gibt. */
+    try {
+      var kachelzahl = new URLSearchParams(window.location.search).get('kachelzahl');
+      if (kachelzahl && window.BOS_KACHEL_ZAHLEN) {
+        kachelzahl.split(',').forEach(function (paar) {
+          var m = /^\s*([a-z0-9_]+)\s*:\s*(-?\d+)\s*$/.exec(paar);
+          if (m) window.BOS_KACHEL_ZAHLEN.setze(m[1], parseInt(m[2], 10));
+        });
+      }
+    } catch (e) { /* Prüfschalter darf den Start nie stören */ }
 
     BOS_BOOT.play(function () {
       // 19.09.2026: kein Profilwahl-Zweig mehr. Wer da ist, steht seit der

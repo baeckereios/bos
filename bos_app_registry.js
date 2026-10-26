@@ -2,6 +2,14 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-10-26 · 17:18 · Nachrichtenzentrale Stufe 1a, #131 (Bauplan 17:01,
+       Go KC 17:07, pinned: Ulf 17:15): neuer Eintrag nachrichtenzentrale
+       (Kachel „Nachrichten“, Bereich Allgemein, geplant, ohne roles,
+       pinned, zaehler). Neues optionales Feld zaehler (Zahl an der Kachel,
+       bos_kachel_zahlen.js) im Kopf dokumentiert. Für die Mechanik „Zahl an
+       der Kachel“ wurde der Launcher EINMAL angefasst (launcher.html v3.8);
+       ab jetzt gilt wieder: Satellit will eine Zahl → nur das Feld setzen.
+       Sonst unverändert.
      2026-10-23 · 23:04 · Maschinenseite Stufe A (Bauplan Go KC 22:22):
        neuer Eintrag maschinenseite (Kachel „Maschinen“, Bereich Produktion,
        fünf Rollen, direkt: 'anmeldung'). Sonst unverändert.
@@ -95,6 +103,18 @@
               Reiter „Zugriffe“ der Kontenverwaltung — die Haken stehen dort
               in den Stammdaten. Die Datenbank-Regel muss dieselben Haken
               prüfen, sonst ist die Kachel ein Schild ohne Schloss.
+     zaehler — NEU (26.10.2026, Nachrichtenzentrale Stufe 1a, #131). optional.
+              true = der Launcher baut die Kachel mit einem Platz für eine
+              Zahl oben rechts am Symbol (<span class="bos-tile__zahl">).
+              Die Zahl selbst kommt NIE aus der Registry, sondern von einem
+              Modul über die Tafel bos_kachel_zahlen.js
+              (BOS_KACHEL_ZAHLEN.setze(id, n); ab Stufe 1c
+              bos_nachrichten_zahl.js). Fehlt das Feld oder ist es nicht
+              true, zeigt die Kachel nie eine Zahl — auch wenn ein Modul eine
+              für diese id meldet (so bemalt kein Modul eine fremde Kachel).
+              Nur Kacheln des Hauptbildschirms; Hub-Kinder kennen die Zahl
+              (noch) nicht. Betrifft nur launcher.html/buildTileEl(), keine
+              Zugriffswirkung.
      (beschreibung — 21.10.2026, 08:38 bis 21.10.2026 (#110): ENTFERNT.
               Die App-Texte (kurz, lang, Verlauf) stehen in der Datenbank
               (backstore_texte, RK §26) und werden im BackStore gepflegt, nicht
@@ -660,6 +680,33 @@ window.BOS_APPS = [
     // Admin-Tools). pinned:true ist NEU, siehe Feld-Doku oben — die
     // Kachel ist immer da, lässt sich nicht über sich selbst deinstallieren.
     // Details zum ganzen Install/Deinstall-Modell: BACKSTORE_DOKU.md.
+  },
+  {
+    // NEU 26.10.2026 (Nachrichtenzentrale Stufe 1a, #131; Bauplan 17:01, Go KC
+    // 17:07). Postfach für Dienstliches — in Stufe 1a nur die geplante Kachel
+    // und der Platz für die Zahl; der Satellit kommt in Stufe 1c (dann url +
+    // status 'live'). Konzept: _ideen/2026-10-25_NACHRICHTENZENTRALE.md,
+    // Kompendium: nachrichtenzentrale/NACHRICHTENZENTRALE_KOMPENDIUM.md.
+    id: 'nachrichtenzentrale',
+    bereich: 'allgemein',
+    name: 'Nachrichten',
+    icon: '📬',
+    color: '#4a8fd6',     // Neutral-Akzent (= --bos-blue, wie BackStore/Taschenrechner): rollenunabhängiges Werkzeug, nicht Warnfarbe, nicht Honig
+    url: null,            // Stufe 1c: 'nachrichtenzentrale/nachrichtenzentrale.html'
+    status: 'geplant',
+    pinned: true,         // Ulf 26.10., 17:01/17:15: „sobald ein Konto freigeschaltet ist, ist es Empfänger — damit keine Nachricht verloren geht, ist die Zentrale automatisch da“. Steht fest auf jedem Schreibtisch, BackStore zeigt „immer da“.
+    zaehler: true         // NEU: diese Kachel darf eine Zahl tragen (bos_kachel_zahlen.js), siehe Feld-Doku oben
+    // Bewusst KEIN roles-Feld und keine Zeile in bos_permissions.js (Ulf U1,
+    // 26.10., 17:01): lesen dürfen alle Konten, auch vor Rollenzuteilung — wie
+    // Taschenrechner/BackStore. Eine Matrix-Zeile wäre eine Sperre, keine Doku:
+    // sie würde freigeschaltete Konten OHNE Rolle aussperren, die ab Stufe 1b im
+    // Adressbuch stehen und Nachrichten bekommen. Schreiben braucht ab 1b einen
+    // Haken im Konto, den die Datenbank-Regel prüft — nicht die Kachel. Kein
+    // haken-Feld, weil sonst die Kachel nur mit Haken sichtbar wäre
+    // (bos_access.js: Haken-Seiten fallen nie auf offen zurück).
+    // Merkposten 1c: nicht freigeschaltete Konten und Ort-Konten (Stationen)
+    // sehen die Kachel auch — die Zentrale muss ihnen drinnen einen klaren Satz
+    // zeigen, die Zahl darf dort nie anspringen.
   },
   {
     id: 'produktionsplaner',
