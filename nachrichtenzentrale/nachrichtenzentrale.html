@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: nachrichtenzentrale/nachrichtenzentrale.html — Nachrichtenzentrale (Stufe 1c, #131)
+  ZWECK: Postfach für Dienstliches: Postfach · Aushänge · Gesendet · Schreiben. Antworten (nur an den
+         Absender bzw. vom Absender zurück), Daumen, Korrektur-Kette, Aushänge mit „gilt bis“, Drucken und
+         Abnehmen, „für mich ausblenden“, Beispiel-Nachricht von Crumble. Meldet die Zahl an der Kachel
+         sofort nach Lesen/Ausblenden/Senden (window.parent.BOS_KACHEL_ZAHLEN über bos_nachrichten_zahl.js).
+  DATEN: nachrichten (+ antworten), nachrichten_status, nachrichten_adressbuch, nachrichten_vorlagen,
+         namen — Regel RK §29 (eingesetzt, Fassung nachrichten-2026-10-27). Laden und Schreiben nur über
+         nachrichten_logik.js, Ansicht in nachrichten_ansicht.js. Kein onSnapshot.
+  EINBINDUNG: normaler Satellit über den Launcher (Checkliste §2a): bos_access.js → bos_access_guard.js.
+         Kein bos_standalone_login.js, kein Registry-Feld direkt (K-c): direkt aufgerufen führt
+         bos_firebase_config.js über die Tür mit ?weiter= hierher zurück.
+  CHANGELOG
+    2026-10-27 · 08:07 · v1.0 · Feature (Nachrichtenzentrale Stufe 1c, #131; Anweisung KC 07:29, Bauplan,
+      Go Kontroll-Chat 07:54 mit Auflagen A1–A8). Neu.
+      nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1C_BAU.md
+  Doku: nachrichtenzentrale/NACHRICHTENZENTRALE_DOKU.md (Nutzer-Hilfetext dort ist die Quelle)
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Nachrichten</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- MUSS vor bos_design_tokens.css stehen, sonst blitzt kurz das falsche Theme auf -->
+<script src="../bos_theme_sync.js"></script>
+<script src="../bos_density_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --nz-tap: max(44px, var(--bos-tap-min, 44px));
+    --nz-max: 760px;
+    /* Typ = Markierung, kein Status und kein Akzent (E3, Checkliste §3a): neutrale/Info-Töne, Kritik nicht rot */
+    --nz-typ-nachricht: var(--bos-text-dim, #a9a39a);
+    --nz-typ-info: var(--bos-blue, #4a8fd6);
+    --nz-typ-lob: var(--bos-green, #4caf7d);
+    --nz-typ-kritik: var(--bos-purple, #8b5cf6);
+    --nz-typ-bekanntmachung: var(--bos-gelb, #d9b521);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bos-bg, #15130f); color: var(--bos-text, #f2ede4);
+    font-family: var(--bos-font-body, 'Barlow', sans-serif); font-size: 1rem; line-height: 1.45;
+    -webkit-text-size-adjust: 100%; overflow-x: hidden;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  .wrap { max-width: var(--nz-max); margin: 0 auto; padding: 0 12px 96px; }
+
+  /* Kopf */
+  #kopf { position: sticky; top: 0; z-index: 20; background: var(--bos-bg, #15130f); border-bottom: 1px solid var(--bos-border, rgba(255,255,255,.08)); }
+  .kopf-zeile { max-width: var(--nz-max); margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
+  .kopf-titel { flex: 1; min-width: 0; }
+  .kopf-titel h1 { margin: 0; font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.45rem; line-height: 1.15; }
+  .kopf-unter { color: var(--bos-text-dim, #a9a39a); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kopf-btn { min-width: var(--nz-tap); min-height: var(--nz-tap); border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-border, rgba(255,255,255,.08));
+    background: var(--bos-surface, #1f1c17); cursor: pointer; font-size: 1.1rem; }
+  .tab-row { max-width: var(--nz-max); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 10px; }
+  .tab-btn { flex: 1 1 auto; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--bos-border, rgba(255,255,255,.08));
+    background: var(--bos-surface, #1f1c17); cursor: pointer; font-family: var(--bos-font-label, 'Barlow Condensed', sans-serif); font-weight: 700; font-size: 1rem; white-space: nowrap; }
+  .tab-btn[aria-selected="true"] { border-color: var(--bos-amber, #c07a10); background: color-mix(in srgb, var(--bos-amber, #c07a10) 18%, transparent); color: var(--bos-amber-bright, #e0973a); }
+  .tab-zahl { display: inline-block; min-width: 1.5em; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--bos-red, #d6584a); color: #fff; font-size: .8rem; line-height: 1.5; text-align: center; }
+
+  /* Zeilen oben */
+  .fehler-zeile { margin: 10px 0; padding: 10px 12px; border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-red, #d6584a);
+    background: color-mix(in srgb, var(--bos-red, #d6584a) 14%, transparent); white-space: pre-wrap; word-break: break-word; font-size: .92rem; }
+  .fehler-zeile::before { content: "✕ " / ""; color: var(--bos-red, #d6584a); font-weight: 700; }
+  .fehler-zeile a { color: var(--bos-amber-bright, #e0973a); word-break: break-all; }
+  .fehler-zeile .zeile-zu { float: right; border: 0; background: none; cursor: pointer; min-width: 32px; min-height: 32px; }
+  .hinweis-zeile { margin: 10px 0; padding: 10px 12px; border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-warn, #d9a521);
+    background: color-mix(in srgb, var(--bos-warn, #d9a521) 12%, transparent); font-size: .92rem; white-space: pre-wrap; }
+  .hinweis-zeile::before { content: "\26A0\FE0E  " / ""; color: var(--bos-warn, #d9a521); }
+  .zustand-satz { margin: 14px 0; padding: 14px; border-radius: var(--bos-radius-md, 14px); background: var(--bos-surface, #1f1c17);
+    border: 1px solid var(--bos-border, rgba(255,255,255,.08)); font-size: 1.02rem; }
+  .laden { color: var(--bos-text-dim, #a9a39a); padding: 18px 4px; }
+  .leer { color: var(--bos-text-dim, #a9a39a); padding: 18px 4px; text-align: center; }
+
+  /* Werkzeugzeile */
+  .werkzeug-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 6px; }
+  .klein-btn { min-height: 40px; padding: 6px 12px; border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.16));
+    background: var(--bos-surface, #1f1c17); cursor: pointer; font-size: .92rem; }
+  .klein-btn:disabled { opacity: .5; cursor: default; }
+  .klein-btn.haupt { border-color: var(--bos-amber, #c07a10); background: var(--bos-amber, #c07a10); color: #1a1408; font-weight: 700; }
+  .schalter { display: inline-flex; align-items: center; gap: 6px; font-size: .92rem; color: var(--bos-text-dim, #a9a39a); min-height: 40px; }
+  .schalter input { width: 20px; height: 20px; }
+
+  /* Karten */
+  .liste { display: flex; flex-direction: column; gap: 8px; }
+  .karte { display: flex; gap: 10px; width: 100%; text-align: left; padding: 10px 12px; border-radius: var(--bos-radius-md, 14px); cursor: pointer;
+    border: 1px solid var(--bos-border, rgba(255,255,255,.08)); background: var(--bos-surface, #1f1c17); border-left: 5px solid var(--nz-typ, var(--nz-typ-nachricht)); }
+  .karte.neu { background: var(--bos-surface-raised, #29251f); }
+  .karte.ausgeblendet { opacity: .55; }
+  .typ-nachricht { --nz-typ: var(--nz-typ-nachricht); } .typ-info { --nz-typ: var(--nz-typ-info); } .typ-lob { --nz-typ: var(--nz-typ-lob); }
+  .typ-kritik { --nz-typ: var(--nz-typ-kritik); } .typ-bekanntmachung { --nz-typ: var(--nz-typ-bekanntmachung); }
+  .symbol { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;
+    background: color-mix(in srgb, var(--nz-typ, var(--nz-typ-nachricht)) 28%, var(--bos-surface, #1f1c17)); font-weight: 700; font-family: var(--bos-font-label, 'Barlow Condensed', sans-serif); font-size: 1.1rem; }
+  .symbol img { width: 100%; height: 100%; object-fit: contain; }
+  .karte-mitte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .karte-kopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .typ-wort { font-family: var(--bos-font-label, 'Barlow Condensed', sans-serif); font-weight: 800; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--nz-typ, var(--nz-typ-nachricht)); }
+  .absender { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .zeit { margin-left: auto; color: var(--bos-text-faint, #7d776d); font-size: .82rem; white-space: nowrap; }
+  .karte-text { color: var(--bos-text-dim, #a9a39a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .karte.neu .karte-text { color: var(--bos-text, #f2ede4); }
+  .karte-fuss { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .82rem; color: var(--bos-text-dim, #a9a39a); }
+  .marke-neu { color: var(--bos-amber-bright, #e0973a); font-weight: 700; }
+  .marke-neu::before { content: "● " / ""; }
+  .durch { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .marke-korr { color: var(--bos-text-faint, #7d776d); }
+
+  /* Aushang */
+  .aushang { padding: 12px 14px; border-radius: var(--bos-radius-md, 14px); border: 1px solid var(--bos-border, rgba(255,255,255,.08)); border-left: 5px solid var(--nz-typ-bekanntmachung);
+    background: var(--bos-surface, #1f1c17); }
+  .aushang.neu { background: var(--bos-surface-raised, #29251f); }
+  .aushang-text { white-space: pre-wrap; word-break: break-word; font-size: 1.08rem; margin: 8px 0; }
+  .aushang-zeile { font-size: .88rem; color: var(--bos-text-dim, #a9a39a); }
+  .abgelaufen { color: var(--bos-warn, #d9a521); font-weight: 700; }
+  .abgelaufen::before { content: "\26A0\FE0E " / ""; }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .erledigt { color: var(--bos-green, #4caf7d); }
+
+  /* Detail */
+  .detail { padding: 12px 14px; border-radius: var(--bos-radius-md, 14px); border: 1px solid var(--bos-border, rgba(255,255,255,.08)); border-left: 5px solid var(--nz-typ, var(--nz-typ-nachricht));
+    background: var(--bos-surface, #1f1c17); margin-top: 8px; }
+  .detail-kopf { display: flex; gap: 10px; align-items: center; }
+  .detail-an { margin: 8px 0 0; font-size: .9rem; color: var(--bos-text-dim, #a9a39a); word-break: break-word; }
+  .detail-text { white-space: pre-wrap; word-break: break-word; margin: 12px 0; font-size: 1.05rem; }
+  .banner { margin: 8px 0; padding: 8px 10px; border-radius: var(--bos-radius-sm, 6px); background: var(--bos-bg-soft, #1a1813); color: var(--bos-text-dim, #a9a39a); font-size: .9rem; }
+  .daumen-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .92rem; color: var(--bos-text-dim, #a9a39a); }
+  .daumen-btn[aria-pressed="true"] { border-color: var(--bos-amber, #c07a10); color: var(--bos-amber-bright, #e0973a); }
+  .kette { margin-top: 12px; border-top: 1px dashed var(--bos-border-strong, rgba(255,255,255,.16)); padding-top: 8px; }
+  .kette-glied { margin-top: 8px; padding: 8px 10px; border-radius: var(--bos-radius-sm, 6px); background: var(--bos-bg-soft, #1a1813); }
+  .kette-glied .detail-text { margin: 6px 0; font-size: .98rem; }
+  .antworten { margin-top: 14px; border-top: 1px solid var(--bos-border, rgba(255,255,255,.08)); padding-top: 10px; }
+  .antworten h3 { margin: 0 0 6px; font-family: var(--bos-font-label, 'Barlow Condensed', sans-serif); font-size: 1rem; letter-spacing: .04em; text-transform: uppercase; color: var(--bos-text-dim, #a9a39a); }
+  .antwort { padding: 8px 10px; border-radius: var(--bos-radius-sm, 6px); background: var(--bos-bg-soft, #1a1813); margin-bottom: 6px; }
+  .antwort.eigene { background: color-mix(in srgb, var(--bos-amber, #c07a10) 8%, var(--bos-bg-soft, #1a1813)); }
+  .antwort-kopf { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: .85rem; color: var(--bos-text-dim, #a9a39a); }
+  .antwort-kopf b { color: var(--bos-text, #f2ede4); }
+  .an-dich { color: var(--bos-amber-bright, #e0973a); font-weight: 700; }
+  .antwort-text { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+  .antwort-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+  /* Formular */
+  .feld { margin: 14px 0; }
+  .feld-titel { display: flex; align-items: baseline; gap: 8px; font-family: var(--bos-font-label, 'Barlow Condensed', sans-serif); font-weight: 700; font-size: 1rem;
+    text-transform: uppercase; letter-spacing: .04em; color: var(--bos-text-dim, #a9a39a); margin-bottom: 6px; }
+  .feld-titel .zaehler { margin-left: auto; text-transform: none; letter-spacing: 0; font-family: var(--bos-font-body, 'Barlow', sans-serif); font-weight: 500; font-size: .85rem; }
+  .zaehler.zu-viel { color: var(--bos-red, #d6584a); font-weight: 700; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--bos-border-strong, rgba(255,255,255,.16)); background: var(--bos-surface, #1f1c17); cursor: pointer; }
+  .chip[aria-pressed="true"] { border-color: var(--bos-amber, #c07a10); background: color-mix(in srgb, var(--bos-amber, #c07a10) 18%, transparent); }
+  .chip:disabled { opacity: .45; cursor: default; }
+  .chip.typ { border-left: 5px solid var(--nz-typ); }
+  .adressbuch { margin-top: 8px; max-height: 340px; overflow-y: auto; border: 1px solid var(--bos-border, rgba(255,255,255,.08)); border-radius: var(--bos-radius-sm, 6px); }
+  .ab-zeile { display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-height: 44px; border-bottom: 1px solid var(--bos-border, rgba(255,255,255,.08)); cursor: pointer; }
+  .ab-zeile:last-child { border-bottom: 0; }
+  .ab-zeile input { width: 22px; height: 22px; flex: 0 0 auto; }
+  .ab-name { font-weight: 600; }
+  .ab-beschr { color: var(--bos-text-faint, #7d776d); font-size: .88rem; margin-left: 4px; }
+  .ab-art { width: 1.4em; text-align: center; flex: 0 0 auto; }
+  .eingabe { width: 100%; padding: 10px 12px; border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-border-strong, rgba(255,255,255,.16));
+    background: var(--bos-bg-soft, #1a1813); color: var(--bos-text, #f2ede4); }
+  textarea.eingabe { min-height: 140px; resize: vertical; }
+  .antwort-form textarea.eingabe { min-height: 84px; }
+  .fester-hinweis { font-size: .88rem; color: var(--bos-text-dim, #a9a39a); padding: 8px 10px; border-left: 3px solid var(--bos-border-strong, rgba(255,255,255,.16)); margin: 8px 0; }
+  .satz { font-size: .9rem; color: var(--bos-text-dim, #a9a39a); margin: 6px 0; }
+  .korrektur-zeile { margin: 10px 0; padding: 10px 12px; border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-amber, #c07a10);
+    background: color-mix(in srgb, var(--bos-amber, #c07a10) 10%, transparent); font-size: .92rem; }
+  .senden-zeile { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .senden-zeile .klein-btn { min-height: var(--nz-tap); padding: 8px 18px; font-size: 1rem; }
+
+  /* Hilfe */
+  .hilfe-hintergrund { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; }
+  .hilfe-sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow-y: auto; z-index: 51; background: var(--bos-surface-raised, #29251f);
+    border-radius: var(--bos-radius-lg, 22px) var(--bos-radius-lg, 22px) 0 0; padding: 18px 18px 28px; max-width: var(--nz-max); margin: 0 auto; }
+  .hilfe-sheet h2 { margin: 0 0 8px; font-family: var(--bos-font-display, 'Fraunces', serif); }
+  .hilfe-sheet h3 { margin: 14px 0 4px; font-size: 1rem; }
+  .hilfe-sheet p { margin: 0; color: var(--bos-text-dim, #a9a39a); white-space: pre-wrap; }
+  .crumble-text p { margin: 0 0 10px; }
+
+  @media (max-width: 480px) {
+    .kopf-titel h1 { font-size: 1.25rem; }
+    .tab-btn { font-size: .95rem; padding: 6px 8px; }
+    .zeit { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<!-- Einbindung normaler Satellit über den Launcher (Checkliste §2a, Muster konten/konten_verwaltung.html). -->
+<script>var BOS_APP_ID = 'nachrichtenzentrale';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_accounts.js"></script>
+<script src="../bos_namen.js"></script>            <!-- Rufname/Beschreibung über personId aus dem Adressbuch (eine Abfrage 'namen') -->
+<script src="../bos_druck.js"></script>            <!-- Aushang drucken (nie window.print direkt) -->
+<script src="../bos_ungespeichert.js"></script>    <!-- offener Text im Schreibfenster / Antwortfeld → Rückfrage beim ✕ -->
+<script src="../bos_nachrichten_zahl.js"></script> <!-- die eine Zählregel (Kachel-Zahl); hier ohne Takt, nur zaehle/melde -->
+<script src="nachrichten_logik.js"></script>
+<script src="nachrichten_ansicht.js"></script>
+
+<header id="kopf">
+  <div class="kopf-zeile">
+    <div class="kopf-titel">
+      <h1 data-i18n="titel"></h1>
+      <div class="kopf-unter" id="werZeile"></div>
+    </div>
+    <button type="button" class="kopf-btn" id="neuLadenBtn" data-i18n-title="neu_laden">↻</button>
+    <button type="button" class="kopf-btn" id="hilfeBtn" data-i18n-title="hilfe">❓</button>
+  </div>
+  <nav class="tab-row" id="reiter" role="tablist" hidden>
+    <button type="button" class="tab-btn" role="tab" data-reiter="postfach"><span data-i18n="r_postfach"></span><span class="tab-zahl" hidden></span></button>
+    <button type="button" class="tab-btn" role="tab" data-reiter="aushaenge"><span data-i18n="r_aushaenge"></span><span class="tab-zahl" hidden></span></button>
+    <button type="button" class="tab-btn" role="tab" data-reiter="gesendet"><span data-i18n="r_gesendet"></span><span class="tab-zahl" hidden></span></button>
+    <button type="button" class="tab-btn" role="tab" data-reiter="schreiben" hidden><span data-i18n="r_schreiben"></span></button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <div class="fehler-zeile" id="fehlerZeile" role="alert" hidden><button type="button" class="zeile-zu" id="fehlerZu" aria-label="schließen">✕</button><span id="fehlerText"></span></div>
+  <div class="hinweis-zeile" id="hinweisZeile" hidden></div>
+  <div class="zustand-satz" id="zustandSatz" hidden></div>
+  <div class="laden" id="ladenZeile" data-i18n="laden"></div>
+
+  <section id="panel-postfach" class="panel" hidden>
+    <div class="werkzeug-zeile">
+      <button type="button" class="klein-btn" id="alleGelesenBtn" data-i18n="alle_gelesen_aus"></button>
+      <label class="schalter"><input type="checkbox" id="zeigeAusPostfach"><span data-i18n="zeige_ausgeblendete"></span></label>
+    </div>
+    <div class="liste" id="listePostfach"></div>
+  </section>
+
+  <section id="panel-aushaenge" class="panel" hidden>
+    <p class="satz" data-i18n="aushaenge_satz"></p>
+    <div class="liste" id="listeAushaenge"></div>
+  </section>
+
+  <section id="panel-gesendet" class="panel" hidden>
+    <div class="werkzeug-zeile">
+      <label class="schalter"><input type="checkbox" id="zeigeAusGesendet"><span data-i18n="zeige_ausgeblendete"></span></label>
+    </div>
+    <div class="liste" id="listeGesendet"></div>
+  </section>
+
+  <section id="panel-schreiben" class="panel" hidden>
+    <div class="korrektur-zeile" id="korrekturZeile" hidden><span id="korrekturText"></span></div>
+    <div class="feld">
+      <div class="feld-titel" data-i18n="feld_art"></div>
+      <div class="chips" id="typChips"></div>
+      <p class="satz" id="typSatz" hidden></p>
+    </div>
+    <div class="feld" id="empfaengerBlock">
+      <div class="feld-titel"><span data-i18n="feld_an"></span><span class="zaehler" id="empfZaehler"></span></div>
+      <p class="satz" id="kritikSatz" hidden></p>
+      <div class="chips" id="vorlagenChips"></div>
+      <input type="search" class="eingabe" id="empfSuche" data-i18n-placeholder="suchen" style="margin-top:8px">
+      <div class="adressbuch" id="adressbuchListe"></div>
+    </div>
+    <div class="feld" id="aushangBlock" hidden>
+      <div class="feld-titel" data-i18n="feld_gilt_bis"></div>
+      <input type="date" class="eingabe" id="giltBis">
+      <p class="satz" data-i18n="aushang_satz_schreiben"></p>
+    </div>
+    <div class="feld">
+      <div class="feld-titel"><span data-i18n="feld_text"></span><span class="zaehler" id="textZaehler"></span></div>
+      <p class="fester-hinweis" data-i18n="fester_hinweis"></p>
+      <textarea class="eingabe" id="textFeld" rows="6"></textarea>
+      <p class="satz" id="nameZeile"></p>
+    </div>
+    <div class="fehler-zeile" id="schreibFehler" role="alert" hidden></div>
+    <div class="senden-zeile">
+      <button type="button" class="klein-btn haupt" id="sendenBtn" data-i18n="senden"></button>
+      <button type="button" class="klein-btn" id="verwerfenBtn" data-i18n="verwerfen"></button>
+    </div>
+  </section>
+
+  <section id="detail" hidden>
+    <div class="werkzeug-zeile"><button type="button" class="klein-btn" id="detailZurueck" data-i18n="zurueck"></button></div>
+    <div id="detailInhalt"></div>
+  </section>
+</main>
+
+<div class="hilfe-hintergrund" id="hilfeHintergrund" hidden></div>
+<div class="hilfe-sheet" id="hilfeSheet" role="dialog" aria-modal="true" hidden>
+  <h2 id="hilfeTitel"></h2>
+  <div id="hilfeInhalt"></div>
+  <div class="knoepfe">
+    <button type="button" class="klein-btn" id="crumbleWiederBtn" data-i18n="crumble_wieder"></button>
+    <button type="button" class="klein-btn haupt" id="hilfeZu" data-i18n="schliessen"></button>
+  </div>
+</div>
+
+<script>
+/* Nutzer-Hilfetext — Quelle ist NACHRICHTENZENTRALE_DOKU.md §5 (Checkliste §7): dort zuerst ändern, hier nachziehen. */
+const helpData = {
+  titel: 'Nachrichten — so geht’s',
+  abschnitte: [
+    ['Wofür', 'Ein Postfach für Dienstliches: „Wer kann Samstag?“, „Kisten bitte in den Hof“, „Danke fürs Einspringen“. Nichts hier ist vertraulich: Der Absender steht immer dran, und wer den Generalschlüssel hat, kann technisch alles lesen. Anonym geht hier nichts — was du schreibst, trägt deinen Namen.'],
+    ['Postfach', 'Hier steht, was an dich ging, das Neueste oben. „● neu“ heißt: noch nicht geöffnet. Antippen öffnet die Nachricht — dann ist sie gelesen. Wer sonst noch was gelesen hat, sieht niemand, auch der Absender nicht.'],
+    ['Antworten', 'Unter jeder Nachricht kannst du antworten. Die Antwort geht nur an den, der geschrieben hat — nicht an alle anderen. Der Absender kann dir unter seiner Nachricht zurückschreiben; das steht dann bei dir mit „an dich“ darunter. Antworten lassen sich nicht ändern oder löschen: Wer sich vertan hat, schreibt eine weitere. Antworten darf jeder Empfänger, auch ohne Schreib-Haken.'],
+    ['Daumen', 'Ein Daumen sagt „gesehen, passt“. Jeder Empfänger sieht, wer schon einen Daumen gegeben hat. Noch einmal tippen nimmt deinen Daumen zurück. Der Daumen zählt nicht als neue Nachricht.'],
+    ['Ausblenden', '„Für mich ausblenden“ räumt nur dein Postfach auf — bei allen anderen bleibt die Nachricht. „Alle gelesenen ausblenden“ macht das für alles, was du schon geöffnet hast. Mit „ausgeblendete zeigen“ holst du alles zurück. Nichts ist weg.'],
+    ['Korrektur', 'Wer sich in einer eigenen Nachricht vertippt hat, drückt „Korrektur“. Der Text kommt ins Schreibfenster; Empfänger dürfen sich ändern, die Art nicht. Beim Absenden entsteht eine neue Nachricht, die alte bleibt durchgestrichen darunter stehen („ersetzt Nachricht von …“) — mit ihren Antworten, aber ohne neue. Abbrechen ändert nichts.'],
+    ['Aushänge', 'Bekanntmachungen sind Aushänge für alle Konten, auch für die Stationen. Sie hängen bis zum Datum „gilt bis“ oder bis jemand sie abnimmt — der Verfasser, die Produktionsleitung oder der Admin. „Kenne ich ✓“ merkt sich nur für dich, dass du ihn gelesen hast. „Als Aushang drucken“ macht ein Blatt fürs Brett. Aushänge haben keine Antworten und keinen Daumen.'],
+    ['Schreiben', 'Neue Nachrichten anfangen darf, wer den Haken dafür hat — den setzt der Admin in der Kontenverwaltung. Ohne Haken gibt es den Reiter „Schreiben“ nicht; antworten geht trotzdem. Empfänger wählst du einzeln oder über die Gruppen oben (Leitung, Rollen, Gruppen wie Frühschicht). Gespeichert wird nur die Liste der Namen — wer später in eine Gruppe kommt, sieht alte Nachrichten nicht. Höchstens 100 Empfänger, höchstens 2000 Zeichen.'],
+    ['Kritik', 'Kritik geht an die Leitung. Du kannst einzelne aus der Leitung abwählen, einer bleibt immer. Wer den Haken „Bekanntmachungen“ hat, darf Kritik auch an Einzelne und Gruppen schicken. Kritik trägt immer den Namen.'],
+    ['Wer bekommt Nachrichten', 'Jedes freigeschaltete persönliche Konto. Ein Ort-Konto (z. B. eine Filiale) nur, wenn der Admin dort „Nachrichten empfangen“ gesetzt hat. Stations-Tablets bekommen keine Nachrichten — dort stehen hier nur die Aushänge. Ein Konto, das noch nicht freigeschaltet ist, sieht hier nichts.'],
+    ['40 Tage', 'Nachrichten und Antworten verschwinden nach 40 Tagen von selbst. Ein Aushang hängt, bis er abgenommen ist, und verschwindet 40 Tage danach.'],
+    ['Zahl an der Kachel', 'Die Zahl an „Nachrichten“ auf deinem Schreibtisch zählt neue Nachrichten an dich, neue Aushänge und neue Antworten auf deine eigenen Nachrichten. Sie wird alle fünf Minuten nachgezählt und fällt sofort, wenn du hier liest. Wenn dir ein Absender unter seiner Nachricht zurückschreibt, siehst du das erst beim Öffnen der Nachricht — das kommt mit den Benachrichtigungen in einer späteren Stufe.'],
+    ['Benachrichtigungen', 'Eine Benachrichtigung aufs Handy gibt es noch nicht. Sie kommt in einer späteren Stufe; dann steht hier, wie du sie einschaltest.'],
+    ['Rote Zeile', 'Steht oben eine rote Zeile, ist das die echte Meldung der Datenbank. Beim allerersten Aufruf kann dort ein Link stehen („index“) — dann fehlt der Datenbank ein Verzeichnis. Den legt der Admin einmal an. Sonst: Bild von der Zeile an den Admin.']
+  ]
+};
+</script>
+</body>
+</html>

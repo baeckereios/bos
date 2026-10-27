@@ -2,6 +2,11 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-10-27 · 08:12 · Nachrichtenzentrale Stufe 1c, #131 (Bauplan, Go KC
+       07:54): Eintrag nachrichtenzentrale bekommt url
+       'nachrichtenzentrale/nachrichtenzentrale.html' und status 'live'.
+       pinned, zaehler, kein roles, kein direkt bleiben (K-c: über die Tür
+       mit ?weiter=, kein QR-Ziel). Sonst unverändert.
      2026-10-26 · 17:18 · Nachrichtenzentrale Stufe 1a, #131 (Bauplan 17:01,
        Go KC 17:07, pinned: Ulf 17:15): neuer Eintrag nachrichtenzentrale
        (Kachel „Nachrichten“, Bereich Allgemein, geplant, ohne roles,
@@ -692,8 +697,8 @@ window.BOS_APPS = [
     name: 'Nachrichten',
     icon: '📬',
     color: '#4a8fd6',     // Neutral-Akzent (= --bos-blue, wie BackStore/Taschenrechner): rollenunabhängiges Werkzeug, nicht Warnfarbe, nicht Honig
-    url: null,            // Stufe 1c: 'nachrichtenzentrale/nachrichtenzentrale.html'
-    status: 'geplant',
+    url: 'nachrichtenzentrale/nachrichtenzentrale.html',   // seit Stufe 1c (27.10.2026)
+    status: 'live',
     pinned: true,         // Ulf 26.10., 17:01/17:15: „sobald ein Konto freigeschaltet ist, ist es Empfänger — damit keine Nachricht verloren geht, ist die Zentrale automatisch da“. Steht fest auf jedem Schreibtisch, BackStore zeigt „immer da“.
     zaehler: true         // NEU: diese Kachel darf eine Zahl tragen (bos_kachel_zahlen.js), siehe Feld-Doku oben
     // Bewusst KEIN roles-Feld und keine Zeile in bos_permissions.js (Ulf U1,

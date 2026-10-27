@@ -19,6 +19,9 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-27 · 08:12 · v3.9 · Einbindung (Nachrichtenzentrale Stufe 1c, #131; Bauplan, Go KC 07:54 (K-a, A2),
+      Ulf U1 offen beim Bau — Zeile entfernen, falls nein)
+      - Lädt bos_nachrichten_zahl.js nach bos_kachel_zahlen.js; keine Logik geändert.
     2026-10-26 · 17:18 · v3.8 · Feature (Nachrichtenzentrale Stufe 1a, Zahl an der Kachel, #131;
       Bauplan 17:01, Go Kontroll-Chat 17:07 mit Auflagen A1–A4; Kern-Datei-Freigabe Ulf 15:33)
       - Lädt bos_kachel_zahlen.js (die Tafel: setze/lese/text/fuelle; vor der Registry).
@@ -845,6 +848,7 @@
   </div>
 
   <script src="bos_kachel_zahlen.js"></script>   <!-- NEU 26.10.2026, #131 Stufe 1a: Tafel für Zahlen an Kacheln (zaehler: true), siehe buildTileEl(); keine Abhängigkeit, fehlt sie → Kacheln ohne Zahl -->
+  <script src="bos_nachrichten_zahl.js"></script>   <!-- NEU 27.10.2026, #131 Stufe 1c: zählt die Zahl an der Kachel „Nachrichten“ (Start, alle 5 min, beim Zurückkommen) und schreibt sie an die Tafel; fasst db/BOS_ACCOUNTS erst zur Laufzeit an; fehlt sie → Kachel ohne Zahl -->
   <script src="bos_app_registry.js"></script>
   <script src="bos_launcher_roles.js"></script>
   <script src="bos_launcher_profiles.js"></script>
