@@ -1,0 +1,227 @@
+{
+ "_kommentar": "Loch-Crumble an der Tür (index.html), Stufe 1f. Texte wörtlich (Entwurf 1e + Anweisung 1f K80, Ulf 14:50). Büsten: 252×300 px = 84×100 CSS-px bei 3×, normiert auf Wangenbreite 195 und Kopfoberkante y 33 (Werkzeug loch_buesten.py); Maße in Ausgabepixeln. Pflege: §4.8 der HAMSTER_FIGUR_DOKU.",
+ "version": 1,
+ "erster_satz_ms": 1000,
+ "tipp_abstand_s": [
+  20,
+  30
+ ],
+ "tipps_max": 4,
+ "eingabe_stille_s": 20,
+ "lesedauer_ms": {
+  "je_zeichen": 70,
+  "min": 4000,
+  "max": 7500
+ },
+ "blinzeln_s": [
+  3,
+  6
+ ],
+ "blinzel_ms": 120,
+ "schlaf_s": 120,
+ "lachen_ms": 2500,
+ "ausdruck": {
+  "ruhe": "neutral",
+  "blinzeln": "blinzeln",
+  "oeffnen": "winken",
+  "tipp": [
+   "zwinkern",
+   "wangen"
+  ],
+  "nach_tipps": "lachen",
+  "schlaf": "schlafen"
+ },
+ "buesten": {
+  "neutral": {
+   "datei": "neutral.png",
+   "kopf_y": 33,
+   "wange": 194,
+   "schnitt_y": 227
+  },
+  "blinzeln": {
+   "datei": "blinzeln.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 227
+  },
+  "winken": {
+   "datei": "winken.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 206
+  },
+  "zwinkern": {
+   "datei": "zwinkern.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 206
+  },
+  "wangen": {
+   "datei": "wangen.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 206
+  },
+  "lachen": {
+   "datei": "lachen.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 216
+  },
+  "daumen": {
+   "datei": "daumen.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 214
+  },
+  "besorgt": {
+   "datei": "besorgt.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 217
+  },
+  "gaehnen": {
+   "datei": "gaehnen.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 215
+  },
+  "pfote": {
+   "datei": "pfote.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 215
+  },
+  "schlafen": {
+   "datei": "schlafen.png",
+   "kopf_y": 33,
+   "wange": 194,
+   "schnitt_y": 216
+  },
+  "herzen": {
+   "datei": "herzen.png",
+   "kopf_y": 33,
+   "wange": 195,
+   "schnitt_y": 215,
+   "tuer": false
+  }
+ },
+ "oeffnen": [
+  {
+   "id": "T1",
+   "text": "Moin. Hier geht's rein."
+  },
+  {
+   "id": "T2",
+   "text": "Ich bin Crumble. Ich pass hier auf."
+  },
+  {
+   "id": "T3",
+   "text": "Kennung, Passwort, rein. Ich halt die Stellung."
+  },
+  {
+   "id": "T4",
+   "text": "Na, Schicht? Dann mal rein."
+  },
+  {
+   "id": "T5",
+   "text": "Willkommen in der Backstube. Fast. Erst die Tür."
+  },
+  {
+   "id": "T6",
+   "text": "Ich wohn hier im Loch. Und pass auf die Tür auf."
+  },
+  {
+   "id": "T7",
+   "text": "Ohne Kennung kommt hier keiner rein. Nicht mal ich."
+  },
+  {
+   "id": "T8",
+   "text": "Moin. Ich hab extra die Krümel weggefegt."
+  },
+  {
+   "id": "T19",
+   "text": "Ich guck nur kurz raus. Anmelden müsst ihr selbst."
+  },
+  {
+   "id": "T21",
+   "text": "Mein Loch, meine Regeln: erst Kennung, dann rein."
+  }
+ ],
+ "tipps": [
+  {
+   "id": "T9",
+   "text": "Oben die Kennung, darunter das Passwort. Enter geht auch."
+  },
+  {
+   "id": "T10",
+   "text": "Neu hier? Tipp auf mich. Ich zeig dir, wofür das alles gut ist."
+  },
+  {
+   "id": "T11",
+   "text": "Hinter mir wohnen kurze Geschichten. Gucken geht ohne Kennung."
+  },
+  {
+   "id": "T12",
+   "text": "Passwort weg? Sag Ulf Bescheid."
+  },
+  {
+   "id": "T13",
+   "text": "Einmal angemeldet, merkt sich das Gerät dich. Dann wink ich dich nur noch durch."
+  },
+  {
+   "id": "T14",
+   "text": "Die Handy-Ansicht ist noch in Planung. Ich übe schon mal, klein zu sein."
+  },
+  {
+   "id": "T15",
+   "text": "Kein Netz, keine Tür. Ohne Internet komm ich auch nicht weiter."
+  },
+  {
+   "id": "T17",
+   "text": "Beim Passwort zählen Groß- und Kleinbuchstaben. Passwort-Hamster sind pingelig."
+  },
+  {
+   "id": "T18",
+   "text": "Erst anmelden, dann Brötchen. So ist die Regel."
+  },
+  {
+   "id": "T20",
+   "text": "Beim Passwort guck ich weg. Ehrenwort."
+  }
+ ],
+ "reaktionen": {
+  "falsch": {
+   "buste": "besorgt",
+   "text": "Hm. Nochmal in Ruhe?"
+  },
+  "falsch2": {
+   "buste": "besorgt",
+   "text": "Kennung prüfen. Die Tippfehler verstecken sich gern da."
+  },
+  "format": {
+   "buste": "besorgt",
+   "text": "Die Kennung sieht komisch aus. Leerzeichen drin?"
+  },
+  "zu_viele": {
+   "buste": "gaehnen",
+   "text": "Kurze Pause. Ich zähl solange Brötchen."
+  },
+  "netz": {
+   "buste": "besorgt",
+   "text": "Kein Netz. Ich warte mit."
+  },
+  "freischalten": {
+   "buste": "pfote",
+   "text": "Fast drin. Ulf muss dich noch freischalten."
+  },
+  "angemeldet": {
+   "buste": "daumen",
+   "text": "Rein mit dir. Gute Schicht!"
+  },
+  "gesperrt": {
+   "buste": "neutral",
+   "text": ""
+  }
+ }
+}

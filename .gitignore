@@ -18,3 +18,16 @@ produkt_config/weggelassene_auto_stubs.txt
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Entwicklungsumgebung ENTWICKLUNG_BOS (12.10.2026, 22:34 Uhr)
+# Dokus, Protokolle und Prüfdateien liegen dort neben dem Code.
+# Diese Zeilen halten sie aus dem Repo, auch wenn einmal der
+# falsche bos-Ordner synchronisiert wird.
+*.md
+!bos_backgrounds/README.md
+_protokolle/
+_regeln/
+_ideen/
+_altsystem/
+_PRUEF_*
+*.rules
