@@ -42,6 +42,12 @@
        reparaturMelden: boolean,  // NEU 10.10.2026 — „Melden“ (neue Anfrage; schließt Mitlesen ein)
        reparaturBearbeiten: boolean, // NEU 10.10.2026 — „Bearbeiten“, Hausmeister (Status, Fenster, Dringlichkeit; schließt Mitlesen ein)
        farbschema: string,        // NEU 15.10.2026 — Farbprofil-ID (bos_farbprofile.js), NUR bei Abweichung von der Rolle; fehlt = Profil der Rolle
+       freigeschaltet: boolean,   // seit 26.09.2026 (Namens-Fundament Schritt 2) — fehlt = false; Regel hatKonto() (RK §3, §27). Setzt die Kontenverwaltung (Karte, Beschriften, Weggang). Kopf nachgezogen 27.10.2026 (B3)
+       art: 'person' | 'ort' | 'system',  // seit 26.09.2026 — Konto-Art; Regel personKonto() (RK §27), nzEmpfaenger() (RK §29). Ältere Konten können ohne art sein (Kontenverwaltung, Abgleich-Liste)
+       name: string,              // bei art 'ort' der Ortsname (Beschriften, z. B. „Wandtablet Rondo“); bei Personen der Vorname aus der Registrierung
+       nachrichtenSchreiben: boolean,      // NEU 27.10.2026 (Nachrichtenzentrale 1b) — „✉️ Nachrichten schreiben“; Regel nzHaken() (RK §29)
+       nachrichtenBekanntmachung: boolean, // NEU 27.10.2026 — „📌 Bekanntmachungen“ (schließt Kritik an Gruppen/Einzelne ein, E32)
+       nachrichtenEmpfangen: boolean,      // NEU 27.10.2026 — „📬 Nachrichten empfangen“, NUR bei art 'ort' (Filiale); Stationen bekommen ihn nicht (U2). Personen-Konten empfangen immer
        erstelltAm: Firestore-Timestamp
      }
 
@@ -77,6 +83,16 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-10-27 · 23:29 (26.10.) · v-Nachrichten-1 · Feature (Nachrichtenzentrale Stufe 1b, #131;
+       Bauplan 23:05, Go Kontroll-Chat 23:12, Auflagen A1–A5; Kern-Datei-Freigabe Ulf 15:33)
+       Nur Zusätze: drei Haken-Setzer nach dem Reparatur-Muster —
+       setzeNachrichtenSchreibenRecht(), setzeNachrichtenBekanntmachungRecht(),
+       setzeNachrichtenEmpfangenRecht() (Letzterer nur für Ort-Konten; die
+       Kontenverwaltung zeigt ihn nur dort). Die Regel prüft alle drei
+       serverseitig (nzHaken()/nzEmpfaenger(), RK §29); setzen darf nur der
+       Generalschlüssel. Dateikopf: Feldliste um freigeschaltet, art, name und
+       die drei Felder nachgezogen (Befund B3 des Kontroll-Chats). Sonst nichts.
+       nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
      2026-10-21 · 07:29 · v-Zugangsblatt-QR-1 · Feature (nur Zusatz)
        adminKennung(): Kennung (Teil vor dem @) der angemeldeten Admin-Sitzung,
        sonst null. Die NFC-/QR-Zentrale schreibt sie als geaendertVon, die
@@ -419,6 +435,26 @@ window.BOS_ACCOUNTS = (function () {
   }
 
   /**
+   * NEU (27.10.2026, Nachrichtenzentrale Stufe 1b). Admin-Funktionen wie die
+   * Reparatur-Setzer. „Nachrichten schreiben“ = darf Nachrichten senden (Azubis
+   * nicht, E6); „Bekanntmachungen“ = darf Aushänge für alle anpinnen und Kritik
+   * an Gruppen/Einzelne senden (E17, E32); „Nachrichten empfangen“ = NUR für
+   * Ort-Konten (Filiale, U2) — Personen-Konten empfangen immer, Stationen nie.
+   * Die Regel prüft alle drei serverseitig (nzHaken(), nzEmpfaenger(), RK §29).
+   * Das Adressbuch (nachrichten_adressbuch) trägt nur Kopien zur Anzeige; es
+   * schreibt die Kontenverwaltung beim Abgleich, nie diese Datei.
+   */
+  async function setzeNachrichtenSchreibenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ nachrichtenSchreiben: !!wert });
+  }
+  async function setzeNachrichtenBekanntmachungRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ nachrichtenBekanntmachung: !!wert });
+  }
+  async function setzeNachrichtenEmpfangenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ nachrichtenEmpfangen: !!wert });
+  }
+
+  /**
    * NEU (15.10.2026, Farbprofile Stufe B). Admin-Funktion wie die Haken-Setzer.
    * id = Profil-ID aus bos_farbprofile.js → wird gespeichert; leer/null →
    * Feld wird GELÖSCHT („Nach Rolle“), nicht mit null oder '' beschrieben.
@@ -543,6 +579,9 @@ window.BOS_ACCOUNTS = (function () {
     setzeReparaturLesenRecht: setzeReparaturLesenRecht,
     setzeReparaturMeldenRecht: setzeReparaturMeldenRecht,
     setzeReparaturBearbeitenRecht: setzeReparaturBearbeitenRecht,
+    setzeNachrichtenSchreibenRecht: setzeNachrichtenSchreibenRecht,           // NEU 27.10.2026, Nachrichtenzentrale 1b
+    setzeNachrichtenBekanntmachungRecht: setzeNachrichtenBekanntmachungRecht, // NEU 27.10.2026
+    setzeNachrichtenEmpfangenRecht: setzeNachrichtenEmpfangenRecht,           // NEU 27.10.2026 (nur Ort-Konten)
     setzeFarbschema: setzeFarbschema,
     loescheKonto: loescheKonto,
     ladeAlleKonten: ladeAlleKonten,

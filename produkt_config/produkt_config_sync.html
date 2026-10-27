@@ -3,6 +3,7 @@
 <!--
   MODUL: produkt_config/produkt_config_sync.html — Produkt-Config Sync
   CHANGELOG
+    2026-10-27 · 00:06 · Nur Text: Grund (2) einer Ablehnung nennt jetzt firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md (dreizehnte Stelle, nicht im Wächter; #111)
     2026-10-24 · 07:46 · Nur Text: Grund (2) einer Ablehnung nennt jetzt firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Kern-Freigabe Ulf F6 24.10. 00:32). Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
     2026-10-23 · 23:04 · Import behält auch den Werdegang (Maschinenseite Stufe A; Bauplan Go Kontroll-Chat 22:22, Kern-Freigabe Ulf 18:09)
       DB_BEHALTEN_FELDER + 'werdegang': Eine Notfall-Kopie von vor dem
@@ -558,7 +559,7 @@ document.getElementById('importConfirmBtn').onclick = function () {
     console.error('[Produkt-Config Sync] Schreiben:', err);
     var code = (err && err.code) || '';
     setzeStatus(statusEl, '✗ ' + (code === 'permission-denied'
-      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel ist älter als diese Seite und kennt ein Feld der Datei noch nicht (einzusetzen: firestore_regeln_2026-10-24_maschinen_b.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
+      ? 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: (1) Konto ohne Admin-Rolle, (2) eingesetzte Regel ist älter als diese Seite und kennt ein Feld der Datei noch nicht (einzusetzen: firestore_regeln_2026-10-27_nachrichten.rules), (3) jemand hat gleichzeitig eingespielt — Vorschau neu prüfen. Nichts wurde geschrieben. '
       : '') + fehlerText(err), 'err');
     zurueck();
   });

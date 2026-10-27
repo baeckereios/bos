@@ -7,6 +7,25 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-27 · 23:29 (26.10.) · v-Nachrichten-1 · Feature (Nachrichtenzentrale Stufe 1b, #131;
+      Bauplan 23:05, Go Kontroll-Chat 23:12 mit A1–A5; Kern-Datei-Freigabe Ulf 15:33; U2 Ulf 23:01, U4 Ulf 23:22)
+      Rein additiv. (a) Haken-Gruppe „✉️ Nachrichtenzentrale“ in der Konto-Karte unter
+      der Reparatur-Gruppe (NACHRICHTEN_HAKEN, nachrichtenHakenHTML, toggleKontoNachrichten;
+      bearbeitung[] + tatsaechlichSpeichern()). Je Art: Person → Schreiben + Bekanntmachung,
+      Ort → nur Empfangen (Filiale) + Hinweis, System → nichts; beim Speichern werden Haken,
+      die zur Art nicht passen, nie geschrieben (Art-Sperre). (b) Reiter „Gruppen“ (K7/K11):
+      Hand-Gruppen als Vorlagen-Dokumente nachrichten_vorlagen/hand_<slug> — anlegen,
+      umbenennen, Reihenfolge, Mitglieder aus dem Adressbuch, löschen; Slug nach dem Anlegen
+      fest. (c) Abgleich „Adressbuch & Vorlagen“ gleicheAdressbuchAb(): berechnet aus
+      bos_accounts + personen das Adressbuch (nachrichten_adressbuch, nur Empfänger: Personen
+      und Ort-Konten mit Empfangen-Haken, freigeschaltet) und die automatischen Vorlagen
+      (rolle_<id>, leitung) neu, schreibt idempotent nur Unterschiede, löscht Einträge ohne
+      Soll, lässt beschreibung in Ruhe; läuft nach JEDEM der sieben Schreibwege der Konto-Karte
+      (Speichern/Löschen, Art, Freischaltung, Weggang, Beschriften, Verknüpfung, Namen lösen)
+      sowie nach Gruppen-Speichern und auf Knopfdruck; Ergebnis und err.message sichtbar
+      (§7a); nennt freigeschaltete Konten ohne Art (Auflage A4). Vorlagen und Adressbuch
+      werden beim Laden getrennt abgefangen (wie Personen/Namen). Sonst nichts geändert.
+      nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
     2026-10-21 · 11:07 · v-BackStore-Texte · Umbau (#110 BackStore wie ein App Store,
       Bauplan freigegeben KC 10:27, Teile D und E)
       Bereiche der Reiter „Zugriffe“/„Rechte“ kommen aus der Registry
@@ -373,6 +392,19 @@
   .sektion-bestaetigt { margin-bottom: var(--bos-space-lg, 22px); }
 
   .entry-list { display: flex; flex-direction: column; gap: var(--bos-space-2xs, 7px); }
+  /* NEU 27.10.2026, Nachrichtenzentrale 1b: Reiter „Gruppen“ (nur Tokens) */
+  .gruppen-kopf { display: flex; flex-wrap: wrap; gap: var(--bos-space-xs, 9px); margin: 0 0 10px; }
+  .gruppe-zeile { display: flex; align-items: center; gap: var(--bos-space-sm, 14px); padding: var(--bos-space-xs, 9px) var(--bos-space-sm, 14px); border: 1px solid var(--bos-border); border-radius: var(--bos-radius-sm, 6px); background: var(--bos-surface); }
+  .gruppe-zeile__name { font-family: var(--bos-font-label); font-weight: 700; font-size: var(--bos-font-md, .95rem); flex: 1; }
+  .gruppe-zeile__meta { color: var(--bos-text-dim); font-size: var(--bos-font-xs, .72rem); }
+  .gruppe-zeile .bos-btn { padding: 4px 10px; min-height: 0; }
+  .gruppe-editor { margin: 12px 0; padding: var(--bos-space-sm, 14px); border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-md, 14px); background: var(--bos-surface-raised); }
+  .gruppe-editor .felder { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--bos-space-sm, 14px); margin-bottom: 10px; }
+  .gruppe-editor label span { display: block; font-size: var(--bos-font-xs, .72rem); color: var(--bos-text-dim); margin-bottom: 3px; }
+  .gruppe-mitglieder { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px 14px; margin: 6px 0 10px; }
+  .gruppen-auto { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--bos-border); }
+  .vorlage-auto { font-size: var(--bos-font-sm, .82rem); color: var(--bos-text-dim); padding: 2px 0; }
+  .abgleich-liste { margin: 4px 0 0; padding-left: 18px; color: var(--bos-warn, var(--bos-amber)); }
   .entry-row {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--bos-space-2xs, 8px) var(--bos-space-sm, 13px);
     padding: var(--bos-space-xs, 11px) var(--bos-space-sm, 14px);
@@ -553,10 +585,32 @@
     </div>
     <div id="adminInhalt" class="hidden">
     <div id="laufzeitStreifen" class="hidden" role="status" style="margin-bottom:12px; padding:10px 14px; border:1px solid var(--bos-warn, var(--bos-amber)); border-radius:var(--bos-radius-sm, 8px); background:var(--bos-surface, #1c1a17); color:var(--bos-warn, var(--bos-amber)); font-weight:600; font-size:.88rem;"></div>
-    <div class="tab-row" style="display:flex; gap:8px; margin-bottom:16px;">
+    <div class="tab-row" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">   <!-- 27.10.2026, 1b: flex-wrap — vier Reiter passen am Handy (390 px) sonst nicht nebeneinander (Fund der Passwort-Prüfung) -->
       <button class="bos-btn bos-btn--amber tab-btn" data-tab="konten">Konten</button>
       <button class="bos-btn tab-btn" data-tab="rollen">Rollen &amp; Rechte</button>
       <button class="bos-btn tab-btn" data-tab="namen">Namen</button>
+      <button class="bos-btn tab-btn" data-tab="gruppen">Gruppen</button>   <!-- NEU 27.10.2026, Nachrichtenzentrale 1b -->
+    </div>
+
+    <!-- NEU 27.10.2026 (Nachrichtenzentrale Stufe 1b, K7/K11): Hand-Gruppen als Empfänger-Vorlagen + Abgleich Adressbuch & Vorlagen -->
+    <div id="tabGruppen" class="hidden">
+      <p style="color:var(--bos-text-dim); font-size:.85rem; margin:0 0 10px;">
+        Gruppen sind Empfänger-Vorlagen für die Nachrichtenzentrale („Frühschicht“, „Teigmacher“, „Brötchenstraße“ …), quer über alle Rollen.
+        Mitglieder sind Konten aus dem Adressbuch (Personen und Filial-Konten mit Haken „Nachrichten empfangen“). Die Vorlagen je Rolle und die Leitungsliste entstehen von selbst.
+      </p>
+      <div class="gruppen-kopf">
+        <button class="bos-btn bos-btn--amber" id="gruppeNeuBtn">+ Neue Gruppe</button>
+        <button class="bos-btn" id="abgleichBtn">Jetzt abgleichen (Adressbuch &amp; Vorlagen)</button>
+      </div>
+      <p id="abgleichStatus" style="font-size:.82rem; color:var(--bos-text-dim); margin:0 0 8px;"></p>
+      <p id="gruppenErr" class="status-err hidden"></p>
+      <p id="gruppenStatus" style="font-size:.82rem; color:var(--bos-text-dim); margin:0 0 8px;"></p>
+      <div id="gruppenListe" class="entry-list"></div>
+      <div id="gruppeEditor" class="gruppe-editor hidden"></div>
+      <div class="gruppen-auto">
+        <div class="haken-gruppe-titel">Automatische Vorlagen (aus den Konten, nur Anzeige)</div>
+        <div id="vorlagenAuto"></div>
+      </div>
     </div>
 
     <div id="tabNamen" class="hidden">
@@ -914,6 +968,9 @@ function initBearbeitung() {
       reparaturLesen: !!k.reparaturLesen,         // NEU 10.10.2026, Reparaturanfrage Stufe 1
       reparaturMelden: !!k.reparaturMelden,       // NEU 10.10.2026
       reparaturBearbeiten: !!k.reparaturBearbeiten, // NEU 10.10.2026
+      nachrichtenSchreiben: !!k.nachrichtenSchreiben,           // NEU 27.10.2026, Nachrichtenzentrale 1b
+      nachrichtenBekanntmachung: !!k.nachrichtenBekanntmachung, // NEU 27.10.2026
+      nachrichtenEmpfangen: !!k.nachrichtenEmpfangen,           // NEU 27.10.2026 (nur Ort-Konten)
       farbschema: (typeof k.farbschema === 'string' && k.farbschema) ? k.farbschema : null, // NEU 15.10.2026, #72 Stufe B — null = „Nach Rolle“
       farbHinweis: null
     };
@@ -1121,7 +1178,8 @@ var KONTO_KARTEN_TABS = [
           '<label class="checkbox-feld"><input type="checkbox" ' + (b.weitereTeige ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'weitereTeige\', this.checked)">' +
           '<span class="cb-label">🥨 Weitere Teige pflegen — Teige der Stationen (Rondo, Frühschicht, Brötchenstraße): Name, Stationen, Ausbeute, Hefe, Kessel. Produkte zuordnen braucht zusätzlich die Rolle admin</span></label>' +
         '</div>' +
-        reparaturHakenHTML(k, b)
+        reparaturHakenHTML(k, b) +
+        nachrichtenHakenHTML(k, b)   // NEU 27.10.2026, Nachrichtenzentrale 1b
       );
     }
   },
@@ -1311,6 +1369,42 @@ function toggleKontoTeigecke(feld, checked) {
   markiereGeaendert();
 }
 
+// NEU 27.10.2026, Nachrichtenzentrale Stufe 1b — eigene Gruppe unter der
+// Reparatur-Gruppe, gleiche Mechanik (bearbeitung[], dieselbe Sammelaktion).
+// Die Regel prüft alle drei serverseitig (nzHaken()/nzEmpfaenger(), RK §29).
+// Je Art (U2, Ulf 23:01): Person → Schreiben + Bekanntmachung; Ort → nur
+// „empfangen“ (das ist die Filiale; Stationen bekommen ihn nicht); System → nichts.
+// nachrichtenHakenFuerArt() ist die EINE Stelle, die sagt, welcher Haken zu
+// welcher Art gehört — Anzeige und Speichern (Art-Sperre) lesen sie beide.
+var NACHRICHTEN_HAKEN = [
+  { feld: 'nachrichtenSchreiben', arten: ['person'], text: '✉️ Nachrichten schreiben — darf Nachrichten an Kollegen und Gruppen senden (Azubis bekommen ihn nicht)' },
+  { feld: 'nachrichtenBekanntmachung', arten: ['person'], text: '📌 Bekanntmachungen — darf Aushänge für alle anpinnen; schließt Kritik an Gruppen und Einzelne ein' },
+  { feld: 'nachrichtenEmpfangen', arten: ['ort'], text: '📬 Nachrichten empfangen — nur Ort-Konten: steht im Adressbuch und bekommt Nachrichten (Filiale). Arbeitsstationen bekommen den Haken nicht' }
+];
+function nachrichtenHakenFuerArt(art) {
+  return NACHRICHTEN_HAKEN.filter(function (h) { return h.arten.indexOf(art || '') !== -1; });
+}
+function nachrichtenHakenHTML(k, b) {
+  var art = k ? (k.art || '') : '';
+  var haken = nachrichtenHakenFuerArt(art);
+  var hinweis = '';
+  if (art === 'ort') hinweis = '<div class="haken-gruppe-hinweis">Ort-Konto: Arbeitsstationen bekommen keine Nachrichten — der Haken ist nur für Filialen. Schreiben und Bekanntmachungen gibt es nur für Personen.</div>';
+  else if (art === 'system') hinweis = '<div class="haken-gruppe-hinweis">Systemkonto: keine Nachrichten-Haken.</div>';
+  else if (art !== 'person') hinweis = '<div class="haken-gruppe-hinweis">Dieses Konto hat noch keine Art — erst oben die Art setzen (Person oder Ort), dann erscheinen die Haken. Ohne Art steht das Konto nicht im Adressbuch.</div>';
+  return '<div class="detail-section full"><div><div class="haken-gruppe-titel">✉️ Nachrichtenzentrale</div>' +
+    haken.map(function (h) {
+      return '<label class="checkbox-feld"><input type="checkbox" ' + (b[h.feld] ? 'checked' : '') +
+        ' onchange="toggleKontoNachrichten(\'' + h.feld + '\', this.checked)">' +
+        '<span class="cb-label">' + esc(h.text) + '</span></label>';
+    }).join('') + hinweis + '</div></div>';
+}
+function toggleKontoNachrichten(feld, checked) {
+  var erlaubt = NACHRICHTEN_HAKEN.some(function (h) { return h.feld === feld; });
+  if (!kontoKarteId || !erlaubt) return;
+  bearbeitung[kontoKarteId][feld] = checked;
+  markiereGeaendert();
+}
+
 // Verknüpft ein Konto mit einer SchichtPlaner-Person (schreibt bosKontoId
 // dort) -- Ulf, 12.09.2026: "würde diese Einstellung nicht sogar im
 // Konten & Rollen System Sinn machen?" Bewusst SOFORT geschrieben, nicht
@@ -1409,6 +1503,7 @@ function setzeKontoArt(kontoId, art) {
     k.art = art || null;
     zeigeFreigabeStatus(kontoId, '✓ Art gespeichert: ' + (ARTEN[art] || '—'));
     renderKontoKarte(); renderKontenListen();
+    nachKontoAenderung('Art');   // NEU 27.10.2026, 1b (Weg 3)
   }).catch(function (f) {
     console.error('[Konten & Rollen] Art speichern fehlgeschlagen:', f);
     zeigeFreigabeStatus(kontoId, 'Art nicht gespeichert: ' + freigabeFehler(f), true);
@@ -1432,6 +1527,7 @@ function setzeFreigeschaltet(kontoId, wert) {
     k.freigeschaltet = !!wert;
     zeigeFreigabeStatus(kontoId, wert ? '✓ ' + kontoId + ' freigeschaltet' : '✓ ' + kontoId + ' gesperrt (Haken entfernt)');
     renderKontoKarte(); renderKontenListen();
+    nachKontoAenderung('Freischaltung');   // NEU 27.10.2026, 1b (Weg 4)
   }).catch(function (f) {
     console.error('[Konten & Rollen] Haken speichern fehlgeschlagen:', f);
     zeigeFreigabeStatus(kontoId, 'Haken nicht gespeichert: ' + freigabeFehler(f), true);
@@ -1459,6 +1555,7 @@ function weggangKlick(kontoId) {
     if (person) person.bosKontoId = null;
     zeigeFreigabeStatus(kontoId, 'Erledigt. Jetzt den Login „' + kontoId + '“ in der Firebase-Konsole löschen oder deaktivieren.');
     renderKontoKarte(); renderKontenListen();
+    nachKontoAenderung('Weggang');   // NEU 27.10.2026, 1b (Weg 5)
   }).catch(function (f) {
     console.error('[Konten & Rollen] Weggang fehlgeschlagen:', f);
     zeigeFreigabeStatus(kontoId, 'Weggang nicht gespeichert — nichts geändert (ein Schreibvorgang): ' + freigabeFehler(f), true);
@@ -1738,6 +1835,7 @@ function beschriftenKlick(kontoId) {
       beschriftenStatus(kontoId, '✓ ' + kontoId + ' beschriftet' + (pid ? ' (' + pid + ')' : ' (Ort)') + ' und freigeschaltet. Jetzt das Zugangsblatt drucken.');
       var z = document.getElementById('zStatus-' + kontoId);
       if (z) z.textContent = '✓ ' + kontoId + ' beschriftet' + (pid ? ' (' + pid + ')' : ' (Ort)') + ' und freigeschaltet. Jetzt das Zugangsblatt drucken.';
+      nachKontoAenderung('Beschriften');   // NEU 27.10.2026, 1b (Weg 6)
     });
   }).catch(function (f) {
     console.error('[Konten & Rollen] Beschriften fehlgeschlagen', f);
@@ -2210,6 +2308,7 @@ function setzeVerknuepftePerson(kontoId, neuePersonId) {
     var neuEl = document.getElementById('verknuepfungStatus-' + kontoId);
     if (neuEl) neuEl.textContent = text;
     var st = document.getElementById('saveStatus'); if (st) { st.textContent = text; st.className = 'status-ok'; }
+    nachKontoAenderung('Verknüpfung');   // NEU 27.10.2026, 1b (Weg 7)
   }).catch(function (fehler) {
     console.error('[Konten & Rollen] Verknüpfung fehlgeschlagen:', fehler);
     var text = 'Verknüpfung nicht gespeichert: ' + freigabeFehler(fehler);
@@ -2252,10 +2351,27 @@ function ladeAllesUndRender() {
     namenLadefehler = fehler;
     return null;
   });
+  // NEU 27.10.2026 (Nachrichtenzentrale 1b): Vorlagen und Adressbuch, ebenfalls getrennt
+  // abgefangen — scheitert nur das (z. B. Regel noch nicht eingesetzt), bleibt der Rest bedienbar.
+  nzLadefehler = null;
+  var vorlagenPromise = adminDb.collection('nachrichten_vorlagen').get().catch(function (fehler) {
+    console.error('Konten-Verwaltung: Vorlagen (nachrichten_vorlagen) konnten nicht geladen werden', fehler);
+    nzLadefehler = fehler;
+    return null;
+  });
+  var adressbuchPromise = adminDb.collection('nachrichten_adressbuch').get().catch(function (fehler) {
+    console.error('Konten-Verwaltung: Adressbuch (nachrichten_adressbuch) konnte nicht geladen werden', fehler);
+    nzLadefehler = nzLadefehler || fehler;
+    return null;
+  });
   return window.BOS_AUTH_READY.then(function () {
-    return Promise.all([window.BOS_ACCOUNTS.ladeAlleKonten(adminDb), ladePermissions(), personenPromise, namenPromise]);
+    return Promise.all([window.BOS_ACCOUNTS.ladeAlleKonten(adminDb), ladePermissions(), personenPromise, namenPromise, vorlagenPromise, adressbuchPromise]);
   }).then(function (ergebnisse) {
     alleKonten = ergebnisse[0];
+    alleVorlagen = {};
+    if (ergebnisse[4]) ergebnisse[4].forEach(function (doc) { alleVorlagen[doc.id] = doc.data(); });
+    adressbuchIst = {};
+    if (ergebnisse[5]) ergebnisse[5].forEach(function (doc) { adressbuchIst[doc.id] = doc.data(); });
     alleNamen = {};
     if (ergebnisse[3]) ergebnisse[3].forEach(function (doc) { alleNamen[doc.id] = doc.data(); });
     namenEntwurf = {};
@@ -2275,6 +2391,7 @@ function ladeAllesUndRender() {
     initBearbeitung();
     renderKontenListen();
     renderNamen();
+    renderGruppen();   // NEU 27.10.2026, 1b
     geaendert = false;
     document.getElementById('saveStatus').textContent = '';
     document.getElementById('fsStatus').textContent = alleKonten.length + ' Konten';
@@ -2484,6 +2601,18 @@ function tatsaechlichSpeichern() {
     if (!!b.reparaturBearbeiten !== !!k.reparaturBearbeiten) {
       aufgaben.push(window.BOS_ACCOUNTS.setzeReparaturBearbeitenRecht(window.db, k.id, b.reparaturBearbeiten));
     }
+    // NEU 27.10.2026, Nachrichtenzentrale 1b: drei Haken, selbe Sammelaktion.
+    // Art-Sperre: ein Haken wird nur dann als gesetzt geschrieben, wenn er zur
+    // Art des Kontos gehört (Ort nie „schreiben“, Person nie „empfangen“);
+    // ein gesetzter Haken, der nicht zur Art passt, wird auf false gezogen.
+    var nzErlaubt = nachrichtenHakenFuerArt(k.art).map(function (h) { return h.feld; });
+    NACHRICHTEN_HAKEN.forEach(function (h) {
+      var will = !!b[h.feld] && nzErlaubt.indexOf(h.feld) !== -1;
+      if (will !== !!k[h.feld]) {
+        var setzer = { nachrichtenSchreiben: 'setzeNachrichtenSchreibenRecht', nachrichtenBekanntmachung: 'setzeNachrichtenBekanntmachungRecht', nachrichtenEmpfangen: 'setzeNachrichtenEmpfangenRecht' }[h.feld];
+        aufgaben.push(window.BOS_ACCOUNTS[setzer](window.db, k.id, will));
+      }
+    });
     // NEU 15.10.2026, Farbprofile Stufe B: selbe Sammelaktion. Gegen die NEUE
     // Rolle normalisiert (gleich wie Rolle = Feld löschen); unbekannte, nicht
     // angefasste ID bleibt stehen.
@@ -2564,6 +2693,7 @@ function fuehreAdminAktionAus(aktion) {
     return ladeAllesUndRender().then(function () {
       statusEl.textContent = meldung;
       statusEl.className = 'status-ok';
+      nachKontoAenderung(aktion.typ === 'loeschen' ? 'löschen' : 'speichern');   // NEU 27.10.2026, 1b (Weg 1/2)
     });
   }).catch(function (fehler) {
     console.error('Konten-Verwaltung: Aktion fehlgeschlagen', fehler);
@@ -2792,6 +2922,7 @@ document.getElementById('namenSpeichernBtn').addEventListener('click', function 
   }).then(function () {
     document.getElementById('namenStatus').textContent = '✓ ' + plan.neu.length + ' neu, ' + plan.geaendert.length + ' geändert, ' +
       plan.leeren.length + ' Rufname(n) geleert, ' + plan.loesen.length + ' Verknüpfung(en) gelöst — ' + document.getElementById('namenStatus').textContent;
+    if (plan.loesen.length) nachKontoAenderung('Namen (Verknüpfung gelöst)');   // NEU 27.10.2026, 1b (Weg 7b)
   }).catch(function (f) {
     console.error('Konten-Verwaltung: Namen speichern fehlgeschlagen', f);
     zeigeNamenFehler('Nicht gespeichert — nichts davon (ein Schreibvorgang): ' + namenFehlertext(f));
@@ -2889,6 +3020,295 @@ document.getElementById('neuPersonBtn').addEventListener('click', function () {
   }).then(function () { neuPersonKnopfAktualisieren(); });
 });
 
+
+// ==========================================================================
+// NEU 27.10.2026 — Nachrichtenzentrale Stufe 1b: Adressbuch, Vorlagen, Gruppen
+// (Bauplan §3.2/§3.3; K1, K5, K7, K11, T2, T6, T7; Go KC 23:12). Das Adressbuch
+// ist das SCHILD (Anzeige), das Schloss bleibt der Haken im Konto (RK §29).
+// ==========================================================================
+var alleVorlagen = {};       // nachrichten_vorlagen, { id: doc } (Admin-Sitzung)
+var adressbuchIst = {};      // nachrichten_adressbuch, { kennung: doc }
+var nzLadefehler = null;
+var gruppeEntwurf = null;    // { slug, name, kennungen: [], reihenfolge, neu }
+var NZ_NAME_MAX = 40, NZ_SLUG = /^[a-z0-9_]{2,40}$/;
+
+function nzFehler(f) { return ((f && f.code) ? f.code + ' — ' : '') + ((f && f.message) || String(f)); }
+function nzSlugAusName(name) {
+  var t = String(name || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return t.slice(0, 40);
+}
+// Ist dieses Konto ein Empfänger? (dieselbe Regel wie nzEmpfaenger() in der Datenbank)
+function nzIstEmpfaenger(k) {
+  return k.freigeschaltet === true && (k.art === 'person' || (k.art === 'ort' && k.nachrichtenEmpfangen === true));
+}
+function nzAnzeigeName(kennung) {
+  var e = adressbuchIst[kennung];
+  if (e && e.personId && alleNamen[e.personId]) {
+    var n = alleNamen[e.personId];
+    return String(n.rufname || '').trim() || String(n.beschreibung || '').trim() || kennung;
+  }
+  return (e && String(e.name || '').trim()) || kennung;
+}
+// Soll-Zustand aus Konten + Personen (nur Speicher der Seite, Admin-Sitzung hat ihn geladen)
+function nzSollAdressbuch() {
+  var soll = {}, ohneArt = [];
+  alleKonten.forEach(function (k) {
+    if (k.freigeschaltet === true && !k.art && k.id && !istAdminKennung(k.id)) ohneArt.push(k.id);
+    if (!nzIstEmpfaenger(k)) return;
+    var person = allePersonen.filter(function (p) { return p.bosKontoId === k.id; })[0] || null;
+    var e = { art: k.art, rolle: k.role || null, name: String(k.name || ''), schreiben: k.art === 'person' && k.nachrichtenSchreiben === true,
+      bekanntmachung: k.art === 'person' && k.nachrichtenBekanntmachung === true };
+    if (person) e.personId = person.id;
+    soll[k.id] = e;
+  });
+  return { soll: soll, ohneArt: ohneArt };
+}
+function nzSollVorlagen(soll) {
+  var v = {};
+  var kennungen = Object.keys(soll).sort();
+  var rollen = window.BOS_ROLES || [];
+  rollen.forEach(function (r, i) {
+    var mit = kennungen.filter(function (k) { return soll[k].rolle === r.id; });
+    if (mit.length) v['rolle_' + r.id] = { name: 'Alle ' + r.name, kennungen: mit, quelle: 'rolle', rolle: r.id, reihenfolge: 10 + i * 10 };
+  });
+  v.leitung = { name: 'Leitung', kennungen: kennungen.filter(function (k) { return soll[k].rolle === 'produktionsleitung' || soll[k].rolle === 'admin'; }), quelle: 'leitung', reihenfolge: 0 };
+  Object.keys(alleVorlagen).forEach(function (id) {
+    var h = alleVorlagen[id];
+    if (!h || h.quelle !== 'hand' || id.indexOf('hand_') !== 0) return;
+    v[id] = { name: String(h.name || ''), kennungen: (h.kennungen || []).filter(function (k) { return !!soll[k]; }), quelle: 'hand',
+      reihenfolge: typeof h.reihenfolge === 'number' ? h.reihenfolge : 100 };
+  });
+  return v;
+}
+function nzGleich(a, b, felder) {
+  return felder.every(function (f) { return JSON.stringify(a[f] === undefined ? null : a[f]) === JSON.stringify(b[f] === undefined ? null : b[f]); });
+}
+var AB_FELDER = ['art', 'rolle', 'personId', 'name', 'schreiben', 'bekanntmachung'];
+var VL_FELDER = ['name', 'kennungen', 'quelle', 'rolle', 'reihenfolge'];
+
+// Rechnet den Abgleich aus (ohne zu schreiben) — damit lässt er sich prüfen.
+function nzAbgleichPlan() {
+  var sa = nzSollAdressbuch(), soll = sa.soll, vorlagenSoll = nzSollVorlagen(soll);
+  var plan = { neu: [], geaendert: [], geloescht: [], vorlagenNeu: [], vorlagenGeaendert: [], vorlagenGeloescht: [], ohneArt: sa.ohneArt, eintraege: Object.keys(soll).length, soll: soll, vorlagenSoll: vorlagenSoll };
+  Object.keys(soll).forEach(function (k) {
+    var ist = adressbuchIst[k];
+    if (!ist) plan.neu.push(k);
+    else if (!nzGleich(ist, soll[k], AB_FELDER) || (soll[k].personId === undefined && ist.personId !== undefined)) plan.geaendert.push(k);
+  });
+  Object.keys(adressbuchIst).forEach(function (k) { if (!soll[k]) plan.geloescht.push(k); });
+  Object.keys(vorlagenSoll).forEach(function (id) {
+    var ist = alleVorlagen[id];
+    if (!ist) plan.vorlagenNeu.push(id);
+    else if (!nzGleich(ist, vorlagenSoll[id], VL_FELDER)) plan.vorlagenGeaendert.push(id);
+  });
+  Object.keys(alleVorlagen).forEach(function (id) { if (!vorlagenSoll[id] && id.indexOf('rolle_') === 0) plan.vorlagenGeloescht.push(id); });
+  return plan;
+}
+// Schreibt den Abgleich (Batch, nur Unterschiede). Gibt das Ergebnis zurück.
+function gleicheAdressbuchAb(grund) {
+  if (!window.BOS_ACCOUNTS || !window.BOS_ACCOUNTS.adminAngemeldet()) return Promise.reject(new Error('Admin-Sitzung abgelaufen — bitte neu öffnen.'));
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var FV = firebase.firestore.FieldValue;
+  // Ist-Stand frisch lesen (die Seite könnte veraltet sein)
+  return Promise.all([adminDb.collection('nachrichten_adressbuch').get(), adminDb.collection('nachrichten_vorlagen').get()]).then(function (r) {
+    adressbuchIst = {}; r[0].forEach(function (d) { adressbuchIst[d.id] = d.data(); });
+    alleVorlagen = {}; r[1].forEach(function (d) { alleVorlagen[d.id] = d.data(); });
+    var plan = nzAbgleichPlan();
+    var batch = adminDb.batch(), schreibt = 0;
+    var ab = function (k) { return adminDb.collection('nachrichten_adressbuch').doc(k); };
+    var vl = function (id) { return adminDb.collection('nachrichten_vorlagen').doc(id); };
+    plan.neu.forEach(function (k) { batch.set(ab(k), Object.assign({ beschreibung: '', stand: FV.serverTimestamp() }, plan.soll[k])); schreibt++; });
+    plan.geaendert.forEach(function (k) {
+      var u = Object.assign({ stand: FV.serverTimestamp() }, plan.soll[k]);
+      if (plan.soll[k].personId === undefined) u.personId = FV.delete();   // Person gelöst → Feld weg
+      batch.update(ab(k), u); schreibt++;   // beschreibung bleibt unberührt
+    });
+    plan.geloescht.forEach(function (k) { batch.delete(ab(k)); schreibt++; });
+    plan.vorlagenNeu.concat(plan.vorlagenGeaendert).forEach(function (id) {
+      var v = Object.assign({ stand: FV.serverTimestamp() }, plan.vorlagenSoll[id]);
+      if (v.rolle === undefined) delete v.rolle;
+      batch.set(vl(id), v); schreibt++;
+    });
+    plan.vorlagenGeloescht.forEach(function (id) { batch.delete(vl(id)); schreibt++; });
+    var fertig = schreibt ? batch.commit() : Promise.resolve();
+    return fertig.then(function () {
+      // Speicher der Seite nachziehen, ohne neu zu laden
+      plan.neu.forEach(function (k) { adressbuchIst[k] = Object.assign({ beschreibung: '' }, plan.soll[k]); });
+      plan.geaendert.forEach(function (k) { adressbuchIst[k] = Object.assign({ beschreibung: adressbuchIst[k].beschreibung || '' }, plan.soll[k]); });
+      plan.geloescht.forEach(function (k) { delete adressbuchIst[k]; });
+      plan.vorlagenNeu.concat(plan.vorlagenGeaendert).forEach(function (id) { alleVorlagen[id] = Object.assign({}, plan.vorlagenSoll[id]); });
+      plan.vorlagenGeloescht.forEach(function (id) { delete alleVorlagen[id]; });
+      return { grund: grund, eintraege: plan.eintraege, neu: plan.neu.length, geaendert: plan.geaendert.length, geloescht: plan.geloescht.length,
+        vorlagen: plan.vorlagenNeu.length + plan.vorlagenGeaendert.length, vorlagenGeloescht: plan.vorlagenGeloescht.length, schreibt: schreibt, ohneArt: plan.ohneArt };
+    });
+  });
+}
+function nzErgebnisText(e) {
+  return 'Adressbuch: ' + e.eintraege + ' Einträge, ' + (e.neu + e.geaendert) + ' geschrieben, ' + e.geloescht + ' gelöscht · Vorlagen: ' + e.vorlagen + ' geschrieben, ' + e.vorlagenGeloescht + ' gelöscht' +
+    (e.schreibt ? '' : ' — nichts zu tun') + (e.grund ? ' (nach: ' + e.grund + ')' : '');
+}
+function zeigeAbgleich(e) {
+  var el = document.getElementById('abgleichStatus');
+  if (el) {
+    el.innerHTML = esc('✓ ' + nzErgebnisText(e)) + (e.ohneArt.length
+      ? '<div class="abgleich-liste-kopf">⚠︎ Freigeschaltete Konten ohne Art — stehen nicht im Adressbuch, bitte in der Konto-Karte „Art“ setzen (die ersten Konten wurden am 26.09. von Hand freigeschaltet, bevor die Karte die Art verlangte):</div><ul class="abgleich-liste">' + e.ohneArt.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul>'
+      : '');
+    el.style.color = e.ohneArt.length ? 'var(--bos-warn, var(--bos-amber))' : '';
+  }
+  var st = document.getElementById('saveStatus');
+  if (st && e.grund) { st.textContent = (st.textContent ? st.textContent + ' · ' : '') + 'Adressbuch abgeglichen (' + (e.neu + e.geaendert + e.geloescht + e.vorlagen + e.vorlagenGeloescht) + ' Änderungen)'; }
+}
+function zeigeAbgleichFehler(f, grund) {
+  console.error('[Konten & Rollen] Abgleich Adressbuch fehlgeschlagen:', f);
+  var text = 'Abgleich Adressbuch & Vorlagen fehlgeschlagen' + (grund ? ' (nach: ' + grund + ')' : '') + ' — der vorherige Vorgang ist gespeichert, nur das Adressbuch hinkt. Grund: ' + nzFehler(f) + '. Im Reiter „Gruppen“ auf „Jetzt abgleichen“ drücken.';
+  var el = document.getElementById('abgleichStatus'); if (el) { el.textContent = text; el.style.color = 'var(--bos-red)'; }
+  var g = document.getElementById('gruppenErr'); if (g) { g.textContent = text; g.classList.remove('hidden'); }
+  var st = document.getElementById('saveStatus'); if (st) { st.textContent = text; st.className = 'status-err'; }
+}
+// EINE Stelle für alle Schreibwege: läuft nach jedem Vorgang, der Konten, Haken,
+// Art, Freischaltung oder die Verknüpfung Person ↔ Konto ändert. Ein Fehler hier
+// schlägt nicht auf den vorherigen Vorgang zurück (der ist gespeichert).
+function nachKontoAenderung(grund) {
+  return gleicheAdressbuchAb(grund).then(function (e) { zeigeAbgleich(e); renderGruppen(); return e; })
+    .catch(function (f) { zeigeAbgleichFehler(f, grund); return null; });
+}
+
+// ---- Reiter „Gruppen“ ----
+function nzHandGruppen() {
+  return Object.keys(alleVorlagen).filter(function (id) { return id.indexOf('hand_') === 0 && alleVorlagen[id] && alleVorlagen[id].quelle === 'hand'; })
+    .map(function (id) { return Object.assign({ id: id }, alleVorlagen[id]); })
+    .sort(function (a, b) { return (a.reihenfolge || 0) - (b.reihenfolge || 0) || String(a.name).localeCompare(String(b.name), 'de'); });
+}
+function nzAdressbuchSortiert() {
+  return Object.keys(adressbuchIst).map(function (k) { return { kennung: k, name: nzAnzeigeName(k), art: adressbuchIst[k].art }; })
+    .sort(function (a, b) { return a.name.localeCompare(b.name, 'de') || a.kennung.localeCompare(b.kennung); });
+}
+function renderGruppen() {
+  var liste = document.getElementById('gruppenListe'), auto = document.getElementById('vorlagenAuto'), err = document.getElementById('gruppenErr');
+  if (!liste) return;
+  if (nzLadefehler && err) { err.textContent = 'Vorlagen/Adressbuch konnten nicht geladen werden (ist die Regel vom 27.10. schon eingesetzt?): ' + nzFehler(nzLadefehler); err.classList.remove('hidden'); }
+  var gruppen = nzHandGruppen();
+  liste.innerHTML = gruppen.length ? gruppen.map(function (g, i) {
+    return '<div class="gruppe-zeile" data-gruppe="' + esc(g.id) + '">' +
+      '<div><div class="gruppe-zeile__name">' + esc(g.name) + '</div><div class="gruppe-zeile__meta">' + esc(g.id) + ' · ' + (g.kennungen || []).length + ' Mitglied' + ((g.kennungen || []).length === 1 ? '' : 'er') + ': ' + esc((g.kennungen || []).map(nzAnzeigeName).join(', ') || '—') + '</div></div>' +
+      '<button class="bos-btn" onclick="gruppeReihenfolge(\'' + esc(g.id) + '\', -1)" title="nach oben"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+      '<button class="bos-btn" onclick="gruppeReihenfolge(\'' + esc(g.id) + '\', 1)" title="nach unten"' + (i === gruppen.length - 1 ? ' disabled' : '') + '>▼</button>' +
+      '<button class="bos-btn" onclick="gruppeBearbeiten(\'' + esc(g.id) + '\')">Bearbeiten</button>' +
+      '<button class="bos-btn" onclick="gruppeLoeschen(\'' + esc(g.id) + '\')">Löschen</button>' +
+      '</div>';
+  }).join('') : '<p style="color:var(--bos-text-faint); font-size:.85rem; margin:0;">Noch keine Gruppe. „+ Neue Gruppe“ legt die erste an.</p>';
+  if (auto) {
+    var autos = Object.keys(alleVorlagen).filter(function (id) { return alleVorlagen[id] && alleVorlagen[id].quelle !== 'hand'; })
+      .sort(function (a, b) { return (alleVorlagen[a].reihenfolge || 0) - (alleVorlagen[b].reihenfolge || 0); });
+    auto.innerHTML = autos.length ? autos.map(function (id) {
+      var v = alleVorlagen[id];
+      return '<div class="vorlage-auto">' + esc(v.name || id) + ' <span style="color:var(--bos-text-faint)">(' + esc(id) + ')</span>: ' + esc((v.kennungen || []).map(nzAnzeigeName).join(', ') || '— niemand —') + '</div>';
+    }).join('') : '<div class="vorlage-auto">Noch keine automatischen Vorlagen — „Jetzt abgleichen“ erzeugt sie aus den Konten.</div>';
+  }
+  renderGruppeEditor();
+}
+function renderGruppeEditor() {
+  var ed = document.getElementById('gruppeEditor');
+  if (!ed) return;
+  if (!gruppeEntwurf) { ed.classList.add('hidden'); ed.innerHTML = ''; return; }
+  var g = gruppeEntwurf;
+  var mitglieder = nzAdressbuchSortiert();
+  ed.classList.remove('hidden');
+  ed.innerHTML =
+    '<div class="haken-gruppe-titel">' + (g.neu ? 'Neue Gruppe' : 'Gruppe bearbeiten') + '</div>' +
+    '<div class="felder">' +
+      '<label><span>Name (1–' + NZ_NAME_MAX + ' Zeichen)</span><input type="text" class="bos-input" id="gruppeName" maxlength="' + NZ_NAME_MAX + '" value="' + esc(g.name) + '" oninput="gruppeNameTippen(this.value)"></label>' +
+      '<label><span>Kennung (a–z, 0–9, _; ' + (g.neu ? 'Vorschlag aus dem Namen, danach fest' : 'fest') + ')</span><input type="text" class="bos-input" id="gruppeSlug" maxlength="40" value="' + esc(g.slug) + '"' + (g.neu ? ' oninput="gruppeEntwurf.slug = this.value"' : ' disabled') + '></label>' +
+    '</div>' +
+    '<div class="haken-gruppe-titel" style="font-size:.8rem;">Mitglieder (' + g.kennungen.length + ')</div>' +
+    (mitglieder.length ? '<div class="gruppe-mitglieder">' + mitglieder.map(function (m) {
+      return '<label class="checkbox-feld"><input type="checkbox" ' + (g.kennungen.indexOf(m.kennung) !== -1 ? 'checked' : '') + ' onchange="gruppeMitglied(\'' + esc(m.kennung) + '\', this.checked)">' +
+        '<span class="cb-label">' + esc(m.name) + ' <span style="color:var(--bos-text-faint)">(' + esc(m.kennung) + (m.art === 'ort' ? ', Filiale' : '') + ')</span></span></label>';
+    }).join('') + '</div>' : '<p class="haken-gruppe-hinweis">Das Adressbuch ist leer — erst „Jetzt abgleichen“ drücken.</p>') +
+    '<div class="gruppen-kopf"><button class="bos-btn bos-btn--amber" onclick="gruppeSpeichern()">Gruppe speichern</button><button class="bos-btn" onclick="gruppeAbbrechen()">Abbrechen</button></div>';
+}
+function gruppeNeu() {
+  gruppeEntwurf = { slug: '', name: '', kennungen: [], reihenfolge: 100 + nzHandGruppen().length * 10, neu: true };
+  renderGruppeEditor();
+}
+function gruppeNameTippen(wert) {
+  if (!gruppeEntwurf) return;
+  gruppeEntwurf.name = wert;
+  if (gruppeEntwurf.neu) { gruppeEntwurf.slug = nzSlugAusName(wert); var s = document.getElementById('gruppeSlug'); if (s) s.value = gruppeEntwurf.slug; }
+}
+function gruppeMitglied(kennung, an) {
+  if (!gruppeEntwurf) return;
+  var i = gruppeEntwurf.kennungen.indexOf(kennung);
+  if (an && i === -1) gruppeEntwurf.kennungen.push(kennung);
+  if (!an && i !== -1) gruppeEntwurf.kennungen.splice(i, 1);
+  var t = document.querySelector('#gruppeEditor .haken-gruppe-titel[style]'); if (t) t.textContent = 'Mitglieder (' + gruppeEntwurf.kennungen.length + ')';
+}
+function gruppeBearbeiten(id) {
+  var g = alleVorlagen[id]; if (!g) return;
+  gruppeEntwurf = { slug: id.slice(5), name: String(g.name || ''), kennungen: (g.kennungen || []).slice(), reihenfolge: typeof g.reihenfolge === 'number' ? g.reihenfolge : 100, neu: false };
+  renderGruppeEditor();
+}
+function gruppeAbbrechen() { gruppeEntwurf = null; renderGruppeEditor(); }
+function zeigeGruppenFehler(text) { var g = document.getElementById('gruppenErr'); if (g) { g.textContent = text; g.classList.remove('hidden'); } }
+function zeigeGruppenStatus(text) { var g = document.getElementById('gruppenStatus'); if (g) g.textContent = text; var e = document.getElementById('gruppenErr'); if (e) { e.textContent = ''; e.classList.add('hidden'); } }
+function gruppeSpeichern() {
+  var g = gruppeEntwurf; if (!g) return;
+  var name = String(g.name || '').trim(), slug = String(g.slug || '').trim();
+  if (!name || name.length > NZ_NAME_MAX) { zeigeGruppenFehler('Bitte einen Namen mit 1–' + NZ_NAME_MAX + ' Zeichen eingeben.'); return; }
+  if (!NZ_SLUG.test(slug)) { zeigeGruppenFehler('Kennung ungültig: nur a–z, 0–9 und _, 2 bis 40 Zeichen (jetzt: „' + slug + '“).'); return; }
+  var id = 'hand_' + slug;
+  if (g.neu && alleVorlagen[id]) { zeigeGruppenFehler('Die Kennung „' + slug + '“ gibt es schon — bitte eine andere.'); return; }
+  if (!window.BOS_ACCOUNTS.adminAngemeldet()) { zeigeGruppenFehler('Admin-Sitzung abgelaufen — bitte neu öffnen.'); return; }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  var kennungen = g.kennungen.filter(function (k) { return !!adressbuchIst[k]; });
+  var doc = { name: name, kennungen: kennungen, quelle: 'hand', reihenfolge: g.reihenfolge, stand: firebase.firestore.FieldValue.serverTimestamp() };
+  zeigeGruppenStatus('Speichert …');
+  adminDb.collection('nachrichten_vorlagen').doc(id).set(doc).then(function () {
+    alleVorlagen[id] = { name: name, kennungen: kennungen, quelle: 'hand', reihenfolge: g.reihenfolge };
+    gruppeEntwurf = null;
+    zeigeGruppenStatus('✓ Gruppe „' + name + '“ gespeichert (' + kennungen.length + ' Mitglieder).');
+    renderGruppen();
+    return nachKontoAenderung('Gruppe „' + name + '“');
+  }).catch(function (f) { console.error('[Konten & Rollen] Gruppe speichern fehlgeschlagen:', f); zeigeGruppenFehler('Gruppe nicht gespeichert: ' + nzFehler(f)); });
+}
+function gruppeLoeschen(id) {
+  var g = alleVorlagen[id]; if (!g) return;
+  if (!confirm('Gruppe „' + (g.name || id) + '“ löschen?\n\nAlte Nachrichten bleiben, wie sie sind — Empfänger wurden beim Absenden aufgelöst. Nur die Vorlage verschwindet.')) return;
+  if (!window.BOS_ACCOUNTS.adminAngemeldet()) { zeigeGruppenFehler('Admin-Sitzung abgelaufen — bitte neu öffnen.'); return; }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore();
+  adminDb.collection('nachrichten_vorlagen').doc(id).delete().then(function () {
+    delete alleVorlagen[id];
+    if (gruppeEntwurf && 'hand_' + gruppeEntwurf.slug === id) gruppeEntwurf = null;
+    zeigeGruppenStatus('✓ Gruppe „' + (g.name || id) + '“ gelöscht.');
+    renderGruppen();
+    return nachKontoAenderung('Gruppe gelöscht');
+  }).catch(function (f) { console.error('[Konten & Rollen] Gruppe löschen fehlgeschlagen:', f); zeigeGruppenFehler('Gruppe nicht gelöscht: ' + nzFehler(f)); });
+}
+function gruppeReihenfolge(id, richtung) {
+  var gruppen = nzHandGruppen();
+  var i = gruppen.findIndex(function (g) { return g.id === id; });
+  var j = i + richtung;
+  if (i === -1 || j < 0 || j >= gruppen.length) return;
+  if (!window.BOS_ACCOUNTS.adminAngemeldet()) { zeigeGruppenFehler('Admin-Sitzung abgelaufen — bitte neu öffnen.'); return; }
+  var adminDb = window.BOS_ACCOUNTS.adminFirestore(), FV = firebase.firestore.FieldValue;
+  // Reihenfolge neu durchnummerieren (100, 110, …) mit vertauschten Nachbarn — ein Batch
+  var folge = gruppen.map(function (g) { return g.id; }); folge[i] = gruppen[j].id; folge[j] = gruppen[i].id;
+  var batch = adminDb.batch();
+  folge.forEach(function (gid, n) { batch.update(adminDb.collection('nachrichten_vorlagen').doc(gid), { reihenfolge: 100 + n * 10, stand: FV.serverTimestamp() }); });
+  batch.commit().then(function () {
+    folge.forEach(function (gid, n) { alleVorlagen[gid].reihenfolge = 100 + n * 10; });
+    zeigeGruppenStatus('✓ Reihenfolge gespeichert.');
+    renderGruppen();
+  }).catch(function (f) { console.error('[Konten & Rollen] Reihenfolge fehlgeschlagen:', f); zeigeGruppenFehler('Reihenfolge nicht gespeichert: ' + nzFehler(f)); });
+}
+document.getElementById('gruppeNeuBtn').addEventListener('click', gruppeNeu);
+document.getElementById('abgleichBtn').addEventListener('click', function () {
+  var btn = this; btn.disabled = true;
+  var el = document.getElementById('abgleichStatus'); if (el) { el.textContent = 'Gleicht ab …'; el.style.color = ''; }
+  nachKontoAenderung('Knopf').then(function () { btn.disabled = false; });
+});
+
 // ==========================================================================
 // Tabs
 // ==========================================================================
@@ -2901,8 +3321,10 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     document.getElementById('tabKonten').classList.toggle('hidden', tab !== 'konten');
     document.getElementById('tabRollen').classList.toggle('hidden', !zeigeRollen);
     document.getElementById('tabNamen').classList.toggle('hidden', tab !== 'namen');
+    document.getElementById('tabGruppen').classList.toggle('hidden', tab !== 'gruppen');   // NEU 27.10.2026, 1b
     if (zeigeRollen) versucheRollenInit();
     if (tab === 'namen') renderNamen();
+    if (tab === 'gruppen') renderGruppen();   // NEU 27.10.2026, 1b
   });
 });
 
