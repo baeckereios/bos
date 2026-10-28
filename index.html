@@ -47,6 +47,18 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-10-28 · 08:00 · Passwort anzeigen („Auge“; Anweisung allgemeiner Kontroll-Chat
+      07:55) · Feature
+      Knopf mit Augen-Symbol rechts im Passwortfeld (div.passwort-huelle, Feld rechts
+      mit Platz für den Knopf). Beim Laden verdeckt; jeder Tipp schaltet password ↔ text,
+      Symbol Auge ↔ durchgestrichenes Auge, aria-pressed/aria-label wechseln mit. Kein
+      automatisches Zurückschalten. Der Tipp lässt den Fokus im Feld (pointerdown und
+      mousedown ohne Standardverhalten) — die Bildschirmtastatur bleibt offen, der
+      Cursor bleibt, wo er war (sonst ans Ende). Passwortfeld: autocapitalize/
+      autocorrect/spellcheck aus, damit die Tastatur im Klartext nichts groß schreibt
+      oder korrigiert. ::-ms-reveal aus (sonst zwei Augen in Edge). Bei gesperrtem
+      Feld (Durchwinken) tut das Auge nichts. Anmeldung, Fehlertexte, Zeitlimit,
+      Crumble-Platz unverändert. SESSION_2026-10-28_TUER_PASSWORT_AUGE_BAU.md
     2026-10-19 · 02:37 · Nacharbeit Zeitlimit (K86, K87; Kontroll-Chat 02:20) · Fehlerbehebung
       K86 (Ulf: „Nur zurück, wenn keiner tippt“): Greift das Zeitlimit, nachdem
       die Seite schon angefasst wurde (Tipp, Klick, Taste, Eingabe seit dem Laden,
@@ -269,6 +281,43 @@
   }
 
   .feld input:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: 2px; }
+
+  /* --- Passwort anzeigen („Auge“, 28.10.2026) -----------------------
+     Der Knopf liegt rechts IM Feld, so hoch wie das Feld und so breit wie die
+     Mindest-Tastenhöhe; das Feld hält rechts genau so viel Platz frei, damit der
+     Text nie unter dem Knopf läuft. Farben nur über Tokens (hell und dunkel). */
+  .passwort-huelle { position: relative; }
+  .feld .passwort-huelle input { padding-right: calc(var(--bos-tap-min) + 4px); }
+  .passwort-huelle input::-ms-reveal,
+  .passwort-huelle input::-ms-clear { display: none; }   /* Edge: sonst zwei Augen */
+
+  .auge {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: var(--bos-tap-min);
+    min-height: var(--bos-tap-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0 var(--bos-radius-md) var(--bos-radius-md) 0;
+    color: var(--bos-text-dim);
+    cursor: pointer;
+    touch-action: manipulation;              /* kein Doppeltipp-Zoom, kein Klick-Verzug */
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--bos-transition-fast);
+  }
+  .auge svg { width: 22px; height: 22px; display: block; pointer-events: none; }
+  .auge .auge-zu { display: none; }
+  .auge[aria-pressed="true"] .auge-offen { display: none; }
+  .auge[aria-pressed="true"] .auge-zu { display: block; }
+  .auge[aria-pressed="true"] { color: var(--bos-amber-bright); }
+  .auge:hover { color: var(--bos-text); }
+  .auge:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: -3px; }
+  .passwort-huelle input:disabled + .auge { opacity: 0.4; cursor: default; pointer-events: none; }
 
   /* Stufe 1f (K76): Anmelden und Mobil nebeneinander, je halbe Breite, gleiche Höhe. Tab-Reihenfolge
      Kennung → Passwort → Anmelden → Mobil bleibt (Reihenfolge im Markup). */
@@ -528,7 +577,27 @@
 
     <div class="feld">
       <label for="passwort">Passwort</label>
-      <input type="password" id="passwort" autocomplete="current-password">
+      <div class="passwort-huelle">
+        <input type="password" id="passwort" autocomplete="current-password"
+               autocapitalize="none" autocorrect="off" spellcheck="false">
+        <!-- Passwort anzeigen („Auge“, 28.10.2026). Symbol zeigt, was ein Tipp tut:
+             Auge = anzeigen, durchgestrichenes Auge = verbergen. -->
+        <button type="button" class="auge" id="passwortAuge"
+                aria-controls="passwort" aria-pressed="false" aria-label="Passwort anzeigen">
+          <svg class="auge-offen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg class="auge-zu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.6"/>
+            <path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/>
+            <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>
+            <line x1="3" y1="3" x2="21" y2="21"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div class="knopfreihe">
@@ -901,6 +970,41 @@
     }
     zeigeMeldung('Die mobile Ansicht ist noch nicht gebaut — ' +
                  'bis dahin führt „Anmelden" in den gewohnten Launcher.', 'laeuft');
+  });
+
+  /* --- Passwort anzeigen („Auge“, 28.10.2026) ----------------------
+     Kollegen tippen die vergebenen Passwörter sonst blind und sehen ihre
+     Tippfehler nicht. Jeder Tipp schaltet um, nichts schaltet von selbst zurück.
+     FOKUS: pointerdown und mousedown ohne Standardverhalten — sonst wandert der
+     Fokus auf den Knopf, das Feld verliert ihn und die Bildschirmtastatur klappt
+     zu. Der click kommt trotzdem. Nach dem Umschalten bekommt das Feld den Fokus
+     (zurück), wenn mit Finger oder Maus getippt wurde; Cursor/Auswahl bleiben, wo
+     sie waren (beim Typwechsel setzen Browser sie sonst zurück), ohne Fokus ans
+     Ende. Mit der Tastatur (Tab aufs Auge, Leertaste) bleibt der Fokus auf dem
+     Knopf — sonst sprünge er bei jedem Druck weg. */
+  var augeKnopf = document.getElementById('passwortAuge');
+  var augeZeiger = false;
+  function setzeAuge(sichtbar) {
+    passwortFeld.type = sichtbar ? 'text' : 'password';
+    augeKnopf.setAttribute('aria-pressed', sichtbar ? 'true' : 'false');
+    augeKnopf.setAttribute('aria-label', sichtbar ? 'Passwort verbergen' : 'Passwort anzeigen');
+  }
+  augeKnopf.addEventListener('pointerdown', function (e) { augeZeiger = true; e.preventDefault(); });
+  augeKnopf.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  augeKnopf.addEventListener('click', function (e) {
+    var vonHand = augeZeiger || e.detail > 0;
+    augeZeiger = false;
+    if (passwortFeld.disabled) return;   // Durchwinken: Feld gesperrt, nichts umschalten
+    var hatteFokus = document.activeElement === passwortFeld;
+    var anfang = passwortFeld.selectionStart, ende = passwortFeld.selectionEnd;
+    setzeAuge(passwortFeld.type === 'password');
+    if (!vonHand) return;
+    try { passwortFeld.focus({ preventScroll: true }); } catch (f) { passwortFeld.focus(); }
+    try {
+      var n = passwortFeld.value.length;
+      if (hatteFokus && anfang !== null && ende !== null) passwortFeld.setSelectionRange(anfang, ende);
+      else passwortFeld.setSelectionRange(n, n);
+    } catch (f) {}
   });
 
   btn.addEventListener('click', anmelden);
