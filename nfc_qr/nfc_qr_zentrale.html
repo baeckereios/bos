@@ -45,6 +45,7 @@
       (A4 hoch, 8 je Blatt, QR 38 mm, nfc_qr_logik.js kaertchenHTML). Kein freies Eintippen.
       Lokal ausgegraut wie Schild und Sammelblatt (darfAusgeben). Fehler mit Meldung der Datenbank.
       Hilfe-Abschnitt „Maschinen-Kärtchen“ neu. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
+    2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
     2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
     2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
     2026-10-23 · 23:04 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-23_maschinen.rules (Maschinenseite Stufe A, Bauplan Go KC 22:22, Freigabe Ulf 22:22; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
@@ -352,7 +353,7 @@ const NFC_ZEITLIMIT_MS = 30000;   /* wie im alten Programm */
    Lehnt die Datenbank ab, ist die eingesetzte Regel älter als diese Seite.
    REGEL_DATEI = neueste Datei, die die Fassung erfüllt (test_nfc_qr.js prüft). */
 const REGEL_FASSUNG = 'nfc-qr-2026-10-21';   /* seit 21.10.2026: Block nfc_einstellungen (RK §25) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten.rules';
+const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';
 const A = window.BOS_ACCOUNTS;
 const LEERLAUF_MS = 5 * 60 * 1000;   /* wie die Kontenverwaltung (N-15, Ulf: 5 Minuten) */
 const VORWARNUNG_MS = 60 * 1000;

@@ -58,6 +58,7 @@
    dreht, dreht dort mit — und umgekehrt.
 
    CHANGELOG
+     2026-10-27 · 19:17 · v1.5 · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md Der Rückfall-Zweig (RUECKFALL) bleibt unverändert.
      2026-10-27 · 00:06 · v1.4 · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules
        (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md Der Rückfall-Zweig (RUECKFALL) bleibt unverändert.
      2026-10-24 · 13:41 · v1.3 · Feature (Nachtrag 2, Go KC 24.10. 13:28, M43): notizenSicht() —
@@ -83,7 +84,7 @@
      Regeldatei wechseln (REGEL_DATEI bzw. RUECKFALL.datei). */
   var FRIST_WEG = 'versatz';
   var REGEL_FASSUNG = 'maschinen-b-2026-10-24';
-  var REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+  var REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
   var RUECKFALL = { fassung: 'maschinen-b-fenster-2026-10-24', datei: 'RUECKFALL_A_firestore_regeln_2026-10-24_maschinen_b.rules' };
   if (FRIST_WEG === 'fenster') { REGEL_FASSUNG = RUECKFALL.fassung; REGEL_DATEI = RUECKFALL.datei; }
   var FRIST_FELD = FRIST_WEG === 'fenster' ? 'ablauf' : 'fristStart';

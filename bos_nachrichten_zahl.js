@@ -1,7 +1,8 @@
 /* ==========================================================================
    MODUL: bos_nachrichten_zahl.js
    ZWECK: Die Zahl an der Kachel „Nachrichten“ (Nachrichtenzentrale Stufe 1c,
-          Baustelle #131). EINE Zählregel für zwei Aufrufer:
+          seit 1d mit Sammelpfad und Nachträgen; Baustelle #131).
+          EINE Zählregel für zwei Aufrufer:
           - der Launcher (eine Script-Zeile hinter bos_kachel_zahlen.js):
             zählt bei Start, alle 5 Minuten und beim Zurückkommen auf den
             Bildschirm (visibilitychange → sichtbar) und schreibt die Zahl
@@ -17,47 +18,67 @@
 
    API (window.BOS_NACHRICHTEN_ZAHL, in Node module.exports)
      APP_ID, REFRESH_MS, ANTWORT_NACHRICHTEN (20), CRUMBLE ('crumble_willkommen')
-     zaehle(d)        rein. d = { ich, postfach: [m], aushaenge: [m],
-                      antwortenAnMich: [a], status: { gelesen, ausgeblendet },
-                      heute: 'JJJJ-MM-TT' } → ganze Zahl ≥ 0 (Regel unten)
+     zaehle(d)        rein. d = { ich, postfach: [m], aushaenge: [m], gesendet: [m],
+                      antwortenAnMich: [a mit kopfId], koepfe: { id: m | null },
+                      status: { gelesen, ausgeblendet }, heute: 'JJJJ-MM-TT' }
+                      → ganze Zahl ≥ 0 (Regel unten)
+     nachtragZahl(m), nachtragSchluessel(m), nachtragNeu(m, gelesen)   (K28)
+     ladeAntwortenAnMich(db, ich, listen, zaehl?)  Sammelpfad + 1c-Rückweg (A3, s. u.)
      istEmpfaenger(konto)   genau nzEmpfaenger() der Regel RK §29:
                       freigeschaltet und (art 'person' oder Haken nachrichtenEmpfangen)
      zustand(konto)   'ohne_konto' | 'gesperrt' | 'system' | 'station' | 'ohne_art' | 'voll'
      heute(datum?)    lokales Datum 'JJJJ-MM-TT' (nie toISOString — UTC, Checkliste §13)
      ms(zeit)         Firestore-Zeit/Date/Zahl → Millisekunden oder null
      gesperrt(m), haengt(m, heute), antwortenAnMich(liste, ich)
-     lade(db, kennung) Promise { zahl, anfragen, antwortenJeNachricht, fehler }
+     lade(db, kennung) Promise { zahl, anfragen, antwortenJeNachricht, weg, rueckweg, fehler }
                       — die Abfragen des Launchers (unten)
      melde(n)         Tafel im eigenen Fenster, sonst window.parent; try/catch
      starte()         Takt (nur im Launcher; siehe unten)
      neuLaden()       ein Takt jetzt (Promise), auch mit frischem Konto
      stand()          { zahl, anfragen, fehler, zuletzt, laeuft, kontoGelesen }
 
-   DIE ZÄHLREGEL (Anweisung 1c §6.3, T9, U2)
+   DIE ZÄHLREGEL (Anweisung 1c §6.3, T9; Stufe 1d: K25, K28, T10, Freigabe A2)
      neue Nachrichten an mich: Postfach (L1) ohne gesperrte (ersetztDurch),
-       ohne ausgeblendete, ohne gelesene, ohne eigene (Nachricht an mich
-       selbst, Fall V)
+       ohne eigene (Nachricht an mich selbst, Fall V), ohne Crumble; je
+       Nachricht höchstens 1:
+       - nicht ausgeblendet: zählt, wenn nicht gelesen ODER ein ungelesener
+         Nachtrag da ist (K28: Schlüssel '<id>#<Anzahl Nachträge>' fehlt in
+         gelesen — auch wenn die Nachricht selbst schon gelesen ist);
+       - ausgeblendet: zählt nur mit ungelesenem Nachtrag (dann erscheint sie
+         wieder, wie F25).
      + hängende neue Aushänge (L2): ohne fristStart, giltBis ≥ heute, nicht
        gelesen, nicht eigene
-     + neue Antworten an mich auf meinen gesendeten Nachrichten: unter den
-       20 neuesten gesendeten (L3, nicht gesperrt) die Antworten mit
-       an == ich, nicht gelesen.
-     NICHT: Antworten, die ein Absender mir unter SEINER Nachricht schreibt
-       (die Regel vom 27.10. hat keinen Sammelpfad für Antworten, B15/U2 —
-       kommt mit Stufe 2); Daumen; die Beispiel-Nachricht von Crumble.
+     + neue Antworten an mich (T10, Sammelpfad G): an == ich, von ≠ ich, nicht
+       gelesen, Kopf nicht gesperrt (F25) und nicht verschwunden (koepfe[id] ===
+       null: TTL oder zu). Ausgeblendeter Kopf zählt trotzdem (die Seite zeigt
+       die Nachricht dann wieder). Das schließt jetzt die Rückantwort des
+       Absenders an mich als Empfänger ein (hebt K17 auf).
+     NICHT: offene Antworten anderer, die ich nur mitlese (an ≠ ich, K25 —
+       sie sind gar nicht in G); Daumen; die Beispiel-Nachricht von Crumble.
+     Kopf einer Antwort: aus postfach/gesendet, sonst koepfe (ein get je
+       unbekanntem Kopf einer UNGELESENEN Antwort, ladeAntwortenAnMich). Ohne
+       kopfId (nie aus den Ladern hier) zählt die Antwort wie in 1c.
 
    ABFRAGEN JE TAKT (Launcher)
      L1 N.where('empfaenger','array-contains',ich).orderBy('erstellt','desc').limit(200)
      L2 N.where('typ','==','bekanntmachung').orderBy('erstellt','desc').limit(100)
      L3 N.where('von','==',ich).orderBy('erstellt','desc').limit(20)
      L4 nachrichten_status/<ich>
-     je nicht gesperrter gesendeter Nachricht (≤ 20): N.doc(id).collection('antworten').get()
-       OHNE Filter — als Absender beweist die Regel über nzKopf(id).von (Fall V
-       V6f am echten System belegt, 27.10.); gefiltert wird hier auf an == ich.
-       Grund statt where('an','==',ich): dieselbe Abfrage liefert der Zentrale
-       auch die Antwort-Zahl je Karte (Bauplan 1c, Abweichung F24).
-     = 4 bis 24 Anfragen. Dazu das eigene Konto (bos_accounts/<ich>) beim
-       ersten Takt und nach jedem Zurückkommen (A3), sonst aus dem Speicher.
+     G  db.collectionGroup('antworten').where('an','==',ich).orderBy('ts','desc').limit(200)
+        (Sammelpfad T10; Index Sammlungsgruppe antworten: an ↑, ts ↓)
+     + selten je unbekanntem Kopf einer ungelesenen Antwort ein get
+     = 5 Anfragen (1c: 4 bis 24). Dazu das eigene Konto (bos_accounts/<ich>)
+       beim ersten Takt und nach jedem Zurückkommen (A3), sonst aus dem Speicher.
+
+   RÜCKWEG AUF DIE 1c-ZÄHLUNG (Freigabe 1d A3 — eine Funktion, nie stumm)
+     ladeAntwortenAnMich: scheitert G (Regel vom 27.10. ohne Sammelpfad →
+       permission-denied; Index fehlt → failed-precondition), holt sie wie
+       1c je nicht gesperrter gesendeter Nachricht (≤ 20) die Antworten
+       OHNE Filter (Absender-Zweig der Regel) und filtert auf an == ich.
+       Ergebnis weg: 'rueckweg_1c', rueckweg: { grund (Fehler), hinweis
+       (welcher Index/welche Regel) } — console.error hier, die Zentrale
+       nennt es zusätzlich in der Fehlerzeile. Was der Rückweg NICHT zählt:
+       die Rückantwort eines Absenders an mich als Empfänger (wie 1c).
 
    TAKT (F-K5, T9): startet NUR, wenn window.BOS_KACHEL_ZAHLEN im EIGENEN
      Fenster liegt (= Launcher). Die Zentrale lädt diese Datei auch, hat aber
@@ -74,6 +95,12 @@
      (ladeKonto; Rückfall direktes get), window.BOS_KACHEL_ZAHLEN.
 
    CHANGELOG
+     2026-10-27 · 19:08 · v1.1 · Feature (Nachrichtenzentrale Stufe 1d, #131;
+       Bauplan 18:45, Go Kontroll-Chat 18:55 mit A1–A6). Zählregel mit
+       Sammelpfad (T10, K25) und Nachträgen (K28) in EINER Funktion zaehle()
+       (A2); ladeAntwortenAnMich mit dem 1c-Rückweg (A3); lade() nutzt sie
+       (5 statt 4–24 Anfragen je Takt).
+       nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
      2026-10-27 · 08:03 · v1.0 · Feature (Nachrichtenzentrale Stufe 1c, #131;
        Bauplan 07:52, Go Kontroll-Chat 07:54 mit A1–A8). Neu.
        nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1C_BAU.md
@@ -122,6 +149,20 @@
   function antwortenAnMich(liste, ich) {
     return (liste || []).filter(function (a) { return a && a.an === ich; });
   }
+  /* Nachträge (K27–K29): Karte nachtraege { '1': { text, ts }, '2': … } — Anzahl = Zahl der Schlüssel. */
+  function nachtragZahl(m) {
+    var n = m && m.nachtraege;
+    return n && typeof n === 'object' && !Array.isArray(n) ? Object.keys(n).length : 0;
+  }
+  function nachtragSchluessel(m) { var n = nachtragZahl(m); return n > 0 ? m.id + '#' + n : null; }
+  function nachtragNeu(m, g) { var k = nachtragSchluessel(m); return !!k && !hat(g, k); }
+  /* Kopf einer Antwort nachschlagen: undefined = unbekannt, null = verschwunden/zu, sonst das Dokument. */
+  function kopfFinder(d) {
+    var k = {};
+    (d.postfach || []).concat(d.gesendet || []).forEach(function (m) { if (m && m.id) k[m.id] = m; });
+    var extra = d.koepfe || {};
+    return function (id) { if (hat(k, id)) return k[id]; if (hat(extra, id)) return extra[id]; return undefined; };
+  }
   function zaehle(d) {
     d = d || {};
     var ich = d.ich, st = d.status || {}, g = st.gelesen || {}, aus = st.ausgeblendet || {};
@@ -129,9 +170,11 @@
     var n = 0;
     (d.postfach || []).forEach(function (m) {
       if (!m || !m.id || m.id === CRUMBLE) return;
-      if (m.von === ich || gesperrt(m) || hat(aus, m.id) || hat(g, m.id)) return;
+      if (m.von === ich || gesperrt(m)) return;
       if (m.typ === 'bekanntmachung') return;             // gehört in L2, nie ins Postfach (Regel: ohne empfaenger)
-      n++;
+      var nachtrag = nachtragNeu(m, g);
+      if (hat(aus, m.id)) { if (nachtrag) n++; return; }  // ausgeblendet: nur ein neuer Nachtrag holt sie zurück
+      if (!hat(g, m.id) || nachtrag) n++;                 // je Nachricht höchstens 1 (K28)
     });
     var gezaehlt = {};
     (d.aushaenge || []).forEach(function (m) {
@@ -140,8 +183,14 @@
       if (m.von === ich || gesperrt(m) || !haengt(m, tag) || hat(g, m.id)) return;
       n++;
     });
+    var kopf = kopfFinder(d), schon = {};
     (d.antwortenAnMich || []).forEach(function (a) {
-      if (!a || !a.id || a.an !== ich || a.von === ich || hat(g, a.id)) return;
+      if (!a || !a.id || schon[a.id] || a.an !== ich || a.von === ich || hat(g, a.id)) return;
+      schon[a.id] = true;
+      if (a.kopfId) {
+        var k = kopf(a.kopfId);
+        if (k === null || gesperrt(k)) return;            // verschwunden/zu · gesperrter Kopf (F25)
+      }
       n++;
     });
     return n;
@@ -157,27 +206,82 @@
     });
   }
   function liste(snap) { var l = []; snap.forEach(function (d) { var x = d.data() || {}; x.id = d.id; l.push(x); }); return l; }
+  /* Sammelpfad-Treffer: der Kopf steht nur im Pfad (F35) — nachrichten/<kopf>/antworten/<id>. */
+  function listeMitKopf(snap) {
+    var l = [];
+    snap.forEach(function (d) {
+      var x = d.data() || {}; x.id = d.id;
+      try { x.kopfId = d.ref.parent.parent.id; } catch (e) { x.kopfId = null; }
+      l.push(x);
+    });
+    return l;
+  }
+  function fehlerText(err) { return ((err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err))); }
+  /* Welcher Index/welche Regel fehlt (A3: im Rückweg genannt). */
+  function rueckwegHinweis(err) {
+    var c = err && err.code;
+    if (c === 'failed-precondition') return 'Index fehlt: Sammlungsgruppe „antworten“, Felder an (aufsteigend) + ts (absteigend), Bereich „Sammlungsgruppe“ — Link in der Meldung.';
+    if (c === 'permission-denied') return 'Die eingesetzte Regel kennt den Sammelpfad nicht (Regel vom 27.10.?) — neue Regel: firestore_regeln_2026-10-27_nachrichten_offen.rules.';
+    return 'Sammelpfad nicht erreichbar: ' + fehlerText(err);
+  }
+  /* ladeAntwortenAnMich(db, ich, listen, zaehl) — DIE eine Funktion für Antworten an mich, mit dem Rückweg
+     auf die 1c-Zählung (Freigabe 1d A3). listen = { postfach, gesendet } (schon geladen; für die Köpfe).
+     zaehl(promise) zählt Anfragen (Launcher); ohne zaehl nur Zeitlimit.
+     → Promise { weg: 'sammelpfad' | 'rueckweg_1c', antworten: [a mit kopfId], je: { kopfId: [a] },
+                 koepfe: { id: m | null }, rueckweg: null | { grund, hinweis } }
+     Wirft nur, wenn auch der Rückweg scheitert. */
+  function ladeAntwortenAnMich(db, ich, listen, zaehl) {
+    zaehl = zaehl || mitZeitlimit;
+    var l = listen || {}, N = db.collection('nachrichten');
+    var bekannt = {};
+    (l.postfach || []).concat(l.gesendet || []).forEach(function (m) { if (m && m.id) bekannt[m.id] = m; });
+    function koepfeHolen(antworten, gelesen) {
+      var fehlt = {};
+      antworten.forEach(function (a) { if (a.kopfId && !bekannt[a.kopfId] && a.an === ich && a.von !== ich && !hat(gelesen, a.id)) fehlt[a.kopfId] = true; });
+      var koepfe = {};
+      return Promise.all(Object.keys(fehlt).map(function (id) {
+        return zaehl(N.doc(id).get()).then(function (s) { koepfe[id] = s.exists ? (function () { var m = s.data() || {}; m.id = id; return m; })() : null; },
+          function (err) { if (err && err.code === 'permission-denied') { koepfe[id] = null; return; } throw err; });
+      })).then(function () { return koepfe; });
+    }
+    function gruppiert(antworten) { var je = {}; antworten.forEach(function (a) { if (!a.kopfId) return; (je[a.kopfId] = je[a.kopfId] || []).push(a); }); return je; }
+    var gelesen = (l.status && l.status.gelesen) || {};
+    return zaehl(db.collectionGroup('antworten').where('an', '==', ich).orderBy('ts', 'desc').limit(200).get()).then(listeMitKopf).then(function (antworten) {
+      return koepfeHolen(antworten, gelesen).then(function (koepfe) {
+        return { weg: 'sammelpfad', antworten: antworten, je: gruppiert(antworten), koepfe: koepfe, rueckweg: null };
+      });
+    }, function (grund) {
+      var hinweis = rueckwegHinweis(grund);
+      try { console.error('[BOS_NACHRICHTEN_ZAHL] Sammelpfad nicht lesbar — Rückweg auf die 1c-Zählung (nur Antworten auf meine 20 neuesten gesendeten). ' + hinweis + ' — ' + fehlerText(grund), grund); } catch (e) { /* nichts */ }
+      var gesendet = (l.gesendet || []).filter(function (m) { return !gesperrt(m) && m.typ !== 'bekanntmachung'; }).slice(0, ANTWORT_NACHRICHTEN);
+      var je = {};
+      return Promise.all(gesendet.map(function (m) {
+        return zaehl(N.doc(m.id).collection('antworten').get()).then(function (s) {
+          je[m.id] = liste(s).map(function (a) { a.kopfId = m.id; return a; });
+        });
+      })).then(function () {
+        var alle = [];
+        Object.keys(je).forEach(function (id) { alle = alle.concat(antwortenAnMich(je[id], ich)); });
+        return { weg: 'rueckweg_1c', antworten: alle, je: je, koepfe: {}, rueckweg: { grund: grund, hinweis: hinweis } };
+      });
+    });
+  }
 
   /* Die Abfragen des Launchers. Wirft nie — Fehler stehen in .fehler. */
   function lade(db, ich) {
     var N = db.collection('nachrichten');
     var anfragen = 0;
     function zaehl(p) { anfragen++; return mitZeitlimit(p); }
-    var erg = { zahl: 0, anfragen: 0, antwortenJeNachricht: {}, fehler: null };
+    var erg = { zahl: 0, anfragen: 0, antwortenJeNachricht: {}, weg: null, rueckweg: null, fehler: null };
     return Promise.all([
       zaehl(N.where('empfaenger', 'array-contains', ich).orderBy('erstellt', 'desc').limit(200).get()).then(liste),
       zaehl(N.where('typ', '==', 'bekanntmachung').orderBy('erstellt', 'desc').limit(100).get()).then(liste),
       zaehl(N.where('von', '==', ich).orderBy('erstellt', 'desc').limit(ANTWORT_NACHRICHTEN).get()).then(liste),
       zaehl(db.collection('nachrichten_status').doc(ich).get()).then(function (s) { return s.exists ? (s.data() || {}) : {}; })
     ]).then(function (r) {
-      var gesendet = r[2].filter(function (m) { return !gesperrt(m) && m.typ !== 'bekanntmachung'; });
-      return Promise.all(gesendet.map(function (m) {
-        return zaehl(N.doc(m.id).collection('antworten').get()).then(function (s) {
-          var a = liste(s); erg.antwortenJeNachricht[m.id] = a; return antwortenAnMich(a, ich);
-        });
-      })).then(function (je) {
-        var alle = [].concat.apply([], je);
-        erg.zahl = zaehle({ ich: ich, postfach: r[0], aushaenge: r[1], antwortenAnMich: alle, status: r[3], heute: heute() });
+      return ladeAntwortenAnMich(db, ich, { postfach: r[0], gesendet: r[2], status: r[3] }, zaehl).then(function (a) {
+        erg.antwortenJeNachricht = a.je; erg.weg = a.weg; erg.rueckweg = a.rueckweg;
+        erg.zahl = zaehle({ ich: ich, postfach: r[0], aushaenge: r[1], gesendet: r[2], antwortenAnMich: a.antworten, koepfe: a.koepfe, status: r[3], heute: heute() });
         erg.anfragen = anfragen;
         return erg;
       });
@@ -206,7 +310,7 @@
   }
 
   /* ---------------- Takt (nur Launcher) ---------------- */
-  var zust = { zahl: 0, anfragen: 0, fehler: null, zuletzt: null, laeuft: false, kontoGelesen: 0 };
+  var zust = { zahl: 0, anfragen: 0, fehler: null, zuletzt: null, laeuft: false, kontoGelesen: 0, weg: null, rueckweg: null };
   var konto = null, kennung = null, kontoFrisch = true, uhr = null, laufend = null;
 
   function ladeKonto(db, k) {
@@ -234,7 +338,7 @@
           console.error('[BOS_NACHRICHTEN_ZAHL] Zahl nicht lesbar — ' + ((e.fehler.code ? e.fehler.code + ' — ' : '') + (e.fehler.message || e.fehler)), e.fehler);
           melde(0); return;
         }
-        zust.fehler = null; zust.zahl = e.zahl; melde(e.zahl);
+        zust.fehler = null; zust.zahl = e.zahl; zust.weg = e.weg; zust.rueckweg = e.rueckweg; melde(e.zahl);
       });
     }).catch(function (err) {
       zust.fehler = err; zust.zahl = 0; kontoFrisch = true;
@@ -256,12 +360,14 @@
     try { global.document.addEventListener('visibilitychange', sichtbar); } catch (e) { /* Node */ }
     return true;
   }
-  function stand() { return { zahl: zust.zahl, anfragen: zust.anfragen, fehler: zust.fehler, zuletzt: zust.zuletzt, laeuft: zust.laeuft, kontoGelesen: zust.kontoGelesen, takt: !!uhr }; }
+  function stand() { return { zahl: zust.zahl, anfragen: zust.anfragen, fehler: zust.fehler, zuletzt: zust.zuletzt, laeuft: zust.laeuft, kontoGelesen: zust.kontoGelesen, takt: !!uhr, weg: zust.weg, rueckweg: zust.rueckweg }; }
 
   var api = {
     APP_ID: APP_ID, REFRESH_MS: REFRESH_MS, ANTWORT_NACHRICHTEN: ANTWORT_NACHRICHTEN, CRUMBLE: CRUMBLE,
     zaehle: zaehle, istEmpfaenger: istEmpfaenger, zustand: zustand, heute: heute, ms: ms,
     gesperrt: gesperrt, haengt: haengt, antwortenAnMich: antwortenAnMich,
+    nachtragZahl: nachtragZahl, nachtragSchluessel: nachtragSchluessel, nachtragNeu: nachtragNeu,
+    ladeAntwortenAnMich: ladeAntwortenAnMich, rueckwegHinweis: rueckwegHinweis,
     lade: lade, melde: melde, starte: starte, neuLaden: neuLaden, stand: stand,
     _sichtbar: sichtbar
   };

@@ -5,6 +5,7 @@
   Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
   CHANGELOG
+    2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
     2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
     2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
     2026-10-23 · 23:04 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-23_maschinen.rules (Maschinenseite Stufe A, Bauplan Go KC 22:22, Freigabe Ulf 22:22; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-23_MASCHINENSEITE_STUFE_A_BAU.md
@@ -164,7 +165,7 @@ const HAKEN_FUER = {
   teigecke_orte: 'wagen', teigecke_zutaten: 'wagen'
 };
 const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* seit 08.10.2026: die Seite schreibt das Feld gruppe (RK §18) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 /* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
    Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
 try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }
