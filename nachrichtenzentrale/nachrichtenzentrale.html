@@ -1,18 +1,27 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
 <!--
-  MODUL: nachrichtenzentrale/nachrichtenzentrale.html — Nachrichtenzentrale (Stufe 1c, #131)
+  MODUL: nachrichtenzentrale/nachrichtenzentrale.html — Nachrichtenzentrale (Stufe 1c, seit 1d offene Gespräche, #131)
   ZWECK: Postfach für Dienstliches: Postfach · Aushänge · Gesendet · Schreiben. Antworten (nur an den
          Absender bzw. vom Absender zurück), Daumen, Korrektur-Kette, Aushänge mit „gilt bis“, Drucken und
-         Abnehmen, „für mich ausblenden“, Beispiel-Nachricht von Crumble. Meldet die Zahl an der Kachel
+         Abnehmen, „für mich ausblenden“, Beispiel-Nachricht von Crumble; seit 1d „Antworten sehen alle
+         Empfänger“ (offene Gespräche) und Nachtrag statt Korrektur in offenen Gesprächen. Meldet die Zahl an der Kachel
          sofort nach Lesen/Ausblenden/Senden (window.parent.BOS_KACHEL_ZAHLEN über bos_nachrichten_zahl.js).
   DATEN: nachrichten (+ antworten), nachrichten_status, nachrichten_adressbuch, nachrichten_vorlagen,
-         namen — Regel RK §29 (eingesetzt, Fassung nachrichten-2026-10-27). Laden und Schreiben nur über
+         namen — Regel RK §29 (Fassung nachrichten-offen-2026-10-27; mit der Fassung vom 27.10. ohne
+         Kästchen und Nachtrag wie 1c). Laden und Schreiben nur über
          nachrichten_logik.js, Ansicht in nachrichten_ansicht.js. Kein onSnapshot.
   EINBINDUNG: normaler Satellit über den Launcher (Checkliste §2a): bos_access.js → bos_access_guard.js.
          Kein bos_standalone_login.js, kein Registry-Feld direkt (K-c): direkt aufgerufen führt
          bos_firebase_config.js über die Tür mit ?weiter= hierher zurück.
   CHANGELOG
+    2026-10-28 · 01:09 · v1.2 · Nacharbeit N1 (Kontroll-Chat 27.10. 19:52): Hilfetext „Nachtrag“ — ein Satz, dass der
+      Nachtrag den Haken „Nachrichten schreiben“ braucht (Quelle NACHRICHTENZENTRALE_DOKU.md §5). Sonst unverändert.
+    2026-10-27 · 19:16 · v1.1 · Feature (Nachrichtenzentrale Stufe 1d, #131; Bauplan 18:45, Go Kontroll-Chat
+      18:55 mit A1–A6). Kästchen „Antworten sehen alle Empfänger“ im Schreiben, Stile für „👥 offen“,
+      Nachträge und das Nachtrag-Formular; Hilfetext: Antworten, Offene Gespräche, Nachtrag, Korrektur,
+      Ausblenden, Zahl an der Kachel (Quelle NACHRICHTENZENTRALE_DOKU.md §5).
+      nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
     2026-10-27 · 08:07 · v1.0 · Feature (Nachrichtenzentrale Stufe 1c, #131; Anweisung KC 07:29, Bauplan,
       Go Kontroll-Chat 07:54 mit Auflagen A1–A8). Neu.
       nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1C_BAU.md
@@ -117,6 +126,7 @@
   .marke-neu::before { content: "● " / ""; }
   .durch { text-decoration: line-through; text-decoration-thickness: 1.5px; }
   .marke-korr { color: var(--bos-text-faint, #7d776d); }
+  .marke-offen { color: var(--nz-typ-info); font-weight: 600; white-space: nowrap; }
 
   /* Aushang */
   .aushang { padding: 12px 14px; border-radius: var(--bos-radius-md, 14px); border: 1px solid var(--bos-border, rgba(255,255,255,.08)); border-left: 5px solid var(--nz-typ-bekanntmachung);
@@ -150,6 +160,20 @@
   .an-dich { color: var(--bos-amber-bright, #e0973a); font-weight: 700; }
   .antwort-text { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
   .antwort-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  /* Stufe 1d: Nachträge (K27) hervorgehoben unter dem Text, Formular des Absenders */
+  .nachtraege { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+  .nachtrag { padding: 8px 10px; border-radius: var(--bos-radius-sm, 6px); border-left: 4px solid var(--bos-amber, #c07a10);
+    background: color-mix(in srgb, var(--bos-amber, #c07a10) 12%, var(--bos-bg-soft, #1a1813)); }
+  .nachtrag-kopf { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: .88rem; }
+  .nachtrag-kopf b { color: var(--bos-amber-bright, #e0973a); }
+  .nachtrag-text { white-space: pre-wrap; word-break: break-word; margin-top: 2px; font-size: 1.02rem; }
+  .nachtrag-form { margin-top: 12px; padding: 10px 12px; border-radius: var(--bos-radius-sm, 6px); border: 1px solid var(--bos-amber, #c07a10); display: flex; flex-direction: column; gap: 6px; }
+  .nachtrag-form h3 { margin: 0; font-family: var(--bos-font-label, 'Barlow Condensed', sans-serif); font-size: 1rem; letter-spacing: .04em; text-transform: uppercase; color: var(--bos-text-dim, #a9a39a); }
+  .nachtrag-form textarea.eingabe { min-height: 84px; }
+  .satz-wichtig { color: var(--bos-text, #f2ede4); font-weight: 600; }
+  .ab-zeile.schon { opacity: .5; cursor: default; }
+  .offen-zeile { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 10px; cursor: pointer; font-weight: 600; }
+  .offen-zeile input { width: 22px; height: 22px; flex: 0 0 auto; }
 
   /* Formular */
   .feld { margin: 14px 0; }
@@ -270,6 +294,8 @@
       <div class="chips" id="vorlagenChips"></div>
       <input type="search" class="eingabe" id="empfSuche" data-i18n-placeholder="suchen" style="margin-top:8px">
       <div class="adressbuch" id="adressbuchListe"></div>
+      <label class="offen-zeile" id="offenZeile" hidden><input type="checkbox" id="offenKaestchen"><span data-i18n="offen_kaestchen"></span></label>
+      <p class="satz" id="offenSatz" hidden></p>
     </div>
     <div class="feld" id="aushangBlock" hidden>
       <div class="feld-titel" data-i18n="feld_gilt_bis"></div>
@@ -312,16 +338,18 @@ const helpData = {
   abschnitte: [
     ['Wofür', 'Ein Postfach für Dienstliches: „Wer kann Samstag?“, „Kisten bitte in den Hof“, „Danke fürs Einspringen“. Nichts hier ist vertraulich: Der Absender steht immer dran, und wer den Generalschlüssel hat, kann technisch alles lesen. Anonym geht hier nichts — was du schreibst, trägt deinen Namen.'],
     ['Postfach', 'Hier steht, was an dich ging, das Neueste oben. „● neu“ heißt: noch nicht geöffnet. Antippen öffnet die Nachricht — dann ist sie gelesen. Wer sonst noch was gelesen hat, sieht niemand, auch der Absender nicht.'],
-    ['Antworten', 'Unter jeder Nachricht kannst du antworten. Die Antwort geht nur an den, der geschrieben hat — nicht an alle anderen. Der Absender kann dir unter seiner Nachricht zurückschreiben; das steht dann bei dir mit „an dich“ darunter. Antworten lassen sich nicht ändern oder löschen: Wer sich vertan hat, schreibt eine weitere. Antworten darf jeder Empfänger, auch ohne Schreib-Haken.'],
+    ['Antworten', 'Unter jeder Nachricht kannst du antworten. Normal geht die Antwort nur an den, der geschrieben hat — die anderen Empfänger sehen sie nicht. Der Absender kann dir unter seiner Nachricht zurückschreiben; das steht dann bei dir mit „an dich“ darunter. Bei jeder Antwort steht, von wem an wen. Antworten lassen sich nicht ändern oder löschen: Wer sich vertan hat, schreibt eine weitere. Antworten darf jeder Empfänger, auch ohne Schreib-Haken.'],
+    ['Offene Gespräche', 'Wer schreibt, kann „Antworten sehen alle Empfänger“ anhaken — gut für Fragen an eine Gruppe wie „Wer kann Sonntag?“. Dann steht an der Nachricht „👥 offen“, und jeder Empfänger liest alle Antworten mit; über dem Antwortfeld steht „Deine Antwort sehen alle Empfänger.“ Geantwortet wird trotzdem dem Absender, und der Absender antwortet einem Empfänger. Das Häkchen gilt ab dem Senden fest. Bei Kritik und bei Aushängen gibt es das Kästchen nicht.'],
+    ['Nachtrag', 'Ein offenes Gespräch wird nicht korrigiert — sonst rissen die Antworten ab. Stattdessen schreibt der Absender einen „Nachtrag“: Der Text oben bleibt, der Nachtrag steht hervorgehoben darunter („Nachtrag 14:05: …“). Die Nachricht ist dann für alle Empfänger wieder „neu“. Beim Nachtrag kann der Absender Empfänger hinzufügen, aber keine entfernen — neue Empfänger sehen das bisherige Gespräch. Höchstens 20 Nachträge. Einen Nachtrag schreibt nur, wer den Haken „Nachrichten schreiben“ hat — wie eine neue Nachricht.'],
     ['Daumen', 'Ein Daumen sagt „gesehen, passt“. Jeder Empfänger sieht, wer schon einen Daumen gegeben hat. Noch einmal tippen nimmt deinen Daumen zurück. Der Daumen zählt nicht als neue Nachricht.'],
-    ['Ausblenden', '„Für mich ausblenden“ räumt nur dein Postfach auf — bei allen anderen bleibt die Nachricht. „Alle gelesenen ausblenden“ macht das für alles, was du schon geöffnet hast. Mit „ausgeblendete zeigen“ holst du alles zurück. Nichts ist weg.'],
-    ['Korrektur', 'Wer sich in einer eigenen Nachricht vertippt hat, drückt „Korrektur“. Der Text kommt ins Schreibfenster; Empfänger dürfen sich ändern, die Art nicht. Beim Absenden entsteht eine neue Nachricht, die alte bleibt durchgestrichen darunter stehen („ersetzt Nachricht von …“) — mit ihren Antworten, aber ohne neue. Abbrechen ändert nichts.'],
+    ['Ausblenden', '„Für mich ausblenden“ räumt nur dein Postfach auf — bei allen anderen bleibt die Nachricht. „Alle gelesenen ausblenden“ macht das für alles, was du schon geöffnet hast. Mit „ausgeblendete zeigen“ holst du alles zurück. Nichts ist weg. Kommt zu einer ausgeblendeten Nachricht ein Nachtrag oder eine Antwort an dich, taucht sie von selbst wieder auf.'],
+    ['Korrektur', 'Wer sich in einer eigenen Nachricht vertippt hat, drückt „Korrektur“. Der Text kommt ins Schreibfenster; Empfänger dürfen sich ändern, die Art nicht. Beim Absenden entsteht eine neue Nachricht, die alte bleibt durchgestrichen darunter stehen („ersetzt Nachricht von …“) — mit ihren Antworten, aber ohne neue. Abbrechen ändert nichts. Offene Gespräche haben keine Korrektur, dort gibt es den Nachtrag.'],
     ['Aushänge', 'Bekanntmachungen sind Aushänge für alle Konten, auch für die Stationen. Sie hängen bis zum Datum „gilt bis“ oder bis jemand sie abnimmt — der Verfasser, die Produktionsleitung oder der Admin. „Kenne ich ✓“ merkt sich nur für dich, dass du ihn gelesen hast. „Als Aushang drucken“ macht ein Blatt fürs Brett. Aushänge haben keine Antworten und keinen Daumen.'],
     ['Schreiben', 'Neue Nachrichten anfangen darf, wer den Haken dafür hat — den setzt der Admin in der Kontenverwaltung. Ohne Haken gibt es den Reiter „Schreiben“ nicht; antworten geht trotzdem. Empfänger wählst du einzeln oder über die Gruppen oben (Leitung, Rollen, Gruppen wie Frühschicht). Gespeichert wird nur die Liste der Namen — wer später in eine Gruppe kommt, sieht alte Nachrichten nicht. Höchstens 100 Empfänger, höchstens 2000 Zeichen.'],
     ['Kritik', 'Kritik geht an die Leitung. Du kannst einzelne aus der Leitung abwählen, einer bleibt immer. Wer den Haken „Bekanntmachungen“ hat, darf Kritik auch an Einzelne und Gruppen schicken. Kritik trägt immer den Namen.'],
     ['Wer bekommt Nachrichten', 'Jedes freigeschaltete persönliche Konto. Ein Ort-Konto (z. B. eine Filiale) nur, wenn der Admin dort „Nachrichten empfangen“ gesetzt hat. Stations-Tablets bekommen keine Nachrichten — dort stehen hier nur die Aushänge. Ein Konto, das noch nicht freigeschaltet ist, sieht hier nichts.'],
     ['40 Tage', 'Nachrichten und Antworten verschwinden nach 40 Tagen von selbst. Ein Aushang hängt, bis er abgenommen ist, und verschwindet 40 Tage danach.'],
-    ['Zahl an der Kachel', 'Die Zahl an „Nachrichten“ auf deinem Schreibtisch zählt neue Nachrichten an dich, neue Aushänge und neue Antworten auf deine eigenen Nachrichten. Sie wird alle fünf Minuten nachgezählt und fällt sofort, wenn du hier liest. Wenn dir ein Absender unter seiner Nachricht zurückschreibt, siehst du das erst beim Öffnen der Nachricht — das kommt mit den Benachrichtigungen in einer späteren Stufe.'],
+    ['Zahl an der Kachel', 'Die Zahl an „Nachrichten“ auf deinem Schreibtisch zählt neue Nachrichten an dich, neue Nachträge, neue Aushänge und neue Antworten an dich — auch wenn dir ein Absender unter seiner Nachricht zurückschreibt. Antworten, die du in einem offenen Gespräch nur mitliest, zählen nicht; sie stehen beim Öffnen mit „neu“ da. Die Zahl wird alle fünf Minuten nachgezählt und fällt sofort, wenn du hier liest.'],
     ['Benachrichtigungen', 'Eine Benachrichtigung aufs Handy gibt es noch nicht. Sie kommt in einer späteren Stufe; dann steht hier, wie du sie einschaltest.'],
     ['Rote Zeile', 'Steht oben eine rote Zeile, ist das die echte Meldung der Datenbank. Beim allerersten Aufruf kann dort ein Link stehen („index“) — dann fehlt der Datenbank ein Verzeichnis. Den legt der Admin einmal an. Sonst: Bild von der Zeile an den Admin.']
   ]

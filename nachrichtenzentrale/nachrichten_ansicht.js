@@ -8,6 +8,18 @@
    Texte nur über t() (Checkliste §6). Jeder Fehler mit err.message sichtbar (Checkliste §7a).
 
    CHANGELOG
+     2026-10-28 · 01:08 · v1.2 · Nacharbeit (Kontroll-Chat 27.10. 19:52). N1: Nachtrag nur mit Schreib-Haken — ohne Haken
+       statt Knopf der Satz „Nachträge braucht den Haken …“, Fehlertext f_kein_haken_nachtrag. N2 (Antwort auf K-e/F47):
+       erkennt die Seite die Regel vom 27.10. und scheitert der Sammelpfad mit permission-denied, steht der Rückweg als
+       ERKLÄRTER Zustand im gelben Hinweis (Satz + Code in Klammern), nicht in der roten Zeile; rot bleibt alles
+       Unerwartete (Index fehlt, Netz, andere Codes, neue Fassung erkannt und trotzdem abgelehnt). console.error bleibt.
+     2026-10-27 · 19:14 · v1.1 · Feature (Nachrichtenzentrale Stufe 1d, #131; Bauplan 18:45, Go Kontroll-Chat 18:55,
+       A1–A6). Kästchen „Antworten sehen alle Empfänger“ (nur mit Regel-Fassung 1d, nie Kritik/Aushang; in der
+       Korrektur gesperrt), Marke „👥 offen“, Satz über dem Antwortfeld, Antworten immer „von … an …“; Nachtrag
+       (Knopf beim Absender offener Nachrichten, Empfänger nur dazu, Satz K29), Nachträge hervorgehoben unter dem
+       Text, Marke „Nachtrag“; Lese-Schlüssel id#n; G (Sammelpfad) für „💬 n“ und „neue Antwort“, Rückweg in der
+       Fehlerzeile genannt (A3).
+       nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
      2026-10-27 · 08:09 · v1.0 · Feature (Nachrichtenzentrale Stufe 1c, #131; Go Kontroll-Chat 07:54, A1–A8). Neu.
        nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1C_BAU.md
    ================================================================ */
@@ -79,13 +91,31 @@
     crumble_name: 'Crumble', crumble_vorschau: 'Moin. Ich bin Crumble — kurz, wie das hier geht.',
     crumble_text: 'Moin. Ich bin Crumble, der Hamster von deinem Schreibtisch. Das hier ist dein Postfach — für Dienstliches: „Wer kann Samstag?“, „Kisten bitte in den Hof“, „Danke fürs Einspringen“.\n' +
       'Ein paar Dinge vorweg. Nichts hier ist vertraulich: Der Absender steht immer dran, und wer den Generalschlüssel hat, kann technisch alles lesen. Anonym geht hier nichts — was du schreibst, trägt deinen Namen.\n' +
-      'Unter jeder Nachricht kannst du antworten — die Antwort geht nur an den, der geschrieben hat, nicht an alle. Ein Daumen sagt „gesehen, passt“ und sieht jeder Empfänger. Ausblenden räumt dein Postfach auf, sonst niemandem — mit „ausgeblendete zeigen“ holst du alles zurück. Wer sich vertippt hat, drückt Korrektur: Die alte Fassung bleibt durchgestrichen stehen, die neue kommt oben drauf.\n' +
+      'Unter jeder Nachricht kannst du antworten — die Antwort geht nur an den, der geschrieben hat. Steht an der Nachricht „👥 offen“, lesen alle Empfänger die Antworten mit. Ein Daumen sagt „gesehen, passt“ und sieht jeder Empfänger. Ausblenden räumt dein Postfach auf, sonst niemandem — mit „ausgeblendete zeigen“ holst du alles zurück. Wer sich vertippt hat, drückt Korrektur: Die alte Fassung bleibt durchgestrichen stehen, die neue kommt oben drauf. In offenen Gesprächen schreibt der Absender stattdessen einen Nachtrag.\n' +
       'Neue Nachrichten anfangen darf, wer den Haken dafür hat — den setzt der Admin in der Kontenverwaltung. Antworten darf jeder. Aushänge sieht jeder, auch die Stationen; sie hängen bis zum Datum oder bis jemand sie abnimmt.\n' +
       'Alles hier verschwindet nach 40 Tagen von selbst. Eine Benachrichtigung aufs Handy gibt es noch nicht — die kommt in einer späteren Stufe, dann steht hier, wie du sie einschaltest.\n' +
       'Bis dahin: einmal am Tag reinschauen reicht. — Crumble',
     druck_kopf: 'Bekanntmachung · Aushang', druck_von: 'von', druck_gilt: 'gilt bis', druck_fuss: 'Aus der Nachrichtenzentrale gedruckt. Der Aushang selbst nimmt keine Antworten an.',
     druck_titel: 'Bekanntmachung', druck_app: 'Nachrichten',
-    wochentag: 'So,Mo,Di,Mi,Do,Fr,Sa'
+    wochentag: 'So,Mo,Di,Mi,Do,Fr,Sa',
+    /* Stufe 1d */
+    offen_kaestchen: 'Antworten sehen alle Empfänger', offen_satz: 'Gut für Fragen an eine Gruppe — so sieht jeder, wer schon geantwortet hat.',
+    offen_korrektur: 'Bleibt wie beim Original.', offen_marke: '👥 offen', offen_antwort_satz: 'Deine Antwort sehen alle Empfänger.',
+    offen_rueckweg: 'Die Antworten der anderen Empfänger lassen sich gerade nicht laden — du siehst nur deine eigenen und die an dich. Kontroll-Chat Bescheid geben.',
+    nachtrag: 'Nachtrag', nachtrag_marke: 'Nachtrag', nachtrag_zeile: 'Nachtrag {zeit}:', nachtrag_titel: 'Nachtrag schreiben',
+    nachtrag_senden: 'Nachtrag senden', nachtrag_abbrechen: 'Abbrechen',
+    nachtrag_satz: 'Der Text oben bleibt, wie er ist. Der Nachtrag steht hervorgehoben darunter und macht die Nachricht für alle Empfänger wieder „neu“.',
+    nachtrag_dazu: 'Empfänger hinzufügen (freiwillig)', nachtrag_dazu_satz: 'Neue Empfänger sehen das bisherige Gespräch.', nachtrag_schon: 'schon dabei',
+    nachtrag_voll: 'Höchstens {max} Nachträge — mehr geht hier nicht.',
+    f_nicht_absender: 'Einen Nachtrag schreibt nur, wer die Nachricht geschickt hat.', f_nicht_offen: 'Nachträge gibt es nur bei offenen Gesprächen — sonst „Korrektur“.',
+    f_nachtraege_voll: 'Höchstens {max} Nachträge.', f_kritik_offen: 'Kritik ist nie offen — Antworten auf Kritik sieht nur der Absender.',
+    f_aushang_offen: 'Aushänge haben keine Antworten.', f_korrektur_offen: 'Eine Korrektur übernimmt die Einstellung des Originals.',
+    f_offen_regel_alt: 'Die eingesetzten Regeln kennen „Antworten sehen alle Empfänger“ noch nicht — bitte das Kästchen aus.',
+    rueckweg_zahl: 'Die Zahl an der Kachel und „💬“ in Gesendet laufen gerade über den alten Weg (nur Antworten auf deine 20 neuesten gesendeten Nachrichten; wenn dir ein Absender zurückschreibt, zählt das nicht). Grund: {hinweis}',
+    regel_alt_offen: 'Hinweis: In der Datenbank sind die Regeln vom 27.10. eingesetzt ({fassung}). Alles geht wie gewohnt — nur „Antworten sehen alle Empfänger“ und Nachträge gibt es erst mit {datei}.',
+    rueckweg_erklaert: 'Darum laufen die Zahl an der Kachel und „💬“ in Gesendet über den alten Weg (nur Antworten auf deine 20 neuesten gesendeten Nachrichten; wenn dir ein Absender zurückschreibt, zählt das nicht). ({original})',
+    nachtrag_kein_haken: 'Nachträge braucht den Haken „Nachrichten schreiben“ — den setzt der Admin in der Kontenverwaltung.',
+    f_kein_haken_nachtrag: 'Nachträge schreibt nur, wer den Haken „Nachrichten schreiben“ hat — den setzt der Admin in der Kontenverwaltung.'
   };
   function t(k, p) {
     var s = Object.prototype.hasOwnProperty.call(I18N_DE, k) ? I18N_DE[k] : k;
@@ -96,7 +126,7 @@
   /* ---------- Zustand ---------- */
   var S = {
     db: null, z: null, ich: null, regel: null, adressbuch: {}, vorlagen: [], leitung: [], name: function (k) { return k; },
-    postfach: [], aushaenge: [], gesendet: [], antwortenJe: {}, status: { gelesen: {}, ausgeblendet: {} },
+    postfach: [], aushaenge: [], gesendet: [], antwortenJe: {}, koepfe: {}, antwortenWeg: null, nachtragForm: null, status: { gelesen: {}, ausgeblendet: {} },
     bekannt: {}, reiter: 'postfach', zeigeAus: { postfach: false, gesendet: false }, offen: null, antworten: {}, kettenOffen: {},
     entwurf: null, sendet: false, ladeFehler: [], geladen: false, zweiterSchritt: null
   };
@@ -172,7 +202,7 @@
   /* ---------- Zahl an der Kachel ---------- */
   function meldeZahl() {
     if (!S.z || !S.z.voll) { Z.melde(0); return 0; }
-    var n = L.zahlAus({ ich: S.ich.kennung, postfach: S.postfach, aushaenge: S.aushaenge, antwortenJe: S.antwortenJe, status: S.status, heute: L.heute() });
+    var n = L.zahlAus({ ich: S.ich.kennung, postfach: S.postfach, aushaenge: S.aushaenge, gesendet: S.gesendet, koepfe: S.koepfe, antwortenJe: S.antwortenJe, status: S.status, heute: L.heute() });
     Z.melde(n);
     return n;
   }
@@ -208,8 +238,11 @@
       if (S.z.voll) {
         if (r[2].ok) S.postfach = r[2].x; else S.ladeFehler.push(r[2]);
         if (r[3].ok) S.gesendet = r[3].x; else S.ladeFehler.push(r[3]);
-        return versuche('liste_antworten_gesendet', L.ladeAntwortenGesendet(db, S.gesendet)).then(function (a) {
-          if (a.ok) S.antwortenJe = a.x; else S.ladeFehler.push(a);
+        return versuche('liste_antworten_gesendet', L.ladeAntwortenAnMich(db, k, { postfach: S.postfach, gesendet: S.gesendet, status: S.status })).then(function (a) {
+          if (!a.ok) { S.ladeFehler.push(a); return; }
+          S.antwortenJe = a.x.je; S.koepfe = a.x.koepfe; S.antwortenWeg = a.x.weg;
+          /* A3: Rückweg nie stumm — Grund (welcher Index/welche Regel) in der Fehlerzeile, mit Code und Link */
+          if (a.x.rueckweg) zeigeRueckweg(a.x.rueckweg);
         });
       }
     }).then(function () {
@@ -262,10 +295,27 @@
   }
   function zeigeRegel(r) {
     var h = $('hinweisZeile');
-    if (r.stand === 'passt' && r.art === 'haupt') { h.hidden = true; return; }
+    if (r.stand === 'passt' && r.art === 'offen') { h.hidden = true; return; }
+    if (r.stand === 'passt' && r.art === 'haupt') { h.textContent = t('regel_alt_offen', { fassung: r.fassung, datei: L.REGEL_DATEI }); h.hidden = false; return; }
     if (r.stand === 'passt') { h.textContent = t('regel_flach', { fassung: r.fassung }); h.hidden = false; return; }
     if (r.stand === 'alt') { zeigeFehler(t('regel_alt', { datei: L.REGEL_DATEI })); return; }
     h.textContent = t('regel_unbekannt', { grund: r.fehler ? ((r.fehler.code ? r.fehler.code + ' — ' : '') + r.fehler.message) : '—' }); h.hidden = false;
+  }
+  /* N2 (KC 27.10. 19:52, Antwort auf K-e): Rückweg auf die 1c-Zählung. ERKLÄRT ist er nur, wenn die Seite die Regel vom
+     27.10. erkannt hat (Fassung ohne „offen“) und der Sammelpfad mit permission-denied abgelehnt wurde — dann gelber
+     Hinweis mit dem Code in Klammern (die echte Meldung bleibt sichtbar), keine rote Zeile. Alles andere ist unerwartet
+     und steht rot mit err.message (Index fehlt, Netz, andere Codes, neue Fassung erkannt und trotzdem abgelehnt). */
+  function rueckwegErklaert(rw) {
+    return !!(S.regel && S.regel.stand === 'passt' && S.regel.offen !== true && rw && rw.grund && rw.grund.code === 'permission-denied');
+  }
+  function zeigeRueckweg(rw) {
+    /* console.error kommt schon aus BOS_NACHRICHTEN_ZAHL.ladeAntwortenAnMich (A3) */
+    if (!rueckwegErklaert(rw)) { zeigeFehler(t('rueckweg_zahl', { hinweis: rw.hinweis }), rw.grund); return; }
+    zeigeRegel(S.regel);
+    var h = $('hinweisZeile');
+    var original = (rw.grund.code ? rw.grund.code + ' — ' : '') + (rw.grund.message || String(rw.grund));
+    h.textContent = (h.hidden ? '' : h.textContent + '\n') + t('rueckweg_erklaert', { original: original });
+    h.hidden = false;
   }
   function zustandSatz(k) { var s = $('zustandSatz'); s.textContent = t(k); s.hidden = false; }
 
@@ -320,7 +370,9 @@
     var name = art === 'gesendet' ? empfaengerKurz(m) : S.name(m.von, m.vonName);
     var fuss = [];
     if (e.neu) fuss.push(el('span', { class: 'marke-neu', text: t('neu') }));
+    if (e.nachtragNeu) fuss.push(el('span', { class: 'marke-neu marke-nachtrag', text: t('nachtrag_marke') }));
     if (e.neueAntworten) fuss.push(el('span', { class: 'marke-neu', text: t(e.neueAntworten === 1 ? 'neue_antwort' : 'neue_antworten', { n: e.neueAntworten }) }));
+    if (e.offen) fuss.push(el('span', { class: 'marke-offen', text: t('offen_marke') }));
     if (m.daumen && m.daumen.length) fuss.push(el('span', { text: t('daumen_n', { n: m.daumen.length }) }));
     if (art === 'gesendet' && typeof e.antworten === 'number' && e.antworten) fuss.push(el('span', { text: t('antworten_n', { n: e.antworten }) }));
     if (gesp) fuss.push(el('span', { class: 'marke-korr', text: art === 'postfach' ? t('korrigiert_nicht_an_dich') : t('korrigiert_nicht_hier') }));
@@ -348,17 +400,17 @@
   function zeichnePostfach() {
     if (!S.z.voll) return;
     var ziel = $('listePostfach'); ziel.textContent = '';
-    var l = L.postfachSicht(S.postfach, S.status, S.ich.kennung, { zeigeAusgeblendete: S.zeigeAus.postfach });
+    var l = L.postfachSicht(S.postfach, S.status, S.ich.kennung, { zeigeAusgeblendete: S.zeigeAus.postfach, antwortenJe: S.antwortenJe });
     if (crumbleSichtbar()) ziel.appendChild(crumbleKarte());
     l.forEach(function (e) { ziel.appendChild(karte(e, 'postfach')); });
     if (!l.length && !crumbleSichtbar()) ziel.appendChild(el('p', { class: 'leer', text: t(S.postfach.length ? 'leer_postfach_aus' : 'leer_postfach') }));
-    setzeTabZahl('postfach', l.filter(function (e) { return e.neu; }).length);
+    setzeTabZahl('postfach', l.filter(function (e) { return e.neu || e.neueAntworten; }).length);
     $('alleGelesenBtn').disabled = !l.some(function (e) { return !e.neu && !e.ausgeblendet; });
   }
   function zeichneGesendet() {
     if (!S.z.voll) return;
     var ziel = $('listeGesendet'); ziel.textContent = '';
-    var l = L.gesendetSicht(S.gesendet, S.status, S.ich.kennung, S.antwortenJe, { zeigeAusgeblendete: S.zeigeAus.gesendet });
+    var l = L.gesendetSicht(S.gesendet, S.status, S.ich.kennung, S.antwortenJe, { zeigeAusgeblendete: S.zeigeAus.gesendet, alleGezaehlt: S.antwortenWeg === 'sammelpfad' });
     l.forEach(function (e) { ziel.appendChild(karte(e, 'gesendet')); });
     if (!l.length) ziel.appendChild(el('p', { class: 'leer', text: t('leer_gesendet') }));
     setzeTabZahl('gesendet', l.reduce(function (s, e) { return s + (e.neueAntworten || 0); }, 0));
@@ -430,7 +482,7 @@
   }
   function markiereGelesen(m) {
     var ids = [];
-    if (m.von !== S.ich.kennung) ids.push(m.id);
+    if (m.von !== S.ich.kennung) ids = ids.concat(L.leseSchluessel(m));   // K28: id und id#<Anzahl Nachträge>
     var a = S.antworten[m.id];
     if (a && a.liste) a.liste.forEach(function (x) { if (x.von !== S.ich.kennung) ids.push(x.id); });
     return setzeStatus({ gelesen: ids }).then(function () { zeichnePostfach(); zeichneGesendet(); });
@@ -441,8 +493,12 @@
     if (S.offen && S.offen.id === m.id) zeichneAntworten(m);
     return L.ladeAntworten(S.db, m, S.ich.kennung).then(function (r) {
       S.antworten[m.id] = { liste: r.liste, warnung: r.warnung };
-      if (m.von === S.ich.kennung && !L.gesperrt(m)) S.antwortenJe[m.id] = r.liste;
-      if (r.warnung) console.error('[Nachrichten] A7: Antworten an mich nicht ladbar', r.warnung.fehler);
+      /* G-Stand nachziehen: im Sammelpfad-Weg nur Antworten an mich (wie G), im 1c-Rückweg alle Antworten meiner gesendeten */
+      if (!L.gesperrt(m)) {
+        if (S.antwortenWeg === 'sammelpfad') S.antwortenJe[m.id] = r.liste.filter(function (a) { return a.an === S.ich.kennung; }).map(function (a) { return Object.assign({ kopfId: m.id }, a); });
+        else if (m.von === S.ich.kennung) S.antwortenJe[m.id] = r.liste;
+      }
+      if (r.warnung) console.error('[Nachrichten] ' + (r.warnung.art === 'offen_rueckweg' ? 'offene Antworten ohne Filter abgelehnt — zwei gefilterte Abfragen' : 'A7: Antworten an mich nicht ladbar'), r.warnung.fehler);
       if (S.offen && S.offen.id === m.id) zeichneAntworten(m);
     }, function (err) {
       S.antworten[m.id] = { liste: [], fehler: err };
@@ -493,6 +549,10 @@
     var r = L.rechte(m, S.z), gesp = L.gesperrt(m);
     var kn = [];
     if (r.korrektur) kn.push(el('button', { type: 'button', class: 'klein-btn', text: t('korrektur'), onclick: function () { starteKorrektur(m); } }));
+    if (r.nachtrag) kn.push(el('button', { type: 'button', class: 'klein-btn', text: t('nachtrag'), 'aria-expanded': S.nachtragForm && S.nachtragForm.id === m.id ? 'true' : 'false',
+      onclick: function () { S.nachtragForm = S.nachtragForm && S.nachtragForm.id === m.id ? null : { id: m.id, text: '', dazu: [], such: '' }; zeichneDetail(); } }));
+    else if (r.nachtragOhneHaken) kn.push(el('span', { class: 'satz', text: t('nachtrag_kein_haken') }));   // N1
+    else if (r.binAbsender && r.offen && !gesp && L.nachtragZahl(m) >= L.GRENZEN.NACHTRAEGE) kn.push(el('span', { class: 'satz', text: t('nachtrag_voll', { max: L.GRENZEN.NACHTRAEGE }) }));
     if (r.ausblenden) {
       var aus = hat(S.status.ausgeblendet, m.id);
       kn.push(el('button', { type: 'button', class: 'klein-btn', text: aus ? t('einblenden') : t('ausblenden'), onclick: function (ev) {
@@ -504,16 +564,90 @@
     if (gesp) banner = el('div', { class: 'banner', text: S.bekannt[m.ersetztDurch] ? t('korrigiert_hier') : (quelle === 'postfach' ? t('korrigiert_nicht_an_dich') : t('korrigiert_nicht_hier')) });
     return el('article', { class: 'detail typ-' + m.typ, 'data-id': m.id }, [
       el('div', { class: 'detail-kopf' }, [symbol(S.name(m.von, m.vonName)), el('div', { style: 'flex:1;min-width:0' }, [
-        el('div', { class: 'karte-kopf' }, [typWort(m.typ), el('span', { class: 'zeit', text: zeit(m.erstellt) })]),
+        el('div', { class: 'karte-kopf' }, [typWort(m.typ), el('span', { class: 'zeit', text: zeit(m.erstellt) }), r.offen ? el('span', { class: 'marke-offen', text: t('offen_marke') }) : null]),
         el('div', { class: 'absender', text: t('von', { name: S.name(m.von, m.vonName) }) })])]),
       banner,
       el('div', { class: 'detail-an', text: t('an_liste', { namen: (m.empfaenger || []).map(function (k) { return S.name(k); }).join(', ') }) }),
       el('div', { class: 'detail-text' + (gesp ? ' durch' : ''), text: m.text }),
+      nachtraegeBox(m),
       daumenZeile(m, r, gesp),
       kn.length ? el('div', { class: 'knoepfe' }, kn) : null,
+      r.nachtrag && S.nachtragForm && S.nachtragForm.id === m.id ? nachtragFormular(m) : null,
       ketteBox(m),
       el('section', { class: 'antworten', id: 'antworten-' + m.id })
     ]);
+  }
+  /* K27: Nachträge hervorgehoben direkt unter dem Text, über den Antworten, der Reihe nach. „neu“ an denen, die ich
+     noch nicht gesehen habe (höchstes gelesenes id#k). */
+  function nachtraegeBox(m) {
+    var l = L.nachtraegeListe(m);
+    if (!l.length) return null;
+    var bis = 0;
+    if (m.von !== S.ich.kennung) { for (var k = l.length; k >= 1; k--) { if (hat(S.status.gelesen, m.id + '#' + k)) { bis = k; break; } } }
+    else bis = l.length;
+    return el('div', { class: 'nachtraege' }, l.map(function (n) {
+      return el('div', { class: 'nachtrag' }, [
+        el('div', { class: 'nachtrag-kopf' }, [el('b', { text: t('nachtrag_zeile', { zeit: zeit(n.ts) }) }), n.nr > bis ? el('span', { class: 'marke-neu', text: t('neu') }) : null]),
+        el('div', { class: 'nachtrag-text', text: n.text })
+      ]);
+    }));
+  }
+  /* K27–K29: Formular für den Absender — Text, freiwillig Empfänger dazu (enthaltene ausgegraut), Satz bei neuen. */
+  function nachtragFormular(m) {
+    var f = S.nachtragForm, ich = S.ich.kennung;
+    var box = el('div', { class: 'nachtrag-form' });
+    box.appendChild(el('h3', { text: t('nachtrag_titel') }));
+    box.appendChild(el('p', { class: 'satz', text: t('nachtrag_satz') }));
+    var ta = el('textarea', { class: 'eingabe', id: 'nachtragText-' + m.id, maxlength: String(L.GRENZEN.NACHTRAG), rows: '3' });
+    ta.value = f.text;
+    ta.addEventListener('input', function () { f.text = ta.value; });
+    box.appendChild(ta);
+    box.appendChild(el('div', { class: 'feld-titel', style: 'margin-top:8px' }, [el('span', { text: t('nachtrag_dazu') })]));
+    var such = el('input', { type: 'search', class: 'eingabe', placeholder: t('suchen') });
+    such.value = f.such || '';
+    var liste = el('div', { class: 'adressbuch' });
+    var satz = el('p', { class: 'satz satz-wichtig', text: t('nachtrag_dazu_satz'), hidden: !f.dazu.length });
+    function zeichneListe() {
+      liste.textContent = '';
+      var q = String(such.value || '').toLocaleLowerCase('de').trim();
+      var drin = m.empfaenger || [];
+      var kennungen = Object.keys(S.adressbuch).filter(function (k) { return k !== ich && S.adressbuch[k] && S.adressbuch[k].aktiv !== false; });
+      drin.forEach(function (k) { if (kennungen.indexOf(k) === -1 && k !== ich) kennungen.push(k); });
+      kennungen.sort(function (a, b) { return S.name(a).localeCompare(S.name(b), 'de'); });
+      kennungen.forEach(function (k) {
+        var eintrag = S.adressbuch[k] || {}, name = S.name(k), schon = drin.indexOf(k) !== -1;
+        if (q && (name + ' ' + (eintrag.beschreibung || '') + ' ' + k).toLocaleLowerCase('de').indexOf(q) === -1 && f.dazu.indexOf(k) === -1) return;
+        var cb = el('input', { type: 'checkbox', 'data-kennung': k, disabled: schon });
+        cb.checked = schon || f.dazu.indexOf(k) !== -1;
+        cb.addEventListener('change', function () {
+          if (cb.checked) { if (f.dazu.indexOf(k) === -1) f.dazu.push(k); } else f.dazu = f.dazu.filter(function (x) { return x !== k; });
+          satz.hidden = !f.dazu.length;
+        });
+        liste.appendChild(el('label', { class: 'ab-zeile' + (schon ? ' schon' : '') }, [cb, el('span', { class: 'ab-art', text: eintrag.art === 'ort' ? '📍' : '👤' }),
+          el('span', {}, [el('span', { class: 'ab-name', text: name }), schon ? el('span', { class: 'ab-beschr', text: '· ' + t('nachtrag_schon') }) : (eintrag.beschreibung ? el('span', { class: 'ab-beschr', text: '· ' + eintrag.beschreibung }) : null)])]));
+      });
+    }
+    such.addEventListener('input', function () { f.such = such.value; zeichneListe(); });
+    zeichneListe();
+    box.appendChild(such); box.appendChild(liste); box.appendChild(satz);
+    var fehlerBox = el('div', { class: 'fehler-zeile', hidden: true });
+    var knopf = el('button', { type: 'button', class: 'klein-btn haupt', text: t('nachtrag_senden'), onclick: function () {
+      var entwurf = { text: ta.value, empfaengerDazu: f.dazu.slice() };
+      var fl = L.pruefeNachtrag(entwurf, m, Object.assign({}, S.z, { kennung: ich }));
+      if (fl.length) { fehlerBox.textContent = fl.map(function (x) { return t('f_' + x, { max: x === 'text_lang' ? L.GRENZEN.NACHTRAG : x === 'nachtraege_voll' ? L.GRENZEN.NACHTRAEGE : L.GRENZEN.EMPFAENGER }); }).join('\n'); fehlerBox.hidden = false; return; }
+      knopf.disabled = true; S.sendet = true; fehlerBox.hidden = true;
+      L.nachtrag(S.db, m.id, entwurf, S.ich, Object.assign({}, S.z, { kennung: ich })).then(function () {
+        S.sendet = false; S.nachtragForm = null;
+        return ladeListen().then(function () { if (S.offen && S.offen.id === m.id) { zeichneDetail(); var mm = S.bekannt[m.id]; if (mm) ladeAntwortenFuer(mm); } });
+      }, function (err) {
+        S.sendet = false; knopf.disabled = false;
+        if (err && err.schluessel) { fehlerBox.textContent = err.schluessel.map(function (x) { return t('f_' + x, { max: x === 'text_lang' ? L.GRENZEN.NACHTRAG : x === 'nachtraege_voll' ? L.GRENZEN.NACHTRAEGE : L.GRENZEN.EMPFAENGER }); }).join('\n') + '\n(' + err.message + ')'; fehlerBox.hidden = false; return; }
+        erklaereUndZeige(err, { art: 'nachtrag' }, fehlerBox);
+      });
+    } });
+    box.appendChild(fehlerBox);
+    box.appendChild(el('div', { class: 'knoepfe' }, [knopf, el('button', { type: 'button', class: 'klein-btn', text: t('nachtrag_abbrechen'), onclick: function () { S.nachtragForm = null; zeichneDetail(); } })]));
+    return box;
   }
   function ketteBox(m) {
     if (!m.ersetzt) return null;
@@ -554,8 +688,9 @@
   function antwortBox(a, kopf, mitKnopf) {
     var ich = S.ich.kennung, eigene = a.von === ich;
     var kopfZ = [el('b', { text: S.name(a.von, a.vonName) }), el('span', { text: zeit(a.ts) })];
+    /* 1d: bei jeder Antwort steht, von wem an wen (bei offenen lesen alle mit) */
     if (a.an === ich && !eigene) kopfZ.push(el('span', { class: 'an-dich', text: t('an_dich') }));
-    else if (kopf.von === ich || eigene) kopfZ.push(el('span', { text: t('an_name', { name: S.name(a.an) }) }));
+    else kopfZ.push(el('span', { text: t('an_name', { name: S.name(a.an) }) }));
     if (!hat(S.status.gelesen, a.id) && !eigene) kopfZ.push(el('span', { class: 'marke-neu', text: t('neu') }));
     var k = [el('div', { class: 'antwort-kopf' }, kopfZ), el('div', { class: 'antwort-text', text: a.text })];
     if (mitKnopf && kopf.von === ich && !eigene) k.push(el('button', { type: 'button', class: 'klein-btn', style: 'margin-top:6px', text: t('antworten_name', { name: S.name(a.von, a.vonName) }),
@@ -573,7 +708,7 @@
     var a = S.antworten[m.id] || {};
     if (a.warnung) {
       var w = el('div', { class: 'fehler-zeile' });
-      setzeMitLinks(w, t('a7_satz') + '\n(' + ((a.warnung.fehler.code ? a.warnung.fehler.code + ' — ' : '') + a.warnung.fehler.message) + ')');
+      setzeMitLinks(w, t(a.warnung.art === 'offen_rueckweg' ? 'offen_rueckweg' : 'a7_satz') + '\n(' + ((a.warnung.fehler.code ? a.warnung.fehler.code + ' — ' : '') + a.warnung.fehler.message) + ')');
       box.appendChild(w);
     }
     if (a.laedt && !a.liste) box.appendChild(el('p', { class: 'satz', text: t('antworten_laden') }));
@@ -583,6 +718,7 @@
     if (L.gesperrt(m)) { box.appendChild(el('p', { class: 'satz', text: t('antwort_gesperrt') })); return; }
     if (!r.antworten) return;
     var form = el('div', { class: 'antwort-form' });
+    if (r.offen) form.appendChild(el('p', { class: 'satz satz-wichtig', text: t('offen_antwort_satz') }));   // K23
     if (r.binAbsender) {
       var sel = el('select', { class: 'eingabe', id: 'antwortAn-' + m.id, 'aria-label': t('antwort_an_wahl') });
       sel.appendChild(el('option', { value: '', text: t('antwort_an_wahl') + ' …' }));
@@ -612,9 +748,10 @@
   }
 
   /* ---------- Schreiben ---------- */
-  function neuerEntwurf() { return { typ: 'nachricht', empfaenger: [], text: '', giltBis: L.plusTage(L.heute(), L.GRENZEN.GILT_VORGABE_TAGE), korrekturVon: null }; }
+  function neuerEntwurf() { return { typ: 'nachricht', empfaenger: [], text: '', giltBis: L.plusTage(L.heute(), L.GRENZEN.GILT_VORGABE_TAGE), korrekturVon: null, antwortenOffen: false }; }
   function starteKorrektur(m) {
-    S.entwurf = { typ: m.typ, empfaenger: (m.empfaenger || []).slice(), text: m.text || '', giltBis: m.typ === 'bekanntmachung' && m.giltBis >= L.heute() ? m.giltBis : L.plusTage(L.heute(), L.GRENZEN.GILT_VORGABE_TAGE), korrekturVon: m };
+    if (L.istOffen(m)) return;   // K27: offene werden nicht korrigiert (Knopf fehlt ohnehin)
+    S.entwurf = { typ: m.typ, empfaenger: (m.empfaenger || []).slice(), text: m.text || '', giltBis: m.typ === 'bekanntmachung' && m.giltBis >= L.heute() ? m.giltBis : L.plusTage(L.heute(), L.GRENZEN.GILT_VORGABE_TAGE), korrekturVon: m, antwortenOffen: false };
     $('textFeld').value = S.entwurf.text;
     zeigeReiter('schreiben');
   }
@@ -645,14 +782,27 @@
     $('empfaengerBlock').hidden = aushang;
     var gb = $('giltBis'); gb.min = L.heute(); gb.value = e.giltBis;
     if (!aushang) zeichneEmpfaenger();
+    zeichneOffen();
     zaehleText();
     var nz = $('nameZeile');
     nz.textContent = S.ich.nameQuelle === 'kein_eintrag' ? t('name_kennung', { name: S.ich.name }) : t('name_ok', { name: S.ich.name });
     pruefeSendbar();
   }
+  /* K23/K24, F34: Kästchen nur mit erkannter Regel-Fassung 1d, nie bei Kritik und Aushang; Korrektur: gesperrt wie das Original. */
+  function offenMoeglich() { return !!(S.regel && S.regel.offen); }
+  function zeichneOffen() {
+    var e = S.entwurf, zeile = $('offenZeile'), kb = $('offenKaestchen'), satz = $('offenSatz');
+    var zeigen = offenMoeglich() && e.typ !== 'kritik' && e.typ !== 'bekanntmachung';
+    zeile.hidden = !zeigen; satz.hidden = !zeigen;
+    if (!zeigen) { e.antwortenOffen = false; kb.checked = false; return; }
+    kb.disabled = !!e.korrekturVon;
+    kb.checked = e.antwortenOffen === true;
+    satz.textContent = e.korrekturVon ? t('offen_korrektur') : t('offen_satz');
+  }
   function waehleTyp(typ) {
     var e = S.entwurf, vorher = kritikModus();
     e.typ = typ;
+    if (typ === 'kritik' || typ === 'bekanntmachung') e.antwortenOffen = false;
     if (kritikModus()) e.empfaenger = L.leitungFuer(S.leitung, S.ich.kennung);
     else if (vorher) e.empfaenger = [];
     zeichneSchreiben();
@@ -710,11 +860,12 @@
   }
   function entwurfJetzt() {
     var e = S.entwurf;
-    return { typ: e.typ, empfaenger: e.empfaenger.slice(), text: $('textFeld').value, giltBis: $('giltBis').value, ersetzt: e.korrekturVon ? e.korrekturVon.id : null };
+    return { typ: e.typ, empfaenger: e.empfaenger.slice(), text: $('textFeld').value, giltBis: $('giltBis').value, ersetzt: e.korrekturVon ? e.korrekturVon.id : null,
+             antwortenOffen: e.antwortenOffen === true && !e.korrekturVon && offenMoeglich() };
   }
   function pruefeSendbar() {
     if (!S.entwurf) return [];
-    var f = L.pruefeEntwurf(entwurfJetzt(), Object.assign({}, S.z, { kennung: S.ich.kennung }), L.leitungFuer(S.leitung, S.ich.kennung), L.heute());
+    var f = L.pruefeEntwurf(entwurfJetzt(), Object.assign({}, S.z, { kennung: S.ich.kennung }), L.leitungFuer(S.leitung, S.ich.kennung), L.heute(), { offenMoeglich: offenMoeglich() });
     var harte = f.filter(function (x) { return x === 'leitung_leer' || x === 'empfaenger_viele' || x === 'kein_haken' || x === 'kein_haken_aushang'; });
     $('sendenBtn').disabled = S.sendet || harte.length > 0;
     return f;
@@ -772,12 +923,13 @@
     $('textFeld').addEventListener('input', function () { zaehleText(); pruefeSendbar(); });
     $('giltBis').addEventListener('input', function () { if (S.entwurf) S.entwurf.giltBis = $('giltBis').value; pruefeSendbar(); });
     $('empfSuche').addEventListener('input', zeichneEmpfaenger);
+    $('offenKaestchen').addEventListener('change', function (ev) { if (S.entwurf) S.entwurf.antwortenOffen = ev.target.checked === true; pruefeSendbar(); });
     $('sendenBtn').addEventListener('click', sende);
     $('verwerfenBtn').addEventListener('click', function () { S.entwurf = null; $('textFeld').value = ''; $('schreibFehler').hidden = true; zeichneSchreiben(); });
     if (window.BOS_UNGESPEICHERT) {
       window.BOS_UNGESPEICHERT.melde(function () {
         if ($('textFeld').value.trim()) return true;
-        return Array.prototype.some.call(document.querySelectorAll('textarea[id^="antwortText-"]'), function (x) { return !!x.value.trim(); });
+        return Array.prototype.some.call(document.querySelectorAll('textarea[id^="antwortText-"], textarea[id^="nachtragText-"]'), function (x) { return !!x.value.trim(); });
       }, { laeuft: function () { return S.sendet; } });
     }
   }

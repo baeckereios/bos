@@ -20,12 +20,18 @@
      nachrichten/{id}
        normal:  { von, vonName, typ ∈ nachricht|info|lob|kritik, empfaenger [1–100],
                   text 1–2000, erstellt, fristStart, daumen [] } (+ ersetzt)
+                  (+ antwortenOffen: true — Stufe 1d, NUR wenn true geschrieben (F34), nie bei
+                  Kritik, nach dem Senden fest; offene werden nie korrigiert, dafür Nachtrag)
+                  (+ nachtraege { '1': { text 1–1000, ts }, … bis '20' } — nur per Nachtrag)
        Aushang: { von, vonName, typ 'bekanntmachung', text, erstellt, giltBis 'JJJJ-MM-TT' }
                   (+ ersetzt) — kein empfaenger, kein daumen, kein fristStart bis zum Abnehmen
        ändern:  nur daumen (eigene Kennung dazu/weg, Empfänger) · nur ersetztDurch
-                (Korrektur-Batch) · nur fristStart (Aushang abnehmen: Verfasser/Planung)
+                (Korrektur-Batch, nicht bei offenen) · nur fristStart (Aushang abnehmen:
+                Verfasser/Planung) · Nachtrag (1d: Absender einer offenen; genau ein neuer
+                Schlüssel in nachtraege, Empfänger nur dazu)
      nachrichten/{id}/antworten/{a}  { von, vonName, an, text 1–1000, ts, fristStart }
      nachrichten_status/{ich}  { gelesen: { id: ms }, ausgeblendet: { id: ms } } (T8)
+                  gelesen kennt seit 1d auch '<id>#<Anzahl Nachträge>' (K28)
      nachrichten_adressbuch/{kennung}  Schild (1b), lesen jeder mit Konto
      nachrichten_vorlagen/{id}  { name, kennungen, quelle, reihenfolge } (1b)
 
@@ -36,13 +42,30 @@
      L4 Status    nachrichten_status/<ich>
      L5 Adressbuch, L6 Vorlagen — ohne Filter (die Regel erlaubt es jedem Konto)
      L7 Antworten je Nachricht, erst beim Öffnen: Absender ohne Filter;
-        Empfänger zwei Abfragen where('von','==',ich) + where('an','==',ich),
-        zusammengeführt, nach ts in der Seite sortiert. Kein collectionGroup
-        (die Regel hat keinen Sammelpfad, B15).
+        Empfänger einer OFFENEN (1d) eine Abfrage ohne Filter (scheitert sie:
+        zwei gefilterte wie 1c + warnung); Empfänger einer geschlossenen zwei
+        Abfragen where('von','==',ich) + where('an','==',ich), zusammengeführt,
+        nach ts in der Seite sortiert.
+     G  Antworten an mich (1d, T10): BOS_NACHRICHTEN_ZAHL.ladeAntwortenAnMich —
+        collectionGroup('antworten').where('an','==',ich).orderBy('ts','desc')
+        .limit(200), mit dem 1c-Rückweg (A3). Liefert die Zahl „💬 n“ in Gesendet
+        und „neue Antwort“ im Postfach (statt bis zu 20 Abfragen je gesendeter).
      L8 Namen: BOS_NAMEN.laden(db) — eine Abfrage 'namen' je Seite.
      Kette: ein get je fehlendem Glied (ersetzt), höchstens GRENZEN.KETTE.
 
    CHANGELOG
+     2026-10-28 · 01:08 · v1.2 · Nacharbeit N1 (Kontroll-Chat 27.10. 19:52): Nachtrag nur mit Schreib-Haken —
+       rechte().nachtrag und pruefeNachtrag() verlangen z.schreiben (Fehler 'kein_haken_nachtrag', rechte().nachtragOhneHaken
+       für den Satz in der Seite); erklaere(nachtrag) nennt bei fehlendem Haken „den setzt der Admin“. Regel: vierter Weg
+       mit nzHaken('nachrichtenSchreiben') (gleiche Datei, gleiche Fassung).
+     2026-10-27 · 19:09 · v1.1 · Feature (Nachrichtenzentrale Stufe 1d, #131;
+       Bauplan 18:45, Go Kontroll-Chat 18:55 mit A1–A6). Regelstand: Fassung
+       nachrichten-offen-2026-10-27 vorn (FASSUNGEN, offen: true). Offene
+       Antworten (K23–K26): antwortenOffen nur bei true, Kritik nie; rechte()
+       ohne Korrektur bei offenen, mit Nachtrag (K27–K29); nachtrag() mit
+       frischem Kopf; Lese-Schlüssel '<id>#n' (K28); L7 offen ohne Filter mit
+       Rückweg; G über BOS_NACHRICHTEN_ZAHL.ladeAntwortenAnMich (A3).
+       nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
      2026-10-27 · 08:04 · v1.0 · Feature (Nachrichtenzentrale Stufe 1c, #131;
        Bauplan, Go Kontroll-Chat 07:54 mit A1–A8). Neu.
        nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1C_BAU.md
@@ -55,11 +78,14 @@
   if (!Z) throw new Error('bos_nachrichten_zahl.js fehlt — muss VOR nachrichten_logik.js geladen werden.');
 
   /* Regelstand (RK §13). REGEL_DATEI = neueste Datei, die REGEL_FASSUNG erfüllt (Pflege bei jeder neuen Regel). */
-  var REGEL_FASSUNG = 'nachrichten-2026-10-27';
-  var REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten.rules';
-  /* Die drei Fassungen, die RK §29 erfüllen (Bau-Doku 1b §6 Nr. 13): Hauptform, flache Listen, Rückfall B. */
+  var REGEL_FASSUNG = 'nachrichten-offen-2026-10-27';
+  var REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';
+  /* Die Fassungen, die RK §29 erfüllen: 1d (offen: Kästchen, Nachtrag, Sammelpfad) vorn, dahinter die drei von 1b
+     (Hauptform, flache Listen, Rückfall B — Bau-Doku 1b §6 Nr. 13). Mit einer alten Fassung schreibt die Seite wie 1c
+     (kein Kästchen, kein Feld antwortenOffen — F34). */
   var FASSUNGEN = [
-    { fassung: REGEL_FASSUNG, datei: REGEL_DATEI, art: 'haupt' },
+    { fassung: REGEL_FASSUNG, datei: REGEL_DATEI, art: 'offen', offen: true },
+    { fassung: 'nachrichten-2026-10-27', datei: 'firestore_regeln_2026-10-27_nachrichten.rules', art: 'haupt' },
     { fassung: 'nachrichten-flach-2026-10-27', datei: 'RUECKFALL_FLACH_firestore_regeln_2026-10-27_nachrichten.rules', art: 'flach' },
     { fassung: 'nachrichten-leser-2026-10-27', datei: 'RUECKFALL_B_LESER_firestore_regeln_2026-10-27_nachrichten.rules', art: 'leser' }
   ];
@@ -68,7 +94,8 @@
   var GRENZEN = {
     TEXT: 2000, ANTWORT: 1000, NAME: 40, EMPFAENGER: 100,
     POSTFACH: 200, AUSHAENGE: 100, GESENDET: 200,
-    KETTE: 10, STATUS_TAGE: 41, GILT_VORGABE_TAGE: 14
+    KETTE: 10, STATUS_TAGE: 41, GILT_VORGABE_TAGE: 14,
+    NACHTRAG: 1000, NACHTRAEGE: 20, SAMMELPFAD: 200
   };
   var TYPEN = ['nachricht', 'info', 'lob', 'kritik', 'bekanntmachung'];
   var CRUMBLE = Z.CRUMBLE;
@@ -153,7 +180,7 @@
       if (i >= FASSUNGEN.length) return Promise.resolve({ stand: letzter && letzter.code === 'permission-denied' ? 'alt' : 'unbekannt', fassung: null, datei: REGEL_DATEI, fehler: letzter });
       var f = FASSUNGEN[i++];
       return mitZeitlimit(d.collection('bos_regelstand').doc(f.fassung).get({ source: 'server' }))
-        .then(function () { return { stand: 'passt', fassung: f.fassung, datei: f.datei, art: f.art }; },
+        .then(function () { return { stand: 'passt', fassung: f.fassung, datei: f.datei, art: f.art, offen: f.offen === true }; },
           function (err) { letzter = err; if (err && err.code !== 'permission-denied') { i = FASSUNGEN.length; } return naechste(); });
     }
     return naechste();
@@ -244,6 +271,9 @@
     var d = { von: ich.kennung, vonName: sauber(ich.name, GRENZEN.NAME) || ich.kennung, typ: e.typ, empfaenger: einmal(e.empfaenger).slice(),
               text: text(e.text), erstellt: srv, fristStart: srv, daumen: [] };
     if (e.ersetzt) d.ersetzt = e.ersetzt;
+    /* F34: nur bei true schreiben (fehlt = geschlossen) — so lehnt auch die Regel vom 27.10. nichts ab. Nie bei Kritik
+       (K24) und nie in einer Korrektur (offene werden nicht korrigiert, Regel nzKorrektur). */
+    if (e.antwortenOffen === true && e.typ !== 'kritik' && !e.ersetzt) d.antwortenOffen = true;
     return d;
   }
   function bekanntmachungDokument(e, ich, srv) {
@@ -256,6 +286,29 @@
     return { von: ich.kennung, vonName: sauber(ich.name, GRENZEN.NAME) || ich.kennung, an: e.an, text: text(e.text), ts: srv, fristStart: srv };
   }
   /* Daumen: genau ein Element Unterschied (Regel nzDaumenDazu/nzDaumenWeg). */
+  /* Nachträge (K27–K29). */
+  function istOffen(m) { return !!m && m.antwortenOffen === true; }
+  function nachtraegeListe(m) {
+    var n = (m && m.nachtraege) || {};
+    if (typeof n !== 'object' || Array.isArray(n)) return [];
+    return Object.keys(n).filter(function (k) { return /^[0-9]+$/.test(k); }).sort(function (a, b) { return Number(a) - Number(b); })
+      .map(function (k) { var x = n[k] || {}; return { nr: Number(k), text: text(x.text), ts: x.ts }; });
+  }
+  /* Was „gelesen“ beim Öffnen bekommt: die Nachricht und — mit Nachträgen — '<id>#<Anzahl>' (K28). */
+  function leseSchluessel(m) { var r = [m.id], k = Z.nachtragSchluessel(m); if (k) r.push(k); return r; }
+  function pruefeNachtrag(e, kopf, z) {
+    var f = [], t = text(e.text);
+    if (!t.trim()) f.push('text_leer');
+    if (t.length > GRENZEN.NACHTRAG) f.push('text_lang');
+    if (!z || !z.schreiben) f.push('kein_haken_nachtrag');   // N1: das Schloss sitzt am Konto (T2)
+    if (!kopf || kopf.von !== (z && z.kennung)) f.push('nicht_absender');
+    else if (Z.gesperrt(kopf)) f.push('gesperrt');
+    else if (!istOffen(kopf)) f.push('nicht_offen');
+    if (kopf && Z.nachtragZahl(kopf) >= GRENZEN.NACHTRAEGE) f.push('nachtraege_voll');
+    var alle = einmal(((kopf && kopf.empfaenger) || []).concat(e.empfaengerDazu || []));
+    if (alle.length > GRENZEN.EMPFAENGER) f.push('empfaenger_viele');
+    return f;
+  }
   function daumenNeu(alt, kennung) {
     var a = (alt || []).slice();
     var i = a.indexOf(kennung);
@@ -269,8 +322,15 @@
   function leitungFuer(leitung, kennung) { return einmal((leitung || []).filter(function (k) { return k !== kennung; })); }
   function kritikGesperrt(z, typ) { return typ === 'kritik' && !z.bekanntmachung; }
   /* Gibt eine Liste von Fehlerschlüsseln zurück (leer = sendbar). leitung = nachrichten_vorlagen/leitung.kennungen. */
-  function pruefeEntwurf(e, z, leitung, tag) {
+  /* opt.offenMoeglich: die Seite hat die Fassung von 1d erkannt (sonst darf antwortenOffen nicht gesetzt sein, F34). */
+  function pruefeEntwurf(e, z, leitung, tag, opt) {
     var f = [];
+    if (e.antwortenOffen === true) {
+      if (e.typ === 'kritik') f.push('kritik_offen');
+      else if (e.typ === 'bekanntmachung') f.push('aushang_offen');
+      else if (e.ersetzt) f.push('korrektur_offen');
+      else if (opt && opt.offenMoeglich === false) f.push('offen_regel_alt');
+    }
     if (!z || !z.schreiben) f.push('kein_haken');
     if (TYPEN.indexOf(e.typ) === -1) f.push('typ');
     if (e.typ === 'bekanntmachung' && !(z && z.bekanntmachung)) f.push('kein_haken_aushang');
@@ -311,11 +371,15 @@
     var ich = z.kennung, aushang = m.typ === 'bekanntmachung', gesp = Z.gesperrt(m);
     var binEmpf = !aushang && (m.empfaenger || []).indexOf(ich) !== -1;
     var binAbs = m.von === ich;
+    var offen = !aushang && istOffen(m);
     return {
       daumen: z.empfaenger && binEmpf && !binAbs && !gesp,                         // K-a: nicht beim Absender
       antworten: z.empfaenger && !aushang && !gesp && (binAbs ? (m.empfaenger || []).some(function (k) { return k !== ich; }) : binEmpf),
       antwortAnFest: binAbs ? null : m.von,
-      korrektur: binAbs && !gesp && z.schreiben && (!aushang || z.bekanntmachung),
+      korrektur: binAbs && !gesp && !offen && z.schreiben && (!aushang || z.bekanntmachung),   // K27: offene nie
+      nachtrag: binAbs && offen && !gesp && z.schreiben && Z.nachtragZahl(m) < GRENZEN.NACHTRAEGE,   // N1: Schreib-Haken
+      nachtragOhneHaken: binAbs && offen && !gesp && !z.schreiben,
+      offen: offen,
       ausblenden: !aushang,
       kenneIch: aushang,
       drucken: aushang,
@@ -338,13 +402,24 @@
     return { oben: oben, nachId: nachId };
   }
   function ungelesen(m, st, ich) { return m.von !== ich && !hatFeld(st.gelesen, m.id); }
-  /* Postfach: L1 (+ Crumble getrennt in der Ansicht). opt.zeigeAusgeblendete. */
+  function neueAntwortenAn(a, st, ich) { return (a || []).filter(function (x) { return x.an === ich && x.von !== ich && !hatFeld(st.gelesen, x.id); }).length; }
+  /* Postfach: L1 (+ Crumble getrennt in der Ansicht). opt.zeigeAusgeblendete; opt.antwortenJe = G je Kopf (1d).
+     Eine ausgeblendete Nachricht mit neuem Nachtrag (K28) oder neuer Antwort an mich (F25) erscheint wieder —
+     sonst zählte die Kachel etwas, das niemand findet. */
   function postfachSicht(l1, status, ich, opt) {
-    var st = statusNormal(status), o = opt || {};
+    var st = statusNormal(status), o = opt || {}, aj = o.antwortenJe || {};
     var b = obenUndKette((l1 || []).filter(function (m) { return m.typ !== 'bekanntmachung'; }).sort(nachZeit('erstellt', true)));
-    return b.oben.filter(function (e) { return o.zeigeAusgeblendete || !hatFeld(st.ausgeblendet, e.m.id); }).map(function (e) {
-      return { m: e.m, neu: ungelesen(e.m, st, ich) && !Z.gesperrt(e.m), ausgeblendet: hatFeld(st.ausgeblendet, e.m.id), nachfolgerFehlt: e.nachfolgerFehlt };
+    var r = [];
+    b.oben.forEach(function (e) {
+      var m = e.m, gesp = Z.gesperrt(m);
+      var nachtrag = m.von !== ich && !gesp && Z.nachtragNeu(m, st.gelesen);
+      var neuAntw = gesp ? 0 : neueAntwortenAn(aj[m.id], st, ich);
+      var aus = hatFeld(st.ausgeblendet, m.id);
+      if (aus && !o.zeigeAusgeblendete && !nachtrag && !neuAntw) return;
+      r.push({ m: m, neu: (ungelesen(m, st, ich) || nachtrag) && !gesp, nachtragNeu: nachtrag, neueAntworten: neuAntw,
+               offen: istOffen(m), ausgeblendet: aus, nachfolgerFehlt: e.nachfolgerFehlt });
     });
+    return r;
   }
   /* Aushänge: hängend (kein fristStart, giltBis ≥ heute); abgelaufene nur für Verfasser/Planung. Aushänge sind
      nicht ausblendbar (Anweisung §3.5). Ein korrigierter Aushang, dessen alte Fassung noch nicht abgenommen ist
@@ -362,19 +437,19 @@
     });
     return r;
   }
-  /* Gesendet: L3. Antworten je Nachricht (aus dem Zähl-Laden, höchstens 20) für die Zahl und „neue Antwort“.
-     Eine ausgeblendete Nachricht mit NEUER Antwort an mich erscheint trotzdem (sonst zählte die Kachel etwas,
-     das niemand findet). */
+  /* Gesendet: L3. antwortenJe: G je Kopf (1d — Antworten an mich, also alle der Empfänger) oder im 1c-Rückweg alle
+     Antworten der 20 neuesten. „💬 n“ und „neue Antwort“. Eine ausgeblendete Nachricht mit NEUER Antwort an mich
+     erscheint trotzdem (sonst zählte die Kachel etwas, das niemand findet). */
   function gesendetSicht(l3, status, ich, antwortenJe, opt) {
     var st = statusNormal(status), o = opt || {}, aj = antwortenJe || {};
     var b = obenUndKette((l3 || []).slice().sort(nachZeit('erstellt', true)));
     var r = [];
     b.oben.forEach(function (e) {
       var a = aj[e.m.id];
-      var neuAntw = a ? a.filter(function (x) { return x.an === ich && x.von !== ich && !hatFeld(st.gelesen, x.id); }).length : 0;
+      var neuAntw = Z.gesperrt(e.m) ? 0 : neueAntwortenAn(a, st, ich);
       var aus = hatFeld(st.ausgeblendet, e.m.id);
       if (aus && !o.zeigeAusgeblendete && !neuAntw) return;
-      r.push({ m: e.m, antworten: a ? a.length : null, neueAntworten: neuAntw, ausgeblendet: aus, nachfolgerFehlt: e.nachfolgerFehlt });
+      r.push({ m: e.m, antworten: a ? a.length : (o.alleGezaehlt ? 0 : null), neueAntworten: neuAntw, offen: istOffen(e.m), ausgeblendet: aus, nachfolgerFehlt: e.nachfolgerFehlt });
     });
     return r;
   }
@@ -402,11 +477,15 @@
       return x !== y ? x - y : text(a.name).localeCompare(text(b.name), 'de');
     });
   }
-  /* Kachel-Zahl aus den Listen der Seite — dieselbe Regel wie im Launcher (Z.zaehle). */
+  /* Kachel-Zahl aus den Listen der Seite — dieselbe Regel wie im Launcher (Z.zaehle). antwortenJe: { kopfId: [a] }
+     (G oder 1c-Rückweg; jede Antwort trägt kopfId), koepfe: aus ladeAntwortenAnMich. */
   function zahlAus(d) {
     var an = [];
-    Object.keys(d.antwortenJe || {}).forEach(function (id) { an = an.concat(Z.antwortenAnMich(d.antwortenJe[id], d.ich)); });
-    return Z.zaehle({ ich: d.ich, postfach: d.postfach, aushaenge: d.aushaenge, antwortenAnMich: an, status: d.status, heute: d.heute });
+    Object.keys(d.antwortenJe || {}).forEach(function (id) {
+      an = an.concat(Z.antwortenAnMich(d.antwortenJe[id], d.ich).map(function (a) { if (!a.kopfId) a.kopfId = id; return a; }));
+    });
+    return Z.zaehle({ ich: d.ich, postfach: d.postfach, aushaenge: d.aushaenge, gesendet: d.gesendet, koepfe: d.koepfe,
+                      antwortenAnMich: an, status: d.status, heute: d.heute });
   }
 
   /* ---------- Laden (L1–L7) ---------- */
@@ -423,20 +502,27 @@
     });
   }
   function ladeVorlagen(db) { return mitZeitlimit(datenbank(db).collection(SAMMLUNG.VORLAGEN).get()).then(liste).then(vorlagenSortiert); }
-  /* Antworten für die 20 neuesten gesendeten, nicht gesperrten (wie der Launcher; ohne Filter, Absender). */
-  function ladeAntwortenGesendet(db, gesendet) {
-    var l = (gesendet || []).filter(function (m) { return !Z.gesperrt(m) && m.typ !== 'bekanntmachung'; })
-      .sort(nachZeit('erstellt', true)).slice(0, Z.ANTWORT_NACHRICHTEN);
-    var je = {};
-    return Promise.all(l.map(function (m) {
-      return mitZeitlimit(N(db).doc(m.id).collection(SAMMLUNG.ANTWORTEN).get()).then(function (s) { je[m.id] = antwortenZusammen(liste(s)); });
-    })).then(function () { return je; });
+  /* G — Antworten an mich (1d, T10) über die EINE Funktion in bos_nachrichten_zahl.js (mit 1c-Rückweg, A3).
+     listen = { postfach, gesendet, status }. Gesendet wird nach erstellt sortiert übergeben (Rückweg: 20 neueste). */
+  function ladeAntwortenAnMich(db, ich, listen) {
+    var l = listen || {};
+    return Z.ladeAntwortenAnMich(datenbank(db), ich, { postfach: l.postfach, gesendet: (l.gesendet || []).slice().sort(nachZeit('erstellt', true)), status: l.status }, null)
+      .then(function (r) { Object.keys(r.je).forEach(function (id) { r.je[id] = antwortenZusammen(r.je[id]); }); return r; });
   }
-  /* L7 — beim Öffnen. Absender: ohne Filter. Empfänger: zwei Abfragen; scheitert „an == ich“, NICHT stumm (A7):
-     es kommt ein warnung-Objekt mit dem Fehler zurück, die Seite zeigt err.message und den Satz. */
+  /* L7 — beim Öffnen. Absender: ohne Filter. Empfänger einer OFFENEN (1d): eine Abfrage ohne Filter; scheitert sie,
+     zwei gefilterte wie 1c und warnung 'offen_rueckweg' (nie stumm). Empfänger einer geschlossenen: zwei Abfragen;
+     scheitert „an == ich“, NICHT stumm (A7): warnung mit dem Fehler, die Seite zeigt err.message und den Satz. */
   function ladeAntworten(db, kopf, ich) {
     var A = N(db).doc(kopf.id).collection(SAMMLUNG.ANTWORTEN);
     if (kopf.von === ich) return mitZeitlimit(A.get()).then(function (s) { return { liste: antwortenZusammen(liste(s)), warnung: null }; });
+    if (istOffen(kopf) && (kopf.empfaenger || []).indexOf(ich) !== -1) {
+      return mitZeitlimit(A.get()).then(function (s) { return { liste: antwortenZusammen(liste(s)), warnung: null }; }, function (err) {
+        return zweiGefiltert(A, ich).then(function (r) { r.warnung = { art: 'offen_rueckweg', fehler: err, zweite: r.warnung }; return r; });
+      });
+    }
+    return zweiGefiltert(A, ich);
+  }
+  function zweiGefiltert(A, ich) {
     var von = mitZeitlimit(A.where('von', '==', ich).get()).then(liste);
     var an = mitZeitlimit(A.where('an', '==', ich).get()).then(liste).then(function (l) { return { l: l, f: null }; }, function (err) { return { l: [], f: err }; });
     return Promise.all([von, an]).then(function (r) {
@@ -476,6 +562,7 @@
      Aushang (B13): danach ZWEITER Schritt — alte abnehmen (fristStart). Scheitert er, kommt zweiterSchritt:
      'fehler' + der Fehler zurück; die Seite bietet „alten Aushang abnehmen“ an (wiederholt nur Schritt 2). */
   function korrektur(db, alt, entwurf, ich) {
+    if (istOffen(alt)) return Promise.reject(fehler('offen', 'Offene Gespräche werden nicht korrigiert (K27) — dafür gibt es den Nachtrag.'));
     var d = datenbank(db), ref = N(d).doc();
     var e = {}; Object.keys(entwurf).forEach(function (k) { e[k] = entwurf[k]; });
     e.typ = alt.typ; e.ersetzt = alt.id;                 // Typ bleibt gleich (Regel)
@@ -500,6 +587,28 @@
       if (Z.gesperrt(m)) throw fehler('gesperrt', 'Die Nachricht ist korrigiert und gesperrt — kein Daumen mehr.');
       var n = daumenNeu(m.daumen, kennung);
       return mitZeitlimit(ref.update({ daumen: n.daumen })).then(function () { m.daumen = n.daumen; m.id = id; return { m: m, dazu: n.dazu }; });
+    });
+  }
+  /* Nachtrag (K27–K29): frischer Kopf, Prüfung, dann update mit Feldpfad 'nachtraege.<n+1>' (eine Karte mit
+     Serverzeit — in einer LISTE erlaubt Firestore serverTimestamp() nicht, darum Karte statt Liste; Bau-Doku 1d).
+     Empfänger nur dazu (einmal, ohne mich). Scheitert die Regel → die Seite zeigt err.message (Freigabe A1 Nr. 3). */
+  function nachtrag(db, kopfId, entwurf, ich, z) {
+    var ref = N(db).doc(kopfId);
+    return mitZeitlimit(ref.get({ source: 'server' })).then(function (s) {
+      if (!s.exists) throw fehler('weg', 'Die Nachricht gibt es nicht mehr.');
+      var m = s.data() || {}; m.id = kopfId;
+      var dazu = einmal(entwurf.empfaengerDazu || []).filter(function (k) { return k !== ich.kennung && (m.empfaenger || []).indexOf(k) === -1; });
+      var f = pruefeNachtrag({ text: entwurf.text, empfaengerDazu: dazu }, m, z || { kennung: ich.kennung });
+      if (f.length) { var e = fehler('nachtrag_' + f[0], 'Nachtrag nicht möglich (' + f.join(', ') + ').'); e.schluessel = f; throw e; }
+      var n = Z.nachtragZahl(m) + 1;
+      var upd = {};
+      upd['nachtraege.' + n] = { text: text(entwurf.text), ts: serverZeit() };
+      if (dazu.length) upd.empfaenger = (m.empfaenger || []).concat(dazu);
+      return mitZeitlimit(ref.update(upd)).then(function () {
+        m.nachtraege = m.nachtraege || {}; m.nachtraege[String(n)] = { text: text(entwurf.text), ts: null };
+        if (dazu.length) m.empfaenger = upd.empfaenger;
+        return { m: m, nr: n, dazu: dazu };
+      });
     });
   }
   function antworten(db, kopfId, entwurf, ich) {
@@ -538,10 +647,12 @@
         if (!z.schreiben) return g('kein_haken', 'Neue Nachrichten anfangen darf, wer den Haken dafür hat — den setzt der Admin in der Kontenverwaltung. Antworten geht ohne Haken. Nichts gesendet.');
         if (k.typ === 'bekanntmachung' && !z.bekanntmachung) return g('kein_haken_aushang', 'Aushänge darf nur schreiben, wer den Haken „Bekanntmachungen“ hat. Nichts gesendet.');
         if (k.typ === 'kritik' && !z.bekanntmachung) return g('kritik', 'Kritik geht nur an die Leitung. Die Leitungsliste hat sich vielleicht gerade geändert — neu laden und noch einmal. Nichts gesendet.');
-        if (a === 'korrektur') return g('korrektur', 'Die Korrektur wurde abgelehnt — vielleicht wurde die alte Nachricht inzwischen schon korrigiert. Neu laden. Nichts gesendet.');
+        if (a === 'korrektur') return g('korrektur', 'Die Korrektur wurde abgelehnt — vielleicht wurde die alte Nachricht inzwischen schon korrigiert, oder sie ist ein offenes Gespräch (dort geht nur ein Nachtrag). Neu laden. Nichts gesendet.');
         return g('abgelehnt', 'Die Datenbank hat die Nachricht abgelehnt. Nichts gesendet.');
       }
       if (a === 'antwort') return g('antwort', 'Die Datenbank hat die Antwort abgelehnt — vielleicht wurde die Nachricht gerade korrigiert (dann unter der neuen Fassung antworten). Nichts gesendet.');
+      if (a === 'nachtrag' && !z.schreiben) return g('kein_haken_nachtrag', 'Nachträge schreibt nur, wer den Haken „Nachrichten schreiben“ hat — den setzt der Admin in der Kontenverwaltung. Nichts gesendet.');
+      if (a === 'nachtrag') return g('nachtrag', 'Die Datenbank hat den Nachtrag abgelehnt — nur der Absender eines offenen Gesprächs darf ihn schreiben, höchstens ' + GRENZEN.NACHTRAEGE + ' Nachträge, Empfänger nur dazu. Vielleicht kam gerade ein anderer Nachtrag dazwischen: neu laden und noch einmal. Nichts gesendet.');
       if (a === 'daumen') return g('daumen', 'Den Daumen geben nur Empfänger, nicht bei Aushängen und nicht bei korrigierten Nachrichten. Nichts gespeichert.');
       if (a === 'abnehmen') return g('abnehmen', 'Abnehmen dürfen der Verfasser, die Produktionsleitung und der Admin — oder der Aushang ist schon abgenommen. Neu laden.');
       if (a === 'status') return g('status', 'Dein Lese-Merker wurde abgelehnt. Nichts verloren, nur „neu“ bleibt stehen.');
@@ -557,11 +668,13 @@
     statusNormal: statusNormal, statusRaeumen: statusRaeumen, statusMit: statusMit, statusAendertEtwas: statusAendertEtwas,
     nachrichtDokument: nachrichtDokument, bekanntmachungDokument: bekanntmachungDokument, dokumentFuer: dokumentFuer,
     antwortDokument: antwortDokument, daumenNeu: daumenNeu,
+    istOffen: istOffen, nachtraegeListe: nachtraegeListe, leseSchluessel: leseSchluessel, pruefeNachtrag: pruefeNachtrag, nachtrag: nachtrag,
+    nachtragZahl: Z.nachtragZahl, nachtragNeu: Z.nachtragNeu,
     leitungFuer: leitungFuer, kritikGesperrt: kritikGesperrt, pruefeEntwurf: pruefeEntwurf, pruefeAntwort: pruefeAntwort, rechte: rechte,
     postfachSicht: postfachSicht, aushaengeSicht: aushaengeSicht, gesendetSicht: gesendetSicht, kette: kette,
     antwortenZusammen: antwortenZusammen, vorlagenSortiert: vorlagenSortiert, zahlAus: zahlAus,
     ladePostfach: ladePostfach, ladeAushaenge: ladeAushaenge, ladeGesendet: ladeGesendet, ladeStatus: ladeStatus,
-    ladeAdressbuch: ladeAdressbuch, ladeVorlagen: ladeVorlagen, ladeAntwortenGesendet: ladeAntwortenGesendet,
+    ladeAdressbuch: ladeAdressbuch, ladeVorlagen: ladeVorlagen, ladeAntwortenAnMich: ladeAntwortenAnMich,
     ladeAntworten: ladeAntworten, ladeGlied: ladeGlied,
     statusSetzen: statusSetzen, senden: senden, korrektur: korrektur, aushangAbnehmen: aushangAbnehmen, daumen: daumen, antworten: antworten,
     einordnen: einordnen, erklaere: erklaere, mitZeitlimit: mitZeitlimit
