@@ -174,6 +174,14 @@
  *   Entfernt: Ebene „Eigene lokale Einstellungen“ (P2). Unverändert: die ganze
  *   Rechnung (holeManuelleWerte, holeOffizielleWerte, pruefeAusreisser,
  *   pruefeBackzettelWert, holeDurchschnitt, holeWochenbedarf, durchgang).
+ * 29.10.2026 · 07:37 — FESTER ZEITRAUM GENAU t TAGE (Kern-Datei, Ulf „Ja, auf
+ *   genau 28“, FREIGABE_2026-10-29_VERBRAUCH_KALENDER_LESBAR_BAUPLAN.md F1;
+ *   Bau-Doku SESSION_2026-10-29_VERBRAUCH_KALENDER_LESBAR_BAU.md). In
+ *   holeManuelleWerte() und holeOffizielleWerte() je eine Bedingung:
+ *   `alterTage > kontiguierlichTage` → `>=`. Vorher zählten Alter 0 … t, also
+ *   t + 1 Tage (bei 28: für den Wochentag von heute 5 Werte statt 4); jetzt
+ *   Alter 0 … t − 1 = genau t Tage, wie der Kalender im Editor sie zeigt.
+ *   Feste Anzahl (suchfensterWochen) unverändert. Sonst nichts geändert.
  *
  * EINHEITEN (Stand 13.10.2026, Baustelle #64):
  *   Regel: jede Bedarfszahl verlässt diesen Host in der `einheit` des
@@ -751,7 +759,7 @@ window.BOS_VERBRAUCH = {
 
         // Modus-Zeitfenster.
         const alterTage = this._tageSeit(data.datum);
-        if (modus === 'kontiguierlich' && alterTage > kontiguierlichTage) return;
+        if (modus === 'kontiguierlich' && alterTage >= kontiguierlichTage) return;   // 29.10.2026: genau t Tage (heute und t−1 zurück)
         if (modus === 'stichprobe' && alterTage > suchfensterTage) return;
 
         (data.eintraege || []).forEach(eintrag => {
@@ -830,7 +838,7 @@ window.BOS_VERBRAUCH = {
       if (einstellungen?.ausgeschlosseneTage?.some(t => t.datum === data.datum)) return;
 
       const alterTage = this._tageSeit(data.datum);               // B4
-      if (modus === 'kontiguierlich' && alterTage > kontiguierlichTage) return;
+      if (modus === 'kontiguierlich' && alterTage >= kontiguierlichTage) return;   // 29.10.2026: genau t Tage (heute und t−1 zurück)
       if (modus === 'stichprobe' && alterTage > suchfensterTage) return;
 
       // F2: „zählt nicht“ für dieses Produkt an diesem Tag

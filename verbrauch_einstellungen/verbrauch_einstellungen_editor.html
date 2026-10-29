@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-29 · 07:57 · Stufe 2c „verständlich machen“ (Freigabe KC 29.10., 07:34; Ulf F1–F3): Kalender je Tag „Zettel da? Zählt er?“ — grün zählt gerade, grau zählt nicht (✕ ✦ ◆ ☀), nur Rahmen kein Zettel, blass zu alt (bei Feste Anzahl: nicht unter den n neuesten), gestrichelt Zukunft; Farben aus Statusfarbe/Grau statt Akzent (Blau auf Blau); Ferien je Topf richtig (Backzettel zählt). Logik als reine Funktionen in window.VE_KALENDER (eigener Block), gegen den Rechner geprüft. Neue Karte „Was gerade rechnet“ (Station/Schnellrechner) mit kleinem Wurm je Wochentag. Namen „Feste Anzahl“/„Fester Zeitraum“ und neue Feldnamen (Datenbank unverändert), Satz mit echten Zahlen unter der Rechenart, Hilfe neu. Produktnamen im Datenbestand mit esc() (N-10). Kein zusätzlicher Lesevorgang. SESSION_2026-10-29_VERBRAUCH_KALENDER_LESBAR_BAU.md -->
 <!-- 2026-10-28 · 17:41 · Backzettel Stufe 2b (Freigabe KC 28.10.): Der Batch „Sicherung + system, Stand + 1“ steht jetzt in ../bos_verbrauch_einstellungen_schreiben.js (wörtlich kopiert, Z. 1254–1262); die Backzettel-Erfassung schreibt einen ausgeschlossenen Backtag über dieselbe Mechanik. Prüfung, Meldungen, Zeitlimit, Konflikt-Deutung, Neuladen und Vorversionen bleiben hier unverändert. Fehlt das Modul: Speichern gesperrt mit roter Zeile, „Als Datei herunterladen“ geht weiter. SESSION_2026-10-28_BACKZETTEL_TAG_AUSSCHLIESSEN_BAU.md -->
 <!-- 2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md -->
 <!-- 2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md -->
@@ -265,15 +266,32 @@
     font-size: var(--bos-font-xs, 11px); color: var(--ve-text-schwach); cursor: default;
   }
   .kal-tag .kal-sym { font-size: var(--bos-font-2xs, 9px); line-height: 1; margin-top: var(--bos-space-3xs, 1px); }
-  .kal-tag.im-fenster {
-    border-style: solid; border-color: color-mix(in srgb, var(--ve-primary) 40%, transparent); background: color-mix(in srgb, var(--ve-primary) 10%, transparent);
-    color: var(--ve-text); cursor: pointer;
-  }
-  .kal-tag.im-fenster:active { background: color-mix(in srgb, var(--ve-primary) 22%, transparent); }
-  .kal-tag.feiertag { border-color: rgba(74,143,214,0.5); }
-  .kal-tag.im-fenster.feiertag { background: rgba(74,143,214,0.16); }
-  .kal-tag.ausgeschlossen { background: var(--ve-warnung-bg); border-color: var(--ve-warnung); }
+  /* 29.10.2026 (Stufe 2c): Farben NICHT mehr aus dem Akzent (--ve-primary = Ulfs Farbprofil, „Blau auf Blau“),
+     sondern feste Statusfarbe (--bos-green, färbt nie um) und neutrales Grau (--bos-border-strong, in keinem Profil).
+     Unterschied immer zusätzlich über Füllung, Rahmen und Zeichen. */
+  .kal-tag .kal-sym { font-size: var(--bos-font-xs, 11px); }                       /* 29.10.2026: Zeichen tragen jetzt Bedeutung — etwas größer */
+  .kal-tag.vergangen { border-style: solid; border-color: var(--bos-border-strong, rgba(255,255,255,0.18)); }
+  .kal-tag.im-fenster { color: var(--ve-text); cursor: pointer; }                   /* antippbar (Suchbereich) */
+  .kal-tag.im-fenster:active { outline: 2px solid var(--ve-text-schwach); }
+  .kal-tag.zaehlt { background: color-mix(in srgb, var(--bos-green, #4caf7d) 38%, transparent); border-color: var(--bos-green, #4caf7d); color: var(--ve-text); }
+  .kal-tag.zaehlt-nicht { background: var(--bos-border-strong, rgba(255,255,255,0.18)); border-color: var(--bos-border-strong, rgba(255,255,255,0.18)); }
+  .kal-tag.blass { opacity: 0.4; }
+  .kal-tag.zukunft { border-style: dashed; }
   .kal-tag.ausgeschlossen .kal-datum { text-decoration: line-through; opacity: 0.8; }
+  .kal-legende .kal-tag { min-height: 14px; width: 18px; border-radius: 4px; display: inline-flex; font-size: 9px; }
+  .kal-status { font-size: var(--bos-font-xs, 12px); color: var(--ve-text-schwach); margin: 0 0 var(--bos-space-xs, 8px); }
+
+  /* Was gerade rechnet + kleiner Wurm (29.10.2026, Stufe 2c) */
+  .rechnet-satz { font-size: var(--bos-font-sm, 13px); color: var(--ve-text); line-height: 1.5; }
+  .rechnet-satz.fehler { color: var(--ve-warnung); }
+  .rechnet-liste, .wurm-liste { display: none; margin-top: var(--bos-space-xs, 8px); border: 1px solid var(--ve-rand); border-radius: 8px; }
+  .rechnet-liste.offen, .wurm-liste.offen { display: block; }
+  .wurm-zeile { padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px); border-bottom: 1px solid var(--ve-rand); font-size: var(--bos-font-xs, 12px); }
+  .wurm-zeile:last-child { border-bottom: none; }
+  .wurm-zeile strong { font-family: var(--ve-font-label); }
+  .wurm-zuwenig { color: var(--ve-warnung); margin-top: 2px; }
+  .wurm-hinweis { font-size: var(--bos-font-xs, 11px); color: var(--ve-text-schwach); padding: var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px); }
+  .modus-satz { font-size: var(--bos-font-xs, 12px); color: var(--ve-text-schwach); margin-top: var(--bos-space-2xs, 6px); }
 
   .ausschluss-liste { display: flex; flex-direction: column; gap: var(--bos-space-3xs, 4px); margin-top: var(--bos-space-xs, 10px); }
   .ausschluss-item {
@@ -394,12 +412,26 @@
     gilt, steht in der Produkt-Karte (Reiter Bedarf). Die dritte Quelle, der Richtwert, ist eine feste Zahl je
     Wochentag am Produkt und hat hier keine Einstellungen.</p>
 
-    <h3>Was bedeutet "Stichprobe" vs. "Kontiguierlich"?</h3>
-    <p><strong>Stichprobe</strong> nimmt eine feste Anzahl der letzten Werte für denselben Wochentag (z. B. die
-    letzten 6 Dienstage), sucht dafür aber nur innerhalb eines Suchfensters zurück — findet sich nicht genug in
-    diesem Fenster, gibt es eben weniger Vergleichswerte. <strong>Kontiguierlich</strong> nimmt stattdessen einfach
-    alle Werte innerhalb eines festen Zeitraums (z. B. die letzten 28 Tage), egal wie viele das am Ende sind. Im
-    Zweifel ist Stichprobe die robustere Wahl, weil sie eine gleichbleibende Menge an Vergleichsdaten anstrebt.</p>
+    <h3>Was bedeutet „Feste Anzahl“ und „Fester Zeitraum“?</h3>
+    <p>Beides sind zwei Arten, den Durchschnitt für einen Wochentag zu bilden, zum Beispiel für den Freitag.
+    <strong>Feste Anzahl</strong> nimmt immer gleich viele Freitage, nämlich die letzten mit Zahlen (Beispiel: 6 Freitage),
+    sucht dafür aber höchstens eine bestimmte Zahl Wochen zurück (Beispiel: 12 Wochen). <strong>Fester Zeitraum</strong>
+    nimmt alle Freitage eines festen Zeitraums, heute eingeschlossen (Beispiel: 28 Tage, das sind 4 Freitage). Welche
+    Zahlen gerade eingestellt sind, steht direkt unter der Auswahl.</p>
+
+    <h3>Feste Anzahl oder Fester Zeitraum — was ist besser wann?</h3>
+    <p><strong>Lücken</strong> (ein Feiertag, ein ausgeschlossener Tag, ein vergessener Zettel): Feste Anzahl holt dafür
+    einen älteren Freitag nach, bis zur Wochengrenze. Fester Zeitraum hat dann einfach einen Wert weniger. Gibt es weniger
+    Vergleichstage als „Mindestens so viele Vergleichstage“ (Beispiel: 3), fällt die Prüfung aus (beim Backzettel „Zu wenig
+    Vergleichstage“ beim Erfassen, bei der Mitschrift keine Warnung „Ungewöhnliche Werte“). Stationen und Schnellrechner
+    rechnen trotzdem weiter, zeigen dann aber ⚠ „nicht verlässlich“.
+    <strong>Saisonwechsel</strong> (Kürbis, Advent, neue Filiale): Steigt der Bedarf von heute auf morgen um 20 %, ist
+    der Durchschnitt bei Fester Zeitraum mit 4 Werten nach 4 Wochen ganz oben (je Woche +5 %), bei Feste Anzahl mit 6
+    Werten erst nach 6 Wochen (je Woche gut +3 %). Fester Zeitraum folgt also schneller.
+    <strong>Ausreißer</strong>: Ein einzelner Tag, der 30 % zu hoch ist, verschiebt den Durchschnitt bei 4 Werten um
+    7,5 %, bei 6 Werten nur um 5 %. Feste Anzahl ist also ruhiger.
+    <strong>Empfehlung:</strong> Feste Anzahl als Normalfall. Fester Zeitraum, wenn die Zahlen bei Saisonwechseln
+    merklich hinterherhängen.</p>
 
     <h3>Was bedeuten die Schwellenwerte?</h3>
     <p>Ein neuer Wert gilt nur dann als auffällig, wenn er gleichzeitig um die hier eingestellte Mindest-Menge UND
@@ -416,9 +448,9 @@
 
     <h3>Backzettel: Ferien, Feiertage und Zeitfenster</h3>
     <p>Beim Backzettel zählen Schulferien ganz normal mit; Feiertage und ein eingetragener Betriebsurlaub zählen nicht. Seit
-    19.10.2026 gilt auch beim Backzettel das Zeitfenster (Suchfenster bei Stichprobe, Zeitraum bei Kontiguierlich): Ältere
-    Tage zählen nicht mehr. Das gilt auch für den Knopf „Aus Backzettel übernehmen“ in der Produktkarte — wer dort ältere
-    Tage braucht, stellt das Suchfenster vorher höher.</p>
+    19.10.2026 gilt auch beim Backzettel das Zeitfenster („Höchstens so viele Wochen zurück“ bei Feste Anzahl, „Zeitraum“
+    bei Fester Zeitraum): Ältere Tage zählen nicht mehr. Das gilt auch für den Knopf „Aus Backzettel übernehmen“ in der
+    Produktkarte — wer dort ältere Tage braucht, stellt die Wochen vorher höher.</p>
 
     <h3>Was zeigt der Datenbestand?</h3>
     <p>Ganz oben in jedem Tab: wie viele Tage in diesem Datentopf tatsächlich in der Datenbank stehen, für
@@ -427,11 +459,24 @@
     um zu sehen, ob und wie viel angekommen ist, bevor man sich auf die Zahlen verlässt.</p>
 
     <h3>Was zeigt der Kalender?</h3>
-    <p>Markierte Tage liegen im aktuell berechneten Fenster — bei Kontiguierlich exakt, bei Stichprobe nur der
-    Suchbereich (die tatsächlichen Datenpunkte hängen vom jeweiligen Produkt ab). Auf einen markierten Tag tippen
-    schließt ihn manuell aus der Berechnung aus, mit optionalem Grund — nochmal tippen nimmt ihn wieder auf. Blau
-    markierte Tage sind Feiertage/Ferien (nur zur Orientierung). Feiertage fließen ohnehin nicht mit ein, Ferien bei der
-    Mitschrift auch nicht — beim Backzettel zählen Ferien seit 19.10.2026 mit.</p>
+    <p>Jedes Kästchen beantwortet eine Frage: Gibt es für den Tag einen Zettel (bei der Mitschrift: eine Erfassung), und
+    zählt er im Durchschnitt? <strong>Grün</strong>: da und zählt gerade. <strong>Grau</strong>: da, zählt aber nicht; das
+    Zeichen sagt warum (✦ Feiertag, ✕ von dir ausgeschlossen, ◆ in der Mitschrift als besonderer Tag erfasst; ein
+    Betriebsurlaub steht ohne Zeichen, der Grund im Tooltip). <strong>Nur Rahmen</strong>: kein Zettel.
+    <strong>Blass</strong>: zu alt — liegt vor dem Zeitraum, oder es gibt bei „Feste Anzahl“ schon genug neuere gleiche
+    Wochentage. <strong>Gestrichelt</strong>: Zukunft. ☀ steht an Ferientagen: beim Backzettel zählen Ferien mit (der Tag
+    bleibt grün), bei der Mitschrift nicht (grau). Halb erfasste Tage und einzelne gelbe Zeilen, die beim Erfassen vorab
+    nicht zählen, zeigt der Kalender nicht extra. Antippen geht im ganzen Suchbereich: schließt den Tag von Hand aus, mit
+    optionalem Grund — nochmal tippen nimmt ihn wieder auf. Die Farben hängen nicht am Farbprofil.</p>
+
+    <h3>Was zeigt „Was gerade rechnet“?</h3>
+    <p>Oben in jedem Reiter: wie viele Produkte gerade wirklich mit dieser Quelle rechnen, also auf einer Station
+    erscheinen (Haken „Auf Produktionsplaner anzeigen“) oder im Schnellrechner, ohne Saison-Pause. Ein Produkt ohne Station
+    und ohne Schnellrechner zählt nicht mit, auch wenn seine Quelle passt — seine Zahl erscheint nirgends. Steht dort „kein
+    Produkt“, wirken diese Einstellungen im Moment nur auf die Prüfung beim Erfassen bzw. die Warnung in der Mitschrift.
+    Aufklappbar darunter je Wochentag die Tage, mit denen gerade gerechnet wird, z. B. „Fr: 4 von 6 Tagen gefunden
+    (23.10., 16.10., 09.10., 02.10.)“. Gezählt sind Tage mit Zettel (bei der Mitschrift: Erfassungen, die zuletzt
+    gespeicherten zuerst). Fehlt einem Produkt an einem Tag die Zahl, hat es entsprechend weniger oder ältere Werte.</p>
 
     <h3>Wie speichere ich meine Änderungen?</h3>
     <p>Mit „Speichern“ unten. Es gilt sofort, ohne Datei und ohne GitSync. Die alte Version wird dabei automatisch
@@ -461,6 +506,170 @@
 <script src="../bos_verbrauch_einstellungen_schreiben.js"></script>   <!-- NEU 28.10.2026: der eine Schreibweg (auch Backzettel) -->
 <script src="../bos_ungespeichert.js"></script>
 
+<!-- VE_KALENDER ANFANG — 29.10.2026, Stufe 2c (SESSION_2026-10-29_VERBRAUCH_KALENDER_LESBAR_BAU.md).
+     Reine Logik ohne Seite und ohne Datenbank: „Zettel da? Zählt er?“ je Tag, der kleine Wurm je
+     Wochentag und „welche Produkte rechnen gerade mit diesem Topf“. Die Bedingungen sind die des
+     Rechners (bos_verbrauch_durchschnitt.js, holeOffizielleWerte / holeManuelleWerte, Fassung
+     29.10.2026): Feiertag/Betriebsurlaub kommen beim Backzettel aus dem Rechner selbst
+     (_feiertagOderBetriebsurlaub), bei der Mitschrift aus BOS_IST_BESONDERER_TAG wie im Rechner;
+     Fenster, Reihenfolge und Grenze 400 sind kopiert und werden von _PRUEF_verbrauch_kalender.js
+     gegen den echten Rechner geprüft (jeder Tag 2025–2028). Der Stations-Filter ist wörtlich aus
+     den vier Stationsseiten kopiert (ebenfalls geprüft). Nicht ändern, ohne die Prüfung zu fahren. -->
+<script>
+window.VE_KALENDER = (function () {
+  'use strict';
+  const WT_JS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  const WT_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+  const WT_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const GRENZE_DOKUMENTE = 400;   // = BOS_VERBRAUCH.MAX_DOKUMENTE_SCAN
+  /* Stationen: STATION_CFG der vier Seiten und ihr Filter, wörtlich kopiert (station_*.html, Z. 496) */
+  const STATIONEN = ['Frühschicht', 'Brötchenstraße', 'Rondo', 'Nachtschicht'];
+  function stationZeigt(cfg, STATION_CFG) { return cfg.station === STATION_CFG && cfg.legacyKey && cfg.nfcSeite === true; }
+  /* Schnellrechner: Sicht 'laufend', dann filter(p => p.schnellrechnerRelevant === true) (schnellrechner.html Z. 759 f.) */
+  function schnellrechnerZeigt(p) { return p.schnellrechnerRelevant === true; }
+
+  function teile(datum) { const [j, m, t] = datum.split('-').map(Number); return new Date(j, m - 1, t); }
+  function iso(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  function heuteIso() { return iso(new Date()); }
+  /* wie BOS_VERBRAUCH._tageSeit, nur mit festem „heute“ (beide lokal, nie toISOString) */
+  function alterTage(datum, heute) {
+    if (!datum) return Infinity;
+    return Math.round((teile(heute) - teile(datum)) / 86400000);
+  }
+  function wochentagVon(datum) { return WT_JS[teile(datum).getDay()]; }
+  function kurz(datum) { const [, m, t] = datum.split('-'); return t + '.' + m + '.'; }
+
+  /* Fenster wie im Rechner: dieselben Vorgaben (??), dieselben Vergleiche */
+  function fenster(e) {
+    return {
+      modus: e?.modus ?? 'stichprobe',
+      n: e?.stichprobeAnzahl ?? 6,
+      suchTage: (e?.suchfensterWochen ?? 12) * 7,
+      t: e?.kontiguierlichTage ?? 28
+    };
+  }
+  function imFenster(f, alter) {
+    if (f.modus === 'kontiguierlich' && alter >= f.t) return false;   // seit 29.10.2026 >= (genau t Tage)
+    if (f.modus === 'stichprobe' && alter > f.suchTage) return false;
+    return true;
+  }
+  function vonHand(e, datum) { return !!(e?.ausgeschlosseneTage?.some(t => t.datum === datum)); }
+  function vonHandGrund(e, datum) { const x = (e?.ausgeschlosseneTage || []).find(t => t.datum === datum); return x ? (x.grund || '') : null; }
+  function besondererTag(datum) { return (typeof window.BOS_IST_BESONDERER_TAG === 'function') ? window.BOS_IST_BESONDERER_TAG(datum) : null; }
+  function betriebsurlaub(datum) {
+    const bu = (window.BOS_FEIERTAGE && window.BOS_FEIERTAGE.betriebsurlaub) || [];
+    return bu.find(f => f && f.von && f.bis && datum >= f.von && datum <= f.bis) || null;
+  }
+  function rechner() {
+    const V = window.BOS_VERBRAUCH;
+    if (!V || typeof V._feiertagOderBetriebsurlaub !== 'function') {
+      throw new Error('Rechen-Modul (bos_verbrauch_durchschnitt.js) nicht oder in einer alten Fassung geladen — Seite neu laden.');
+    }
+    return V;
+  }
+
+  /* Was der Rechner an einem Tag ausschließt, unabhängig von Fenster und Produkt.
+     → { feiertag, betriebsurlaub, ferien, vonHand, name, ausgeschlossen } */
+  function tagGruende(topf, datum, e) {
+    const info = besondererTag(datum);
+    const bu = betriebsurlaub(datum);
+    const g = {
+      feiertag: !!(info && info.typ === 'feiertag'),
+      betriebsurlaub: !!bu && !(info && info.typ === 'feiertag'),
+      ferien: !!(info && info.typ === 'ferien') && !bu,
+      vonHand: vonHand(e, datum),
+      name: info ? info.name : (bu ? bu.name : null)
+    };
+    if (topf === 'offiziell') {
+      g.ausgeschlossen = rechner()._feiertagOderBetriebsurlaub(datum) || g.vonHand;   // Ferien zählen (B3)
+    } else {
+      g.ausgeschlossen = !!info || g.vonHand;                                          // Feiertag, Ferien, Betriebsurlaub
+    }
+    return g;
+  }
+
+  /* Der kleine Wurm: je Wochentag die Tage (Backzettel) bzw. Erfassungen (Mitschrift),
+     die der Rechner für ein Produkt mit einer Zahl an JEDEM Tag nähme.
+     dokumente: Backzettel [{datum}], Mitschrift [{datum, wochentag, besondererTag, tsMs}] */
+  function wurm(topf, dokumente, e, heute) {
+    const f = fenster(e);
+    const zeilen = WT_LANG.map((wt, i) => ({ wochentag: wt, kurz: WT_KURZ[i], gewaehlt: [] }));
+    if (topf === 'offiziell') {
+      const V = rechner();
+      const docs = dokumente.filter(d => d && typeof d.datum === 'string')
+        .slice().sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, GRENZE_DOKUMENTE);
+      zeilen.forEach(z => {
+        docs.forEach(d => {
+          if (f.modus === 'stichprobe' && z.gewaehlt.length >= f.n) return;
+          if (d.datum > heute) return;
+          if (wochentagVon(d.datum) !== z.wochentag) return;
+          if (V._feiertagOderBetriebsurlaub(d.datum)) return;
+          if (vonHand(e, d.datum)) return;
+          if (!imFenster(f, alterTage(d.datum, heute))) return;
+          z.gewaehlt.push(d.datum);
+        });
+      });
+    } else {
+      zeilen.forEach(z => {
+        const docs = dokumente.filter(d => d && d.wochentag === z.wochentag && typeof d.tsMs === 'number')
+          .slice().sort((a, b) => b.tsMs - a.tsMs).slice(0, GRENZE_DOKUMENTE);
+        docs.forEach(d => {
+          if (f.modus === 'stichprobe' && z.gewaehlt.length >= f.n) return;
+          if (d.besondererTag === true) return;
+          if (besondererTag(d.datum)) return;
+          if (vonHand(e, d.datum)) return;
+          if (!imFenster(f, alterTage(d.datum, heute))) return;
+          z.gewaehlt.push(d.datum);
+        });
+      });
+    }
+    const benutzt = new Set();
+    zeilen.forEach(z => z.gewaehlt.forEach(d => benutzt.add(d)));
+    return { modus: f.modus, ziel: f.modus === 'stichprobe' ? f.n : null, tage: f.t, zeilen, benutzt };
+  }
+
+  /* Ein Tag im Kalender.
+     tag: null (Datenbestand unbekannt) oder { anzahl, besonders } — Zahl der Dokumente und
+     davon als „besonderer Tag“ erfasste (nur Mitschrift).
+     → { bekannt, zettel, zaehlt, imFenster, zukunft, benutzt, gruende, besondersAlle } */
+  function tagStatus(topf, datum, e, tag, heute, benutzt) {
+    const gruende = tagGruende(topf, datum, e);
+    const f = fenster(e);
+    const zukunft = datum > heute;
+    const bekannt = !!tag;
+    const zettel = bekannt && tag.anzahl > 0;
+    const besondersAlle = topf === 'manuell' && zettel && tag.besonders >= tag.anzahl;
+    let zaehlt = !gruende.ausgeschlossen;
+    if (topf === 'offiziell' && zukunft) zaehlt = false;          // B5: Zukunft zählt beim Backzettel nie
+    if (besondersAlle) zaehlt = false;                            // Mitschrift: keine Erfassung ohne „besonderer Tag“
+    return {
+      bekannt, zettel, zaehlt, zukunft, gruende, besondersAlle,
+      imFenster: imFenster(f, alterTage(datum, heute)),
+      benutzt: !!(benutzt && benutzt.has(datum))
+    };
+  }
+
+  /* Welche laufenden Produkte lesen diesen Topf tatsächlich? (Ulf/KC 29.10.: Station oder Schnellrechner) */
+  function rechnetMit(topf, laufend, P) {
+    return (laufend || []).filter(p => P.bedarfsQuelle(p) === topf).map(p => {
+      const wo = STATIONEN.filter(s => stationZeigt(p, s));
+      if (schnellrechnerZeigt(p)) wo.push('Schnellrechner');
+      return { name: p.name || p.legacyKey || '(ohne Namen)', legacyKey: p.legacyKey, wo };
+    }).filter(x => x.wo.length > 0);
+  }
+
+  /* Werte je Wochentag bei „Fester Zeitraum“ (genau t Tage, heute eingeschlossen) */
+  function werteImZeitraum(t) {
+    const lo = Math.floor(t / 7);
+    return t % 7 === 0 ? { von: lo, bis: lo } : { von: lo, bis: lo + 1 };
+  }
+
+  return { WT_LANG, WT_KURZ, STATIONEN, stationZeigt, schnellrechnerZeigt, teile, iso, heuteIso, alterTage,
+    wochentagVon, kurz, fenster, imFenster, tagGruende, wurm, tagStatus, rechnetMit, werteImZeitraum, vonHandGrund };
+})();
+</script>
+<!-- VE_KALENDER ENDE -->
+
 <script>
 (function () {
   'use strict';
@@ -475,6 +684,7 @@
     einstellungen: { manuell: KLASSEN_STANDARD(), offiziell: KLASSEN_STANDARD() },
     produkte: [],
     datenbestand: { manuell: null, offiziell: null }, // null = noch nicht geladen
+    produkteLaufend: null, produkteFehler: null,      // 29.10.2026: „Was gerade rechnet“
     // 20.10.2026: Datenbank
     quelle: 'laden',          // 'laden' | 'datenbank' | 'leer' | 'fehler'
     serverRoh: null,          // rohes Serverdokument (für Sicherung „vorher“, Stand)
@@ -491,12 +701,15 @@
   const TOEPFE = ['manuell', 'offiziell'];
   const TOPF_NAME = { manuell: 'Mitschrift', offiziell: 'Backzettel' };
   const FELD_NAME = {
-    modus: 'Modus', stichprobeAnzahl: 'Anzahl Werte', suchfensterWochen: 'Suchfenster (Wochen)',
-    kontiguierlichTage: 'Zeitraum (Tage)', minStichprobe: 'Mindest-Stichprobe', schwelleProzent: 'Relative Mindestabweichung',
+    // 29.10.2026 (Stufe 2c, Ulf 07:16): neue Wörter — gespeicherte Werte und Feldnamen bleiben
+    modus: 'Rechenart', stichprobeAnzahl: 'Gleiche Wochentage', suchfensterWochen: 'Höchstens Wochen zurück',
+    kontiguierlichTage: 'Zeitraum (Tage zurück)', minStichprobe: 'Mindestens Vergleichstage', schwelleProzent: 'Relative Mindestabweichung',
     schwelleAbsolut: 'Absolute Mindestabweichung', ausgeschlosseneTage: 'Ausgeschlossene Tage',
     erfassungSchwelleBleche: 'Erfassen: Abweichung (Bleche)', erfassungSchwelleProzent: 'Erfassen: Abweichung (%)'
   };
   const PROZENT_FELDER = ['schwelleProzent', 'erfassungSchwelleProzent'];
+  const MODUS_NAME = { stichprobe: 'Feste Anzahl', kontiguierlich: 'Fester Zeitraum' };   // Anzeige; Datenbank bleibt stichprobe/kontiguierlich
+  const K = window.VE_KALENDER;
   const REGEL_FASSUNG = 'verbrauch-einstellungen-2026-10-20';
   const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';
   const SPEICHER_ZEITLIMIT_MS = 30000;
@@ -523,6 +736,7 @@
     if (w === null || w === undefined || (typeof w === 'number' && Number.isNaN(w))) return '(leer)';
     if (feld === 'ausgeschlosseneTage') return Array.isArray(w) ? w.length + ' Tag(e)' + (w.length ? ': ' + w.map(x => x && x.datum).join(', ') : '') : String(w);
     if (PROZENT_FELDER.indexOf(feld) !== -1 && typeof w === 'number') return Math.round(w * 10000) / 100 + ' %';
+    if (feld === 'modus' && MODUS_NAME[w]) return MODUS_NAME[w];
     return String(w);
   }
   /* Liste der geänderten Felder zwischen zwei Blöcke-Paaren */
@@ -563,6 +777,21 @@
     const pfx = datentopf; // eindeutige IDs pro Datentopf
 
     panel.innerHTML = `
+      <div class="karte" id="${pfx}-rechnet-karte">
+        <div class="feld-label-zeile">
+          <span class="feld-label">Was gerade rechnet</span>
+          <button class="hilfe-knopf" data-erklaerung="${pfx}-rechnetErklaerung" type="button">?</button>
+        </div>
+        <div class="feld-erklaerung" id="${pfx}-rechnetErklaerung">
+          Gezählt werden nur Produkte, deren Zahl wirklich irgendwo benutzt wird: auf einer Station (Haken „Auf
+          Produktionsplaner anzeigen“) oder im Schnellrechner, ohne Saison-Pause, mit Quelle ${TOPF_NAME[datentopf]}.
+          Darunter je Wochentag die Tage, mit denen gerade gerechnet wird. Ausführlich über den ❓ oben rechts.
+        </div>
+        <div id="${pfx}-rechnet-inhalt"><div class="db-lade">Lädt …</div></div>
+        <button class="db-toggle" type="button" data-wurm-toggle="${pfx}"><span>Vergleichstage je Wochentag</span><span class="kal-monat-pfeil">▾</span></button>
+        <div class="wurm-liste" id="${pfx}-wurm"></div>
+      </div>
+
       <div class="karte">
         <div class="feld-label-zeile">
           <span class="feld-label">Datenbestand</span>
@@ -581,50 +810,52 @@
       <div class="karte">
         <div class="feld-zeile">
           <div class="feld-label-zeile">
-            <span class="feld-label">Modus</span>
+            <span class="feld-label">Rechenart</span>
             <button class="hilfe-knopf" data-erklaerung="${pfx}-modusErklaerung" type="button">?</button>
           </div>
           <div class="radio-gruppe">
             <label class="radio-option" id="${pfx}-modus-stichprobe-label">
-              <input type="radio" name="${pfx}-modus" value="stichprobe"> Stichprobe
+              <input type="radio" name="${pfx}-modus" value="stichprobe"> Feste Anzahl
             </label>
             <label class="radio-option" id="${pfx}-modus-kontiguierlich-label">
-              <input type="radio" name="${pfx}-modus" value="kontiguierlich"> Kontiguierlich
+              <input type="radio" name="${pfx}-modus" value="kontiguierlich"> Fester Zeitraum
             </label>
           </div>
+          <div class="modus-satz" id="${pfx}-modusSatz"></div>
           <div class="feld-erklaerung" id="${pfx}-modusErklaerung">
-            Stichprobe: feste Anzahl Werte, gesucht innerhalb eines Suchfensters. Kontiguierlich: alle Werte
-            innerhalb eines festen Zeitraums, ohne Anzahl-Deckel. Ausführlich über den ❓ oben rechts.
+            Feste Anzahl: immer gleich viele gleiche Wochentage, bei Lücken werden ältere nachgeholt (bis zur
+            Wochengrenze). Fester Zeitraum: alle gleichen Wochentage eines festen Zeitraums, bei Lücken eben weniger.
+            Vor- und Nachteile über den ❓ oben rechts.
           </div>
         </div>
 
         <div class="modus-block" id="${pfx}-block-stichprobe">
           <div class="feld-zeile">
-            <div class="feld-label-zeile"><span class="feld-label">Anzahl Werte (Stichprobe)</span></div>
+            <div class="feld-label-zeile"><span class="feld-label">Wie viele gleiche Wochentage</span></div>
             <input type="number" id="${pfx}-stichprobeAnzahl" min="1" max="50">
           </div>
           <div class="feld-zeile">
-            <div class="feld-label-zeile"><span class="feld-label">Suchfenster (Wochen zurück)</span></div>
+            <div class="feld-label-zeile"><span class="feld-label">Höchstens so viele Wochen zurück</span></div>
             <input type="number" id="${pfx}-suchfensterWochen" min="1" max="52">
           </div>
         </div>
 
         <div class="modus-block" id="${pfx}-block-kontiguierlich">
           <div class="feld-zeile">
-            <div class="feld-label-zeile"><span class="feld-label">Zeitraum (Tage)</span></div>
+            <div class="feld-label-zeile"><span class="feld-label">Zeitraum (Tage zurück)</span></div>
             <input type="number" id="${pfx}-kontiguierlichTage" min="1" max="365">
           </div>
         </div>
 
         <div class="feld-zeile">
           <div class="feld-label-zeile">
-            <span class="feld-label">Mindest-Stichprobe (Kaltstart-Schwelle)</span>
+            <span class="feld-label">Mindestens so viele Vergleichstage</span>
             <button class="hilfe-knopf" data-erklaerung="${pfx}-minErklaerung" type="button">?</button>
           </div>
           <input type="number" id="${pfx}-minStichprobe" min="1" max="20">
           <div class="feld-erklaerung" id="${pfx}-minErklaerung">
-            Unter dieser Anzahl an vorhandenen Vergleichswerten findet gar kein Ausreißer-Check statt — lieber
-            kein Alarm als ein falscher, wenn noch zu wenig Historie da ist ("Kaltstart").
+            Gibt es weniger Vergleichstage, fällt die Prüfung aus (${datentopf === 'offiziell' ? '„Zu wenig Vergleichstage“ beim Erfassen' : 'keine Warnung „Ungewöhnliche Werte“ in der Mitschrift'}) —
+            lieber kein Alarm als ein falscher. Stationen und Schnellrechner rechnen trotzdem, zeigen dann aber „nicht verlässlich“ (⚠).
           </div>
         </div>
 
@@ -674,16 +905,13 @@ ${datentopf === 'offiziell' ? `
           <button class="hilfe-knopf" data-erklaerung="${pfx}-kalenderErklaerung" type="button">?</button>
         </div>
         <div class="feld-erklaerung" id="${pfx}-kalenderErklaerung">
-          Markierte Tage liegen im aktuell berechneten Fenster. Bei Kontiguierlich ist das exakt — bei Stichprobe
-          nur der Suchbereich, aus dem die tatsächlichen Datenpunkte gezogen werden, je nach Produkt unterschiedlich.
-          Auf einen markierten Tag tippen schließt ihn manuell aus der Berechnung aus (mit optionalem Grund) —
-          nochmal tippen nimmt ihn wieder auf.
+          Jedes Kästchen sagt: ${datentopf === 'offiziell' ? 'Gibt es einen Zettel' : 'Gibt es eine Erfassung'}, und zählt er im Durchschnitt? Grün = zählt gerade,
+          grau = zählt nicht (Zeichen = Grund), nur Rahmen = ${datentopf === 'offiziell' ? 'kein Zettel' : 'nichts erfasst'}, blass = zu alt, gestrichelt = Zukunft.
+          Antippen geht im ganzen Suchbereich: schließt den Tag von Hand aus (mit optionalem Grund) — nochmal tippen
+          nimmt ihn wieder auf.
         </div>
-        <div class="kal-legende">
-          <span><i style="background:color-mix(in srgb, var(--ve-primary) 35%, transparent);"></i> im Fenster</span>
-          <span><i style="background:rgba(74,143,214,0.5);"></i> Feiertag/Ferien</span>
-          <span><i style="background:var(--ve-warnung);"></i> manuell ausgeschlossen</span>
-        </div>
+        <div class="kal-legende" id="${pfx}-legende"></div>
+        <div class="kal-status" id="${pfx}-kal-status"></div>
         <div id="${pfx}-kalender"></div>
         <div class="feld-label" style="margin-top:14px;margin-bottom:2px;">Manuell ausgeschlossene Tage</div>
         <div class="ausschluss-liste" id="${pfx}-ausschluss-liste"></div>
@@ -733,7 +961,7 @@ ${datentopf === 'offiziell' ? `
         const text = String(ev.target.value).trim();
         const roh = text === '' ? NaN : Number(text);
         zustand.einstellungen[datentopf][feld] = Number.isNaN(roh) ? null : (transform ? transform(roh) : roh);
-        if (['stichprobeAnzahl', 'suchfensterWochen', 'kontiguierlichTage'].includes(feld)) {
+        if (['stichprobeAnzahl', 'suchfensterWochen', 'kontiguierlichTage', 'minStichprobe'].includes(feld)) {   // minStichprobe: Wurm „zu wenig“ (29.10.2026)
           renderKalender(datentopf);
         }
         aktualisiereLeiste();
@@ -762,6 +990,10 @@ ${datentopf === 'offiziell' ? `
       });
     });
 
+    const wurmBtn = panel.querySelector('[data-wurm-toggle]');
+    wurmBtn.addEventListener('click', () => { wurmBtn.classList.toggle('offen'); qs(pfx + '-wurm').classList.toggle('offen'); });
+
+    renderRechnet(datentopf);
     renderKalender(datentopf);
     renderDatenbestand(datentopf); // zeigt Platzhalter oder ggf. bereits geladenen Stand
   }
@@ -771,10 +1003,13 @@ ${datentopf === 'offiziell' ? `
    * Berechnungsfenster fallen, und einzelne Tage per Klick manuell
    * ausschließen. Vorbild: wochenconfig_editor.html (Altsystem).
    *
-   * Bewusste Einschränkung gegenüber dem Altsystem-Vorbild: kein
-   * Zugriff auf echte Verbrauchsdaten (bräuchte Firestore pro Produkt,
-   * siehe Kopfkommentar) — gezeigt wird das BERECHNETE Fenster, nicht
-   * live, welche Tage tatsächlich befüllt sind.
+   * ~~Bewusste Einschränkung gegenüber dem Altsystem-Vorbild: kein
+   * Zugriff auf echte Verbrauchsdaten — gezeigt wird das BERECHNETE
+   * Fenster, nicht live, welche Tage tatsächlich befüllt sind.~~
+   * Überholt 29.10.2026 (Stufe 2c): Der Kalender nutzt die Tage, die
+   * ladeDatenbestand() ohnehin liest (eine Abfrage je Topf, kein
+   * zusätzlicher Lesevorgang), und zeigt je Tag „Zettel da? Zählt er?“.
+   * Halb erfasste Tage und gelbe Einzelzeilen zeigt er bewusst nicht.
    * --------------------------------------------------------- */
   function addTage(datumStr, deltaTage) {
     const [j, m, t] = datumStr.split('-').map(Number);
@@ -792,7 +1027,8 @@ ${datentopf === 'offiziell' ? `
 
   /**
    * Berechnet das aktuell gültige Fenster aus den Einstellungen.
-   * Kontiguierlich: exakt (heute - kontiguierlichTage+1 .. heute).
+   * Kontiguierlich: exakt (heute - kontiguierlichTage+1 .. heute) — seit 29.10.2026 deckt
+   * sich das mit dem Rechner (dort jetzt alterTage >= kontiguierlichTage, vorher ein Tag mehr).
    * Stichprobe: Suchbereich (heute - suchfensterWochen*7 .. heute) —
    * die tatsächlichen Datenpunkte sind eine Teilmenge davon, abhängig
    * vom Produkt, siehe Hinweis im UI.
@@ -811,14 +1047,98 @@ ${datentopf === 'offiziell' ? `
   const WOCHENTAGE_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   const MONATSNAMEN = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
+  /* 29.10.2026 (Stufe 2c): Jedes Kästchen beantwortet „Zettel da? Zählt er?“ — Logik in
+     window.VE_KALENDER (oben, reine Funktionen, gegen den Rechner geprüft). Antippbar bleibt
+     unverändert der Suchbereich aus berechneFenster(). */
+  const ZEICHEN = { vonHand: '✕', feiertag: '✦', besonders: '◆', ferien: '☀' };
+
+  function kalWort(datentopf) {
+    return datentopf === 'offiziell'
+      ? { da: 'Zettel da', keiner: 'kein Zettel', einheit: 'Tage', einheitDat: 'Tagen', einheit1: 'Tag', lade: 'Zettel werden geladen …', was: 'Zettel' }
+      : { da: 'Erfasst', keiner: 'nichts erfasst', einheit: 'Erfassungen', einheitDat: 'Erfassungen', einheit1: 'Erfassung', lade: 'Erfassungen werden geladen …', was: 'Erfassungen' };
+  }
+
+  function renderLegende(datentopf) {
+    const ziel = qs(datentopf + '-legende');
+    if (!ziel) return;
+    const w = kalWort(datentopf);
+    const muster = (klasse, zeichen) => `<span class="kal-tag ${klasse}">${zeichen || ''}</span>`;
+    let html = `<span>${muster('vergangen zaehlt')} ${w.da} · zählt</span>`;
+    html += `<span>${muster('vergangen zaehlt-nicht')} ${w.da} · zählt nicht</span>`;
+    html += `<span>${muster('vergangen')} ${w.keiner}</span>`;
+    html += `<span>${muster('vergangen zaehlt blass')} zu alt</span>`;
+    html += `<span>${muster('zukunft')} Zukunft</span>`;
+    html += `<span>✦ Feiertag</span><span>✕ von dir ausgeschlossen</span>`;
+    if (datentopf === 'manuell') html += `<span>◆ als besonderer Tag erfasst</span>`;
+    html += datentopf === 'offiziell'
+      ? `<span>☀ Ferien (zählen beim Backzettel mit)</span>`
+      : `<span>☀ Ferien (zählen bei der Mitschrift nicht)</span>`;
+    ziel.innerHTML = html;
+  }
+
+  /* Satz mit den echten Zahlen unter der Rechenart (läuft beim Tippen mit) */
+  function renderModusSatz(datentopf) {
+    const ziel = qs(datentopf + '-modusSatz');
+    if (!ziel) return;
+    const e = zustand.einstellungen[datentopf];
+    const ok = x => typeof x === 'number' && Number.isFinite(x) && x >= 1;
+    if (e.modus === 'kontiguierlich') {
+      if (!ok(e.kontiguierlichTage)) { ziel.textContent = ''; return; }
+      const z = K.werteImZeitraum(e.kontiguierlichTage);
+      const werte = z.von === z.bis ? `${z.von} Wert${z.von === 1 ? '' : 'e'}` : `${z.von} bis ${z.bis} Werte`;
+      ziel.textContent = `Gerechnet wird mit allen gleichen Wochentagen der letzten ${e.kontiguierlichTage} Tage (heute eingeschlossen), also ${werte} je Wochentag.`;
+    } else {
+      if (!ok(e.stichprobeAnzahl) || !ok(e.suchfensterWochen)) { ziel.textContent = ''; return; }
+      ziel.textContent = `Gerechnet wird mit den letzten ${e.stichprobeAnzahl} gleichen Wochentagen mit Zahlen (höchstens ${e.suchfensterWochen} Wochen zurück).`;
+    }
+  }
+
+  /* Tage des Datenbestands als Karte datum → { anzahl, besonders } */
+  function tagKarte(stand) {
+    const m = new Map();
+    (stand.dokumente || []).forEach(d => {
+      if (!d.datum) return;
+      const x = m.get(d.datum) || { anzahl: 0, besonders: 0 };
+      x.anzahl++; if (d.besondererTag === true) x.besonders++;
+      m.set(d.datum, x);
+    });
+    return m;
+  }
+
   function renderKalender(datentopf) {
     const e = zustand.einstellungen[datentopf];
     const container = qs(datentopf + '-kalender');
     if (!container) return; // Panel evtl. noch nicht gerendert
+    renderLegende(datentopf);
+    renderModusSatz(datentopf);
+    const statusEl = qs(datentopf + '-kal-status');
+    const w = kalWort(datentopf);
 
     const fenster = berechneFenster(e);
-    if (!fenster) { container.innerHTML = '<div class="kal-hinweis">Kein Fenster — erst eine gültige Zahl eintragen.</div>'; renderAusschlussListe(datentopf); return; }
+    if (!fenster) { container.innerHTML = '<div class="kal-hinweis">Kein Fenster — erst eine gültige Zahl eintragen.</div>'; if (statusEl) statusEl.textContent = ''; renderWurm(datentopf, null); renderAusschlussListe(datentopf); return; }
     const heute = new Date();
+    const heuteStr = K.heuteIso();
+
+    // Datenbestand: erst wenn er da ist, sagt der Kalender „Zettel da / kein Zettel“ (früherer Schritt vorausgesetzt)
+    const stand = zustand.datenbestand[datentopf];
+    let karte = null, wurmErg = null, kalFehler = null;
+    if (stand && stand.status === 'ok') {
+      try {
+        karte = tagKarte(stand);
+        wurmErg = K.wurm(datentopf, stand.dokumente || [], e, heuteStr);
+      } catch (fehler) {
+        console.error('Kalender: Auswertung fehlgeschlagen.', fehler);
+        kalFehler = fehler; karte = null; wurmErg = null;
+      }
+    }
+    if (statusEl) {
+      statusEl.className = 'kal-status';
+      if (kalFehler) { statusEl.className = 'kal-status warnbox'; statusEl.textContent = `Ob es ${w.was} gibt, kann ich gerade nicht zeigen: ${fehlerText(kalFehler)}`; }
+      else if (!stand) statusEl.textContent = w.lade + ' Bis dahin zeigt der Kalender nur Zeichen und Suchbereich.';
+      else if (stand.status === 'fehler') { statusEl.className = 'kal-status warnbox'; statusEl.textContent = `Ob es ${w.was} gibt, kann ich gerade nicht zeigen: ${stand.meldung}`; }
+      else statusEl.textContent = '';
+    }
+    renderWurm(datentopf, kalFehler ? { fehler: kalFehler } : wurmErg);
 
     // Anzahl anzuzeigender Monate: vom aktuellen Monat zurück bis zum
     // Monat, der die Fenstergrenze enthält, plus ein Puffermonat —
@@ -849,21 +1169,61 @@ ${datentopf === 'offiziell' ? `
       for (let i = 0; i < ersterWochentag; i++) html += `<div></div>`;
       for (let tag = 1; tag <= tageImMonat; tag++) {
         const datumStr = `${jahr}-${String(monat + 1).padStart(2, '0')}-${String(tag).padStart(2, '0')}`;
-        const imFenster = datumStr >= fenster.von && datumStr <= fenster.bis;
-        const feiertagInfo = window.BOS_IST_BESONDERER_TAG?.(datumStr) ?? null;
-        const ausgeschlossen = (e.ausgeschlosseneTage || []).some(x => x.datum === datumStr);
+        const antippbar = datumStr >= fenster.von && datumStr <= fenster.bis;   // unverändert: Suchbereich
+        let st;
+        try {
+          st = K.tagStatus(datentopf, datumStr, e, karte ? (karte.get(datumStr) || { anzahl: 0, besonders: 0 }) : null, heuteStr, wurmErg ? wurmErg.benutzt : null);
+        } catch (fehler) {
+          console.error('Kalender: tagStatus fehlgeschlagen.', fehler);
+          container.innerHTML = `<div class="warnbox" role="alert">Kalender kann nicht gezeichnet werden: ${esc(fehlerText(fehler))}</div>`;
+          renderAusschlussListe(datentopf);
+          return;
+        }
+        const g = st.gruende;
 
         let klassen = 'kal-tag';
-        if (imFenster) klassen += ' im-fenster';
-        if (feiertagInfo) klassen += ' feiertag';
-        if (ausgeschlossen) klassen += ' ausgeschlossen';
+        klassen += st.zukunft ? ' zukunft' : ' vergangen';
+        if (antippbar) klassen += ' im-fenster';
+        if (g.feiertag) klassen += ' feiertag';
+        if (g.ferien) klassen += ' ferien';
+        if (g.vonHand) klassen += ' ausgeschlossen';
+        const titel = [];
+        if (st.bekannt && st.zettel) {
+          if (!st.zaehlt) {
+            klassen += ' zaehlt-nicht';
+            if (!st.imFenster && !st.zukunft) klassen += ' blass';
+          } else if (st.imFenster && st.benutzt) {
+            klassen += ' zaehlt';
+          } else if (st.zukunft) {
+            klassen += ' zaehlt';   // nur Mitschrift: ein Zukunftsdatum zählt im Rechner (Nebenfund N-9)
+            titel.push('Datum in der Zukunft — zählt im Rechner trotzdem schon mit');
+          } else {
+            klassen += ' zaehlt blass';
+            titel.push(st.imFenster ? `zu alt — es gibt genug neuere ${w.einheit}` : 'zu alt — liegt vor dem Zeitraum');
+          }
+          const n = karte.get(datumStr);
+          titel.unshift(`${w.da}${datentopf === 'manuell' && n.anzahl > 1 ? ` (${n.anzahl}×)` : ''} · ${st.zaehlt && (st.imFenster && st.benutzt || st.zukunft) ? 'zählt' : 'zählt nicht'}`);
+          if (datentopf === 'manuell' && n.besonders > 0) titel.push(`${n.besonders} von ${n.anzahl} als besonderer Tag erfasst`);
+        } else if (st.bekannt) {
+          if (!st.imFenster && !st.zukunft) klassen += ' blass';
+          if (!st.zukunft) titel.unshift(w.keiner);
+        }
+        if (g.feiertag) titel.push(`Feiertag: ${g.name} · zählt nicht`);
+        else if (g.betriebsurlaub) titel.push(`Betriebsurlaub: ${g.name} · zählt nicht`);
+        else if (g.ferien) titel.push(`Ferien: ${g.name}${datentopf === 'offiziell' ? ' · zählen beim Backzettel mit' : ' · zählen bei der Mitschrift nicht'}`);
+        if (g.vonHand) { const gr = K.vonHandGrund(e, datumStr); titel.push('von dir ausgeschlossen' + (gr ? ': ' + gr : '')); }
 
-        const klickbar = imFenster ? ` data-kal-tag="${datentopf}|${datumStr}"` : '';
-        const titel = feiertagInfo ? ` title="${feiertagInfo.name}"` : '';
-        html += `<div class="${klassen}"${klickbar}${titel}>`;
+        let zeichen = '';
+        if (g.vonHand) zeichen = ZEICHEN.vonHand;
+        else if (g.feiertag) zeichen = ZEICHEN.feiertag;
+        else if (st.besondersAlle) zeichen = ZEICHEN.besonders;
+        else if (g.ferien) zeichen = ZEICHEN.ferien;
+        // Betriebsurlaub: kein eigenes Zeichen (Ulf 29.10.: „BU gibt es nicht“) — grau, Grund im Tooltip
+
+        const klickbar = antippbar ? ` data-kal-tag="${datentopf}|${datumStr}"` : '';
+        html += `<div class="${klassen}" data-datum="${datumStr}"${klickbar}${titel.length ? ` title="${esc(titel.join(' · '))}"` : ''}>`;
         html += `<div class="kal-datum">${tag}</div>`;
-        if (ausgeschlossen) html += `<div class="kal-sym">✕</div>`;
-        else if (feiertagInfo) html += `<div class="kal-sym">✦</div>`;
+        if (zeichen) html += `<div class="kal-sym">${zeichen}</div>`;
         html += `</div>`;
       }
       html += `</div></div></div>`;
@@ -882,6 +1242,76 @@ ${datentopf === 'offiziell' ? `
     });
 
     renderAusschlussListe(datentopf);
+  }
+
+  /* Der kleine Wurm (4d.2): je Wochentag die Tage/Erfassungen, mit denen gerade gerechnet wird */
+  function renderWurm(datentopf, erg) {
+    const ziel = qs(datentopf + '-wurm');
+    if (!ziel) return;
+    const w = kalWort(datentopf);
+    const stand = zustand.datenbestand[datentopf];
+    if (erg && erg.fehler) { ziel.innerHTML = `<div class="wurm-hinweis warnbox">Vergleichstage nicht ermittelbar: ${esc(fehlerText(erg.fehler))}</div>`; return; }
+    if (!stand) { ziel.innerHTML = `<div class="wurm-hinweis">${w.lade}</div>`; return; }
+    if (stand.status === 'fehler') { ziel.innerHTML = `<div class="wurm-hinweis warnbox">Vergleichstage nicht ermittelbar: ${esc(stand.meldung)}</div>`; return; }
+    if (!erg) { ziel.innerHTML = '<div class="wurm-hinweis">Kein Fenster — erst eine gültige Zahl eintragen.</div>'; return; }
+    const e = zustand.einstellungen[datentopf];
+    const min = (typeof e.minStichprobe === 'number' && Number.isFinite(e.minStichprobe)) ? e.minStichprobe : null;
+    let html = '';
+    erg.zeilen.forEach(z => {
+      // gleiche Daten zusammenfassen (Mitschrift: zweimal am selben Tag erfasst → „23.10. ×2“)
+      const liste = [];
+      z.gewaehlt.forEach(d => { const x = liste.find(y => y.d === d); if (x) x.n++; else liste.push({ d, n: 1 }); });
+      const daten = liste.map(x => K.kurz(x.d) + (x.n > 1 ? ' ×' + x.n : '')).join(', ');
+      const zahl = z.gewaehlt.length;
+      const kopf = erg.modus === 'stichprobe'
+        ? `${zahl} von ${erg.ziel} ${erg.ziel === 1 ? w.einheit1 : w.einheitDat}${datentopf === 'offiziell' ? ' gefunden' : ''}`
+        : `${zahl} ${zahl === 1 ? w.einheit1 : w.einheit} in den letzten ${erg.tage}`;
+      html += `<div class="wurm-zeile"><strong>${z.kurz}:</strong> ${kopf}${daten ? ` (${daten})` : ''}`;
+      if (min !== null && zahl < min) {
+        html += `<div class="wurm-zuwenig">→ zu wenig (unter ${min}): ${datentopf === 'offiziell' ? 'keine Prüfung beim Erfassen' : 'keine Warnung „Ungewöhnliche Werte“'}, Stationen rechnen mit ⚠ „nicht verlässlich“</div>`;
+      }
+      html += `</div>`;
+    });
+    html += datentopf === 'offiziell'
+      ? '<div class="wurm-hinweis">Gezählt sind Tage mit Zettel. Fehlt einem Produkt an einem Tag die Zahl oder ist seine Zeile gelb (zählt vorab nicht), holt es sich bei „Feste Anzahl“ einen älteren Tag bzw. hat weniger Werte.</div>'
+      : '<div class="wurm-hinweis">Gezählt sind Erfassungen, die zuletzt gespeicherten zuerst (so rechnet die Mitschrift). Fehlt einem Produkt in einer Erfassung die Zahl, holt es sich bei „Feste Anzahl“ eine ältere bzw. hat weniger Werte.</div>';
+    ziel.innerHTML = html;
+  }
+
+  /* Was gerade rechnet (4d.1): nur Produkte, deren Zahl wirklich benutzt wird (Station oder Schnellrechner) */
+  function renderRechnet(datentopf) {
+    const ziel = qs(datentopf + '-rechnet-inhalt');
+    if (!ziel) return;
+    const topf = TOPF_NAME[datentopf];
+    if (zustand.produkteFehler || !zustand.produkteLaufend) {
+      ziel.innerHTML = `<div class="rechnet-satz fehler">Welche Produkte gerade mit dem ${topf} rechnen, kann ich nicht zeigen: ${esc(zustand.produkteFehler ? fehlerText(zustand.produkteFehler) : 'Produktliste nicht geladen')}</div>`;
+      return;
+    }
+    let liste;
+    try {
+      liste = K.rechnetMit(datentopf, zustand.produkteLaufend, window.BOS_PRODUKTE);
+    } catch (fehler) {
+      console.error('Was gerade rechnet: Auswertung fehlgeschlagen.', fehler);
+      ziel.innerHTML = `<div class="rechnet-satz fehler">Welche Produkte gerade mit dem ${topf} rechnen, kann ich nicht zeigen: ${esc(fehlerText(fehler))}</div>`;
+      return;
+    }
+    const ausserdem = datentopf === 'offiziell'
+      ? 'die Prüfung beim Erfassen (Backzettel) und den Knopf „Aus Backzettel übernehmen“ in der Produktkarte'
+      : 'die Warnung „Ungewöhnliche Werte“ in der Mitschrift';
+    if (liste.length === 0) {
+      ziel.innerHTML = `<div class="rechnet-satz">Gerade rechnet <strong>kein Produkt</strong> mit der Quelle ${topf}. Stationen und Schnellrechner nutzen ${datentopf === 'offiziell' ? 'Richtwert oder Mitschrift' : 'Richtwert oder Backzettel'}. Diese Einstellungen wirken im Moment nur auf ${ausserdem}.</div>`;
+      return;
+    }
+    let html = `<div class="rechnet-satz"><strong>${liste.length} Produkt${liste.length === 1 ? '' : 'e'}</strong> rechne${liste.length === 1 ? 't' : 'n'} mit der Quelle ${topf}. Außerdem wirken diese Einstellungen auf ${ausserdem}.</div>`;
+    html += `<button class="db-toggle" type="button" data-rechnet-toggle="${datentopf}"><span>Welche Produkte?</span><span class="kal-monat-pfeil">▾</span></button>`;
+    html += `<div class="rechnet-liste" id="${datentopf}-rechnet-liste">`;
+    liste.slice().sort((a, b) => a.name.localeCompare(b.name, 'de')).forEach(x => {
+      html += `<div class="db-produkt-zeile"><span class="db-produkt-name">${esc(x.name)}</span><span>${esc(x.wo.join(', '))}</span></div>`;
+    });
+    html += '</div>';
+    ziel.innerHTML = html;
+    const btn = ziel.querySelector('[data-rechnet-toggle]');
+    btn.addEventListener('click', () => { btn.classList.toggle('offen'); qs(datentopf + '-rechnet-liste').classList.toggle('offen'); });
   }
 
   function kalenderTagKlick(datentopf, datumStr) {
@@ -942,18 +1372,26 @@ ${datentopf === 'offiziell' ? `
   // die Anzeige „von N aktiven Produkten“ (F11). Eine Abfrage, zwei Sichten.
   async function ladeProdukte() {
     zustand.produkteAktiv = 0;
+    zustand.produkteLaufend = null; zustand.produkteFehler = null;
     try {
       if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
       const alle = await window.BOS_PRODUKTE.lade({ sicht: 'alle' });
       const aktive = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
       zustand.produkte = alle.liste;
       zustand.produkteAktiv = aktive.liste.length;
+      // 29.10.2026 (Stufe 2c, „Was gerade rechnet“): Sicht 'laufend' wie Stationen und Schnellrechner —
+      // dieselbe Abfrage (BOS_PRODUKTE bildet alle Sichten aus einem Abruf), kein zusätzlicher Lesevorgang.
+      if (typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Bedarfsquelle) — Seite neu laden.');
+      zustand.produkteLaufend = (await window.BOS_PRODUKTE.lade({ sicht: 'laufend' })).liste;
       const hinweis = window.BOS_PRODUKTE.hinweisText(alle);
       if (hinweis) window.BOS_PRODUKTE.zeigeMeldung(hinweis, 'hinweis');
     } catch (fehler) {
       console.error('Produktliste nicht ladbar — Pro-Produkt-Liste zeigt dann legacyKey statt Klarname.', fehler);
-      zustand.produkte = [];
-      if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung('Produktnamen fehlen, Liste zeigt Rohschlüssel: ' + window.BOS_PRODUKTE.fehlerText(fehler), 'fehler');
+      zustand.produkteFehler = fehler;
+      if (!Array.isArray(zustand.produkte) || zustand.produkte.length === 0) {
+        zustand.produkte = [];
+        if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung('Produktnamen fehlen, Liste zeigt Rohschlüssel: ' + window.BOS_PRODUKTE.fehlerText(fehler), 'fehler');
+      }   // sonst: nur „Was gerade rechnet“ fehlt — die Karte zeigt den Grund selbst
     }
   }
 
@@ -975,6 +1413,7 @@ ${datentopf === 'offiziell' ? `
       const snap = await db.collection('bos_events').where('type', '==', typ).get();
 
       const tage = new Set();
+      const dokumente = [];      // 29.10.2026 (Stufe 2c): für Kalender und Wurm aufgehoben — kein zusätzlicher Lesevorgang
       const proProduktTage = {}; // legacyKey -> Set(datum)
       let von = null, bis = null;
 
@@ -987,6 +1426,13 @@ ${datentopf === 'offiziell' ? `
       snap.forEach(doc => {
         const d = doc.data();
         const datum = d.datum || null;
+        if (datentopf === 'offiziell') {
+          dokumente.push({ datum: typeof d.datum === 'string' ? d.datum : null });
+        } else {
+          const ts = d.ts;
+          const tsMs = ts && typeof ts.toMillis === 'function' ? ts.toMillis() : (ts instanceof Date ? ts.getTime() : (typeof ts === 'number' ? ts : null));
+          dokumente.push({ datum: typeof d.datum === 'string' ? d.datum : null, wochentag: d.wochentag, besondererTag: d.besondererTag, tsMs });
+        }
         if (datum) {
           tage.add(datum);
           if (!von || datum < von) von = datum;
@@ -1005,13 +1451,14 @@ ${datentopf === 'offiziell' ? `
       Object.keys(proProduktTage).forEach(k => { proProdukt[k] = proProduktTage[k].size; });
 
       zustand.datenbestand[datentopf] = {
-        status: 'ok', anzahlDokumente: snap.size, anzahlTage: tage.size, von, bis, proProdukt
+        status: 'ok', anzahlDokumente: snap.size, anzahlTage: tage.size, von, bis, proProdukt, dokumente
       };
     } catch (fehler) {
-      console.warn(`Datenbestand (${datentopf}) nicht ladbar.`, fehler);
+      console.error(`Datenbestand (${datentopf}) nicht ladbar.`, fehler);
       zustand.datenbestand[datentopf] = { status: 'fehler', meldung: fehler.message || String(fehler) };
     }
     renderDatenbestand(datentopf);
+    renderKalender(datentopf);   // 29.10.2026: erst jetzt weiß der Kalender, an welchen Tagen es Zettel gibt
   }
 
   function renderDatenbestand(datentopf) {
@@ -1050,7 +1497,7 @@ ${datentopf === 'offiziell' ? `
       html += '<div class="db-produkt-zeile leer">Keine Produktdaten in den Dokumenten gefunden.</div>';
     } else {
       zeilen.forEach(z => {
-        html += `<div class="db-produkt-zeile"><span class="db-produkt-name">${z.name}</span><span class="db-produkt-anzahl">${z.anzahl}</span></div>`;
+        html += `<div class="db-produkt-zeile"><span class="db-produkt-name">${esc(z.name)}</span><span class="db-produkt-anzahl">${z.anzahl}</span></div>`;
       });
     }
     html += `</div>`;
