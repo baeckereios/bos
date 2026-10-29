@@ -7,6 +7,21 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-10-29 · 16:14 · v-Zugriff-Texte-1 · Anzeige (Anweisung Kontroll-Chat allgemein 29.10., 01:33;
+      Kern-Datei, Freigabe Ulf über den Auftrag)
+      Reiter „Zugriffe“ (Konto-Karte) und „Rechte“ (Rollen-Karte), beide über
+      bereichsGruppenHTML(): Kästchen und Wort getrennt. Der Haken schaltet nur
+      noch übers Kästchen (eigenes label, Trefffläche 44×44); Symbol + Wort sind
+      ein Knopf (aria-expanded/aria-controls), der darunter in derselben Zelle den
+      Kurztext aufklappt — kurzMitRueckfall aus bos_backstore_texte.js, ohne Text
+      „Noch keine Beschreibung — im BackStore ergänzen.“ Nur ein Text zur Zeit
+      offen, zweiter Tipp schließt. Texte laden einmal je Seitenaufruf beim
+      ersten Öffnen einer Karte, im Hintergrund (ladeZugriffTexteEinmal); Fehler
+      wie beim Zugangsblatt unterschieden und mit Code + err.message im Textfeld,
+      console.error dazu; die Haken gehen weiter. onchange, toggleKontoZugriff,
+      toggleRolleRecht, Speichern unverändert. Ein Satz in der Hilfe.
+      Keine Daten, keine Rechte, keine Regel.
+      SESSION_2026-10-29_KONTEN_ZUGRIFF_BESCHREIBUNG.md
     2026-10-27 · 23:29 (26.10.) · v-Nachrichten-1 · Feature (Nachrichtenzentrale Stufe 1b, #131;
       Bauplan 23:05, Go Kontroll-Chat 23:12 mit A1–A5; Kern-Datei-Freigabe Ulf 15:33; U2 Ulf 23:01, U4 Ulf 23:22)
       Rein additiv. (a) Haken-Gruppe „✉️ Nachrichtenzentrale“ in der Konto-Karte unter
@@ -509,12 +524,28 @@
   .bereich-gruppe { margin-bottom: var(--bos-space-md, 20px); }
   .bereich-gruppe + .bereich-gruppe { border-top: 1px solid var(--bos-border); padding-top: var(--bos-space-md, 18px); }
   .bereich-gruppe h3 { font-size: var(--bos-font-xs, .72rem); text-transform: uppercase; letter-spacing: .06em; color: var(--bos-amber); margin: 0 0 var(--bos-space-2xs, 6px); }
-  .zugriff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--bos-space-md, 18px); }
+  /* row-gap 8px und column-gap 10px (unten) fest, nicht aus der Dichte: ohne diesen Abstand zieht die
+     Tipp-Korrektur des Browsers Tipps am Rand der 44er-Fläche zum Nachbar-Kästchen bzw. aufs Wort
+     (gemessen 29.10.2026: 62–64 von 81 Rasterpunkten richtig, mit Abstand 81 von 81). */
+  .zugriff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px var(--bos-space-md, 18px); align-items: start; }
   @media (max-width: 480px) { .zugriff-grid { grid-template-columns: 1fr; } }
-  .zugriff-zeile { display: flex; align-items: center; gap: var(--bos-space-xs, 11px); padding: var(--bos-space-2xs, 7px) 0; cursor: pointer; min-width: 0; }
-  .zugriff-zeile input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; }
+  /* 29.10.2026: Kästchen und Wort getrennt. Links das Kästchen in einer eigenen
+     Trefffläche (mind. 44×44), rechts das Wort als Knopf; darunter, in derselben
+     Zelle, der Kurztext. Ein Tipp aufs Wort schaltet KEINEN Haken mehr. */
+  .zugriff-zeile { display: grid; grid-template-columns: var(--bos-tap-min, 44px) minmax(0, 1fr); align-items: center; column-gap: 10px; min-width: 0; }
+  .zugriff-haken { display: flex; align-items: center; justify-content: center; width: var(--bos-tap-min, 44px); height: var(--bos-tap-min, 44px); cursor: pointer; }
+  .zugriff-haken input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; margin: 0; flex-shrink: 0; cursor: pointer; }
+  .zugriff-wort { display: flex; align-items: center; gap: var(--bos-space-xs, 11px); min-height: var(--bos-tap-min, 44px); min-width: 0; width: 100%;
+    padding: 0 var(--bos-space-2xs, 6px) 0 0; margin: 0; background: none; border: none; border-radius: var(--bos-radius-sm, 6px);
+    color: var(--bos-text); font: inherit; text-align: left; text-transform: none; letter-spacing: 0; cursor: pointer; }
+  .zugriff-wort:focus-visible { outline: 2px solid var(--bos-amber); outline-offset: 1px; }
+  .zugriff-wort .zugriff-name { text-decoration: underline dotted; text-decoration-color: var(--bos-text-faint); text-underline-offset: 3px; }
+  .zugriff-wort[aria-expanded="true"] .zugriff-name { color: var(--bos-amber); text-decoration-color: var(--bos-amber); }
   .zugriff-icon { width: 1.4em; text-align: center; flex-shrink: 0; }
   .zugriff-name { font-size: var(--bos-font-sm, .88rem); min-width: 0; overflow-wrap: break-word; }
+  .zugriff-text { grid-column: 2; font-size: var(--bos-font-xs, .78rem); line-height: 1.4; color: var(--bos-text-dim); padding: 0 var(--bos-space-2xs, 6px) var(--bos-space-xs, 10px) calc(1.4em + var(--bos-space-xs, 11px)); overflow-wrap: break-word; }
+  .zugriff-text[hidden] { display: none !important; }
+  .zugriff-text.fehler { color: var(--bos-red); }
 
   .bos-modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50;
@@ -818,7 +849,7 @@ var helpData = {
     },
     {
       heading: "Was bedeutet die Gruppierung nach Bereich?",
-      text: "Reine Übersichtshilfe (Verwaltung, Produktion, Verbrauch, Vertrieb & Filiale, Allgemein) — hat keinen Einfluss auf die tatsächliche Berechtigung. Ein Satellit ohne zugeordneten Bereich landet sichtbar unter „Sonstiges”, statt zu verschwinden."
+      text: "Reine Übersichtshilfe (Verwaltung, Produktion, Verbrauch, Vertrieb & Filiale, Allgemein) — hat keinen Einfluss auf die tatsächliche Berechtigung. Ein Satellit ohne zugeordneten Bereich landet sichtbar unter „Sonstiges”, statt zu verschwinden. Tipp aufs Wort zeigt, wofür der Haken ist. Der Haken selbst sitzt im Kästchen."
     }
   ]
 };
@@ -884,20 +915,102 @@ function esc(s) {
 // `handlerName` der Name der global definierten Callback-Funktion, die bei
 // jeder Änderung aufgerufen wird (toggleKontoZugriff / toggleRolleRecht).
 // Eine Mechanik, zwei Aufrufer, statt zwei separate Render-Funktionen.
+// 29.10.2026 (Beschreibung je Zugriff): Kästchen und Wort getrennt. Das Kästchen
+// sitzt allein in seinem <label> (onchange wie bisher), Symbol + Wort sind ein
+// Knopf, der darunter den Kurztext aus dem BackStore aufklappt
+// (zeigeZugriffText). Die Kennung des Textfelds trägt den Handler-Namen, damit
+// Konto- und Rollen-Karte nie dieselbe id im DOM haben.
 function bereichsGruppenHTML(checksObj, handlerName) {
   return BEREICHE.map(function (b) {
     var apps = gatedApps.filter(function (a) { return window.BOS_BEREICH_VON(a) === b.id; });
     if (!apps.length) return '';
     var zeilen = apps.map(function (a) {
       var checked = !!checksObj[a.id];
-      return '<label class="zugriff-zeile">' +
-        '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="' + handlerName + '(\'' + a.id + '\', this.checked)">' +
-        '<span class="zugriff-icon">' + (a.icon || '') + '</span>' +
-        '<span class="zugriff-name">' + esc(a.name) + '</span>' +
-      '</label>';
+      var textId = 'ztext-' + handlerName + '-' + String(a.id).replace(/[^A-Za-z0-9_-]/g, '_');
+      return '<div class="zugriff-zeile">' +
+        '<label class="zugriff-haken"><input type="checkbox" aria-label="' + esc(a.name) + '" ' + (checked ? 'checked' : '') + ' onchange="' + handlerName + '(\'' + a.id + '\', this.checked)"></label>' +
+        '<button type="button" class="zugriff-wort" aria-expanded="false" aria-controls="' + textId + '" data-app="' + esc(a.id) + '" onclick="zeigeZugriffText(this)">' +
+          '<span class="zugriff-icon">' + (a.icon || '') + '</span>' +
+          '<span class="zugriff-name">' + esc(a.name) + '</span>' +
+        '</button>' +
+        '<div class="zugriff-text" id="' + textId + '" role="note" hidden></div>' +
+      '</div>';
     }).join('');
     return '<div class="bereich-gruppe"><h3>' + esc(b.titel) + '</h3><div class="zugriff-grid">' + zeilen + '</div></div>';
   }).join('');
+}
+
+// ── Beschreibung je Zugriff (29.10.2026) ──────────────────────────────────
+// Die Kurztexte kommen aus backstore_texte (RK §26) — dieselbe Quelle und
+// derselbe Ladeweg wie beim Zugangsblatt (bos_backstore_texte.js, ladeAlle über
+// adminFirestore). Geladen wird EINMAL je Seitenaufruf, beim ersten Öffnen
+// einer Konto- oder Rollen-Karte, im Hintergrund: die Liste ist sofort
+// bedienbar. Neu laden nur durch Neuladen der Seite. Reine Anzeige — keine
+// Daten, keine Rechte, keine Regel.
+var zugriffTexte = { stand: 'aus', texte: null, fehler: '' };   // aus | laedt | da | fehler
+var ZUGRIFF_TEXT_LEER = 'Noch keine Beschreibung — im BackStore ergänzen.';
+
+function ladeZugriffTexteEinmal() {
+  if (zugriffTexte.stand !== 'aus') return;
+  zugriffTexte.stand = 'laedt';
+  new Promise(function (ja) {
+    if (!window.BOS_BACKSTORE_TEXTE) throw Object.assign(new Error('bos_backstore_texte.js nicht geladen — Seite hart neu laden'), { code: 'bos/skripte' });
+    if (!window.BOS_ACCOUNTS || typeof window.BOS_ACCOUNTS.adminFirestore !== 'function') throw Object.assign(new Error('bos_accounts.js nicht geladen — Seite hart neu laden'), { code: 'bos/skripte' });
+    ja(window.BOS_BACKSTORE_TEXTE.ladeAlle(window.BOS_ACCOUNTS.adminFirestore()));
+  }).then(function (t) {
+    zugriffTexte.texte = t || {};
+    zugriffTexte.stand = 'da';
+  }, function (err) {
+    console.error('[Konten & Rollen] App-Texte für die Zugriffe nicht geladen', (err && err.code) || '', (err && err.message) || String(err));
+    var c = (err && err.code) || '';
+    var grund = c === 'permission-denied' ? 'Die Regel für die App-Texte lässt dieses Konto nicht lesen (wohl nicht eingesetzt). '
+      : (c === 'unavailable' || c === 'zeitlimit') ? 'Kein Netz oder keine Antwort der Datenbank. '
+      : c === 'bos/skripte' ? 'Ein Skript fehlt. ' : '';
+    zugriffTexte.fehler = 'Beschreibungen nicht geladen: ' + grund + '[' + (c || 'ohne Code') + ': ' + ((err && err.message) || String(err)) + ']';
+    zugriffTexte.stand = 'fehler';
+  }).then(aktualisiereOffeneZugriffTexte);
+}
+
+// Text für eine App, je nach Ladestand. Rückgabe { text, fehler }.
+function zugriffTextFuer(appId) {
+  if (zugriffTexte.stand === 'fehler') return { text: zugriffTexte.fehler, fehler: true };
+  if (zugriffTexte.stand !== 'da') return { text: 'Beschreibung wird geladen …', fehler: false };
+  var kurz = '';
+  try { kurz = window.BOS_BACKSTORE_TEXTE.kurzMitRueckfall(zugriffTexte.texte, appId, window.BOS_APPS, {}); }
+  catch (e) {
+    console.error('[Konten & Rollen] Beschreibung nicht lesbar', appId, e && e.message);
+    return { text: 'Beschreibung nicht lesbar: [' + ((e && e.code) || 'ohne Code') + ': ' + ((e && e.message) || String(e)) + ']', fehler: true };
+  }
+  return { text: kurz || ZUGRIFF_TEXT_LEER, fehler: false };
+}
+function fuelleZugriffText(knopf, feld) {
+  var t = zugriffTextFuer(knopf.getAttribute('data-app'));
+  feld.textContent = t.text;
+  feld.classList.toggle('fehler', !!t.fehler);
+}
+// Tipp aufs Wort: nur ein Text zur Zeit offen; zweiter Tipp aufs selbe Wort
+// schließt ihn. Ob offen, steht allein am Knopf (aria-expanded) — so gibt es
+// nach einem Neuzeichnen der Karte keinen „toten“ ersten Tipp.
+function zeigeZugriffText(knopf) {
+  var feld = document.getElementById(knopf.getAttribute('aria-controls'));
+  if (!feld) return;
+  var warOffen = knopf.getAttribute('aria-expanded') === 'true';
+  Array.prototype.forEach.call(document.querySelectorAll('.zugriff-wort[aria-expanded="true"]'), function (k) {
+    k.setAttribute('aria-expanded', 'false');
+    var f = document.getElementById(k.getAttribute('aria-controls'));
+    if (f) f.hidden = true;
+  });
+  if (warOffen) return;
+  fuelleZugriffText(knopf, feld);
+  knopf.setAttribute('aria-expanded', 'true');
+  feld.hidden = false;
+}
+// Kommen die Texte (oder der Fehler), während ein Text offen steht, füllt er sich nach.
+function aktualisiereOffeneZugriffTexte() {
+  Array.prototype.forEach.call(document.querySelectorAll('.zugriff-wort[aria-expanded="true"]'), function (k) {
+    var f = document.getElementById(k.getAttribute('aria-controls'));
+    if (f) fuelleZugriffText(k, f);
+  });
 }
 
 function ladeGatedApps() {
@@ -1238,6 +1351,7 @@ function oeffneKontoKarte(kontoId) {
   kontoKarteAktiverTab = (kOeffnen && istRohling(kOeffnen) && !istAdminKennung(kontoId)) ? 'konto' : 'stamm';
   renderKontoKarte();
   document.getElementById('kontoKarteOverlay').classList.remove('hidden');
+  ladeZugriffTexteEinmal();   // 29.10.2026: Beschreibungen der Zugriffe, einmal, im Hintergrund
 }
 function kontoKarteNav(delta) {
   var pos = kontoKarteListe.indexOf(kontoKarteId);
@@ -3471,6 +3585,7 @@ function oeffneRollenKarte(rolleId, tab) {
   rollenKarteAktiverTab = tab || 'stamm';
   renderRollenKarte();
   document.getElementById('rollenKarteOverlay').classList.remove('hidden');
+  ladeZugriffTexteEinmal();   // 29.10.2026: Beschreibungen der Rechte, einmal, im Hintergrund
 }
 function rollenKarteNav(delta) {
   var pos = rollenKarteListe.indexOf(rollenKarteId);
