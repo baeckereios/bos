@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-10-28 · 17:41 · Backzettel Stufe 2b (Freigabe KC 28.10.): Der Batch „Sicherung + system, Stand + 1“ steht jetzt in ../bos_verbrauch_einstellungen_schreiben.js (wörtlich kopiert, Z. 1254–1262); die Backzettel-Erfassung schreibt einen ausgeschlossenen Backtag über dieselbe Mechanik. Prüfung, Meldungen, Zeitlimit, Konflikt-Deutung, Neuladen und Vorversionen bleiben hier unverändert. Fehlt das Modul: Speichern gesperrt mit roter Zeile, „Als Datei herunterladen“ geht weiter. SESSION_2026-10-28_BACKZETTEL_TAG_AUSSCHLIESSEN_BAU.md -->
 <!-- 2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md -->
 <!-- 2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md -->
 <!-- 2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md -->
@@ -457,6 +458,7 @@
 <script src="../bos_zeitkontext_referenz.js"></script>
 <!-- 20.10.2026: Rechner (Grenzen, Prüfung, Collection-Namen, Gerätekopie) und Ungespeichert-Schutz -->
 <script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_verbrauch_einstellungen_schreiben.js"></script>   <!-- NEU 28.10.2026: der eine Schreibweg (auch Backzettel) -->
 <script src="../bos_ungespeichert.js"></script>
 
 <script>
@@ -1143,6 +1145,9 @@ ${datentopf === 'offiziell' ? `
         '<br>Speichern ist gesperrt. Die Seiten rechnen solange mit der Kopie auf ihrem Gerät bzw. der Datei. „Als Datei herunterladen“ geht weiter.</div>';
       if (zustand.datei) html += '<div class="herkunft-zeile" style="margin-top:6px;">Angezeigt: die Werte aus der Datei.</div>';
     }
+    if (!window.BOS_VERBRAUCH_EINSTELLUNGEN_SCHREIBEN) {   // 28.10.2026: nie still
+      html += '<div class="warnbox" role="alert" id="schreibModulFehlt"><code>bos_verbrauch_einstellungen_schreiben.js</code> ist nicht geladen — Seite neu laden (neue Fassung noch nicht vollständig online?). Speichern ist gesperrt, „Als Datei herunterladen“ geht weiter.</div>';
+    }
     if (zustand.regel === 'alt') {
       html += '<div class="warnbox" role="alert">Die eingesetzte Datenbank-Regel kennt die Verbrauch-Einstellungen noch nicht — <code>' + esc(REGEL_DATEI) + '</code> einsetzen. Bis dahin ist Speichern gesperrt.</div>';
     }
@@ -1228,6 +1233,7 @@ ${datentopf === 'offiziell' ? `
     const sperre = [];
     if (fehler.length) sperre.push(fehler.length + ' Feld(er) ungültig: ' + fehler.slice(0, 3).map(f => TOPF_NAME[f.topf] + ' ' + (FELD_NAME[f.feld] || f.feld) + ' ' + f.grund).join('; '));
     if (zustand.regel === 'alt') sperre.push('Regel noch nicht eingesetzt (' + REGEL_DATEI + ')');
+    if (!window.BOS_VERBRAUCH_EINSTELLUNGEN_SCHREIBEN) sperre.push('bos_verbrauch_einstellungen_schreiben.js nicht geladen — Seite neu laden');   // 28.10.2026
     const fe = qs('speicherFehler');
     if (zustand.speicherFehlerText) { fe.hidden = false; fe.textContent = zustand.speicherFehlerText + (sperre.length && diff.length ? ' — Außerdem gesperrt: ' + sperre.join(' · ') : ''); }
     else if (sperre.length && diff.length) { fe.hidden = false; fe.textContent = 'Speichern gesperrt: ' + sperre.join(' · '); }
@@ -1249,20 +1255,14 @@ ${datentopf === 'offiziell' ? `
       if (f.length) { zeig('Nicht gespeichert — ' + TOPF_NAME[t] + ': ' + f.map(x => (FELD_NAME[x.feld] || x.feld) + ' ' + x.grund).join('; ')); return false; }
     }
     if (!k) { zeig('Nicht gespeichert: keine Kennung — bist du angemeldet?'); return false; }
+    const SCHREIBEN = window.BOS_VERBRAUCH_EINSTELLUNGEN_SCHREIBEN;   // 28.10.2026: der eine Schreibweg
+    if (!SCHREIBEN) { zeig('Nicht gespeichert: bos_verbrauch_einstellungen_schreiben.js nicht geladen — Seite neu laden (neue Fassung noch nicht vollständig online?). „Als Datei herunterladen“ geht weiter.'); return false; }
     const vorher = aktion === 'erstfuellung' ? null : zustand.serverRoh;
     const geladenerStand = vorher ? vorher.stand : 0;
     zustand.speichertGerade = true; aktualisiereLeiste();
     try {
-      const ts = firebase.firestore.FieldValue.serverTimestamp();
-      const b = db.batch();
-      const sRef = db.collection(V.EINSTELLUNGEN_SICHERUNGEN).doc();
-      b.set(sRef, { dokId: V.EINSTELLUNGEN_DOK, aktion: aktion, vorher: vorher, konto: k, ts: ts });
-      b.set(db.collection(V.EINSTELLUNGEN_COLLECTION).doc(V.EINSTELLUNGEN_DOK), {
-        manuell: V.nurEinstellungsFelder(bloecke.manuell, 'manuell'),     // V1: nur die acht Felder
-        offiziell: V.nurEinstellungsFelder(bloecke.offiziell, 'offiziell'),
-        stand: geladenerStand + 1, sicherungId: sRef.id, geaendertVon: k, geaendertAm: ts
-      });
-      await mitZeitlimit(b.commit(), SPEICHER_ZEITLIMIT_MS);
+      // Batch (Sicherung + system, Stand + 1) aus dem gemeinsamen Modul — bis 28.10.2026 stand er hier
+      await mitZeitlimit(SCHREIBEN.schreibe({ kennung: k, aktion: aktion, vorher: vorher, bloecke: bloecke }), SPEICHER_ZEITLIMIT_MS);
     } catch (fehler) {
       console.error('Verbrauch-Einstellungen: Speichern fehlgeschlagen.', fehler);
       zustand.speichertGerade = false;

@@ -29,6 +29,8 @@
                               „Unbekannte Artikel“ (Stufe 2a C)
      umzugTage(tage, artNr, key)   Tage mit ohneProdukt[artNr] (Stufe 2a B)
      umzugTag(dok, opt)       ein Tag: ohneProdukt[artNr] → produkte[key]
+     tagesLage(backtag, besondererTag, betriebsurlaub)   Feiertag/Betriebs-
+                              urlaub am Backtag, Feiertag am Tag danach (Stufe 2b)
 
    ZAHLEN-REGELN (Ulf/KC 19.10.2026): gespeichert wird nur Stück (E16);
    Bleche und Charge sind stille Kontrolle (P1), die Charge bleibt nur bei
@@ -59,6 +61,11 @@
    wiederholbar (ein zweiter Lauf findet nichts mehr unter ohneProdukt).
 
    CHANGELOG
+     2026-10-28 · 17:41 · v4 · Stufe 2b „ganzen Tag ausschließen“ (Freigabe KC 28.10.)
+       Neu, rein additiv: tagesLage() — „morgen“ lokal gerechnet (nie
+       toISOString), Feiertag und Betriebsurlaub wie der Rechner
+       (_feiertagOderBetriebsurlaub). Sonst nichts geändert.
+       Prüfung: _PRUEF_backzettel.js Teil T.
      2026-10-26 · 07:33 · v3 · Stufe 2a „Produkt anlegen“ (Freigabe KC 06:20)
        Neu, rein additiv: unbekannteArtikel(), umzugTage(), umzugTag(),
        VORKOMMEN_TAGE gilt auch für „n× in 4 Wochen“ der Übersicht. Zuordnung
@@ -582,6 +589,25 @@
     return { ergebnis: 'umgezogen', dok: neu, anzahl: anzahl };
   }
 
+  /* ---------- Stufe 2b: Lage des Backtags (Feiertag heute / morgen) ----------
+     besondererTag: window.BOS_IST_BESONDERER_TAG (Feiertag = typ 'feiertag';
+     Ferien zählen beim Backzettel, E22). betriebsurlaub: BOS_FEIERTAGE.
+     betriebsurlaub [{ name, von, bis }]. Dieselbe Entscheidung wie
+     BOS_VERBRAUCH._feiertagOderBetriebsurlaub(); die Prüfdatei vergleicht.
+     Betriebsurlaub morgen löst KEINEN Hinweis aus (Anweisung 28.10., B).
+     Ergebnis: { morgen, feiertagHeute, betriebsurlaubHeute, feiertagMorgen } (Namen oder null). */
+  function tagesLage(backtag, besondererTag, betriebsurlaub) {
+    var d = ausIso(backtag); d.setDate(d.getDate() + 1);
+    var morgen = iso(d);   // lokal, nie toISOString (Muster „Die Zeit verrät sich“)
+    function feiertag(t) {
+      var info = typeof besondererTag === 'function' ? besondererTag(t) : null;
+      return info && info.typ === 'feiertag' ? (info.name || 'Feiertag') : null;
+    }
+    var bu = null;
+    (betriebsurlaub || []).forEach(function (f) { if (!bu && f && f.von && f.bis && backtag >= f.von && backtag <= f.bis) bu = f.name || 'Betriebsurlaub'; });
+    return { morgen: morgen, feiertagHeute: feiertag(backtag), betriebsurlaubHeute: bu, feiertagMorgen: feiertag(morgen) };
+  }
+
   var L = {
     WT_LANG: WT_LANG, KREISE: KREISE,
     FEHLT_TAGE: FEHLT_TAGE, FEHLT_MINDEST: FEHLT_MINDEST, FEHLT_WOCHEN: FEHLT_WOCHEN,
@@ -593,7 +619,8 @@
     doppelteSeiten: doppelteSeiten, datumsLage: datumsLage,
     vorkommen: vorkommen, fehltListe: fehltListe, letzterBacktag: letzterBacktag,
     anderswo: anderswo, konflikte: konflikte, importTag: importTag, baueTagesdokument: baueTagesdokument,
-    unbekannteArtikel: unbekannteArtikel, umzugTage: umzugTage, umzugTag: umzugTag
+    unbekannteArtikel: unbekannteArtikel, umzugTage: umzugTage, umzugTag: umzugTag,
+    tagesLage: tagesLage
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = L;
   else wurzel.BOS_BACKZETTEL_LOGIK = L;

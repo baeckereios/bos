@@ -12,6 +12,10 @@
           Mechanik wie „＋ Produkt“ in der Produkt-Config), geschrieben über
           ../bos_produkte_schreiben.js (Sicherung + Produkt + Stand, RK §16/§17)
 
+  Tag ausschließen (Stufe 2b): ../bos_verbrauch_einstellungen_schreiben.js —
+          derselbe Schreibweg wie der Einstellungs-Editor (Liste
+          offiziell.ausgeschlosseneTage, Sicherung + Stand + 1, RK §24)
+
   Schreibt: bos_events/verbrauch_offiziell_<JJJJ-MM-TT> (Backzettel-Topf), per
   Transaktion als GANZES Dokument (bewusste Ausnahme von „nur anhängen“, B11:
   ein Dokument je Backtag, mehrere Durchgänge, ein zurückgenommener Ausschluss
@@ -35,6 +39,16 @@
       Dazu: „Heute nicht auf dem Zettel“ kennt jetzt jede Zeile mit bekannter
       Nummer (auch Bestellung oder rot) — sonst hieße eine als Bestellung
       gekennzeichnete Zeile „Seite vergessen?“.
+    2026-10-28 · 17:41 · v5 · Stufe 2b „ganzen Tag ausschließen“ (Anweisung KC 09:32,
+      Freigabe Bauplan KC 28.10., E34/E35)
+      Speichern-Blatt: Schalter „Dieser Tag zählt für den Durchschnitt / zählt
+      nicht“ (Vorgabe zählt; Stand frisch vom Server), Grund ≤ 100 (vorbefüllt),
+      Hinweis „Morgen ist {Feiertag} …“ (nur Hinweis, Ulf 09:30), am Feiertag/
+      Betriebsurlaub kein Schalter, Datenbank leer → Verweis auf die Erst-Füllung.
+      Reihenfolge: erst der Tag, dann (nur bei Änderung) der Ausschluss über
+      BOS_VERBRAUCH_EINSTELLUNGEN_SCHREIBEN.setzeTagAusschluss(); scheitert er,
+      sagt die Quittung „Tag gespeichert, Ausschluss nicht“ mit Grund und Knopf
+      „nochmal“. Stand-Karte: ✕ an ausgeschlossenen Backtagen. Hilfe.
     2026-10-26 · 07:33 · v4 · Stufe 2a „Produkt anlegen“ (Anweisung KC 04:31,
       Freigabe Bauplan KC 06:20 mit Auflage N1, Kern-Freigabe Ulf 06:43)
       A: „＋ Als neues Produkt anlegen“ im Zeilen-Fenster (nur „ohne Produkt“),
@@ -172,6 +186,11 @@
   .bz-umzug li .bz-zaehlwahl button.aktiv { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
   .bz-feldfehler { color: var(--bos-red); font-size: var(--bos-font-xs); min-height: 1em; }
   select.bos-input { min-height: var(--bos-tap-min); }
+  /* Stufe 2b */
+  .bz-tagaus { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--bos-border-strong); border-radius: var(--bos-radius-sm); }
+  .bz-tagaus .bz-zaehlwahl { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bz-tagaus .bz-zaehlwahl button.aktiv { border-color: var(--bos-amber); background: var(--bos-amber-glow-soft); }
+  .bz-quittung-warn { margin-top: 8px; }
   @media (max-width: 480px) { main { padding: var(--bos-space-sm); } .bz-zweispaltig { grid-template-columns: 1fr; } .bz-fotos { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -186,6 +205,7 @@
 
 <script src="../bos_zeitkontext_referenz.js"></script>
 <script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_verbrauch_einstellungen_schreiben.js"></script>
 <script src="../bos_ungespeichert.js"></script>
 <script src="../bos_foto.js"></script>
 <script src="backzettel_prompt.js"></script>
@@ -446,6 +466,23 @@ const I18N_DE = {
   unb_konflikt: 'zwei Produkte mit dieser Nummer — in der Produkt-Config klären', unb_kein_stueck: 'Produkt „{name}“, Schlüssel nicht in Stück — in der Produkt-Config klären',
   unb_produkt: 'jetzt Produkt „{name}“', unb_leer: 'Keine unbekannten Artikel gespeichert.', unb_fehler: 'Unbekannte Artikel: nicht verfügbar — {m}',
   unb_erklaerung: 'Nummern, die gespeichert sind, aber noch kein Produkt haben — die häufigsten zuerst.',
+  /* Stufe 2b: ganzen Tag ausschließen */
+  ta_zaehlt: 'Dieser Tag zählt für den Durchschnitt', ta_nicht: 'Dieser Tag zählt nicht',
+  ta_grund: 'Grund', ta_zaehler: '{n} / 100', ta_zu_lang: 'Der Grund darf höchstens 100 Zeichen haben (jetzt {n}).',
+  ta_satz: 'Gilt für den ganzen Tag im Durchschnitt (Kalender der Verbrauch-Einstellungen). Die Zahlen werden trotzdem gespeichert.',
+  ta_morgen: 'Morgen ist {name}. An Tagen davor wird oft anders verkauft — Tag ausschließen?',
+  ta_ohnehin_feiertag: 'Zählt ohnehin nicht (Feiertag: {name}).', ta_ohnehin_bu: 'Zählt ohnehin nicht (Betriebsurlaub: {name}).',
+  ta_leer: 'Tag ausschließen geht erst, wenn die Einstellungen in der Datenbank stehen (Verbrauch → Einstellungen → „Aus der Datei in die Datenbank übernehmen“).',
+  ta_ungeprueft: 'Ob der Tag schon ausgeschlossen ist, war nicht prüfbar: {m}',
+  ta_modul_fehlt: 'Tag ausschließen geht gerade nicht: bos_verbrauch_einstellungen_schreiben.js nicht geladen — Seite neu laden. Sonst im Kalender (Verbrauch → Einstellungen → Backzettel).',
+  ta_grund_standard: 'beim Erfassen ausgeschlossen', ta_grund_vortag: 'Tag vor {name}',
+  q_nicht: ' · Tag zählt nicht für den Durchschnitt ({grund})', q_wieder: ' · Tag zählt wieder für den Durchschnitt',
+  q_fehler: 'Tag gespeichert — ✕ Ausschluss nicht gespeichert: {m}', q_fehler_wieder: 'Tag gespeichert — ✕ „zählt wieder“ nicht gespeichert: {m}',
+  q_nochmal: 'Ausschluss nochmal versuchen', q_kalender: 'oder im Kalender (Verbrauch → Einstellungen → Backzettel)', q_laeuft: 'Schreibe den Ausschluss …',
+  ta_e_konflikt: 'Inzwischen wurden die Einstellungen woanders gespeichert; auch der zweite Versuch kam nicht durch', ta_e_rolle: 'Den Ausschluss darf nur die Rolle admin speichern (angemeldet als {k})',
+  ta_e_netz: 'Keine Verbindung zum Server (WLAN?)', ta_e_zeit: 'Keine Bestätigung vom Server nach {s} s', ta_e_lang: 'Grund länger als 100 Zeichen',
+  ta_e_voll: 'Die Liste der ausgeschlossenen Tage ist voll (400)', ta_e_leer: 'Die Einstellungen stehen noch nicht in der Datenbank (Erst-Füllung im Editor)', ta_e_sonst: 'Fehler',
+  st_aus: ' · ✕ zählt nicht: {grund}',
   /* N1: Produktliste geändert? */
   liste_neu: 'Produktliste neu geladen (Stand {n}) — Zeilen neu zugeordnet, ohne neues Auslesen.',
   stand_pruef_fehler: 'Produktliste nicht prüfbar: {m}', sp_liste_ungeprueft: '⚠︎ Ob es neue Produkte gibt, war nicht prüfbar ({m}). Gespeichert wird mit der geladenen Produktliste.',
@@ -516,7 +553,12 @@ const S = {
   legtAn: false, zieheUm: false,
   anlegen: null,        // { artNr, name, charge, zeileId }
   umzug: null,          // { artNr, key, name, wahl: { datum: zählt? }, meldung, quittung }
-  unbOffen: false
+  unbOffen: false,
+  // Stufe 2b
+  tagAus: null,         // { datum, ohnehin, leer, lesefehler, gespeichert: {grund}|null, wahl: 'zaehlt'|'nicht', grund, morgen }
+  ausschlussOffen: null, // { datum, grund (null = entfernen) } — gescheiterter Ausschluss, bis „nochmal“ gelingt
+  ausschlussMeldung: null,
+  schliesstAus: false
 };
 let fotoZaehler = 0;
 
@@ -584,7 +626,8 @@ function zeichneStand() {
       html += '<p class="' + (letzter.warnung ? 'bz-warn' : '') + '">' + (letzter.warnung ? '⚠︎ ' : '') + esc(t(k, { tag: datumKurz(letzter.datum), n: letzter.tage })) + '</p>';
       const neu = S.tage.filter(function (d) { return d.quelle === 'backzettel_ki'; }).slice(0, 7);
       html += '<p class="bz-dim">' + esc(t('letzte_tage')) + '</p><ul class="bz-tage">' + neu.map(function (d) {
-        return '<li><b>' + esc(datumKurz(d.datum)) + '</b> · ' + esc(seitenText(d.seiten)) + '</li>';
+        const aus = S.einst && Array.isArray(S.einst.ausgeschlosseneTage) ? S.einst.ausgeschlosseneTage.find(function (x) { return x && x.datum === d.datum; }) : null;
+        return '<li><b>' + esc(datumKurz(d.datum)) + '</b> · ' + esc(seitenText(d.seiten)) + (aus ? '<span class="bz-warn">' + esc(t('st_aus', { grund: aus.grund || '–' })) + '</span>' : '') + '</li>';
       }).join('') + '</ul>';
     }
   }
@@ -1003,8 +1046,8 @@ function zeileKnopf(z, b) {
 }
 function zeichneUebersicht(lage) {
   const el = $('uebersichtInhalt');
-  if (S.quittung && !S.fotos.length) {
-    el.innerHTML = '<p class="bz-ok">' + esc(S.quittung) + '</p>';
+  if ((S.quittung || S.ausschlussMeldung) && !S.fotos.length) {
+    el.innerHTML = quittungHTML();
     return;
   }
   if (!lage) { el.innerHTML = ''; return; }
@@ -1072,7 +1115,7 @@ function zeichneUebersicht(lage) {
     '<button type="button" class="bos-btn bos-btn--amber bz-btn" id="speichernBtn"' + (a.sperre.length || S.speichertGerade ? ' disabled' : '') + '>' + esc(S.speichertGerade ? t('speichert') : t('speichern_btn')) + '</button>' +
     '<button type="button" class="bos-btn bz-btn" id="kopierenBtn">' + esc(t('ergebnis_kopieren')) + '</button>' +
     (S.gespeichert ? '<button type="button" class="bos-btn bz-btn" id="neuBtn">' + esc(t('neuer_durchgang')) + '</button>' : '') + '</div>';
-  if (S.quittung) html += '<p class="bz-ok" style="margin-top:8px;">' + esc(S.quittung) + '</p>';
+  html += quittungHTML();
   el.innerHTML = html;
 }
 $('uebersichtInhalt').addEventListener('click', function (ev) {
@@ -1092,6 +1135,7 @@ $('uebersichtInhalt').addEventListener('click', function (ev) {
   if (ev.target.id === 'speichernBtn') { oeffneSpeichern(); return; }
   if (ev.target.id === 'kopierenBtn') { kopiereErgebnis(); return; }
   if (ev.target.id === 'neuBtn') { neuerDurchgang(); return; }
+  if (ev.target.id === 'ausschlussNochmalBtn') { ausschlussNochmal(); return; }
 });
 
 /* ===================== Zeile bearbeiten ===================== */
@@ -1209,10 +1253,126 @@ async function oeffneSpeichern() {
   if (sorten) html += '<p class="bz-dim">' + esc(t('sp_sorten', { n: sorten })) + '</p>';
   if (a.lage.rueckfrage) html += '<p class="bz-warnbox">' + esc(t(a.lage.rueckfrage.grund === 'alt' ? 'datum_rueck_alt' : 'datum_rueck_zukunft', { tag: datumKurz(a.lage.backtag), n: a.lage.rueckfrage.tage })) + '</p>';
   if (pr && pr.fehler) html += '<p class="bz-warnbox" id="spListeUngeprueft">' + esc(t('sp_liste_ungeprueft', { m: fehlerKurz(pr.fehler) })) + '</p>';
+  await ladeTagAusschluss(a.lage.backtag);   // Stufe 2b: Stand frisch vom Server (F-e)
+  html += '<div id="tagAusBox"></div>';
   html += '<p class="bz-faint">' + esc(t('sp_erklaerung')) + '</p><p id="spFehler" class="bz-rot" role="alert"></p>';
   $('speichernInhalt').innerHTML = html;
-  $('speichernJaBtn').disabled = false;
+  zeichneTagAusschluss();
+  $('speichernJaBtn').disabled = !tagAusGrundOk();
   $('speichernSheet').hidden = false;
+}
+
+/* ===================== Stufe 2b: ganzen Tag ausschließen ===================== */
+const VE = window.BOS_VERBRAUCH_EINSTELLUNGEN_SCHREIBEN || null;
+/* Lage des Backtags + gespeicherter Stand der Liste, frisch vom Server (ein Lesevorgang). */
+async function ladeTagAusschluss(backtag) {
+  const lage = L.tagesLage(backtag, window.BOS_IST_BESONDERER_TAG, (window.BOS_FEIERTAGE && window.BOS_FEIERTAGE.betriebsurlaub) || []);
+  const ta = { datum: backtag, morgen: lage.feiertagMorgen, ohnehin: null, leer: false, lesefehler: null, gespeichert: null, wahl: 'zaehlt', grund: '', modulFehlt: !VE };
+  if (lage.feiertagHeute) ta.ohnehin = t('ta_ohnehin_feiertag', { name: lage.feiertagHeute });
+  else if (lage.betriebsurlaubHeute) ta.ohnehin = t('ta_ohnehin_bu', { name: lage.betriebsurlaubHeute });
+  else if (VE) {
+    let liste = null;
+    try {
+      const snap = await mitZeitlimit(window.db.collection(V.EINSTELLUNGEN_COLLECTION).doc(V.EINSTELLUNGEN_DOK).get({ source: 'server' }), 10000);
+      if (snap && snap.metadata && snap.metadata.fromCache) { const e = new Error('Antwort aus dem Zwischenspeicher'); e.code = 'unavailable'; throw e; }
+      if (!snap.exists) ta.leer = true;
+      else liste = (snap.data().offiziell || {}).ausgeschlosseneTage || [];
+    } catch (err) {
+      ta.lesefehler = err;
+      liste = S.einst && Array.isArray(S.einst.ausgeschlosseneTage) ? S.einst.ausgeschlosseneTage : [];
+    }
+    const e = (liste || []).find(function (x) { return x && x.datum === backtag; });
+    if (e) { ta.gespeichert = { grund: e.grund === undefined || e.grund === null ? '' : String(e.grund) }; ta.wahl = 'nicht'; ta.grund = ta.gespeichert.grund; }
+  }
+  if (!ta.grund) ta.grund = lage.feiertagMorgen ? t('ta_grund_vortag', { name: lage.feiertagMorgen }) : t('ta_grund_standard');
+  S.tagAus = ta;
+}
+function tagAusGrundOk() { const ta = S.tagAus; return !ta || ta.wahl !== 'nicht' || ta.grund.length <= 100; }
+function zeichneTagAusschluss() {
+  const ta = S.tagAus, el = $('tagAusBox'); if (!ta || !el) return;
+  let html = '';
+  if (ta.ohnehin) html = '<p class="bz-dim" id="tagAusOhnehin">' + esc(ta.ohnehin) + '</p>';
+  else if (ta.modulFehlt) html = '<p class="bz-warnbox" id="tagAusModul">' + esc(t('ta_modul_fehlt')) + '</p>';
+  else if (ta.leer) html = '<p class="bz-hinweis" id="tagAusLeer">' + esc(t('ta_leer')) + '</p>';
+  else {
+    if (ta.morgen) html += '<p class="bz-hinweis" id="tagAusHinweis">' + esc(t('ta_morgen', { name: ta.morgen })) + '</p>';
+    if (ta.lesefehler) html += '<p class="bz-warnbox" id="tagAusUngeprueft">' + esc(t('ta_ungeprueft', { m: fehlerKurz(ta.lesefehler) })) + '</p>';
+    html += '<div class="bz-tagaus"><div class="bz-zaehlwahl">' +
+      '<button type="button" class="bos-btn' + (ta.wahl === 'zaehlt' ? ' aktiv' : '') + '" data-tagaus="zaehlt" aria-pressed="' + (ta.wahl === 'zaehlt') + '">' + esc(t('ta_zaehlt')) + '</button>' +
+      '<button type="button" class="bos-btn' + (ta.wahl === 'nicht' ? ' aktiv' : '') + '" data-tagaus="nicht" aria-pressed="' + (ta.wahl === 'nicht') + '">' + esc(t('ta_nicht')) + '</button></div>';
+    if (ta.wahl === 'nicht') {
+      html += '<div class="bz-feld"><label for="tagAusGrund">' + esc(t('ta_grund')) + '</label><input class="bos-input" id="tagAusGrund" autocomplete="off" value="' + esc(ta.grund) + '">' +
+        '<span class="bz-faint" id="tagAusZaehler">' + esc(t('ta_zaehler', { n: ta.grund.length })) + '</span><span class="bz-feldfehler" id="tagAusFehler">' + (ta.grund.length > 100 ? esc(t('ta_zu_lang', { n: ta.grund.length })) : '') + '</span></div>';
+    }
+    html += '<p class="bz-faint">' + esc(t('ta_satz')) + '</p></div>';
+  }
+  el.innerHTML = html;
+  const inp = $('tagAusGrund');
+  if (inp) inp.addEventListener('input', function () {
+    ta.grund = inp.value;
+    $('tagAusZaehler').textContent = t('ta_zaehler', { n: ta.grund.length });
+    $('tagAusFehler').textContent = ta.grund.length > 100 ? t('ta_zu_lang', { n: ta.grund.length }) : '';
+    $('speichernJaBtn').disabled = !tagAusGrundOk() || S.speichertGerade;
+  });
+}
+$('speichernInhalt').addEventListener('click', function (ev) {
+  const b = ev.target.closest('[data-tagaus]'); if (!b || !S.tagAus || S.speichertGerade) return;
+  S.tagAus.wahl = b.getAttribute('data-tagaus');
+  zeichneTagAusschluss();
+  $('speichernJaBtn').disabled = !tagAusGrundOk();
+});
+/* Was nach dem Speichern des Tages am Ausschluss zu tun ist: null (nichts) oder { datum, grund|null }. */
+function tagAusAuftrag() {
+  const ta = S.tagAus;
+  if (!ta || ta.ohnehin || ta.leer || ta.modulFehlt) return null;
+  if (ta.wahl === 'nicht') return (ta.gespeichert && ta.gespeichert.grund === ta.grund) ? null : { datum: ta.datum, grund: ta.grund };
+  return ta.gespeichert ? { datum: ta.datum, grund: null } : null;
+}
+function ausschlussFehlerText(err) {
+  const art = err && err.art;
+  let m = art === 'konflikt' ? t('ta_e_konflikt') : art === 'rolle' ? t('ta_e_rolle', { k: S.kennung || '?' }) : art === 'kein_netz' ? t('ta_e_netz')
+    : (err && err.code === 'zeitlimit') ? t('ta_e_zeit', { s: SPEICHER_ZEITLIMIT_MS / 1000 }) : art === 'grund_zu_lang' ? t('ta_e_lang') : art === 'voll' ? t('ta_e_voll')
+    : art === 'leer' ? t('ta_e_leer') : t('ta_e_sonst');
+  const roh = err && err.original ? err.original : err;
+  return m + ' (' + ((roh && roh.code) || (err && err.code) || art || '?') + ' — ' + ((roh && roh.message) || (err && err.message) || String(err)) + ')';
+}
+/* Schreibt den Ausschluss (Schritt 2 von D). Ergebnis: Zusatz zur Quittung oder null bei Fehler (dann S.ausschlussMeldung). */
+async function fuehreAusschlussAus(auftrag) {
+  S.schliesstAus = true; S.ausschlussMeldung = null;
+  try {
+    const r = await mitZeitlimit(VE.setzeTagAusschluss({ kennung: S.kennung, datum: auftrag.datum, grund: auftrag.grund }), SPEICHER_ZEITLIMIT_MS);
+    S.ausschlussOffen = null;
+    return { ok: true, zusatz: auftrag.grund === null ? t('q_wieder') : t('q_nicht', { grund: auftrag.grund }), geschrieben: r.geschrieben };
+  } catch (err) {
+    S.ausschlussOffen = auftrag;
+    S.ausschlussMeldung = t(auftrag.grund === null ? 'q_fehler_wieder' : 'q_fehler', { m: ausschlussFehlerText(err) });
+    zeigeFehler(S.ausschlussMeldung, err);
+    return { ok: false };
+  } finally {
+    S.schliesstAus = false;
+    V.vergissEinstellungen();
+    V.vergissOffizielle();
+    await ladeEinstellungen();
+  }
+}
+async function ausschlussNochmal() {
+  const auftrag = S.ausschlussOffen; if (!auftrag || S.schliesstAus) return;
+  S.ausschlussMeldung = t('q_laeuft');
+  zeichneUebersicht(letzteAuswertung && letzteAuswertung.lage);
+  const r = await fuehreAusschlussAus(auftrag);
+  if (r.ok && S.quittung) S.quittung += r.zusatz;
+  zeichneStand();
+  zeichneUebersicht(letzteAuswertung && letzteAuswertung.lage);
+  if (r.ok) toast(S.quittung);
+}
+function quittungHTML() {
+  let h = '';
+  if (S.quittung) h += '<p class="bz-ok" id="quittung">' + esc(S.quittung) + '</p>';
+  if (S.ausschlussMeldung) {
+    h += '<div class="bz-warnbox bz-quittung-warn" id="ausschlussMeldung" role="alert"><p>' + esc(S.ausschlussMeldung) + '</p>' +
+      (S.ausschlussOffen && !S.schliesstAus ? '<div class="bz-zeile"><button type="button" class="bos-btn bz-btn" id="ausschlussNochmalBtn">' + esc(t('q_nochmal')) + '</button><span class="bz-dim">' + esc(t('q_kalender')) + '</span></div>' : '') + '</div>';
+  }
+  return h;
 }
 $('speichernNeinBtn').addEventListener('click', function () { $('speichernSheet').hidden = true; });
 function stempel(dok) {
@@ -1230,6 +1390,8 @@ function mitZeitlimit(versprechen, ms) {
 const SPEICHER_ZEITLIMIT_MS = 30000;
 $('speichernJaBtn').addEventListener('click', async function () {
   const a = letzteAuswertung; if (!a || a.sperre.length || S.speichertGerade) return;
+  if (!tagAusGrundOk()) { $('spFehler').textContent = t('ta_zu_lang', { n: S.tagAus.grund.length }); return; }   // Stufe 2b: nichts schreiben
+  const ausAuftrag = tagAusAuftrag();
   S.speichertGerade = true; $('speichernJaBtn').disabled = true; $('spFehler').textContent = t('speichert');
   const datum = a.lage.backtag;
   const g = A.geraet();
@@ -1251,6 +1413,15 @@ $('speichernJaBtn').addEventListener('click', async function () {
     const z = a.zaehl;
     S.quittung = t('gespeichert', { p: z.produkte, n: z.zaehltNicht, o: z.unbekannt, b: z.bestellungen, tag: datumKurz(datum) });
     S.gespeichert = true;
+    S.ausschlussMeldung = null; S.ausschlussOffen = null;
+    // Stufe 2b, Schritt 2: erst jetzt (der Tag ist gespeichert) und nur bei Änderung der Ausschluss
+    if (ausAuftrag) {
+      $('spFehler').textContent = t('q_laeuft');
+      const r = await fuehreAusschlussAus(ausAuftrag);
+      if (r.ok) S.quittung += r.zusatz;
+    } else if (S.tagAus && S.tagAus.wahl === 'nicht' && S.tagAus.gespeichert) {
+      S.quittung += t('q_nicht', { grund: S.tagAus.gespeichert.grund || '–' });   // stand schon so — nichts geschrieben
+    }
     $('speichernSheet').hidden = true;
     V.vergissOffizielle();
     S.alt = { datum: null, dok: null, geladen: false, fehler: null };
@@ -1277,6 +1448,7 @@ $('speichernJaBtn').addEventListener('click', async function () {
   }
 });
 function neuerDurchgang() {
+  S.ausschlussOffen = null; S.ausschlussMeldung = null;   // Stufe 2b: ein offener Ausschluss gilt nur für diesen Durchgang
   S.fotos.forEach(function (f) { URL.revokeObjectURL(f.url); });
   S.fotos = []; S.abw = {}; S.reiter = null; S.gespeichert = false;
   S.alt = { datum: null, dok: null, geladen: false, fehler: null };
@@ -1561,6 +1733,7 @@ const HILFE = [
   ['Was heißen die Farben?', '✕ Rot: muss geklärt werden, sonst geht Speichern nicht. ⚠︎ Abweichung: Der Wert weicht stark vom Durchschnitt desselben Wochentags ab — mindestens 3 Bleche UND mindestens 20 % (einstellbar im Verbrauch-Einstellungs-Editor, Reiter Backzettel). So eine Zeile steht vorab auf „zählt nicht für den Schnitt“. Ist der Wert echt (neue Filiale, Aktion), tippe sie an und stelle sie auf „zählt“. 💡 Hinweis: etwas zum Ansehen, z. B. die Charge auf dem Zettel passt nicht zur Produktkarte. Graue Zeilen (eingeklappt): unbekannte Artikelnummern und Kundenbestellungen mit unbekannter Nummer — sie werden still mitgespeichert, zählen aber nicht für den Schnitt. Ein bekanntes Produkt, das als Kundenbestellung gilt, steht dagegen als 💡 Hinweis oben.'],
   ['Kundenbestellungen', 'Steht unter einer Zeile ein Kunde-Block und ist die bestellte Menge gleich der Anzahl, schlägt BOS „Kundenbestellung“ vor. Ist die Menge kleiner als die Anzahl, bleibt es ein normales Produkt. Eine Kundenbestellung zählt nicht für den Schnitt und löst nie „fehlt“ aus. Du kannst jede Zeile selbst umstellen: Zeile antippen, dann „Als Kundenbestellung kennzeichnen“ oder „Normales Produkt“ (bei unbekannter Nummer „Keine Kundenbestellung“). Das geht auch ohne Kunde-Block, denn die Kommentare auf dem Zettel sind nicht immer zuverlässig. Deine Wahl geht vor. Ist ein bekanntes Produkt eine Kundenbestellung, steht es unter „Bitte ansehen“: Hat die KI die Kunde-Menge falsch gelesen, würde sonst still ein Wert im Schnitt fehlen. Unbekannte Bestellungen stehen eingeklappt. „kam n× in den letzten 4 Wochen“ zeigt, wie oft so eine Zeile schon da war. Soll eine unbekannte Nummer ein Produkt werden, stell die Zeile auf „Keine Kundenbestellung“ und tippe dann „Als neues Produkt anlegen“. Tage, die schon als Kundenbestellung gespeichert sind, ziehen dabei nicht mit um.'],
   ['Unbekannte Artikel als Produkt anlegen', 'Eine Zeile ohne Produkt (grau, eingeklappt) antippen, dann „＋ Als neues Produkt anlegen“. Das Formular ist vorbefüllt: Name vom Zettel (änderbar — aus ihm entsteht der Produkt-Schlüssel, der bleibt für immer), die Artikelnummer, die Kategorie aus der Nummer (11… Brötchen, 12… Brot, 13… Konditorei; du kannst sie ändern) und Stück pro Blech aus der Charge. Nach „Anlegen“ ist die Zeile sofort ein Produkt, ohne neues Auslesen; deine Korrekturen bleiben. Gibt es die Nummer schon an einem Produkt, legt BOS kein zweites an; ist es ein gelöschtes Produkt, holst du es in der Produkt-Config zurück. Gleich danach zeigt BOS die Tage, an denen der Artikel schon „ohne Produkt“ gespeichert ist: je Tag „zählt“ oder „zählt nicht“, dann „Übernehmen“. Erst dann rechnen diese Tage im Durchschnitt mit. Bricht das ab (Netz), stehen die übrigen Tage beim nächsten Mal wieder da; doppelt wird nichts. Alle unbekannten Nummern findest du in der Stand-Karte unter „Unbekannte Artikel“, die häufigsten zuerst. Hast du ein Produkt in der Produkt-Config angelegt, heißt der Knopf dort „Werte übernehmen“. Station, Einheit und Backtage pflegst du danach in der Produkt-Config; bis dahin erscheint das neue Produkt im Betrieb nirgends (ein Brot steht in „Teige & Rezepte“ unter „Brote ohne Teig“). Anlegen darf nur die Rolle admin.'],
+  ['Ganzen Tag ausschließen', 'War der Tag ungewöhnlich (zum Beispiel der Tag vor einem Feiertag), kannst du ihn beim Speichern ganz aus dem Durchschnitt nehmen: Im Blatt „Speichern?“ „Dieser Tag zählt nicht“ antippen und einen Grund eintragen (höchstens 100 Zeichen). Vorgabe ist „zählt“. Ist morgen ein Feiertag, weist BOS darauf hin, entscheiden tust du. Gespeichert werden die Zahlen trotzdem; der Tag steht danach im Kalender der Verbrauch-Einstellungen (Reiter Backzettel) mit ✕ — dort nimmst du ihn auch wieder heraus, oder beim nächsten Durchgang mit „Dieser Tag zählt für den Durchschnitt“. Ist der Tag selbst ein Feiertag, zählt er ohnehin nicht. Gelbe Zeilen bleiben trotzdem einzeln „zählt nicht“, damit echte Ausreißer draußen bleiben, falls du den Tag später wieder hereinnimmst. Klappt das Ausschließen nicht (Netz, Berechtigung), ist der Tag trotzdem gespeichert; die Quittung sagt es und bietet „Ausschluss nochmal versuchen“ an. Ausschließen darf nur die Rolle admin.'],
   ['Heute nicht auf dem Zettel', 'Steht ein Produkt an diesem Wochentag sonst fast immer auf dem Zettel (an 3 der letzten 4 erfassten gleichen Wochentage), fehlt heute aber, obwohl seine Abteilung erfasst ist, fragt BOS: „Seite vergessen?“. Das sperrt das Speichern nicht. Die Prüfung beginnt, sobald drei gleiche Wochentage erfasst sind.'],
   ['Mehrere Durchgänge am selben Tag', 'Du kannst z. B. erst die Konditorei und später die Brote erfassen. Beim zweiten Mal wird der gespeicherte Tag ergänzt. Steht ein Produkt schon mit einer anderen Zahl drin, zeigt BOS „bisher / jetzt“ und du entscheidest. Dasselbe gilt, wenn ein Artikel die Art wechselt, zum Beispiel bisher als Produkt gespeichert und jetzt Kundenbestellung: „bisher: Produkt 20 · jetzt: Kundenbestellung 20“. Gespeichert wird er danach nur an einer Stelle. Nichts wird still überschrieben.'],
   ['Was wird gespeichert?', 'Nur die Stückzahl je Produkt, dazu still die Sorten unter GESAMT-Zeilen, unbekannte Zeilen und Kundenbestellungen. Ausreißer bekommen „zählt nicht“ und bleiben trotzdem sichtbar gespeichert. Für Tage aus dem alten BOS1 (bis 24.05.2026) wird nichts ergänzt. Ein Backtag, der mehr als 7 Tage zurück oder mehr als 2 Tage in der Zukunft liegt, wird vor dem Speichern angezeigt.'],
@@ -1578,8 +1751,8 @@ $('hilfeZuBtn').addEventListener('click', function () { $('hilfeSheet').hidden =
 (function (pruef, laeuft) {
   if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: laeuft }); return; }
   window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
-})(function () { return !S.gespeichert && S.fotos.some(function (f) { return f.status === 'fertig'; }); },
-   function () { return S.speichertGerade || S.laeuft || S.legtAn || S.zieheUm; });
+})(function () { return (!S.gespeichert && S.fotos.some(function (f) { return f.status === 'fertig'; })) || !!S.ausschlussOffen; },
+   function () { return S.speichertGerade || S.laeuft || S.legtAn || S.zieheUm || S.schliesstAus; });
 
 start().catch(function (err) { zeigeFehler(t('unbehandelt', { m: (err && (err.meldung || err.message)) || String(err) }), err); });
 })();
