@@ -19,6 +19,25 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-10-30 · 03:57 · v3.11 · Nacharbeit N1 (KC allgemein 30.10., 03:4x)
+      - meldeSyncFehler(fehler, 'wartet'): gelb (--bos-gelb) „Nur auf diesem Gerät gespeichert — wird
+        abgeglichen, sobald wieder Netz da ist. [code: err.message]“ (Text settings.syncWartet);
+        das Nachholen selbst steckt in bos_profil_sync.js. Andere Fehler unverändert rot.
+    2026-10-29 · 19:11 · v3.10 · Feature + Fix (Anweisung KC allgemein 17:43 + Ergänzung 17:47, Go 17:53
+      mit A1/A2; Kern-Datei-Freigabe Ulf 17:42)
+      - Reihenfolge geräteübergreifend: endDrag() bildet nach dem Ablegen die Lesereihenfolge
+        der sichtbaren Kacheln (ordneNachAnzeige, Zeile dann Spalte) und belegt deren Plätze in
+        data.order neu; andere Einträge bleiben. Neuer orderStand (synct) bei jedem echten
+        Verschieben, auch an derselben Stelle; lokal orderStandAngewendet.
+      - uebernimmEinstellungen(): orderStand ≠ orderStandAngewendet → positions dieses Profils
+        leeren, renderGrid() legt nach order neu aus. Ohne orderStand nichts. orderStandBasis
+        (lokal) = Stand beim Laden.
+      - A1: saveState() gibt uebernimmOrdnungAusSync an bos_profil_sync.js; die Datei liest vor
+        dem Schreiben und lässt ein Gerät, das seit dem letzten Abgleich nicht verschoben hat,
+        die Reihenfolge eines anderen Geräts nicht zurückdrehen.
+      - setZoom(): danach renderGrid() (rechte Spalte ragte bei 80 → 100 % ohne Neuladen raus).
+      positions, Reflow, Kollisionsprüfung, Installieren/Entfernen, Geisterklick-Sperre, Hubs
+      unverändert. SESSION_2026-10-29_LAUNCHER_REIHENFOLGE_ZOOM.md
     2026-10-27 · 08:12 · v3.9 · Einbindung (Nachrichtenzentrale Stufe 1c, #131; Bauplan, Go KC 07:54 (K-a, A2),
       Ulf U1 offen beim Bau — Zeile entfernen, falls nein)
       - Lädt bos_nachrichten_zahl.js nach bos_kachel_zahlen.js; keine Logik geändert.
@@ -957,6 +976,7 @@
     'settings.farbHinweis': 'Gilt für alle Seiten. Statusfarben (Rot, Gelb, Grün) und Ausgedrucktes bleiben immer gleich.',
     'settings.syncFehler': 'Einstellungen konnten nicht gespeichert werden (bleiben auf diesem Gerät):',
     'settings.ladeFehler': 'Einstellungen konnten nicht geladen werden (es gilt der Stand dieses Geräts):',
+    'settings.syncWartet': 'Nur auf diesem Gerät gespeichert — wird abgeglichen, sobald wieder Netz da ist.',
     'settings.symbolpaket': 'Symbolpaket (Beschriftung)',
     'settings.symbolpaketHell': 'Hell',
     'settings.symbolpaketDunkel': 'Dunkel',
@@ -1106,20 +1126,44 @@
     // dem Laden aus Firestore, um den gerade erst empfangenen Stand nicht
     // sofort wieder ins selbe Dokument zurückzuschreiben.
     if (!keinSync && state.activeProfileId && state.profileData[state.activeProfileId] && window.BOS_PROFIL_SYNC && window.db && !aktivesProfilOhneHaken()) {
-      window.BOS_PROFIL_SYNC.speichere(window.db, state.activeProfileId, state.profileData[state.activeProfileId], meldeSyncFehler);
+      window.BOS_PROFIL_SYNC.speichere(window.db, state.activeProfileId, state.profileData[state.activeProfileId], meldeSyncFehler, uebernimmOrdnungAusSync);
     }
+  }
+  /* 29.10.2026 (Reihenfolge geräteübergreifend, Auflage A1): bos_profil_sync.js meldet
+     nach dem Schreiben, was lokal nachzutragen ist — immer orderStandBasis (der Stand, den
+     Firestore jetzt trägt), und wenn ein anderes Gerät inzwischen verschoben hat und dieses
+     nicht, auch dessen order + orderStand. orderStandAngewendet bleibt: neu ausgelegt wird
+     erst beim nächsten Start (uebernimmEinstellungen). Fester profilId statt Objekt-
+     Verweis, weil loadState() (storage-Ereignis) profileData ersetzen kann. keinSync. */
+  function uebernimmOrdnungAusSync(profilId, felder) {
+    var d = state.profileData[profilId];
+    if (!d || !felder) return;
+    Object.keys(felder).forEach(function (k) {
+      if (felder[k] === undefined) delete d[k]; else d[k] = felder[k];
+    });
+    saveState(true);
   }
   /* 16.10.2026 (Projektregel Fehlermeldungen): scheitert ein Sync, steht
      err.message sichtbar im Einstellungs-Fenster, nicht nur in der Konsole.
      null = gelungen → Zeile verschwindet. */
   var syncFehlerText = '';
+  var syncFehlerFarbe = 'var(--bos-red)';
+  /* 30.10.2026 (Nacharbeit N1): art 'wartet' = kein Netz, bos_profil_sync.js holt nach —
+     gelb und wahr („nur auf diesem Gerät gespeichert“), kein roter Fehler. */
   function meldeSyncFehler(fehler, art) {
-    syncFehlerText = fehler
-      ? (t(art === 'laden' ? 'settings.ladeFehler' : 'settings.syncFehler') + ' ' +
-         (fehler.code ? fehler.code + ' — ' : '') + (fehler.message || String(fehler)))
-      : '';
+    if (fehler && art === 'wartet') {
+      syncFehlerText = t('settings.syncWartet') + ' [' + (fehler.code || 'ohne Code') + ': ' + (fehler.message || String(fehler)) + ']';
+      syncFehlerFarbe = 'var(--bos-gelb)';
+    } else {
+      syncFehlerText = fehler
+        ? (t(art === 'laden' ? 'settings.ladeFehler' : 'settings.syncFehler') + ' ' +
+           (fehler.code ? fehler.code + ' — ' : '') + (fehler.message || String(fehler)))
+        : '';
+      syncFehlerFarbe = 'var(--bos-red)';
+    }
     document.querySelectorAll('[data-role="sync-fehler"]').forEach(function (z) {
       z.textContent = syncFehlerText;
+      z.style.color = syncFehlerFarbe;
       z.style.display = syncFehlerText ? '' : 'none';
     });
   }
@@ -1570,8 +1614,31 @@
     dragCtx.tileEl.style.zIndex = '';
     dragCtx.tileEl.classList.remove('bos-tile--dragging');
     dragCtx = null;
-    saveState();
     renderGrid();
+    // 29.10.2026: Reihenfolge = was jetzt auf dem Bildschirm steht; geht mit auf die
+    // anderen Geräte (orderStand). Auch beim Ablegen an derselben Stelle („Takt geben“).
+    ordneNachAnzeige(data);
+    saveState();
+  }
+  /* 29.10.2026 (Reihenfolge geräteübergreifend, Anweisung KC 17:43, Go 17:53).
+     Lesereihenfolge der SICHTBAREN Kacheln (lastDisplayPositions = gerade gezeichnet,
+     auch nach Reflow; Zeile, dann Spalte; bei großen Kacheln die Ecke oben links). Ihre
+     Plätze in data.order werden der Reihe nach neu belegt — alle anderen Einträge
+     (Hub-Kinder, von der Rolle verborgene, nicht installierte) bleiben, wo sie stehen.
+     orderStand ist neu, auch wenn sich nichts geändert hat; orderStandAngewendet =
+     derselbe Wert, damit dieses Gerät sich beim nächsten Start nicht selbst neu auslegt. */
+  function ordneNachAnzeige(data) {
+    var ids = Object.keys(lastDisplayPositions).filter(function (id) {
+      return id !== '__add__' && data.order.indexOf(id) !== -1;
+    });
+    ids.sort(function (a, b) {
+      var p = lastDisplayPositions[a], q = lastDisplayPositions[b];
+      return (p.row - q.row) || (p.col - q.col);
+    });
+    var plaetze = ids.map(function (id) { return data.order.indexOf(id); }).sort(function (a, b) { return a - b; });
+    plaetze.forEach(function (platz, i) { data.order[platz] = ids[i]; });
+    data.orderStand = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    data.orderStandAngewendet = data.orderStand;
   }
 
   /* ---------------- Geisterklick-Sperre (15.10.2026, Baustelle #71) ----------------
@@ -1881,7 +1948,7 @@
         '<button class="bos-btn" data-role="layout-reset" style="margin-top:.45rem;">' + t('settings.layoutReset') + '</button>' +
       '</div>' +
       '<div style="color:var(--bos-text-faint);font-size:.8rem;">' + t('settings.info') + '</div>' +
-      '<div data-role="sync-fehler" style="color:var(--bos-red);font-size:.8rem;' + (syncFehlerText ? '' : 'display:none;') + '">' + escapeHtml(syncFehlerText) + '</div>' +
+      '<div data-role="sync-fehler" style="color:' + syncFehlerFarbe + ';font-size:.8rem;' + (syncFehlerText ? '' : 'display:none;') + '">' + escapeHtml(syncFehlerText) + '</div>' +
       '</div>';
   }
   /* 16.10.2026 (#72 Stufe C): Zeile „🎨 Farbprofil“. Erster Knopf „Vorgabe:
@@ -2343,6 +2410,11 @@
     data.zoom = stufe;
     document.documentElement.setAttribute('data-zoom', stufe);
     saveState();
+    /* 29.10.2026 (Ergänzung KC 17:47): CSS-zoom auf <html> ändert die verfügbare Breite
+       in Zellen, ohne resize-Ereignis — ohne Neuzeichnen ragte die rechte Spalte raus.
+       Wie setKachelgroesse(). Reine Anzeige: renderGrid() fasst gespeicherte Plätze nicht
+       an (Reflow über displayPositions). */
+    renderGrid();
   }
   /* NEU 05.09.2026 (Ulf: "User weiß ja, welchen Hintergrund er nimmt") —
      dritte, unabhängige Achse neben Theme und Dichte: regelt NUR die
@@ -2764,6 +2836,20 @@
     if (!state.profileData[id]) state.profileData[id] = defaultProfileData();
     Object.assign(state.profileData[id], gespeichert);
     if (!Object.prototype.hasOwnProperty.call(gespeichert, 'farbschema')) delete state.profileData[id].farbschema;
+    /* 29.10.2026 (Reihenfolge geräteübergreifend): Hat irgendwo ein Gerät verschoben
+       (orderStand ≠ dem, was dieses Gerät zuletzt ausgelegt hat), werden die Plätze
+       dieses Profils auf diesem Gerät geleert — renderGrid() legt dann nach order neu aus,
+       ohne Lücken. Vergleich mit ≠, nicht „neuer“ (Uhren der Geräte gehen verschieden).
+       Ohne orderStand (Übergang) ändert sich nichts. orderStandBasis = was Firestore beim
+       Laden trug; bos_profil_sync.js erkennt daran, ob dieses Gerät seitdem selbst
+       verschoben hat (Auflage A1). Beide Felder sind lokal, sie syncen nicht. */
+    var dOrd = state.profileData[id];
+    var fernStand = gespeichert.orderStand ? String(gespeichert.orderStand) : '';
+    if (fernStand) dOrd.orderStandBasis = fernStand; else delete dOrd.orderStandBasis;
+    if (fernStand && fernStand !== (dOrd.orderStandAngewendet || '')) {
+      dOrd.positions = {};
+      dOrd.orderStandAngewendet = fernStand;
+    }
     var eintrag = state.localProfiles.find(function (x) { return x.id === id; });
     if (eintrag && window.BOS_KONTO_PROFIL && typeof window.BOS_KONTO_PROFIL.setzeFarbschema === 'function') {
       window.BOS_KONTO_PROFIL.setzeFarbschema(state, eintrag);
