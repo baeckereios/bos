@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-02 · 17:41 · Wochenzettel nach Tagen (Go Kontroll-Chat 02.11., 17:2x): Druckknopf „Wochenplan drucken“ fragt zuerst „Alle Stationen“ oder eine Station (Auswahlblatt, kein Browser-Dialog). Zettel nach Tagen gegliedert (aus tage der Einreichungen, Stationen in Übersichts-, Produkte in Stationsreihenfolge), danach Wochensumme (gesamt = Summe der gedruckten Tage) und Nachbestellungen (bei einer Station nur deren). Hinweise oben: ohne Tagesaufteilung eingereicht / noch nicht eingereicht. Tage außerhalb Mo–So verbreitern die Spanne im Titel statt zu verschwinden. Ladefehler mit Grund in der Meldezeile; nach einem Ladefehler wird nicht gedruckt (sonst stünde „nicht eingereicht“ auf dem Papier). Druckfehler mit Grund im Blatt. Nachtrag eintragen unverändert. SESSION_2026-11-02_PRODUKTIONSPLANER_WOCHENZETTEL_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Ladeanzeige-Tönung folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:25 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Nachtrag-Auswahl aus der Sicht 'laufend' (pausierte Produkte fehlen), mit Fassungsprüfung; die Einheit im Druck wird weiter über 'aktive' nachgeschlagen (auch ein inzwischen pausiertes Produkt eines alten Plans zeigt seine Einheit, F9). SESSION_2026-10-14_RICHTWERT_BAU.md -->
 <!-- 2026-10-13 · 12:10 · Einheiten (Baustelle #64, Freigabe Kontroll-Chat 11:48): Druck-Wochenübersicht zeigt hinter Produktion, Endlager und Nachtrag die Einheit des Produkts (BOS_PRODUKTE.einheit().kurz) statt fest „Bl.“ — die Stationen planen seit #64 in der Einheit des Produkts (Brot in Stück). Produkt nicht in der Liste (gelöscht, Liste nicht geladen) → „Bl.“ wie bisher. SESSION_2026-10-13_EINHEITEN_BAU.md -->
@@ -69,6 +70,21 @@
   .nachtrag-liste { margin-top:12px; }
   .nachtrag-item { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px dashed var(--bos-border); font-family:var(--bos-font-label); font-size:0.75rem; color:var(--bos-text-dim); }
   .nachtrag-item b { color:var(--bos-text); font-weight:800; }
+
+  /* 02.11.2026 · Auswahlblatt Drucken (Alle / eine Station) */
+  #pp-druck-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #pp-druck-wrap { background:var(--bos-surface); border-radius:var(--bos-radius-lg,18px) var(--bos-radius-lg,18px) 0 0; max-width:680px; margin:80px auto 0; padding:20px 18px 40px; }
+  .pp-druck-kopf { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .pp-druck-titel { font-family:var(--bos-font-display); font-weight:900; color:var(--bos-amber); font-size:1.05rem; }
+  .pp-druck-x { background:none; border:none; font-size:1.3rem; color:var(--bos-text-dim); cursor:pointer; }
+  .pp-druck-sub { font-family:var(--bos-font-label); font-size:0.75rem; font-weight:700; color:var(--bos-text-dim); margin-bottom:14px; }
+  .pp-druck-wahl { width:100%; display:flex; align-items:center; gap:10px; padding:13px 14px; margin-bottom:8px; border-radius:12px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; font-size:1rem; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .pp-druck-wahl.alle { border-color:var(--bos-amber); }
+  .pp-druck-wahl:disabled { opacity:0.5; cursor:default; }
+  .pp-druck-wahl-icon { font-size:1.3rem; width:1.6rem; text-align:center; }
+  .pp-druck-meldung { font-family:var(--bos-font-label); font-size:0.78rem; font-weight:700; margin-top:10px; word-break:break-word; }
+  .pp-druck-meldung.fehler { color:var(--bos-red); }
+  .pp-druck-meldung.info { color:var(--bos-text-dim); }
 </style>
 </head>
 <body>
@@ -125,7 +141,20 @@
     <div class="nachtrag-liste" id="nachtrag-liste"></div>
   </div>
 
-  <button class="btn-druck" onclick="druckWoche()">🖨 Wochenübersicht drucken</button>
+  <button class="btn-druck" id="btn-druck" onclick="ppOeffneDruckwahl()">🖨 Wochenplan drucken</button>
+</div>
+
+<!-- ═══ Auswahlblatt Drucken (02.11.2026) ═══ -->
+<div id="pp-druck-modal" onclick="if(event.target===this)ppSchliesseDruckwahl()">
+  <div id="pp-druck-wrap">
+    <div class="pp-druck-kopf">
+      <div class="pp-druck-titel">🖨 Wochenplan drucken</div>
+      <button class="pp-druck-x" onclick="ppSchliesseDruckwahl()" title="Schließen">✕</button>
+    </div>
+    <div class="pp-druck-sub" id="pp-druck-sub">Was soll auf den Zettel?</div>
+    <div id="pp-druck-auswahl"></div>
+    <div class="pp-druck-meldung" id="pp-druck-meldung"></div>
+  </div>
 </div>
 
 <!-- ═══ Hilfe-Sheet ═══ -->
@@ -171,6 +200,11 @@ var STAND = {}; // station -> zuletzt eingereichte Doku
 var NACHTRAEGE = []; // in der Planungswoche eingetragene Nachträge, chronologisch
 var PRODUKTE_NACH_STATION = {}; // station -> [{legacyKey, name}], nur nfcSeite:true
 var PRODUKT_JE_KEY = {}; // 13.10.2026 (#64): legacyKey -> Produkt, für die Einheit im Druck
+var PRODUKT_POS = {};    // 02.11.2026: legacyKey -> Platz in der Produktliste (= Reihenfolge in der Station)
+var PRODUKTLISTE_GELADEN = Promise.resolve();   // 02.11.2026: der Druck wartet darauf (Einheit, Reihenfolge)
+var STAND_VERSPRECHEN = null;   // 02.11.2026: laufendes/letztes ladeStand — der Druck wartet darauf
+var STAND_FEHLER = null;        // 02.11.2026: Grund, falls der Stand nicht geladen werden konnte → kein Druck
+var STAND_FEHLER_RAT = '';      // 02.11.2026: was stattdessen hilft (Berechtigung ≠ kein Netz)
 
 function setStatus(cls, text) {
   var el = document.getElementById('brain-status');
@@ -265,7 +299,7 @@ async function ladeProduktDropdown() {
     if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
     var produktErgebnis = await window.BOS_PRODUKTE.lade({ sicht: 'aktive' });
     var configData = produktErgebnis.liste;
-    configData.forEach(function (p) { if (p && p.legacyKey) PRODUKT_JE_KEY[p.legacyKey] = p; });
+    configData.forEach(function (p, i) { if (p && p.legacyKey) { PRODUKT_JE_KEY[p.legacyKey] = p; PRODUKT_POS[p.legacyKey] = i; } });
     var produktHinweis = window.BOS_PRODUKTE.hinweisText(produktErgebnis);
     if (produktHinweis) window.BOS_PRODUKTE.zeigeMeldung(produktHinweis, 'hinweis');
     // 15.10.2026 (#63): Nachtrag nur für laufende Produkte (Sicht 'laufend', derselbe Abruf, kein weiterer Lesevorgang)
@@ -293,7 +327,28 @@ async function ladeProduktDropdown() {
   }
 }
 
-async function ladeStand() {
+// 02.11.2026: Hülle — merkt sich das Versprechen, damit der Druck auf den
+// gerade laufenden Ladevorgang wartet (Aufrufer unverändert, auch der Nachtrag).
+function ladeStand() {
+  STAND_VERSPRECHEN = ladeStandIntern();
+  return STAND_VERSPRECHEN;
+}
+
+// Was hilft — keine Berechtigung ist etwas anderes als kein Netz (Starter Bau-Chat §4).
+function fehlerRat(e) {
+  var c = e && e.code;
+  if (c === 'permission-denied') return 'Dieses Konto darf den Stand nicht lesen — Ulf Bescheid sagen.';
+  if (c === 'unavailable' || c === 'deadline-exceeded') return 'Keine Verbindung zur Datenbank — Netz prüfen und die Seite neu laden.';
+  return 'Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.';
+}
+
+function fehlerText(e) {
+  var t = (e && e.message) || String(e);
+  if (e && e.code && t.indexOf(e.code) < 0) t += ' (' + e.code + ')';
+  return t;
+}
+
+async function ladeStandIntern() {
   await (window.BOS_AUTH_READY || Promise.resolve());
   var db = window.db;
   try {
@@ -323,10 +378,13 @@ async function ladeStand() {
       return tb - ta;
     });
 
+    STAND_FEHLER = null; STAND_FEHLER_RAT = '';
     setStatus('ready', '✓ Stand geladen · Woche ' + WOCHE_ISO);
   } catch (e) {
     console.warn('Produktionsplaner Übersicht: Laden fehlgeschlagen', e);
-    setStatus('error', '⚠ Stand konnte nicht geladen werden');
+    STAND_FEHLER = fehlerText(e);   // 02.11.2026: Grund sichtbar, und der Druck weiß Bescheid
+    STAND_FEHLER_RAT = fehlerRat(e);
+    setStatus('error', '⚠ Stand konnte nicht geladen werden: ' + STAND_FEHLER);
   }
   renderStationen();
   renderNachtragListe();
@@ -392,48 +450,198 @@ function einheitKurzFuer(lk) {
   return String(k).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
 }
 
-function druckWoche() {
-  var teile = [];
-  STATIONEN.forEach(function (s) {
+// ── WOCHENZETTEL (02.11.2026, Ulf 09:33: „Montag das, Dienstag das …“,
+// gesamt oder je Station) ──────────────────────────────────────────
+// Quelle: neueste Einreichung je Station (STAND) mit tage: [{datum, menge}]
+// je Produkt (seit 02.11. von den Stationen über plan_tage.js geschrieben).
+// Nichts wird nachgerechnet: Einreichungen ohne tage bekommen keine
+// Tageszahlen, nur Hinweis und Gesamtwerte. Nachträge bleiben ein eigener
+// Block (Ulf 03.09.2026: nicht in die Planung einrechnen).
+var WT_NAMEN = ['SONNTAG','MONTAG','DIENSTAG','MITTWOCH','DONNERSTAG','FREITAG','SAMSTAG'];
+
+function esc(t) {
+  return String(t === undefined || t === null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+function ausIso(iso) {   // 'JJJJ-MM-TT' → lokales Datum (nie über UTC)
+  var t = String(iso).split('-');
+  return new Date(Number(t[0]), Number(t[1]) - 1, Number(t[2]));
+}
+function kurzDatum(d) {
+  return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.';
+}
+function hatTage(einreichung) {   // jede Produktzeile muss tage tragen (leeres Array zählt)
+  var pr = (einreichung && einreichung.produkte) || {};
+  var keys = Object.keys(pr);
+  return keys.length > 0 && keys.every(function (lk) { return Array.isArray(pr[lk] && pr[lk].tage); });
+}
+// Produkte wie in der Station: Platz in der Produktliste; Unbekannte
+// (gelöscht, Liste nicht geladen) ans Ende, nach Name. Nicht Object.keys —
+// Firestore liefert Map-Felder nach Schlüssel sortiert.
+function produktReihenfolge(produkte) {
+  return Object.keys(produkte || {}).sort(function (a, b) {
+    var pa = PRODUKT_POS[a], pb = PRODUKT_POS[b];
+    if (pa !== undefined && pb !== undefined) return pa - pb;
+    if (pa !== undefined) return -1;
+    if (pb !== undefined) return 1;
+    return String(produkte[a].name || a).localeCompare(String(produkte[b].name || b), 'de');
+  });
+}
+
+// Baut den Zettel. auswahl: 'alle' oder ein Stationsname aus STATIONEN.
+// Rein aus STAND/NACHTRAEGE — kein Firestore, prüfbar ohne Druck.
+function baueWochenzettel(auswahl) {
+  var stationen = auswahl === 'alle' ? STATIONEN : STATIONEN.filter(function (s) { return s.station === auswahl; });
+  if (!stationen.length) throw new Error('Unbekannte Station: ' + auswahl);
+
+  var hinweise = [], tagesMap = {}, summenTeile = [];
+  stationen.forEach(function (s) {
     var d = STAND[s.station];
-    teile.push('<h3>' + s.icon + ' ' + s.station + '</h3>');
+    summenTeile.push('<h3 class="pp-z-station">' + s.icon + ' ' + esc(s.station) + '</h3>');
     if (!d) {
-      teile.push('<p class="pp-druck-fehlt"><em>Noch keine Planung eingereicht.</em></p>');
+      hinweise.push(s.icon + ' ' + esc(s.station) + ': noch keine Planung eingereicht.');
+      summenTeile.push('<p class="pp-druck-fehlt"><em>Noch keine Planung eingereicht.</em></p>');
       return;
     }
-    teile.push('<table class="pp-druck-tabelle"><thead><tr><th>Produkt</th><th>Produktion gesamt</th><th>Endlager</th></tr></thead><tbody>');
-    Object.keys(d.produkte || {}).forEach(function (lk) {
+    var mitTage = hatTage(d);
+    if (!mitTage) hinweise.push(s.icon + ' ' + esc(s.station) + ': Planung ohne Tagesaufteilung eingereicht (ältere Fassung der Station) — bitte neu einreichen.');
+    summenTeile.push('<table class="pp-druck-tabelle"><thead><tr><th>Produkt</th><th>Produktion gesamt</th><th>Endlager</th></tr></thead><tbody>');
+    produktReihenfolge(d.produkte).forEach(function (lk) {
       var p = d.produkte[lk];
       var eh = einheitKurzFuer(lk);
-      teile.push('<tr><td>' + p.name + '</td><td>' + p.gesamtProduktion + ' ' + eh + '</td><td>' + p.endlager + ' ' + eh + '</td></tr>');
+      var gesamtZelle;
+      if (mitTage) {
+        // Regel: gedruckte Summe = Summe der gedruckten Tage. Abweichung vom
+        // eingereichten Wert (heute unmöglich, Bau-Doku §3 Fund 1) sichtbar.
+        var summe = 0;
+        p.tage.forEach(function (t) {
+          summe += Number(t.menge) || 0;
+          if (!tagesMap[t.datum]) tagesMap[t.datum] = {};
+          if (!tagesMap[t.datum][s.station]) tagesMap[t.datum][s.station] = [];
+          tagesMap[t.datum][s.station].push({ lk: lk, name: p.name, menge: t.menge, eh: eh });
+        });
+        gesamtZelle = summe + ' ' + eh + (Number(p.gesamtProduktion) !== summe ? ' <span class="pp-z-abw">⚠ eingereicht: ' + esc(p.gesamtProduktion) + '</span>' : '');
+      } else {
+        gesamtZelle = esc(p.gesamtProduktion) + ' ' + eh;
+      }
+      summenTeile.push('<tr><td>' + esc(p.name) + '</td><td>' + gesamtZelle + '</td><td>' + esc(p.endlager) + ' ' + eh + '</td></tr>');
     });
-    teile.push('</tbody></table>');
-    teile.push('<p class="pp-druck-meta">Eingereicht von ' + (d.eingereichtVon || 'unbekannt') + '</p>');
+    summenTeile.push('</tbody></table>');
+    summenTeile.push('<p class="pp-druck-meta">Eingereicht von ' + esc(d.eingereichtVon || 'unbekannt') + '</p>');
   });
 
-  // Nachträge bewusst als EIGENER, separater Bereich — nicht in die Tabellen
-  // oben eingerechnet. Auf Ulfs ausdrücklichen Wunsch (03.09.2026): das
-  // System soll die ursprüngliche Planung nicht selbst verändern, das würde
-  // die Person überrumpeln, die den Plan erstellt hat.
-  teile.push('<h3>➕ Nachbestellungen</h3>');
-  if (!NACHTRAEGE.length) {
-    teile.push('<p class="pp-druck-fehlt"><em>Keine Nachträge für diese Planungswoche.</em></p>');
+  // Spanne: Mo–So der Planungswoche, verbreitert um Tage außerhalb (Auflage A1 — nichts still verwerfen)
+  var tageSortiert = Object.keys(tagesMap).sort();
+  var von = new Date(wochenMo), bis = new Date(wochenMo); bis.setDate(bis.getDate() + 6);
+  tageSortiert.forEach(function (iso) { var d = ausIso(iso); if (d < von) von = d; if (d > bis) bis = d; });
+  var spanne = kurzDatum(von) + '–' + kurzDatum(bis);
+  var titelName = auswahl === 'alle' ? 'Alle Stationen' : esc(auswahl);
+
+  var teile = [];
+  if (hinweise.length) {
+    teile.push('<div class="pp-z-hinweise"><b>Hinweise</b><ul>' + hinweise.map(function (h) { return '<li>' + h + '</li>'; }).join('') + '</ul></div>');
+  }
+  if (!tageSortiert.length) {
+    teile.push('<p class="pp-druck-fehlt"><em>Keine Tagesmengen vorhanden.</em></p>');
+  }
+  tageSortiert.forEach(function (iso) {
+    var d = ausIso(iso);
+    teile.push('<div class="pp-z-tag"><div class="pp-z-tagkopf">' + WT_NAMEN[d.getDay()] + ', ' + kurzDatum(d) + '</div>');
+    stationen.forEach(function (s) {
+      var zeilen = tagesMap[iso][s.station];
+      if (!zeilen || !zeilen.length) return;
+      teile.push('<div class="pp-z-st">' + s.icon + ' ' + esc(s.station) + '</div>');
+      // Reihenfolge der Produkte = Reihenfolge der Wochensumme (produktReihenfolge)
+      var ordnung = produktReihenfolge(STAND[s.station].produkte);
+      zeilen.sort(function (a, b) { return ordnung.indexOf(a.lk) - ordnung.indexOf(b.lk); });
+      zeilen.forEach(function (z) {
+        teile.push('<div class="pp-z-zeile"><span class="pp-z-name">' + esc(z.name) + '</span><span class="pp-z-pkt"></span><span class="pp-z-menge">' + esc(z.menge) + ' ' + z.eh + '</span></div>');
+      });
+    });
+    teile.push('</div>');
+  });
+
+  teile.push('<h2 class="pp-z-block">Wochensumme</h2>');
+  teile.push(summenTeile.join(''));
+
+  // Nachträge bewusst als EIGENER Bereich — nicht eingerechnet (Ulf 03.09.2026:
+  // das System soll die ursprüngliche Planung nicht selbst verändern).
+  var nachtraege = auswahl === 'alle' ? NACHTRAEGE : NACHTRAEGE.filter(function (n) { return n.station === auswahl; });
+  teile.push('<h2 class="pp-z-block">➕ Nachbestellungen</h2>');
+  if (!nachtraege.length) {
+    teile.push('<p class="pp-druck-fehlt"><em>Keine Nachträge für diese Planungswoche' + (auswahl === 'alle' ? '' : ' und Station') + '.</em></p>');
   } else {
-    teile.push('<table class="pp-druck-tabelle"><thead><tr><th>Station</th><th>Produkt</th><th>Menge</th><th>Von</th></tr></thead><tbody>');
-    NACHTRAEGE.forEach(function (n) {
-      teile.push('<tr><td>' + n.station + '</td><td>' + n.produktName + '</td><td>+' + n.menge + ' ' + einheitKurzFuer(n.legacyKey) + '</td><td>' + (n.eingetragenVon || '—') + '</td></tr>');
+    teile.push('<table class="pp-druck-tabelle"><thead><tr>' + (auswahl === 'alle' ? '<th>Station</th>' : '') + '<th>Produkt</th><th>Menge</th><th>Von</th></tr></thead><tbody>');
+    nachtraege.forEach(function (n) {
+      teile.push('<tr>' + (auswahl === 'alle' ? '<td>' + esc(n.station) + '</td>' : '') + '<td>' + esc(n.produktName) + '</td><td>+' + esc(n.menge) + ' ' + einheitKurzFuer(n.legacyKey) + '</td><td>' + esc(n.eingetragenVon || '—') + '</td></tr>');
     });
     teile.push('</tbody></table>');
   }
 
-  window.BOS_DRUCK.drucken({
-    inhaltHTML: teile.join(''),
-    appName: 'Produktionsplaner',
-    titel: 'Wochenübersicht · ' + WOCHE_ISO,
-    mitKopf: true,
-    farbig: true,
-    extraCSS: '.pp-druck-tabelle{width:100%;border-collapse:collapse;margin:4px 0 6px;} .pp-druck-tabelle th,.pp-druck-tabelle td{border:1px solid #ddd;padding:4px 8px;text-align:left;font-size:0.85rem;} .pp-druck-meta{font-size:0.75rem;color:#666;margin:0 0 14px;} .pp-druck-fehlt{color:#888;margin:0 0 14px;}'
+  return { titel: 'Wochenplan · ' + titelName + ' · ' + spanne, inhaltHTML: teile.join('') };
+}
+
+var PP_ZETTEL_CSS = '.pp-druck-tabelle{width:100%;border-collapse:collapse;margin:4px 0 6px;} .pp-druck-tabelle th,.pp-druck-tabelle td{border:1px solid #ddd;padding:4px 8px;text-align:left;font-size:0.85rem;} .pp-druck-meta{font-size:0.75rem;color:#666;margin:0 0 14px;} .pp-druck-fehlt{color:#888;margin:0 0 14px;}'
+  + ' .pp-z-hinweise{border:1.5px solid #000;padding:6px 10px;margin:0 0 12px;font-size:0.85rem;line-height:1.5;} .pp-z-hinweise ul{margin:4px 0 0;padding-left:18px;}'
+  + ' .pp-z-tag{page-break-inside:avoid;break-inside:avoid;margin:0 0 10px;} .pp-z-tagkopf{font-weight:900;font-size:1rem;letter-spacing:0.5px;border-bottom:1.5px solid #000;margin:0 0 4px;padding-bottom:1px;}'
+  + ' .pp-z-st{font-weight:700;font-size:0.9rem;margin:4px 0 0 4mm;} .pp-z-zeile{display:flex;align-items:baseline;gap:6px;margin-left:10mm;font-size:0.95rem;line-height:1.5;}'
+  + ' .pp-z-pkt{flex:1;border-bottom:1px dotted #888;transform:translateY(-3px);} .pp-z-menge{font-weight:700;white-space:nowrap;}'
+  + ' .pp-z-block{font-size:1.05rem;margin:16px 0 4px;padding-top:6px;border-top:1px solid #ddd;page-break-after:avoid;} .pp-z-station{font-size:0.95rem;margin:8px 0 2px;} .pp-z-abw{color:#000;font-weight:700;}';
+
+function ppDruckMeldung(text, art) {
+  var el = document.getElementById('pp-druck-meldung');
+  el.className = 'pp-druck-meldung' + (art ? ' ' + art : '');
+  el.textContent = text || '';
+}
+function ppOeffneDruckwahl() {
+  var wahl = [{ wert: 'alle', icon: '📋', text: 'Alle Stationen' }].concat(STATIONEN.map(function (s) { return { wert: s.station, icon: s.icon, text: s.station }; }));
+  var box = document.getElementById('pp-druck-auswahl');
+  box.innerHTML = '';
+  wahl.forEach(function (w) {
+    var b = document.createElement('button');
+    b.className = 'pp-druck-wahl' + (w.wert === 'alle' ? ' alle' : '');
+    b.dataset.wahl = w.wert;
+    b.innerHTML = '<span class="pp-druck-wahl-icon">' + w.icon + '</span><span></span>';
+    b.lastChild.textContent = w.text;
+    b.onclick = function () { druckWoche(w.wert); };
+    box.appendChild(b);
   });
+  document.getElementById('pp-druck-sub').textContent = 'Was soll auf den Zettel? Woche ab ' + kurzDatum(wochenMo);
+  ppDruckMeldung('');
+  document.getElementById('pp-druck-modal').style.display = 'block';
+}
+function ppSchliesseDruckwahl() {
+  document.getElementById('pp-druck-modal').style.display = 'none';
+}
+
+async function druckWoche(auswahl) {
+  var knoepfe = document.querySelectorAll('.pp-druck-wahl');
+  knoepfe.forEach(function (b) { b.disabled = true; });
+  ppDruckMeldung('Zettel wird vorbereitet …', 'info');
+  try {
+    await PRODUKTLISTE_GELADEN;                // Einheit und Reihenfolge (scheitert nie, fängt selbst ab)
+    if (STAND_VERSPRECHEN) await STAND_VERSPRECHEN;
+    if (STAND_FEHLER) {
+      // Fund 2: sonst stünde „nicht eingereicht“ auf dem Papier, obwohl nur das Laden scheiterte
+      ppDruckMeldung('Drucken nicht möglich — der Stand ist nicht geladen: ' + STAND_FEHLER + ' — ' + STAND_FEHLER_RAT, 'fehler');
+      return;
+    }
+    if (!window.BOS_DRUCK || typeof window.BOS_DRUCK.drucken !== 'function') throw new Error('bos_druck.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    var zettel = baueWochenzettel(auswahl || 'alle');
+    window.BOS_DRUCK.drucken({
+      inhaltHTML: zettel.inhaltHTML,
+      appName: 'Produktionsplaner',
+      titel: zettel.titel,
+      mitKopf: true,
+      farbig: true,
+      extraCSS: PP_ZETTEL_CSS
+    });
+    ppSchliesseDruckwahl();
+  } catch (e) {
+    console.error('Produktionsplaner Übersicht: Drucken fehlgeschlagen', e);
+    ppDruckMeldung('Drucken fehlgeschlagen: ' + fehlerText(e), 'fehler');
+  } finally {
+    knoepfe.forEach(function (b) { b.disabled = false; });
+  }
 }
 
 // ── Hilfe ─────────────────────────────────────────────────────────
@@ -442,7 +650,7 @@ const PP_HILFE_SCHRITTE = [
   ['Zeitfenster', 'Die Planung ist nur Freitag bis Dienstag geöffnet. Die Karte oben zeigt entweder, wie viel Zeit noch bleibt, oder — außerhalb des Fensters — wann es wieder öffnet. Außerhalb des Fensters sind die Stationsseiten gesperrt, es gibt dann nichts mehr zu planen.'],
   ['Zur Station springen', 'Über "Zur Station →" bei jeder Zeile kommst du direkt zur jeweiligen Stationsseite.'],
   ['Nachtrag eintragen', 'Braucht es spontan mehr von einem Produkt (z. B. Kundenbestellung) als ursprünglich geplant, trägst du das hier ein — Produkt wählen (nach Station sortiert), Menge, fertig. Das verändert die ursprüngliche Planung NICHT und rechnet auch nichts neu — es ist eine reine Zusatz-Notiz, die separat mit ausgedruckt wird. Wer die Station bedienen darf, darf auch nachtragen.'],
-  ['Drucken', 'Der Button unten druckt alle vier Stationen zusammen auf einen Zettel — auch wenn noch nicht jede Station eingereicht hat. Nachträge erscheinen in einem eigenen Abschnitt am Ende.']
+  ['Drucken', 'Der Button unten („Wochenplan drucken“) fragt zuerst, was auf den Zettel soll: alle Stationen zusammen oder nur eine Station. Der Zettel ist nach Tagen gegliedert — Montag das, Dienstag das … — und zeigt je Tag, welche Station wie viel von welchem Produkt produziert. Tage ohne Produktion fehlen. Danach folgt die Wochensumme je Station (gesamt und Endlager) und am Ende die Nachbestellungen in einem eigenen Abschnitt (bei einer Station nur deren). Gedruckt werden kann auch, wenn noch nicht jede Station eingereicht hat — oben auf dem Zettel steht dann, welche fehlt. Wurde eine Planung mit einer älteren Fassung der Station eingereicht, fehlt ihr die Aufteilung nach Tagen: Sie erscheint nur in der Wochensumme, und oben steht der Hinweis, neu einzureichen.']
 ];
 function ppOeffneHilfe() {
   const inhalt = document.getElementById('pp-hilfe-inhalt');
@@ -458,7 +666,7 @@ function ppSchliesseHilfe() {
 window.addEventListener('load', function () {
   renderCountdown();
   setInterval(renderCountdown, 60000);
-  ladeProduktDropdown();
+  PRODUKTLISTE_GELADEN = ladeProduktDropdown();
   ladeStand();
 });
 </script>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-02 · 17:41 · Wochenzettel nach Tagen (Go Kontroll-Chat 02.11., 17:2x): Einreichen schreibt je Produkt zusätzlich tage: [{datum, menge}] (nur Tage mit Produktion, Datum lokal) über ./plan_tage.js — eine Mechanik für alle vier Stationen. Fehlt plan_tage.js, wird ohne tage eingereicht und unter dem Knopf steht das sichtbar. Rechnung, Vorschläge, Fenster, Ungespeichert-Schutz unverändert. SESSION_2026-11-02_PRODUKTIONSPLANER_WOCHENZETTEL_BAU.md -->
 <!-- 2026-10-20 · 06:59 · Herkunft der Einstellungen (Verbrauch aufräumen, Freigabe KC 06:20, K4): Statuszeile hängt an, woher die Verbrauchs-Einstellungen kommen („Einstellungen Stand N“ / „⚠︎ vom Gerät“ / „aus der Datei“ / „✕ Startwerte“, BOS_VERBRAUCH.einstellungenHerkunft()). Sonst nichts geändert. SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md -->
 <!-- 2026-10-17 · 04:59 · #77 Teil 2 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 04:57): Das ✕ im Launcher und das Neuladen fragen nach, wenn die Planung von der zuletzt geladenen bzw. eingereichten abweicht (Fingerabdruck planungsAbdruck(), ohne „Kette prüfen“; zurückgestellt = unverändert). Während des Einreichens Text „wird gerade gespeichert“. Über ../bos_ungespeichert.js, Rückfall auf eigenen beforeunload. Rechnung, Rendern, Einreichen-Inhalt unverändert. SESSION_2026-10-17_UNGESPEICHERT_STATIONEN_BAU.md -->
 <!-- 2026-10-15 · 19:56 · Farbprofile Stufe B (#72, Freigabe Kontroll-Chat 18:48): Zelle „von Hand“ mit gestricheltem Rand (F12, im Profil Stahl sonst kaum von „automatisch“ zu unterscheiden); Zahl „von Hand“ dunkel #60a5fa statt #1d4ed8 (Kontrast 2,3 → 5,7 bis 6,3 je Profil), hell unverändert; „⚠ min“ mit FE0E wie die übrigen Zeichen (F22). SESSION_2026-10-15_FARBSCHEMA_STUFE_B_BAU.md -->
@@ -198,6 +199,7 @@
 <script src="../bos_hamster.js"></script>
 <script src="../bos_produktionskette.js"></script>
 <script src="../bos_froster.js"></script>
+<script src="plan_tage.js"></script>
 <script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77 Teil 2: Ungespeichert-Schutz -->
 
 <div class="nfc-header">
@@ -977,6 +979,9 @@ async function planungEinreichen() {
 
   var produkteDaten = {};
   var mind1 = false;
+  // 02.11.2026 (Wochenzettel): Tagesaufteilung über plan_tage.js. Fehlt das Modul
+  // (alte Fassung im Zwischenspeicher), wird ohne tage eingereicht — sichtbar gemeldet.
+  var tageModul = window.BOS_PLAN_TAGE && typeof window.BOS_PLAN_TAGE.ausKette === 'function' ? window.BOS_PLAN_TAGE : null;
   PRODUKTE.forEach(function(prod) {
     var s = state[prod.bosId];
     var prodOffsets = Object.keys(s.prodTage).filter(function(k){ return s.prodTage[k]; });
@@ -996,6 +1001,7 @@ async function planungEinreichen() {
       warnungen: result ? result.warnungen : [],
       bedarfsQuelle: prod.quelle   // 15.10.2026 (#63): womit gerechnet wurde (Datenbankwert)
     };
+    if (tageModul) produkteDaten[prod.legacyKey].tage = tageModul.ausKette(result);   // 02.11.2026: Tagesmengen für den Wochenzettel
   });
   if (!mind1) return;
   var abdruckEingereicht = planungsAbdruck();   // #77 Teil 2: Stand beim Zusammenstellen, VOR dem await
@@ -1018,6 +1024,11 @@ async function planungEinreichen() {
     });
     gemerkterAbdruck = abdruckEingereicht;   // #77 Teil 2: nur bei Erfolg; spätere Änderungen bleiben „ungespeichert“
     btn.textContent = '✓ Eingereicht';
+    var cntOk = document.getElementById('export-count');
+    if (!tageModul) {   // 02.11.2026: eingereicht, aber ohne Tagesaufteilung — nicht still
+      cntOk.textContent = '⚠ Eingereicht, aber ohne Tagesaufteilung (plan_tage.js nicht geladen) — Seite neu laden und nochmal einreichen.';
+      cntOk.style.color = 'var(--bos-warn, var(--bos-amber))';
+    }
     setTimeout(function() {
       btn.textContent = urspruenglicherText;
       btn.disabled = false;
