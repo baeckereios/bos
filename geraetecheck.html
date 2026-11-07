@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<!--
+  MODUL: geraetecheck.html — BOS Gerätecheck
+  ZWECK: Eigenständige Diagnoseseite für alle (ohne Anmeldung erreichbar, verlinkt an der Tür index.html).
+         Berührt keine andere Datei, braucht keine Firebase-Konfiguration, liest und schreibt keine BOS-Daten.
+  ABLAGE: Repo-Wurzel neben launcher.html → https://baeckereios.github.io/bos/geraetecheck.html
+  SEITEN TESTEN: nur Seiten aus ERLAUBTE_SEITEN (feste Liste im Code), z. B.
+         geraetecheck.html?seite=launcher.html,produktionsplaner/uebersicht.html
+         Alles andere wird sichtbar abgewiesen und nicht geladen (Grund: der Testrahmen erbt die Herkunft
+         von BOS und hätte Zugriff auf den Login-Speicher).
+  PRÜFT: Gerät/Browser, JS-Fähigkeiten (iOS-Stolpersteine), Datumsformate und Geräteuhr, Speicher,
+         Firebase-Login, Verbindung (Art, Laufzeit 3×, Dauertest 2 Minuten), und lädt die erlaubten BOS-Seiten
+         im Testrahmen mit Fehlerfang (JS-Fehler, nicht geladene Dateien, unbehandelte Promises, console.error).
+         Ergebnis als Bericht zum Teilen per WhatsApp.
+  SYNTAX: bewusst alt (var, function, keine Pfeile), damit die Seite auch auf alten iPhones läuft.
+
+  CHANGELOG
+    2026-11-03 · 01:23 · Absicherung, Umbenennung, Verbindung (Anweisung allgemeiner Kontroll-Chat 02.11., 22:1x,
+      Ergänzung 03.11., 01:2x) · Feature/Sicherheit
+      P1: ?seite= lädt nur noch Seiten aus der festen Liste ERLAUBTE_SEITEN, gleiche Herkunft, nur .html;
+          alles andere „nicht erlaubt: …“, nicht geladen. Freitextfeld ersetzt durch Haken je erlaubter Seite.
+      P2: Datumsformate, die BOS nicht mit new Date() liest (deutsch, Leerzeichen, Schrägstriche), melden
+          Abweichungen als Hinweis statt Fehler. Formate, die BOS nutzt (ISO mit T, ISO nur Datum, UTC), bleiben rot.
+      P3: diagnose.html → geraetecheck.html (diagnose.html steht in bos/.gitignore).
+      V1: Verbindungsart (navigator.connection). V2: BOS-Server und Firestore je 3× gemessen (Kleinst/Mittel/Größt).
+      V3: Dauertest „Verbindung 2 Minuten beobachten“ mit Aussetzern und Uhrzeiten, eigener Berichtsabschnitt.
+      SESSION_2026-11-03_GERAETECHECK_BAU.md
+    2026-11-02 · 22:0x · Erste Fassung als diagnose.html (Chat mit Ulf, Anlass: iPhone eines Kollegen lädt BOS nicht)
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>BOS · Gerätecheck</title>
+<script>
+  window.__bosTlaTest = false;
+  window.onerror = function (msg, datei, zeile) {
+    if (window.__bosTlaTest) return;
+    var s = document.getElementById('status');
+    if (s) {
+      s.textContent = 'Die Prüfseite selbst ist abgestürzt: ' + msg + ' (Zeile ' + zeile + '). Bitte Screenshot an Ulf.';
+      s.className = 'bad';
+    }
+  };
+</script>
+<style>
+  :root { --ok:#1b7f3b; --warn:#9a5c00; --bad:#b00020; --line:#e3e0da; --bg:#faf8f4; --ink:#222; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.45 -apple-system, system-ui, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink);
+         padding:16px 14px calc(28px + env(safe-area-inset-bottom)); max-width:720px; margin-inline:auto; }
+  h1 { font-size:22px; margin:4px 0; }
+  .sub { color:#666; font-size:15px; margin:0 0 14px; }
+  #status { padding:14px; border-radius:10px; background:#fff; border:1px solid var(--line); font-weight:600; margin-bottom:14px; }
+  #status.ok { border-color:var(--ok); color:var(--ok); }
+  #status.warn { border-color:var(--warn); color:var(--warn); }
+  #status.bad { border-color:var(--bad); color:var(--bad); }
+  section { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 14px 12px; margin-bottom:12px; }
+  h2 { font-size:13px; margin:2px 0 6px; text-transform:uppercase; letter-spacing:.05em; color:#666; }
+  .z { display:flex; gap:8px; padding:6px 0; border-top:1px solid #f1eee9; font-size:15px; }
+  h2 + .z, .seitenkopf + .z { border-top:0; }
+  .i { flex:0 0 1.5em; }
+  .t { flex:1; min-width:0; word-break:break-word; }
+  .d { display:block; color:#666; font-size:13px; }
+  .ok .i::before { content:"✅"; } .warn .i::before { content:"⚠️"; } .bad .i::before { content:"❌"; } .info .i::before { content:"ℹ️"; }
+  .seitenkopf { font-weight:700; margin-top:12px; }
+  button { font:inherit; font-weight:600; border:0; border-radius:10px; padding:14px; width:100%; margin-top:8px; background:#2a5d8f; color:#fff; }
+  button.zweit { background:#ebe8e2; color:#222; }
+  button:disabled { opacity:.45; }
+  button[hidden], div[hidden] { display:none !important; }
+  iframe { width:100%; height:240px; border:1px solid var(--line); border-radius:8px; background:#fff; margin-top:6px; }
+  textarea { width:100%; height:170px; font:12px/1.35 ui-monospace, Menlo, monospace; border:1px solid var(--line); border-radius:8px; padding:8px; }
+  .wahl { display:flex; align-items:center; gap:10px; padding:8px 0; font-size:15px; border-top:1px solid #f1eee9; }
+  .wahl:first-child { border-top:0; }
+  .wahl input { width:22px; height:22px; margin:0; flex:0 0 22px; }
+  .klein { font-size:13px; color:#666; margin-top:6px; }
+  .hinweis { margin-top:10px; padding:10px 12px; border-radius:8px; background:#fff4dc; border:1px solid #e9c46a; color:#6b4a00; font-size:14px; font-weight:600; }
+  #dauer-stand { font-size:15px; margin-top:8px; }
+</style>
+</head>
+<body>
+<h1>BOS · Gerätecheck</h1>
+<p class="sub">Prüft, ob BOS auf diesem Gerät laufen kann. Dauert etwa eine halbe Minute. Danach unten auf „Bericht teilen“ tippen und an Ulf schicken.</p>
+<div id="status">Prüfung läuft …</div>
+
+<section id="s-geraet"><h2>Gerät</h2></section>
+<section id="s-js"><h2>JavaScript</h2></section>
+<section id="s-datum"><h2>Datum &amp; Uhrzeit</h2></section>
+<section id="s-speicher"><h2>Speicher &amp; Login</h2></section>
+<section id="s-netz"><h2>Verbindung</h2></section>
+<section id="s-dauer">
+  <h2>Verbindung beobachten</h2>
+  <div class="klein">Prüft 2 Minuten lang alle 5 Sekunden, ob BOS-Server und Datenbank erreichbar sind. Hilft bei „mal geht es, mal nicht“.</div>
+  <button id="dauer-start" class="zweit" disabled>Verbindung 2 Minuten beobachten</button>
+  <button id="dauer-stopp" class="zweit" hidden>Abbrechen</button>
+  <div id="dauer-hinweis" class="hinweis" hidden>Gerät nicht sperren und diese Seite offen lassen, sonst pausiert der Test.</div>
+  <div id="dauer-stand" hidden></div>
+  <div id="dauer-ergebnis"></div>
+</section>
+<section id="s-seiten">
+  <h2>BOS-Seiten im Test</h2>
+  <div id="seiten-wahl"></div>
+  <div class="klein">Geprüft werden nur diese BOS-Seiten. Sie werden nur geöffnet, es wird nichts gespeichert.</div>
+  <div id="seiten-ergebnis"></div>
+</section>
+<section>
+  <h2>Bericht</h2>
+  <textarea id="bericht" readonly></textarea>
+  <button id="teilen" disabled>Bericht teilen</button>
+  <button id="kopieren" class="zweit" disabled>Bericht kopieren</button>
+  <button id="nochmal" class="zweit" disabled>Seiten erneut prüfen</button>
+</section>
+<section>
+  <h2>Nur wenn Ulf es sagt</h2>
+  <button id="cache" class="zweit">Zwischenspeicher von BOS leeren</button>
+  <div id="cache-ergebnis" class="klein">Entfernt Service Worker und Cache-Speicher dieser Seite. Login und Daten bleiben erhalten.</div>
+</section>
+
+<script>
+(function () {
+  'use strict';
+  // Bewusst nur alte Syntax (var, function), damit die Prüfseite auch auf alten iPhones läuft.
+
+  var WARTE_MS = 15000;
+  var BERICHT = [];
+  var DAUER_BERICHT = [];
+  var ZAEHL = { bad: 0, warn: 0 };
+  var GEPRUEFT = false;
+
+  /* P1 (03.11.2026): Nur diese Seiten dürfen in den Testrahmen. Der Rahmen (srcdoc) erbt die Herkunft von BOS
+     und hätte vollen Zugriff auf localStorage und IndexedDB (dort liegt der Login). Deshalb: feste Liste, exakter
+     Vergleich, dazu gleiche Herkunft und .html. Aufnehmen nur Seiten, die beim Öffnen nichts in Firestore schreiben. */
+  var ERLAUBTE_SEITEN = [
+    ['launcher.html', 'Launcher (Startseite nach der Anmeldung)'],
+    ['produktionsplaner/uebersicht.html', 'Produktionsplaner · Übersicht'],
+    ['tour/tour.html', 'Demo-Tour (ohne Anmeldung, ohne Daten)']
+  ];
+  var STANDARD_SEITEN = ['launcher.html'];
+
+  function el(id) { return document.getElementById(id); }
+
+  // liste: wohin die Berichtszeile geht (Standard: Hauptbericht; nur der zählt für den Status oben)
+  function zeile(ziel, art, text, detail, liste) {
+    var z = document.createElement('div'); z.className = 'z ' + art;
+    var i = document.createElement('span'); i.className = 'i';
+    var t = document.createElement('span'); t.className = 't'; t.textContent = text;
+    if (detail) { var d = document.createElement('span'); d.className = 'd'; d.textContent = detail; t.appendChild(d); }
+    z.appendChild(i); z.appendChild(t);
+    (typeof ziel === 'string' ? el(ziel) : ziel).appendChild(z);
+    var sym = { ok: 'OK  ', warn: 'WARN', bad: 'FEHL', info: 'INFO' }[art] || art;
+    (liste || BERICHT).push(sym + ' ' + text + (detail ? ' — ' + detail : ''));
+    if (!liste || liste === BERICHT) {
+      if (art === 'bad') ZAEHL.bad++;
+      if (art === 'warn') ZAEHL.warn++;
+    }
+  }
+
+  function abschnitt(titel) { BERICHT.push(''); BERICHT.push('== ' + titel + ' =='); }
+
+  function mitZeitlimit(p, ms, name) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error('Zeitüberschreitung nach ' + (ms / 1000) + ' s' + (name ? ' (' + name + ')' : ''))); }, ms);
+      p.then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); });
+    });
+  }
+
+  function fehlertext(e) {
+    if (!e) return 'unbekannt';
+    return (e.name && e.name !== 'Error' ? e.name + ': ' : '') + (e.code ? e.code + ' – ' : '') + (e.message || String(e));
+  }
+
+  function zwei(n) { return (n < 10 ? '0' : '') + n; }
+  function uhrzeit(ms) { var d = new Date(ms); return zwei(d.getHours()) + ':' + zwei(d.getMinutes()) + ':' + zwei(d.getSeconds()); }
+  function sekunden(ms) { return (Math.round(ms / 100) / 10).toString().replace('.', ',') + ' s'; }
+
+  // ---------- Gerät ----------
+  function pruefeGeraet() {
+    abschnitt('Gerät');
+    var ua = navigator.userAgent;
+    var apple = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var vSaf = ua.match(/Version\/(\d+(?:\.\d+)?)/);
+    var vOS = ua.match(/OS (\d+)_(\d+)/);
+    if (apple) {
+      zeile('s-geraet', 'info', 'Apple-Gerät' + (vSaf ? ', Safari ' + vSaf[1] : '') + (vOS ? ', meldet iOS ' + vOS[1] + '.' + vOS[2] : ''),
+        'Genaue Version: Einstellungen → Allgemein → Info');
+      if (/CriOS|FxiOS|EdgiOS/.test(ua)) {
+        zeile('s-geraet', 'info', 'Chrome/Firefox/Edge auf dem iPhone', 'nutzt intern trotzdem die Safari-Technik');
+      } else if (ua.indexOf('Safari/') === -1) {
+        zeile('s-geraet', 'warn', 'Vermutlich in einer App geöffnet (z. B. WhatsApp), nicht in Safari',
+          'Zum Vergleich den Link in Safari öffnen');
+      }
+    } else {
+      zeile('s-geraet', 'info', 'Kein Apple-Gerät', '');
+    }
+    var standalone = navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    zeile('s-geraet', 'info', standalone ? 'Läuft als Homescreen-App' : 'Läuft im Browser',
+      standalone ? '' : 'Homescreen-App und Browser haben auf dem iPhone getrennte Speicher und getrenntes Login');
+    zeile('s-geraet', navigator.onLine ? 'ok' : 'bad', navigator.onLine ? 'Online' : 'Offline', '');
+    zeile('s-geraet', 'info', 'Browser-Kennung', ua);
+  }
+
+  // ---------- JavaScript ----------
+  var SYNTAX = [
+    ['Optional Chaining  a?.b', 'var o={a:{b:1}};return o?.a?.b;', 'iOS 13.4'],
+    ['Nullish  ??', 'return null ?? 1;', 'iOS 13.4'],
+    ['Zuweisung  ??=  ||=', 'var a=null;a??=1;a||=2;return a;', 'iOS 14'],
+    ['Klassenfelder  static x / #privat', 'class K{static x=1;#p=2;g(){return this.#p}}return new K().g()+K.x;', 'iOS 14.5'],
+    ['Regex Lookbehind  (?<=…)', 'return new RegExp("(?<=a)b").test("ab");', 'iOS 16.4'],
+    ['Static-Block in Klassen  static { }', 'class K{static{this.y=1}}return K.y;', 'iOS 16.4'],
+    ['Regex-Flag  /v', 'return new RegExp("[a]","v").test("a");', 'iOS 17']
+  ];
+
+  var APIS = [
+    ['String.replaceAll', function () { return !!String.prototype.replaceAll; }, 'iOS 13.4'],
+    ['Promise.any', function () { return !!Promise.any; }, 'iOS 14'],
+    ['Array.at', function () { return !!Array.prototype.at; }, 'iOS 15.4'],
+    ['Array.findLast', function () { return !!Array.prototype.findLast; }, 'iOS 15.4'],
+    ['Object.hasOwn', function () { return !!Object.hasOwn; }, 'iOS 15.4'],
+    ['structuredClone', function () { return typeof window.structuredClone === 'function'; }, 'iOS 15.4'],
+    ['crypto.randomUUID', function () { return !!(window.crypto && crypto.randomUUID); }, 'iOS 15.4'],
+    ['Array.toSorted', function () { return !!Array.prototype.toSorted; }, 'iOS 16'],
+    ['Import Maps', function () { return !!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')); }, 'iOS 16.4'],
+    ['Set.union', function () { return !!(window.Set && Set.prototype.union); }, 'iOS 17'],
+    ['Object.groupBy', function () { return !!Object.groupBy; }, 'iOS 17.4'],
+    ['Promise.withResolvers', function () { return !!Promise.withResolvers; }, 'iOS 17.4']
+  ];
+
+  function pruefeTLA() {
+    return new Promise(function (res) {
+      if (!('noModule' in document.createElement('script'))) { res('keine-module'); return; }
+      window.__bosTLA = false;
+      window.__bosTlaTest = true;
+      var s = document.createElement('script');
+      s.type = 'module';
+      s.textContent = 'await Promise.resolve(); window.__bosTLA = true;';
+      document.head.appendChild(s);
+      setTimeout(function () { window.__bosTlaTest = false; res(window.__bosTLA === true ? 'ja' : 'nein'); }, 900);
+    });
+  }
+
+  function pruefeJS() {
+    abschnitt('JavaScript');
+    var fehlt = 0;
+    SYNTAX.forEach(function (s) {
+      var ok = true;
+      try { new Function(s[1])(); } catch (e) { ok = false; }
+      if (!ok) fehlt++;
+      zeile('s-js', ok ? 'ok' : 'bad', s[0], ok ? '' : 'Fehlt (kommt mit ' + s[2] + '). Steht das im BOS-Code, lädt die ganze Datei nicht.');
+    });
+    APIS.forEach(function (a) {
+      var ok = false;
+      try { ok = a[1](); } catch (e) { ok = false; }
+      if (!ok) fehlt++;
+      zeile('s-js', ok ? 'ok' : 'warn', a[0], ok ? '' : 'Fehlt (kommt mit ' + a[2] + '). Nur ein Problem, wenn BOS es nutzt.');
+    });
+    return pruefeTLA().then(function (r) {
+      if (r === 'keine-module') zeile('s-js', 'bad', 'ES-Module', 'Werden nicht unterstützt');
+      else zeile('s-js', r === 'ja' ? 'ok' : 'bad', 'Top-Level await in Modulen', r === 'ja' ? '' : 'Fehlt (kommt mit iOS 15)');
+      if (!fehlt && r === 'ja') BERICHT.push('     (alle JS-Prüfungen bestanden)');
+    });
+  }
+
+  // ---------- Datum & Uhrzeit ----------
+  // Chrome (Android-Tablets) liest fast jedes Datumsformat, Safari nur wenige — und Chrome liest deutsche
+  // Daten als Monat.Tag (02.11. → 11. Februar). P2 (03.11.2026): Am Paket vom 02.11.2026 geprüft — BOS liest
+  // mit new Date() nur ISO mit T ('…T00:00:00', '…T00:00:00Z', Eingabefeld '…THH:MM') und ISO nur Datum.
+  // Diese Formate bleiben rot, wenn das Gerät sie nicht oder falsch liest. Alle anderen sind nur ein Hinweis:
+  // BOS darf sie nie mit new Date() lesen.
+  // [Text, Bezeichnung, mit Uhrzeit 05:30?, nutzt BOS?, als UTC lesen?]
+  var DATUMSFORMATE = [
+    ['2026-11-02T05:30:00', 'ISO mit T', true, true, false],
+    ['2026-11-02T05:30', 'ISO mit T ohne Sekunden (Eingabefeld Datum + Uhrzeit)', true, true, false],
+    ['2026-11-02T00:00:00Z', 'ISO in UTC', false, true, true],
+    ['2026-11-02', 'ISO nur Datum (wird als UTC gelesen)', false, true, true],
+    ['2026-11-02 05:30', 'ISO mit Leerzeichen', true, false, false],
+    ['2026-11-02 05:30:00', 'ISO mit Leerzeichen und Sekunden', true, false, false],
+    ['2026/11/02 05:30', 'mit Schrägstrichen', true, false, false],
+    ['02.11.2026', 'deutsch TT.MM.JJJJ', false, false, false],
+    ['2.11.2026, 05:30:00', 'deutsch wie toLocaleString(\'de-DE\')', true, false, false]
+  ];
+
+  function pruefeDatum() {
+    abschnitt('Datum & Uhrzeit');
+    var kaputt = 0;
+    DATUMSFORMATE.forEach(function (f) {
+      var d = new Date(f[0]);
+      var nutzt = f[3], utc = f[4];
+      var NIE = ' — BOS darf dieses Format nie mit new Date() lesen (tut es auch nicht)';
+      if (isNaN(d.getTime())) {
+        if (nutzt) {
+          kaputt++;
+          zeile('s-datum', 'bad', 'Kann „' + f[0] + '“ nicht lesen', f[1] + '. BOS nutzt dieses Format — Datumsberechnungen gehen auf diesem Gerät schief.');
+        } else {
+          zeile('s-datum', 'info', 'Gerät liest „' + f[0] + '“ nicht', f[1] + NIE);
+        }
+        return;
+      }
+      var j = utc ? d.getUTCFullYear() : d.getFullYear(), m = utc ? d.getUTCMonth() : d.getMonth(), t = utc ? d.getUTCDate() : d.getDate();
+      var h = utc ? d.getUTCHours() : d.getHours(), mi = utc ? d.getUTCMinutes() : d.getMinutes();
+      var richtig = j === 2026 && m === 10 && t === 2 && (f[2] ? (h === 5 && mi === 30) : (!utc || h === 0));
+      if (richtig) { zeile('s-datum', 'ok', '„' + f[0] + '“', f[1]); return; }
+      var gelesen = zwei(t) + '.' + zwei(m + 1) + '.' + j + (f[2] ? ', ' + zwei(h) + ':' + zwei(mi) : '');
+      if (nutzt) {
+        kaputt++;
+        zeile('s-datum', 'bad', 'Liest „' + f[0] + '“ falsch', f[1] + ' → ' + gelesen + '. BOS nutzt dieses Format — Datumsberechnungen gehen auf diesem Gerät schief.');
+      } else {
+        zeile('s-datum', 'info', 'Gerät liest „' + f[0] + '“ als ' + gelesen, f[1] + NIE);
+      }
+    });
+    var tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    var off = -new Date().getTimezoneOffset() / 60;
+    zeile('s-datum', (tz && tz !== 'Europe/Berlin') ? 'warn' : 'info', 'Zeitzone ' + (tz || 'unbekannt'),
+      'UTC' + (off >= 0 ? '+' : '') + off + ((tz && tz !== 'Europe/Berlin') ? ' — nicht deutsche Zeit, Tageswechsel kann verrutschen' : ''));
+    zeile('s-datum', 'info', 'Gerätezeit', new Date().toLocaleString('de-DE'));
+    if (!kaputt) BERICHT.push('     (alle Datumsformate, die BOS nutzt, korrekt gelesen)');
+  }
+
+  // Vergleicht die Geräteuhr mit der Serverzeit von GitHub Pages
+  function pruefeUhr() {
+    if (!window.fetch) return Promise.resolve();
+    var t0 = Date.now();
+    return mitZeitlimit(fetch('launcher.html', { method: 'HEAD', cache: 'no-store' }), 8000, 'Serverzeit').then(function (r) {
+      var kopf = r.headers.get('date');
+      if (!kopf) { zeile('s-datum', 'info', 'Geräteuhr', 'Serverzeit nicht lesbar'); return; }
+      var server = new Date(kopf).getTime();
+      var geraet = (t0 + Date.now()) / 2;
+      var diff = Math.round((geraet - server) / 1000);
+      var abs = Math.abs(diff);
+      var art = abs > 300 ? 'bad' : (abs > 60 ? 'warn' : 'ok');
+      var txt = abs < 5 ? 'stimmt mit dem Server überein'
+        : 'geht ' + (diff > 0 ? 'vor' : 'nach') + ': ' + (abs >= 120 ? Math.round(abs / 60) + ' min' : abs + ' s');
+      zeile('s-datum', art, 'Geräteuhr', txt + (abs > 60 ? ' — falsche Uhr verfälscht jede „wie alt sind die Daten“-Prüfung' : ''));
+    }, function (e) {
+      zeile('s-datum', 'info', 'Geräteuhr', 'nicht prüfbar: ' + fehlertext(e));
+    });
+  }
+
+  // ---------- Speicher & Login ----------
+  function pruefeSpeicher() {
+    abschnitt('Speicher & Login');
+    try {
+      localStorage.setItem('__bos_diag', '1');
+      var ok = localStorage.getItem('__bos_diag') === '1';
+      localStorage.removeItem('__bos_diag');
+      zeile('s-speicher', ok ? 'ok' : 'bad', 'localStorage', ok ? '' : 'liest nicht zurück');
+    } catch (e) {
+      zeile('s-speicher', 'bad', 'localStorage gesperrt', fehlertext(e) + ' — oft wegen „Privates Surfen“');
+    }
+    zeile('s-speicher', navigator.cookieEnabled ? 'ok' : 'warn', 'Cookies', navigator.cookieEnabled ? '' : 'blockiert');
+
+    var idb = new Promise(function (res, rej) {
+      if (!window.indexedDB) { rej(new Error('IndexedDB fehlt')); return; }
+      var r = indexedDB.open('bos_diagnose_test', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('t'); };
+      r.onsuccess = function () {
+        var db = r.result;
+        try {
+          var tx = db.transaction('t', 'readwrite');
+          tx.objectStore('t').put(1, 'k');
+          tx.oncomplete = function () { db.close(); indexedDB.deleteDatabase('bos_diagnose_test'); res(); };
+          tx.onerror = function () { db.close(); rej(tx.error); };
+        } catch (e) { db.close(); rej(e); }
+      };
+      r.onerror = function () { rej(r.error); };
+      r.onblocked = function () { rej(new Error('blockiert')); };
+    });
+
+    return mitZeitlimit(idb, 5000, 'IndexedDB').then(function () {
+      zeile('s-speicher', 'ok', 'IndexedDB (Speicher für Firebase-Login und -Daten)', '');
+    }, function (e) {
+      zeile('s-speicher', 'bad', 'IndexedDB (Speicher für Firebase-Login und -Daten)',
+        fehlertext(e) + ' — ohne das hängt Firebase oder man bleibt nicht eingeloggt');
+    }).then(pruefeLogin).then(function () {
+      if (navigator.storage && navigator.storage.persisted) {
+        return navigator.storage.persisted().then(function (p) {
+          zeile('s-speicher', 'info', 'Dauerhafter Speicher', p ? 'ja' : 'nein (Safari darf Daten nach längerer Nichtnutzung löschen)');
+        });
+      }
+    }).then(function () {
+      if (!('serviceWorker' in navigator)) { zeile('s-speicher', 'info', 'Service Worker', 'nicht verfügbar'); return; }
+      return navigator.serviceWorker.getRegistrations().then(function (regs) {
+        zeile('s-speicher', 'info', 'Service Worker registriert',
+          regs.length ? regs.map(function (r) { return r.scope; }).join(', ') : 'keiner');
+      });
+    }).catch(function (e) {
+      zeile('s-speicher', 'warn', 'Speicherprüfung unvollständig', fehlertext(e));
+    });
+  }
+
+  // Liest nur, ob im Firebase-Login-Speicher eine Sitzung liegt. Öffnet die Datenbank nur, wenn sie schon existiert.
+  function pruefeLogin() {
+    var sek = 's-speicher';
+    if (!window.indexedDB || !indexedDB.databases) {
+      zeile(sek, 'info', 'Firebase-Login', 'nicht prüfbar (ältere Safari-Version)');
+      return Promise.resolve();
+    }
+    return mitZeitlimit(indexedDB.databases(), 4000, 'Datenbankliste').then(function (liste) {
+      var da = (liste || []).some(function (d) { return d.name === 'firebaseLocalStorageDb'; });
+      if (!da) { zeile(sek, 'warn', 'Firebase-Login hier', 'nicht eingeloggt (kein Login-Speicher in diesem Browser)'); return; }
+      return mitZeitlimit(new Promise(function (res, rej) {
+        var r = indexedDB.open('firebaseLocalStorageDb');
+        r.onerror = function () { rej(r.error); };
+        r.onsuccess = function () {
+          var db = r.result;
+          try {
+            if (!db.objectStoreNames.contains('firebaseLocalStorage')) { db.close(); res([]); return; }
+            var q = db.transaction('firebaseLocalStorage', 'readonly').objectStore('firebaseLocalStorage').getAll();
+            q.onsuccess = function () { db.close(); res(q.result || []); };
+            q.onerror = function () { db.close(); rej(q.error); };
+          } catch (e) { db.close(); rej(e); }
+        };
+      }), 4000, 'Login-Speicher').then(function (eintraege) {
+        var gefunden = 0;
+        eintraege.forEach(function (e) {
+          var k = e && String(e.fbase_key || '');
+          if (k.indexOf('firebase:authUser:') !== 0) return;
+          gefunden++;
+          var app = k.split(':').pop();
+          var u = e.value || {};
+          zeile(sek, 'ok', 'Firebase-Login hier' + (app && app !== '[DEFAULT]' ? ' (' + app + ')' : ''),
+            u.isAnonymous ? 'anonyme Sitzung' : 'eingeloggt als ' + (u.email || u.uid || '?'));
+        });
+        if (!gefunden) zeile(sek, 'warn', 'Firebase-Login hier', 'nicht eingeloggt');
+      });
+    }).catch(function (e) {
+      zeile(sek, 'warn', 'Firebase-Login', 'nicht prüfbar: ' + fehlertext(e));
+    });
+  }
+
+  // ---------- Verbindung ----------
+  var FIRESTORE_URL = 'https://firestore.googleapis.com/';
+  // [Name, Adresse, gleiche Herkunft?, 3× messen?]
+  var ZIELE = [
+    ['BOS-Server (GitHub Pages)', 'launcher.html', true, true],
+    ['Firebase-Bibliothek (gstatic.com)', 'https://www.gstatic.com/firebasejs/', false, false],
+    ['Firestore (Datenbank)', FIRESTORE_URL, false, true],
+    ['Firebase-Login', 'https://identitytoolkit.googleapis.com/', false, false],
+    ['Login-Token', 'https://securetoken.googleapis.com/', false, false]
+  ];
+
+  // Eine Abfrage: gleiche Herkunft mit HEAD (Status lesbar), fremd mit no-cors (antwortet = erreichbar)
+  function abfrage(url, eigen, ms) {
+    var opt = eigen ? { method: 'HEAD', cache: 'no-store' } : { mode: 'no-cors', cache: 'no-store' };
+    var t0 = Date.now();
+    return mitZeitlimit(fetch(url, opt), ms).then(function (r) {
+      if (eigen && !r.ok) { var e = new Error('HTTP ' + r.status); e.antwort = r; throw e; }
+      return { ms: Date.now() - t0, antwort: r };
+    });
+  }
+
+  // V1: Verbindungsart, wo der Browser sie verrät (Chrome/Android ja, iPhone nein)
+  function pruefeVerbindungsart() {
+    var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!c) { zeile('s-netz', 'info', 'Verbindungsart', 'nicht ermittelbar (z. B. iPhone)'); return; }
+    var teile = [];
+    if (c.type) teile.push('Art: ' + ({ wifi: 'WLAN', cellular: 'Mobilfunk', ethernet: 'Kabel', none: 'keine', bluetooth: 'Bluetooth', wimax: 'WiMAX', other: 'andere', unknown: 'unbekannt' }[c.type] || c.type));
+    if (c.effectiveType) teile.push('wirkt wie: ' + c.effectiveType);
+    if (typeof c.downlink === 'number') teile.push('ca. ' + String(c.downlink).replace('.', ',') + ' Mbit/s');
+    if (typeof c.rtt === 'number') teile.push('Antwortzeit ca. ' + c.rtt + ' ms');
+    if (c.saveData) teile.push('Datensparmodus an');
+    zeile('s-netz', 'info', 'Verbindungsart', teile.length ? teile.join(', ') : 'Browser liefert keine Angaben');
+  }
+
+  // V2: dreimal messen, eine Zeile mit Kleinst-/Mittel-/Größtwert
+  function messeDreimal(z) {
+    var werte = [], letzte = null, fehler = null;
+    var kette = Promise.resolve();
+    [0, 1, 2].forEach(function () {
+      kette = kette.then(function () {
+        return abfrage(z[1], z[2], 8000).then(function (r) { werte.push(r.ms); letzte = r.antwort; }, function (e) { if (!fehler) fehler = e; });
+      });
+    });
+    return kette.then(function () {
+      if (!werte.length) {
+        zeile('s-netz', 'bad', z[0], 'nicht erreichbar: ' + fehlertext(fehler) + ' (Inhaltsblocker, VPN oder Firmennetz?)');
+        return;
+      }
+      var min = Math.min.apply(null, werte), max = Math.max.apply(null, werte);
+      var summe = 0; werte.forEach(function (w) { summe += w; });
+      var mittel = Math.round(summe / werte.length);
+      var streut = max > 3 * min && max > 1000;
+      var txt = 'erreichbar, ' + werte.length + '×: ' + min + ' / ' + mittel + ' / ' + max + ' ms (kleinste / mittel / größte)';
+      if (z[2] && letzte) {
+        var lm = letzte.headers.get('last-modified');
+        if (lm) txt += ', Launcher-Stand auf dem Server: ' + new Date(lm).toLocaleString('de-DE');
+      }
+      if (fehler) {
+        zeile('s-netz', 'warn', z[0], txt + ' — ' + (3 - werte.length) + '× keine Antwort: ' + fehlertext(fehler));
+      } else if (streut) {
+        zeile('s-netz', 'warn', z[0], txt + ' — Antwortzeit schwankt stark (Funkloch, schwaches WLAN?)');
+      } else {
+        zeile('s-netz', 'ok', z[0], txt);
+      }
+    });
+  }
+
+  function messeEinmal(z) {
+    return abfrage(z[1], z[2], 8000).then(function (r) {
+      zeile('s-netz', 'ok', z[0], 'erreichbar, ' + r.ms + ' ms');
+    }, function (e) {
+      zeile('s-netz', 'bad', z[0], 'nicht erreichbar: ' + fehlertext(e) + ' (Inhaltsblocker, VPN oder Firmennetz?)');
+    });
+  }
+
+  function pruefeNetz() {
+    abschnitt('Verbindung');
+    pruefeVerbindungsart();
+    if (!window.fetch) { zeile('s-netz', 'bad', 'fetch fehlt', 'Browser zu alt'); return Promise.resolve(); }
+    var kette = Promise.resolve();
+    ZIELE.forEach(function (z) {
+      kette = kette.then(function () { return z[3] ? messeDreimal(z) : messeEinmal(z); });
+    });
+    return kette;
+  }
+
+  // ---------- Dauertest (V3) ----------
+  // Alle 5 s eine Abfrage an BOS-Server und Firestore (je 4 s Zeitlimit), dazu die online/offline-Ereignisse.
+  // Ein Aussetzer beginnt mit der ersten gescheiterten Abfrage oder dem offline-Ereignis und endet mit dem
+  // online-Ereignis (wenn danach nichts mehr scheiterte) bzw. mit der ersten Abfrage, bei der beide antworten.
+  var DAUER_MS = 120000, TAKT_MS = 5000, DAUER_LIMIT_MS = 4000;
+  var D = null;
+
+  function dauerEreignis(text) { if (D) D.ereignisse.push([Date.now(), text]); }
+
+  function dauerOeffne(t, grund) {
+    if (!D.offen) D.offen = { start: t, gruende: [], onlineAt: 0 };
+    if (D.offen.gruende.indexOf(grund) === -1) D.offen.gruende.push(grund);
+  }
+
+  function dauerSchliesse(ende, vermerk) {
+    var a = D.offen; if (!a) return;
+    a.ende = ende; a.dauer = Math.max(0, ende - a.start); a.vermerk = vermerk || '';
+    D.ausfaelle.push(a); D.offen = null;
+  }
+
+  function dauerAbfrage() {
+    if (!D || D.inFlug) return;
+    D.inFlug = true; D.letzteAbfrage = Date.now();
+    var t = D.letzteAbfrage, meinD = D;   // ein abgebrochener Lauf darf einen neuen nicht beschreiben
+    function probe(url, eigen) {
+      return abfrage(url, eigen, DAUER_LIMIT_MS).then(function () { return null; }, function (e) { return fehlertext(e); });
+    }
+    Promise.all([probe('launcher.html', true), probe(FIRESTORE_URL, false)]).then(function (f) {
+      if (!D || D !== meinD) return;
+      D.inFlug = false; D.abfragen++;
+      var gruende = [];
+      if (f[0]) gruende.push('BOS-Server: ' + f[0]);
+      if (f[1]) gruende.push('Firestore: ' + f[1]);
+      if (gruende.length) {
+        D.fehlAbfragen++; D.letzterFehl = t;
+        gruende.forEach(function (g) { dauerOeffne(t, g); });
+      } else if (D.offen && navigator.onLine !== false) {
+        var o = D.offen;
+        dauerSchliesse(o.onlineAt && o.onlineAt >= (D.letzterFehl || 0) ? o.onlineAt : t);
+      }
+      dauerStand();
+      if (D.fertigWenn) dauerEnde(D.fertigWenn);
+    });
+  }
+
+  function aufOffline() { dauerEreignis('Gerät meldet „offline“'); if (D) dauerOeffne(Date.now(), 'Gerät meldet „offline“'); dauerStand(); }
+  function aufOnline() {
+    dauerEreignis('Gerät meldet „online“');
+    if (D && D.offen) D.offen.onlineAt = Date.now();
+    dauerAbfrage();
+  }
+  function aufSicht() {
+    if (!D) return;
+    if (document.hidden) { D.verstecktSeit = Date.now(); dauerEreignis('Seite im Hintergrund oder Gerät gesperrt — Test pausiert womöglich'); }
+    else if (D.verstecktSeit) { dauerEreignis('wieder im Vordergrund nach ' + sekunden(Date.now() - D.verstecktSeit)); D.verstecktSeit = 0; }
+  }
+
+  function dauerStand() {
+    if (!D) return;
+    var rest = Math.max(0, Math.ceil((D.ende - Date.now()) / 1000));
+    var n = D.ausfaelle.length + (D.offen ? 1 : 0);
+    el('dauer-stand').textContent = 'Läuft · noch ' + Math.floor(rest / 60) + ':' + zwei(rest % 60) + ' min · ' + D.abfragen + ' Abfragen · ' +
+      (n ? n + ' Aussetzer' + (D.offen ? ' (gerade keine Verbindung)' : '') : 'bisher keine Aussetzer');
+  }
+
+  function dauerTick() {
+    if (!D) return;
+    var jetzt = Date.now();
+    if (jetzt >= D.ende) { if (D.inFlug) D.fertigWenn = 'fertig'; else dauerEnde('fertig'); return; }
+    if (jetzt - D.letzteAbfrage >= TAKT_MS) dauerAbfrage();
+    dauerStand();
+  }
+
+  function dauerStart() {
+    if (D) return;
+    D = { start: Date.now(), ende: Date.now() + DAUER_MS, abfragen: 0, fehlAbfragen: 0, ausfaelle: [], offen: null,
+          ereignisse: [], inFlug: false, letzteAbfrage: 0, letzterFehl: 0, verstecktSeit: 0, fertigWenn: '' };
+    DAUER_BERICHT = [];
+    el('dauer-ergebnis').innerHTML = '';
+    el('dauer-start').hidden = true; el('dauer-stopp').hidden = false;
+    el('dauer-hinweis').hidden = false; el('dauer-stand').hidden = false;
+    el('nochmal').disabled = true;
+    window.addEventListener('offline', aufOffline);
+    window.addEventListener('online', aufOnline);
+    document.addEventListener('visibilitychange', aufSicht);
+    if (navigator.onLine === false) aufOffline();
+    D.uhr = setInterval(dauerTick, 1000);
+    dauerAbfrage();
+    dauerStand();
+  }
+
+  function dauerEnde(wie) {
+    if (!D) return;
+    var d = D;
+    clearInterval(d.uhr);
+    window.removeEventListener('offline', aufOffline);
+    window.removeEventListener('online', aufOnline);
+    document.removeEventListener('visibilitychange', aufSicht);
+    var jetzt = Date.now();
+    if (d.offen) dauerSchliesse(jetzt, 'dauerte bei Testende noch an');
+    D = null;
+
+    var L = DAUER_BERICHT = [];
+    L.push(''); L.push('== Dauertest Verbindung ==');
+    var box = el('dauer-ergebnis');
+    var dauer = jetzt - d.start;
+    zeile(box, 'info', wie === 'fertig' ? 'Test vollständig (2 Minuten)' : 'Test abgebrochen nach ' + sekunden(dauer),
+      uhrzeit(d.start) + ' bis ' + uhrzeit(jetzt) + ' Gerätezeit · ' + d.abfragen + ' Abfragen alle 5 s, davon ' + d.fehlAbfragen + ' ohne Antwort', L);
+    if (!d.ausfaelle.length) {
+      zeile(box, 'ok', 'Keine Aussetzer', 'BOS-Server und Datenbank haben jedes Mal geantwortet', L);
+    } else {
+      var laengster = 0;
+      d.ausfaelle.forEach(function (a) { if (a.dauer > laengster) laengster = a.dauer; });
+      zeile(box, 'warn', d.ausfaelle.length + ' Aussetzer, längster ' + sekunden(laengster), 'Die Verbindung war zwischendurch weg (das Gerät ist dadurch nicht kaputt)', L);
+      d.ausfaelle.forEach(function (a) {
+        zeile(box, 'warn', 'Aussetzer ' + uhrzeit(a.start) + ' – ' + uhrzeit(a.ende) + ' (' + sekunden(a.dauer) + ')',
+          a.gruende.join(' · ') + (a.vermerk ? ' · ' + a.vermerk : ''), L);
+      });
+    }
+    d.ereignisse.forEach(function (e) { zeile(box, 'info', uhrzeit(e[0]) + ' ' + e[1], '', L); });
+
+    el('dauer-start').hidden = false; el('dauer-start').textContent = 'Noch einmal 2 Minuten beobachten';
+    el('dauer-stopp').hidden = true; el('dauer-hinweis').hidden = true; el('dauer-stand').hidden = true;
+    el('nochmal').disabled = !GEPRUEFT;
+    aktualisiereBericht();
+  }
+
+  // ---------- Seitentest ----------
+  // P1: nur exakt gelistete Seiten, gleiche Herkunft, .html — alles andere wird abgewiesen, nie geladen.
+  function erlaubteSeite(name) {
+    var n = String(name || '').replace(/^\s+|\s+$/g, '');
+    var gelistet = false;
+    for (var i = 0; i < ERLAUBTE_SEITEN.length; i++) { if (ERLAUBTE_SEITEN[i][0] === n) gelistet = true; }
+    if (!gelistet) return { ok: false, grund: 'nicht in der Liste der prüfbaren Seiten' };
+    var u;
+    try { u = new URL(n, location.href); } catch (e) { return { ok: false, grund: 'keine gültige Adresse' }; }
+    if (u.origin !== location.origin) return { ok: false, grund: 'andere Herkunft (' + u.origin + ')' };
+    if (!/\.html$/i.test(u.pathname)) return { ok: false, grund: 'keine .html-Seite' };
+    return { ok: true, url: u.href, name: n };
+  }
+
+  function kurz(s) { s = String(s); return s.length > 120 ? s.slice(0, 120) + ' …' : s; }
+
+  // Läuft im Testrahmen VOR dem Seitencode. Wird per toString() in die Seite gesetzt.
+  function fehlerHaken(kanal) {
+    function m(art, text) { try { parent[kanal](art, String(text).slice(0, 600)); } catch (e) {} }
+    function s(a) {
+      try {
+        if (a && a.message) return (a.code ? a.code + ' – ' : '') + a.message;
+        if (a && typeof a === 'object') return JSON.stringify(a);
+        return String(a);
+      } catch (e) { return String(a); }
+    }
+    window.addEventListener('error', function (ev) {
+      var t = ev.target;
+      if (t && t !== window && (t.src || t.href)) { m('datei', t.src || t.href); return; }
+      m('fehler', (ev.message || 'Fehler') + '  [' + String(ev.filename || '?').split('/').pop() + ':' + (ev.lineno || '?') + ']');
+    }, true);
+    window.addEventListener('unhandledrejection', function (ev) {
+      var r = ev.reason;
+      m('promise', r ? s(r) : 'unbekannt');
+    });
+    var ce = console.error;
+    console.error = function () {
+      var x = [];
+      for (var i = 0; i < arguments.length; i++) x.push(s(arguments[i]));
+      m('console', x.join(' '));
+      return ce.apply(console, arguments);
+    };
+    window.alert = function (t) { m('alert', t); };
+    window.confirm = function (t) { m('alert', 'Rückfrage: ' + t + ' (im Test mit Nein beantwortet)'); return false; };
+    window.prompt = function (t) { m('alert', 'Eingabe: ' + t + ' (im Test abgebrochen)'); return null; };
+  }
+
+  var TITEL = {
+    fehler: 'JS-Fehler',
+    datei: 'Datei nicht geladen',
+    promise: 'Unbehandelter Fehler',
+    console: 'console.error',
+    alert: 'Meldungsfenster'
+  };
+
+  function pruefeSeite(name) {
+    return new Promise(function (res) {
+      var box = document.createElement('div');
+      el('seiten-ergebnis').appendChild(box);
+      var kopf = document.createElement('div'); kopf.className = 'seitenkopf'; kopf.textContent = kurz(name);
+      box.appendChild(kopf);
+      abschnitt('Seite ' + kurz(name));
+
+      var e = erlaubteSeite(name);
+      if (!e.ok) { zeile(box, 'warn', 'nicht erlaubt: ' + kurz(name), e.grund + ' — nicht geladen'); res(); return; }
+      var url = e.url;
+      var funde = 0;
+      var kanal = '__bosDiag_' + Math.random().toString(36).slice(2);
+
+      window[kanal] = function (art, text) {
+        var klasse = 'bad';
+        if (art === 'alert') klasse = 'info';
+        else if (art === 'console') klasse = 'warn';
+        else if (art === 'datei' && !/\.(js|mjs|css)(\?|#|$)/i.test(text)) klasse = 'warn';
+        if (/service ?worker/i.test(text)) { klasse = 'info'; text += ' (im Testrahmen normal)'; }
+        if (klasse !== 'info') funde++;
+        zeile(box, klasse, TITEL[art] || art, text);
+      };
+
+      mitZeitlimit(fetch(url, { cache: 'no-store' }), 10000, name).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      }).then(function (html) {
+        var haken = '<base href="' + url.replace(/"/g, '&quot;') + '">' +
+          '<script>(' + fehlerHaken.toString().replace(/\n\s*/g, ' ') + ')(' + JSON.stringify(kanal) + ');<\/script>';
+        // Haken auf eine Zeile, damit Zeilennummern inline-Skripte der echten HTML-Datei entsprechen
+        var doc = /<head[^>]*>/i.test(html)
+          ? html.replace(/<head[^>]*>/i, function (m) { return m + haken; })
+          : haken + html;
+
+        var f = document.createElement('iframe');
+        f.title = 'Test ' + name;
+        f.onload = function () {
+          try {
+            var h = f.contentWindow.location.href;
+            if (h && h !== 'about:srcdoc' && h !== 'about:blank') zeile(box, 'info', 'Seite leitet weiter', h);
+          } catch (e) {}
+        };
+        box.appendChild(f);
+        f.srcdoc = doc;
+
+        setTimeout(function () {
+          var txt = '';
+          try {
+            var b = f.contentDocument && f.contentDocument.body;
+            txt = ((b && (b.innerText || b.textContent)) || '').replace(/\s+/g, ' ').trim();
+          } catch (e) {}
+          if (!funde) zeile(box, 'ok', 'Keine Fehler in ' + (WARTE_MS / 1000) + ' s', '');
+          zeile(box, txt ? 'info' : 'warn', txt ? 'Seite zeigt' : 'Seite zeigt keinen Text', txt ? '„' + txt.slice(0, 180) + (txt.length > 180 ? ' …' : '') + '“' : '');
+          res();
+        }, WARTE_MS);
+      }).catch(function (e) {
+        zeile(box, 'bad', 'Seite nicht abrufbar', fehlertext(e));
+        res();
+      });
+    });
+  }
+
+  // Auswahl: Haken je erlaubter Seite; ?seite= hakt gelistete Seiten an und meldet den Rest als „nicht erlaubt“
+  var ABGEWIESEN = [];
+  function baueAuswahl() {
+    var param = null;
+    try { param = new URLSearchParams(location.search).get('seite'); } catch (e) {}
+    var gewuenscht = STANDARD_SEITEN.slice();
+    if (param !== null) {
+      gewuenscht = [];
+      param.split(',').forEach(function (s) {
+        s = s.replace(/^\s+|\s+$/g, '');
+        if (!s) return;
+        if (erlaubteSeite(s).ok) { if (gewuenscht.indexOf(s) === -1) gewuenscht.push(s); }
+        else ABGEWIESEN.push(s);
+      });
+    }
+    var wahl = el('seiten-wahl');
+    ERLAUBTE_SEITEN.forEach(function (s, i) {
+      var l = document.createElement('label'); l.className = 'wahl';
+      var c = document.createElement('input'); c.type = 'checkbox'; c.value = s[0]; c.id = 'seite' + i;
+      c.checked = gewuenscht.indexOf(s[0]) !== -1;
+      var t = document.createElement('span'); t.textContent = s[1];
+      l.appendChild(c); l.appendChild(t); wahl.appendChild(l);
+    });
+  }
+
+  function seitenListe() {
+    var l = [];
+    var cs = el('seiten-wahl').querySelectorAll('input[type=checkbox]');
+    for (var i = 0; i < cs.length; i++) if (cs[i].checked) l.push(cs[i].value);
+    return l;
+  }
+
+  function pruefeSeiten() {
+    var kette = Promise.resolve();
+    ABGEWIESEN.forEach(function (n) { kette = kette.then(function () { return pruefeSeite(n); }); });
+    seitenListe().forEach(function (n) { kette = kette.then(function () { return pruefeSeite(n); }); });
+    return kette;
+  }
+
+  // ---------- Abschluss ----------
+  function aktualisiereBericht() {
+    var kopf = [
+      'BOS Gerätecheck · ' + new Date().toLocaleString('de-DE'),
+      'Ergebnis: ' + ZAEHL.bad + ' Fehler, ' + ZAEHL.warn + ' Hinweise'
+    ];
+    el('bericht').value = kopf.concat(BERICHT, DAUER_BERICHT).join('\n');
+  }
+
+  function abschluss() {
+    var s = el('status');
+    if (ZAEHL.bad) { s.className = 'bad'; s.textContent = ZAEHL.bad + ' Problem(e) gefunden. Bitte Bericht an Ulf schicken.'; }
+    else if (ZAEHL.warn) { s.className = 'warn'; s.textContent = 'Keine harten Fehler, aber ' + ZAEHL.warn + ' Hinweis(e). Bitte Bericht an Ulf schicken.'; }
+    else { s.className = 'ok'; s.textContent = 'Keine Probleme gefunden. Bitte trotzdem Bericht an Ulf schicken.'; }
+    aktualisiereBericht();
+    el('teilen').disabled = false;
+    el('kopieren').disabled = false;
+    el('nochmal').disabled = !!D;
+    el('dauer-start').disabled = false;
+    GEPRUEFT = true;
+  }
+
+  el('teilen').onclick = function () {
+    var text = el('bericht').value;
+    if (navigator.share) {
+      navigator.share({ title: 'BOS Gerätecheck', text: text }).catch(function (e) {
+        if (e && e.name !== 'AbortError') kopiere(text);
+      });
+    } else {
+      kopiere(text);
+    }
+  };
+
+  function kopiere(text) {
+    function alt() {
+      var ta = el('bericht');
+      ta.removeAttribute('readonly'); ta.select(); ta.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.setAttribute('readonly', '');
+      el('kopieren').textContent = ok ? 'Kopiert ✓' : 'Bitte Text markieren und kopieren';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { el('kopieren').textContent = 'Kopiert ✓'; }, alt);
+    } else { alt(); }
+  }
+
+  el('kopieren').onclick = function () { kopiere(el('bericht').value); };
+
+  el('nochmal').onclick = function () {
+    if (!GEPRUEFT || D) return;
+    el('nochmal').disabled = true; el('teilen').disabled = true; el('kopieren').disabled = true;
+    el('dauer-start').disabled = true;
+    el('kopieren').textContent = 'Bericht kopieren';
+    el('seiten-ergebnis').innerHTML = '';
+    el('status').className = ''; el('status').textContent = 'Seiten werden erneut geprüft …';
+    // Seitenteil im Bericht ersetzen
+    var schnitt = -1;
+    for (var i = 0; i < BERICHT.length; i++) { if (BERICHT[i].indexOf('== Seite ') === 0) { schnitt = i - 1; break; } }
+    if (schnitt >= 0) BERICHT.length = schnitt;
+    ZAEHL = { bad: 0, warn: 0 };
+    BERICHT.forEach(function (z) { if (z.indexOf('FEHL') === 0) ZAEHL.bad++; if (z.indexOf('WARN') === 0) ZAEHL.warn++; });
+    pruefeSeiten().then(abschluss);
+  };
+
+  el('dauer-start').onclick = function () { if (GEPRUEFT) dauerStart(); };
+  el('dauer-stopp').onclick = function () { dauerEnde('abgebrochen'); };
+
+  el('cache').onclick = function () {
+    var aufgaben = [];
+    if ('serviceWorker' in navigator) {
+      aufgaben.push(navigator.serviceWorker.getRegistrations().then(function (r) {
+        return Promise.all(r.map(function (x) { return x.unregister(); })).then(function () { return r.length + ' Service Worker entfernt'; });
+      }));
+    }
+    if (window.caches) {
+      aufgaben.push(caches.keys().then(function (k) {
+        return Promise.all(k.map(function (n) { return caches.delete(n); })).then(function () { return k.length + ' Cache-Speicher geleert'; });
+      }));
+    }
+    Promise.all(aufgaben).then(function (t) {
+      el('cache-ergebnis').textContent = (t.length ? t.join(', ') : 'Nichts zu leeren') + '. Login und Daten bleiben erhalten. BOS jetzt neu öffnen.';
+    }, function (e) {
+      el('cache-ergebnis').textContent = 'Fehler beim Leeren: ' + fehlertext(e);
+    });
+  };
+
+  // ---------- Start ----------
+  baueAuswahl();
+
+  pruefeGeraet();
+  pruefeJS()
+    .then(function () { pruefeDatum(); return pruefeUhr(); })
+    .then(pruefeSpeicher)
+    .then(pruefeNetz)
+    .then(pruefeSeiten)
+    .then(abschluss)
+    .catch(function (e) {
+      zeile('s-geraet', 'bad', 'Prüfung abgebrochen', fehlertext(e));
+      abschluss();
+    });
+})();
+</script>
+</body>
+</html>

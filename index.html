@@ -47,6 +47,13 @@
       Selbstbedienungsweg; neues Passwort setzt Ulf in der Konsole.
 
   CHANGELOG
+    2026-11-03 · 01:23 · Link „Probleme mit BOS? Gerätecheck“ (Anweisung allgemeiner Kontroll-Chat
+      02.11., 22:1x) · Feature
+      Kleiner Textlink unter der Wechsel-Zeile auf geraetecheck.html (Repo-Wurzel), Farben aus den Tokens
+      (wie die Wechsel-Zeile, eine Schriftstufe kleiner), ohne Anmeldung, selbes Fenster, bleibt auch bei
+      ?wechseln=1 sichtbar. Anmeldung, Auge, Crumble/Loch, Zeitlimit K86 und Platzreservierung
+      mit-crumble unverändert. Die Prüfzeile (?crumble=pruefen) steht jetzt 4 px unter dem Link statt unter
+      der Wechsel-Zeile (sie hängt an der Unterkante der Spalte). SESSION_2026-11-03_GERAETECHECK_BAU.md
     2026-10-28 · 08:00 · Passwort anzeigen („Auge“; Anweisung allgemeiner Kontroll-Chat
       07:55) · Feature
       Knopf mit Augen-Symbol rechts im Passwortfeld (div.passwort-huelle, Feld rechts
@@ -532,6 +539,34 @@
 
   .wechsel[hidden] { display: none; }
 
+  /* Gerätecheck (03.11.2026): kleiner Textlink unter der Wechsel-Zeile, leiser als sie (eine Stufe
+     kleiner), Farben nur aus den Tokens. Ohne Anmeldung erreichbar, öffnet im selben Fenster. */
+  .geraetecheck {
+    margin: var(--bos-space-xs) 0 0;
+    text-align: center;
+    font-size: var(--bos-font-xs);
+  }
+
+  /* Trefffläche größer als die kleine Schrift (Finger, Handschuh): Innenabstand mit gleich großem negativem
+     Außenabstand — die Lage aller anderen Teile bleibt, der Link ist trotzdem gut zu treffen. */
+  .geraetecheck a {
+    display: inline-block;
+    padding: 6px 10px;     /* oben nicht mehr als 6 px: sonst reicht die Fläche in die Wechsel-Zeile */
+    margin: -6px -10px;
+    color: var(--bos-text-faint);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--bos-transition-fast);
+  }
+
+  .geraetecheck a:hover, .geraetecheck a:focus-visible {
+    color: var(--bos-text-dim);
+    text-decoration: underline;
+    text-decoration-color: var(--bos-border-strong);
+    text-underline-offset: 3px;
+  }
+  .geraetecheck a:focus-visible { outline: 2px solid var(--bos-amber-bright); outline-offset: -2px; border-radius: var(--bos-radius-sm); }
+
   /* --- Meldungsband ------------------------------------------------ */
   .band {
     align-self: end;
@@ -630,6 +665,9 @@
     </a>
 
     <p class="wechsel"><a href="?wechseln=1" id="wechselLink">Abmelden und andere Kennung verwenden</a></p>
+    <!-- Gerätecheck (03.11.2026): ohne Anmeldung erreichbar, für alle; prüft Gerät, Verbindung und Seiten,
+         liest und schreibt keine BOS-Daten. Bleibt auch bei ?wechseln=1 sichtbar. -->
+    <p class="geraetecheck"><a href="geraetecheck.html" id="geraetecheckLink">Probleme mit BOS? Gerätecheck</a></p>
   </main>
 
   <aside class="band" id="band" hidden></aside>
