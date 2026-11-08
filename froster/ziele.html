@@ -33,6 +33,9 @@
       Direktlink zum Anlegen (einmalig, danach dauerhaft behoben).
 
   CHANGELOG
+    2026-11-08 · 15:38 · Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45)
+      Lädt ../produktionsplaner/bestell_regeln.js vor bos_ziel_berechnung.js: Bestellungen „noch nicht
+      eingeplant“ zählen dort wie ein Nachtrag (🔔). Sonst unverändert. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md
     2026-09-05 · v0.1 · Feature
       Erste Version. Liste je Station, X/Y-Fortschritt, grüner Haken
       bei erfülltem Ziel, auffälliges Symbol + aufklappbare Details
@@ -182,6 +185,7 @@
 <script src="../bos_permissions.js"></script>
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
+<script src="../produktionsplaner/bestell_regeln.js"></script>   <!-- NEU 08.11.2026: Kennzeichen der Bestellungen, VOR bos_ziel_berechnung.js -->
 <script src="../bos_ziel_berechnung.js"></script>
 
 <header>

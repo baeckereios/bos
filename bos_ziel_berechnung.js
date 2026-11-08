@@ -26,7 +26,26 @@
 
    AUFRUFER: froster/ziele.html, froster/froster_produktion.html (v0.3+)
 
+   BESTELLUNGEN (seit 08.11.2026): Zusätzlich zu den alten Nachträgen zählen
+   Bestellungen (type produktionsplan_bestellung), die gegen die Einreichung
+   „neu seit Einreichung — noch nicht eingeplant“ sind (Regel in
+   ../produktionsplaner/bestell_regeln.js, eine Rechenstelle für Station,
+   Übersicht, Seite Bestellungen und hier). Eingeplante stecken schon in
+   gesamtProduktion. Die Seiten müssen bestell_regeln.js VOR dieser Datei laden.
+
    CHANGELOG
+     2026-11-08 · 15:38 · v0.4 · Feature (Produktionsplaner Schritt 1, Go
+       Kontroll-Chat 08.11., 14:45, E1) — ladeWoche() liest zusätzlich die
+       Bestellungen der Planungsspanne (type ==, datum in [17 Tage], ohne
+       orderBy) und die Einreichungen der übrigen Wochen, die diese Tage
+       abdecken können (für dasselbe Kennzeichen wie überall).
+       berechneProdukt() schlägt Bestellungen „noch nicht eingeplant“, die
+       die Einreichung der Woche abdeckt, wie einen Nachtrag auf das Ziel
+       (in nachtraege, Feld bestellung: true, dazu datum und notiz).
+       Ohne Bestellungen rechnet alles wie vorher (Vergleichslauf alt/neu).
+       Fehlt bestell_regeln.js (alte Seite im Zwischenspeicher), lehnt
+       ladeWoche() mit sichtbarem Grund ab, statt Bestellungen still
+       wegzulassen. Rechnung der Nachträge unverändert.
      2026-09-05 · v0.1 · Feature — Erste Version.
      2026-09-06 · v0.2 · Fix — montagDerWoche() lieferte den Montag der
        KALENDERWOCHE, die das übergebene Datum enthält — an einem Fr/Sa/So
@@ -127,10 +146,18 @@
     var fensterStart = new Date(montag);
     fensterStart.setDate(fensterStart.getDate() - 3);
     fensterStart.setHours(0, 1, 0, 0);
+    // 08.11.2026: Bestellungen der Planungsspanne und Einreichungen der übrigen
+    // Wochen, die diese Tage abdecken können (bestell_regeln.js).
+    var BR = global.BOS_BESTELL_REGELN;
+    if (!BR) return Promise.reject(new Error('bestell_regeln.js ist nicht geladen (../produktionsplaner/bestell_regeln.js) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.'));
+    var spanne = BR.planungsSpanne(montag);
+    var andereWochen = BR.wochenFuerTage(spanne).filter(function (w) { return w !== wocheIso; });
     return Promise.all([
       db.collection('bos_events').where('type', '==', 'produktionsplan_einreichung').where('woche', '==', wocheIso).get(),
       db.collection('bos_events').where('type', '==', 'produktionsplan_nachtrag').where('woche', '==', wocheIso).get(),
-      db.collection('bos_events').where('type', '==', 'froster_produktion').where('ts', '>=', fensterStart).get()
+      db.collection('bos_events').where('type', '==', 'froster_produktion').where('ts', '>=', fensterStart).get(),
+      db.collection('bos_events').where('type', '==', BR.TYP).where('datum', 'in', spanne).get(),
+      andereWochen.length ? db.collection('bos_events').where('type', '==', 'produktionsplan_einreichung').where('woche', 'in', andereWochen).get() : null
     ]).then(function (results) {
       var einreichungenSnap = results[0], nachtragSnap = results[1], produktionSnap = results[2];
 
@@ -150,7 +177,15 @@
       var produktionen = [];
       produktionSnap.forEach(function (doc) { produktionen.push(doc.data()); });
 
-      return { einreichungProStation: einreichungProStation, nachtraege: nachtraege, produktionen: produktionen };
+      // 08.11.2026: Bestellungen (mit id) und die Einreichungen für die Kennzeichen
+      var bestellungen = [];
+      results[3].forEach(function (doc) { var d = doc.data(); d.id = doc.id; bestellungen.push(d); });
+      var alleEinreichungen = [];
+      einreichungenSnap.forEach(function (doc) { alleEinreichungen.push(doc.data()); });
+      if (results[4]) results[4].forEach(function (doc) { alleEinreichungen.push(doc.data()); });
+
+      return { einreichungProStation: einreichungProStation, nachtraege: nachtraege, produktionen: produktionen,
+               bestellungen: bestellungen, einreichungenKZ: BR.neuesteJeStationUndWoche(alleEinreichungen) };
     });
   }
 
@@ -165,6 +200,17 @@
     var passendeNachtraege = kontext.nachtraege.filter(function (n) {
       return n.legacyKey === legacyKey && n.station === station && alsMillis(n.ts) > einreichungMillis;
     });
+    // 08.11.2026: Bestellungen „noch nicht eingeplant“, die diese Einreichung abdeckt,
+    // zählen wie ein Nachtrag (Kennzeichen aus bestell_regeln.js, nicht über ts).
+    var BR = global.BOS_BESTELL_REGELN;
+    if (BR && kontext.bestellungen) {
+      kontext.bestellungen.forEach(function (b) {
+        if (b.station !== station || b.legacyKey !== legacyKey) return;
+        if (!BR.deckt(einreichung, legacyKey, b.datum)) return;
+        if (BR.kennzeichen(b, kontext.einreichungenKZ || [einreichung]) !== 'neu') return;
+        passendeNachtraege.push({ menge: b.menge, eingetragenVon: b.eingetragenVon, ts: b.ts, datum: b.datum, notiz: b.notiz, bestellung: true, id: b.id });
+      });
+    }
     var nachtragSumme = passendeNachtraege.reduce(function (sum, n) { return sum + (n.menge || 0); }, 0);
 
     var produziert = kontext.produktionen

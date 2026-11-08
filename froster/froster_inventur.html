@@ -33,6 +33,16 @@
          nächste Schritt.
 
   CHANGELOG
+    2026-11-08 · 15:38 · v0.11 · Fix (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45)
+      Ein Minus wird abgewiesen, auch beim Einfügen (Ulf 03.11., 05:05: „bei der
+      Inventur darf man keine Fehlmengen eingeben. Es ist eine Bestandsaufnahme“):
+      Zeile rot, Wert nicht in ZAEHLUNGEN, Hinweis „Nur zählen, was im Froster
+      liegt — Fehlmengen gehören in die Produktionsplanung.“ Solange ein Feld rot
+      ist, ist „Zählung absenden“ gesperrt. Vorher wies min="0" außerhalb eines
+      Formulars nichts ab. Sendefehler zeigt den echten Grund (err.message, Code,
+      Rat) statt „Senden fehlgeschlagen — erneut versuchen.“ Hilfe: ein Satz zu
+      Fehlmengen. window.onerror/unhandledrejection sichtbar.
+      SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md
     2026-10-15 · 01:26 · v0.10 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
       Produktliste aus der Sicht 'laufend': pausierte Produkte (Haken „Aktiv“
       aus im Produkt-Editor) fehlen in der Zählung. Der Editor sagt beim
@@ -292,6 +302,12 @@
     box-shadow:0 0 8px var(--amber-glow);
   }
   .zeile.gezaehlt{border-color:#4a3821;}
+  /* 08.11.2026: abgewiesener Wert (Minus) — Zeile rot, Hinweis darunter */
+  .zeile.abgewiesen{border-color:var(--danger); flex-wrap:wrap;}
+  .zeile.abgewiesen::before{background:var(--danger); box-shadow:none;}
+  .zeile.abgewiesen input.zaehl-input{border-color:var(--danger); color:var(--danger);}
+  .abweis-hinweis{flex-basis:100%; font-family:var(--font-label); font-weight:700; font-size: var(--bos-font-xs, .78rem); color:var(--danger); line-height:1.35;}
+  .seiten-fehler{margin:10px auto; max-width:640px; padding:9px 12px; border:1px solid var(--danger); border-radius:10px; color:var(--danger); font-family:var(--font-label); font-weight:700; font-size:.82rem; overflow-wrap:anywhere;}
 
   .produkt-name{
     flex:1;
@@ -527,6 +543,7 @@
     <p>Beim Öffnen fragt die Seite pro Zuständigkeit: „Vorbereitung für morgen schon fertig?" Damit ist gemeint, ob die Teiglinge für morgen bereits aus dem Froster geholt und zusammengestellt wurden. Ist das schon erledigt, zählt der morgige Verbrauch nicht mehr auf diese Zählung — sonst schon. Auch das ist nur eine Beobachtung von dir, keine Berechnung.</p>
     <p>Lass ein Feld leer, wenn du dieses Produkt nicht geprüft hast. Eine leere Zeile bedeutet „nicht gezählt", nicht „null Stück im Froster" — das ist ein wichtiger Unterschied für die Auswertung.</p>
     <p>Was mit den Zahlen passiert — ob etwas fehlt, was produziert werden muss — wird automatisch woanders im System berechnet. Hier zählst du nur, sonst nichts.</p>
+    <p>Fehlmengen trägst du in der Produktionsplanung ein, nicht hier — ein Minus nimmt die Inventur nicht an.</p>
     <button class="sheet-schluss" id="hilfeSchluss">Verstanden</button>
   </div>
 </div>
@@ -541,6 +558,9 @@ const STR = {
   submitSenden: 'Wird gesendet …',
   submitLeer: 'Trage mindestens einen Wert ein.',
   submitOk: 'Leer gelassene Produkte gelten als nicht geprüft.',
+  abgewiesen: 'Nur zählen, was im Froster liegt — Fehlmengen gehören in die Produktionsplanung.',   // 08.11.2026
+  submitRot: 'Rot markierte Felder korrigieren oder leeren.',                                       // 08.11.2026
+  sendeFehler: 'Senden fehlgeschlagen: ',                                                          // 08.11.2026
   authFehlt: 'Firebase ist noch nicht konfiguriert — Zählung kann nicht gesendet werden.',
   erfolgTitel: 'Zählung gespeichert',
   erfolgText: (n) => `${n} Produkte erfasst und an den Host übermittelt.`,
@@ -605,6 +625,7 @@ setInterval(renderZeit, 30000);
 /* ==== Produktliste laden ==== */
 let PRODUKTE = [];      // {legacyKey, name, zustaendigkeit, sort}
 let ZAEHLUNGEN = {};    // legacyKey -> Zahl (nur tatsächlich eingetragene Werte)
+let ABGEWIESEN = {};    // 08.11.2026: legacyKey -> true, solange das Feld ein Minus (oder Unsinn) enthält
 
 const GRUPPEN_REIHENFOLGE = ['baecker','konditoren','sonstige'];
 
@@ -767,22 +788,41 @@ function renderListe(){
 
   document.getElementById('main').innerHTML = html;
 
+  // 08.11.2026: Ein Minus wird abgewiesen — auch beim Einfügen (input-Ereignis kommt
+  // dafür genauso). badInput = der Browser hält den Text für keine Zahl (z. B. nur
+  // „-“); dann steht value leer da, obwohl etwas im Feld steht → ebenfalls abweisen.
   document.querySelectorAll('.zaehl-input').forEach(function(input){
     input.addEventListener('input', function(){
       const key = input.dataset.key;
       const val = input.value.trim();
       const zeile = document.getElementById('zeile_' + key);
-      if (val === '') {
+      const zahl = parseFloat(val);
+      const unsinn = (input.validity && input.validity.badInput) || (val !== '' && (!isFinite(zahl) || zahl < 0 || /^-/.test(val)));
+      setzeAbgewiesen(key, zeile, unsinn);
+      if (unsinn || val === '') {
         delete ZAEHLUNGEN[key];
         zeile.classList.remove('gezaehlt');
       } else {
-        ZAEHLUNGEN[key] = parseFloat(val);
+        ZAEHLUNGEN[key] = zahl;
         zeile.classList.add('gezaehlt');
       }
       aktualisiereProgress();
       aktualisiereSubmitZustand();
     });
   });
+}
+
+function setzeAbgewiesen(key, zeile, an){
+  let h = zeile.querySelector('.abweis-hinweis');
+  if (an) {
+    ABGEWIESEN[key] = true;
+    zeile.classList.add('abgewiesen');
+    if (!h) { h = document.createElement('div'); h.className = 'abweis-hinweis'; h.textContent = t('abgewiesen'); zeile.appendChild(h); }
+  } else {
+    delete ABGEWIESEN[key];
+    zeile.classList.remove('abgewiesen');
+    if (h) h.remove();
+  }
 }
 
 function aktualisiereProgress(){
@@ -797,10 +837,16 @@ function aktualisiereSubmitZustand(){
   const btn = document.getElementById('submitBtn');
   const hint = document.getElementById('submitHint');
   const anzahl = Object.keys(ZAEHLUNGEN).length;
+  hint.style.color = Object.keys(ABGEWIESEN).length ? 'var(--danger)' : '';   // 08.11.2026
 
   if (!firebaseKonfiguriert) {
     btn.disabled = true;
     hint.textContent = t('authFehlt');
+    return;
+  }
+  if (Object.keys(ABGEWIESEN).length) {   // 08.11.2026
+    btn.disabled = true;
+    hint.textContent = t('submitRot');
     return;
   }
   if (anzahl === 0) {
@@ -820,6 +866,7 @@ function aktualisiereSubmitZustand(){
 
 document.getElementById('submitBtn').addEventListener('click', function(){
   const btn = this;
+  if (Object.keys(ABGEWIESEN).length) { aktualisiereSubmitZustand(); return; }   // 08.11.2026: nie mit rotem Feld senden
   btn.disabled = true;
   btn.textContent = t('submitSenden');
 
@@ -839,7 +886,17 @@ document.getElementById('submitBtn').addEventListener('click', function(){
       console.error('[Froster-Inventur] Sende-Fehler:', err);
       btn.disabled = false;
       btn.textContent = t('submit');
-      document.getElementById('submitHint').textContent = 'Senden fehlgeschlagen — erneut versuchen.';
+      // 08.11.2026: echter Grund sichtbar (Projektregel err.message), dazu was hilft
+      // ~~'Senden fehlgeschlagen — erneut versuchen.'~~
+      const code = err && err.code;
+      let grund = (err && err.message) ? err.message : String(err);
+      if (code && grund.indexOf(code) < 0) grund += ' (' + code + ')';
+      const rat = code === 'permission-denied' ? ' — dieses Konto darf keine Zählung speichern, Ulf Bescheid sagen.'
+        : (code === 'unavailable' || code === 'deadline-exceeded') ? ' — keine Verbindung zur Datenbank, Netz prüfen und erneut senden.'
+        : ' — erneut senden. Hilft das nicht: Ulf Bescheid sagen.';
+      const hint = document.getElementById('submitHint');
+      hint.textContent = t('sendeFehler') + grund + rat;
+      hint.style.color = 'var(--danger)';
     });
 });
 
@@ -855,6 +912,7 @@ function zeigeErfolg(anzahl){
     '</div>';
   document.getElementById('neuBtn').addEventListener('click', function(){
     ZAEHLUNGEN = {};
+    ABGEWIESEN = {};   // 08.11.2026
     document.getElementById('submitBar').style.display = 'block';
     document.getElementById('progressWrap').style.display = 'block';
     renderListe();
@@ -873,6 +931,15 @@ document.getElementById('hilfeSchluss').addEventListener('click', function(){
 document.getElementById('hilfeOverlay').addEventListener('click', function(e){
   if (e.target === this) this.classList.remove('offen');
 });
+
+/* ==== Unerwartete Fehler sichtbar (Checkliste §7a, 08.11.2026) ==== */
+function zeigeSeitenFehler(text){
+  let el = document.getElementById('seitenFehler');
+  if (!el) { el = document.createElement('div'); el.id = 'seitenFehler'; el.className = 'seiten-fehler'; document.body.insertBefore(el, document.getElementById('main')); }
+  el.textContent = '⚠ Unerwarteter Fehler: ' + text + ' — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.';
+}
+window.addEventListener('error', function(e){ zeigeSeitenFehler((e && e.message ? e.message : 'Fehler') + (e && e.filename ? ' (' + String(e.filename).replace(/^.*\//, '') + ':' + e.lineno + ')' : '')); });
+window.addEventListener('unhandledrejection', function(e){ const r = e && e.reason; zeigeSeitenFehler((r && r.message) ? r.message : String(r)); });
 
 /* ==== Start ==== */
 initFirebase();

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="de">
+<!-- 2026-11-08 · 15:38 · v1.0 · Feature — Erstfassung (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45, Freigabe §3; Ulf 08.11., 14:42/14:44: „eine eigene Seite … wo wir sauber alle Bestellungen in einer Liste vor uns sehen? Und auch hinzufügen und ggf wieder löschen können?“). Alle Bestellungen (bos_events, type produktionsplan_bestellung) in einer Liste, nach Tag sortiert, Filter Station und Produkt; je Zeile Tag, Station, Produkt, Menge mit Einheit, Notiz, wer, wann, Kennzeichen (bestell_regeln.js: eingeplant · neu seit Einreichung — noch nicht eingeplant · ohne = kommt in eine spätere Planung), Löschen mit Rückfrage auf der Seite. Eintragen mit Tag frei ab morgen (keine Grenze nach vorne). Vergangene eingeklappt, nichts gelöscht. Zeilen „Bestellung gelöscht, steckt noch in der eingereichten Planung von …“. Alte Nachträge (produktionsplan_nachtrag) nur lesen. Abfrage nur type == … (kein Index), Rest im Gerät; Einreichungen der Wochen aus wochenFuerTage(). Fehler sichtbar mit Grund, Zeitlimit beim Speichern. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BOS · Bestellungen</title>
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  body { padding-bottom: 60px; margin: 0; background: var(--bos-bg); }
+  * { box-sizing: border-box; }
+
+  .nfc-header { background:var(--bos-surface); border-bottom:1px solid var(--bos-border); padding:14px 16px; position: sticky; top: 0; z-index: 100; }
+  .nfc-header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .nfc-title  { font-family:var(--bos-font-display); font-weight:900; font-size:1.3rem; color:var(--bos-text); line-height:1.1; }
+  .nfc-sub    { font-family:var(--bos-font-label); font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--bos-text-dim); margin-top:3px; }
+  .nfc-back   { font-family:var(--bos-font-label); font-weight:800; font-size:0.72rem; color:var(--bos-text-dim); text-decoration:none; white-space:nowrap; padding-top:4px; -webkit-tap-highlight-color:transparent; }
+  .nfc-header-actions { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .pp-help-btn { width:30px; height:30px; border-radius:50%; border:none; background:var(--bos-amber); color:#1a1208; font-weight:900; font-size:0.9rem; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+
+  #pp-hilfe-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
+  #pp-hilfe-inhalt-wrap { background:var(--bos-surface); border-radius:var(--bos-radius-lg,18px) var(--bos-radius-lg,18px) 0 0; max-width:680px; margin:40px auto 0; padding:20px 18px 40px; min-height:50vh; }
+  .pp-hilfe-schritt { margin-bottom:18px; padding-bottom:14px; border-bottom:1px dashed var(--bos-border); }
+  .pp-hilfe-titel { font-family:var(--bos-font-display); font-weight:900; color:var(--bos-amber); margin-bottom:5px; }
+  .pp-hilfe-text { font-family:var(--bos-font-body); font-size:0.85rem; line-height:1.6; color:var(--bos-text-dim); white-space:pre-line; }
+
+  .brain-status { padding:8px 16px; text-align:center; font-size:0.75rem; font-family:var(--bos-font-label); font-weight:700; letter-spacing:0.5px; border-bottom:2px solid var(--bos-border); overflow-wrap:anywhere; }
+  .brain-status.loading { color:var(--bos-amber); background:color-mix(in srgb, var(--bos-amber) 6%, transparent); }
+  .brain-status.ready   { color:var(--bos-green);  background:rgba(77,184,122,0.06); }
+  .brain-status.error   { color:var(--bos-red);    background:rgba(201,74,74,0.06); }
+
+  .container { max-width:640px; margin:0 auto; padding:14px 12px 20px; }
+  .karte { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:14px 16px; margin-bottom:14px; }
+  .karte-titel { font-family:var(--bos-font-display); font-weight:900; font-size:1rem; color:var(--bos-text); margin-bottom:10px; }
+  .feld-raster { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .feld-raster .ganz { grid-column:1 / -1; }
+  .feld-label { display:block; font-family:var(--bos-font-label); font-weight:800; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.6px; color:var(--bos-text-dim); margin-bottom:3px; }
+  .feld { width:100%; padding:9px 8px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-body); font-size:0.9rem; }
+  .feld.zahl { font-family:var(--bos-font-display); font-weight:900; }
+  .btn-haupt { width:100%; margin-top:10px; padding:11px; border:none; border-radius:10px; background:var(--bos-amber); color:#1a1208; font-family:var(--bos-font-label); font-weight:900; font-size:0.88rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .btn-haupt:disabled { background:var(--bos-border-strong); color:var(--bos-text-dim); cursor:not-allowed; }
+  .meldung { font-family:var(--bos-font-label); font-size:0.78rem; font-weight:800; margin-top:8px; overflow-wrap:anywhere; }
+  .meldung.ok { color:var(--bos-green); } .meldung.fehler { color:var(--bos-red); } .meldung.info { color:var(--bos-text-dim); }
+
+  .filter { display:flex; gap:8px; margin-bottom:10px; }
+  .filter .feld { font-family:var(--bos-font-label); font-weight:800; font-size:0.8rem; }
+
+  .abschnitt-titel { font-family:var(--bos-font-label); font-weight:900; font-size:0.7rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--bos-amber); margin:16px 2px 6px; }
+  .tag-kopf { font-family:var(--bos-font-display); font-weight:900; font-size:0.95rem; color:var(--bos-text); margin:12px 2px 4px; }
+  .bst-zeile { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:12px; padding:9px 11px; margin-bottom:6px; font-family:var(--bos-font-label); font-size:0.78rem; font-weight:700; color:var(--bos-text-dim); }
+  .bst-zeile.neu { border-color:var(--bos-warn); }
+  .bst-zeile.geloescht { border-style:dashed; border-color:var(--bos-red); }
+  .bst-haupt { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+  .bst-text { min-width:0; overflow-wrap:anywhere; line-height:1.45; }
+  .bst-text b { color:var(--bos-text); font-weight:900; }
+  .bst-marke { display:inline-block; margin:4px 6px 0 0; padding:1px 7px; border-radius:6px; font-size:0.66rem; font-weight:800; }
+  .bst-marke.neu { color:var(--bos-warn-bright); border:1px solid var(--bos-warn); background:var(--bos-warn-glow-soft); }
+  .bst-marke.eingeplant { color:var(--bos-green); border:1px solid rgba(77,184,122,.5); }
+  .bst-marke.spaeter, .bst-marke.vergangen, .bst-marke.alt { color:var(--bos-text-faint); border:1px solid var(--bos-border-strong); }
+  .bst-marke.geloescht { color:var(--bos-red); border:1px solid var(--bos-red); }
+  .bst-btn { padding:5px 10px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:900; font-size:0.7rem; cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+  .bst-btn.rot { border-color:var(--bos-red); color:var(--bos-red); }
+  .bst-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .bst-frage { display:flex; align-items:center; gap:6px; margin-top:6px; color:var(--bos-red); font-weight:800; flex-wrap:wrap; }
+  .bst-fehler { margin-top:4px; color:var(--bos-red); font-weight:800; overflow-wrap:anywhere; }
+  .leer { font-family:var(--bos-font-label); font-weight:700; font-size:0.78rem; color:var(--bos-text-faint); padding:6px 2px; }
+  details.klapp { margin-top:14px; }
+  details.klapp > summary { cursor:pointer; font-family:var(--bos-font-label); font-weight:900; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--bos-text-dim); padding:6px 2px; -webkit-tap-highlight-color:transparent; }
+  .seiten-hinweis { margin:0 0 10px; padding:9px 12px; border-radius:10px; border:1.5px solid var(--bos-red); background:rgba(201,74,74,0.08); color:var(--bos-red); font-family:var(--bos-font-label); font-weight:800; font-size:.78rem; line-height:1.4; overflow-wrap:anywhere; }
+  .seiten-hinweis a { color:inherit; text-decoration:underline; }
+</style>
+</head>
+<body>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_produkte.js"></script>
+<script src="../bos_accounts.js"></script>
+<script>var BOS_APP_ID = 'produktionsplaner_bestellungen';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_standalone_login.js"></script>
+<script src="bestell_regeln.js"></script>
+<script src="../bos_ungespeichert.js"></script>
+
+<div class="nfc-header">
+  <div class="nfc-header-top">
+    <div>
+      <div class="nfc-title">Bestellungen</div>
+      <div class="nfc-sub">Produktionsplaner · alle Stationen</div>
+    </div>
+    <div class="nfc-header-actions">
+      <a href="../launcher.html" class="nfc-back" id="nfc-back-link" style="display:none;">← Zurück</a>
+      <button class="pp-help-btn" onclick="ppOeffneHilfe()" title="Hilfe">?</button>
+    </div>
+    <script>
+      if (window.self === window.top) {
+        document.getElementById('nfc-back-link').style.display = 'block';
+      }
+    </script>
+  </div>
+</div>
+
+<div class="brain-status loading" id="brain-status">⏳ Bestellungen werden geladen…</div>
+
+<div class="container">
+  <div id="seiten-hinweise"></div>
+
+  <div class="karte" id="eintragen">
+    <div class="karte-titel">📋 Bestellung eintragen</div>
+    <div class="feld-raster">
+      <div class="ganz">
+        <label class="feld-label" for="neu-produkt">Produkt</label>
+        <select class="feld" id="neu-produkt" onchange="formGeaendert()"><option value="">— Produkt wählen —</option></select>
+      </div>
+      <div>
+        <label class="feld-label" for="neu-tag">Tag (ab morgen)</label>
+        <input class="feld" id="neu-tag" type="date" onchange="formGeaendert()">
+      </div>
+      <div>
+        <label class="feld-label" for="neu-menge">Menge</label>
+        <input class="feld zahl" id="neu-menge" type="text" inputmode="decimal" placeholder="z. B. 5" oninput="formGeaendert()">
+      </div>
+      <div class="ganz">
+        <label class="feld-label" for="neu-notiz">Notiz (optional)</label>
+        <input class="feld" id="neu-notiz" type="text" placeholder="z. B. Kunde" oninput="formGeaendert()">
+      </div>
+    </div>
+    <button class="btn-haupt" id="btn-eintragen" onclick="bestellungEintragen()">Eintragen</button>
+    <div class="meldung" id="eintragen-meldung"></div>
+  </div>
+
+  <div class="filter">
+    <select class="feld" id="filter-station" onchange="filterStation()" aria-label="Station"><option value="">Alle Stationen</option></select>
+    <select class="feld" id="filter-produkt" onchange="renderListe()" aria-label="Produkt"><option value="">Alle Produkte</option></select>
+  </div>
+
+  <div class="abschnitt-titel" id="titel-kommend">Kommende Bestellungen</div>
+  <div id="liste-kommend"><div class="leer">Wird geladen…</div></div>
+
+  <div id="liste-geloescht"></div>
+
+  <details class="klapp" id="klapp-vergangen">
+    <summary id="titel-vergangen">vergangene Bestellungen (0)</summary>
+    <div id="liste-vergangen"></div>
+  </details>
+
+  <details class="klapp" id="klapp-nachtraege">
+    <summary id="titel-nachtraege">alte Nachträge (ohne Tag) (0)</summary>
+    <div id="liste-nachtraege"></div>
+  </details>
+</div>
+
+<!-- ═══ Hilfe-Sheet ═══ -->
+<div id="pp-hilfe-modal" onclick="if(event.target===this)ppSchliesseHilfe()">
+  <div id="pp-hilfe-inhalt-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:900;color:var(--bos-amber);font-size:1.05rem;">❓ Anleitung</div>
+      <button onclick="ppSchliesseHilfe()" style="background:none;border:none;font-size:1.3rem;color:var(--bos-text-dim);cursor:pointer;">✕</button>
+    </div>
+    <div id="pp-hilfe-inhalt"></div>
+  </div>
+</div>
+
+<script>
+// ── i18n-Hook (Checkliste §6; bisher nur Deutsch) ─────────────────────
+var I18N_DE = {
+  laden: '⏳ Bestellungen werden geladen…',
+  geladen: function (n) { return '✓ ' + n + ' Bestellung' + (n === 1 ? '' : 'en') + ' geladen'; },
+  ladeFehler: '⚠ Bestellungen konnten nicht geladen werden: ',
+  kennzeichenFehler: '⚠ Einreichungen nicht gelesen — die Kennzeichen „eingeplant / noch nicht eingeplant“ fehlen: ',
+  nachtragFehler: '⚠ Alte Nachträge nicht gelesen: ',
+  produktFehler: '⚠ Produktliste nicht geladen: ',
+  keineKommenden: 'Keine kommenden Bestellungen.',
+  keineVergangenen: 'Keine vergangenen Bestellungen.',
+  keineNachtraege: 'Keine alten Nachträge.',
+  produktWaehlen: 'Bitte ein Produkt wählen.',
+  tagWaehlen: function (m) { return 'Bitte einen Tag ab morgen (' + m + ') wählen.'; },
+  mengeFehlt: 'Bitte eine Menge größer 0 eintragen.',
+  speichert: 'Wird gespeichert …',
+  gespeichert: function (t) { return '✓ Eingetragen: ' + t; },
+  zeitlimit: 'Keine Bestätigung vom Server nach 15 Sekunden — Netz prüfen. Die Bestellung erscheint in der Liste, sobald sie gespeichert ist; erst dann nochmal versuchen.',
+  speichernFehler: 'Speichern fehlgeschlagen: ',
+  loeschenFehler: 'Löschen fehlgeschlagen: ',
+  wirklich: 'Wirklich löschen?',
+  jaLoeschen: 'Ja, löschen',
+  abbrechen: 'Abbrechen',
+  loeschen: 'Löschen',
+  geloescht: function (st) { return 'Bestellung gelöscht, steckt noch in der eingereichten Planung von ' + st; },
+  alterNachtrag: 'alter Nachtrag (ohne Tag)',
+  vergangen: 'vergangen',
+  spaeter: 'kommt in eine spätere Planung',
+  unerwartet: '⚠ Unerwarteter Fehler: '
+};
+function t(k) { var v = I18N_DE[k]; return typeof v === 'function' ? v.apply(null, Array.prototype.slice.call(arguments, 1)) : (v !== undefined ? v : k); }
+
+var STATIONEN = [
+  { station: 'Rondo',           icon: '🔄' },
+  { station: 'Brötchenstraße',  icon: '🥐' },
+  { station: 'Frühschicht',     icon: '🌅' },
+  { station: 'Nachtschicht',    icon: '🌙' }
+];
+var BR = window.BOS_BESTELL_REGELN || null;
+var heute = new Date(); heute.setHours(0, 0, 0, 0);
+var WT_KURZ_JS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+var BESTELLUNGEN = [];          // alle Bestellungen (mit id)
+var BESTELL_FEHLER = null;
+var BESTELL_GELADEN = false;
+var EINREICHUNGEN = [];         // neueste je Station und Woche, aus den Wochen, die die Tage abdecken können
+var EINR_WOCHEN = '';           // geladene Wochenliste (als Schlüssel)
+var EINR_FEHLER = null;
+var NACHTRAEGE = [];
+var NACHTRAG_FEHLER = null;
+var PRODUKT_JE_KEY = {};
+var PRODUKT_FEHLER = null;
+var FRAGE = null, LAEUFT = {}, FEHLER = {};
+var speichernLaeuft = false;
+var SEITEN_FEHLER = null;
+
+function esc(x) { return String(x === undefined || x === null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function setStatus(cls, text) { var el = document.getElementById('brain-status'); el.className = 'brain-status ' + cls; el.textContent = text; }
+function fehlerText(e) { var x = (e && e.message) || String(e); if (e && e.code && x.indexOf(e.code) < 0) x += ' (' + e.code + ')'; return x; }
+function fehlerRat(e) {
+  var c = e && e.code;
+  if (c === 'permission-denied') return ' — dieses Konto darf das nicht, Ulf Bescheid sagen.';
+  if (c === 'unavailable' || c === 'deadline-exceeded') return ' — keine Verbindung zur Datenbank, Netz prüfen und die Seite neu laden.';
+  return '';
+}
+function mitLink(text) { return esc(text).replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank" rel="noopener">Index anlegen</a>'); }
+function heuteIso() { return BR.datumLokal(heute); }
+function morgenIso() { return BR.plusTageIso(heuteIso(), 1); }
+function einheitKurz(lk) {
+  var p = PRODUKT_JE_KEY[lk];
+  return (p && window.BOS_PRODUKTE && window.BOS_PRODUKTE.einheit) ? window.BOS_PRODUKTE.einheit(p).kurz : 'Bl.';
+}
+function stationIcon(st) { var s = STATIONEN.find(function (x) { return x.station === st; }); return s ? s.icon : '•'; }
+function fmtTag(iso) { var d = BR.ausIso(iso); return d ? WT_KURZ_JS[d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' : esc(iso); }
+function fmtTagLang(iso) {
+  var d = BR.ausIso(iso); if (!d) return esc(iso);
+  return ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+}
+function fmtWann(ts) {
+  var d = BR.alsDatum(ts); if (!d) return 'gerade eben';
+  return WT_KURZ_JS[d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '. ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function zahl(n) { return String(Math.round(Number(n) * 100) / 100).replace('.', ','); }
+function aktuellerProfilName() {
+  try {
+    var st = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
+    if (!st || !st.activeProfileId) return null;
+    var alle = (window.BOS_PROFILES || []).concat(st.localProfiles || []);
+    var p = alle.find(function (x) { return x.id === st.activeProfileId; });
+    return p ? p.name : null;
+  } catch (e) { return null; }
+}
+
+// Checkliste §7a: nicht abgefangene Fehler sichtbar
+window.addEventListener('error', function (e) { SEITEN_FEHLER = (e && e.message ? e.message : 'Fehler') + (e && e.filename ? ' (' + String(e.filename).replace(/^.*\//, '') + ':' + e.lineno + ')' : ''); renderHinweise(); });
+window.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; SEITEN_FEHLER = (r && r.message) ? r.message : String(r); renderHinweise(); });
+
+// Checkliste §7b: ein halb ausgefülltes Formular gilt als ungespeichert
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return speichernLaeuft; } }); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () {
+  return ['neu-produkt', 'neu-tag', 'neu-menge', 'neu-notiz'].some(function (id) { var el = document.getElementById(id); return el && String(el.value || '').trim() !== ''; });
+});
+function formGeaendert() { var m = document.getElementById('eintragen-meldung'); if (m.className.indexOf('ok') >= 0) { m.textContent = ''; m.className = 'meldung'; } }
+
+// ── PRODUKTE ─────────────────────────────────────────────────────────
+async function ladeProdukte() {
+  try {
+    if (!window.BOS_PRODUKTE) throw new Error('bos_produkte.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    if (typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    var aktive = (await window.BOS_PRODUKTE.lade({ sicht: 'aktive' })).liste;
+    aktive.forEach(function (p) { if (p && p.legacyKey) PRODUKT_JE_KEY[p.legacyKey] = p; });
+    var laufend = (await window.BOS_PRODUKTE.lade({ sicht: 'laufend' })).liste.filter(function (p) { return p.nfcSeite === true && p.legacyKey; });
+    var sel = document.getElementById('neu-produkt');
+    STATIONEN.forEach(function (s) {
+      var hier = laufend.filter(function (p) { return p.station === s.station; });
+      if (!hier.length) return;
+      var g = document.createElement('optgroup'); g.label = s.icon + ' ' + s.station;
+      hier.forEach(function (p) {
+        var o = document.createElement('option'); o.value = p.legacyKey; o.textContent = p.name;
+        o.dataset.station = s.station; o.dataset.name = p.name; g.appendChild(o);
+      });
+      sel.appendChild(g);
+    });
+    PRODUKT_FEHLER = null;
+  } catch (e) {
+    console.error('[Bestellungen] Produktliste:', e);
+    PRODUKT_FEHLER = window.BOS_PRODUKTE && window.BOS_PRODUKTE.fehlerText ? window.BOS_PRODUKTE.fehlerText(e) : fehlerText(e);
+  }
+  fuelleFilter();
+  renderHinweise();
+}
+
+// ── LADEN ────────────────────────────────────────────────────────────
+// Nur type == … (kein Index nötig, Menge auf Jahre klein); Rest im Gerät.
+function starteBestellungen() {
+  try {
+    window.db.collection('bos_events').where('type', '==', BR.TYP).onSnapshot(function (snap) {
+      var l = [];
+      snap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; l.push(d); });
+      BESTELLUNGEN = BR.sortiere(l);
+      BESTELL_FEHLER = null; BESTELL_GELADEN = true;
+      setStatus('ready', t('geladen', BESTELLUNGEN.length));
+      fuelleFilter();
+      ladeEinreichungen();
+      renderListe();
+    }, function (e) {
+      console.error('[Bestellungen] Laden:', e);
+      BESTELL_FEHLER = fehlerText(e) + fehlerRat(e);
+      setStatus('error', t('ladeFehler') + BESTELL_FEHLER);
+      renderListe();
+    });
+  } catch (e) {
+    BESTELL_FEHLER = fehlerText(e);
+    setStatus('error', t('ladeFehler') + BESTELL_FEHLER);
+    renderListe();
+  }
+}
+// Einreichungen aller Wochen, die einen kommenden Tag abdecken können (inkl. heute).
+function noetigeWochen() {
+  var tage = BESTELLUNGEN.filter(function (b) { return b.datum >= heuteIso(); }).map(function (b) { return b.datum; });
+  tage.push(heuteIso());
+  return BR.wochenFuerTage(tage);
+}
+async function ladeEinreichungen() {
+  var wochen = noetigeWochen();
+  var schluessel = wochen.join(',');
+  if (schluessel === EINR_WOCHEN && !EINR_FEHLER) return;
+  try {
+    var liste = [];
+    var abfragen = BR.stuecke(wochen, 30).map(function (teil) {
+      return window.db.collection('bos_events').where('type', '==', 'produktionsplan_einreichung').where('woche', 'in', teil).get()
+        .then(function (snap) { snap.forEach(function (doc) { liste.push(doc.data()); }); });
+    });
+    await Promise.all(abfragen);
+    EINREICHUNGEN = BR.neuesteJeStationUndWoche(liste);
+    EINR_WOCHEN = schluessel; EINR_FEHLER = null;
+  } catch (e) {
+    console.error('[Bestellungen] Einreichungen:', e);
+    EINR_FEHLER = fehlerText(e) + fehlerRat(e);
+  }
+  renderHinweise();
+  renderListe();
+}
+function ladeNachtraege() {
+  return window.db.collection('bos_events').where('type', '==', 'produktionsplan_nachtrag').get().then(function (snap) {
+    var l = []; snap.forEach(function (doc) { l.push(doc.data()); });
+    l.sort(function (a, b) { return BR.alsMillis(b.ts) - BR.alsMillis(a.ts); });
+    NACHTRAEGE = l; NACHTRAG_FEHLER = null;
+  }).catch(function (e) {
+    console.error('[Bestellungen] Alte Nachträge:', e);
+    NACHTRAG_FEHLER = fehlerText(e) + fehlerRat(e);
+  }).then(function () { renderHinweise(); renderListe(); });
+}
+
+// ── ANZEIGE ──────────────────────────────────────────────────────────
+function renderHinweise() {
+  var t2 = [];
+  if (PRODUKT_FEHLER) t2.push('<div class="seiten-hinweis">' + esc(t('produktFehler')) + mitLink(PRODUKT_FEHLER) + '</div>');
+  if (EINR_FEHLER) t2.push('<div class="seiten-hinweis" id="hinweis-einreichungen">' + esc(t('kennzeichenFehler')) + mitLink(EINR_FEHLER) + '</div>');
+  if (NACHTRAG_FEHLER) t2.push('<div class="seiten-hinweis">' + esc(t('nachtragFehler')) + mitLink(NACHTRAG_FEHLER) + '</div>');
+  if (SEITEN_FEHLER) t2.push('<div class="seiten-hinweis">' + esc(t('unerwartet') + SEITEN_FEHLER) + ' — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.</div>');
+  document.getElementById('seiten-hinweise').innerHTML = t2.join('');
+}
+function fuelleFilter() {
+  var fs = document.getElementById('filter-station'), fp = document.getElementById('filter-produkt');
+  var stWahl = fs.value, prWahl = fp.value;
+  if (fs.options.length === 1) STATIONEN.forEach(function (s) { var o = document.createElement('option'); o.value = s.station; o.textContent = s.icon + ' ' + s.station; fs.appendChild(o); });
+  // Produkte: aus den Bestellungen und der Produktliste, passend zur Station
+  var namen = {};
+  Object.keys(PRODUKT_JE_KEY).forEach(function (lk) { var p = PRODUKT_JE_KEY[lk]; if (p.nfcSeite === true && STATIONEN.some(function (s) { return s.station === p.station; })) namen[lk] = { name: p.name, station: p.station }; });
+  BESTELLUNGEN.forEach(function (b) { if (!namen[b.legacyKey]) namen[b.legacyKey] = { name: b.produktName || b.legacyKey, station: b.station }; });
+  var keys = Object.keys(namen).filter(function (lk) { return !stWahl || namen[lk].station === stWahl; })
+    .sort(function (a, b) { return String(namen[a].name).localeCompare(String(namen[b].name), 'de'); });
+  fp.innerHTML = '<option value="">Alle Produkte</option>' + keys.map(function (lk) { return '<option value="' + esc(lk) + '"' + (lk === prWahl ? ' selected' : '') + '>' + esc(namen[lk].name) + '</option>'; }).join('');
+}
+function filterStation() { fuelleFilter(); renderListe(); }
+function passtFilter(st, lk) {
+  var fs = document.getElementById('filter-station').value, fp = document.getElementById('filter-produkt').value;
+  return (!fs || st === fs) && (!fp || lk === fp);
+}
+function zeileHtml(b, mitKennzeichen) {
+  var marken = [];
+  var kz = mitKennzeichen ? BR.kennzeichen(b, EINREICHUNGEN) : null;
+  if (!mitKennzeichen) marken.push(['vergangen', t('vergangen')]);
+  else if (kz === 'neu') marken.push(['neu', BR.KENNZEICHEN_TEXT.neu]);
+  else if (kz === 'eingeplant') marken.push(['eingeplant', '✓ ' + BR.KENNZEICHEN_TEXT.eingeplant]);
+  else marken.push(['spaeter', t('spaeter')]);
+  var id = esc(b.id);
+  var h = '<div class="bst-zeile' + (kz === 'neu' ? ' neu' : '') + '" data-bestellung="' + id + '" data-kennzeichen="' + (kz || 'vergangen') + '">'
+        + '<div class="bst-haupt"><div class="bst-text">' + stationIcon(b.station) + ' ' + esc(b.station) + ' · <b>' + esc(b.produktName || b.legacyKey) + '</b> · <b>' + zahl(b.menge) + ' ' + esc(einheitKurz(b.legacyKey)) + '</b>'
+        + (b.notiz ? ' · ' + esc(b.notiz) : '') + '<br>eingetragen' + (b.eingetragenVon ? ' von ' + esc(b.eingetragenVon) : '') + ' ' + esc(fmtWann(b.ts)) + '</div>'
+        + (FRAGE === b.id ? '' : '<button class="bst-btn" onclick="frage(\'' + id + '\')">' + esc(t('loeschen')) + '</button>') + '</div>'
+        + marken.map(function (m) { return '<span class="bst-marke ' + m[0] + '">' + esc(m[1]) + '</span>'; }).join('');
+  if (FRAGE === b.id) h += '<div class="bst-frage">' + esc(t('wirklich')) + ' <button class="bst-btn rot" ' + (LAEUFT[b.id] ? 'disabled ' : '') + 'onclick="loeschen(\'' + id + '\')">' + esc(t('jaLoeschen')) + '</button><button class="bst-btn" onclick="frage(null)">' + esc(t('abbrechen')) + '</button></div>';
+  if (FEHLER[b.id]) h += '<div class="bst-fehler">⚠ ' + esc(t('loeschenFehler') + FEHLER[b.id]) + '</div>';
+  return h + '</div>';
+}
+function nachTagen(liste, mitKennzeichen) {
+  var h = '', letzter = null;
+  liste.forEach(function (b) {
+    if (b.datum !== letzter) { h += '<div class="tag-kopf">' + esc(fmtTagLang(b.datum)) + '</div>'; letzter = b.datum; }
+    h += zeileHtml(b, mitKennzeichen);
+  });
+  return h;
+}
+function renderListe() {
+  var kommend = document.getElementById('liste-kommend');
+  if (!BR) return;
+  if (BESTELL_FEHLER) {
+    kommend.innerHTML = '<div class="seiten-hinweis">' + esc(t('ladeFehler')) + mitLink(BESTELL_FEHLER) + '</div>';
+  } else if (BESTELL_GELADEN) {
+    var hi = heuteIso();
+    var k = BESTELLUNGEN.filter(function (b) { return b.datum >= hi && passtFilter(b.station, b.legacyKey); });
+    var v = BESTELLUNGEN.filter(function (b) { return b.datum < hi && passtFilter(b.station, b.legacyKey); }).reverse();
+    document.getElementById('titel-kommend').textContent = 'Kommende Bestellungen (' + k.length + ')';
+    kommend.innerHTML = k.length ? nachTagen(k, true) : '<div class="leer">' + esc(t('keineKommenden')) + '</div>';
+    document.getElementById('titel-vergangen').textContent = 'vergangene Bestellungen (' + v.length + ')';
+    document.getElementById('liste-vergangen').innerHTML = v.length ? nachTagen(v, false) : '<div class="leer">' + esc(t('keineVergangenen')) + '</div>';
+    // Gelöscht nach Einreichung: ID in einer Einreichung, Dokument fehlt (Tage ab heute)
+    var ids = {}; BESTELLUNGEN.forEach(function (b) { ids[b.id] = true; });
+    var gl = BR.geloeschte(EINREICHUNGEN, ids, { von: hi }).filter(function (g) { return passtFilter(g.station, g.legacyKey); });
+    document.getElementById('liste-geloescht').innerHTML = gl.length ? '<div class="abschnitt-titel">Gelöscht nach Einreichung (' + gl.length + ')</div>' + gl.map(function (g) {
+      return '<div class="bst-zeile geloescht" data-geloescht="' + esc(g.id) + '"><div class="bst-text">' + esc(fmtTag(g.datum)) + ' · ' + stationIcon(g.station) + ' ' + esc(g.station) + ' · <b>' + esc(g.produktName) + '</b> · <b>' + zahl(g.menge) + ' ' + esc(einheitKurz(g.legacyKey)) + '</b></div>'
+        + '<span class="bst-marke geloescht">' + esc(t('geloescht', g.station)) + '</span></div>';
+    }).join('') : '';
+  }
+  var n = NACHTRAEGE.filter(function (x) { return passtFilter(x.station, x.legacyKey); });
+  document.getElementById('titel-nachtraege').textContent = 'alte Nachträge (ohne Tag) (' + n.length + ')';
+  document.getElementById('liste-nachtraege').innerHTML = n.length ? n.map(function (x) {
+    return '<div class="bst-zeile"><div class="bst-text">' + stationIcon(x.station) + ' ' + esc(x.station) + ' · <b>' + esc(x.produktName || x.legacyKey) + '</b> · <b>+' + zahl(x.menge) + ' ' + esc(einheitKurz(x.legacyKey)) + '</b> · Woche ab ' + esc(fmtTag(x.woche))
+      + '<br>eingetragen' + (x.eingetragenVon ? ' von ' + esc(x.eingetragenVon) : '') + ' ' + esc(fmtWann(x.ts)) + '</div><span class="bst-marke alt">' + esc(t('alterNachtrag')) + '</span></div>';
+  }).join('') : '<div class="leer">' + esc(t('keineNachtraege')) + '</div>';
+}
+
+// ── EINTRAGEN ────────────────────────────────────────────────────────
+function mitZeitlimit(versprechen, ms) {
+  return new Promise(function (ok, nein) {
+    var z = setTimeout(function () { var e = new Error(t('zeitlimit')); e.code = 'zeitlimit'; nein(e); }, ms);
+    versprechen.then(function (x) { clearTimeout(z); ok(x); }, function (e) { clearTimeout(z); nein(e); });
+  });
+}
+async function bestellungEintragen() {
+  if (speichernLaeuft) return;
+  var sel = document.getElementById('neu-produkt'), opt = sel.options[sel.selectedIndex];
+  var tag = document.getElementById('neu-tag').value;
+  var menge = BR.mengeAusText(document.getElementById('neu-menge').value);
+  var notiz = BR.notizAusText(document.getElementById('neu-notiz').value);
+  var m = document.getElementById('eintragen-meldung');
+  function melde(text, art) { m.textContent = text; m.className = 'meldung ' + art; }
+  if (!sel.value || !opt || !opt.dataset.station) return melde(t('produktWaehlen'), 'fehler');
+  if (!BR.istIso(tag) || tag < morgenIso()) return melde(t('tagWaehlen', fmtTag(morgenIso())), 'fehler');
+  if (menge === null) return melde(t('mengeFehlt'), 'fehler');
+  speichernLaeuft = true;
+  var btn = document.getElementById('btn-eintragen'); btn.disabled = true; btn.textContent = t('speichert');
+  melde('', 'info');
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    await mitZeitlimit(window.db.collection('bos_events').add({
+      type: BR.TYP,
+      station: opt.dataset.station,
+      legacyKey: sel.value,
+      produktName: opt.dataset.name,
+      datum: tag,
+      menge: menge,
+      notiz: notiz,
+      eingetragenVon: aktuellerProfilName(),
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    }), 15000);
+    var text = zahl(menge) + ' ' + einheitKurz(sel.value) + ' ' + opt.dataset.name + ' für ' + fmtTag(tag) + ' (' + opt.dataset.station + ')';
+    ['neu-produkt', 'neu-tag', 'neu-menge', 'neu-notiz'].forEach(function (id) { document.getElementById(id).value = ''; });
+    melde(t('gespeichert', text), 'ok');
+  } catch (e) {
+    console.error('[Bestellungen] Speichern:', e);
+    melde(e && e.code === 'zeitlimit' ? e.message : t('speichernFehler') + fehlerText(e) + fehlerRat(e), 'fehler');
+  }
+  speichernLaeuft = false;
+  btn.disabled = false; btn.textContent = 'Eintragen';
+}
+
+// ── LÖSCHEN (Rückfrage auf der Seite, kein Browser-Dialog) ────────────
+function frage(id) { FRAGE = id; if (id) delete FEHLER[id]; renderListe(); }
+async function loeschen(id) {
+  if (LAEUFT[id]) return;
+  LAEUFT[id] = true; renderListe();
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    await mitZeitlimit(window.db.collection('bos_events').doc(id).delete(), 15000);
+    FRAGE = null;
+  } catch (e) {
+    console.error('[Bestellungen] Löschen:', e);
+    FEHLER[id] = (e && e.code === 'zeitlimit') ? e.message : fehlerText(e) + fehlerRat(e);
+  }
+  delete LAEUFT[id];
+  renderListe();
+}
+
+// ── Hilfe (Text identisch in PRODUKTIONSPLANER_DOKU.md §15) ─────────────
+const PP_HILFE_SCHRITTE = [
+  ['Wofür ist diese Seite?', 'Hier stehen alle Bestellungen aller Stationen in einer Liste — sortiert nach dem Tag, an dem die Ware gebraucht wird. Du kannst Bestellungen eintragen, ansehen und wieder löschen. Dieselben Bestellungen siehst du an jeder Station im Block „📋 Bestellungen“ bei ihrem Produkt.'],
+  ['Bestellung eintragen', 'Produkt wählen (nach Station sortiert), den Tag, an dem die Ware gebraucht wird, die Menge in der Einheit des Produkts und auf Wunsch eine kurze Notiz, z. B. den Kunden. Der Tag geht ab morgen, nach vorne gibt es keine Grenze — auch eine Bestellung in fünf Wochen kannst du schon eintragen. Mit „Eintragen“ ist sie sofort gespeichert und für alle Kollegen da.'],
+  ['Was die Kennzeichen bedeuten', '„✓ eingeplant“: Die Station hat diese Bestellung beim letzten Einreichen schon mitgerechnet, sie steckt in den Tagesmengen. „Neu seit Einreichung — noch nicht eingeplant“: Die Station hat schon eingereicht, aber diese Bestellung kam danach dazu (oder wurde nicht mitgerechnet). Dann muss die Station nochmal planen und einreichen — sie steht bis dahin auch im Wochenzettel unter „Nachbestellungen“. „Kommt in eine spätere Planung“: Für diesen Tag hat die Station noch keine Planung eingereicht, die Bestellung wird beim nächsten Planen automatisch mitgerechnet.'],
+  ['Filtern', 'Oben kannst du die Liste auf eine Station und ein Produkt eingrenzen. „Alle Stationen“ und „Alle Produkte“ zeigen wieder alles.'],
+  ['Löschen', 'Bei jeder Bestellung steht „Löschen“. Die Seite fragt nach („Wirklich löschen?“), erst „Ja, löschen“ löscht wirklich. War die Bestellung schon eingeplant, steckt sie trotzdem noch in der eingereichten Planung — dann steht weiter unten „Bestellung gelöscht, steckt noch in der eingereichten Planung von …“. Die Station sollte dann neu planen.'],
+  ['Vergangene Bestellungen', 'Bestellungen, deren Tag vorbei ist, werden nicht gelöscht. Sie stehen eingeklappt unter „vergangene Bestellungen“ — antippen klappt sie auf.'],
+  ['Alte Nachträge', 'Vor dem 08.11.2026 gab es in der Übersicht „Nachträge“ ohne Tag. Die stehen eingeklappt unter „alte Nachträge (ohne Tag)“ und lassen sich nur lesen. Neu angelegt wird nur noch hier als Bestellung mit Tag.']
+];
+function ppOeffneHilfe() {
+  document.getElementById('pp-hilfe-inhalt').innerHTML = PP_HILFE_SCHRITTE.map(function (s) {
+    return '<div class="pp-hilfe-schritt"><div class="pp-hilfe-titel">' + s[0] + '</div><div class="pp-hilfe-text">' + s[1] + '</div></div>';
+  }).join('');
+  document.getElementById('pp-hilfe-modal').style.display = 'block';
+}
+function ppSchliesseHilfe() { document.getElementById('pp-hilfe-modal').style.display = 'none'; }
+
+window.addEventListener('load', async function () {
+  if (!BR) { setStatus('error', '⚠ bestell_regeln.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.'); return; }
+  document.getElementById('neu-tag').min = morgenIso();
+  document.getElementById('neu-notiz').maxLength = BR.NOTIZ_MAX;
+  await (window.BOS_AUTH_READY || Promise.resolve());
+  ladeProdukte();
+  starteBestellungen();
+  ladeNachtraege();
+});
+</script>
+</body>
+</html>

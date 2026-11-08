@@ -62,6 +62,11 @@
       frosterZustaendigkeit bisher nur "baecker" kennt).
 
   CHANGELOG
+    2026-11-08 · 15:38 · Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45)
+      Lädt ../produktionsplaner/bestell_regeln.js vor bos_ziel_berechnung.js: Bestellungen „noch nicht
+      eingeplant“ zählen dort wie ein Nachtrag (🔔). Sonst unverändert.
+      Dazu: Fehlerzeile „Ziel-Stand aktuell nicht abrufbar.“ nennt jetzt den Grund (err.message,
+      Projektregel) — der neue Abbruch „bestell_regeln.js ist nicht geladen“ landet genau dort. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md
     2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50)
       Schleier im Seitenkopf folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md
     2026-10-15 · 01:26 · v0.7 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19)
@@ -353,6 +358,7 @@
 <script src="../bos_permissions.js"></script>
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
+<script src="../produktionsplaner/bestell_regeln.js"></script>   <!-- NEU 08.11.2026: Kennzeichen der Bestellungen, VOR bos_ziel_berechnung.js -->
 <script src="../bos_ziel_berechnung.js"></script>
 
 <header>
@@ -754,7 +760,9 @@ function ladeZielStand(prod){
   }).catch(function(err){
     console.error('[Froster-Produktion] Ziel-Stand konnte nicht geladen werden:', err);
     var linkMatch = (err && err.message) ? err.message.match(/https?:\/\/\S+/) : null;
-    box.innerHTML = '<p class="erfolg-ziel-laden">Ziel-Stand aktuell nicht abrufbar.' +
+    // 08.11.2026: Grund sichtbar (Projektregel err.message), entschärft
+    var grund = String((err && err.message) || err).replace(/https?:\/\/\S+/g, '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+    box.innerHTML = '<p class="erfolg-ziel-laden">Ziel-Stand aktuell nicht abrufbar: ' + grund +
       (linkMatch ? ' <a href="' + linkMatch[0] + '" target="_blank" rel="noopener" style="color:var(--amber-bright);">Index-Link öffnen</a>' : '') +
       '</p>';
   });

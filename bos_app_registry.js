@@ -2,6 +2,10 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-08 · 15:38 · Produktionsplaner Schritt 1 (Go Kontroll-Chat
+       08.11., 14:45, Freigabe §3): neuer Eintrag produktionsplaner_bestellungen
+       (Kind-Kachel „Bestellungen“ im Hub produktionsplaner, direkt:
+       'anmeldung', Rollen wie die Übersicht). Sonst unverändert.
      2026-10-27 · 08:12 · Nachrichtenzentrale Stufe 1c, #131 (Bauplan, Go KC
        07:54): Eintrag nachrichtenzentrale bekommt url
        'nachrichtenzentrale/nachrichtenzentrale.html' und status 'live'.
@@ -741,6 +745,21 @@ window.BOS_APPS = [
     status: 'live',
     hub: 'produktionsplaner',
     roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
+  },
+  {
+    id: 'produktionsplaner_bestellungen',
+    bereich: 'produktion',
+    name: 'Bestellungen',
+    icon: '🧾',
+    color: '#c07a10',
+    url: 'produktionsplaner/bestellungen.html',
+    direkt: 'anmeldung',
+    status: 'live',
+    hub: 'produktionsplaner',
+    roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
+    // NEU 08.11.2026 (Ulf 14:42/14:44): alle Bestellungen aller Stationen in
+    // einer Liste, eintragen und löschen. Rollen wie die Übersicht („Nein das
+    // passt so“). Gleiche Zeile in bos_permissions.js (Registry = Matrix).
   },
   {
     id: 'produktionsplaner_rondo',

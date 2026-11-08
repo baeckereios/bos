@@ -34,7 +34,34 @@
  *   2. Lücke/Knapp DARAUF prüfen → warnung
  *   3. Produktion ADDIEREN       → bestand (Endstand des Tages)
  *
- * Export: window.BOS_KETTE = { berechne, ermittleTagesTypen, berechneMitZeitkontext }
+ * Export: window.BOS_KETTE = { berechne, ermittleTagesTypen, berechneMitZeitkontext, kann }
+ *
+ * ÄNDERUNGSPROTOKOLL (neu seit 08.11.2026)
+ *   2026-11-08 · 15:38 · Fix + Feature (Produktionsplaner Schritt 1,
+ *     Go Kontroll-Chat 08.11., 14:45; SESSION_2026-11-08_PRODUKTIONS-
+ *     PLANER_FROSTER_BESTELLUNGEN_BAU.md):
+ *     1. Fix „zweiter Backtag“: Im sequenziellen Weg startet simBestand
+ *        jetzt bei startBestand − fehlmengeAbs, der einmalige Aufschlag
+ *        fehlmengeOffen am ersten Backtag ist weg. Vorher bekam der zweite
+ *        Backtag die Fehlmenge wieder abgezogen (Bestand 0, Fehlmenge 3,
+ *        Di/Do → {23, 7} statt {23, 10}, Endlager −3). Der gleichmäßige Weg
+ *        rechnete schon richtig und ist unverändert.
+ *     2. Neuer optionaler Eingang zusatzBedarf { offset: menge }
+ *        (Bestellungen). Zählt an seinem Tag zum Verbrauch, über
+ *        verbrauchAn() also an allen Stellen gleich. Auch an Tagen „zu“
+ *        (eine Bestellung ist eine Tatsache). Bei frosterFertig zählt eine
+ *        Bestellung für morgen (Offset 1) NICHT — was für morgen fehlt,
+ *        gehört ins Fehlmenge-Feld (Kontroll-Chat-Regel, Ulf darf kippen).
+ *        Ohne den Eingang rechnet alles wie vorher (Vergleichslauf
+ *        20 000 Fälle, 0 Abweichungen).
+ *     3. Kettenzeile hat das Zusatzfeld `zusatz` (Bestellmenge des Tages,
+ *        0 wenn keine oder nicht gezählt) — NUR wenn zusatzBedarf übergeben
+ *        wird. Ohne den Eingang ist die Ausgabe byte-gleich (auch das
+ *        Ergebnis-Objekt, nicht nur die Zahlen; geprüft u. a. mit
+ *        _PRUEF_richtwert.js Teil D).
+ *     4. BOS_KETTE.kann = { zusatzBedarf: true }: Aufrufer erkennen daran
+ *        eine alte, zwischengespeicherte Fassung, die zusatzBedarf still
+ *        ignorieren würde.
  * ============================================================
  */
 
@@ -141,6 +168,9 @@ function verteileGleichmaessig({ prodOffsets, zielOff, batch, startBestand, fehl
  * @param {Date}    inp.heute            Datum "heute", 00:00:00
  * @param {object}  [inp.tagesTypen]     { offset: 'normal'|'zu'|'hamster_1'|'hamster_2'|'hamster_3' }.
  *                                        Fehlt ein Offset, gilt 'normal'. Siehe ermittleTagesTypen().
+ * @param {object}  [inp.zusatzBedarf]   { offset: Zahl } — Bestellungen je Tag (NEU 08.11.2026).
+ *                                        Zählt zum Verbrauch des Tages, auch an Tagen 'zu';
+ *                                        Offset ≤ 0 nie, Offset 1 nicht bei frosterFertig.
  * @returns {{kette:object[], vorschlaege:object, gesamtVerbrauch:number, gesamtProduktion:number, endlager:number, warnungen:object[], istOk:boolean}}
  */
 function berechne(inp) {
@@ -157,8 +187,28 @@ function berechne(inp) {
   const gleichmaessig = !!inp.gleichmaessig;
   const heute = inp.heute;
   const tagesTypen = inp.tagesTypen || {};
+  const zusatzBedarf = inp.zusatzBedarf || {};   // NEU 08.11.2026: Bestellungen je Tag
+  const mitZusatz = inp.zusatzBedarf != null;     // nur dann trägt die Kettenzeile das Feld `zusatz` (sonst byte-gleich wie vorher)
 
+  // Verbrauch eines Tages = Grundverbrauch + Bestellungen (08.11.2026).
+  // Weil alle Stellen (sequenziell, gleichmäßig, Kette, Vorschau) über
+  // verbrauchAn() gehen, wirken Bestellungen überall gleich.
   function verbrauchAn(offset) {
+    return grundverbrauchAn(offset) + zusatzAn(offset);
+  }
+
+  // Bestellung an diesem Tag. Heute (Offset 0) nie: heute hat keinen
+  // Verbrauch in der Kette. Morgen bei „Froster fertig“ nicht: dann ist
+  // vorbereitet, was morgen gebraucht wird; was fehlt, ist Fehlmenge.
+  // Tage „zu“ zählen trotzdem — eine Bestellung ist eine Tatsache.
+  function zusatzAn(offset) {
+    if (offset <= 0) return 0;
+    if (frosterFertig && offset === 1) return 0;
+    const z = Number(zusatzBedarf[offset]);
+    return z > 0 ? z : 0;
+  }
+
+  function grundverbrauchAn(offset) {
     if (offset <= 0) return 0;
     if (frosterFertig && offset === 1) return 0;
 
@@ -187,9 +237,17 @@ function berechne(inp) {
       prodOffsets, zielOff, batch, startBestand, fehlmengeAbs, gesperrtWerte, verbrauchAn
     });
   } else {
-    // simBestand startet OHNE Abzug von fehlmengeAbs — die Fehlmenge wird
+    // ~~simBestand startet OHNE Abzug von fehlmengeAbs — die Fehlmenge wird
     // stattdessen unten einmalig als garantierter Zusatzbedarf beim ersten
-    // automatisch berechneten Produktionstag aufgeschlagen (fehlmengeOffen).
+    // automatisch berechneten Produktionstag aufgeschlagen (fehlmengeOffen).~~
+    // WIDERLEGT 08.11.2026 (Fehler „zweiter Backtag“): Die Fehlmenge wurde
+    // einmal aufgeschlagen, aber nie aus dem simulierten Bestand abgezogen.
+    // Ab dem ersten Backtag glaubte die Simulation, sie liege noch im
+    // Froster, und der zweite Backtag bekam sie wieder weg. Beispiel:
+    // Bestand 0, Fehlmenge 3, Backtage Di/Do, Bedarf 10/10/10/15 →
+    // {Di: 23, Do: 7}, Endlager −3; richtig ist {23, 10}. Jetzt wie im
+    // gleichmäßigen Weg und in der Kette unten: simBestand startet bei
+    // startBestand − fehlmengeAbs, kein Aufschlag mehr.
     //
     // FIX 03.09.2026 (Rondo-Livetest, Ulf): "verfuegbar" wird jetzt NICHT
     // mehr auf 0 gekappt. Kappen hätte ein bereits VOR der Produktion
@@ -202,11 +260,12 @@ function berechne(inp) {
     // ein negativer bestandNachMorgen jetzt als zusätzlicher Bedarf mit ein
     // (fehlend = futureBedarf - bestandNachMorgen), unabhängig davon, ob
     // das Minus von fehlmengeAbs oder schlicht zu wenig startBestand kommt.
-    // Kein Konflikt mit fehlmengeOffen: die beiden Mechanismen greifen an
+    // ~~Kein Konflikt mit fehlmengeOffen: die beiden Mechanismen greifen an
     // unterschiedlichen Stellen (einmaliger Fixbetrag oben drauf vs. der
-    // tatsächliche, tagesaktuelle Bestandsverlauf) und addieren sich sauber.
-    let simBestand = startBestand;
-    let fehlmengeOffen = fehlmengeAbs;
+    // tatsächliche, tagesaktuelle Bestandsverlauf) und addieren sich sauber.~~
+    // WIDERLEGT 08.11.2026: genau das stimmte nicht (siehe oben). Der Fix
+    // vom 03.09. (keine Kappung von „verfuegbar“) bleibt richtig und steht.
+    let simBestand = startBestand - fehlmengeAbs;   // 08.11.2026: wie verteileGleichmaessig() und die Kette
 
     for (let i = 0; i <= zielOff; i++) {
       const vb_i = verbrauchAn(i);
@@ -220,12 +279,11 @@ function berechne(inp) {
         } else {
           const naechster = prodOffsets.find(o => o > i);
           const bis = naechster !== undefined ? naechster : zielOff;
-          let futureBedarf = fehlmengeOffen;
+          let futureBedarf = 0;   // 08.11.2026: kein fehlmengeOffen mehr, die Fehlmenge steckt in simBestand
           for (let j = i + 1; j <= bis; j++) futureBedarf += verbrauchAn(j);
           const verfuegbar = bestandNachMorgen;
           const fehlend = Math.max(0, futureBedarf - verfuegbar);
           vorschlaege[i] = fehlend > 0 ? Math.ceil(fehlend / batch) * batch : 0;
-          fehlmengeOffen = 0; // nur einmal verrechnen, an der ersten automatischen Stelle
         }
       }
 
@@ -265,7 +323,7 @@ function berechne(inp) {
     const d = new Date(heute);
     d.setDate(heute.getDate() + i);
 
-    kette.push({
+    const zeile = {
       offset: i,
       datum: d,
       bosIdx,
@@ -286,7 +344,9 @@ function berechne(inp) {
       istManuell: gesperrtWerte[i] === undefined && manuelleWerte[i] !== undefined,
       vorschlag: vorschlaege[i] ?? 0,
       warnung
-    });
+    };
+    if (mitZusatz) zeile.zusatz = zusatzAn(i);   // NEU 08.11.2026: Bestellmenge des Tages (steckt in verbrauch)
+    kette.push(zeile);
   }
 
   const warnungen = kette
@@ -353,7 +413,11 @@ async function berechneMitZeitkontext(inp) {
 window.BOS_KETTE = {
   berechne,
   ermittleTagesTypen,
-  berechneMitZeitkontext
+  berechneMitZeitkontext,
+  // NEU 08.11.2026: Fähigkeiten dieser Fassung. Fehlt `kann.zusatzBedarf`,
+  // ist eine alte Kette aus dem Zwischenspeicher geladen — die würde
+  // Bestellungen still ignorieren. Die Stationen brechen dann sichtbar ab.
+  kann: { zusatzBedarf: true }
 };
 
 })();

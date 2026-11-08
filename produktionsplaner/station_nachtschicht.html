@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-08 · 15:38 · Froster-Frage, Bestand, Fehlmenge, Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45): Beim Öffnen Dialog „Vorbereitung für ⟨Tag⟩ schon fertig?“ wie in der Inventur, nichts vorgewählt, Seite bis zur Antwort gesperrt; nach Ja Ulfs Hinweis auf Fehlmengen. Leiste oben ohne Vorwahl, danach umstellbar. Bestand nur aus Zählung unter 24 Std., sonst leer, Produkt nicht gerechnet, Einreichen gesperrt (Knopf nennt die Produkte); oben Hinweis, wenn kein Produkt frisch gezählt ist. Fehlmenge-Zeile nur bei Ja, eigene Optik („⚠ Fehlt für ⟨Tag⟩?“), Werte bleiben bei Nein erhalten, zählen aber nicht. Je Karte Block „📋 Bestellungen“ (bos_events produktionsplan_bestellung, live über onSnapshot, Abfrage type/station/datum in Planungsspanne): eintragen, löschen mit Rückfrage auf der Seite, Kennzeichen über ./bestell_regeln.js; Bestellungen gehen als zusatzBedarf an die Kette. Alte Kette im Zwischenspeicher (ohne BOS_KETTE.kann.zusatzBedarf) → sichtbarer Abbruch. Einreichung zusätzlich planungsTag, je Produkt fehlmengeFroster, bestellungen [{id, datum, menge}]. Ungespeichert-Schutz: Abdruck mit eingerechneten Bestellungen und wirksamer Fehlmenge, erster Abdruck nach „Bestätigen“. Einreichen gesperrt, solange Bestellungen nicht geladen sind. window.onerror/unhandledrejection sichtbar. Hilfetext neu. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
 <!-- 2026-11-02 · 17:41 · Wochenzettel nach Tagen (Go Kontroll-Chat 02.11., 17:2x): Einreichen schreibt je Produkt zusätzlich tage: [{datum, menge}] (nur Tage mit Produktion, Datum lokal) über ./plan_tage.js — eine Mechanik für alle vier Stationen. Fehlt plan_tage.js, wird ohne tage eingereicht und unter dem Knopf steht das sichtbar. Rechnung, Vorschläge, Fenster, Ungespeichert-Schutz unverändert. SESSION_2026-11-02_PRODUKTIONSPLANER_WOCHENZETTEL_BAU.md -->
 <!-- 2026-10-20 · 06:59 · Herkunft der Einstellungen (Verbrauch aufräumen, Freigabe KC 06:20, K4): Statuszeile hängt an, woher die Verbrauchs-Einstellungen kommen („Einstellungen Stand N“ / „⚠︎ vom Gerät“ / „aus der Datei“ / „✕ Startwerte“, BOS_VERBRAUCH.einstellungenHerkunft()). Sonst nichts geändert. SESSION_2026-10-20_VERBRAUCH_AUFRAEUMEN_BAU.md -->
 <!-- 2026-10-17 · 04:59 · #77 Teil 2 Ungespeichert-Schutz (Freigabe Kontroll-Chat 17.10., 04:57): Das ✕ im Launcher und das Neuladen fragen nach, wenn die Planung von der zuletzt geladenen bzw. eingereichten abweicht (Fingerabdruck planungsAbdruck(), ohne „Kette prüfen“; zurückgestellt = unverändert). Während des Einreichens Text „wird gerade gespeichert“. Über ../bos_ungespeichert.js, Rückfall auf eigenen beforeunload. Rechnung, Rendern, Einreichen-Inhalt unverändert. SESSION_2026-10-17_UNGESPEICHERT_STATIONEN_BAU.md -->
@@ -180,6 +181,60 @@
   .pp-hilfe-schritt { margin-bottom:18px; padding-bottom:14px; border-bottom:1px dashed var(--bos-border); }
   .pp-hilfe-titel { font-family:var(--bos-font-display); font-weight:900; color:var(--bos-amber); margin-bottom:5px; }
   .pp-hilfe-text { font-family:var(--bos-font-body); font-size:0.85rem; line-height:1.6; color:var(--bos-text-dim); white-space:pre-line; }
+
+  /* ── 08.11.2026: Froster-Dialog — Aufbau 1:1 wie froster_inventur.html (.pk-*), Farben auf bos_design_tokens.css ── */
+  .pk-overlay { position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .pk-card { background:var(--bos-surface); border:1px solid var(--bos-border); border-radius:16px; padding:24px 20px; width:100%; max-width:420px; box-sizing:border-box; }
+  .pk-frage { font-family:var(--bos-font-display); font-weight:700; font-size:1.25rem; color:var(--bos-text); margin-bottom:4px; line-height:1.3; }
+  .pk-sub { font-family:var(--bos-font-body); font-size:.86rem; color:var(--bos-text-dim); margin-bottom:18px; }
+  .pk-row { margin-bottom:14px; }
+  .pk-row-label { font-family:var(--bos-font-label); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:.8rem; color:var(--bos-text-dim); margin-bottom:8px; }
+  .pk-row-btns { display:flex; gap:10px; }
+  .pk-btn { flex:1; padding:14px 8px; border-radius:10px; border:1px solid var(--bos-border); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-label); font-weight:700; font-size:.92rem; letter-spacing:.02em; cursor:pointer; transition:border-color .15s ease, background .15s ease; -webkit-tap-highlight-color:transparent; }
+  .pk-btn.gewaehlt { border-color:var(--bos-amber); background:var(--bos-amber-glow); color:var(--bos-amber-bright); }
+  .pk-hinweis { border:1.5px solid var(--bos-warn); background:var(--bos-warn-glow-soft); color:var(--bos-warn-bright); border-radius:10px; padding:10px 12px; margin:0 0 14px; font-family:var(--bos-font-body); font-weight:700; font-size:.9rem; line-height:1.45; }
+  .pk-confirm { width:100%; margin-top:8px; padding:15px; border-radius:10px; border:none; font-family:var(--bos-font-label); font-weight:800; letter-spacing:.05em; text-transform:uppercase; font-size:.92rem; color:#1b1305; background:linear-gradient(180deg, var(--bos-amber-bright), var(--bos-amber)); cursor:pointer; }
+  .pk-confirm:disabled { background:var(--bos-surface-raised); color:var(--bos-text-faint); cursor:not-allowed; }
+  .f-hinweis { max-width:600px; margin:7px auto 0; font-family:var(--bos-font-body); font-weight:700; font-size:.78rem; line-height:1.4; color:var(--bos-warn-bright); }
+  .f-btn.yes.active { border-color:var(--bos-green); background:rgba(77,184,122,0.1); color:var(--bos-green); }
+
+  /* ── 08.11.2026: Hinweise oben, Bestand fehlt, Fehlmenge, Bestellungen ── */
+  .seiten-hinweis { max-width:600px; margin:10px auto 0; padding:9px 12px; border-radius:10px; border:1.5px solid var(--bos-warn); background:var(--bos-warn-glow-soft); color:var(--bos-warn-bright); font-family:var(--bos-font-label); font-weight:800; font-size:.78rem; line-height:1.4; box-sizing:border-box; }
+  .seiten-hinweis.fehler { border-color:var(--bos-red); background:rgba(201,74,74,0.08); color:var(--bos-red); overflow-wrap:anywhere; }
+  .seiten-hinweis a { color:inherit; text-decoration:underline; }
+  .bestand-row.fehlt .bestand-input { border-color:var(--bos-red); box-shadow:0 0 0 2px rgba(201,74,74,0.18); }
+  .bestand-input.abgewiesen { border-color:var(--bos-red) !important; color:var(--bos-red); }
+  .fehlmenge-row { display:flex; align-items:center; gap:8px; margin:0 12px 10px; padding:8px 10px; border:2px solid var(--bos-warn); border-radius:12px; background:var(--bos-warn-glow-soft); flex-wrap:wrap; }
+  .fehlmenge-label { font-family:var(--bos-font-label); font-weight:900; font-size:.78rem; letter-spacing:.4px; color:var(--bos-warn-bright); }
+  .fehlmenge-row .bestand-input { border-color:var(--bos-warn); }
+  .fehlmenge-row .bestand-unit { color:var(--bos-warn-bright); }
+  .prod-status .fm-zusatz { color:var(--bos-warn-bright); }
+
+  .bst-block { margin:0 12px 10px; border:1.5px solid var(--bos-border-strong); border-radius:12px; background:var(--bos-surface-raised); overflow:hidden; }
+  .bst-kopf { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; font-family:var(--bos-font-label); font-weight:900; font-size:.7rem; text-transform:uppercase; letter-spacing:.8px; color:var(--bos-text-dim); }
+  .bst-kopf a { font-weight:800; text-transform:none; letter-spacing:0; color:var(--bos-amber); text-decoration:none; white-space:nowrap; }
+  .bst-leer { padding:0 10px 8px; font-family:var(--bos-font-label); font-size:.7rem; font-weight:700; color:var(--bos-text-faint); }
+  .bst-zeile { padding:6px 10px; border-top:1px dashed var(--bos-border-strong); font-family:var(--bos-font-label); font-size:.74rem; font-weight:700; color:var(--bos-text-dim); }
+  .bst-haupt { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+  .bst-text { min-width:0; overflow-wrap:anywhere; }
+  .bst-text b { color:var(--bos-text); font-weight:900; }
+  .bst-marke { display:inline-block; margin:3px 6px 0 0; padding:1px 7px; border-radius:6px; font-size:.64rem; font-weight:800; }
+  .bst-marke.neu { color:var(--bos-warn-bright); border:1px solid var(--bos-warn); background:var(--bos-warn-glow-soft); }
+  .bst-marke.eingeplant { color:var(--bos-green); border:1px solid rgba(77,184,122,.5); }
+  .bst-marke.aus { color:var(--bos-text-faint); border:1px solid var(--bos-border-strong); }
+  .bst-marke.zu { color:var(--bos-text-dim); border:1px solid var(--bos-border-strong); }
+  .bst-btn { padding:4px 9px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:900; font-size:.68rem; cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+  .bst-btn.rot { border-color:var(--bos-red); color:var(--bos-red); }
+  .bst-btn.haupt { border-color:var(--bos-amber); color:var(--bos-amber); }
+  .bst-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .bst-frage { display:flex; align-items:center; gap:6px; margin-top:5px; color:var(--bos-red); font-weight:800; flex-wrap:wrap; }
+  .bst-fehler { margin-top:4px; color:var(--bos-red); font-weight:800; overflow-wrap:anywhere; }
+  .bst-neu { padding:8px 10px; border-top:1px dashed var(--bos-border-strong); }
+  .bst-form { display:grid; grid-template-columns:1.2fr .7fr; gap:6px; margin-top:6px; }
+  .bst-form select, .bst-form input { width:100%; box-sizing:border-box; padding:8px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface); color:var(--bos-text); font-family:var(--bos-font-label); font-weight:800; font-size:.82rem; }
+  .bst-form .bst-notiz { grid-column:1 / -1; }
+  .bst-form .bst-aktion { grid-column:1 / -1; display:flex; gap:6px; }
+  .cr-verb .cr-bst { color:var(--bos-amber); font-size:.6rem; }
 </style>
 </head>
 <body>
@@ -200,6 +255,7 @@
 <script src="../bos_produktionskette.js"></script>
 <script src="../bos_froster.js"></script>
 <script src="plan_tage.js"></script>
+<script src="bestell_regeln.js"></script>   <!-- NEU 08.11.2026: Regeln der Bestellliste (eine Rechenstelle für Station, Übersicht, Bestellungen, Froster-Ziele) -->
 <script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77 Teil 2: Ungespeichert-Schutz -->
 
 <div class="nfc-header">
@@ -230,11 +286,33 @@
 
 <div class="froster-bar">
   <div class="froster-bar-inner">
-    <span class="froster-label">Froster</span>
+    <span class="froster-label">Froster fertig?</span>
     <div class="f-toggle">
-      <button class="f-btn yes" id="f-ja"   onclick="setFroster(true)">✓ Fertig</button>
-      <button class="f-btn no active" id="f-nein" onclick="setFroster(false)">noch nicht</button>
+      <!-- 08.11.2026: keine Vorwahl mehr (vorher „noch nicht“ aktiv); Antwort kommt aus dem Dialog -->
+      <button class="f-btn yes" id="f-ja"   onclick="setFroster(true)">✓ Ja</button>
+      <button class="f-btn no" id="f-nein" onclick="setFroster(false)">✗ Nein</button>
     </div>
+  </div>
+  <div class="f-hinweis" id="f-hinweis" style="display:none;"></div>
+</div>
+
+<!-- 08.11.2026: Hinweise oben (keine frische Zählung, Bestellungen nicht geladen, unerwarteter Fehler) -->
+<div id="seiten-hinweise" style="padding:0 12px;"></div>
+
+<!-- 08.11.2026: Froster-Dialog wie in froster_inventur.html — keine Vorwahl, blockiert bis zur Antwort -->
+<div class="pk-overlay" id="pk-overlay" style="display:none;">
+  <div class="pk-card" role="dialog" aria-modal="true" aria-labelledby="pk-frage">
+    <div class="pk-frage" id="pk-frage">Vorbereitung für morgen schon fertig?</div>
+    <div class="pk-sub" id="pk-sub">Bitte aktiv angeben — keine Vorauswahl möglich.</div>
+    <div class="pk-row">
+      <div class="pk-row-label" id="pk-station"></div>
+      <div class="pk-row-btns">
+        <button class="pk-btn" id="pk-ja" onclick="pkWaehle(true)">✓ Ja</button>
+        <button class="pk-btn" id="pk-nein" onclick="pkWaehle(false)">✗ Nein</button>
+      </div>
+    </div>
+    <div class="pk-hinweis" id="pk-hinweis" style="display:none;"></div>
+    <button class="pk-confirm" id="pk-confirm" disabled onclick="pkBestaetigen()">Bestätigen</button>
   </div>
 </div>
 
@@ -332,8 +410,30 @@ function zeigeProduktFehler(text) {
   c.appendChild(d);
 }
 
-var frosterFertig = false;
-var frosterStartwert = frosterFertig;   // #77 Teil 2 (17.10.2026): Vorwahl beim Start festhalten, bevor ein Klick möglich ist — Ausgangsstand für den ersten Abdruck
+// 08.11.2026: null = noch nicht beantwortet. Keine Vorwahl mehr (Ulf 03.11., 05:29:
+// „Ohne Froster eingabe sollte die Eingabe blockiert sein“). Die Antwort kommt aus
+// dem Dialog; bis dahin ist die Seite gesperrt. ~~frosterStartwert (#77 Teil 2)~~
+// entfällt: der erste Abdruck entsteht jetzt erst nach „Bestätigen“.
+var frosterFertig = null;
+var pkWahl = null;              // Wahl im Dialog vor „Bestätigen“
+// Ulfs Text nach „Ja“ (03.11., 05:29), wörtlich
+var FEHLMENGE_HINWEIS = 'Bitte Fehlmengen für den morgigen Tag beachten. Falls es diese gibt, bitte bei dem jeweiligen Produkt eintragen!';
+var WT_LANG_JS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+var WT_KURZ_JS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+// ── BESTELLUNGEN (08.11.2026) ─────────────────────────────────────────
+// Eigene Dokumente in bos_events (type produktionsplan_bestellung), nicht an
+// der Einreichung. Live über onSnapshot: Abfrage type/station/datum in der
+// Planungsspanne (Fr vor der Planungswoche … So der Woche danach, 17 Tage).
+var BR = window.BOS_BESTELL_REGELN || null;
+var BESTELLUNGEN = [];          // gelesene Bestellungen dieser Station (mit id)
+var BESTELL_STAND = { geladen: false, fehler: null };
+var BESTELL_ABMELDEN = null;
+var EINREICHUNGEN_KZ = [];      // neueste eigene Einreichung je Woche, die die Spanne abdecken kann (für die Kennzeichen)
+var EINREICHUNGEN_FEHLER = null;
+var BST_FORM = {};              // bosId → { offen, tag, menge, notiz, fehler, laeuft }
+var BST_FRAGE = null;           // id der Bestellung mit offener Lösch-Rückfrage
+var BST_FEHLER = {};            // id → Fehlertext beim Löschen
+var BST_LAEUFT = {};            // id → Löschen läuft
 var state = {};
 var PRODUKTE = [];
 var rebuildTimers = {};
@@ -376,6 +476,9 @@ async function einstellungenFuer(topf) {
 // festgestellt: "brauche zusätzlich noch X schon für morgen"), pro Produkt,
 // analog zum Bestand. bos_froster.js liefert das bewusst nicht mit — laut
 // dessen Kopfkommentar Aufgabe des Aufrufers.
+// 08.11.2026: Die Fehlmenge gilt nur noch für MORGEN und nur bei „Froster fertig: Ja“
+// (Ulf 03.11., 04:19). Bestellungen haben ihren eigenen Block (siehe BESTELLUNGEN) —
+// ~~„spontane Kundenbestellung“ ins Fehlmenge-Feld~~ entfällt.
 
 // ── Planungsfenster: Fr 00:01 – Di 23:59, danach HART gesperrt (Ulf,
 // 03.09.2026 — Kurskorrektur gegenüber der ursprünglichen Annahme "weiches
@@ -409,15 +512,22 @@ function planungsfenster(von) {
 // (Stand beim Zusammenstellen, vor dem await). Kein Abdruck (lädt,
 // Ladefehler, Planung gesperrt) = nichts ungespeichert. Alle Produkte zählen,
 // auch halb geplante (Kontroll-Chat 04:57, Weg A).
-function planungsAbdruck(frosterWert) {
+// 08.11.2026: dazu je Produkt die EINGERECHNETEN Bestellungen [id, offset, menge]
+// (auch die für morgen bei „Ja“, die mit in die Einreichung gehen) und statt
+// s.fehlmengeAbs die WIRKSAME Fehlmenge (0 bei Nein) — „gefragt wird bei allem,
+// was in die Einreichung gehen würde“. Eine neue oder gelöschte Bestellung im
+// Horizont (hier oder von woanders) macht die Planung so „nicht eingereicht“.
+function planungsAbdruck() {
   function sortiert(o) { var r = {}; Object.keys(o || {}).sort().forEach(function (k) { r[k] = o[k]; }); return r; }
   var p = {};
   Object.keys(state).sort().forEach(function (id) {
     var s = state[id];
+    var bst = bestellAnteil(id);
+    var bAbdruck = bst ? bst.gerechnet.concat(bst.ueberFroster).map(function (b) { return [b.id, b.offset, b.menge]; }) : [];
     p[id] = [s.zielOff, sortiert(s.prodTage), sortiert(s.manuelleWerte), sortiert(s.gesperrtWerte),
-             s.startBestand, s.fehlmengeAbs || 0, !!s.gleichmaessig];   // ohne _akkOpen
+             s.startBestand, wirksameFehlmenge(id), !!s.gleichmaessig, bAbdruck];   // ohne _akkOpen
   });
-  return JSON.stringify([frosterWert === undefined ? frosterFertig : frosterWert, p]);
+  return JSON.stringify([frosterFertig, p]);
 }
 var gemerkterAbdruck = null;   // null = kein Abdruck → nichts ungespeichert
 var einreichenLaeuft = false;
@@ -449,6 +559,18 @@ window.addEventListener('load', async function() {
 
   if (!window.BOS_VERBRAUCH || !window.BOS_FROSTER || !window.BOS_KETTE) {
     setStatus('error', '⚠ Kernmodule nicht geladen'); return;
+  }
+  // 08.11.2026: Versionsschutz. Eine alte, zwischengespeicherte Kette würde die
+  // Bestellungen still ignorieren und sie trotzdem als eingeplant einreichen.
+  if (!window.BOS_KETTE.kann || !window.BOS_KETTE.kann.zusatzBedarf) {
+    setStatus('error', '⚠ Rechen-Modul veraltet');
+    zeigeProduktFehler('Rechen-Modul veraltet (bos_produktionskette.js kennt keine Bestellungen) — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    return;
+  }
+  if (!BR) {
+    setStatus('error', '⚠ Bestell-Regeln nicht geladen');
+    zeigeProduktFehler('bestell_regeln.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    return;
   }
   // Lädt die echte bos_hamster_config.json statt des eingebauten Fallbacks
   // (der bisher ohnehin exakt übereinstimmt) — bewusst "fire and forget",
@@ -505,7 +627,7 @@ window.addEventListener('load', async function() {
   }
 
   PRODUKTE.forEach(function(prod) {
-    state[prod.bosId] = { zielOff:null, prodTage:{}, manuelleWerte:{}, gesperrtWerte:{}, startBestand:0, fehlmengeAbs:0, gleichmaessig:false, _akkOpen:false };
+    state[prod.bosId] = { zielOff:null, prodTage:{}, manuelleWerte:{}, gesperrtWerte:{}, startBestand:null, fehlmengeAbs:0, gleichmaessig:false, _akkOpen:false };   // 08.11.2026: startBestand null = fehlt
   });
 
   try {
@@ -527,12 +649,20 @@ window.addEventListener('load', async function() {
           // macht einen echten Abfragefehler von "nie gezählt" unterscheidbar.
           fehlerText: fb.fehlerText || null
         };
-        state[prod.bosId].startBestand = Math.round(bestandBleche);
+        // 08.11.2026: Nur eine Zählung unter 24 Std. wird übernommen (Ulf 03.11., 05:29:
+        // „Alles unter 24 Stunden“; 05:05: „er dürfte gar keine Werte übernehmen“).
+        // Älter, nie gezählt oder Abfragefehler → Feld leer, Produkt wird nicht gerechnet.
+        // ~~state[prod.bosId].startBestand = Math.round(bestandBleche);~~ (übernahm auch alte Werte)
+        state[prod.bosId].startBestand = (fb.veraltet === false && typeof fb.bestand === 'number') ? Math.round(bestandBleche) : null;
       });
     });
     ladeVorgaenge.push(
       window.BOS_KETTE.ermittleTagesTypen(db, heute, 17).then(function(tt){ TAGESTYPEN = tt; })
     );
+    // 08.11.2026: Bestellungen (live) und die eigenen Einreichungen für die Kennzeichen.
+    // Beide fangen ihre Fehler selbst und zeigen sie an — kein Abbruch der Seite.
+    ladeVorgaenge.push(starteBestellungen(db));
+    ladeVorgaenge.push(ladeEinreichungenKZ(db));
     await Promise.all(ladeVorgaenge);
   } catch (e) {
     console.warn('Produktionsplaner Nachtschicht: Datenladung fehlgeschlagen', e);
@@ -540,15 +670,166 @@ window.addEventListener('load', async function() {
     return;
   }
 
-  // #77 Teil 2: erster Abdruck — alle startBestand-Schreibzugriffe (oben im .then) sind vorbei,
-  // Karten gibt es noch keine. Froster mit dem Startwert: eine Wahl während des Ladens zählt als Eingabe.
-  gemerkterAbdruck = planungsAbdruck(frosterStartwert);
+  // #77 Teil 2: ~~erster Abdruck hier, mit dem Froster-Startwert~~ — seit 08.11.2026
+  // erst in pkBestaetigen(): Die Pflichtantwort im Dialog ist keine Änderung, und bis
+  // dahin ist die Seite gesperrt.
   // 20.10.2026 (K4): Herkunft der Einstellungen (nur wenn ein Topf mit Einstellungen gelesen wurde)
   var einstHk = window.BOS_VERBRAUCH && typeof window.BOS_VERBRAUCH.einstellungenHerkunft === 'function' ? window.BOS_VERBRAUCH.einstellungenHerkunft() : null;
   setStatus('ready', '✓ ' + PRODUKTE.length + ' Produkte geladen' + produktQuelleText + (einstHk ? ' · ' + einstHk.kurz : ''));
   if (einstHk && einstHk.warnung) { var bs = document.getElementById('brain-status'); bs.title = einstHk.text; bs.style.color = 'var(--bos-warn)'; }   // Warnfarbe statt Grün (§3a)
   renderAll();
+  renderSeitenHinweise();
+  zeigeFrosterDialog();   // 08.11.2026: Pflichtfrage, blockiert bis zur Antwort
 });
+
+// ── FROSTER-DIALOG (08.11.2026) ─────────────────────────────────────
+// Wie froster_inventur.html: zwei Knöpfe, keine Vorwahl, „Bestätigen“ erst nach
+// einer Wahl. Ein Schalter pro Station (Ulf 03.11., 05:29).
+function morgenDatum() { return offsetToDate(1); }
+function zeigeFrosterDialog() {
+  var m = morgenDatum();
+  document.getElementById('pk-frage').textContent = 'Vorbereitung für ' + WT_LANG_JS[m.getDay()] + ', ' + fmtD(m) + ' schon fertig?';
+  document.getElementById('pk-station').textContent = STATION_CFG;
+  pkWahl = null;
+  pkZeichne();
+  document.getElementById('pk-overlay').style.display = 'flex';
+}
+function pkWaehle(v) { pkWahl = v; pkZeichne(); }
+function pkZeichne() {
+  document.getElementById('pk-ja').classList.toggle('gewaehlt', pkWahl === true);
+  document.getElementById('pk-nein').classList.toggle('gewaehlt', pkWahl === false);
+  var h = document.getElementById('pk-hinweis');
+  h.textContent = FEHLMENGE_HINWEIS;
+  h.style.display = pkWahl === true ? 'block' : 'none';
+  document.getElementById('pk-confirm').disabled = (pkWahl === null);
+}
+function pkBestaetigen() {
+  if (pkWahl === null) return;
+  document.getElementById('pk-overlay').style.display = 'none';
+  frosterFertig = pkWahl;
+  zeichneFrosterLeiste();
+  recalcAll();
+  // #77 Teil 2: erster Abdruck JETZT (Pflichtantwort ist keine Änderung)
+  gemerkterAbdruck = planungsAbdruck();
+}
+function zeichneFrosterLeiste() {
+  document.getElementById('f-ja').classList.toggle('active',  frosterFertig === true);
+  document.getElementById('f-nein').classList.toggle('active', frosterFertig === false);
+  var h = document.getElementById('f-hinweis');
+  h.textContent = FEHLMENGE_HINWEIS;
+  h.style.display = frosterFertig === true ? 'block' : 'none';
+}
+
+// ── HINWEISE OBEN (08.11.2026) ──────────────────────────────────────
+function renderSeitenHinweise() {
+  var box = document.getElementById('seiten-hinweise');
+  if (!box) return;
+  var teile = [];
+  var frisch = PRODUKTE.some(function (p) { return DATEN[p.bosId] && DATEN[p.bosId].veraltet === false; });
+  if (PRODUKTE.length && !frisch) {
+    teile.push('<div class="seiten-hinweis" id="hinweis-keine-zaehlung">Keine aktuelle Froster-Zählung (unter 24 Std.) — bitte zuerst Inventur zählen.</div>');
+  }
+  if (BESTELL_STAND.fehler) {
+    teile.push('<div class="seiten-hinweis fehler" id="hinweis-bestellungen">⚠ Bestellungen nicht geladen — Einreichen gesperrt: ' + fehlertextMitLink(escText(BESTELL_STAND.fehler)) + '</div>');
+  }
+  if (EINREICHUNGEN_FEHLER) {
+    teile.push('<div class="seiten-hinweis fehler" id="hinweis-einreichungen">⚠ Letzte Einreichungen nicht gelesen — die Kennzeichen „eingeplant / noch nicht eingeplant“ fehlen: ' + fehlertextMitLink(escText(EINREICHUNGEN_FEHLER)) + '</div>');
+  }
+  if (SEITEN_FEHLER) {
+    teile.push('<div class="seiten-hinweis fehler" id="hinweis-fehler">⚠ Unerwarteter Fehler: ' + escText(SEITEN_FEHLER) + ' — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.</div>');
+  }
+  box.innerHTML = teile.join('');
+}
+function escText(t) {
+  return String(t === undefined || t === null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+// Checkliste §7a: nicht abgefangene Fehler sichtbar
+var SEITEN_FEHLER = null;
+window.addEventListener('error', function (e) { SEITEN_FEHLER = (e && e.message ? e.message : 'Fehler') + (e && e.filename ? ' (' + String(e.filename).replace(/^.*\//, '') + ':' + e.lineno + ')' : ''); renderSeitenHinweise(); });
+window.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; SEITEN_FEHLER = (r && r.message) ? r.message : String(r); renderSeitenHinweise(); });
+
+// ── BESTELLUNGEN LADEN (08.11.2026) ─────────────────────────────────
+// Planungsspanne: Fr vor der Planungswoche … So der Woche danach (17 Tage).
+// Gleichheits-Filter + `in`, ohne orderBy (Doku §10). Braucht Firestore doch
+// einen Index, steht der Link im Hinweis oben (fehlertextMitLink).
+function planungsSpanneStation() { return BR.planungsSpanne(wochenMo); }
+// Antwortet die Datenbank gar nicht (kein Netz, kein Zwischenspeicher), lädt die Seite
+// nach ANTWORT_MS trotzdem weiter: Bestellungen gelten als nicht geladen, Einreichen
+// ist gesperrt. Kommt die Antwort später, verschwindet die Sperre von selbst.
+var ANTWORT_MS = 10000;
+var KEINE_ANTWORT = 'keine Antwort der Datenbank nach 10 Sekunden — Netz prüfen. Sobald die Bestellungen ankommen, ist das Einreichen wieder frei.';
+function starteBestellungen(db) {
+  return new Promise(function (fertig) {
+    var erste = true;
+    function einmal() { if (erste) { erste = false; fertig(); } }
+    setTimeout(function () {
+      if (!erste) return;
+      BESTELL_STAND = { geladen: false, fehler: KEINE_ANTWORT };
+      einmal();
+    }, ANTWORT_MS);
+    try {
+      BESTELL_ABMELDEN = db.collection('bos_events')
+        .where('type', '==', BR.TYP)
+        .where('station', '==', STATION_CFG)
+        .where('datum', 'in', planungsSpanneStation())
+        .onSnapshot(function (snap) {
+          var neu = [];
+          snap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; neu.push(d); });
+          neu = BR.sortiere(neu);
+          var vorher = JSON.stringify(BESTELLUNGEN.map(function (b) { return [b.id, b.datum, b.menge, b.notiz, b.legacyKey, BR.alsMillis(b.ts)]; }));
+          var jetzt = JSON.stringify(neu.map(function (b) { return [b.id, b.datum, b.menge, b.notiz, b.legacyKey, BR.alsMillis(b.ts)]; }));
+          BESTELLUNGEN = neu;
+          var warFehler = !!BESTELL_STAND.fehler;
+          BESTELL_STAND = { geladen: true, fehler: null };
+          if (!erste && (vorher !== jetzt || warFehler)) { recalcAll(); renderSeitenHinweise(); }
+          einmal();
+        }, function (e) {
+          console.error('[Station] Bestellungen:', e);
+          BESTELL_STAND = { geladen: false, fehler: fehlerGrund(e) + (e && e.code && String(e.message || '').indexOf(e.code) < 0 ? ' (' + e.code + ')' : '') };
+          if (!erste) { recalcAll(); renderSeitenHinweise(); }
+          einmal();
+        });
+    } catch (e) {
+      console.error('[Station] Bestellungen (Abfrage):', e);
+      BESTELL_STAND = { geladen: false, fehler: fehlerGrund(e) };
+      einmal();
+    }
+  });
+}
+// Eigene Einreichungen aus allen Wochen, die einen Tag der Spanne abdecken können
+// (bestell_regeln.js wochenFuerTage, bei W = Planungswoche: W−14 … W+14), je Woche
+// die neueste. Dieselbe Auswahl wie Übersicht, Seite Bestellungen und Froster-Ziele.
+function ladeEinreichungenKZ(db) {
+  var zeitlimit = new Promise(function (_, nein) { setTimeout(function () { nein(new Error(KEINE_ANTWORT)); }, ANTWORT_MS); });
+  return Promise.race([zeitlimit, db.collection('bos_events')
+    .where('type', '==', 'produktionsplan_einreichung')
+    .where('station', '==', STATION_CFG)
+    .where('woche', 'in', BR.wochenFuerTage(planungsSpanneStation()))
+    .get()
+    .then(function (snap) {
+      var liste = [];
+      snap.forEach(function (doc) { liste.push(doc.data()); });
+      EINREICHUNGEN_KZ = BR.neuesteJeStationUndWoche(liste);
+      EINREICHUNGEN_FEHLER = null;
+    })])
+    .catch(function (e) {
+      console.error('[Station] Einreichungen für Kennzeichen:', e);
+      EINREICHUNGEN_KZ = [];
+      EINREICHUNGEN_FEHLER = fehlerGrund(e);
+    });
+}
+
+// Anteil der Bestellungen an einem Produkt (über bestell_regeln.js).
+function bestellAnteil(bosId) {
+  if (!BR) return null;
+  var s = state[bosId];
+  return BR.fuerKette(BESTELLUNGEN, bosId, heute, s ? s.zielOff : null, frosterFertig);
+}
+// Fehlmenge zählt nur bei „Ja“ (Ulf 03.11., 04:19).
+function wirksameFehlmenge(bosId) {
+  var s = state[bosId];
+  return (frosterFertig === true && s && s.fehlmengeAbs > 0) ? s.fehlmengeAbs : 0;
+}
 
 // 13.10.2026 (#64): Versionsschutz. Ein neuer Rechen-Host sagt in `einheit`,
 // worin er liefert. Fehlt das, kommt die Antwort von einer alten, noch
@@ -591,13 +872,16 @@ function getResult(bosId) {
   if (!prod) return null;
   var s = state[bosId];
   if (s.zielOff === null) return null;
+  if (s.startBestand === null) return null;   // 08.11.2026: Bestand fehlt → nicht rechnen
   var d = DATEN[bosId];
   if (!d) return null;
+  var bst = bestellAnteil(bosId);
   return window.BOS_KETTE.berechne({
     needs: d.needs,
     startBestand: s.startBestand,
-    fehlmengeAbs: s.fehlmengeAbs || 0,
-    frosterFertig: frosterFertig,
+    fehlmengeAbs: wirksameFehlmenge(bosId),   // 08.11.2026: nur bei Ja
+    zusatzBedarf: bst ? bst.zusatz : {},      // 08.11.2026: Bestellungen an ihrem Tag
+    frosterFertig: frosterFertig === true,
     zielOff: s.zielOff,
     prodTage: s.prodTage,
     manuelleWerte: s.manuelleWerte,
@@ -640,7 +924,9 @@ function buildCard(bosId) {
   card.className = 'prod-card' + (isOk ? ' ok' : hatLuecke ? ' warn' : hatKnapp ? ' knapp-card' : '');
 
   var statusTxt = 'Produktionstage und Ziel wählen', statusCls = '';
-  if (s.zielOff !== null && !prodCount) statusTxt = 'Produktionstage wählen';
+  var bestandFehlt = (s.startBestand === null);   // 08.11.2026
+  if (bestandFehlt) { statusTxt = '✕ Bestand fehlt — bitte zählen oder eintragen'; statusCls = ' err'; card.className = 'prod-card warn'; }
+  else if (s.zielOff !== null && !prodCount) statusTxt = 'Produktionstage wählen';
   else if (prodCount && s.zielOff === null) statusTxt = 'Zieldatum wählen';
   else if (isOk)      { statusTxt = '✓ Kette vollständig gedeckt · Bestand: ' + startBest + ' ' + eh; statusCls = ' ok'; }
   else if (hatLuecke) { statusTxt = '✕ Lücke — Produktion erhöhen oder Tag hinzufügen'; statusCls = ' err'; }
@@ -657,7 +943,9 @@ function buildCard(bosId) {
   // 15.10.2026 (V2, B7): ohne Quellennamen — an der Station steht nicht, woher die Zahl kommt.
 
   var html = '<div class="prod-name">' + prod.name + '</div>';
-  html += '<div class="prod-status' + statusCls + '">' + statusTxt + '</div>';
+  var fmW = wirksameFehlmenge(bosId);   // 08.11.2026: „+3 Bl. Fehlmenge eingerechnet“
+  html += '<div class="prod-status' + statusCls + '">' + statusTxt
+        + (fmW > 0 && !bestandFehlt ? ' · <span class="fm-zusatz">+' + fmW + ' ' + eh + ' Fehlmenge eingerechnet</span>' : '') + '</div>';
   if (alleUnzuverlaessig) {
     html += '<div class="verlaesslich-hint" style="color:var(--bos-red);">✕ Keine ausreichenden Bedarfszahlen — Ergebnis nicht verlässlich!</div>';
   } else if (teilweiseUnzuverlaessig) {
@@ -665,21 +953,30 @@ function buildCard(bosId) {
   }
 
   // ── BESTAND (editierbar, Warnung bei veraltet/nie gezählt) ──
-  html += '<div class="bestand-row' + (bestandVeraltet ? ' warn' : '') + '">'
+  // 08.11.2026: leer, wenn keine Zählung unter 24 Std. (startBestand null)
+  html += '<div class="bestand-row' + (bestandVeraltet ? ' warn' : '') + (bestandFehlt ? ' fehlt' : '') + '">'
         + '<span class="bestand-label">❄️ Bestand</span>'
-        + '<input class="bestand-input" type="number" min="0" value="' + startBest + '"'
-        + ' oninput="onBestandInput(\'' + bosId + '\', this)">'
+        + '<input class="bestand-input" type="number" min="0" inputmode="numeric" placeholder="—" value="' + (bestandFehlt ? '' : startBest) + '"'
+        + ' data-bestand="' + bosId + '" oninput="onBestandInput(\'' + bosId + '\', this)">'
         + '<span class="bestand-unit">' + eh + '</span>'
-        + (bestandVeraltet ? '<span class="bestand-hint">' + (datenEintrag.fehlerText ? ('⚠ Abfrage fehlgeschlagen: ' + fehlertextMitLink(datenEintrag.fehlerText)) : (datenEintrag.gefunden ? 'älter als 24 Std. — bitte prüfen' : 'nie gezählt — bitte eintragen')) + '</span>' : '')
+        + (bestandVeraltet ? '<span class="bestand-hint">' + (datenEintrag.fehlerText ? ('⚠ Abfrage fehlgeschlagen: ' + fehlertextMitLink(datenEintrag.fehlerText)) : (datenEintrag.gefunden ? 'älter als 24 Std. — bitte zählen und eintragen' : 'nie gezählt — bitte eintragen')) + '</span>' : '')
+        + '<span class="bestand-hint" id="bestand-abgewiesen-' + bosId + '" style="display:none;">Nur Werte ab 0</span>'
         + '</div>';
 
-  // ── FEHLMENGE (Sofort-Zusatzbedarf, pro Produkt, Default 0) ──
-  html += '<div class="bestand-row">'
-        + '<span class="bestand-label">➕ Fehlmenge</span>'
-        + '<input class="bestand-input" type="number" min="0" value="' + (s.fehlmengeAbs || 0) + '"'
-        + ' oninput="onFehlmengeInput(\'' + bosId + '\', this)">'
-        + '<span class="bestand-unit">' + eh + ' zusätzlich nötig</span>'
-        + '</div>';
+  // ── FEHLMENGE (08.11.2026: nur bei „Froster fertig = Ja“, für morgen, eigene Optik) ──
+  // ~~„➕ Fehlmenge … zusätzlich nötig“ im Grau des Bestands, immer sichtbar~~ (wurde übersehen,
+  // diente zwei Zwecken). Bestellungen haben jetzt ihren eigenen Block.
+  if (frosterFertig === true) {
+    var mo = morgenDatum();
+    html += '<div class="fehlmenge-row">'
+          + '<span class="fehlmenge-label">⚠ Fehlt für ' + WT_LANG_JS[mo.getDay()] + '?</span>'
+          + '<input class="bestand-input" type="number" min="0" inputmode="numeric" placeholder="0" value="' + (s.fehlmengeAbs > 0 ? s.fehlmengeAbs : '') + '"'
+          + ' data-fehlmenge="' + bosId + '" oninput="onFehlmengeInput(\'' + bosId + '\', this)">'
+          + '<span class="bestand-unit">' + eh + ' fehlen für ' + fmtD(mo) + '</span>'
+          + '</div>';
+  }
+
+  html += baueBestellBlock(bosId, eh);
 
   // ── PRODUKTIONSTAGE (Planungswoche, siehe wochenMo oben) ──
   html += '<div class="section"><div class="slabel">Produktionstage</div><div class="day-row">';
@@ -783,6 +1080,7 @@ function buildCard(bosId) {
       else if (t.istZu)          verb = '🔒';
       else if (t.istHamster)     verb = rd(t.verbrauch) + ' 🐹';
       else                       verb = t.verbrauch ? rd(t.verbrauch) : '—';
+      if (t.zusatz > 0)          verb = verb + '<span class="cr-bst" title="davon Bestellung"> 📋' + rd(t.zusatz) + '</span>';   // 08.11.2026: Bestellung des Tages (steckt im Verbrauch)
 
       // Bestand-Anzeige:
       // Bei Produktionstagen zeigen wir den Bestand VOR Produktion (nach Morgen-Verbrauch)
@@ -842,10 +1140,10 @@ function buildCard(bosId) {
 
 // ── INTERAKTION ─────────────────────────────────
 function setFroster(v) {
+  if (frosterFertig === null) return;   // 08.11.2026: erst über den Dialog beantworten
   frosterFertig = v;
-  document.getElementById('f-ja').classList.toggle('active',  v === true);
-  document.getElementById('f-nein').classList.toggle('active', v === false);
-  recalcAll();
+  zeichneFrosterLeiste();
+  recalcAll();   // Ja → Nein: Fehlmenge-Zeilen weg, Werte bleiben in state, zählen aber nicht
 }
 
 function tapDay(bosId, offset) {
@@ -892,8 +1190,15 @@ function onInput(bosId, offset, el) {
 
 // Bestand manuell korrigieren (v.a. bei veraltet/nie gezählt nötig)
 function onBestandInput(bosId, el) {
-  var val = parseInt(el.value);
-  state[bosId].startBestand = (!isNaN(val) && val >= 0) ? val : 0;
+  // 08.11.2026: leer = Bestand fehlt (nicht 0); Minus wird abgewiesen (Feld rot, Wert zählt nicht)
+  var roh = String(el.value || '').trim();
+  var hinweis = document.getElementById('bestand-abgewiesen-' + bosId);
+  var val = parseInt(roh, 10);
+  var unsinn = (el.validity && el.validity.badInput) || (roh !== '' && (isNaN(val) || val < 0));
+  el.classList.toggle('abgewiesen', !!unsinn);
+  if (hinweis) hinweis.style.display = unsinn ? 'inline' : 'none';
+  if (unsinn) { updateExportBar(); return; }
+  state[bosId].startBestand = (roh === '') ? null : val;
   clearTimeout(rebuildTimers['bestand_' + bosId]);
   rebuildTimers['bestand_' + bosId] = setTimeout(function() {
     rebuildCard(bosId);
@@ -941,6 +1246,18 @@ function toggleAkk(bosId) {
 }
 
 // ── EXPORT BAR ────────────────────────────────
+// 08.11.2026: Sperrgrund fürs Einreichen (null = frei). Reihenfolge: Froster-Frage,
+// Bestellungen nicht geladen, Bestand fehlt (Knopf nennt die Produkte).
+function einreichSperre() {
+  if (frosterFertig === null) return 'Erst die Froster-Frage beantworten.';
+  if (!BESTELL_STAND.geladen) return '⚠ Bestellungen nicht geladen — Einreichen gesperrt' + (BESTELL_STAND.fehler ? ': ' + BESTELL_STAND.fehler : '.');
+  var fehlen = PRODUKTE.filter(function (p) { return state[p.bosId] && state[p.bosId].startBestand === null; }).map(function (p) { return p.name; });
+  if (fehlen.length) {
+    var txt = fehlen.slice(0, 3).join(', ') + (fehlen.length > 3 ? ' und ' + (fehlen.length - 3) + ' weitere' : '');
+    return '✕ Bestand fehlt: ' + txt + ' — Einreichen gesperrt';
+  }
+  return null;
+}
 function updateExportBar() {
   var fertig = 0, gesamt = PRODUKTE.length;
   PRODUKTE.forEach(function(prod) {
@@ -950,9 +1267,10 @@ function updateExportBar() {
   });
   var btn = document.getElementById('btn-export');
   var cnt = document.getElementById('export-count');
-  btn.className = 'btn-export' + (fertig === 0 ? ' disabled' : '');
-  cnt.textContent = fertig + ' / ' + gesamt + ' Produkte mit Vorschlag';
-  cnt.style.color = '';
+  var sperre = einreichSperre();
+  btn.className = 'btn-export' + (fertig === 0 || sperre ? ' disabled' : '');
+  cnt.textContent = sperre || (fertig + ' / ' + gesamt + ' Produkte mit Vorschlag');
+  cnt.style.color = sperre ? 'var(--bos-red)' : '';
 }
 
 // ── EINREICHEN (ersetzt den alten WhatsApp-Export) ──────────
@@ -976,6 +1294,7 @@ function aktuellerProfilName() {
 async function planungEinreichen() {
   var btn = document.getElementById('btn-export');
   if (btn.classList.contains('disabled') || btn.disabled) return;
+  if (einreichSperre()) { updateExportBar(); return; }   // 08.11.2026: nicht nur über die Knopf-Klasse
 
   var produkteDaten = {};
   var mind1 = false;
@@ -988,6 +1307,7 @@ async function planungEinreichen() {
     if (s.zielOff === null || !prodOffsets.length) return;
     mind1 = true;
     var result = getResult(prod.bosId);
+    var bstAnteil = bestellAnteil(prod.bosId);   // 08.11.2026
     produkteDaten[prod.legacyKey] = {
       name: prod.name,
       zielOff: s.zielOff,
@@ -995,7 +1315,9 @@ async function planungEinreichen() {
       manuelleWerte: s.manuelleWerte,
       gesperrtWerte: s.gesperrtWerte,
       startBestand: s.startBestand,
-      fehlmengeAbs: s.fehlmengeAbs || 0,
+      fehlmengeAbs: wirksameFehlmenge(prod.bosId),      // 08.11.2026: wirksamer Wert (0 bei Nein), Feld bleibt für alte Leser
+      fehlmengeFroster: wirksameFehlmenge(prod.bosId),  // 08.11.2026: neuer Name, derselbe Wert
+      bestellungen: bstAnteil ? BR.fuerEinreichung(bstAnteil) : [],   // 08.11.2026: eingeplante Bestellungen [{id, datum, menge}]
       gesamtProduktion: result ? rd(result.gesamtProduktion) : 0,
       endlager: result ? rd(result.endlager) : 0,
       warnungen: result ? result.warnungen : [],
@@ -1017,12 +1339,18 @@ async function planungEinreichen() {
       type: 'produktionsplan_einreichung',
       station: STATION_CFG,
       woche: isoDatum(wochenMo),
+      planungsTag: isoDatum(heute),   // 08.11.2026: „heute“ der Station, auf das sich alle Versätze beziehen
       frosterFertig: frosterFertig,
       eingereichtVon: aktuellerProfilName(),
       ts: firebase.firestore.FieldValue.serverTimestamp(),
       produkte: produkteDaten
     });
     gemerkterAbdruck = abdruckEingereicht;   // #77 Teil 2: nur bei Erfolg; spätere Änderungen bleiben „ungespeichert“
+    // 08.11.2026: Kennzeichen sofort gegen die eigene neue Einreichung (ersetzt die der Planungswoche)
+    var wIso = isoDatum(wochenMo);
+    EINREICHUNGEN_KZ = EINREICHUNGEN_KZ.filter(function (e) { return e.woche !== wIso; })
+      .concat([{ station: STATION_CFG, woche: wIso, planungsTag: isoDatum(heute), ts: new Date(), produkte: produkteDaten }]);
+    recalcAll();
     btn.textContent = '✓ Eingereicht';
     var cntOk = document.getElementById('export-count');
     if (!tageModul) {   // 02.11.2026: eingereicht, aber ohne Tagesaufteilung — nicht still
@@ -1045,6 +1373,140 @@ async function planungEinreichen() {
   einreichenLaeuft = false;   // #77 Teil 2
 }
 
+// ── BESTELLBLOCK (08.11.2026) ───────────────────────────────────────
+// Immer sichtbar, unabhängig von der Froster-Frage. Zeile: Menge · Tag · Notiz ·
+// eingetragen von … · Kennzeichen · Löschen (Rückfrage auf der Seite).
+function fmtTagKurz(iso) { var d = BR.ausIso(iso); return d ? WT_KURZ_JS[d.getDay()] + ' ' + fmtD(d) : String(iso); }
+function fmtWann(ts) {
+  var d = BR.alsDatum(ts);
+  if (!d) return 'gerade eben';
+  return WT_KURZ_JS[d.getDay()] + ' ' + fmtD(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function bestellTagOffsets() {   // morgen … So der Woche nach der Planungswoche (Ziel-Grenze der Station)
+  var bis = naechsteWocheOffsets[6], r = [];
+  for (var o = 1; o <= bis; o++) r.push(o);
+  return r;
+}
+function baueBestellBlock(bosId, eh) {
+  var s = state[bosId];
+  var html = '<div class="bst-block" id="bst-' + bosId + '"><div class="bst-kopf"><span>📋 Bestellungen</span>'
+           + '<a href="bestellungen.html">Alle Bestellungen →</a></div>';
+  if (BESTELL_STAND.fehler) {
+    html += '<div class="bst-leer bst-fehler">⚠ Bestellungen nicht geladen: ' + fehlertextMitLink(escText(BESTELL_STAND.fehler)) + '</div>';
+  } else {
+    html += baueBestellZeilen(bosId, eh);
+  }
+  return html + '</div>';
+}
+function baueBestellZeilen(bosId, eh) {
+  var s = state[bosId], html = '';
+  var eigene = BESTELLUNGEN.filter(function (b) { return b.legacyKey === bosId; });
+  if (!eigene.length) html += '<div class="bst-leer">Keine Bestellungen in dieser Planung.</div>';
+  eigene.forEach(function (b) {
+    var d = BR.ausIso(b.datum);
+    var off = d ? BR.tageAbstand(heute, d) : null;
+    var marken = [];
+    if (off === null || off < 1) marken.push(['aus', 'liegt außerhalb der Planung, nicht eingerechnet']);
+    else if (s.zielOff === null) marken.push(['aus', 'wird eingerechnet, sobald ein Ziel gewählt ist']);
+    else if (off > s.zielOff) marken.push(['aus', 'liegt außerhalb der Planung, nicht eingerechnet']);
+    else if (frosterFertig === true && off === 1) marken.push(['aus', 'morgen — gehört zur Vorbereitung oder ins Fehlmenge-Feld']);
+    if (off !== null && off >= 1 && (TAGESTYPEN[off] || 'normal') === 'zu') marken.push(['zu', 'Bestellung an einem geschlossenen Tag']);
+    var kz = BR.kennzeichen(b, EINREICHUNGEN_KZ);
+    if (kz === 'neu') marken.push(['neu', BR.KENNZEICHEN_TEXT.neu]);
+    else if (kz === 'eingeplant') marken.push(['eingeplant', '✓ ' + BR.KENNZEICHEN_TEXT.eingeplant]);
+    var idA = escText(b.id);
+    html += '<div class="bst-zeile" data-bestellung="' + idA + '"><div class="bst-haupt"><div class="bst-text"><b>' + escText(rd2(b.menge)) + ' ' + eh + '</b> · ' + escText(fmtTagKurz(b.datum))
+          + (b.notiz ? ' · ' + escText(b.notiz) : '') + ' · eingetragen' + (b.eingetragenVon ? ' von ' + escText(b.eingetragenVon) : '') + ' ' + escText(fmtWann(b.ts)) + '</div>'
+          + (BST_FRAGE === b.id ? '' : '<button class="bst-btn" onclick="bstFrage(\'' + idA + '\')">Löschen</button>') + '</div>'
+          + marken.map(function (m) { return '<span class="bst-marke ' + m[0] + '">' + escText(m[1]) + '</span>'; }).join('');
+    if (BST_FRAGE === b.id) {
+      html += '<div class="bst-frage">Wirklich löschen? <button class="bst-btn rot" ' + (BST_LAEUFT[b.id] ? 'disabled ' : '') + 'onclick="bstLoeschen(\'' + idA + '\')">Ja, löschen</button>'
+            + '<button class="bst-btn" onclick="bstFrage(null)">Abbrechen</button></div>';
+    }
+    if (BST_FEHLER[b.id]) html += '<div class="bst-fehler">⚠ Löschen fehlgeschlagen: ' + escText(BST_FEHLER[b.id]) + '</div>';
+    html += '</div>';
+  });
+  // + Bestellung
+  var f = BST_FORM[bosId] || {};
+  html += '<div class="bst-neu">';
+  if (!f.offen) {
+    html += '<button class="bst-btn haupt" onclick="bstFormAuf(\'' + bosId + '\')">+ Bestellung</button>';
+  } else {
+    var optionen = bestellTagOffsets().map(function (o) {
+      var dt = offsetToDate(o), iso = isoDatum(dt), zu = (TAGESTYPEN[o] || 'normal') === 'zu';
+      return '<option value="' + iso + '"' + (f.tag === iso ? ' selected' : '') + '>' + WT_KURZ_JS[dt.getDay()] + ' ' + fmtD(dt) + (zu ? ' 🔒 zu' : '') + '</option>';
+    }).join('');
+    html += '<div class="bst-form">'
+          + '<select data-bst-tag="' + bosId + '" onchange="bstFeld(\'' + bosId + '\', \'tag\', this.value)"><option value="">— Tag —</option>' + optionen + '</select>'
+          + '<input data-bst-menge="' + bosId + '" type="text" inputmode="decimal" placeholder="Menge ' + eh + '" value="' + escText(f.menge || '') + '" oninput="bstFeld(\'' + bosId + '\', \'menge\', this.value)">'
+          + '<input class="bst-notiz" data-bst-notiz="' + bosId + '" type="text" maxlength="' + BR.NOTIZ_MAX + '" placeholder="Notiz (optional, z. B. Kunde)" value="' + escText(f.notiz || '') + '" oninput="bstFeld(\'' + bosId + '\', \'notiz\', this.value)">'
+          + '<div class="bst-aktion"><button class="bst-btn haupt" ' + (f.laeuft ? 'disabled ' : '') + 'onclick="bstSpeichern(\'' + bosId + '\')">' + (f.laeuft ? 'Wird gespeichert …' : 'Speichern') + '</button>'
+          + '<button class="bst-btn" onclick="bstFormZu(\'' + bosId + '\')">Abbrechen</button></div>'
+          + '</div>' + (f.fehler ? '<div class="bst-fehler">⚠ ' + escText(f.fehler) + '</div>' : '');
+  }
+  html += '</div>';
+  return html;
+}
+function rd2(n) { var x = Math.round(Number(n) * 100) / 100; return String(x).replace('.', ','); }
+function bstFormAuf(bosId) { if (frosterFertig === null) return; BST_FORM[bosId] = { offen: true, tag: '', menge: '', notiz: '' }; rebuildCard(bosId); }
+function bstFormZu(bosId) { delete BST_FORM[bosId]; rebuildCard(bosId); }
+function bstFeld(bosId, feld, wert) { if (BST_FORM[bosId]) BST_FORM[bosId][feld] = wert; }
+async function bstSpeichern(bosId) {
+  var f = BST_FORM[bosId];
+  if (!f || f.laeuft || frosterFertig === null) return;
+  var prod = PRODUKTE.find(function (x) { return x.bosId === bosId; });
+  var menge = BR.mengeAusText(f.menge);
+  if (!BR.istIso(f.tag)) { f.fehler = 'Bitte einen Tag wählen.'; rebuildCard(bosId); return; }
+  if (menge === null) { f.fehler = 'Bitte eine Menge größer 0 eintragen.'; rebuildCard(bosId); return; }
+  f.laeuft = true; f.fehler = null; rebuildCard(bosId);
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    await window.db.collection('bos_events').add({
+      type: BR.TYP,
+      station: STATION_CFG,
+      legacyKey: prod.legacyKey,
+      produktName: prod.name,
+      datum: f.tag,
+      menge: menge,
+      notiz: BR.notizAusText(f.notiz),
+      eingetragenVon: aktuellerProfilName(),
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    delete BST_FORM[bosId];   // die Zeile kommt über onSnapshot
+    rebuildCard(bosId);
+  } catch (e) {
+    console.error('[Station] Bestellung speichern:', e);
+    f.laeuft = false;
+    f.fehler = 'Speichern fehlgeschlagen: ' + fehlerGrund(e) + bstRat(e);
+    rebuildCard(bosId);
+  }
+}
+function bstRat(e) {
+  var c = e && e.code;
+  if (c === 'permission-denied') return ' — dieses Konto darf das nicht, Ulf Bescheid sagen.';
+  if (c === 'unavailable' || c === 'deadline-exceeded') return ' — keine Verbindung zur Datenbank, Netz prüfen und nochmal versuchen.';
+  return '';
+}
+function bstFrage(id) {
+  BST_FRAGE = id;
+  if (id) delete BST_FEHLER[id];
+  recalcAll();
+}
+async function bstLoeschen(id) {
+  if (BST_LAEUFT[id]) return;
+  BST_LAEUFT[id] = true; recalcAll();
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    await window.db.collection('bos_events').doc(id).delete();
+    BST_FRAGE = null;
+  } catch (e) {
+    console.error('[Station] Bestellung löschen:', e);
+    BST_FEHLER[id] = fehlerGrund(e) + bstRat(e);
+  }
+  delete BST_LAEUFT[id];
+  recalcAll();
+}
+
 // ── Hilfe (Standard-Muster: einfaches Schritte-Array + Bottom-Sheet,
 // Fundament §5.2/§5.2.1 — gab es bei den alten NFC-Seiten nie, war dort
 // bei einem einzigen Nutzer auch nie nötig. Jetzt potenziell jede
@@ -1052,7 +1514,10 @@ async function planungEinreichen() {
 // danebensteht — deshalb hier ergänzt.) ──────────────────────────────
 const PP_HILFE_SCHRITTE = [
   ['Wofür ist der Produktionsplaner?', 'Er sagt dir für jedes Produkt dieser Station, wie viel du an welchem Tag produzieren musst — damit bis zu deinem gewählten Ziel-Tag kein Engpass entsteht. Am Ende reichst du die Planung für die Station ein.'],
-  ['Bestand und Fehlmenge — der Unterschied', '"Bestand" ist, was gerade tatsächlich da ist — automatisch aus der letzten Froster-Zählung übernommen, wenn die jünger als 24 Stunden ist. Siehst du einen roten Rahmen und "nie gezählt" oder "älter als 24 Std.", trägst du den aktuellen Bestand von Hand ein. "Fehlmenge" ist etwas anderes: ein zusätzlicher Sofortbedarf OBEN DRAUF, der über den normalen Verbrauch hinausgeht — z. B. eine spontane Kundenbestellung. Ersetzt den Bestand nicht, kommt einfach dazu.'],
+  ['Zuerst: Froster fertig?', 'Beim Öffnen fragt die Seite: "Vorbereitung für (morgen) schon fertig?" — also ob die Ware für morgen schon aus dem Froster geholt und vorbereitet ist. Es ist nichts vorgewählt, du musst aktiv "Ja" oder "Nein" tippen und bestätigen. Vorher kannst du nichts eintragen und nicht einreichen. Bei "Ja" zählt der Verbrauch von morgen nicht mehr, er ist ja schon vorbereitet. Bei "Ja" erscheint der Hinweis, Fehlmengen für morgen zu beachten. Oben in der Leiste siehst du deine Antwort und kannst sie später noch umstellen.'],
+  ['Bestand', '"Bestand" ist, was gerade tatsächlich im Froster liegt. Er wird nur aus einer Froster-Zählung übernommen, die jünger als 24 Stunden ist. Ist die Zählung älter, fehlt sie oder konnte sie nicht gelesen werden, bleibt das Feld leer, die Karte zeigt "Bestand fehlt", und für dieses Produkt wird nichts gerechnet. Dann zählst du im Froster nach (am besten in der Froster-Inventur) oder trägst den Bestand von Hand ein. Solange bei einem Produkt der Bestand fehlt, kann die Station nicht einreichen — der Knopf unten sagt, welche Produkte fehlen. Es gehen nur Zahlen ab 0, ein Minus wird abgewiesen.'],
+  ['Fehlmenge (nur bei "Froster fertig: Ja")', 'Hast du "Ja" gesagt, steht bei jedem Produkt eine farbig umrandete Zeile "⚠ Fehlt für (morgen)?". Dort trägst du ein, was für morgen fehlt — zum Beispiel weil beim Vorbereiten nicht genug da war, oder weil eine Bestellung für morgen nicht mit vorbereitet wurde. Die Menge wird in der Planung gleich am Anfang mitgerechnet, die Karte zeigt dann "+3 Bl. Fehlmenge eingerechnet". Bei "Nein" ist die Zeile weg und zählt nicht; was du eingetragen hattest, ist aber nicht verloren und kommt bei "Ja" wieder.'],
+  ['Bestellungen', 'Jede Karte hat einen Block "📋 Bestellungen". Mit "+ Bestellung" trägst du eine Bestellung ein: Tag (morgen bis zum letzten möglichen Zieltag), Menge und auf Wunsch eine kurze Notiz, z. B. den Kunden. Sie wird sofort gespeichert und ist für alle Kollegen da, auch beim nächsten Öffnen. Die Bestellung wird an ihrem Tag mitgerechnet, die Planung sorgt also dafür, dass sie bis dahin da ist. Liegt sie nach deinem Zieltag (oder heute), steht "liegt außerhalb der Planung, nicht eingerechnet" dabei — sie kommt dann in eine spätere Planung. Bei "Froster fertig: Ja" zählt eine Bestellung für morgen nicht noch einmal: Sie ist vorbereitet, oder sie gehört ins Fehlmenge-Feld. Auch an geschlossenen Tagen zählt eine Bestellung, dann steht ein Hinweis dabei. "Neu seit Einreichung — noch nicht eingeplant" heißt: Die Station hat schon eingereicht, und diese Bestellung steckt noch nicht drin — dann nochmal einreichen. Löschen geht über "Löschen" und eine Rückfrage. "Alle Bestellungen →" öffnet die Liste aller Stationen.'],
   ['Schritt 1: Produktionstage wählen', 'Oben unter "Produktionstage" wählst du, an welchen Tagen der kommenden Planungswoche produziert wird. Bereits vergangene Tage sind grau und nicht wählbar, geschlossene Tage ebenso.'],
   ['Schritt 2: Ziel setzen', 'Darunter unter "Bis wann reicht der Bestand?" wählst du dein Zieldatum in der Woche danach — der Tag, für den die ganze Rechnung aufgeht. Je weiter er entfernt ist, desto mehr muss vorher produziert werden.'],
   ['Vorschlag lesen', 'Die große Zahl ist automatisch berechnet und direkt editierbar — antippen und Wert ändern reicht. Darunter steht "min X" mit der Einheit des Produkts (z. B. Bl., Dl., Stk.) — das ist die Mindestmenge, die für die Kette bis zum nächsten Produktionstag oder Ziel nötig ist. Wird sie unterschritten, färbt sich die Karte rot.'],
@@ -1060,8 +1525,7 @@ const PP_HILFE_SCHRITTE = [
   ['Gleichmäßige Belastung', 'Checkbox direkt über dem Vorschlag, pro Produkt einzeln. Verteilt die benötigte Menge gleichmäßiger auf die gewählten Produktionstage, statt möglichst viel auf einen einzigen Tag zu packen.'],
   ['Kette prüfen', 'Der Bereich ist standardmäßig aufgeklappt und zeigt Tag für Tag: Verbrauch, Produktion und den Bestand davor/danach. "Lücke" heißt: an dem Tag reicht der Bestand nicht. "Knapp" heißt: heute reicht es noch, morgen nicht mehr ohne Nachschub.'],
   ['Woher kommt die Bedarfszahl?', 'Für jedes Produkt ist in der Produkt-Karte festgelegt, womit gerechnet wird: Richtwert, Backzettel oder Mitschrift. Hier an der Station gibt es dafür keinen Schalter. Reichen die Zahlen an einzelnen Tagen nicht, steht an der Karte eine Warnung. Pausierte Produkte (Saison-Pause) erscheinen hier nicht.'],
-  ['Froster fertig?', 'Ganz oben: ob der Froster für morgen schon vorbereitet ist. Beeinflusst, ob morgen als "durch Froster gedeckt" gilt oder normal mitgerechnet wird.'],
-  ['Planung einreichen', 'Der Button unten wird aktiv, sobald mindestens ein Produkt einen Produktionstag und ein Ziel hat. Schickt die aktuelle Planung für diese Station in die zentrale Übersicht — mehrfaches Einreichen ist möglich, es zählt immer die letzte Einreichung.']
+  ['Planung einreichen', 'Der Button unten wird aktiv, sobald mindestens ein Produkt einen Produktionstag und ein Ziel hat, die Froster-Frage beantwortet ist, alle Produkte einen Bestand haben und die Bestellungen geladen sind. Schickt die aktuelle Planung für diese Station in die zentrale Übersicht, mit den eingerechneten Bestellungen — mehrfaches Einreichen ist möglich, es zählt immer die letzte Einreichung. Kommt danach eine Bestellung dazu oder wird eine gelöscht, gilt die Planung als nicht mehr eingereicht, bis du nochmal einreichst.']
 ];
 
 function ppOeffneHilfe() {

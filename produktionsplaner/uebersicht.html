@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-08 · 15:38 · Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45, Freigabe §3): Kasten „➕ Nachtrag eintragen“ entfällt (damit auch alert() ohne Grund). An seiner Stelle eine Zeile „📋 n Bestellungen noch nicht eingeplant · m gelöscht nach Einreichung“ mit Sprung zur neuen Seite bestellungen.html (bei 0 nur der Sprung). Lädt Bestellungen (type produktionsplan_bestellung, nur type ==, Rest im Gerät) und die Einreichungen der Wochen aus bestell_regeln.js wochenFuerTage(); Kennzeichen über ./bestell_regeln.js. Wochenzettel-Block „Nachbestellungen“: alte Nachträge wie bisher plus Bestellungen „noch nicht eingeplant“ im Zeitraum des Zettels, jetzt mit Spalten Tag und Notiz. Ladefehler der Bestellungen sperren den Druck wie ein Ladefehler des Stands. Produktliste ohne Auswahlfeld (ladeProduktliste statt ladeProduktDropdown). window.onerror sichtbar. Hilfetext. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
 <!-- 2026-11-02 · 17:41 · Wochenzettel nach Tagen (Go Kontroll-Chat 02.11., 17:2x): Druckknopf „Wochenplan drucken“ fragt zuerst „Alle Stationen“ oder eine Station (Auswahlblatt, kein Browser-Dialog). Zettel nach Tagen gegliedert (aus tage der Einreichungen, Stationen in Übersichts-, Produkte in Stationsreihenfolge), danach Wochensumme (gesamt = Summe der gedruckten Tage) und Nachbestellungen (bei einer Station nur deren). Hinweise oben: ohne Tagesaufteilung eingereicht / noch nicht eingereicht. Tage außerhalb Mo–So verbreitern die Spanne im Titel statt zu verschwinden. Ladefehler mit Grund in der Meldezeile; nach einem Ladefehler wird nicht gedruckt (sonst stünde „nicht eingereicht“ auf dem Papier). Druckfehler mit Grund im Blatt. Nachtrag eintragen unverändert. SESSION_2026-11-02_PRODUKTIONSPLANER_WOCHENZETTEL_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Ladeanzeige-Tönung folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <!-- 2026-10-15 · 01:25 · Saison-Pause (Baustelle #63, Freigabe Kontroll-Chat 14.10., 19:19): Nachtrag-Auswahl aus der Sicht 'laufend' (pausierte Produkte fehlen), mit Fassungsprüfung; die Einheit im Druck wird weiter über 'aktive' nachgeschlagen (auch ein inzwischen pausiertes Produkt eines alten Plans zeigt seine Einheit, F9). SESSION_2026-10-14_RICHTWERT_BAU.md -->
@@ -61,15 +62,12 @@
 
   .btn-druck { width:100%; padding:14px; border:none; border-radius:14px; background:var(--bos-amber); color:#1a1208; font-family:var(--bos-font-label); font-weight:900; font-size:1rem; letter-spacing:1px; text-transform:uppercase; cursor:pointer; -webkit-tap-highlight-color:transparent; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:6px; }
 
-  .nachtrag-box { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:14px 16px; margin:18px 0 14px; }
-  .nachtrag-titel { font-family:var(--bos-font-display); font-weight:900; font-size:1rem; color:var(--bos-text); margin-bottom:10px; }
-  .nachtrag-row { display:flex; gap:8px; margin-bottom:8px; }
-  .nachtrag-select { flex:1; padding:9px 8px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-body); font-size:0.85rem; }
-  .nachtrag-menge { width:70px; padding:9px 8px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text); font-family:var(--bos-font-display); font-weight:900; text-align:center; }
-  .btn-nachtrag { width:100%; padding:10px; border:none; border-radius:10px; background:var(--bos-amber); color:#1a1208; font-family:var(--bos-font-label); font-weight:900; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .nachtrag-liste { margin-top:12px; }
-  .nachtrag-item { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px dashed var(--bos-border); font-family:var(--bos-font-label); font-size:0.75rem; color:var(--bos-text-dim); }
-  .nachtrag-item b { color:var(--bos-text); font-weight:800; }
+  /* 08.11.2026: statt des Nachtrag-Kastens eine Zeile mit Sprung zur Seite Bestellungen */
+  .bestell-zeile { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:12px 16px; margin:18px 0 14px; font-family:var(--bos-font-label); font-weight:800; font-size:0.8rem; color:var(--bos-text-dim); text-decoration:none; -webkit-tap-highlight-color:transparent; }
+  .bestell-zeile.offen { border-color:var(--bos-warn); color:var(--bos-warn-bright); background:var(--bos-warn-glow-soft); }
+  .bestell-zeile.fehler { border-color:var(--bos-red); color:var(--bos-red); overflow-wrap:anywhere; }
+  .bestell-zeile .sprung { color:var(--bos-amber); white-space:nowrap; flex-shrink:0; }
+  .seiten-fehler { margin:10px 0 0; padding:9px 12px; border-radius:10px; border:1.5px solid var(--bos-red); color:var(--bos-red); font-family:var(--bos-font-label); font-weight:800; font-size:.78rem; overflow-wrap:anywhere; }
 
   /* 02.11.2026 · Auswahlblatt Drucken (Alle / eine Station) */
   #pp-druck-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; overflow-y:auto; }
@@ -99,6 +97,7 @@
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
 <script src="../bos_druck.js"></script>
+<script src="bestell_regeln.js"></script>   <!-- NEU 08.11.2026: Kennzeichen der Bestellungen (eine Rechenstelle) -->
 
 <div class="nfc-header">
   <div class="nfc-header-top">
@@ -131,15 +130,9 @@
     <div style="text-align:center;padding:20px;font-family:var(--bos-font-label);font-weight:700;color:var(--bos-text-dim);">Wird geladen…</div>
   </div>
 
-  <div class="nachtrag-box">
-    <div class="nachtrag-titel">➕ Nachtrag eintragen</div>
-    <div class="nachtrag-row">
-      <select class="nachtrag-select" id="nachtrag-produkt"><option value="">— Produkt wählen —</option></select>
-      <input class="nachtrag-menge" id="nachtrag-menge" type="number" min="1" placeholder="Menge">
-    </div>
-    <button class="btn-nachtrag" onclick="nachtragEintragen()">Eintragen</button>
-    <div class="nachtrag-liste" id="nachtrag-liste"></div>
-  </div>
+  <!-- 08.11.2026: ~~„➕ Nachtrag eintragen“~~ → eingetragen wird jetzt auf der Seite Bestellungen -->
+  <a class="bestell-zeile" id="bestell-zeile" href="bestellungen.html"><span id="bestell-zeile-text">📋 Bestellungen werden geladen…</span><span class="sprung">Bestellungen →</span></a>
+  <div id="seiten-fehler"></div>
 
   <button class="btn-druck" id="btn-druck" onclick="ppOeffneDruckwahl()">🖨 Wochenplan drucken</button>
 </div>
@@ -197,7 +190,10 @@ var wochenMo = planWocheMontag(heute);
 var WOCHE_ISO = isoDatum(wochenMo);
 
 var STAND = {}; // station -> zuletzt eingereichte Doku
-var NACHTRAEGE = []; // in der Planungswoche eingetragene Nachträge, chronologisch
+var NACHTRAEGE = []; // in der Planungswoche eingetragene Nachträge (alt, seit 08.11.2026 nur noch gelesen), chronologisch
+var BR = window.BOS_BESTELL_REGELN || null;   // 08.11.2026
+var BESTELLUNGEN = [];      // 08.11.2026: alle Bestellungen (mit id)
+var EINREICHUNGEN_KZ = [];  // 08.11.2026: neueste je Station und Woche, aus den Wochen, die die Tage abdecken können
 var PRODUKTE_NACH_STATION = {}; // station -> [{legacyKey, name}], nur nfcSeite:true
 var PRODUKT_JE_KEY = {}; // 13.10.2026 (#64): legacyKey -> Produkt, für die Einheit im Druck
 var PRODUKT_POS = {};    // 02.11.2026: legacyKey -> Platz in der Produktliste (= Reihenfolge in der Station)
@@ -291,8 +287,9 @@ function renderStationen() {
   document.getElementById('stationen-liste').innerHTML = html;
 }
 
-async function ladeProduktDropdown() {
-  var select = document.getElementById('nachtrag-produkt');
+// 08.11.2026: ~~ladeProduktDropdown()~~ → ladeProduktliste(): kein Auswahlfeld mehr (eingetragen
+// wird auf der Seite Bestellungen); geladen wird nur noch für Einheit und Reihenfolge im Druck.
+async function ladeProduktliste() {
   // 05.10.2026 (Stufe 1): Produktliste aus Firestore über bos_produkte.js;
   // Ladefehler sichtbar in der Meldezeile statt nur console.warn (K8).
   try {
@@ -302,27 +299,10 @@ async function ladeProduktDropdown() {
     configData.forEach(function (p, i) { if (p && p.legacyKey) { PRODUKT_JE_KEY[p.legacyKey] = p; PRODUKT_POS[p.legacyKey] = i; } });
     var produktHinweis = window.BOS_PRODUKTE.hinweisText(produktErgebnis);
     if (produktHinweis) window.BOS_PRODUKTE.zeigeMeldung(produktHinweis, 'hinweis');
-    // 15.10.2026 (#63): Nachtrag nur für laufende Produkte (Sicht 'laufend', derselbe Abruf, kein weiterer Lesevorgang)
-    if (typeof window.BOS_PRODUKTE.bedarfsQuelle !== 'function') throw new Error('bos_produkte.js ist in einer alten Fassung geladen (ohne Saison-Pause) — Seite neu laden (neue Fassung noch nicht online?)');
-    var laufend = (await window.BOS_PRODUKTE.lade({ sicht: 'laufend' })).liste;
-    var proTag = laufend.filter(function (p) { return p.nfcSeite === true && p.legacyKey; });
-    STATIONEN.forEach(function (s) {
-      var produkteHier = proTag.filter(function (p) { return p.station === s.station; });
-      if (!produkteHier.length) return;
-      var group = document.createElement('optgroup');
-      group.label = s.icon + ' ' + s.station;
-      produkteHier.forEach(function (p) {
-        var opt = document.createElement('option');
-        opt.value = p.legacyKey; opt.textContent = p.name;
-        opt.dataset.station = s.station; opt.dataset.name = p.name;
-        group.appendChild(opt);
-      });
-      select.appendChild(group);
-    });
   } catch (e) {
-    console.error('Produktionsplaner Übersicht: Produktliste für Nachtrag konnte nicht geladen werden', e);
+    console.error('Produktionsplaner Übersicht: Produktliste konnte nicht geladen werden', e);
     var text = window.BOS_PRODUKTE ? window.BOS_PRODUKTE.fehlerText(e) : ((e && e.message) || String(e));
-    if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung('Nachtrag ohne Produktliste: ' + text, 'fehler');
+    if (window.BOS_PRODUKTE) window.BOS_PRODUKTE.zeigeMeldung('Produktliste nicht geladen (Druck ohne Einheiten und Reihenfolge): ' + text, 'fehler');
     else setStatus('error', '⚠ ' + text);
   }
 }
@@ -378,6 +358,24 @@ async function ladeStandIntern() {
       return tb - ta;
     });
 
+    // 08.11.2026: Bestellungen (nur type ==, kein Index) und die Einreichungen aller
+    // Wochen, die einen der Tage abdecken können — dieselbe Auswahl wie Station und
+    // Seite Bestellungen, damit die Kennzeichen überall gleich sind.
+    if (!BR) throw new Error('bestell_regeln.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    var bSnap = await db.collection('bos_events').where('type', '==', BR.TYP).get();
+    var bl = [];
+    bSnap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; bl.push(d); });
+    BESTELLUNGEN = BR.sortiere(bl);
+    var abTag = BR.datumLokal(heute < wochenMo ? heute : wochenMo);
+    var tageKZ = BESTELLUNGEN.filter(function (b) { return b.datum >= abTag; }).map(function (b) { return b.datum; });
+    tageKZ.push(BR.datumLokal(heute));
+    var eListe = [];
+    await Promise.all(BR.stuecke(BR.wochenFuerTage(tageKZ), 30).map(function (teil) {
+      return db.collection('bos_events').where('type', '==', 'produktionsplan_einreichung').where('woche', 'in', teil).get()
+        .then(function (snap) { snap.forEach(function (doc) { eListe.push(doc.data()); }); });
+    }));
+    EINREICHUNGEN_KZ = BR.neuesteJeStationUndWoche(eListe);
+
     STAND_FEHLER = null; STAND_FEHLER_RAT = '';
     setStatus('ready', '✓ Stand geladen · Woche ' + WOCHE_ISO);
   } catch (e) {
@@ -387,59 +385,34 @@ async function ladeStandIntern() {
     setStatus('error', '⚠ Stand konnte nicht geladen werden: ' + STAND_FEHLER);
   }
   renderStationen();
-  renderNachtragListe();
+  renderBestellZeile();
 }
 
-function renderNachtragListe() {
-  var el = document.getElementById('nachtrag-liste');
-  if (!NACHTRAEGE.length) { el.innerHTML = ''; return; }
-  el.innerHTML = NACHTRAEGE.map(function (n) {
-    return '<div class="nachtrag-item"><span>' + n.station + ' · <b>' + n.produktName + '</b></span>'
-         + '<span>+' + n.menge + ' · ' + (n.eingetragenVon || '—') + '</span></div>';
-  }).join('');
+// ~~renderNachtragListe() / nachtragEintragen()~~ (08.11.2026): Eintragen und Liste
+// sind auf der Seite Bestellungen. Neu angelegt wird nur noch produktionsplan_bestellung.
+// Kennzeichen „noch nicht eingeplant“ für kommende Tage (ab heute).
+function offeneBestellungen() {
+  if (!BR) return [];
+  var hi = BR.datumLokal(heute);
+  return BESTELLUNGEN.filter(function (b) { return b.datum >= hi && BR.kennzeichen(b, EINREICHUNGEN_KZ) === 'neu'; });
+}
+function geloeschteBestellungen() {
+  if (!BR) return [];
+  var ids = {}; BESTELLUNGEN.forEach(function (b) { ids[b.id] = true; });
+  return BR.geloeschte(EINREICHUNGEN_KZ, ids, { von: BR.datumLokal(heute) });
+}
+function renderBestellZeile() {
+  var a = document.getElementById('bestell-zeile'), t = document.getElementById('bestell-zeile-text');
+  if (STAND_FEHLER) { a.className = 'bestell-zeile fehler'; t.textContent = '📋 Bestellungen nicht geladen: ' + STAND_FEHLER; return; }
+  var n = offeneBestellungen().length, m = geloeschteBestellungen().length;
+  var teile = [];
+  if (n) teile.push(n + (n === 1 ? ' Bestellung' : ' Bestellungen') + ' noch nicht eingeplant');
+  if (m) teile.push(m + ' gelöscht nach Einreichung');
+  a.className = 'bestell-zeile' + (teile.length ? ' offen' : '');
+  t.textContent = '📋 ' + (teile.length ? teile.join(' · ') : 'Alle Bestellungen');
 }
 
-async function nachtragEintragen() {
-  var select = document.getElementById('nachtrag-produkt');
-  var opt = select.options[select.selectedIndex];
-  var mengeInput = document.getElementById('nachtrag-menge');
-  var menge = parseInt(mengeInput.value);
-
-  if (!select.value || !menge || menge <= 0) {
-    alert('Bitte Produkt und eine Menge größer 0 eingeben.');
-    return;
-  }
-
-  try {
-    await (window.BOS_AUTH_READY || Promise.resolve());
-    await window.db.collection('bos_events').add({
-      type: 'produktionsplan_nachtrag',
-      station: opt.dataset.station,
-      woche: WOCHE_ISO,
-      legacyKey: select.value,
-      produktName: opt.dataset.name,
-      menge: menge,
-      eingetragenVon: aktuellerProfilName(),
-      ts: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    select.value = '';
-    mengeInput.value = '';
-    await ladeStand();
-  } catch (e) {
-    console.warn('Produktionsplaner Übersicht: Nachtrag konnte nicht eingetragen werden', e);
-    alert('Nachtrag konnte nicht eingetragen werden — bitte nochmal versuchen.');
-  }
-}
-
-function aktuellerProfilName() {
-  try {
-    var st = JSON.parse(localStorage.getItem('bos_launcher_state_v2') || 'null');
-    if (!st || !st.activeProfileId) return null;
-    var alle = (window.BOS_PROFILES || []).concat(st.localProfiles || []);
-    var p = alle.find(function (x) { return x.id === st.activeProfileId; });
-    return p ? p.name : null;
-  } catch (e) { return null; }
-}
+// ~~aktuellerProfilName()~~ entfernt 08.11.2026: einziger Aufrufer war nachtragEintragen() (Eintragen jetzt auf der Seite Bestellungen).
 
 // 13.10.2026 (#64): Kurzform der Einheit (Stk., Bl., Dl. …) für einen
 // Schlüssel. Unbekanntes Produkt → „Bl.“ wie vor dem 13.10. Entschärft,
@@ -565,14 +538,24 @@ function baueWochenzettel(auswahl) {
 
   // Nachträge bewusst als EIGENER Bereich — nicht eingerechnet (Ulf 03.09.2026:
   // das System soll die ursprüngliche Planung nicht selbst verändern).
-  var nachtraege = auswahl === 'alle' ? NACHTRAEGE : NACHTRAEGE.filter(function (n) { return n.station === auswahl; });
+  // 08.11.2026: dazu Bestellungen „noch nicht eingeplant“ mit Tag im Zeitraum des
+  // Zettels (von … bis), jetzt mit Spalten Tag und Notiz. Eingeplante stecken schon
+  // in den Tagesmengen und erscheinen hier nicht noch einmal. Alte Nachträge wie bisher.
+  var passt = function (st) { return auswahl === 'alle' || st === auswahl; };
+  var nachtraege = NACHTRAEGE.filter(function (n) { return passt(n.station); });
+  var vonIso = BR ? BR.datumLokal(von) : '', bisIso = BR ? BR.datumLokal(bis) : '';
+  var neueBst = (BR ? BESTELLUNGEN : []).filter(function (b) { return passt(b.station) && b.datum >= vonIso && b.datum <= bisIso && BR.kennzeichen(b, EINREICHUNGEN_KZ) === 'neu'; });
   teile.push('<h2 class="pp-z-block">➕ Nachbestellungen</h2>');
-  if (!nachtraege.length) {
-    teile.push('<p class="pp-druck-fehlt"><em>Keine Nachträge für diese Planungswoche' + (auswahl === 'alle' ? '' : ' und Station') + '.</em></p>');
+  if (!nachtraege.length && !neueBst.length) {
+    teile.push('<p class="pp-druck-fehlt"><em>Keine Nachbestellungen für diese Planungswoche' + (auswahl === 'alle' ? '' : ' und Station') + '.</em></p>');
   } else {
-    teile.push('<table class="pp-druck-tabelle"><thead><tr>' + (auswahl === 'alle' ? '<th>Station</th>' : '') + '<th>Produkt</th><th>Menge</th><th>Von</th></tr></thead><tbody>');
+    teile.push('<table class="pp-druck-tabelle"><thead><tr>' + (auswahl === 'alle' ? '<th>Station</th>' : '') + '<th>Tag</th><th>Produkt</th><th>Menge</th><th>Notiz</th><th>Von</th></tr></thead><tbody>');
+    neueBst.forEach(function (b) {
+      var d = ausIso(b.datum);
+      teile.push('<tr>' + (auswahl === 'alle' ? '<td>' + esc(b.station) + '</td>' : '') + '<td>' + (WT_NAMEN[d.getDay()].charAt(0) + WT_NAMEN[d.getDay()].charAt(1).toLowerCase()) + ' ' + kurzDatum(d) + '</td><td>' + esc(b.produktName) + '</td><td>+' + esc(String(b.menge).replace('.', ',')) + ' ' + einheitKurzFuer(b.legacyKey) + '</td><td>' + esc(b.notiz || '') + '</td><td>' + esc(b.eingetragenVon || '—') + '</td></tr>');
+    });
     nachtraege.forEach(function (n) {
-      teile.push('<tr>' + (auswahl === 'alle' ? '<td>' + esc(n.station) + '</td>' : '') + '<td>' + esc(n.produktName) + '</td><td>+' + esc(n.menge) + ' ' + einheitKurzFuer(n.legacyKey) + '</td><td>' + esc(n.eingetragenVon || '—') + '</td></tr>');
+      teile.push('<tr>' + (auswahl === 'alle' ? '<td>' + esc(n.station) + '</td>' : '') + '<td>—</td><td>' + esc(n.produktName) + '</td><td>+' + esc(n.menge) + ' ' + einheitKurzFuer(n.legacyKey) + '</td><td>alter Nachtrag (ohne Tag)</td><td>' + esc(n.eingetragenVon || '—') + '</td></tr>');
     });
     teile.push('</tbody></table>');
   }
@@ -649,8 +632,8 @@ const PP_HILFE_SCHRITTE = [
   ['Wofür ist diese Seite?', 'Sie zeigt auf einen Blick, welche Station ihre Produktionsplanung für die aktuelle Planungswoche (Fr–Di) schon eingereicht hat — mit grünem Haken, wer es war und wann. Fehlt eine Station, steht das genauso sichtbar da.'],
   ['Zeitfenster', 'Die Planung ist nur Freitag bis Dienstag geöffnet. Die Karte oben zeigt entweder, wie viel Zeit noch bleibt, oder — außerhalb des Fensters — wann es wieder öffnet. Außerhalb des Fensters sind die Stationsseiten gesperrt, es gibt dann nichts mehr zu planen.'],
   ['Zur Station springen', 'Über "Zur Station →" bei jeder Zeile kommst du direkt zur jeweiligen Stationsseite.'],
-  ['Nachtrag eintragen', 'Braucht es spontan mehr von einem Produkt (z. B. Kundenbestellung) als ursprünglich geplant, trägst du das hier ein — Produkt wählen (nach Station sortiert), Menge, fertig. Das verändert die ursprüngliche Planung NICHT und rechnet auch nichts neu — es ist eine reine Zusatz-Notiz, die separat mit ausgedruckt wird. Wer die Station bedienen darf, darf auch nachtragen.'],
-  ['Drucken', 'Der Button unten („Wochenplan drucken“) fragt zuerst, was auf den Zettel soll: alle Stationen zusammen oder nur eine Station. Der Zettel ist nach Tagen gegliedert — Montag das, Dienstag das … — und zeigt je Tag, welche Station wie viel von welchem Produkt produziert. Tage ohne Produktion fehlen. Danach folgt die Wochensumme je Station (gesamt und Endlager) und am Ende die Nachbestellungen in einem eigenen Abschnitt (bei einer Station nur deren). Gedruckt werden kann auch, wenn noch nicht jede Station eingereicht hat — oben auf dem Zettel steht dann, welche fehlt. Wurde eine Planung mit einer älteren Fassung der Station eingereicht, fehlt ihr die Aufteilung nach Tagen: Sie erscheint nur in der Wochensumme, und oben steht der Hinweis, neu einzureichen.']
+  ['Bestellungen', 'Bestellungen trägst du auf der Seite „Bestellungen“ ein (Zeile „📋 …“ antippen) oder direkt an der Station beim Produkt. Die Zeile hier zählt, wie viele kommende Bestellungen noch in keiner eingereichten Planung stecken („noch nicht eingeplant“) und wie viele gelöscht wurden, obwohl sie schon eingeplant waren. Steht dort etwas, sollte die betroffene Station neu planen und einreichen. Eine Bestellung ändert eine eingereichte Planung nie von selbst. Die früheren „Nachträge“ ohne Tag gibt es nicht mehr neu; alte stehen weiter auf der Seite Bestellungen und auf dem Zettel.'],
+  ['Drucken', 'Der Button unten („Wochenplan drucken“) fragt zuerst, was auf den Zettel soll: alle Stationen zusammen oder nur eine Station. Der Zettel ist nach Tagen gegliedert — Montag das, Dienstag das … — und zeigt je Tag, welche Station wie viel von welchem Produkt produziert. Tage ohne Produktion fehlen. Danach folgt die Wochensumme je Station (gesamt und Endlager) und am Ende die Nachbestellungen in einem eigenen Abschnitt (bei einer Station nur deren): Bestellungen, die noch nicht eingeplant sind, mit Tag und Notiz, und alte Nachträge ohne Tag. Gedruckt werden kann auch, wenn noch nicht jede Station eingereicht hat — oben auf dem Zettel steht dann, welche fehlt. Wurde eine Planung mit einer älteren Fassung der Station eingereicht, fehlt ihr die Aufteilung nach Tagen: Sie erscheint nur in der Wochensumme, und oben steht der Hinweis, neu einzureichen.']
 ];
 function ppOeffneHilfe() {
   const inhalt = document.getElementById('pp-hilfe-inhalt');
@@ -663,10 +646,15 @@ function ppSchliesseHilfe() {
   document.getElementById('pp-hilfe-modal').style.display = 'none';
 }
 
+// Checkliste §7a: nicht abgefangene Fehler sichtbar (08.11.2026)
+function zeigeSeitenFehler(text) { var el = document.getElementById('seiten-fehler'); if (el) el.innerHTML = '<div class="seiten-fehler">⚠ Unerwarteter Fehler: ' + esc(text) + ' — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.</div>'; }
+window.addEventListener('error', function (e) { zeigeSeitenFehler((e && e.message ? e.message : 'Fehler') + (e && e.filename ? ' (' + String(e.filename).replace(/^.*\//, '') + ':' + e.lineno + ')' : '')); });
+window.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; zeigeSeitenFehler((r && r.message) ? r.message : String(r)); });
+
 window.addEventListener('load', function () {
   renderCountdown();
   setInterval(renderCountdown, 60000);
-  PRODUKTLISTE_GELADEN = ladeProduktDropdown();
+  PRODUKTLISTE_GELADEN = ladeProduktliste();
   ladeStand();
 });
 </script>

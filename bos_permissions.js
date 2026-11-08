@@ -41,6 +41,11 @@
      <script src="bos_access_guard.js"></script>
      ... restlicher Seiteninhalt ...
    ================================================================ */
+/* ERGÄNZT 08.11.2026 (Produktionsplaner Schritt 1, Seite Bestellungen):
+   "produktionsplaner_bestellungen" bei backstube, konditorei,
+   produktionsleitung, admin — genau wie produktionsplaner_uebersicht und
+   gleich dem roles-Feld der Registry (sonst fail-open für alle, F-7).
+   SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md */
 /* ERGÄNZT 23.10.2026 (Maschinenseite Stufe A, Ulf U1 22:22): "maschinenseite"
    bei backstube, konditorei, produktionsleitung, admin und — als erster
    Eintrag dieser Rolle — haustechnik. Gleich dem roles-Feld der Registry
@@ -100,6 +105,7 @@ window.BOS_PERMISSIONS = {
     "schnellrechner": true,
     "produktionsplaner": true,
     "produktionsplaner_uebersicht": true,
+    "produktionsplaner_bestellungen": true,
     "produktionsplaner_rondo": true,
     "produktionsplaner_broetchenstrasse": true,
     "produktionsplaner_fruehschicht": true,
@@ -130,6 +136,7 @@ window.BOS_PERMISSIONS = {
     "schnellrechner": true,
     "produktionsplaner": true,
     "produktionsplaner_uebersicht": true,
+    "produktionsplaner_bestellungen": true,
     "produktionsplaner_rondo": true,
     "produktionsplaner_broetchenstrasse": true,
     "produktionsplaner_fruehschicht": true,
@@ -177,6 +184,7 @@ window.BOS_PERMISSIONS = {
     "schichtplaner_bankkonto": true,
     "produktionsplaner": true,
     "produktionsplaner_uebersicht": true,
+    "produktionsplaner_bestellungen": true,
     "produktionsplaner_rondo": true,
     "produktionsplaner_broetchenstrasse": true,
     "produktionsplaner_fruehschicht": true,
@@ -224,6 +232,7 @@ window.BOS_PERMISSIONS = {
     "schichtplaner_bankkonto": true,
     "produktionsplaner": true,
     "produktionsplaner_uebersicht": true,
+    "produktionsplaner_bestellungen": true,
     "produktionsplaner_rondo": true,
     "produktionsplaner_broetchenstrasse": true,
     "produktionsplaner_fruehschicht": true,
