@@ -15,6 +15,13 @@
   SYNTAX: bewusst alt (var, function, keine Pfeile), damit die Seite auch auf alten iPhones läuft.
 
   CHANGELOG
+    2026-11-08 · 04:57 · Fix: Gerätecheck sprang zur Anmeldung (Meldung Ulf 08.11., 04:48) · Bugfix
+      Ursache: Der Launcher im Testrahmen schickt ohne Sitzung das ÄUSSERE Fenster zur Tür
+      (Iframe-Weiche window.top, gedacht für Satelliten im Launcher) — das war der Gerätecheck selbst,
+      Ziel index.html?wechseln=1. Fix: Seiten mit Anmeldung werden ohne echte Anmeldung übersprungen
+      (sichtbare Zeile), Testrahmen sandboxed ohne allow-top-navigation, Weiterleitung zur Tür als Hinweis.
+      Im Prüfstand der Lieferung vom 03.11. nicht aufgefallen: dort lud das Firebase-SDK nicht (kein Internet),
+      der Launcher kam nie bis zur Weiterleitung. SESSION_2026-11-08_GERAETECHECK_FIX.md
     2026-11-03 · 01:23 · Absicherung, Umbenennung, Verbindung (Anweisung allgemeiner Kontroll-Chat 02.11., 22:1x,
       Ergänzung 03.11., 01:2x) · Feature/Sicherheit
       P1: ?seite= lädt nur noch Seiten aus der festen Liste ERLAUBTE_SEITEN, gleiche Herkunft, nur .html;
@@ -130,11 +137,20 @@
   /* P1 (03.11.2026): Nur diese Seiten dürfen in den Testrahmen. Der Rahmen (srcdoc) erbt die Herkunft von BOS
      und hätte vollen Zugriff auf localStorage und IndexedDB (dort liegt der Login). Deshalb: feste Liste, exakter
      Vergleich, dazu gleiche Herkunft und .html. Aufnehmen nur Seiten, die beim Öffnen nichts in Firestore schreiben. */
+  // [Seite, Bezeichnung, braucht Anmeldung?]
   var ERLAUBTE_SEITEN = [
-    ['launcher.html', 'Launcher (Startseite nach der Anmeldung)'],
-    ['produktionsplaner/uebersicht.html', 'Produktionsplaner · Übersicht'],
-    ['tour/tour.html', 'Demo-Tour (ohne Anmeldung, ohne Daten)']
+    ['launcher.html', 'Launcher (Startseite nach der Anmeldung)', true],
+    ['produktionsplaner/uebersicht.html', 'Produktionsplaner · Übersicht', true],
+    ['tour/tour.html', 'Demo-Tour (ohne Anmeldung, ohne Daten)', false]
   ];
+  /* Fix 08.11.2026: Seiten mit Anmeldung schicken ohne Sitzung das ÄUSSERE Fenster zur Tür
+     (Iframe-Weiche window.self !== window.top in launcher.html, bos_firebase_config.js,
+     bos_standalone_login.js). Im Testrahmen ist das äußere Fenster der Gerätecheck — er wurde
+     weggerissen, beim Launcher sogar nach index.html?wechseln=1 (= Abmelden).
+     Zwei Riegel: (1) ohne echte Anmeldung werden solche Seiten übersprungen,
+     (2) der Testrahmen ist sandboxed ohne allow-top-navigation — er darf das äußere Fenster nie umlenken. */
+  var LOGIN = 'unbekannt';   // 'ja' (echtes Konto), 'nein' (keins oder nur anonym), 'unbekannt' (nicht prüfbar)
+  var RAHMEN_SANDBOX = 'allow-scripts allow-same-origin allow-forms';
   var STANDARD_SEITEN = ['launcher.html'];
 
   function el(id) { return document.getElementById(id); }
@@ -398,7 +414,7 @@
     }
     return mitZeitlimit(indexedDB.databases(), 4000, 'Datenbankliste').then(function (liste) {
       var da = (liste || []).some(function (d) { return d.name === 'firebaseLocalStorageDb'; });
-      if (!da) { zeile(sek, 'warn', 'Firebase-Login hier', 'nicht eingeloggt (kein Login-Speicher in diesem Browser)'); return; }
+      if (!da) { LOGIN = 'nein'; zeile(sek, 'warn', 'Firebase-Login hier', 'nicht eingeloggt (kein Login-Speicher in diesem Browser)'); return; }
       return mitZeitlimit(new Promise(function (res, rej) {
         var r = indexedDB.open('firebaseLocalStorageDb');
         r.onerror = function () { rej(r.error); };
@@ -418,10 +434,12 @@
           if (k.indexOf('firebase:authUser:') !== 0) return;
           gefunden++;
           var app = k.split(':').pop();
+          if (app === '[DEFAULT]' && !(e.value || {}).isAnonymous) LOGIN = 'ja';
           var u = e.value || {};
           zeile(sek, 'ok', 'Firebase-Login hier' + (app && app !== '[DEFAULT]' ? ' (' + app + ')' : ''),
             u.isAnonymous ? 'anonyme Sitzung' : 'eingeloggt als ' + (u.email || u.uid || '?'));
         });
+        if (LOGIN !== 'ja') LOGIN = 'nein';
         if (!gefunden) zeile(sek, 'warn', 'Firebase-Login hier', 'nicht eingeloggt');
       });
     }).catch(function (e) {
@@ -646,14 +664,14 @@
   // P1: nur exakt gelistete Seiten, gleiche Herkunft, .html — alles andere wird abgewiesen, nie geladen.
   function erlaubteSeite(name) {
     var n = String(name || '').replace(/^\s+|\s+$/g, '');
-    var gelistet = false;
-    for (var i = 0; i < ERLAUBTE_SEITEN.length; i++) { if (ERLAUBTE_SEITEN[i][0] === n) gelistet = true; }
+    var gelistet = false, login = false;
+    for (var i = 0; i < ERLAUBTE_SEITEN.length; i++) { if (ERLAUBTE_SEITEN[i][0] === n) { gelistet = true; login = !!ERLAUBTE_SEITEN[i][2]; } }
     if (!gelistet) return { ok: false, grund: 'nicht in der Liste der prüfbaren Seiten' };
     var u;
     try { u = new URL(n, location.href); } catch (e) { return { ok: false, grund: 'keine gültige Adresse' }; }
     if (u.origin !== location.origin) return { ok: false, grund: 'andere Herkunft (' + u.origin + ')' };
     if (!/\.html$/i.test(u.pathname)) return { ok: false, grund: 'keine .html-Seite' };
-    return { ok: true, url: u.href, name: n };
+    return { ok: true, url: u.href, name: n, login: login };
   }
 
   function kurz(s) { s = String(s); return s.length > 120 ? s.slice(0, 120) + ' …' : s; }
@@ -707,6 +725,11 @@
 
       var e = erlaubteSeite(name);
       if (!e.ok) { zeile(box, 'warn', 'nicht erlaubt: ' + kurz(name), e.grund + ' — nicht geladen'); res(); return; }
+      if (e.login && LOGIN === 'nein') {
+        zeile(box, 'info', 'Übersprungen: hier nicht angemeldet',
+          'Diese Seite braucht eine Anmeldung und würde nur zur Anmeldung weiterleiten. Zum Prüfen erst in BOS anmelden, dann den Gerätecheck über den direkten Link öffnen.');
+        res(); return;
+      }
       var url = e.url;
       var funde = 0;
       var kanal = '__bosDiag_' + Math.random().toString(36).slice(2);
@@ -734,10 +757,16 @@
 
         var f = document.createElement('iframe');
         f.title = 'Test ' + name;
+        // Riegel 2: ohne allow-top-navigation kann die Seite den Gerätecheck nicht wegreißen
+        f.setAttribute('sandbox', RAHMEN_SANDBOX);
         f.onload = function () {
           try {
             var h = f.contentWindow.location.href;
-            if (h && h !== 'about:srcdoc' && h !== 'about:blank') zeile(box, 'info', 'Seite leitet weiter', h);
+            if (h && h !== 'about:srcdoc' && h !== 'about:blank') {
+              var zurTuer = /\/index\.html(\?|#|$)/.test(h);
+              zeile(box, zurTuer ? 'warn' : 'info', zurTuer ? 'Seite schickt zur Anmeldung' : 'Seite leitet weiter',
+                h + (zurTuer ? ' — die Seite hält dieses Gerät für nicht angemeldet' : ''));
+            }
           } catch (e) {}
         };
         box.appendChild(f);
