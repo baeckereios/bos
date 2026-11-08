@@ -54,6 +54,22 @@
  * Unterordner-Satelliten ../bos_froster.js.
  *
  * ÄNDERUNGSPROTOKOLL:
+ * 08.11.2026, 16:41 — Feature (Produktionsplaner Schritt 2, Go Kontroll-
+ *   Chat 08.11., 16:07, E2/E3): NEU rechneBestandMitProduktion() (rein
+ *   rechnend) und holeBestandMitProduktion() — Zählung wie holeBestand()
+ *   plus die froster_produktion-Einträge des Produkts mit ts NACH dem ts
+ *   der Zählung (streng „>“: bei gleichem Zeitstempel ist unklar, ob die
+ *   Ware schon gezählt war — nicht addieren ist die sichere Seite, doppelt
+ *   gezählt hieße eine Lücke). Nur Einträge in der Einheit des Produkts
+ *   (die Zählung selbst trägt keine Einheit; Inventur und Froster-
+ *   Produktion nehmen beide cfg.einheit || 'bleche'); andere oder fehlende
+ *   Einheit wird nicht addiert und gemeldet. Verglichen wird mit
+ *   BOS_PRODUKTE.einheitGleich, wenn der Aufrufer sie mitgibt („bleche“ =
+ *   „Blech“), sonst streng (ohne Rand-Leerzeichen, ohne Groß/klein). Abfrage type ==
+ *   'froster_produktion' + ts >= Zählzeit (dieselbe Form wie
+ *   bos_ziel_berechnung.js, also derselbe Index), legacyKey im Gerät.
+ *   holeBestand() UNVERÄNDERT. SESSION_2026-11-08_PRODUKTIONSPLANER_
+ *   LETZTER_STAND_BAU.md
  * 31.08.2026 — Erstversion. holeBestand() aus der Konzept-Session
  *   zum Schnellrechner-Rebuild.
  * ------------------------------------------------------------
@@ -137,6 +153,84 @@ window.BOS_FROSTER = {
       var fehlerText = (fehler && fehler.message) ? fehler.message : String(fehler);
       console.warn('BOS_FROSTER.holeBestand: Abfrage fehlgeschlagen, manuelle Eingabe erforderlich.', fehler);
       return { bestand: null, ts: null, gefunden: false, veraltet: true, fehlerText: fehlerText };
+    }
+  },
+
+  // ── 08.11.2026: Bestand = Zählung + Produktion seit der Zählung ─────────
+  // Einheit des Produkts wie Inventur und Froster-Produktion sie schreiben
+  // (Freitext, Rückfall 'bleche'); verglichen ohne Leerzeichen am Rand und
+  // ohne Groß/klein.
+  EINHEIT_STANDARD: 'bleche',
+  _einheitNorm(e) { return String(e).trim().toLowerCase(); },
+  _alsMillis(ts) {
+    if (ts === null || ts === undefined) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (ts instanceof Date) return ts.getTime();
+    if (typeof ts === 'number') return ts;
+    if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+    return null;
+  },
+
+  /**
+   * Rein rechnend (in Node prüfbar). zaehlung = Ergebnis von holeBestand().
+   * eintraege = froster_produktion-Dokumente (beliebige Produkte).
+   * @returns {{zaehlung:number|null, zaehlTs:number|null, frisch:boolean, produktion:number,
+   *   gezaehlt:object[], andereEinheit:object[], ohneEinheit:object[], gesamt:number|null}}
+   *   gesamt ist null, wenn die Zählung fehlt oder älter als FRISCHE_GRENZE_STUNDEN ist —
+   *   dann wird auch keine Produktion aufgerechnet (Regel aus Schritt 1 gilt weiter).
+   */
+  rechneBestandMitProduktion(zaehlung, eintraege, legacyKey, produktEinheit, einheitGleich) {
+    const z = zaehlung || {};
+    const frisch = z.veraltet === false && typeof z.bestand === 'number' && typeof z.ts === 'number';
+    const r = { zaehlung: (typeof z.bestand === 'number') ? z.bestand : null, zaehlTs: (typeof z.ts === 'number') ? z.ts : null,
+                frisch, produktion: 0, gezaehlt: [], andereEinheit: [], ohneEinheit: [], gesamt: null };
+    if (!frisch) return r;
+    const soll = produktEinheit || this.EINHEIT_STANDARD;
+    const gleich = (typeof einheitGleich === 'function') ? einheitGleich
+      : (a, b) => this._einheitNorm(a) === this._einheitNorm(b);
+    (eintraege || []).forEach((e) => {
+      if (!e || e.legacyKey !== legacyKey) return;
+      const t = this._alsMillis(e.ts);
+      if (t === null || !(t > z.ts)) return;            // streng NACH der Zählung
+      const menge = Number(e.menge);
+      if (!(menge > 0)) return;
+      const eintrag = { menge, ts: t, einheit: e.einheit, eingetragenVon: e.eingetragenVon || null };
+      if (e.einheit === undefined || e.einheit === null || String(e.einheit).trim() === '') { r.ohneEinheit.push(eintrag); return; }
+      if (!gleich(e.einheit, soll)) { r.andereEinheit.push(eintrag); return; }
+      r.gezaehlt.push(eintrag);
+      r.produktion += menge;
+    });
+    r.produktion = Math.round(r.produktion * 100) / 100;
+    r.gesamt = z.bestand + r.produktion;
+    return r;
+  },
+
+  /**
+   * Zählung (holeBestand) + Produktion seit der Zählung, mit Fehlern samt Grund.
+   * produktEinheit: cfg.einheit || 'bleche' (wie Inventur und Froster-Produktion).
+   * einheitGleich: optional BOS_PRODUKTE.einheitGleich.
+   * @returns {Promise<object>} alle Felder von holeBestand() und von
+   *   rechneBestandMitProduktion(); dazu produktionFehler (Text), falls die
+   *   Abfrage der Produktion scheiterte — dann ist gesamt null (lieber einmal
+   *   von Hand als ein falscher Bestand).
+   */
+  async holeBestandMitProduktion(db, legacyKey, produktEinheit, einheitGleich) {
+    const z = await this.holeBestand(db, legacyKey);
+    const leer = this.rechneBestandMitProduktion(z, [], legacyKey, produktEinheit, einheitGleich);
+    if (!leer.frisch) return Object.assign({}, z, leer);
+    try {
+      const snap = await db.collection('bos_events')
+        .where('type', '==', 'froster_produktion')
+        .where('ts', '>=', new Date(z.ts))
+        .get();
+      const eintraege = [];
+      snap.forEach((doc) => eintraege.push(doc.data()));
+      return Object.assign({}, z, this.rechneBestandMitProduktion(z, eintraege, legacyKey, produktEinheit, einheitGleich));
+    } catch (fehler) {
+      let text = (fehler && fehler.message) ? fehler.message : String(fehler);
+      if (fehler && fehler.code && text.indexOf(fehler.code) < 0) text += ' (' + fehler.code + ')';
+      console.warn('BOS_FROSTER.holeBestandMitProduktion: Produktion nicht ladbar.', fehler);
+      return Object.assign({}, z, leer, { gesamt: null, produktionFehler: text });
     }
   }
 };
