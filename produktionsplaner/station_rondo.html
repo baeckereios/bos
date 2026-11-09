@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-08 · 17:58 · Planung gegen die Inventur (Produktionsplaner Schritt 3, Go Kontroll-Chat 08.11., 17:31): Bedarf über ./plan_pruefung.js BOS_PLAN_PRUEFUNG.ladeBedarf (wörtliche Kopie von einstellungenFuer + pruefeWochenbedarf, eine Stelle für Station und Prüfung; Vergleich alt/neu in vergleich_bedarf.js). Zählungen EINMAL je Seite über BOS_FROSTER.holeZaehlDokumente + zaehlungAusDokumenten (statt holeBestand je Produkt; Zufallsvergleich vergleich_zaehlung.js), an holeBestandMitProduktion weitergegeben. Neu an der Karte (4.4): „Gezählt ⟨Di 20:00⟩, da war die Vorbereitung für ⟨Gruppe⟩ noch nicht fertig. Ist die Ware für ⟨Tag⟩ schon raus, ist der Bestand zu hoch — bitte neu zählen oder Bestand von Hand eintragen.“ — nur Hinweis, keine Korrektur; nicht bei Bestand von Hand. Hilfetext „Bestand“ ein Satz. SESSION_2026-11-08_PRODUKTIONSPLANER_PRUEFUNG_INVENTUR_BAU.md -->
 <!-- 2026-11-08 · 17:05 · Nacharbeit Schritt 2 (Kontroll-Chat 08.11., 16:57): „Neu laden“ (Doppel-Prüfung) und „Laden“ (spät angekommene Einreichung) ersetzen nur noch den Planungsstand; Froster-Antwort, Fehlmenge und Bestand (auch von Hand) bleiben. Knopftext „… deine Planungsänderungen gehen verloren (Bestand und Fehlmenge bleiben)“. Vergleichsstand für den Ungespeichert-Schutz aus planungsAbdruck() wie frisch geöffnet (abdruckWieGeoeffnet): stehen gebliebene Fehlmenge oder Hand-Bestand gelten als nicht eingereicht. Hilfetext „Zwei planen gleichzeitig“ angepasst. SESSION_2026-11-08_PRODUKTIONSPLANER_LETZTER_STAND_BAU.md -->
 <!-- 2026-11-08 · 16:47 · Letzten Stand laden, Bestand mit Produktion seit der Zählung (Produktionsplaner Schritt 2, Go Kontroll-Chat 08.11., 16:07): Beim Öffnen wird die neueste Einreichung dieser Station für die Planungswoche übernommen (Backtage, Ziel, Hand-Werte, Sperren, gleichmäßig), umgerechnet über ./plan_laden.js auf das heutige „heute“; weggefallene Werte mit Hinweis an der Karte, Vergleichszeile „eingereicht: …“, Hinweis oben „Geladen: eingereicht von …“ mit „Leer neu anfangen“ (Rückfrage auf der Seite). Dieselbe Abfrage wie die Kennzeichen (jetzt mit Dokument-ID); solange sie nicht gelesen ist, Einreichen gesperrt (10 s, Grund sichtbar, „Nochmal versuchen“, spät angekommen → übernommen, wenn nichts geändert, sonst angeboten). Vor dem Einreichen Doppel-Prüfung über die Dokument-ID (neueste Einreichung type/station/woche, vom Server): andere neuere → „Neu laden — deine Änderungen seit dem Laden gehen verloren“ / „Trotzdem einreichen“; Abfrage scheitert → nicht eingereicht, Grund unter dem Knopf. Bestand = frische Zählung + froster_produktion seit der Zählung (BOS_FROSTER.holeBestandMitProduktion, Einheit über BOS_PRODUKTE.einheitGleich), Zeile „12 gezählt (Di 03:00) + 20 produziert seit der Zählung = 32“, andere/fehlende Einheit nicht eingerechnet mit Hinweis, Produktion nicht lesbar → Feld leer, Einreichen gesperrt; von Hand geändert → „von Hand eingetragen“. Einreichung je Produkt neu: gleichmaessig, bestandZaehlung, bestandProduktion, bestandVonHand. Hilfetext neu. SESSION_2026-11-08_PRODUKTIONSPLANER_LETZTER_STAND_BAU.md -->
 <!-- 2026-11-08 · 15:38 · Froster-Frage, Bestand, Fehlmenge, Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45): Beim Öffnen Dialog „Vorbereitung für ⟨Tag⟩ schon fertig?“ wie in der Inventur, nichts vorgewählt, Seite bis zur Antwort gesperrt; nach Ja Ulfs Hinweis auf Fehlmengen. Leiste oben ohne Vorwahl, danach umstellbar. Bestand nur aus Zählung unter 24 Std., sonst leer, Produkt nicht gerechnet, Einreichen gesperrt (Knopf nennt die Produkte); oben Hinweis, wenn kein Produkt frisch gezählt ist. Fehlmenge-Zeile nur bei Ja, eigene Optik („⚠ Fehlt für ⟨Tag⟩?“), Werte bleiben bei Nein erhalten, zählen aber nicht. Je Karte Block „📋 Bestellungen“ (bos_events produktionsplan_bestellung, live über onSnapshot, Abfrage type/station/datum in Planungsspanne): eintragen, löschen mit Rückfrage auf der Seite, Kennzeichen über ./bestell_regeln.js; Bestellungen gehen als zusatzBedarf an die Kette. Alte Kette im Zwischenspeicher (ohne BOS_KETTE.kann.zusatzBedarf) → sichtbarer Abbruch. Einreichung zusätzlich planungsTag, je Produkt fehlmengeFroster, bestellungen [{id, datum, menge}]. Ungespeichert-Schutz: Abdruck mit eingerechneten Bestellungen und wirksamer Fehlmenge, erster Abdruck nach „Bestätigen“. Einreichen gesperrt, solange Bestellungen nicht geladen sind. window.onerror/unhandledrejection sichtbar. Hilfetext neu. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
@@ -272,6 +273,7 @@
 <script src="plan_tage.js"></script>
 <script src="bestell_regeln.js"></script>   <!-- NEU 08.11.2026: Regeln der Bestellliste (eine Rechenstelle für Station, Übersicht, Bestellungen, Froster-Ziele) -->
 <script src="plan_laden.js"></script>   <!-- NEU 08.11.2026 (Schritt 2): letzten Stand auf heute umrechnen (nach bestell_regeln.js) -->
+<script src="plan_pruefung.js"></script>   <!-- NEU 08.11.2026 (Schritt 3): Bedarf laden (eine Stelle mit der Prüfung), Hinweis Vorbereitung -->
 <script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77 Teil 2: Ungespeichert-Schutz -->
 
 <div class="nfc-header">
@@ -495,12 +497,10 @@ var TAGESTYPEN = {};
 // ohne Feld 'manuell' = die bisherige Voreinstellung dieser Seite). Je Produkt
 // genau ein Topf, kein Vermischen (bos_verbrauch_durchschnitt.js Kopf).
 // Einstellungen je Topf werden einmal geholt und wiederverwendet.
-var einstellungenJeTopf = {};
-async function einstellungenFuer(topf) {
-  if (topf === 'richtwert') return null;   // der Richtwert hat keine Einstellungen
-  if (!einstellungenJeTopf[topf]) einstellungenJeTopf[topf] = await window.BOS_VERBRAUCH.holeEinstellungen(topf);
-  return einstellungenJeTopf[topf];
-}
+// ~~var einstellungenJeTopf = {}; async function einstellungenFuer(topf) {…}~~ — 08.11.2026
+// (Schritt 3): wörtlich nach plan_pruefung.js (BOS_PLAN_PRUEFUNG.ladeBedarf), damit die
+// Prüfung gegen die Inventur genau dieselben Zahlen bekommt.
+var PP = window.BOS_PLAN_PRUEFUNG || null;
 
 // Fehlmenge: Sofort-Zusatzbedarf oben drauf (z.B. beim Froster-Zählen
 // festgestellt: "brauche zusätzlich noch X schon für morgen"), pro Produkt,
@@ -608,6 +608,12 @@ window.addEventListener('load', async function() {
     zeigeProduktFehler((!PL ? 'plan_laden.js ist nicht geladen' : 'bos_froster.js ist in einer alten Fassung geladen (ohne Produktion seit der Zählung)') + ' — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
     return;
   }
+  // 08.11.2026 (Schritt 3): Bedarf und Zählungen über die neuen Fassungen
+  if (!PP || typeof PP.ladeBedarf !== 'function' || typeof window.BOS_FROSTER.holeZaehlDokumente !== 'function') {
+    setStatus('error', '⚠ Lade-Regeln nicht geladen');
+    zeigeProduktFehler((!PP ? 'plan_pruefung.js ist nicht geladen' : 'bos_froster.js ist in einer alten Fassung geladen (ohne Zählungen für alle Produkte)') + ' — Seite neu laden (neue Fassung noch nicht online?). Hilft das nicht: Ulf Bescheid sagen.');
+    return;
+  }
   // Lädt die echte bos_hamster_config.json statt des eingebauten Fallbacks
   // (der bisher ohnehin exakt übereinstimmt) — bewusst "fire and forget",
   // kein await: schlägt es fehl, greift automatisch derselbe Fallback,
@@ -667,17 +673,28 @@ window.addEventListener('load', async function() {
   });
 
   try {
+    // 08.11.2026 (Schritt 3, E2): Zählungen EINMAL laden (dieselbe Abfrage wie holeBestand()),
+    // je Produkt rein rechnend auswerten. Ein Abfragefehler wird wie bei holeBestand() je
+    // Produkt zu „Abfrage fehlgeschlagen: …“.
+    var zaehlDokumente = window.BOS_FROSTER.holeZaehlDokumente(db).then(function (docs) { return { docs: docs }; }, function (e) {
+      console.warn('BOS_FROSTER.holeZaehlDokumente: Abfrage fehlgeschlagen, manuelle Eingabe erforderlich.', e);
+      return { fehler: e };
+    });
     var ladeVorgaenge = PRODUKTE.map(function(prod) {
       return Promise.all([
-        einstellungenFuer(prod.quelle).then(function(einstellungen) {
-          return window.BOS_VERBRAUCH.holeWochenbedarf(db, prod.legacyKey, einstellungen, prod.quelle, prod.produkt);
-        }),
+        // ~~einstellungenFuer(prod.quelle).then(… holeWochenbedarf …)~~ — 08.11.2026 (Schritt 3): eine Stelle
+        PP.ladeBedarf(db, prod.produkt, prod.quelle),
         // ~~window.BOS_FROSTER.holeBestand(db, prod.legacyKey)~~ — 08.11.2026 (Schritt 2): Zählung
         // + Produktion seit der Zählung. Einheit wie Inventur und Froster-Produktion
         // (cfg.einheit || 'bleche'), verglichen über BOS_PRODUKTE.einheitGleich.
-        window.BOS_FROSTER.holeBestandMitProduktion(db, prod.legacyKey, prod.produkt.einheit || 'bleche', window.BOS_PRODUKTE.einheitGleich)
+        // Schritt 3: mit der einmal geladenen Zählung (samt vorbereitungFertig).
+        zaehlDokumente.then(function (zd) {
+          var F = window.BOS_FROSTER;
+          var z = zd.fehler ? F.zaehlungFehler(zd.fehler) : F.zaehlungAusDokumenten(zd.docs, prod.legacyKey);
+          return F.holeBestandMitProduktion(db, prod.legacyKey, prod.produkt.einheit || 'bleche', window.BOS_PRODUKTE.einheitGleich, z);
+        })
       ]).then(function(res) {
-        var wb = pruefeWochenbedarf(res[0]), fb = res[1];
+        var wb = res[0], fb = res[1];   // ~~pruefeWochenbedarf(res[0])~~ prüft jetzt ladeBedarf
         // 06.09.2026 · Fix: Froster-Zählung ist bereits im Träger, keine Stück-Umrechnung (gilt auch für die Produktion, gleiche Einheit)
         var automatisch = (typeof fb.gesamt === 'number') ? Math.round(fb.gesamt) : null;   // Schritt 2, E4
         DATEN[prod.bosId] = {
@@ -692,7 +709,10 @@ window.addEventListener('load', async function() {
           frisch: fb.frisch === true, zaehlung: fb.zaehlung, zaehlTs: fb.zaehlTs,
           produktion: fb.produktion || 0, gezaehlt: fb.gezaehlt || [], andereEinheit: fb.andereEinheit || [], ohneEinheit: fb.ohneEinheit || [],
           produktionFehler: fb.produktionFehler || null,
-          automatisch: automatisch
+          automatisch: automatisch,
+          // 08.11.2026 (Schritt 3): für den Hinweis „Vorbereitung beim Zählen nicht fertig“
+          vorbereitungFertig: fb.vorbereitungFertig || null,
+          gruppe: prod.produkt.frosterZustaendigkeit || null
         };
         // 08.11.2026: Nur eine Zählung unter 24 Std. wird übernommen (Ulf 03.11., 05:29:
         // „Alles unter 24 Stunden“; 05:05: „er dürfte gar keine Werte übernehmen“).
@@ -1076,17 +1096,8 @@ function wirksameFehlmenge(bosId) {
   return (frosterFertig === true && s && s.fehlmengeAbs > 0) ? s.fehlmengeAbs : 0;
 }
 
-// 13.10.2026 (#64): Versionsschutz. Ein neuer Rechen-Host sagt in `einheit`,
-// worin er liefert. Fehlt das, kommt die Antwort von einer alten, noch
-// zwischengespeicherten bos_verbrauch_durchschnitt.js — deren Zahlen lägen
-// roh im Topf (Backzettel in Stück). Dann lieber sichtbar abbrechen als
-// still falsch rechnen.
-function pruefeWochenbedarf(wb) {
-  if (!wb || !wb.einheit) {
-    throw new Error('Rechen-Modul veraltet (bos_verbrauch_durchschnitt.js liefert keine Einheit) — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.');
-  }
-  return wb;
-}
+// 13.10.2026 (#64): Versionsschutz ~~pruefeWochenbedarf()~~ — seit 08.11.2026 (Schritt 3)
+// wörtlich in plan_pruefung.js (BOS_PLAN_PRUEFUNG.pruefeWochenbedarf, von ladeBedarf gerufen).
 // 13.10.2026: echte Fehlermeldung für die Oberfläche (Projektregel err.message).
 function fehlerGrund(e) {
   return (e && e.message) ? e.message : String(e);
@@ -1157,6 +1168,9 @@ function bestandZeile(bosId) {
   if (d.produktionFehler) return '<span class="bestand-hint voll" data-bestandzeile="' + bosId + '">⚠ Produktion seit der Zählung nicht lesbar — Bestand bleibt leer, bitte zählen oder von Hand eintragen: ' + fehlertextMitLink(escText(d.produktionFehler)) + '</span>';
   if (!d.frisch) return '';
   var html = '';
+  // 08.11.2026 (Schritt 3, 4.4): Zählung vor der Vorbereitung — nur Hinweis, keine Korrektur
+  var vh = PP ? PP.vorbereitungsHinweis({ veraltet: false, ts: d.zaehlTs, vorbereitungFertig: d.vorbereitungFertig }, d.gruppe, heute, frosterFertig, s.bestandVonHand) : null;
+  if (vh) html += '<span class="bestand-hint voll" data-vorbereitung="' + bosId + '">⚠ ' + escText(vh) + '</span>';
   if (d.gezaehlt && d.gezaehlt.length) {
     var summe = Math.round((d.zaehlung + d.produktion) * 100) / 100;
     html += '<span class="bestand-zeile" data-bestandzeile="' + bosId + '">' + rd2(d.zaehlung) + ' gezählt (' + wtZeit(d.zaehlTs) + ') + ' + rd2(d.produktion) + ' produziert seit der Zählung = ' + rd2(summe)
@@ -1839,7 +1853,7 @@ const PP_HILFE_SCHRITTE = [
   ['Wofür ist der Produktionsplaner?', 'Er sagt dir für jedes Produkt dieser Station, wie viel du an welchem Tag produzieren musst — damit bis zu deinem gewählten Ziel-Tag kein Engpass entsteht. Am Ende reichst du die Planung für die Station ein.'],
   ['Zuerst: Froster fertig?', 'Beim Öffnen fragt die Seite: "Vorbereitung für (morgen) schon fertig?" — also ob die Ware für morgen schon aus dem Froster geholt und vorbereitet ist. Es ist nichts vorgewählt, du musst aktiv "Ja" oder "Nein" tippen und bestätigen. Vorher kannst du nichts eintragen und nicht einreichen. Bei "Ja" zählt der Verbrauch von morgen nicht mehr, er ist ja schon vorbereitet. Bei "Ja" erscheint der Hinweis, Fehlmengen für morgen zu beachten. Oben in der Leiste siehst du deine Antwort und kannst sie später noch umstellen.'],
   ['Der letzte Stand', 'Hat die Station diese Woche schon eingereicht, holt die Seite beim Öffnen den letzten eingereichten Stand zurück: Produktionstage, Ziel, deine eingetippten Werte, die Schlösser und "Gleichmäßige Belastung". Oben steht dann "Geladen: eingereicht von …" mit Tag und Uhrzeit. Tage, die inzwischen vorbei sind oder heute nicht mehr gehen, werden nicht übernommen — das steht dann an der Karte. Unter dem Produktnamen siehst du zum Vergleich, was eingereicht war ("eingereicht: Mi 46 · Fr 25"). Bestand, Fehlmenge und die Froster-Frage kommen nicht aus der alten Einreichung, die gelten jeden Tag neu. Willst du ganz von vorne planen, tippe oben "Leer neu anfangen" und bestätige — Bestand, Fehlmenge, Bestellungen und deine Froster-Antwort bleiben dabei stehen. Kann die Seite die letzten Einreichungen nicht lesen (kein Netz), steht oben der Grund mit "Nochmal versuchen", und Einreichen ist so lange gesperrt.'],
-  ['Bestand', '"Bestand" ist, was gerade tatsächlich im Froster liegt: die letzte Froster-Zählung plus das, was seit der Zählung in der Froster-Produktion eingetragen wurde. Die Karte zeigt das dann so: "12 gezählt (Di 03:00) + 20 produziert seit der Zählung = 32". Was nicht in der Froster-Produktion eingetragen ist, kann die Seite nicht wissen — darum Produktion immer eintragen. Einträge in einer anderen Einheit als das Produkt werden nicht mitgezählt, das steht dann an der Karte. Die Zählung muss jünger als 24 Stunden sein. Ist sie älter, fehlt sie oder konnte sie (oder die Produktion) nicht gelesen werden, bleibt das Feld leer, die Karte zeigt "Bestand fehlt", und für dieses Produkt wird nichts gerechnet. Dann zählst du im Froster nach (am besten in der Froster-Inventur) oder trägst den Bestand von Hand ein. Von Hand heißt: so viel liegt jetzt im Froster — die Zahl ersetzt Zählung und Produktion, die Karte sagt "von Hand eingetragen". Solange bei einem Produkt der Bestand fehlt, kann die Station nicht einreichen — der Knopf unten sagt, welche Produkte fehlen. Es gehen nur Zahlen ab 0, ein Minus wird abgewiesen.'],
+  ['Bestand', '"Bestand" ist, was gerade tatsächlich im Froster liegt: die letzte Froster-Zählung plus das, was seit der Zählung in der Froster-Produktion eingetragen wurde. Die Karte zeigt das dann so: "12 gezählt (Di 03:00) + 20 produziert seit der Zählung = 32". Was nicht in der Froster-Produktion eingetragen ist, kann die Seite nicht wissen — darum Produktion immer eintragen. Einträge in einer anderen Einheit als das Produkt werden nicht mitgezählt, das steht dann an der Karte. Die Zählung muss jünger als 24 Stunden sein. Ist sie älter, fehlt sie oder konnte sie (oder die Produktion) nicht gelesen werden, bleibt das Feld leer, die Karte zeigt "Bestand fehlt", und für dieses Produkt wird nichts gerechnet. Dann zählst du im Froster nach (am besten in der Froster-Inventur) oder trägst den Bestand von Hand ein. Von Hand heißt: so viel liegt jetzt im Froster — die Zahl ersetzt Zählung und Produktion, die Karte sagt "von Hand eingetragen". Steht an der Karte "Gezählt …, da war die Vorbereitung … noch nicht fertig", enthält die Zählung vielleicht noch Ware, die inzwischen für die Vorbereitung herausgenommen wurde: Dann neu zählen oder den Bestand von Hand eintragen. Solange bei einem Produkt der Bestand fehlt, kann die Station nicht einreichen — der Knopf unten sagt, welche Produkte fehlen. Es gehen nur Zahlen ab 0, ein Minus wird abgewiesen.'],
   ['Fehlmenge (nur bei "Froster fertig: Ja")', 'Hast du "Ja" gesagt, steht bei jedem Produkt eine farbig umrandete Zeile "⚠ Fehlt für (morgen)?". Dort trägst du ein, was für morgen fehlt — zum Beispiel weil beim Vorbereiten nicht genug da war, oder weil eine Bestellung für morgen nicht mit vorbereitet wurde. Die Menge wird in der Planung gleich am Anfang mitgerechnet, die Karte zeigt dann "+3 Bl. Fehlmenge eingerechnet". Bei "Nein" ist die Zeile weg und zählt nicht; was du eingetragen hattest, ist aber nicht verloren und kommt bei "Ja" wieder.'],
   ['Bestellungen', 'Jede Karte hat einen Block "📋 Bestellungen". Mit "+ Bestellung" trägst du eine Bestellung ein: Tag (morgen bis zum letzten möglichen Zieltag), Menge und auf Wunsch eine kurze Notiz, z. B. den Kunden. Sie wird sofort gespeichert und ist für alle Kollegen da, auch beim nächsten Öffnen. Die Bestellung wird an ihrem Tag mitgerechnet, die Planung sorgt also dafür, dass sie bis dahin da ist. Liegt sie nach deinem Zieltag (oder heute), steht "liegt außerhalb der Planung, nicht eingerechnet" dabei — sie kommt dann in eine spätere Planung. Bei "Froster fertig: Ja" zählt eine Bestellung für morgen nicht noch einmal: Sie ist vorbereitet, oder sie gehört ins Fehlmenge-Feld. Auch an geschlossenen Tagen zählt eine Bestellung, dann steht ein Hinweis dabei. "Neu seit Einreichung — noch nicht eingeplant" heißt: Die Station hat schon eingereicht, und diese Bestellung steckt noch nicht drin — dann nochmal einreichen. Löschen geht über "Löschen" und eine Rückfrage. "Alle Bestellungen →" öffnet die Liste aller Stationen.'],
   ['Schritt 1: Produktionstage wählen', 'Oben unter "Produktionstage" wählst du, an welchen Tagen der kommenden Planungswoche produziert wird. Bereits vergangene Tage sind grau und nicht wählbar, geschlossene Tage ebenso.'],

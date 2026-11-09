@@ -137,6 +137,20 @@
       schwarz, während der Rest der Seite korrekt hell wurde. Header nutzt
       jetzt var(--surface) statt des Gradients; --bg-deep entfernt. Siehe
       SESSION_2026-09-04_FROSTER_INVENTUR_UI_FIXES.md.
+    2026-11-08 · 18:05 · Feature (Produktionsplaner Schritt 3, Go Kontroll-Chat
+      08.11., 17:31)
+      NUR der Erfolgsbildschirm: Block „Planung mit dieser Zählung:“. Nach dem
+      Speichern wird die eben gesendete Zählung vom Server zurückgelesen
+      (sonst fehlt ihr Zeitstempel noch) und für ihre Produkte über
+      ../produktionsplaner/plan_pruefung.js gegen die eingereichte Planung
+      gerechnet: alles passt → ✓-Satz; Lücken laut je Zeile; „knapp“ leise,
+      eingeklappt; „nicht prüfbar“ leise mit Grund; gezählte Produkte ohne
+      Station als eine leise Zeile. Fehler → Grund (Index-Link antippbar) und „Die Zählung ist
+      trotzdem gespeichert.“ Zählliste, Dialog „Vorbereitung fertig?“,
+      Minus-Sperre und Senden UNVERÄNDERT. Lädt dafür den Rechenstapel
+      (Zeitkontext, Verbrauch, Hamster, Kette, Froster, Bestell-Regeln,
+      plan_laden, plan_pruefung). SESSION_2026-11-08_PRODUKTIONSPLANER_
+      PRUEFUNG_INVENTUR_BAU.md
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -425,6 +439,15 @@
   }
   .erfolg h2{font-family:var(--font-display); font-size: var(--bos-font-xl, 1.4rem); margin: 0 0 var(--bos-space-xs, 8px);}
   .erfolg p{color:var(--dim); font-size: var(--bos-font-md, .92rem); margin: 0 0 var(--bos-space-lg, 24px);}
+  /* 08.11.2026 (Produktionsplaner Schritt 3): „Planung mit dieser Zählung“ */
+  .pz-block{max-width:560px; margin:0 auto var(--bos-space-lg, 24px); text-align:left; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); font-family:var(--font-label); font-size:.86rem; line-height:1.45; overflow-wrap:anywhere;}
+  .pz-titel{font-weight:800; margin-bottom:6px; color:var(--text);}
+  .pz-ok{color:var(--bos-green, #4db87a); font-weight:700;}
+  .pz-laut{color:var(--danger); font-weight:800; margin:4px 0;}
+  .pz-leise{color:var(--dim); font-size:.8rem; margin:3px 0;}
+  .pz-block details{margin-top:6px;} .pz-block summary{color:var(--dim); font-size:.8rem; cursor:pointer;}
+  .pz-fehler{color:var(--danger); font-weight:700;}
+  .pz-block a{color:inherit; text-decoration:underline;}
   .neu-btn{
     font-family:var(--font-label); font-weight:700; letter-spacing:.04em;
     text-transform:uppercase; font-size: var(--bos-font-sm, .85rem); color:var(--bg);
@@ -500,6 +523,16 @@
      auch direkt per NFC/QR ohne vorherigen Launcher-Aufruf geöffnet werden —
      siehe bos_standalone_login.js Kopf-Kommentar für die Begründung. -->
 <script src="../bos_standalone_login.js"></script>
+<!-- NEU 08.11.2026 (Produktionsplaner Schritt 3): Rechenstapel für „Planung mit dieser Zählung“ (nur Erfolgsbildschirm) -->
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_hamster.js"></script>
+<script src="../bos_produktionskette.js"></script>
+<script src="../bos_froster.js"></script>
+<script src="../produktionsplaner/bestell_regeln.js"></script>
+<script src="../produktionsplaner/plan_laden.js"></script>
+<script src="../produktionsplaner/plan_pruefung.js"></script>
 
 <div class="pk-overlay" id="pkOverlay">
   <div class="pk-card">
@@ -879,8 +912,10 @@ document.getElementById('submitBtn').addEventListener('click', function(){
   };
 
   db.collection('bos_events').add(dokument)
-    .then(function(){
-      zeigeErfolg(Object.keys(ZAEHLUNGEN).length);
+    .then(function(ref){
+      const gezaehlt = Object.keys(ZAEHLUNGEN);   // 08.11.2026 (Schritt 3): vor „Neue Zählung“ festhalten
+      zeigeErfolg(gezaehlt.length);
+      pruefePlanung(ref, gezaehlt);
     })
     .catch(function(err){
       console.error('[Froster-Inventur] Sende-Fehler:', err);
@@ -908,6 +943,7 @@ function zeigeErfolg(anzahl){
     '<div class="glyph">✓</div>' +
     '<h2>' + t('erfolgTitel') + '</h2>' +
     '<p>' + t('erfolgText', anzahl) + '</p>' +
+    '<div class="pz-block" id="pzBlock"><div class="pz-titel">Planung mit dieser Zählung:</div><div class="pz-leise" id="pzInhalt">wird geprüft …</div></div>' +   // 08.11.2026 (Schritt 3)
     '<button class="neu-btn" id="neuBtn">' + t('neueZaehlung') + '</button>' +
     '</div>';
   document.getElementById('neuBtn').addEventListener('click', function(){
@@ -919,6 +955,55 @@ function zeigeErfolg(anzahl){
     aktualisiereProgress();
     aktualisiereSubmitZustand();
   });
+}
+
+/* ==== Planung mit dieser Zählung (08.11.2026, Produktionsplaner Schritt 3) ====
+   Nur Anzeige nach dem Speichern. Die Zählung selbst bleibt reine Bestandsaufnahme.
+   Rechnung: ../produktionsplaner/plan_pruefung.js (BOS_PLAN_PRUEFUNG.pruefe). */
+const PZ_ZEITLIMIT_MS = 20000;
+function pzEsc(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+// Firestore-Index-Link antippbar (wie fehlertextMitLink an der Station)
+function pzLink(html){ return html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">Index anlegen</a>'); }
+function pzZeige(html){ const el = document.getElementById('pzInhalt'); if (el) { el.className = ''; el.innerHTML = html; } }
+function pzFehler(text){ pzZeige('<div class="pz-fehler">⚠ Planung konnte nicht geprüft werden: ' + pzLink(pzEsc(text)) + '</div><div class="pz-leise">Die Zählung ist trotzdem gespeichert.</div>'); }
+async function pruefePlanung(ref, gezaehlt){
+  try {
+    const PP = window.BOS_PLAN_PRUEFUNG;
+    if (!PP || typeof PP.pruefe !== 'function') throw new Error('plan_pruefung.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    if (window.BOS_HAMSTER && typeof window.BOS_HAMSTER.init === 'function') window.BOS_HAMSTER.init();
+    const zeitlimit = new Promise(function(_, nein){ setTimeout(function(){ nein(new Error('keine Antwort der Datenbank nach 20 Sekunden — Netz prüfen')); }, PZ_ZEITLIMIT_MS); });
+    const ergebnis = await Promise.race([zeitlimit, (async function(){
+      // Die eben gesendete Zählung vom Server zurücklesen: erst dann trägt sie ihren Zeitstempel.
+      const snap = await ref.get({ source: 'server' });
+      const data = snap.data();
+      if (!data || !data.ts || typeof data.ts.toMillis !== 'function') throw new Error('die gespeicherte Zählung hat noch keinen Zeitstempel vom Server');
+      return PP.pruefe(db, { legacyKeys: gezaehlt, zaehlDok: { id: snap.id || ref.id, data: data } });
+    })()]);
+    pzZeichne(ergebnis);
+  } catch (err) {
+    console.error('[Froster-Inventur] Planung prüfen:', err);
+    let grund = (err && err.message) ? err.message : String(err);
+    if (err && err.code && grund.indexOf(err.code) < 0) grund += ' (' + err.code + ')';
+    pzFehler(grund);
+  }
+}
+function pzZeichne(erg){
+  const PP = window.BOS_PLAN_PRUEFUNG;
+  const laut = [], leise = [], nicht = [];
+  let geprueft = 0;
+  erg.ergebnisse.forEach(function(x){
+    const z = PP.zeilen(x.ergebnis, x.produkt);
+    if (x.ergebnis.status !== 'nicht_pruefbar') geprueft++;
+    laut.push.apply(laut, z.laut); leise.push.apply(leise, z.leise); if (z.nicht) nicht.push(z.nicht);
+  });
+  let html = '';
+  if (laut.length) html += laut.map(function(t){ return '<div class="pz-laut">' + pzEsc(t) + '</div>'; }).join('');
+  else if (geprueft) html += '<div class="pz-ok">✓ Die eingereichte Planung passt mit dem aktuellen Bestand.</div>';
+  else html += '<div class="pz-leise">Nichts zu prüfen — keines der gezählten Produkte hat eine prüfbare eingereichte Planung.</div>';
+  if (leise.length) html += '<details><summary>' + leise.length + ' × knapp</summary>' + leise.map(function(t){ return '<div class="pz-leise">' + pzEsc(t) + '</div>'; }).join('') + '</details>';
+  html += nicht.map(function(t){ return '<div class="pz-leise">' + pzLink(pzEsc(t)) + '</div>'; }).join('');
+  if (erg.ohneStation) html += '<div class="pz-leise">' + erg.ohneStation + ' weitere gezählte ' + (erg.ohneStation === 1 ? 'Produkt wird' : 'Produkte werden') + ' nicht im Produktionsplaner geplant.</div>';
+  pzZeige(html);
 }
 
 /* ==== Hilfe-Sheet ==== */

@@ -54,6 +54,17 @@
  * Unterordner-Satelliten ../bos_froster.js.
  *
  * ÄNDERUNGSPROTOKOLL:
+ * 08.11.2026, 17:58 — Feature (Produktionsplaner Schritt 3, Go Kontroll-
+ *   Chat 08.11., 17:31, E2): NEU holeZaehlDokumente() (dieselbe Abfrage wie
+ *   holeBestand(), EINMAL für alle Produkte), zaehlungAusDokumenten() (rein
+ *   rechnend, Kopie der Schleife aus holeBestand(), dazu vorbereitungFertig
+ *   und Dokument-ID der Zählung) und zaehlungFehler() (Rückgabe wie der
+ *   catch-Zweig von holeBestand()). holeBestandMitProduktion() nimmt
+ *   optional eine schon ermittelte Zählung (fünfter Parameter), sonst wie
+ *   bisher holeBestand(). holeBestand() UNVERÄNDERT; Gleichheit mit
+ *   zaehlungAusDokumenten() per Zufallsvergleich belegt
+ *   (vergleich_zaehlung.js). SESSION_2026-11-08_PRODUKTIONSPLANER_
+ *   PRUEFUNG_INVENTUR_BAU.md
  * 08.11.2026, 16:41 — Feature (Produktionsplaner Schritt 2, Go Kontroll-
  *   Chat 08.11., 16:07, E2/E3): NEU rechneBestandMitProduktion() (rein
  *   rechnend) und holeBestandMitProduktion() — Zählung wie holeBestand()
@@ -209,13 +220,16 @@ window.BOS_FROSTER = {
    * Zählung (holeBestand) + Produktion seit der Zählung, mit Fehlern samt Grund.
    * produktEinheit: cfg.einheit || 'bleche' (wie Inventur und Froster-Produktion).
    * einheitGleich: optional BOS_PRODUKTE.einheitGleich.
+   * zaehlung: optional (seit Schritt 3) Ergebnis von zaehlungAusDokumenten() bzw.
+   *   zaehlungFehler() — dann keine eigene Abfrage der Zählung.
    * @returns {Promise<object>} alle Felder von holeBestand() und von
    *   rechneBestandMitProduktion(); dazu produktionFehler (Text), falls die
    *   Abfrage der Produktion scheiterte — dann ist gesamt null (lieber einmal
    *   von Hand als ein falscher Bestand).
    */
-  async holeBestandMitProduktion(db, legacyKey, produktEinheit, einheitGleich) {
-    const z = await this.holeBestand(db, legacyKey);
+  async holeBestandMitProduktion(db, legacyKey, produktEinheit, einheitGleich, zaehlung) {
+    // 08.11.2026 (Schritt 3): schon ermittelte Zählung (zaehlungAusDokumenten / zaehlungFehler) statt eigener Abfrage
+    const z = zaehlung || await this.holeBestand(db, legacyKey);
     const leer = this.rechneBestandMitProduktion(z, [], legacyKey, produktEinheit, einheitGleich);
     if (!leer.frisch) return Object.assign({}, z, leer);
     try {
@@ -232,5 +246,47 @@ window.BOS_FROSTER = {
       console.warn('BOS_FROSTER.holeBestandMitProduktion: Produktion nicht ladbar.', fehler);
       return Object.assign({}, z, leer, { gesamt: null, produktionFehler: text });
     }
+  },
+
+  // ── 08.11.2026 (Schritt 3): Zählungen einmal laden, je Produkt rein rechnend ──
+  // Dieselbe Abfrage wie holeBestand(). Wirft bei Fehlern (Aufrufer: zaehlungFehler()).
+  async holeZaehlDokumente(db) {
+    const snap = await db.collection('bos_events')
+      .where('type', '==', 'froster_zaehlung')
+      .orderBy('ts', 'desc')
+      .limit(this.MAX_DOKUMENTE_SCAN)
+      .get();
+    return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+  },
+
+  /**
+   * KOPIE der Schleife aus holeBestand() (gleiche Regeln: neueste Zählung mit dem
+   * Produkt, ohne lesbaren Zeitstempel veraltet, älter als FRISCHE_GRENZE_STUNDEN
+   * veraltet), dazu vorbereitungFertig ({gruppe: true|false} oder null) und
+   * zaehlId. docs = Ergebnis von holeZaehlDokumente() (neueste zuerst).
+   * Ändert sich die Regel in holeBestand(), muss sie hier mit (vergleich_zaehlung.js).
+   */
+  zaehlungAusDokumenten(docs, legacyKey, jetztMs) {
+    const jetzt = (typeof jetztMs === 'number') ? jetztMs : Date.now();
+    for (const doc of (docs || [])) {
+      const data = doc.data || {};
+      const wert = data.zaehlungen?.[legacyKey];
+      if (wert === undefined) continue;
+
+      const tsMillis = data.ts?.toMillis ? data.ts.toMillis() : null;
+      const veraltet = tsMillis === null
+        ? true
+        : (jetzt - tsMillis) / 3600000 > this.FRISCHE_GRENZE_STUNDEN;
+
+      const vf = (data.vorbereitungFertig && typeof data.vorbereitungFertig === 'object') ? Object.assign({}, data.vorbereitungFertig) : null;
+      return { bestand: wert, ts: tsMillis, gefunden: true, veraltet, vorbereitungFertig: vf, zaehlId: doc.id || null };
+    }
+    return { bestand: null, ts: null, gefunden: false, veraltet: true, vorbereitungFertig: null, zaehlId: null };
+  },
+
+  // Rückgabe wie der catch-Zweig von holeBestand() (fehlerText = err.message).
+  zaehlungFehler(fehler) {
+    const fehlerText = (fehler && fehler.message) ? fehler.message : String(fehler);
+    return { bestand: null, ts: null, gefunden: false, veraltet: true, fehlerText: fehlerText, vorbereitungFertig: null, zaehlId: null };
   }
 };

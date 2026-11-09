@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-08 · 18:05 · Planung gegen Bestand (Produktionsplaner Schritt 3, Go Kontroll-Chat 08.11., 17:31): neuer Block „Planung gegen Bestand“ unter der Bestell-Zeile, je Station gruppiert, mit der jeweils neuesten Zählung je Produkt (./plan_pruefung.js BOS_PLAN_PRUEFUNG.pruefe). Lücken laut, „knapp“ eingeklappt, „nicht prüfbar“ leise mit Grund (Index-Link antippbar), „↻ Neu prüfen“. Lädt NACH dem Stand, eigener Ladezustand, sperrt den Druck nicht, kommt nicht auf den Wochenzettel. Lädt dafür den Rechenstapel (Zeitkontext, Verbrauch, Hamster, Kette, Froster, plan_laden, plan_pruefung). SESSION_2026-11-08_PRODUKTIONSPLANER_PRUEFUNG_INVENTUR_BAU.md -->
 <!-- 2026-11-08 · 15:38 · Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45, Freigabe §3): Kasten „➕ Nachtrag eintragen“ entfällt (damit auch alert() ohne Grund). An seiner Stelle eine Zeile „📋 n Bestellungen noch nicht eingeplant · m gelöscht nach Einreichung“ mit Sprung zur neuen Seite bestellungen.html (bei 0 nur der Sprung). Lädt Bestellungen (type produktionsplan_bestellung, nur type ==, Rest im Gerät) und die Einreichungen der Wochen aus bestell_regeln.js wochenFuerTage(); Kennzeichen über ./bestell_regeln.js. Wochenzettel-Block „Nachbestellungen“: alte Nachträge wie bisher plus Bestellungen „noch nicht eingeplant“ im Zeitraum des Zettels, jetzt mit Spalten Tag und Notiz. Ladefehler der Bestellungen sperren den Druck wie ein Ladefehler des Stands. Produktliste ohne Auswahlfeld (ladeProduktliste statt ladeProduktDropdown). window.onerror sichtbar. Hilfetext. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
 <!-- 2026-11-02 · 17:41 · Wochenzettel nach Tagen (Go Kontroll-Chat 02.11., 17:2x): Druckknopf „Wochenplan drucken“ fragt zuerst „Alle Stationen“ oder eine Station (Auswahlblatt, kein Browser-Dialog). Zettel nach Tagen gegliedert (aus tage der Einreichungen, Stationen in Übersichts-, Produkte in Stationsreihenfolge), danach Wochensumme (gesamt = Summe der gedruckten Tage) und Nachbestellungen (bei einer Station nur deren). Hinweise oben: ohne Tagesaufteilung eingereicht / noch nicht eingereicht. Tage außerhalb Mo–So verbreitern die Spanne im Titel statt zu verschwinden. Ladefehler mit Grund in der Meldezeile; nach einem Ladefehler wird nicht gedruckt (sonst stünde „nicht eingereicht“ auf dem Papier). Druckfehler mit Grund im Blatt. Nachtrag eintragen unverändert. SESSION_2026-11-02_PRODUKTIONSPLANER_WOCHENZETTEL_BAU.md -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Ladeanzeige-Tönung folgt dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
@@ -67,6 +68,19 @@
   .bestell-zeile.offen { border-color:var(--bos-warn); color:var(--bos-warn-bright); background:var(--bos-warn-glow-soft); }
   .bestell-zeile.fehler { border-color:var(--bos-red); color:var(--bos-red); overflow-wrap:anywhere; }
   .bestell-zeile .sprung { color:var(--bos-amber); white-space:nowrap; flex-shrink:0; }
+  /* 08.11.2026 (Schritt 3): Planung gegen Bestand */
+  .pg-block { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:12px 16px; margin:0 0 14px; font-family:var(--bos-font-label); font-size:.8rem; line-height:1.45; overflow-wrap:anywhere; }
+  .pg-kopf { display:flex; align-items:center; justify-content:space-between; gap:10px; font-weight:900; color:var(--bos-text); margin-bottom:6px; }
+  .pg-kopf button { background:none; border:1.5px solid var(--bos-border-strong); border-radius:9px; padding:5px 10px; font-family:var(--bos-font-label); font-weight:800; font-size:.72rem; color:var(--bos-text-dim); cursor:pointer; }
+  .pg-station { border-top:1px solid var(--bos-border); padding:8px 0 4px; }
+  .pg-station-name { font-weight:900; color:var(--bos-text); }
+  .pg-zeit { font-weight:700; color:var(--bos-text-dim); font-size:.72rem; margin-left:6px; }
+  .pg-ok { color:var(--bos-green); font-weight:800; }
+  .pg-laut { color:var(--bos-red); font-weight:900; margin:3px 0; }
+  .pg-leise { color:var(--bos-text-dim); font-weight:700; font-size:.74rem; margin:2px 0; }
+  .pg-block details summary { color:var(--bos-text-dim); font-weight:700; font-size:.74rem; cursor:pointer; }
+  .pg-fehler { color:var(--bos-red); font-weight:800; }
+  .pg-block a { color:inherit; text-decoration:underline; }
   .seiten-fehler { margin:10px 0 0; padding:9px 12px; border-radius:10px; border:1.5px solid var(--bos-red); color:var(--bos-red); font-family:var(--bos-font-label); font-weight:800; font-size:.78rem; overflow-wrap:anywhere; }
 
   /* 02.11.2026 · Auswahlblatt Drucken (Alle / eine Station) */
@@ -98,6 +112,15 @@
 <script src="../bos_standalone_login.js"></script>
 <script src="../bos_druck.js"></script>
 <script src="bestell_regeln.js"></script>   <!-- NEU 08.11.2026: Kennzeichen der Bestellungen (eine Rechenstelle) -->
+<!-- NEU 08.11.2026 (Schritt 3): Rechenstapel für „Planung gegen Bestand“ -->
+<script src="../bos_zeitkontext_referenz.js"></script>
+<script src="../bos_zeitkontext.js"></script>
+<script src="../bos_verbrauch_durchschnitt.js"></script>
+<script src="../bos_hamster.js"></script>
+<script src="../bos_produktionskette.js"></script>
+<script src="../bos_froster.js"></script>
+<script src="plan_laden.js"></script>
+<script src="plan_pruefung.js"></script>
 
 <div class="nfc-header">
   <div class="nfc-header-top">
@@ -133,6 +156,8 @@
   <!-- 08.11.2026: ~~„➕ Nachtrag eintragen“~~ → eingetragen wird jetzt auf der Seite Bestellungen -->
   <a class="bestell-zeile" id="bestell-zeile" href="bestellungen.html"><span id="bestell-zeile-text">📋 Bestellungen werden geladen…</span><span class="sprung">Bestellungen →</span></a>
   <div id="seiten-fehler"></div>
+  <!-- 08.11.2026 (Schritt 3): Planung gegen Bestand — nicht auf dem Wochenzettel -->
+  <div class="pg-block" id="pg-block"><div class="pg-kopf"><span>Planung gegen Bestand</span><button id="pg-neu" onclick="ladePruefung()">↻ Neu prüfen</button></div><div id="pg-inhalt" class="pg-leise">wartet auf den Stand …</div></div>
 
   <button class="btn-druck" id="btn-druck" onclick="ppOeffneDruckwahl()">🖨 Wochenplan drucken</button>
 </div>
@@ -646,6 +671,52 @@ function ppSchliesseHilfe() {
   document.getElementById('pp-hilfe-modal').style.display = 'none';
 }
 
+// ── PLANUNG GEGEN BESTAND (08.11.2026, Schritt 3) ────────────────────
+// Rechnung in plan_pruefung.js. Lädt nach dem Stand, eigener Zustand, kein Einfluss auf den Druck.
+var PG_LAEUFT = false;
+function pgWann(ms) { var d = new Date(ms); return ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()] + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+async function ladePruefung() {
+  if (PG_LAEUFT) return;
+  PG_LAEUFT = true;
+  var inhalt = document.getElementById('pg-inhalt'), knopf = document.getElementById('pg-neu');
+  inhalt.className = 'pg-leise'; inhalt.textContent = 'wird geprüft …'; knopf.disabled = true;
+  try {
+    var PP = window.BOS_PLAN_PRUEFUNG;
+    if (!PP || typeof PP.pruefe !== 'function') throw new Error('plan_pruefung.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    if (window.BOS_HAMSTER && typeof window.BOS_HAMSTER.init === 'function') window.BOS_HAMSTER.init();
+    var erg = await PP.pruefe(window.db, {});
+    inhalt.className = ''; inhalt.innerHTML = pgHtml(erg);
+  } catch (e) {
+    console.error('[Übersicht] Planung gegen Bestand:', e);
+    inhalt.className = 'pg-fehler'; inhalt.innerHTML = '⚠ Prüfung fehlgeschlagen: ' + pgLink(esc(fehlerText(e))) + ' — der Wochenplan und der Druck sind davon nicht betroffen.';
+  }
+  knopf.disabled = false; PG_LAEUFT = false;
+}
+// Firestore-Index-Link antippbar (wie fehlertextMitLink an der Station)
+function pgLink(html) { return html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">Index anlegen</a>'); }
+function pgHtml(erg) {
+  var PP = window.BOS_PLAN_PRUEFUNG, html = '';
+  STATIONEN.forEach(function (st) {
+    var eigene = erg.ergebnisse.filter(function (x) { return x.produkt.station === st.station; });
+    if (!eigene.length) return;
+    var laut = [], leise = [], nicht = [], geprueft = 0, zeiten = {};
+    eigene.forEach(function (x) {
+      var z = PP.zeilen(x.ergebnis, x.produkt);
+      if (x.ergebnis.status !== 'nicht_pruefbar') { geprueft++; zeiten[pgWann(x.ergebnis.details.zaehlTs)] = true; }
+      laut.push.apply(laut, z.laut); leise.push.apply(leise, z.leise); if (z.nicht) nicht.push(z.nicht);
+    });
+    var zeitText = Object.keys(zeiten).length ? '<span class="pg-zeit">gezählt ' + esc(Object.keys(zeiten).join(', ')) + '</span>' : '';
+    html += '<div class="pg-station"><div class="pg-station-name">' + st.icon + ' ' + esc(st.station) + zeitText + '</div>';
+    if (laut.length) html += laut.map(function (t) { return '<div class="pg-laut">' + esc(t) + '</div>'; }).join('');
+    else if (geprueft) html += '<div class="pg-ok">✓ Die eingereichte Planung passt mit dem aktuellen Bestand.</div>';
+    if (leise.length) html += '<details><summary>' + leise.length + ' × knapp</summary>' + leise.map(function (t) { return '<div class="pg-leise">' + esc(t) + '</div>'; }).join('') + '</details>';
+    html += nicht.map(function (t) { return '<div class="pg-leise">' + pgLink(esc(t)) + '</div>'; }).join('');
+    html += '</div>';
+  });
+  return html || '<div class="pg-leise">Keine Produkte auf den Stationen.</div>';
+}
+
 // Checkliste §7a: nicht abgefangene Fehler sichtbar (08.11.2026)
 function zeigeSeitenFehler(text) { var el = document.getElementById('seiten-fehler'); if (el) el.innerHTML = '<div class="seiten-fehler">⚠ Unerwarteter Fehler: ' + esc(text) + ' — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.</div>'; }
 window.addEventListener('error', function (e) { zeigeSeitenFehler((e && e.message ? e.message : 'Fehler') + (e && e.filename ? ' (' + String(e.filename).replace(/^.*\//, '') + ':' + e.lineno + ')' : '')); });
@@ -656,6 +727,7 @@ window.addEventListener('load', function () {
   setInterval(renderCountdown, 60000);
   PRODUKTLISTE_GELADEN = ladeProduktliste();
   ladeStand();
+  STAND_VERSPRECHEN.then(ladePruefung, ladePruefung);   // 08.11.2026 (Schritt 3): erst nach dem Stand
 });
 </script>
 </body>
