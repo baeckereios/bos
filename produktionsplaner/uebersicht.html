@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-09 · 06:45 · Sonstige Bestellungen (Produktionsplaner Schritt 4, Go Kontroll-Chat 09.11., 06:32): Lädt zusätzlich produktionsplan_bestellung_sonstiges (nur type ==). Bestell-Zeile hängt „· k sonstige Bestellungen diese Woche“ an (Mo–So der Planungswoche). Wochenzettel: je Tag ein Abschnitt „Sonstige Bestellungen“ mit Text und Notiz; Tage mit nur Sonstigem bekommen einen Block. Zettel einer Station: Sonstiges nur, wenn sein Auftrag eine Position dieser Station hat, sonst je Tag „+ n weitere sonstige Bestellungen (Zettel „Alle“)“. Sonstiges rechnet nirgends mit. Ladefehler der sonstigen: Hinweis mit Grund und „Neu laden“, Druck gesperrt mit Grund, bis „Neu laden“ sie liest. -->
+<!-- 2026-11-09 · 06:36 · Planung gegen Bestand: je Produkt eine laute Zeile, einzelne Lücken unter „Tage anzeigen“ (Produktionsplaner Schritt 4, 4.6). SESSION_2026-11-09_PRODUKTIONSPLANER_AUFTRAEGE_BAU.md -->
 <!-- 2026-11-08 · 18:05 · Planung gegen Bestand (Produktionsplaner Schritt 3, Go Kontroll-Chat 08.11., 17:31): neuer Block „Planung gegen Bestand“ unter der Bestell-Zeile, je Station gruppiert, mit der jeweils neuesten Zählung je Produkt (./plan_pruefung.js BOS_PLAN_PRUEFUNG.pruefe). Lücken laut, „knapp“ eingeklappt, „nicht prüfbar“ leise mit Grund (Index-Link antippbar), „↻ Neu prüfen“. Lädt NACH dem Stand, eigener Ladezustand, sperrt den Druck nicht, kommt nicht auf den Wochenzettel. Lädt dafür den Rechenstapel (Zeitkontext, Verbrauch, Hamster, Kette, Froster, plan_laden, plan_pruefung). SESSION_2026-11-08_PRODUKTIONSPLANER_PRUEFUNG_INVENTUR_BAU.md -->
 <!-- 2026-11-08 · 15:38 · Bestellungen (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45, Freigabe §3): Kasten „➕ Nachtrag eintragen“ entfällt (damit auch alert() ohne Grund). An seiner Stelle eine Zeile „📋 n Bestellungen noch nicht eingeplant · m gelöscht nach Einreichung“ mit Sprung zur neuen Seite bestellungen.html (bei 0 nur der Sprung). Lädt Bestellungen (type produktionsplan_bestellung, nur type ==, Rest im Gerät) und die Einreichungen der Wochen aus bestell_regeln.js wochenFuerTage(); Kennzeichen über ./bestell_regeln.js. Wochenzettel-Block „Nachbestellungen“: alte Nachträge wie bisher plus Bestellungen „noch nicht eingeplant“ im Zeitraum des Zettels, jetzt mit Spalten Tag und Notiz. Ladefehler der Bestellungen sperren den Druck wie ein Ladefehler des Stands. Produktliste ohne Auswahlfeld (ladeProduktliste statt ladeProduktDropdown). window.onerror sichtbar. Hilfetext. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
 <!-- 2026-11-02 · 17:41 · Wochenzettel nach Tagen (Go Kontroll-Chat 02.11., 17:2x): Druckknopf „Wochenplan drucken“ fragt zuerst „Alle Stationen“ oder eine Station (Auswahlblatt, kein Browser-Dialog). Zettel nach Tagen gegliedert (aus tage der Einreichungen, Stationen in Übersichts-, Produkte in Stationsreihenfolge), danach Wochensumme (gesamt = Summe der gedruckten Tage) und Nachbestellungen (bei einer Station nur deren). Hinweise oben: ohne Tagesaufteilung eingereicht / noch nicht eingereicht. Tage außerhalb Mo–So verbreitern die Spanne im Titel statt zu verschwinden. Ladefehler mit Grund in der Meldezeile; nach einem Ladefehler wird nicht gedruckt (sonst stünde „nicht eingereicht“ auf dem Papier). Druckfehler mit Grund im Blatt. Nachtrag eintragen unverändert. SESSION_2026-11-02_PRODUKTIONSPLANER_WOCHENZETTEL_BAU.md -->
@@ -67,6 +69,8 @@
   .bestell-zeile { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:12px 16px; margin:18px 0 14px; font-family:var(--bos-font-label); font-weight:800; font-size:0.8rem; color:var(--bos-text-dim); text-decoration:none; -webkit-tap-highlight-color:transparent; }
   .bestell-zeile.offen { border-color:var(--bos-warn); color:var(--bos-warn-bright); background:var(--bos-warn-glow-soft); }
   .bestell-zeile.fehler { border-color:var(--bos-red); color:var(--bos-red); overflow-wrap:anywhere; }
+  .sonst-hinweis { border:1.5px solid var(--bos-red); color:var(--bos-red); border-radius:14px; padding:10px 14px; margin:-6px 0 14px; font-family:var(--bos-font-label); font-weight:700; font-size:0.78rem; overflow-wrap:anywhere; }
+  .sonst-hinweis button { margin-left:6px; padding:4px 12px; border-radius:10px; border:1.5px solid var(--bos-red); background:transparent; color:var(--bos-red); font-weight:800; cursor:pointer; }
   .bestell-zeile .sprung { color:var(--bos-amber); white-space:nowrap; flex-shrink:0; }
   /* 08.11.2026 (Schritt 3): Planung gegen Bestand */
   .pg-block { background:var(--bos-surface); border:1.5px solid var(--bos-border-strong); border-radius:16px; padding:12px 16px; margin:0 0 14px; font-family:var(--bos-font-label); font-size:.8rem; line-height:1.45; overflow-wrap:anywhere; }
@@ -96,6 +100,7 @@
   .pp-druck-wahl-icon { font-size:1.3rem; width:1.6rem; text-align:center; }
   .pp-druck-meldung { font-family:var(--bos-font-label); font-size:0.78rem; font-weight:700; margin-top:10px; word-break:break-word; }
   .pp-druck-meldung.fehler { color:var(--bos-red); }
+  .pp-druck-neu { margin-left:6px; padding:3px 10px; border-radius:10px; border:1.5px solid var(--bos-red); background:transparent; color:var(--bos-red); font-weight:800; cursor:pointer; }
   .pp-druck-meldung.info { color:var(--bos-text-dim); }
 </style>
 </head>
@@ -155,6 +160,7 @@
 
   <!-- 08.11.2026: ~~„➕ Nachtrag eintragen“~~ → eingetragen wird jetzt auf der Seite Bestellungen -->
   <a class="bestell-zeile" id="bestell-zeile" href="bestellungen.html"><span id="bestell-zeile-text">📋 Bestellungen werden geladen…</span><span class="sprung">Bestellungen →</span></a>
+  <div id="sonst-hinweis"></div>
   <div id="seiten-fehler"></div>
   <!-- 08.11.2026 (Schritt 3): Planung gegen Bestand — nicht auf dem Wochenzettel -->
   <div class="pg-block" id="pg-block"><div class="pg-kopf"><span>Planung gegen Bestand</span><button id="pg-neu" onclick="ladePruefung()">↻ Neu prüfen</button></div><div id="pg-inhalt" class="pg-leise">wartet auf den Stand …</div></div>
@@ -224,6 +230,8 @@ var PRODUKT_JE_KEY = {}; // 13.10.2026 (#64): legacyKey -> Produkt, für die Ein
 var PRODUKT_POS = {};    // 02.11.2026: legacyKey -> Platz in der Produktliste (= Reihenfolge in der Station)
 var PRODUKTLISTE_GELADEN = Promise.resolve();   // 02.11.2026: der Druck wartet darauf (Einheit, Reihenfolge)
 var STAND_VERSPRECHEN = null;   // 02.11.2026: laufendes/letztes ladeStand — der Druck wartet darauf
+// 09.11.2026 (Schritt 4): sonstige Positionen (freier Text, rechnet nirgends mit) — eigener Ladefehler sperrt den Druck
+var SONSTIGE = [], SONST_FEHLER = null, SONST_FEHLER_RAT = '';
 var STAND_FEHLER = null;        // 02.11.2026: Grund, falls der Stand nicht geladen werden konnte → kein Druck
 var STAND_FEHLER_RAT = '';      // 02.11.2026: was stattdessen hilft (Berechtigung ≠ kein Netz)
 
@@ -353,9 +361,35 @@ function fehlerText(e) {
   return t;
 }
 
+// 09.11.2026 (Schritt 4): sonstige Bestellungen, eigener Fehler (Bestellzeile und Stand bleiben)
+async function ladeSonstige(db) {
+  try {
+    if (!BR || !BR.TYP_SONSTIGES) throw new Error('bestell_regeln.js ist alt geladen (ohne Aufträge) — Seite neu laden');
+    var snap = await db.collection('bos_events').where('type', '==', BR.TYP_SONSTIGES).get();
+    var l = [];
+    snap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; l.push(d); });
+    SONSTIGE = l; SONST_FEHLER = null; SONST_FEHLER_RAT = '';
+  } catch (e) {
+    console.error('Produktionsplaner Übersicht: sonstige Bestellungen', e);
+    SONSTIGE = []; SONST_FEHLER = fehlerText(e); SONST_FEHLER_RAT = fehlerRat(e);
+  }
+}
+function renderSonstHinweis() {
+  var box = document.getElementById('sonst-hinweis');
+  if (!box) return;
+  if (!SONST_FEHLER) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="sonst-hinweis">⚠ Sonstige Bestellungen nicht geladen: <span></span> — Wochenplan drucken ist gesperrt, bis sie geladen sind. <button onclick="sonstNeuLaden(this)">Neu laden</button></div>';
+  box.querySelector('span').textContent = SONST_FEHLER + ' — ' + SONST_FEHLER_RAT;
+}
+async function sonstNeuLaden(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'lädt …'; }
+  await ladeStand();
+  if (!SONST_FEHLER && document.getElementById('pp-druck-modal').style.display === 'block') ppDruckMeldung('✓ Sonstige Bestellungen geladen — Drucken ist frei.', 'info');
+}
 async function ladeStandIntern() {
   await (window.BOS_AUTH_READY || Promise.resolve());
   var db = window.db;
+  var sonstLaden = ladeSonstige(db);   // 09.11.2026 (Schritt 4): parallel, fängt selbst ab
   try {
     var snap = await db.collection('bos_events')
       .where('type', '==', 'produktionsplan_einreichung')
@@ -409,8 +443,10 @@ async function ladeStandIntern() {
     STAND_FEHLER_RAT = fehlerRat(e);
     setStatus('error', '⚠ Stand konnte nicht geladen werden: ' + STAND_FEHLER);
   }
+  await sonstLaden;
   renderStationen();
   renderBestellZeile();
+  renderSonstHinweis();
 }
 
 // ~~renderNachtragListe() / nachtragEintragen()~~ (08.11.2026): Eintragen und Liste
@@ -426,6 +462,12 @@ function geloeschteBestellungen() {
   var ids = {}; BESTELLUNGEN.forEach(function (b) { ids[b.id] = true; });
   return BR.geloeschte(EINREICHUNGEN_KZ, ids, { von: BR.datumLokal(heute) });
 }
+function sonstigeDerWoche() {
+  if (!BR || SONST_FEHLER) return [];
+  var bis = new Date(wochenMo); bis.setDate(bis.getDate() + 6);
+  var von = BR.datumLokal(wochenMo), bisIso = BR.datumLokal(bis);
+  return SONSTIGE.filter(function (x) { return x.datum >= von && x.datum <= bisIso; });
+}
 function renderBestellZeile() {
   var a = document.getElementById('bestell-zeile'), t = document.getElementById('bestell-zeile-text');
   if (STAND_FEHLER) { a.className = 'bestell-zeile fehler'; t.textContent = '📋 Bestellungen nicht geladen: ' + STAND_FEHLER; return; }
@@ -433,6 +475,9 @@ function renderBestellZeile() {
   var teile = [];
   if (n) teile.push(n + (n === 1 ? ' Bestellung' : ' Bestellungen') + ' noch nicht eingeplant');
   if (m) teile.push(m + ' gelöscht nach Einreichung');
+  // 09.11.2026 (Schritt 4): sonstige der Planungswoche (Mo–So), nur zur Info
+  var k = sonstigeDerWoche().length;
+  if (k) teile.push(k + (k === 1 ? ' sonstige Bestellung' : ' sonstige Bestellungen') + ' diese Woche');
   a.className = 'bestell-zeile' + (teile.length ? ' offen' : '');
   t.textContent = '📋 ' + (teile.length ? teile.join(' · ') : 'Alle Bestellungen');
 }
@@ -531,6 +576,23 @@ function baueWochenzettel(auswahl) {
   var tageSortiert = Object.keys(tagesMap).sort();
   var von = new Date(wochenMo), bis = new Date(wochenMo); bis.setDate(bis.getDate() + 6);
   tageSortiert.forEach(function (iso) { var d = ausIso(iso); if (d < von) von = d; if (d > bis) bis = d; });
+  // 09.11.2026 (Schritt 4): sonstige Bestellungen im Zeitraum des Zettels, an ihrem Tag.
+  // Zettel einer Station: nur, wenn der Auftrag eine Position dieser Station hat (E7).
+  var produktTage = tageSortiert.length;
+  var sonstJeTag = {}, sonstWeitere = {};
+  if (BR && BR.auftraege) {
+    var vonS = BR.datumLokal(von), bisS = BR.datumLokal(bis);
+    BR.auftraege(BESTELLUNGEN, SONSTIGE).forEach(function (a) {
+      if (a.datum < vonS || a.datum > bisS) return;
+      var sonst = a.positionen.filter(function (p) { return p.art === 'sonstiges'; });
+      if (!sonst.length) return;
+      var gehoertDazu = auswahl === 'alle' || BR.auftragPasst(a, auswahl, null);
+      if (gehoertDazu) sonst.forEach(function (p) { (sonstJeTag[a.datum] = sonstJeTag[a.datum] || []).push(p); });
+      else sonstWeitere[a.datum] = (sonstWeitere[a.datum] || 0) + sonst.length;
+    });
+  }
+  Object.keys(sonstJeTag).concat(Object.keys(sonstWeitere)).forEach(function (iso) { if (!tagesMap[iso]) tagesMap[iso] = {}; });
+  tageSortiert = Object.keys(tagesMap).sort();
   var spanne = kurzDatum(von) + '–' + kurzDatum(bis);
   var titelName = auswahl === 'alle' ? 'Alle Stationen' : esc(auswahl);
 
@@ -538,7 +600,7 @@ function baueWochenzettel(auswahl) {
   if (hinweise.length) {
     teile.push('<div class="pp-z-hinweise"><b>Hinweise</b><ul>' + hinweise.map(function (h) { return '<li>' + h + '</li>'; }).join('') + '</ul></div>');
   }
-  if (!tageSortiert.length) {
+  if (!produktTage) {
     teile.push('<p class="pp-druck-fehlt"><em>Keine Tagesmengen vorhanden.</em></p>');
   }
   tageSortiert.forEach(function (iso) {
@@ -555,6 +617,15 @@ function baueWochenzettel(auswahl) {
         teile.push('<div class="pp-z-zeile"><span class="pp-z-name">' + esc(z.name) + '</span><span class="pp-z-pkt"></span><span class="pp-z-menge">' + esc(z.menge) + ' ' + z.eh + '</span></div>');
       });
     });
+    // 09.11.2026 (Schritt 4): Sonstige Bestellungen des Tages (Text, Notiz) — nicht gerechnet
+    var so = sonstJeTag[iso] || [], weitere = sonstWeitere[iso] || 0;
+    if (so.length || weitere) {
+      teile.push('<div class="pp-z-st pp-z-sonst">✎ Sonstige Bestellungen</div>');
+      so.forEach(function (p) {
+        teile.push('<div class="pp-z-zeile pp-z-sonstzeile"><span class="pp-z-name">' + esc(p.text) + '</span><span class="pp-z-pkt"></span><span class="pp-z-notiz">' + esc(p.notiz || '') + '</span></div>');
+      });
+      if (weitere) teile.push('<div class="pp-z-zeile pp-z-weitere">+ ' + weitere + ' weitere sonstige ' + (weitere === 1 ? 'Bestellung' : 'Bestellungen') + ' (Zettel „Alle“)</div>');
+    }
     teile.push('</div>');
   });
 
@@ -592,6 +663,7 @@ var PP_ZETTEL_CSS = '.pp-druck-tabelle{width:100%;border-collapse:collapse;margi
   + ' .pp-z-hinweise{border:1.5px solid #000;padding:6px 10px;margin:0 0 12px;font-size:0.85rem;line-height:1.5;} .pp-z-hinweise ul{margin:4px 0 0;padding-left:18px;}'
   + ' .pp-z-tag{page-break-inside:avoid;break-inside:avoid;margin:0 0 10px;} .pp-z-tagkopf{font-weight:900;font-size:1rem;letter-spacing:0.5px;border-bottom:1.5px solid #000;margin:0 0 4px;padding-bottom:1px;}'
   + ' .pp-z-st{font-weight:700;font-size:0.9rem;margin:4px 0 0 4mm;} .pp-z-zeile{display:flex;align-items:baseline;gap:6px;margin-left:10mm;font-size:0.95rem;line-height:1.5;}'
+  + ' .pp-z-sonst{font-style:italic;} .pp-z-notiz{white-space:nowrap;font-style:italic;} .pp-z-weitere{font-style:italic;color:#444;}'
   + ' .pp-z-pkt{flex:1;border-bottom:1px dotted #888;transform:translateY(-3px);} .pp-z-menge{font-weight:700;white-space:nowrap;}'
   + ' .pp-z-block{font-size:1.05rem;margin:16px 0 4px;padding-top:6px;border-top:1px solid #ddd;page-break-after:avoid;} .pp-z-station{font-size:0.95rem;margin:8px 0 2px;} .pp-z-abw{color:#000;font-weight:700;}';
 
@@ -633,6 +705,14 @@ async function druckWoche(auswahl) {
       ppDruckMeldung('Drucken nicht möglich — der Stand ist nicht geladen: ' + STAND_FEHLER + ' — ' + STAND_FEHLER_RAT, 'fehler');
       return;
     }
+    if (SONST_FEHLER) {
+      // 09.11.2026 (Schritt 4): sonst fehlten die sonstigen Bestellungen still auf dem Papier
+      ppDruckMeldung('Drucken nicht möglich — die sonstigen Bestellungen sind nicht geladen: ' + SONST_FEHLER + ' — ' + SONST_FEHLER_RAT, 'fehler');
+      var nl = document.createElement('button'); nl.className = 'pp-druck-neu'; nl.textContent = 'Neu laden';
+      nl.onclick = function () { sonstNeuLaden(nl); };
+      document.getElementById('pp-druck-meldung').appendChild(document.createTextNode(' ')); document.getElementById('pp-druck-meldung').appendChild(nl);
+      return;
+    }
     if (!window.BOS_DRUCK || typeof window.BOS_DRUCK.drucken !== 'function') throw new Error('bos_druck.js ist nicht geladen — Seite neu laden (neue Fassung noch nicht online?)');
     var zettel = baueWochenzettel(auswahl || 'alle');
     window.BOS_DRUCK.drucken({
@@ -657,8 +737,8 @@ const PP_HILFE_SCHRITTE = [
   ['Wofür ist diese Seite?', 'Sie zeigt auf einen Blick, welche Station ihre Produktionsplanung für die aktuelle Planungswoche (Fr–Di) schon eingereicht hat — mit grünem Haken, wer es war und wann. Fehlt eine Station, steht das genauso sichtbar da.'],
   ['Zeitfenster', 'Die Planung ist nur Freitag bis Dienstag geöffnet. Die Karte oben zeigt entweder, wie viel Zeit noch bleibt, oder — außerhalb des Fensters — wann es wieder öffnet. Außerhalb des Fensters sind die Stationsseiten gesperrt, es gibt dann nichts mehr zu planen.'],
   ['Zur Station springen', 'Über "Zur Station →" bei jeder Zeile kommst du direkt zur jeweiligen Stationsseite.'],
-  ['Bestellungen', 'Bestellungen trägst du auf der Seite „Bestellungen“ ein (Zeile „📋 …“ antippen) oder direkt an der Station beim Produkt. Die Zeile hier zählt, wie viele kommende Bestellungen noch in keiner eingereichten Planung stecken („noch nicht eingeplant“) und wie viele gelöscht wurden, obwohl sie schon eingeplant waren. Steht dort etwas, sollte die betroffene Station neu planen und einreichen. Eine Bestellung ändert eine eingereichte Planung nie von selbst. Die früheren „Nachträge“ ohne Tag gibt es nicht mehr neu; alte stehen weiter auf der Seite Bestellungen und auf dem Zettel.'],
-  ['Drucken', 'Der Button unten („Wochenplan drucken“) fragt zuerst, was auf den Zettel soll: alle Stationen zusammen oder nur eine Station. Der Zettel ist nach Tagen gegliedert — Montag das, Dienstag das … — und zeigt je Tag, welche Station wie viel von welchem Produkt produziert. Tage ohne Produktion fehlen. Danach folgt die Wochensumme je Station (gesamt und Endlager) und am Ende die Nachbestellungen in einem eigenen Abschnitt (bei einer Station nur deren): Bestellungen, die noch nicht eingeplant sind, mit Tag und Notiz, und alte Nachträge ohne Tag. Gedruckt werden kann auch, wenn noch nicht jede Station eingereicht hat — oben auf dem Zettel steht dann, welche fehlt. Wurde eine Planung mit einer älteren Fassung der Station eingereicht, fehlt ihr die Aufteilung nach Tagen: Sie erscheint nur in der Wochensumme, und oben steht der Hinweis, neu einzureichen.']
+  ['Bestellungen', 'Bestellungen trägst du auf der Seite „Bestellungen“ ein (Zeile „📋 …“ antippen) oder direkt an der Station beim Produkt. Die Zeile hier zählt, wie viele kommende Bestellungen noch in keiner eingereichten Planung stecken („noch nicht eingeplant“) und wie viele gelöscht wurden, obwohl sie schon eingeplant waren. Steht dort etwas, sollte die betroffene Station neu planen und einreichen. Dazu steht, wie viele „sonstige Bestellungen“ (freier Text ohne Produkt, z. B. eine Torte) in der Planungswoche liegen — die rechnen nirgends mit und stehen nur auf dem Zettel. Eine Bestellung ändert eine eingereichte Planung nie von selbst. Die früheren „Nachträge“ ohne Tag gibt es nicht mehr neu; alte stehen weiter auf der Seite Bestellungen und auf dem Zettel.'],
+  ['Drucken', 'Der Button unten („Wochenplan drucken“) fragt zuerst, was auf den Zettel soll: alle Stationen zusammen oder nur eine Station. Der Zettel ist nach Tagen gegliedert — Montag das, Dienstag das … — und zeigt je Tag, welche Station wie viel von welchem Produkt produziert. Tage ohne Produktion fehlen. Gibt es an einem Tag sonstige Bestellungen, stehen sie dort unter „Sonstige Bestellungen“ mit Text und Notiz — auch an einem Tag ohne Produktion. Auf dem Zettel einer Station erscheint Sonstiges nur, wenn derselbe Auftrag auch ein Produkt dieser Station hat; sonst steht dort „+ n weitere sonstige Bestellungen (Zettel „Alle“)“. Konnten die sonstigen Bestellungen nicht geladen werden, steht oben der Grund mit „Neu laden“, und gedruckt wird erst danach. Danach folgt die Wochensumme je Station (gesamt und Endlager) und am Ende die Nachbestellungen in einem eigenen Abschnitt (bei einer Station nur deren): Bestellungen, die noch nicht eingeplant sind, mit Tag und Notiz, und alte Nachträge ohne Tag. Gedruckt werden kann auch, wenn noch nicht jede Station eingereicht hat — oben auf dem Zettel steht dann, welche fehlt. Wurde eine Planung mit einer älteren Fassung der Station eingereicht, fehlt ihr die Aufteilung nach Tagen: Sie erscheint nur in der Wochensumme, und oben steht der Hinweis, neu einzureichen.']
 ];
 function ppOeffneHilfe() {
   const inhalt = document.getElementById('pp-hilfe-inhalt');
@@ -704,11 +784,13 @@ function pgHtml(erg) {
     eigene.forEach(function (x) {
       var z = PP.zeilen(x.ergebnis, x.produkt);
       if (x.ergebnis.status !== 'nicht_pruefbar') { geprueft++; zeiten[pgWann(x.ergebnis.details.zaehlTs)] = true; }
-      laut.push.apply(laut, z.laut); leise.push.apply(leise, z.leise); if (z.nicht) nicht.push(z.nicht);
+      // 09.11.2026 (Schritt 4, 4.6): je Produkt eine laute Zeile, Tage eingeklappt darunter
+      z.laut.forEach(function (t) { laut.push('<div class="pg-laut">' + esc(t) + '</div>' + ((z.tage && z.tage.length) ? '<details><summary>Tage anzeigen</summary>' + z.tage.map(function (x2) { return '<div class="pg-leise">' + esc(x2) + '</div>'; }).join('') + '</details>' : '')); });
+      leise.push.apply(leise, z.leise); if (z.nicht) nicht.push(z.nicht);
     });
     var zeitText = Object.keys(zeiten).length ? '<span class="pg-zeit">gezählt ' + esc(Object.keys(zeiten).join(', ')) + '</span>' : '';
     html += '<div class="pg-station"><div class="pg-station-name">' + st.icon + ' ' + esc(st.station) + zeitText + '</div>';
-    if (laut.length) html += laut.map(function (t) { return '<div class="pg-laut">' + esc(t) + '</div>'; }).join('');
+    if (laut.length) html += laut.join('');
     else if (geprueft) html += '<div class="pg-ok">✓ Die eingereichte Planung passt mit dem aktuellen Bestand.</div>';
     if (leise.length) html += '<details><summary>' + leise.length + ' × knapp</summary>' + leise.map(function (t) { return '<div class="pg-leise">' + esc(t) + '</div>'; }).join('') + '</details>';
     html += nicht.map(function (t) { return '<div class="pg-leise">' + pgLink(esc(t)) + '</div>'; }).join('');

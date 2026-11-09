@@ -36,7 +36,19 @@
    VOR ../bos_ziel_berechnung.js.
    Export: window.BOS_BESTELL_REGELN
 
+   AUFTRÄGE (seit 09.11.2026, Schritt 4): Ein Auftrag ist KEIN eigenes Dokument,
+   sondern die Positionen mit derselben `auftragId` (Tag und Notiz an jeder
+   Position). Positionen: type TYP (Stationsprodukt, wie bisher) oder
+   TYP_SONSTIGES (freier Text, keine Menge, keine Station — liest kein
+   Planungsleser, die fragen alle `type == TYP`). Alte Bestellungen ohne
+   `auftragId` = Auftrag mit einer Position.
+
    CHANGELOG
+     2026-11-09 · 06:35 · Additiv (Produktionsplaner Schritt 4, Go Kontroll-Chat
+       09.11., 06:32, E5): TYP_SONSTIGES, TEXT_MAX, textAusText(),
+       auftragSchluessel(), auftraege(), auftragPasst(), positionenJeAuftrag().
+       Bestehende Funktionen unverändert. SESSION_2026-11-09_
+       PRODUKTIONSPLANER_AUFTRAEGE_BAU.md
      2026-11-08 · 15:38 · Erstfassung (Produktionsplaner Schritt 1, Go
        Kontroll-Chat 08.11., 14:45, Freigabe §3 „eine Rechenstelle für die
        Kennzeichen“). SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_
@@ -264,6 +276,60 @@
     });
   }
 
+  // ── Aufträge (09.11.2026, Schritt 4) ──────────────────────────────
+  var TYP_SONSTIGES = 'produktionsplan_bestellung_sonstiges';
+  var TEXT_MAX = 60;           // KC 08.11. (Anweisung Schritt 4, 4.2): Vorschlag ≤ 60 Zeichen
+  function textAusText(text) {
+    return String(text === undefined || text === null ? '' : text).replace(/\s+/g, ' ').trim().slice(0, TEXT_MAX);
+  }
+  // Alte Bestellungen ohne auftragId bilden je einen eigenen Auftrag.
+  function auftragSchluessel(p) { return p && p.auftragId ? 'a:' + p.auftragId : 'einzel:' + (p && p.id); }
+  function posWert(p) { return typeof p.pos === 'number' ? p.pos : Infinity; }
+  /* bestellungen: TYP-Dokumente (mit id), sonstige: TYP_SONSTIGES-Dokumente (mit id).
+     → [{ schluessel, auftragId, datum, notiz, positionen: [{ art: 'produkt'|'sonstiges', …Dokument }] }]
+     Positionen nach pos, dann Eintragzeit, dann ID; Tag und Notiz von der ersten Position;
+     Aufträge nach Tag, dann Eintragzeit der ersten Position, dann Schlüssel. */
+  function auftraege(bestellungen, sonstige) {
+    var je = {}, liste = [];
+    function nimm(p, art) {
+      if (!p) return;
+      var k = auftragSchluessel(p);
+      if (!je[k]) { je[k] = { schluessel: k, auftragId: p.auftragId || null, positionen: [] }; liste.push(je[k]); }
+      var kopie = {}; Object.keys(p).forEach(function (x) { kopie[x] = p[x]; }); kopie.art = art;
+      je[k].positionen.push(kopie);
+    }
+    (bestellungen || []).forEach(function (p) { nimm(p, 'produkt'); });
+    (sonstige || []).forEach(function (p) { nimm(p, 'sonstiges'); });
+    liste.forEach(function (a) {
+      a.positionen.sort(function (x, y) {
+        var px = posWert(x), py = posWert(y); if (px !== py) return px < py ? -1 : 1;
+        var tx = alsMillis(x.ts), ty = alsMillis(y.ts); if (tx !== ty) return tx - ty;
+        return x.id < y.id ? -1 : x.id > y.id ? 1 : 0;
+      });
+      a.datum = a.positionen[0].datum; a.notiz = a.positionen[0].notiz || '';
+    });
+    liste.sort(function (a, b) {
+      if (a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
+      var ta = alsMillis(a.positionen[0].ts), tb = alsMillis(b.positionen[0].ts); if (ta !== tb) return ta - tb;
+      return a.schluessel < b.schluessel ? -1 : a.schluessel > b.schluessel ? 1 : 0;
+    });
+    return liste;
+  }
+  // Filter der Seite: ein Auftrag erscheint, wenn EINE seiner Positionen passt.
+  // Ohne Filter erscheint jeder; ein reiner Sonstiges-Auftrag nur ohne Filter.
+  function auftragPasst(auftrag, station, legacyKey) {
+    if (!station && !legacyKey) return true;
+    return (auftrag && auftrag.positionen || []).some(function (p) {
+      return p.art === 'produkt' && (!station || p.station === station) && (!legacyKey || p.legacyKey === legacyKey);
+    });
+  }
+  // Zahl der Positionen je auftragId (beide Typen) — für „aus Auftrag … (n Positionen)“.
+  function positionenJeAuftrag(bestellungen, sonstige) {
+    var n = {};
+    (bestellungen || []).concat(sonstige || []).forEach(function (p) { if (p && p.auftragId) n[p.auftragId] = (n[p.auftragId] || 0) + 1; });
+    return n;
+  }
+
   global.BOS_BESTELL_REGELN = {
     TYP: TYP, NOTIZ_MAX: NOTIZ_MAX, KENNZEICHEN_TEXT: KENNZEICHEN_TEXT,
     datumLokal: datumLokal, ausIso: ausIso, plusTage: plusTage, plusTageIso: plusTageIso, tageAbstand: tageAbstand, istIso: istIso,
@@ -271,6 +337,9 @@
     planungsTagVon: planungsTagVon, deckt: deckt, enthaelt: enthaelt, kennzeichen: kennzeichen,
     geloeschte: geloeschte, neuesteJeStation: neuesteJeStation, neuesteJeStationUndWoche: neuesteJeStationUndWoche,
     wochenFuerTag: wochenFuerTag, wochenFuerTage: wochenFuerTage, stuecke: stuecke, fuerKette: fuerKette, fuerEinreichung: fuerEinreichung,
-    mengeAusText: mengeAusText, notizAusText: notizAusText, sortiere: sortiere
+    mengeAusText: mengeAusText, notizAusText: notizAusText, sortiere: sortiere,
+    // 09.11.2026 (Schritt 4)
+    TYP_SONSTIGES: TYP_SONSTIGES, TEXT_MAX: TEXT_MAX, textAusText: textAusText, auftragSchluessel: auftragSchluessel,
+    auftraege: auftraege, auftragPasst: auftragPasst, positionenJeAuftrag: positionenJeAuftrag
   };
 })(typeof window !== 'undefined' ? window : globalThis);

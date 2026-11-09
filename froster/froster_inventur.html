@@ -151,6 +151,11 @@
       (Zeitkontext, Verbrauch, Hamster, Kette, Froster, Bestell-Regeln,
       plan_laden, plan_pruefung). SESSION_2026-11-08_PRODUKTIONSPLANER_
       PRUEFUNG_INVENTUR_BAU.md
+    2026-11-09 · 06:36 · Anzeige (Produktionsplaner Schritt 4, 4.6, Go Kontroll-
+      Chat 09.11., 06:32, E8 — Ausnahme NUR für pzZeichne): je Produkt eine
+      laute Zeile aus plan_pruefung.js zeilen(), die einzelnen Lücken
+      eingeklappt unter „Tage anzeigen“. Sonst nichts geändert.
+      SESSION_2026-11-09_PRODUKTIONSPLANER_AUFTRAEGE_BAU.md
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -994,10 +999,12 @@ function pzZeichne(erg){
   erg.ergebnisse.forEach(function(x){
     const z = PP.zeilen(x.ergebnis, x.produkt);
     if (x.ergebnis.status !== 'nicht_pruefbar') geprueft++;
-    laut.push.apply(laut, z.laut); leise.push.apply(leise, z.leise); if (z.nicht) nicht.push(z.nicht);
+    // 09.11.2026 (Schritt 4, 4.6): je Produkt eine laute Zeile, Tage eingeklappt darunter
+    z.laut.forEach(function(t){ laut.push('<div class="pz-laut">' + pzEsc(t) + '</div>' + ((z.tage && z.tage.length) ? '<details><summary>Tage anzeigen</summary>' + z.tage.map(function(x2){ return '<div class="pz-leise">' + pzEsc(x2) + '</div>'; }).join('') + '</details>' : '')); });
+    leise.push.apply(leise, z.leise); if (z.nicht) nicht.push(z.nicht);
   });
   let html = '';
-  if (laut.length) html += laut.map(function(t){ return '<div class="pz-laut">' + pzEsc(t) + '</div>'; }).join('');
+  if (laut.length) html += laut.join('');
   else if (geprueft) html += '<div class="pz-ok">✓ Die eingereichte Planung passt mit dem aktuellen Bestand.</div>';
   else html += '<div class="pz-leise">Nichts zu prüfen — keines der gezählten Produkte hat eine prüfbare eingereichte Planung.</div>';
   if (leise.length) html += '<details><summary>' + leise.length + ' × knapp</summary>' + leise.map(function(t){ return '<div class="pz-leise">' + pzEsc(t) + '</div>'; }).join('') + '</details>';

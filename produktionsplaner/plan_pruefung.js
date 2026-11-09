@@ -3,6 +3,14 @@
    (Produktionsplaner Schritt 3)
 
    ÄNDERUNGSPROTOKOLL
+     2026-11-09 · 06:36 · Anzeige mehrerer Lücken (Produktionsplaner Schritt 4,
+     4.6, Entscheidung Kontroll-Chat 08.11., 18:18; Go 09.11., 06:32, E8):
+     zeilen() gibt je Produkt EINE laute Zeile „ab ⟨Tag⟩ fehlen N“ (N = Lücke am
+     ersten Tag), bei größerem Fehlbetrag „…, bis ⟨Tag⟩ M“ (M = größter
+     Fehlbetrag im Horizont); die einzelnen Lücken als `tage` (Inventur und
+     Übersicht klappen sie unter „Tage anzeigen“ ein). Rechnung und
+     pruefeProdukt() unverändert. SESSION_2026-11-09_PRODUKTIONSPLANER_
+     AUFTRAEGE_BAU.md
      2026-11-08 · 17:58 · Erstfassung (Produktionsplaner Schritt 3, Go
      Kontroll-Chat 08.11., 17:31, E1–E10, E7 geändert: keine Toleranz).
      SESSION_2026-11-08_PRODUKTIONSPLANER_PRUEFUNG_INVENTUR_BAU.md
@@ -307,16 +315,24 @@
   }
 
   // ── Anzeigetexte (Inventur und Übersicht) ────────────────────────
+  // 09.11.2026 (Schritt 4, 4.6): je Produkt EINE laute Zeile. Mehrere Lücken
+  // desselben Produkts sind dieselbe fehlende Menge an mehreren Tagen, keine Summe.
+  // ~~je Lücke eine laute Zeile~~ (08.11.: „Mi fehlen 3 · Fr fehlen 3 · Mo fehlen 3“ las sich wie 9)
   function zeilen(ergebnis, produkt) {
     var eh = (global.BOS_PRODUKTE && typeof global.BOS_PRODUKTE.einheit === 'function') ? global.BOS_PRODUKTE.einheit(produkt).kurz : '';
     var name = produkt.name + ' (' + produkt.station + ')';
-    var r = { laut: [], leise: [], nicht: null };
+    var r = { laut: [], leise: [], nicht: null, tage: [] };
     if (ergebnis.status === 'nicht_pruefbar') { r.nicht = name + ': nicht prüfbar — ' + ergebnis.grund; return r; }
-    ergebnis.luecken.forEach(function (l) {
-      var t = '⚠ ' + name + ': ' + tagText(l.datum) + ' fehlen ' + l.menge + ' ' + eh;
-      if (l.bisMenge > l.menge) t += ' (bis ' + tagText(l.bisDatum) + ' ' + l.bisMenge + ' ' + eh + ')';
+    if (ergebnis.luecken.length) {
+      var erste = ergebnis.luecken[0], groesste = erste;
+      ergebnis.luecken.forEach(function (l) { if (l.bisMenge > groesste.bisMenge) groesste = l; });
+      var t = '⚠ ' + name + ': ab ' + tagText(erste.datum) + ' fehlen ' + erste.menge + ' ' + eh;
+      if (groesste.bisMenge > erste.menge) t += ', bis ' + tagText(groesste.bisDatum) + ' ' + groesste.bisMenge + ' ' + eh;
       r.laut.push(t);
-    });
+      if (ergebnis.luecken.length > 1) ergebnis.luecken.forEach(function (l) {
+        r.tage.push(tagText(l.datum) + ': fehlen ' + l.menge + ' ' + eh + (l.bisMenge > l.menge ? ' (bis ' + tagText(l.bisDatum) + ' ' + l.bisMenge + ' ' + eh + ')' : ''));
+      });
+    }
     ergebnis.knapp.forEach(function (k) {
       r.leise.push(name + ': ' + tagText(k.datum) + (k.art === 'unter1' ? ' knapp — es fehlt weniger als 1 ' + eh + ' (' + zahl(k.menge) + ')' : ' knapp — danach bleiben ' + zahl(k.bestand) + ' ' + eh + ', zu wenig für den nächsten Tag'));
     });

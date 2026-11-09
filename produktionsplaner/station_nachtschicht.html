@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-09 · 07:09 · Aufträge (Produktionsplaner Schritt 4, Go Kontroll-Chat 09.11., 06:32): Bestellung aus einem Auftrag mit mehreren Positionen zeigt „aus Auftrag ⟨Notiz⟩ (n Positionen) → Bestellungen“. Die Zahl kommt aus zwei eigenen Live-Abfragen (type produktionsplan_bestellung bzw. produktionsplan_bestellung_sonstiges, datum in derselben Spanne, ohne Station) — die Abfrage der Station für die Rechnung bleibt unverändert, ihre Daten fließen nicht in die Rechnung; ein Fehler dort wird am Block angezeigt und sperrt nichts. „+ Bestellung“ schreibt auftragId (doc().id) und pos 0 mit; Feld „Menge (Bl.)“. Löschen an der Station löscht nur diese Position. Hilfetext. SESSION_2026-11-09_PRODUKTIONSPLANER_AUFTRAEGE_BAU.md -->
 <!-- 2026-11-08 · 17:58 · Planung gegen die Inventur (Produktionsplaner Schritt 3, Go Kontroll-Chat 08.11., 17:31): Bedarf über ./plan_pruefung.js BOS_PLAN_PRUEFUNG.ladeBedarf (wörtliche Kopie von einstellungenFuer + pruefeWochenbedarf, eine Stelle für Station und Prüfung; Vergleich alt/neu in vergleich_bedarf.js). Zählungen EINMAL je Seite über BOS_FROSTER.holeZaehlDokumente + zaehlungAusDokumenten (statt holeBestand je Produkt; Zufallsvergleich vergleich_zaehlung.js), an holeBestandMitProduktion weitergegeben. Neu an der Karte (4.4): „Gezählt ⟨Di 20:00⟩, da war die Vorbereitung für ⟨Gruppe⟩ noch nicht fertig. Ist die Ware für ⟨Tag⟩ schon raus, ist der Bestand zu hoch — bitte neu zählen oder Bestand von Hand eintragen.“ — nur Hinweis, keine Korrektur; nicht bei Bestand von Hand. Hilfetext „Bestand“ ein Satz. SESSION_2026-11-08_PRODUKTIONSPLANER_PRUEFUNG_INVENTUR_BAU.md -->
 <!-- 2026-11-08 · 17:05 · Nacharbeit Schritt 2 (Kontroll-Chat 08.11., 16:57): „Neu laden“ (Doppel-Prüfung) und „Laden“ (spät angekommene Einreichung) ersetzen nur noch den Planungsstand; Froster-Antwort, Fehlmenge und Bestand (auch von Hand) bleiben. Knopftext „… deine Planungsänderungen gehen verloren (Bestand und Fehlmenge bleiben)“. Vergleichsstand für den Ungespeichert-Schutz aus planungsAbdruck() wie frisch geöffnet (abdruckWieGeoeffnet): stehen gebliebene Fehlmenge oder Hand-Bestand gelten als nicht eingereicht. Hilfetext „Zwei planen gleichzeitig“ angepasst. SESSION_2026-11-08_PRODUKTIONSPLANER_LETZTER_STAND_BAU.md -->
 <!-- 2026-11-08 · 16:47 · Letzten Stand laden, Bestand mit Produktion seit der Zählung (Produktionsplaner Schritt 2, Go Kontroll-Chat 08.11., 16:07): Beim Öffnen wird die neueste Einreichung dieser Station für die Planungswoche übernommen (Backtage, Ziel, Hand-Werte, Sperren, gleichmäßig), umgerechnet über ./plan_laden.js auf das heutige „heute“; weggefallene Werte mit Hinweis an der Karte, Vergleichszeile „eingereicht: …“, Hinweis oben „Geladen: eingereicht von …“ mit „Leer neu anfangen“ (Rückfrage auf der Seite). Dieselbe Abfrage wie die Kennzeichen (jetzt mit Dokument-ID); solange sie nicht gelesen ist, Einreichen gesperrt (10 s, Grund sichtbar, „Nochmal versuchen“, spät angekommen → übernommen, wenn nichts geändert, sonst angeboten). Vor dem Einreichen Doppel-Prüfung über die Dokument-ID (neueste Einreichung type/station/woche, vom Server): andere neuere → „Neu laden — deine Änderungen seit dem Laden gehen verloren“ / „Trotzdem einreichen“; Abfrage scheitert → nicht eingereicht, Grund unter dem Knopf. Bestand = frische Zählung + froster_produktion seit der Zählung (BOS_FROSTER.holeBestandMitProduktion, Einheit über BOS_PRODUKTE.einheitGleich), Zeile „12 gezählt (Di 03:00) + 20 produziert seit der Zählung = 32“, andere/fehlende Einheit nicht eingerechnet mit Hinweis, Produktion nicht lesbar → Feld leer, Einreichen gesperrt; von Hand geändert → „von Hand eingetragen“. Einreichung je Produkt neu: gleichmaessig, bestandZaehlung, bestandProduktion, bestandVonHand. Hilfetext neu. SESSION_2026-11-08_PRODUKTIONSPLANER_LETZTER_STAND_BAU.md -->
@@ -238,6 +239,9 @@
   .bst-marke.neu { color:var(--bos-warn-bright); border:1px solid var(--bos-warn); background:var(--bos-warn-glow-soft); }
   .bst-marke.eingeplant { color:var(--bos-green); border:1px solid rgba(77,184,122,.5); }
   .bst-marke.aus { color:var(--bos-text-faint); border:1px solid var(--bos-border-strong); }
+  .bst-auftrag { margin-top:4px; font-size:.7rem; color:var(--bos-text-dim); }
+  .bst-auftrag a { color:inherit; font-weight:800; }
+  .bst-auftrag.fehler { color:var(--bos-warn-bright); }
   .bst-marke.zu { color:var(--bos-text-dim); border:1px solid var(--bos-border-strong); }
   .bst-btn { padding:4px 9px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:900; font-size:.68rem; cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
   .bst-btn.rot { border-color:var(--bos-red); color:var(--bos-red); }
@@ -462,6 +466,9 @@ var BEKANNTE_ID = null;    // Dokument-ID der Einreichung, auf der dieser Stand 
 var LEER_FRAGE = false;    // Rückfrage „Leer neu anfangen“ offen
 var DOPPEL = null;         // neuere fremde Einreichung aus der Doppel-Prüfung
 var SPAET_ANGEBOT = null;  // spät angekommene Einreichung, nicht übernommen, weil schon geändert
+// 09.11.2026 (Schritt 4): Positionen je Auftrag — NUR für die Anzeige „aus Auftrag … (n Positionen)“,
+// eigene Abfragen ohne Station, fließen nie in die Rechnung (DATEN/Kette nutzen BESTELLUNGEN).
+var AUFTRAG_POS = { bestellungen: [], sonstige: [], zahl: {}, fehler: null };
 var BST_FORM = {};              // bosId → { offen, tag, menge, notiz, fehler, laeuft }
 var BST_FRAGE = null;           // id der Bestellung mit offener Lösch-Rückfrage
 var BST_FEHLER = {};            // id → Fehlertext beim Löschen
@@ -729,6 +736,7 @@ window.addEventListener('load', async function() {
     // 08.11.2026: Bestellungen (live) und die eigenen Einreichungen für die Kennzeichen.
     // Beide fangen ihre Fehler selbst und zeigen sie an — kein Abbruch der Seite.
     ladeVorgaenge.push(starteBestellungen(db));
+    starteAuftragsZaehlung(db);   // 09.11.2026 (Schritt 4): wird nicht abgewartet, sperrt nichts
     ladeVorgaenge.push(ladeEinreichungenKZ(db));
     await Promise.all(ladeVorgaenge);
   } catch (e) {
@@ -890,6 +898,36 @@ function starteBestellungen(db) {
       BESTELL_STAND = { geladen: false, fehler: fehlerGrund(e) };
       einmal();
     }
+  });
+}
+// 09.11.2026 (Schritt 4): zwei zusätzliche Live-Abfragen nur für die Positionszahl der Aufträge.
+// Ändert sich eine Zahl, werden nur die Karten mit einer Bestellung dieses Auftrags neu gebaut.
+function starteAuftragsZaehlung(db) {
+  if (typeof BR.positionenJeAuftrag !== 'function') { AUFTRAG_POS.fehler = 'bestell_regeln.js ist alt geladen (ohne Aufträge) — App schließen und neu öffnen'; return; }
+  function neuZaehlen() {
+    var alt = AUFTRAG_POS.zahl;
+    AUFTRAG_POS.zahl = BR.positionenJeAuftrag(AUFTRAG_POS.bestellungen, AUFTRAG_POS.sonstige);
+    var geaendert = {};
+    BESTELLUNGEN.forEach(function (b) { if (b.auftragId && alt[b.auftragId] !== AUFTRAG_POS.zahl[b.auftragId]) geaendert[b.legacyKey] = true; });
+    PRODUKTE.forEach(function (p) { if (geaendert[p.legacyKey]) rebuildCard(p.bosId); });
+  }
+  function fehler(e) {
+    console.error('[Station] Positionen der Aufträge:', e);
+    var war = AUFTRAG_POS.fehler;
+    AUFTRAG_POS.fehler = fehlerGrund(e) + (e && e.code && String(e.message || '').indexOf(e.code) < 0 ? ' (' + e.code + ')' : '');
+    if (war !== AUFTRAG_POS.fehler) PRODUKTE.forEach(function (p) { if (BESTELLUNGEN.some(function (b) { return b.legacyKey === p.legacyKey && b.auftragId; })) rebuildCard(p.bosId); });
+  }
+  [['bestellungen', BR.TYP], ['sonstige', BR.TYP_SONSTIGES]].forEach(function (q) {
+    try {
+      db.collection('bos_events').where('type', '==', q[1]).where('datum', 'in', planungsSpanneStation())
+        .onSnapshot(function (snap) {
+          var l = [];
+          snap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; l.push(d); });
+          AUFTRAG_POS[q[0]] = l;
+          if (AUFTRAG_POS.fehler) { AUFTRAG_POS.fehler = null; PRODUKTE.forEach(function (p) { rebuildCard(p.bosId); }); }
+          neuZaehlen();
+        }, fehler);
+    } catch (e) { fehler(e); }
   });
 }
 // Eigene Einreichungen aus allen Wochen, die einen Tag der Spanne abdecken können
@@ -1752,10 +1790,15 @@ function baueBestellZeilen(bosId, eh) {
     if (kz === 'neu') marken.push(['neu', BR.KENNZEICHEN_TEXT.neu]);
     else if (kz === 'eingeplant') marken.push(['eingeplant', '✓ ' + BR.KENNZEICHEN_TEXT.eingeplant]);
     var idA = escText(b.id);
-    html += '<div class="bst-zeile" data-bestellung="' + idA + '"><div class="bst-haupt"><div class="bst-text"><b>' + escText(rd2(b.menge)) + ' ' + eh + '</b> · ' + escText(fmtTagKurz(b.datum))
-          + (b.notiz ? ' · ' + escText(b.notiz) : '') + ' · eingetragen' + (b.eingetragenVon ? ' von ' + escText(b.eingetragenVon) : '') + ' ' + escText(fmtWann(b.ts)) + '</div>'
+    // 09.11.2026 (Schritt 4): Teil eines Auftrags mit mehreren Positionen → Hinweis, Notiz steht dort
+    var nPos = b.auftragId ? AUFTRAG_POS.zahl[b.auftragId] : 0;
+    var imAuftrag = nPos > 1;
+    html += '<div class="bst-zeile" data-bestellung="' + idA + '"' + (b.auftragId ? ' data-auftrag="' + escText(b.auftragId) + '"' : '') + '><div class="bst-haupt"><div class="bst-text"><b>' + escText(rd2(b.menge)) + ' ' + eh + '</b> · ' + escText(fmtTagKurz(b.datum))
+          + (b.notiz && !imAuftrag ? ' · ' + escText(b.notiz) : '') + ' · eingetragen' + (b.eingetragenVon ? ' von ' + escText(b.eingetragenVon) : '') + ' ' + escText(fmtWann(b.ts)) + '</div>'
           + (BST_FRAGE === b.id ? '' : '<button class="bst-btn" onclick="bstFrage(\'' + idA + '\')">Löschen</button>') + '</div>'
           + marken.map(function (m) { return '<span class="bst-marke ' + m[0] + '">' + escText(m[1]) + '</span>'; }).join('');
+    if (imAuftrag) html += '<div class="bst-auftrag">aus Auftrag ' + (b.notiz ? '<b>' + escText(b.notiz) + '</b> ' : '') + '(' + nPos + ' Positionen) → <a href="bestellungen.html">Bestellungen</a></div>';
+    else if (b.auftragId && AUFTRAG_POS.fehler) html += '<div class="bst-auftrag fehler">⚠ Weitere Positionen des Auftrags nicht geladen: ' + escText(AUFTRAG_POS.fehler) + ' — die Rechnung ist davon nicht betroffen.</div>';
     if (BST_FRAGE === b.id) {
       html += '<div class="bst-frage">Wirklich löschen? <button class="bst-btn rot" ' + (BST_LAEUFT[b.id] ? 'disabled ' : '') + 'onclick="bstLoeschen(\'' + idA + '\')">Ja, löschen</button>'
             + '<button class="bst-btn" onclick="bstFrage(null)">Abbrechen</button></div>';
@@ -1775,7 +1818,7 @@ function baueBestellZeilen(bosId, eh) {
     }).join('');
     html += '<div class="bst-form">'
           + '<select data-bst-tag="' + bosId + '" onchange="bstFeld(\'' + bosId + '\', \'tag\', this.value)"><option value="">— Tag —</option>' + optionen + '</select>'
-          + '<input data-bst-menge="' + bosId + '" type="text" inputmode="decimal" placeholder="Menge ' + eh + '" value="' + escText(f.menge || '') + '" oninput="bstFeld(\'' + bosId + '\', \'menge\', this.value)">'
+          + '<input data-bst-menge="' + bosId + '" type="text" inputmode="decimal" placeholder="Menge (' + eh + ')" aria-label="Menge (' + eh + ')" value="' + escText(f.menge || '') + '" oninput="bstFeld(\'' + bosId + '\', \'menge\', this.value)">'
           + '<input class="bst-notiz" data-bst-notiz="' + bosId + '" type="text" maxlength="' + BR.NOTIZ_MAX + '" placeholder="Notiz (optional, z. B. Kunde)" value="' + escText(f.notiz || '') + '" oninput="bstFeld(\'' + bosId + '\', \'notiz\', this.value)">'
           + '<div class="bst-aktion"><button class="bst-btn haupt" ' + (f.laeuft ? 'disabled ' : '') + 'onclick="bstSpeichern(\'' + bosId + '\')">' + (f.laeuft ? 'Wird gespeichert …' : 'Speichern') + '</button>'
           + '<button class="bst-btn" onclick="bstFormZu(\'' + bosId + '\')">Abbrechen</button></div>'
@@ -1798,6 +1841,8 @@ async function bstSpeichern(bosId) {
   f.laeuft = true; f.fehler = null; rebuildCard(bosId);
   try {
     await (window.BOS_AUTH_READY || Promise.resolve());
+    // 09.11.2026 (Schritt 4): eigener Auftrag mit einer Position (auftragId aus doc().id, nichts geschrieben)
+    var auftragId = window.db.collection('bos_events').doc().id;
     await window.db.collection('bos_events').add({
       type: BR.TYP,
       station: STATION_CFG,
@@ -1806,6 +1851,8 @@ async function bstSpeichern(bosId) {
       datum: f.tag,
       menge: menge,
       notiz: BR.notizAusText(f.notiz),
+      auftragId: auftragId,
+      pos: 0,
       eingetragenVon: aktuellerProfilName(),
       ts: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -1855,7 +1902,7 @@ const PP_HILFE_SCHRITTE = [
   ['Der letzte Stand', 'Hat die Station diese Woche schon eingereicht, holt die Seite beim Öffnen den letzten eingereichten Stand zurück: Produktionstage, Ziel, deine eingetippten Werte, die Schlösser und "Gleichmäßige Belastung". Oben steht dann "Geladen: eingereicht von …" mit Tag und Uhrzeit. Tage, die inzwischen vorbei sind oder heute nicht mehr gehen, werden nicht übernommen — das steht dann an der Karte. Unter dem Produktnamen siehst du zum Vergleich, was eingereicht war ("eingereicht: Mi 46 · Fr 25"). Bestand, Fehlmenge und die Froster-Frage kommen nicht aus der alten Einreichung, die gelten jeden Tag neu. Willst du ganz von vorne planen, tippe oben "Leer neu anfangen" und bestätige — Bestand, Fehlmenge, Bestellungen und deine Froster-Antwort bleiben dabei stehen. Kann die Seite die letzten Einreichungen nicht lesen (kein Netz), steht oben der Grund mit "Nochmal versuchen", und Einreichen ist so lange gesperrt.'],
   ['Bestand', '"Bestand" ist, was gerade tatsächlich im Froster liegt: die letzte Froster-Zählung plus das, was seit der Zählung in der Froster-Produktion eingetragen wurde. Die Karte zeigt das dann so: "12 gezählt (Di 03:00) + 20 produziert seit der Zählung = 32". Was nicht in der Froster-Produktion eingetragen ist, kann die Seite nicht wissen — darum Produktion immer eintragen. Einträge in einer anderen Einheit als das Produkt werden nicht mitgezählt, das steht dann an der Karte. Die Zählung muss jünger als 24 Stunden sein. Ist sie älter, fehlt sie oder konnte sie (oder die Produktion) nicht gelesen werden, bleibt das Feld leer, die Karte zeigt "Bestand fehlt", und für dieses Produkt wird nichts gerechnet. Dann zählst du im Froster nach (am besten in der Froster-Inventur) oder trägst den Bestand von Hand ein. Von Hand heißt: so viel liegt jetzt im Froster — die Zahl ersetzt Zählung und Produktion, die Karte sagt "von Hand eingetragen". Steht an der Karte "Gezählt …, da war die Vorbereitung … noch nicht fertig", enthält die Zählung vielleicht noch Ware, die inzwischen für die Vorbereitung herausgenommen wurde: Dann neu zählen oder den Bestand von Hand eintragen. Solange bei einem Produkt der Bestand fehlt, kann die Station nicht einreichen — der Knopf unten sagt, welche Produkte fehlen. Es gehen nur Zahlen ab 0, ein Minus wird abgewiesen.'],
   ['Fehlmenge (nur bei "Froster fertig: Ja")', 'Hast du "Ja" gesagt, steht bei jedem Produkt eine farbig umrandete Zeile "⚠ Fehlt für (morgen)?". Dort trägst du ein, was für morgen fehlt — zum Beispiel weil beim Vorbereiten nicht genug da war, oder weil eine Bestellung für morgen nicht mit vorbereitet wurde. Die Menge wird in der Planung gleich am Anfang mitgerechnet, die Karte zeigt dann "+3 Bl. Fehlmenge eingerechnet". Bei "Nein" ist die Zeile weg und zählt nicht; was du eingetragen hattest, ist aber nicht verloren und kommt bei "Ja" wieder.'],
-  ['Bestellungen', 'Jede Karte hat einen Block "📋 Bestellungen". Mit "+ Bestellung" trägst du eine Bestellung ein: Tag (morgen bis zum letzten möglichen Zieltag), Menge und auf Wunsch eine kurze Notiz, z. B. den Kunden. Sie wird sofort gespeichert und ist für alle Kollegen da, auch beim nächsten Öffnen. Die Bestellung wird an ihrem Tag mitgerechnet, die Planung sorgt also dafür, dass sie bis dahin da ist. Liegt sie nach deinem Zieltag (oder heute), steht "liegt außerhalb der Planung, nicht eingerechnet" dabei — sie kommt dann in eine spätere Planung. Bei "Froster fertig: Ja" zählt eine Bestellung für morgen nicht noch einmal: Sie ist vorbereitet, oder sie gehört ins Fehlmenge-Feld. Auch an geschlossenen Tagen zählt eine Bestellung, dann steht ein Hinweis dabei. "Neu seit Einreichung — noch nicht eingeplant" heißt: Die Station hat schon eingereicht, und diese Bestellung steckt noch nicht drin — dann nochmal einreichen. Löschen geht über "Löschen" und eine Rückfrage. "Alle Bestellungen →" öffnet die Liste aller Stationen.'],
+  ['Bestellungen', 'Jede Karte hat einen Block "📋 Bestellungen". Mit "+ Bestellung" trägst du eine Bestellung ein: Tag (morgen bis zum letzten möglichen Zieltag), Menge und auf Wunsch eine kurze Notiz, z. B. den Kunden. Sie wird sofort gespeichert und ist für alle Kollegen da, auch beim nächsten Öffnen. Die Bestellung wird an ihrem Tag mitgerechnet, die Planung sorgt also dafür, dass sie bis dahin da ist. Liegt sie nach deinem Zieltag (oder heute), steht "liegt außerhalb der Planung, nicht eingerechnet" dabei — sie kommt dann in eine spätere Planung. Bei "Froster fertig: Ja" zählt eine Bestellung für morgen nicht noch einmal: Sie ist vorbereitet, oder sie gehört ins Fehlmenge-Feld. Auch an geschlossenen Tagen zählt eine Bestellung, dann steht ein Hinweis dabei. "Neu seit Einreichung — noch nicht eingeplant" heißt: Die Station hat schon eingereicht, und diese Bestellung steckt noch nicht drin — dann nochmal einreichen. Löschen geht über "Löschen" und eine Rückfrage. "Alle Bestellungen →" öffnet die Liste aller Stationen. Gehört eine Bestellung zu einem Auftrag mit mehreren Positionen (eingetragen auf der Seite Bestellungen, z. B. 30 Bl. hier und eine Torte als „Sonstiges“), steht darunter "aus Auftrag Kunde Meyer (3 Positionen)". Hier wird nur diese eine Position gerechnet und gelöscht; den ganzen Auftrag siehst und änderst du auf der Seite Bestellungen.'],
   ['Schritt 1: Produktionstage wählen', 'Oben unter "Produktionstage" wählst du, an welchen Tagen der kommenden Planungswoche produziert wird. Bereits vergangene Tage sind grau und nicht wählbar, geschlossene Tage ebenso.'],
   ['Schritt 2: Ziel setzen', 'Darunter unter "Bis wann reicht der Bestand?" wählst du dein Zieldatum in der Woche danach — der Tag, für den die ganze Rechnung aufgeht. Je weiter er entfernt ist, desto mehr muss vorher produziert werden.'],
   ['Vorschlag lesen', 'Die große Zahl ist automatisch berechnet und direkt editierbar — antippen und Wert ändern reicht. Darunter steht "min X" mit der Einheit des Produkts (z. B. Bl., Dl., Stk.) — das ist die Mindestmenge, die für die Kette bis zum nächsten Produktionstag oder Ziel nötig ist. Wird sie unterschritten, färbt sich die Karte rot.'],

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- 2026-11-09 · 07:09 · v2.0 · Aufträge (Produktionsplaner Schritt 4, Go Kontroll-Chat 09.11., 06:32; Ulf 08.11., 17:26/17:28): Ein Auftrag = Tag + Notiz/Kunde + eine oder mehrere Positionen; Position = Stationsprodukt mit Menge (Einheit am Feld: „Menge (Bl.)“) oder „Sonstiges“ mit freiem Text (≤ 60, eigener Typ produktionsplan_bestellung_sonstiges, rechnet nirgends mit). Alle Positionen in EINEM Firestore-Batch (alles oder nichts), gemeinsame auftragId (doc().id), Tag und Notiz an jeder Position. Liste je Auftrag ein Block „Kunde · Tag“ mit Positionen und Kennzeichen; Löschen ganzer Auftrag (Batch, Rückfrage auf der Seite) oder einzelne Position; „+ Position“ an Aufträgen ab morgen (nicht an alten ohne auftragId — die werden nicht umgeschrieben). Filter: Auftrag erscheint, wenn eine Position passt. Alte Bestellungen ohne auftragId = Auftrag mit einer Position. Regeln in ./bestell_regeln.js (auftraege, auftragPasst). Erste Positionszeile behält neu-produkt/neu-menge. Hilfetext. SESSION_2026-11-09_PRODUKTIONSPLANER_AUFTRAEGE_BAU.md -->
 <!-- 2026-11-08 · 15:38 · v1.0 · Feature — Erstfassung (Produktionsplaner Schritt 1, Go Kontroll-Chat 08.11., 14:45, Freigabe §3; Ulf 08.11., 14:42/14:44: „eine eigene Seite … wo wir sauber alle Bestellungen in einer Liste vor uns sehen? Und auch hinzufügen und ggf wieder löschen können?“). Alle Bestellungen (bos_events, type produktionsplan_bestellung) in einer Liste, nach Tag sortiert, Filter Station und Produkt; je Zeile Tag, Station, Produkt, Menge mit Einheit, Notiz, wer, wann, Kennzeichen (bestell_regeln.js: eingeplant · neu seit Einreichung — noch nicht eingeplant · ohne = kommt in eine spätere Planung), Löschen mit Rückfrage auf der Seite. Eintragen mit Tag frei ab morgen (keine Grenze nach vorne). Vergangene eingeklappt, nichts gelöscht. Zeilen „Bestellung gelöscht, steckt noch in der eingereichten Planung von …“. Alte Nachträge (produktionsplan_nachtrag) nur lesen. Abfrage nur type == … (kein Index), Rest im Gerät; Einreichungen der Wochen aus wochenFuerTage(). Fehler sichtbar mit Grund, Zeitlimit beim Speichern. SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md -->
 <head>
 <meta charset="UTF-8">
@@ -66,6 +67,19 @@
   .bst-marke.spaeter, .bst-marke.vergangen, .bst-marke.alt { color:var(--bos-text-faint); border:1px solid var(--bos-border-strong); }
   .bst-marke.geloescht { color:var(--bos-red); border:1px solid var(--bos-red); }
   .bst-btn { padding:5px 10px; border-radius:8px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text-dim); font-family:var(--bos-font-label); font-weight:900; font-size:0.7rem; cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+  /* 09.11.2026 (Schritt 4): Aufträge */
+  .pos-zeile { display:grid; grid-template-columns:1fr 34% 34px; gap:6px; align-items:end; margin-bottom:6px; }
+  .pos-zeile .feld-label { margin-top:0; }
+  .pos-weg { height:38px; border-radius:10px; border:1.5px solid var(--bos-border-strong); background:var(--bos-surface-raised); color:var(--bos-text-dim); font-weight:900; cursor:pointer; }
+  .auftrag { border:1.5px solid var(--bos-border-strong); border-radius:14px; padding:8px 8px 4px; margin-bottom:8px; }
+  .auftrag-kopf { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--bos-font-label); font-weight:900; font-size:0.85rem; color:var(--bos-text); margin:0 2px 6px; }
+  .auftrag-titel { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .auftrag-zahl { font-size:0.7rem; color:var(--bos-text-dim); }
+  .auftrag .bst-zeile { margin-bottom:4px; }
+  .bst-zeile.sonst { border-style:dashed; }
+  .bst-marke.sonstiges { color:var(--bos-amber); border:1px solid var(--bos-amber); }
+  .pos-neu { display:grid; grid-template-columns:1fr 34%; gap:6px; margin:4px 0 6px; }
+  .pos-neu .bst-aktion { grid-column:1 / -1; display:flex; gap:6px; }
   .bst-btn.rot { border-color:var(--bos-red); color:var(--bos-red); }
   .bst-btn:disabled { opacity:.5; cursor:not-allowed; }
   .bst-frage { display:flex; align-items:center; gap:6px; margin-top:6px; color:var(--bos-red); font-weight:800; flex-wrap:wrap; }
@@ -117,23 +131,19 @@
   <div class="karte" id="eintragen">
     <div class="karte-titel">📋 Bestellung eintragen</div>
     <div class="feld-raster">
-      <div class="ganz">
-        <label class="feld-label" for="neu-produkt">Produkt</label>
-        <select class="feld" id="neu-produkt" onchange="formGeaendert()"><option value="">— Produkt wählen —</option></select>
-      </div>
       <div>
         <label class="feld-label" for="neu-tag">Tag (ab morgen)</label>
         <input class="feld" id="neu-tag" type="date" onchange="formGeaendert()">
       </div>
       <div>
-        <label class="feld-label" for="neu-menge">Menge</label>
-        <input class="feld zahl" id="neu-menge" type="text" inputmode="decimal" placeholder="z. B. 5" oninput="formGeaendert()">
-      </div>
-      <div class="ganz">
-        <label class="feld-label" for="neu-notiz">Notiz (optional)</label>
-        <input class="feld" id="neu-notiz" type="text" placeholder="z. B. Kunde" oninput="formGeaendert()">
+        <label class="feld-label" for="neu-notiz">Notiz / Kunde (optional)</label>
+        <input class="feld" id="neu-notiz" type="text" placeholder="z. B. Kunde Meyer" oninput="formGeaendert()">
       </div>
     </div>
+    <!-- 09.11.2026 (Schritt 4): Positionen — Stationsprodukt mit Menge oder „Sonstiges“ mit Text -->
+    <div class="feld-label" style="margin-top:10px;">Positionen</div>
+    <div id="positionen"></div>
+    <button class="bst-btn" id="btn-position" onclick="positionDazu()">+ Position</button>
     <button class="btn-haupt" id="btn-eintragen" onclick="bestellungEintragen()">Eintragen</button>
     <div class="meldung" id="eintragen-meldung"></div>
   </div>
@@ -183,6 +193,9 @@ var I18N_DE = {
   keineVergangenen: 'Keine vergangenen Bestellungen.',
   keineNachtraege: 'Keine alten Nachträge.',
   produktWaehlen: 'Bitte ein Produkt wählen.',
+  textFehlt: 'Bitte den Text für „Sonstiges“ eintragen.',
+  sonstFehler: '⚠ Sonstige Bestellungen nicht geladen: ',
+  auftragFrage: function (n) { return 'Auftrag mit ' + n + ' Positionen löschen?'; },
   tagWaehlen: function (m) { return 'Bitte einen Tag ab morgen (' + m + ') wählen.'; },
   mengeFehlt: 'Bitte eine Menge größer 0 eintragen.',
   speichert: 'Wird gespeichert …',
@@ -213,6 +226,14 @@ var heute = new Date(); heute.setHours(0, 0, 0, 0);
 var WT_KURZ_JS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
 var BESTELLUNGEN = [];          // alle Bestellungen (mit id)
+// 09.11.2026 (Schritt 4): sonstige Positionen (eigener Typ), Formular, Auftrags-Aktionen
+var SONSTIGE = [], SONST_FEHLER = null, SONST_GELADEN = false;
+var FORM_POS = [{ wahl: '', menge: '', text: '' }];
+var PRODUKT_OPTIONEN = '';      // <optgroup>… der laufenden Stationsprodukte
+var PRODUKT_WAHL = {};          // legacyKey → { station, name }
+var AFRAGE = null, ALAEUFT = {}, AFEHLER = {};
+var APOS = null;                // „+ Position“ an einem Auftrag: { key, wahl, menge, text, laeuft, fehler }
+var SONST = '__sonstiges';
 var BESTELL_FEHLER = null;
 var BESTELL_GELADEN = false;
 var EINREICHUNGEN = [];         // neueste je Station und Woche, aus den Wochen, die die Tage abdecken können
@@ -272,7 +293,12 @@ window.addEventListener('unhandledrejection', function (e) { var r = e && e.reas
   if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef, { laeuft: function () { return speichernLaeuft; } }); return; }
   window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
 })(function () {
-  return ['neu-produkt', 'neu-tag', 'neu-menge', 'neu-notiz'].some(function (id) { var el = document.getElementById(id); return el && String(el.value || '').trim() !== ''; });
+  // 09.11.2026 (Schritt 4): alle Positionszeilen und ein offenes „+ Position“
+  formLesen();
+  var kopf = ['neu-tag', 'neu-notiz'].some(function (id) { var el = document.getElementById(id); return el && String(el.value || '').trim() !== ''; });
+  var pos = FORM_POS.some(function (z) { return z.wahl || String(z.menge).trim() || String(z.text).trim(); });
+  var apos = !!(APOS && (APOS.wahl || String(APOS.menge || '').trim() || String(APOS.text || '').trim()));
+  return kopf || pos || apos;
 });
 function formGeaendert() { var m = document.getElementById('eintragen-meldung'); if (m.className.indexOf('ok') >= 0) { m.textContent = ''; m.className = 'meldung'; } }
 
@@ -284,17 +310,19 @@ async function ladeProdukte() {
     var aktive = (await window.BOS_PRODUKTE.lade({ sicht: 'aktive' })).liste;
     aktive.forEach(function (p) { if (p && p.legacyKey) PRODUKT_JE_KEY[p.legacyKey] = p; });
     var laufend = (await window.BOS_PRODUKTE.lade({ sicht: 'laufend' })).liste.filter(function (p) { return p.nfcSeite === true && p.legacyKey; });
-    var sel = document.getElementById('neu-produkt');
+    // 09.11.2026 (Schritt 4): dieselben Optionen für jede Positionszeile
+    var html = '';
     STATIONEN.forEach(function (s) {
       var hier = laufend.filter(function (p) { return p.station === s.station; });
       if (!hier.length) return;
-      var g = document.createElement('optgroup'); g.label = s.icon + ' ' + s.station;
+      html += '<optgroup label="' + esc(s.icon + ' ' + s.station) + '">';
       hier.forEach(function (p) {
-        var o = document.createElement('option'); o.value = p.legacyKey; o.textContent = p.name;
-        o.dataset.station = s.station; o.dataset.name = p.name; g.appendChild(o);
+        PRODUKT_WAHL[p.legacyKey] = { station: s.station, name: p.name };
+        html += '<option value="' + esc(p.legacyKey) + '">' + esc(p.name) + '</option>';
       });
-      sel.appendChild(g);
+      html += '</optgroup>';
     });
+    formLesen(); PRODUKT_OPTIONEN = html; renderPositionen();
     PRODUKT_FEHLER = null;
   } catch (e) {
     console.error('[Bestellungen] Produktliste:', e);
@@ -328,6 +356,22 @@ function starteBestellungen() {
     setStatus('error', t('ladeFehler') + BESTELL_FEHLER);
     renderListe();
   }
+}
+// 09.11.2026 (Schritt 4): sonstige Positionen, eigener Typ, nur type ==
+function starteSonstige() {
+  if (typeof BR.TYP_SONSTIGES !== 'string') { SONST_FEHLER = 'bestell_regeln.js ist alt geladen (ohne Aufträge) — App schließen und neu öffnen'; renderHinweise(); return; }
+  try {
+    window.db.collection('bos_events').where('type', '==', BR.TYP_SONSTIGES).onSnapshot(function (snap) {
+      var l = [];
+      snap.forEach(function (doc) { var d = doc.data(); d.id = doc.id; l.push(d); });
+      SONSTIGE = l; SONST_FEHLER = null; SONST_GELADEN = true;
+      renderHinweise(); renderListe();
+    }, function (e) {
+      console.error('[Bestellungen] Sonstige:', e);
+      SONST_FEHLER = fehlerText(e) + fehlerRat(e);
+      renderHinweise(); renderListe();
+    });
+  } catch (e) { SONST_FEHLER = fehlerText(e); renderHinweise(); }
 }
 // Einreichungen aller Wochen, die einen kommenden Tag abdecken können (inkl. heute).
 function noetigeWochen() {
@@ -370,6 +414,7 @@ function ladeNachtraege() {
 function renderHinweise() {
   var t2 = [];
   if (PRODUKT_FEHLER) t2.push('<div class="seiten-hinweis">' + esc(t('produktFehler')) + mitLink(PRODUKT_FEHLER) + '</div>');
+  if (SONST_FEHLER) t2.push('<div class="seiten-hinweis" id="hinweis-sonstige">' + esc(t('sonstFehler')) + mitLink(SONST_FEHLER) + '</div>');
   if (EINR_FEHLER) t2.push('<div class="seiten-hinweis" id="hinweis-einreichungen">' + esc(t('kennzeichenFehler')) + mitLink(EINR_FEHLER) + '</div>');
   if (NACHTRAG_FEHLER) t2.push('<div class="seiten-hinweis">' + esc(t('nachtragFehler')) + mitLink(NACHTRAG_FEHLER) + '</div>');
   if (SEITEN_FEHLER) t2.push('<div class="seiten-hinweis">' + esc(t('unerwartet') + SEITEN_FEHLER) + ' — Seite neu laden. Hilft das nicht: Ulf Bescheid sagen.</div>');
@@ -392,7 +437,7 @@ function passtFilter(st, lk) {
   var fs = document.getElementById('filter-station').value, fp = document.getElementById('filter-produkt').value;
   return (!fs || st === fs) && (!fp || lk === fp);
 }
-function zeileHtml(b, mitKennzeichen) {
+function zeileHtml(b, mitKennzeichen, imAuftrag) {
   var marken = [];
   var kz = mitKennzeichen ? BR.kennzeichen(b, EINREICHUNGEN) : null;
   if (!mitKennzeichen) marken.push(['vergangen', t('vergangen')]);
@@ -400,35 +445,84 @@ function zeileHtml(b, mitKennzeichen) {
   else if (kz === 'eingeplant') marken.push(['eingeplant', '✓ ' + BR.KENNZEICHEN_TEXT.eingeplant]);
   else marken.push(['spaeter', t('spaeter')]);
   var id = esc(b.id);
-  var h = '<div class="bst-zeile' + (kz === 'neu' ? ' neu' : '') + '" data-bestellung="' + id + '" data-kennzeichen="' + (kz || 'vergangen') + '">'
+  var h = '<div class="bst-zeile' + (kz === 'neu' ? ' neu' : '') + '" data-bestellung="' + id + '" data-position="' + id + '" data-kennzeichen="' + (kz || 'vergangen') + '">'
         + '<div class="bst-haupt"><div class="bst-text">' + stationIcon(b.station) + ' ' + esc(b.station) + ' · <b>' + esc(b.produktName || b.legacyKey) + '</b> · <b>' + zahl(b.menge) + ' ' + esc(einheitKurz(b.legacyKey)) + '</b>'
-        + (b.notiz ? ' · ' + esc(b.notiz) : '') + '<br>eingetragen' + (b.eingetragenVon ? ' von ' + esc(b.eingetragenVon) : '') + ' ' + esc(fmtWann(b.ts)) + '</div>'
+        + (b.notiz && !imAuftrag ? ' · ' + esc(b.notiz) : '') + '<br>eingetragen' + (b.eingetragenVon ? ' von ' + esc(b.eingetragenVon) : '') + ' ' + esc(fmtWann(b.ts)) + '</div>'
         + (FRAGE === b.id ? '' : '<button class="bst-btn" onclick="frage(\'' + id + '\')">' + esc(t('loeschen')) + '</button>') + '</div>'
         + marken.map(function (m) { return '<span class="bst-marke ' + m[0] + '">' + esc(m[1]) + '</span>'; }).join('');
   if (FRAGE === b.id) h += '<div class="bst-frage">' + esc(t('wirklich')) + ' <button class="bst-btn rot" ' + (LAEUFT[b.id] ? 'disabled ' : '') + 'onclick="loeschen(\'' + id + '\')">' + esc(t('jaLoeschen')) + '</button><button class="bst-btn" onclick="frage(null)">' + esc(t('abbrechen')) + '</button></div>';
   if (FEHLER[b.id]) h += '<div class="bst-fehler">⚠ ' + esc(t('loeschenFehler') + FEHLER[b.id]) + '</div>';
   return h + '</div>';
 }
-function nachTagen(liste, mitKennzeichen) {
+// 09.11.2026 (Schritt 4): sonstige Position (freier Text, keine Menge, kein Kennzeichen)
+function sonstigesHtml(p) {
+  var id = esc(p.id);
+  var h = '<div class="bst-zeile sonst" data-sonstiges="' + id + '" data-position="' + id + '"><div class="bst-haupt"><div class="bst-text">✎ <b>' + esc(p.text) + '</b>'
+        + '<br>eingetragen' + (p.eingetragenVon ? ' von ' + esc(p.eingetragenVon) : '') + ' ' + esc(fmtWann(p.ts)) + '</div>'
+        + (FRAGE === p.id ? '' : '<button class="bst-btn" onclick="frage(\'' + id + '\')">' + esc(t('loeschen')) + '</button>') + '</div>'
+        + '<span class="bst-marke sonstiges">Sonstiges</span>';
+  if (FRAGE === p.id) h += '<div class="bst-frage">' + esc(t('wirklich')) + ' <button class="bst-btn rot" ' + (LAEUFT[p.id] ? 'disabled ' : '') + 'onclick="loeschen(\'' + id + '\')">' + esc(t('jaLoeschen')) + '</button><button class="bst-btn" onclick="frage(null)">' + esc(t('abbrechen')) + '</button></div>';
+  if (FEHLER[p.id]) h += '<div class="bst-fehler">⚠ ' + esc(t('loeschenFehler') + FEHLER[p.id]) + '</div>';
+  return h + '</div>';
+}
+function posWahlHtml(id, wahl, aenderung) {
+  return '<select class="feld" id="' + id + '" onchange="' + aenderung + '"><option value="">— Produkt wählen —</option>' + PRODUKT_OPTIONEN
+    .replace('value="' + esc(wahl) + '"', 'value="' + esc(wahl) + '" selected') + '<option value="' + SONST + '"' + (wahl === SONST ? ' selected' : '') + '>✎ Sonstiges (freier Text)</option></select>';
+}
+function mengeLabel(wahl) { return wahl && wahl !== SONST ? 'Menge (' + einheitKurz(wahl) + ')' : 'Menge'; }
+function auftragHtml(a, mitKennzeichen) {
+  var key = esc(a.schluessel), n = a.positionen.length;
+  var kopf = (a.notiz ? esc(a.notiz) : (n === 1 ? 'Bestellung' : 'Auftrag')) + ' · ' + esc(fmtTag(a.datum));
+  var h = '<div class="auftrag" data-auftrag="' + key + '" data-positionen="' + n + '"><div class="auftrag-kopf"><span class="auftrag-titel">' + kopf + '</span>'
+        + (n > 1 ? '<span class="auftrag-zahl">' + n + ' Positionen</span>' : '')
+        + (n > 1 && AFRAGE !== a.schluessel ? '<button class="bst-btn" data-auftrag-loeschen="' + key + '" onclick="auftragFrage(\'' + key + '\')">Auftrag löschen</button>' : '') + '</div>';
+  if (AFRAGE === a.schluessel) h += '<div class="bst-frage" data-auftrag-frage="' + key + '">' + esc(t('auftragFrage', n)) + ' <button class="bst-btn rot" ' + (ALAEUFT[a.schluessel] ? 'disabled ' : '') + 'onclick="auftragLoeschen(\'' + key + '\')">' + esc(t('jaLoeschen')) + '</button><button class="bst-btn" onclick="auftragFrage(null)">' + esc(t('abbrechen')) + '</button></div>';
+  if (AFEHLER[a.schluessel]) h += '<div class="bst-fehler">⚠ ' + esc(t('loeschenFehler') + AFEHLER[a.schluessel]) + '</div>';
+  a.positionen.forEach(function (p) { h += p.art === 'sonstiges' ? sonstigesHtml(p) : zeileHtml(p, mitKennzeichen, true); });
+  // „+ Position“: nur Aufträge mit auftragId und Tag ab morgen (alte werden nicht umgeschrieben)
+  if (mitKennzeichen && a.auftragId && a.datum >= morgenIso()) {
+    if (APOS && APOS.key === a.schluessel) {
+      var w = APOS.wahl;
+      h += '<div class="pos-neu" data-pos-neu="' + key + '">' + posWahlHtml('apos-wahl', w, 'aposFeld(\'wahl\', this.value); renderListe()')
+         + (w === SONST
+            ? '<input class="feld" id="apos-text" maxlength="' + BR.TEXT_MAX + '" placeholder="Text, z. B. Hochzeitstorte" value="' + esc(APOS.text) + '" oninput="aposFeld(\'text\', this.value)">'
+            : '<input class="feld zahl" id="apos-menge" inputmode="decimal" aria-label="' + esc(mengeLabel(w)) + '" placeholder="' + esc(mengeLabel(w)) + '" value="' + esc(APOS.menge) + '" oninput="aposFeld(\'menge\', this.value)">')
+         + '<div class="bst-aktion"><button class="bst-btn haupt" ' + (APOS.laeuft ? 'disabled ' : '') + 'onclick="positionNachtragen()">' + (APOS.laeuft ? esc(t('speichert')) : 'Position speichern') + '</button><button class="bst-btn" onclick="aposZu()">' + esc(t('abbrechen')) + '</button></div>'
+         + (APOS.fehler ? '<div class="bst-fehler" style="grid-column:1 / -1;">⚠ ' + esc(APOS.fehler) + '</div>' : '') + '</div>';
+    } else {
+      h += '<button class="bst-btn" data-position-dazu="' + key + '" onclick="aposAuf(\'' + key + '\')">+ Position</button>';
+    }
+  }
+  return h + '</div>';
+}
+function nachTagen(liste, mitKennzeichen) {   // liste = Aufträge (09.11.2026)
   var h = '', letzter = null;
-  liste.forEach(function (b) {
-    if (b.datum !== letzter) { h += '<div class="tag-kopf">' + esc(fmtTagLang(b.datum)) + '</div>'; letzter = b.datum; }
-    h += zeileHtml(b, mitKennzeichen);
+  liste.forEach(function (a) {
+    if (a.datum !== letzter) { h += '<div class="tag-kopf">' + esc(fmtTagLang(a.datum)) + '</div>'; letzter = a.datum; }
+    h += auftragHtml(a, mitKennzeichen);
   });
   return h;
 }
+function zahlPositionen(liste) { return liste.reduce(function (n, a) { return n + a.positionen.length; }, 0); }
 function renderListe() {
   var kommend = document.getElementById('liste-kommend');
   if (!BR) return;
+  if (typeof BR.auftraege !== 'function') {   // 09.11.2026 (Schritt 4): alte bestell_regeln.js im Zwischenspeicher
+    kommend.innerHTML = '<div class="seiten-hinweis">⚠ bestell_regeln.js ist alt geladen (ohne Aufträge) — App schließen und neu öffnen.</div>';
+    return;
+  }
   if (BESTELL_FEHLER) {
     kommend.innerHTML = '<div class="seiten-hinweis">' + esc(t('ladeFehler')) + mitLink(BESTELL_FEHLER) + '</div>';
   } else if (BESTELL_GELADEN) {
     var hi = heuteIso();
-    var k = BESTELLUNGEN.filter(function (b) { return b.datum >= hi && passtFilter(b.station, b.legacyKey); });
-    var v = BESTELLUNGEN.filter(function (b) { return b.datum < hi && passtFilter(b.station, b.legacyKey); }).reverse();
-    document.getElementById('titel-kommend').textContent = 'Kommende Bestellungen (' + k.length + ')';
+    // 09.11.2026 (Schritt 4): nach Aufträgen; ein Auftrag erscheint, wenn eine Position passt
+    var fs = document.getElementById('filter-station').value, fp = document.getElementById('filter-produkt').value;
+    var alle = BR.auftraege(BESTELLUNGEN, SONSTIGE);
+    var k = alle.filter(function (a) { return a.datum >= hi && BR.auftragPasst(a, fs, fp); });
+    var v = alle.filter(function (a) { return a.datum < hi && BR.auftragPasst(a, fs, fp); }).reverse();
+    document.getElementById('titel-kommend').textContent = 'Kommende Bestellungen (' + zahlPositionen(k) + ')';
     kommend.innerHTML = k.length ? nachTagen(k, true) : '<div class="leer">' + esc(t('keineKommenden')) + '</div>';
-    document.getElementById('titel-vergangen').textContent = 'vergangene Bestellungen (' + v.length + ')';
+    document.getElementById('titel-vergangen').textContent = 'vergangene Bestellungen (' + zahlPositionen(v) + ')';
     document.getElementById('liste-vergangen').innerHTML = v.length ? nachTagen(v, false) : '<div class="leer">' + esc(t('keineVergangenen')) + '</div>';
     // Gelöscht nach Einreichung: ID in einer Einreichung, Dokument fehlt (Tage ab heute)
     var ids = {}; BESTELLUNGEN.forEach(function (b) { ids[b.id] = true; });
@@ -453,35 +547,104 @@ function mitZeitlimit(versprechen, ms) {
     versprechen.then(function (x) { clearTimeout(z); ok(x); }, function (e) { clearTimeout(z); nein(e); });
   });
 }
+// ── POSITIONEN IM FORMULAR (09.11.2026, Schritt 4) ─────────────────
+// Erste Zeile: neu-produkt / neu-menge / neu-text (wie bisher), weitere mit -1, -2 …
+function posId(basis, i) { return i === 0 ? basis : basis + '-' + i; }
+function formLesen() {
+  var box = document.getElementById('positionen');
+  if (!box || !box.children.length) return;
+  FORM_POS = FORM_POS.map(function (z, i) {
+    var w = document.getElementById(posId('neu-produkt', i)), m = document.getElementById(posId('neu-menge', i)), x = document.getElementById(posId('neu-text', i));
+    return { wahl: w ? w.value : z.wahl, menge: m ? m.value : z.menge, text: x ? x.value : z.text };
+  });
+}
+function renderPositionen() {
+  var box = document.getElementById('positionen'); if (!box) return;
+  box.innerHTML = FORM_POS.map(function (z, i) {
+    var sonst = z.wahl === SONST;
+    return '<div class="pos-zeile" data-pos="' + i + '"><div><label class="feld-label" for="' + posId('neu-produkt', i) + '">' + (FORM_POS.length > 1 ? 'Position ' + (i + 1) : 'Produkt') + '</label>'
+      + posWahlHtml(posId('neu-produkt', i), z.wahl, 'posWahl(' + i + ')') + '</div>'
+      + '<div><label class="feld-label" id="' + posId('neu-menge-label', i) + '" for="' + posId(sonst ? 'neu-text' : 'neu-menge', i) + '">' + (sonst ? 'Text' : esc(mengeLabel(z.wahl))) + '</label>'
+      + '<input class="feld zahl" id="' + posId('neu-menge', i) + '" type="text" inputmode="decimal" placeholder="' + esc(z.wahl && !sonst ? 'z. B. 5 ' + einheitKurz(z.wahl) : 'z. B. 5') + '" value="' + esc(z.menge) + '" oninput="formGeaendert()"' + (sonst ? ' style="display:none"' : '') + '>'
+      + '<input class="feld" id="' + posId('neu-text', i) + '" type="text" maxlength="' + BR.TEXT_MAX + '" placeholder="z. B. Hochzeitstorte" value="' + esc(z.text) + '" oninput="formGeaendert()"' + (sonst ? '' : ' style="display:none"') + '></div>'
+      + '<button class="pos-weg" data-pos-weg="' + i + '" onclick="positionWeg(' + i + ')" aria-label="Position entfernen">✕</button></div>';
+  }).join('');
+}
+function posWahl(i) { formLesen(); formGeaendert(); renderPositionen(); }
+function positionDazu() { formLesen(); FORM_POS.push({ wahl: '', menge: '', text: '' }); renderPositionen(); }
+function positionWeg(i) {
+  formLesen();
+  if (FORM_POS.length > 1) FORM_POS.splice(i, 1); else FORM_POS = [{ wahl: '', menge: '', text: '' }];
+  renderPositionen(); formGeaendert();
+}
+
+// ── EINTRAGEN ────────────────────────────────────────────────────────
+function mitZeitlimit(versprechen, ms) {
+  return new Promise(function (ok, nein) {
+    var z = setTimeout(function () { var e = new Error(t('zeitlimit')); e.code = 'zeitlimit'; nein(e); }, ms);
+    versprechen.then(function (x) { clearTimeout(z); ok(x); }, function (e) { clearTimeout(z); nein(e); });
+  });
+}
+// Eine Position aus Wahl/Menge/Text — { daten } oder { fehler }.
+function positionAus(z) {
+  if (z.wahl === SONST) {
+    var text = BR.textAusText(z.text);
+    return text ? { daten: { type: BR.TYP_SONSTIGES, text: text } } : { fehler: t('textFehlt') };
+  }
+  var info = PRODUKT_WAHL[z.wahl];
+  if (!z.wahl || !info) return { fehler: t('produktWaehlen') };
+  var menge = BR.mengeAusText(z.menge);
+  if (menge === null) return { fehler: t('mengeFehlt') };
+  return { daten: { type: BR.TYP, station: info.station, legacyKey: z.wahl, produktName: info.name, menge: menge } };
+}
+// 09.11.2026 (Schritt 4): alle Positionen eines Auftrags in EINEM Batch — alles oder nichts.
+function schreibePositionen(liste, auftragId, startPos, tag, notiz) {
+  var col = window.db.collection('bos_events');
+  var batch = window.db.batch();
+  var wer = aktuellerProfilName();
+  liste.forEach(function (d, i) {
+    var doc = { type: d.type };
+    if (d.type === BR.TYP) { doc.station = d.station; doc.legacyKey = d.legacyKey; doc.produktName = d.produktName; doc.menge = d.menge; }
+    else doc.text = d.text;
+    doc.datum = tag; doc.notiz = notiz; doc.auftragId = auftragId; doc.pos = startPos + i;
+    doc.eingetragenVon = wer; doc.ts = firebase.firestore.FieldValue.serverTimestamp();
+    batch.set(col.doc(), doc);
+  });
+  return batch.commit();
+}
 async function bestellungEintragen() {
   if (speichernLaeuft) return;
-  var sel = document.getElementById('neu-produkt'), opt = sel.options[sel.selectedIndex];
+  formLesen();
   var tag = document.getElementById('neu-tag').value;
-  var menge = BR.mengeAusText(document.getElementById('neu-menge').value);
   var notiz = BR.notizAusText(document.getElementById('neu-notiz').value);
   var m = document.getElementById('eintragen-meldung');
   function melde(text, art) { m.textContent = text; m.className = 'meldung ' + art; }
-  if (!sel.value || !opt || !opt.dataset.station) return melde(t('produktWaehlen'), 'fehler');
+  var belegt = [];
+  FORM_POS.forEach(function (z, i) { if (z.wahl || String(z.menge).trim() || String(z.text).trim()) belegt.push({ z: z, nr: i + 1 }); });
+  var vor = function (x) { return belegt.length > 1 || FORM_POS.length > 1 ? 'Position ' + x.nr + ': ' : ''; };
+  if (!belegt.length) return melde(t('produktWaehlen'), 'fehler');
+  var ohneWahl = belegt.filter(function (x) { return !x.z.wahl; })[0];
+  if (ohneWahl) return melde(vor(ohneWahl) + t('produktWaehlen'), 'fehler');
   if (!BR.istIso(tag) || tag < morgenIso()) return melde(t('tagWaehlen', fmtTag(morgenIso())), 'fehler');
-  if (menge === null) return melde(t('mengeFehlt'), 'fehler');
+  var daten = [];
+  for (var i = 0; i < belegt.length; i++) {
+    var r = positionAus(belegt[i].z);
+    if (r.fehler) return melde(vor(belegt[i]) + r.fehler, 'fehler');
+    daten.push(r.daten);
+  }
   speichernLaeuft = true;
   var btn = document.getElementById('btn-eintragen'); btn.disabled = true; btn.textContent = t('speichert');
   melde('', 'info');
   try {
     await (window.BOS_AUTH_READY || Promise.resolve());
-    await mitZeitlimit(window.db.collection('bos_events').add({
-      type: BR.TYP,
-      station: opt.dataset.station,
-      legacyKey: sel.value,
-      produktName: opt.dataset.name,
-      datum: tag,
-      menge: menge,
-      notiz: notiz,
-      eingetragenVon: aktuellerProfilName(),
-      ts: firebase.firestore.FieldValue.serverTimestamp()
-    }), 15000);
-    var text = zahl(menge) + ' ' + einheitKurz(sel.value) + ' ' + opt.dataset.name + ' für ' + fmtTag(tag) + ' (' + opt.dataset.station + ')';
-    ['neu-produkt', 'neu-tag', 'neu-menge', 'neu-notiz'].forEach(function (id) { document.getElementById(id).value = ''; });
+    var auftragId = window.db.collection('bos_events').doc().id;   // neue Kennung, nichts geschrieben
+    await mitZeitlimit(schreibePositionen(daten, auftragId, 0, tag, notiz), 15000);
+    var d0 = daten[0], text;
+    if (daten.length > 1) text = 'Auftrag ' + (notiz ? notiz + ' · ' : '') + fmtTag(tag) + ' · ' + daten.length + ' Positionen';
+    else if (d0.type === BR.TYP) text = zahl(d0.menge) + ' ' + einheitKurz(d0.legacyKey) + ' ' + d0.produktName + ' für ' + fmtTag(tag) + ' (' + d0.station + ')';
+    else text = '„' + d0.text + '“ für ' + fmtTag(tag) + ' (Sonstiges)';
+    FORM_POS = [{ wahl: '', menge: '', text: '' }]; renderPositionen();
+    ['neu-tag', 'neu-notiz'].forEach(function (id) { document.getElementById(id).value = ''; });
     melde(t('gespeichert', text), 'ok');
   } catch (e) {
     console.error('[Bestellungen] Speichern:', e);
@@ -489,6 +652,49 @@ async function bestellungEintragen() {
   }
   speichernLaeuft = false;
   btn.disabled = false; btn.textContent = 'Eintragen';
+}
+
+// ── AUFTRAG: ganz löschen, Position nachtragen (09.11.2026, Schritt 4) ──
+function findeAuftrag(key) { return BR.auftraege(BESTELLUNGEN, SONSTIGE).filter(function (a) { return a.schluessel === key; })[0] || null; }
+function auftragFrage(key) { AFRAGE = key; if (key) delete AFEHLER[key]; renderListe(); }
+async function auftragLoeschen(key) {
+  var a = findeAuftrag(key);
+  if (!a || ALAEUFT[key]) return;
+  ALAEUFT[key] = true; renderListe();
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    var col = window.db.collection('bos_events'), batch = window.db.batch();
+    a.positionen.forEach(function (p) { batch.delete(col.doc(p.id)); });
+    await mitZeitlimit(batch.commit(), 15000);
+    AFRAGE = null;
+  } catch (e) {
+    console.error('[Bestellungen] Auftrag löschen:', e);
+    AFEHLER[key] = (e && e.code === 'zeitlimit') ? e.message : fehlerText(e) + fehlerRat(e);
+  }
+  delete ALAEUFT[key];
+  renderListe();
+}
+function aposAuf(key) { APOS = { key: key, wahl: '', menge: '', text: '', laeuft: false, fehler: null }; renderListe(); }
+function aposZu() { APOS = null; renderListe(); }
+function aposFeld(f, w) { if (APOS) APOS[f] = w; }
+async function positionNachtragen() {
+  if (!APOS || APOS.laeuft) return;
+  var a = findeAuftrag(APOS.key);
+  if (!a) { APOS.fehler = 'Auftrag nicht mehr da.'; renderListe(); return; }
+  var r = positionAus(APOS);
+  if (r.fehler) { APOS.fehler = r.fehler; renderListe(); return; }
+  APOS.laeuft = true; APOS.fehler = null; renderListe();
+  try {
+    await (window.BOS_AUTH_READY || Promise.resolve());
+    var naechste = a.positionen.reduce(function (m, p) { return typeof p.pos === 'number' && p.pos >= m ? p.pos + 1 : m; }, a.positionen.length);
+    await mitZeitlimit(schreibePositionen([r.daten], a.auftragId, naechste, a.datum, a.notiz), 15000);
+    APOS = null;
+  } catch (e) {
+    console.error('[Bestellungen] Position nachtragen:', e);
+    APOS.laeuft = false;
+    APOS.fehler = (e && e.code === 'zeitlimit') ? e.message : t('speichernFehler') + fehlerText(e) + fehlerRat(e);
+  }
+  renderListe();
 }
 
 // ── LÖSCHEN (Rückfrage auf der Seite, kein Browser-Dialog) ────────────
@@ -511,10 +717,12 @@ async function loeschen(id) {
 // ── Hilfe (Text identisch in PRODUKTIONSPLANER_DOKU.md §15) ─────────────
 const PP_HILFE_SCHRITTE = [
   ['Wofür ist diese Seite?', 'Hier stehen alle Bestellungen aller Stationen in einer Liste — sortiert nach dem Tag, an dem die Ware gebraucht wird. Du kannst Bestellungen eintragen, ansehen und wieder löschen. Dieselben Bestellungen siehst du an jeder Station im Block „📋 Bestellungen“ bei ihrem Produkt.'],
-  ['Bestellung eintragen', 'Produkt wählen (nach Station sortiert), den Tag, an dem die Ware gebraucht wird, die Menge in der Einheit des Produkts und auf Wunsch eine kurze Notiz, z. B. den Kunden. Der Tag geht ab morgen, nach vorne gibt es keine Grenze — auch eine Bestellung in fünf Wochen kannst du schon eintragen. Mit „Eintragen“ ist sie sofort gespeichert und für alle Kollegen da.'],
+  ['Bestellung eintragen', 'Eine Bestellung ist ein Auftrag: ein Tag, an dem die Ware gebraucht wird, auf Wunsch eine Notiz (z. B. der Kunde) und eine oder mehrere Positionen. Je Position wählst du ein Produkt (nach Station sortiert) und trägst die Menge ein — in der Einheit, die am Feld steht, z. B. „Menge (Bl.)“, umgerechnet wird nichts. Mit „+ Position“ kommt die nächste Zeile dazu, „✕“ nimmt eine weg. Der Tag geht ab morgen, nach vorne gibt es keine Grenze. „Eintragen“ speichert alle Positionen zusammen — entweder alle oder, wenn etwas schiefgeht, keine; dann steht der Grund darunter und das Formular bleibt ausgefüllt.'],
+  ['Sonstiges', 'Gibt es für etwas kein Produkt an einer Station (z. B. eine Hochzeitstorte), wähle bei der Position „✎ Sonstiges“ und schreib es als Text hin. Sonstiges hat keine Menge und wird nirgends mitgerechnet — es steht in der Liste und auf dem Wochenzettel an seinem Tag, damit es nicht vergessen wird.'],
   ['Was die Kennzeichen bedeuten', '„✓ eingeplant“: Die Station hat diese Bestellung beim letzten Einreichen schon mitgerechnet, sie steckt in den Tagesmengen. „Neu seit Einreichung — noch nicht eingeplant“: Die Station hat schon eingereicht, aber diese Bestellung kam danach dazu (oder wurde nicht mitgerechnet). Dann muss die Station nochmal planen und einreichen — sie steht bis dahin auch im Wochenzettel unter „Nachbestellungen“. „Kommt in eine spätere Planung“: Für diesen Tag hat die Station noch keine Planung eingereicht, die Bestellung wird beim nächsten Planen automatisch mitgerechnet.'],
   ['Filtern', 'Oben kannst du die Liste auf eine Station und ein Produkt eingrenzen. „Alle Stationen“ und „Alle Produkte“ zeigen wieder alles.'],
-  ['Löschen', 'Bei jeder Bestellung steht „Löschen“. Die Seite fragt nach („Wirklich löschen?“), erst „Ja, löschen“ löscht wirklich. War die Bestellung schon eingeplant, steckt sie trotzdem noch in der eingereichten Planung — dann steht weiter unten „Bestellung gelöscht, steckt noch in der eingereichten Planung von …“. Die Station sollte dann neu planen.'],
+  ['Ein Auftrag in der Liste', 'Jeder Auftrag ist ein Block mit Notiz und Tag, darunter seine Positionen mit ihren Kennzeichen. Ruft der Kunde nochmal an, trägt „+ Position“ eine weitere Position mit demselben Tag und derselben Notiz ein (ab morgen). Der Filter zeigt einen Auftrag, sobald eine seiner Positionen passt.'],
+  ['Löschen', '„Auftrag löschen“ löscht alle Positionen eines Auftrags zusammen, nach der Rückfrage „Auftrag mit … Positionen löschen?“. Bei jeder Position steht außerdem „Löschen“. Die Seite fragt nach („Wirklich löschen?“), erst „Ja, löschen“ löscht wirklich. War die Bestellung schon eingeplant, steckt sie trotzdem noch in der eingereichten Planung — dann steht weiter unten „Bestellung gelöscht, steckt noch in der eingereichten Planung von …“. Die Station sollte dann neu planen.'],
   ['Vergangene Bestellungen', 'Bestellungen, deren Tag vorbei ist, werden nicht gelöscht. Sie stehen eingeklappt unter „vergangene Bestellungen“ — antippen klappt sie auf.'],
   ['Alte Nachträge', 'Vor dem 08.11.2026 gab es in der Übersicht „Nachträge“ ohne Tag. Die stehen eingeklappt unter „alte Nachträge (ohne Tag)“ und lassen sich nur lesen. Neu angelegt wird nur noch hier als Bestellung mit Tag.']
 ];
@@ -531,8 +739,10 @@ window.addEventListener('load', async function () {
   document.getElementById('neu-tag').min = morgenIso();
   document.getElementById('neu-notiz').maxLength = BR.NOTIZ_MAX;
   await (window.BOS_AUTH_READY || Promise.resolve());
+  renderPositionen();   // 09.11.2026 (Schritt 4): erste Positionszeile, Produkte folgen
   ladeProdukte();
   starteBestellungen();
+  starteSonstige();
   ladeNachtraege();
 });
 </script>
