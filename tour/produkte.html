@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jedes Produkt hat seine Karte · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Jedes Produkt hat seine Karte – die Produkt-Config
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → verbrauch, weiter → teigecke. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Jedes Produkt hat seine Karte',
+  untertitel:'Die Produkt-Config',
+  zurueck:{href:'verbrauch.html', name:'Woher weiß BäckereiOS das?'},
+  weiter:{href:'teigecke.html', name:'Nachts in der Teigecke'},
+  szenen:[
+    {n:'Ein Brot, viele Fragen', d:7500,
+     t:'An welchen Tagen backen wir das eigentlich? Wie viele passen auf ein Blech? Aus welchem Teig ist es? Früher wusste das, wer lange genug dabei war.',
+     m(F){
+       const fr=(x,y,d)=>`<text class="pop" x="${x}" y="${y}" style="--d:${d}s;fill:#BA7517;font-size:26px;font-weight:700;${F.FONT}">?</text>`;
+       return F.ort('backstube',{licht:120,regal:'r'})
+         +F.tisch(170,170,150)
+         +`<path d="M196 170 q0 -34 50 -34 q50 0 50 34z" fill="#E0A060" stroke="${F.K}" stroke-width="2.2" stroke-linejoin="round"/><path d="M222 146 l8 14 M244 142 l8 14 M266 146 l8 14" stroke="${F.K}" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>`
+         +F.fig(96,146,{c:'t',mund:'sorge',blick:1})
+         +fr(52,96,.5)+fr(132,90,.9)+fr(92,78,1.3);
+     }},
+    {n:'Die Produktkarte', d:10000,
+     t:'In BäckereiOS hat jedes Produkt seine Karte. Darauf steht, an welchen Tagen es gebacken wird, wie viele Stück auf ein Blech passen, aus welchem Teig es entsteht und was man sonst darüber wissen muss.',
+     m(F){
+       const tage=['Mo','Di','Mi','Do','Fr','Sa'],an=[1,0,1,0,1,1];
+       let k=`<rect x="126" y="16" width="222" height="178" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2"/><path d="M126 44 v-18 a10 10 0 0 1 10 -10 h202 a10 10 0 0 1 10 10 v18z" fill="#FAC775" stroke="${F.K}" stroke-width="2.2"/>`
+         +`<text x="237" y="36" text-anchor="middle" style="fill:${F.K};font-size:14px;font-weight:600;${F.FONT}">Korbbrot</text>`;
+       const zeile=(y,l,d,inhalt)=>`<g class="pop" style="--d:${d}s"><text x="138" y="${y}" style="fill:${F.SOFT};font-size:10px;${F.FONT}">${l}</text>${inhalt}</g>`;
+       k+=zeile(62,'Backtage',.4,tage.map((t,i)=>`<rect x="${138+i*34}" y="68" width="30" height="20" rx="6" fill="${an[i]?'#E1F5EE':'#FFFDF6'}" stroke="${an[i]?'#0F6E56':'#C9B79A'}" stroke-width="${an[i]?2:1.2}"/><text x="${153+i*34}" y="82" text-anchor="middle" style="fill:${an[i]?'#085041':'#888780'};font-size:11px;${an[i]?'font-weight:600;':''}${F.FONT}">${t}</text>`).join(''))
+        +zeile(106,'Stück pro Blech',1.0,`<text x="138" y="124" style="fill:${F.K};font-size:14px;font-weight:600;${F.FONT}">12</text>`)
+        +zeile(106,'',1.4,`<text x="236" y="106" style="fill:${F.SOFT};font-size:10px;${F.FONT}">Aus Teig</text><text x="236" y="124" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">Korbbrot-Teig</text>`)
+        +zeile(146,'Besonderheit',1.9,`<rect x="136" y="152" width="202" height="28" rx="6" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.5"/><text x="146" y="171" style="fill:#633806;font-size:12px;${F.FONT}">Im Korb gehen lassen.</text>`);
+       return F.ort('buero')+k+F.figTab(62,146,{hair:'bun',c:'g',blick:1});
+     }},
+    {n:'Einmal gepflegt, überall gültig', d:9500,
+     t:'Einmal gepflegt, gilt es überall. Der Schnellrechner kennt die Backtage, die Station die Blechgröße, die Teigecke den Teig und die Maschinenseite den Weg durch die Öfen. Niemand trägt etwas zweimal ein.',
+     m(F){
+       const ziel=[['Schnellrechner',70,40],['Station',292,40],['Teigecke',64,206],['Maschinenseite',286,206]];
+       return F.ort('bos')
+         +ziel.map(([n,x,y],k)=>`<g class="pop" style="--d:${.6+k*.35}s"><path d="M180 125 L${x} ${y+10}" stroke="#9FD9B8" stroke-width="2.4" stroke-dasharray="3 5"/>`+F.chip(x,y,n,'middle')+`</g>`).join('')
+         +`<rect x="118" y="92" width="124" height="66" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.4"/><path d="M118 114 v-12 a10 10 0 0 1 10 -10 h104 a10 10 0 0 1 10 10 v12z" fill="#FAC775" stroke="${F.K}" stroke-width="2.4"/>`
+         +`<text x="180" y="109" text-anchor="middle" style="fill:${F.K};font-size:12px;font-weight:600;${F.FONT}">Korbbrot</text><path d="M132 128 h70 M132 140 h96" stroke="#C9B79A" stroke-width="3" stroke-linecap="round"/>`;
+     }},
+    {n:'Pause statt Löschen', d:8500,
+     t:'Der Stollen hat im Sommer Pause. Seine Karte wird nicht gelöscht, sie schläft nur: ausgegraut und aus den Listen genommen. Im Herbst genügt ein Haken, und er ist wieder da.',
+     m(F){
+       const karte=(x,name,aktiv,d)=>`<g class="pop" style="--d:${d}s" ${aktiv?'':'opacity=".5"'}><rect x="${x}" y="46" width="124" height="96" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2" ${aktiv?'':'stroke-dasharray="6 4"'}/>`
+         +`<path d="M${x} 72 v-16 a10 10 0 0 1 10 -10 h104 a10 10 0 0 1 10 10 v16z" fill="${aktiv?'#FAC775':'#D3D1C7'}" stroke="${F.K}" stroke-width="2.2"/>`
+         +`<text x="${x+62}" y="65" text-anchor="middle" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">${name}</text><path d="M${x+14} 92 h70 M${x+14} 106 h96 M${x+14} 120 h50" stroke="#C9B79A" stroke-width="3" stroke-linecap="round"/></g>`;
+       return F.ort('backstube',{licht:180,regal:'',lampe:false})
+         +karte(30,'Korbbrot',true,.3)+karte(206,'Stollen',false,.7)
+         +`<g class="stamp" style="--d:1.6s">`+F.chip(268,150,'Saison-Pause','middle')+`</g>`
+         +`<g class="hz-zzz"><text x="322" y="40" style="fill:${F.K};font-size:14px;font-weight:700;${F.FONT}">z</text><text x="334" y="28" style="fill:${F.K};font-size:10px;font-weight:700;${F.FONT}">z</text></g>`
+         +F.fig(180,150,{hair:'tuft',c:'o',gross:.8});
+     }},
+    {n:'Und bald auch das Lager', d:9000,
+     t:'Dasselbe soll es bald für Rohstoffe und Lagerware geben: welches Gebinde, wie groß, an welchem Lagerort. Das ist in Planung.',
+     m(F){
+       return F.ort('lager',{licht:150})
+         +F.wagen(40,false)
+         +F.kartons(208,193)
+         +`<g class="pop" style="--d:.8s">`+F.chip(74,116,'Mehl · 25-kg-Sack','middle')+F.chip(276,138,'Karton · Trockenlager','middle')+`</g>`
+         +F.fig(162,146,{hair:'cap',c:'b',aL:[-20,-4],aR:[20,-4]})
+         +F.stempel(120,52,'Rohstoffe und Lager','in Planung')
+         +F.schluss('daumen');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

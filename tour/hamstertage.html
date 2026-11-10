@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hamstertage · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Hamstertage
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → schnellrechner, weiter → verbrauch. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Hamstertage',
+  untertitel:'Wenn vor dem Feiertag alle Brot kaufen',
+  zurueck:{href:'schnellrechner.html', name:'Der Schnellrechner'},
+  weiter:{href:'verbrauch.html', name:'Woher weiß BäckereiOS das?'},
+  szenen:[
+    {n:'Der Kalender', d:7000,
+     t:'Donnerstag. Morgen ist Feiertag, die Läden bleiben zu. Was das für heute heißt, weiß jeder, der schon einmal in einer Bäckerei gestanden hat.',
+     m(F){
+       return F.ort('buero',{licht:200})
+         +F.kalender(150,40,'Diese Woche','Fr')
+         +`<g class="pop" style="--d:1.6s">`+F.chip(216,116,'Freitag: Feiertag','middle')+`</g>`
+         +F.fig(84,146,{hair:'bun',c:'g',mund:'wow',blick:1,aR:[22,-6]});
+     }},
+    {n:'Die Filiale', d:8000,
+     t:'In der Filiale wird die Schlange lang und die Körbe werden voll. Die Leute hamstern, als gäbe es nächste Woche kein Brot mehr.',
+     m(F){
+       let s=F.ort('hof')+F.filiale(10);
+       [['v',176],['b',222],['g',268],['p',314]].forEach(([c,x],k)=>{
+         s+=F.rein(F.fig(x,152,{c,kunde:true,gross:.72,blick:-1,backen:false,mund:k%2?'wow':'lachen'})
+           +`<path d="M${x-12} 196 h24 l-3 14 h-18z" fill="#D9B48C" stroke="${F.K}" stroke-width="1.6" stroke-linejoin="round"/><path d="M${x-10} 196 q10 -16 20 0" fill="none" stroke="${F.K}" stroke-width="1.6"/>`,{von:200,d:.2+k*.3,dauer:1.2});});
+       return s+F.bub(170,70,150,'Zehn Brötchen mehr!',196,140,2);
+     }},
+    {n:'Früher', d:7500,
+     t:'Früher half da nur das Bauchgefühl. Mal war um zehn das Regal leer, mal blieb abends zu viel liegen.',
+     m(F){
+       return F.ort('backstube',{licht:110,regal:'',lampe:false})
+         +F.brotregal(206,0)+F.uhr(176,44,'')+F.chip(176,70,'10 Uhr','middle')
+         +F.fig(104,146,{c:'r',muetze:true,mund:'sorge',blick:1})
+         +F.bub(14,68,120,'Schon leer?!',98,120,.8);
+     }},
+    {n:'Die Stufe setzen', d:9000,
+     t:'Heute setzt Pauline für den Tag vor dem Feiertag eine Hamster-Stufe: leicht erhöht, wie ein Samstag oder mehr als ein Samstag. Der Feiertag im Kalender ist nur der Hinweis. Entscheiden tut ein Mensch.',
+     m(F){
+       const zeile=(y,h,name,an,d)=>`<g class="pop" style="--d:${d}s"><rect x="146" y="${y}" width="190" height="28" rx="14" fill="${an?'#FAEEDA':'#FFFDF6'}" stroke="${an?'#BA7517':F.K}" stroke-width="${an?2.6:1.5}"/>`
+         +`<text x="158" y="${y+19}" style="font-size:13px;${F.FONT}">${h}</text><text x="214" y="${y+19}" style="fill:${F.K};font-size:12px;${an?'font-weight:600;':''}${F.FONT}">${name}</text></g>`;
+       return F.ort('buero')
+         +F.figTab(66,146,{hair:'bun',c:'g',blick:1})
+         +`<rect x="134" y="20" width="214" height="156" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2"/><path d="M134 46 v-16 a10 10 0 0 1 10 -10 h194 a10 10 0 0 1 10 10 v16z" fill="#FAC775" stroke="${F.K}" stroke-width="2.2"/>`
+         +`<text x="241" y="38" text-anchor="middle" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">Donnerstag · Hamster-Stufe</text>`
+         +zeile(58,'🐹','leicht erhöht',false,.4)+zeile(94,'🐹🐹','wie ein Samstag',true,1.2)+zeile(130,'🐹🐹🐹','mehr als Samstag',false,.8);
+     }},
+    {n:'Die Kette rechnet mit', d:9000,
+     t:'Die Produktionskette rechnet die Stufe mit ein. An den Stationen steht der Hamster neben dem Tag, und weil die Kette vorausplant, wird rechtzeitig mehr für den Froster produziert.',
+     m(F){
+       const tage=['Mo','Di','Mi','Do'];let s=F.ort('bos',{licht:180});
+       tage.forEach((t,i)=>{const x=22+i*84,h=i===3;
+         s+=`<g class="pop" style="--d:${.2+i*.2}s"><rect x="${x}" y="84" width="64" height="74" rx="9" fill="${h?'#FAEEDA':'#FFFDF6'}" stroke="${h?'#BA7517':F.K}" stroke-width="${h?2.8:2}"/>`
+           +`<text x="${x+32}" y="106" text-anchor="middle" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">${t}</text>`
+           +(h?`<text x="${x+32}" y="140" text-anchor="middle" style="font-size:17px">🐹🐹</text>`:`<path d="M${x+14} 124 h36 M${x+14} 136 h24" stroke="#C9B79A" stroke-width="2" stroke-linecap="round"/>`)+`</g>`;});
+       [2,1,0].forEach((i,k)=>{const x=22+i*84;
+         s+=`<g class="pop" style="--d:${1.6+k*.45}s"><path d="M${x+84+18} 70 q-34 -30 -66 0" fill="none" stroke="#BA7517" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="5 4"/><path d="M${x+36} 70 l2 -9 M${x+36} 70 l9 -1" stroke="#BA7517" stroke-width="2.4" stroke-linecap="round"/>`
+           +`<text x="${x+32}" y="178" text-anchor="middle" style="fill:#854F0B;font-size:11px;font-weight:600;${F.FONT}">+ mehr</text></g>`;});
+       return s+F.chip(180,200,'vorausgeplant, nicht erst am Tag selbst','middle');
+     }},
+    {n:'Volle Regale', d:8000,
+     t:'Der Tag vor dem Feiertag: Die Regale sind voll, und die Kunden gehen zufrieden nach Hause. Gehamstert haben am Ende beide Seiten.',
+     m(F){
+       return F.ort('backstube',{licht:120,regal:'',lampe:false})
+         +F.brotregal(196,3)
+         +F.fig(64,150,{c:'v',kunde:true,gross:.8,blick:1,aR:[16,6]})
+         +F.fig(134,146,{c:'r',muetze:true,aL:[-14,-16],aR:[14,-16],huepf:true})
+         +F.bub(20,62,150,'Alles da. Danke!',64,128,.8)
+         +F.schluss('wangen',null,{x:334});
+     }}
+  ]
+});
+</script>
+</body>
+</html>

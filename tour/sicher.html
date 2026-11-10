@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fehler, die gar nicht erst passieren · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Fehler, die gar nicht erst passieren
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → teigecke, weiter → wunschtag. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Fehler, die gar nicht erst passieren',
+  untertitel:'BäckereiOS passt mit auf',
+  zurueck:{href:'teigecke.html', name:'Nachts in der Teigecke'},
+  weiter:{href:'wunschtag.html', name:'Der Wunschtag'},
+  szenen:[
+    {n:'Drei Uhr nachts', d:7000,
+     t:'Drei Uhr nachts, der Kopf ist müde. Genau dann passieren die teuren Fehler. Deshalb passt BäckereiOS an ein paar Stellen ganz bewusst mit auf.',
+     m(F){
+       return F.ort('backstube',{nacht:true,licht:140,regal:''})
+         +F.kessel(240)
+         +F.fig(112,146,{c:'t',schlaf:true})
+         +F.chip(60,60,'03:00 Uhr','middle');
+     }},
+    {n:'Zwei Kessel, nicht einer', d:10000,
+     t:'Steht da „213,2 kg (2×)“, kann man zweimal 213 Kilo lesen und setzt die doppelte Menge an. BäckereiOS schreibt deshalb immer die Menge je Kessel nach vorn: „2 × 106,6 kg“. Die Gesamtmenge steht nur klein daneben.',
+     m(F){
+       return F.ort('backstube',{nacht:true,licht:100,regal:'',fenster:false,lampe:false})
+         +`<g class="pop" style="--d:.3s"><rect x="18" y="24" width="150" height="56" rx="9" fill="#FCEBEB" stroke="#E24B4A" stroke-width="2.2" stroke-dasharray="6 4"/>`
+         +`<text x="93" y="59" text-anchor="middle" style="fill:#A32D2D;font-size:17px;font-weight:600;${F.FONT}">213,2 kg (2×)</text><path d="M30 68 L156 36" stroke="#E24B4A" stroke-width="3" stroke-linecap="round"/></g>`
+         +`<g class="stamp" style="--d:1.8s"><rect x="186" y="18" width="160" height="68" rx="9" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2.6"/>`
+         +`<text x="266" y="50" text-anchor="middle" style="fill:#085041;font-size:19px;font-weight:600;${F.FONT}">2 × 106,6 kg</text><text x="266" y="72" text-anchor="middle" style="fill:#0F6E56;font-size:11px;${F.FONT}">213,2 kg gesamt</text></g>`
+         +`<g transform="translate(60 76) scale(.62)">`+F.kessel(60,true)+`</g><g transform="translate(180 76) scale(.62)">`+F.kessel(60,true)+`</g>`
+         +F.fig(310,150,{c:'t',gross:.8,mund:'wow',blick:-1});
+     }},
+    {n:'Erst wählen, dann rechnen', d:11000,
+     t:'Am Froster gibt es eine Frage mit zwei Knöpfen und keiner Vorauswahl. „Berechnen“ bleibt gesperrt, bis jemand wirklich gewählt hat. Ein Knopf, der schon vorbelegt ist, wird nachts einfach durchgetippt. Dieselbe Regel gilt im Produktionsplaner: keine Berechnung ohne vorherige Entscheidung.',
+     m(F){
+       return F.ort('froster',{licht:100})
+         +`<rect x="132" y="24" width="214" height="150" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2"/><path d="M132 50 v-16 a10 10 0 0 1 10 -10 h194 a10 10 0 0 1 10 10 v16z" fill="#B5D4F4" stroke="${F.K}" stroke-width="2.2"/>`
+         +`<text x="239" y="42" text-anchor="middle" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">Froster fertig?</text>`
+         +`<rect x="148" y="64" width="84" height="38" rx="9" fill="#FFFDF6" stroke="${F.K}" stroke-width="2"/><text x="190" y="88" text-anchor="middle" style="fill:${F.K};font-size:15px;font-weight:600;${F.FONT}">Ja</text>`
+         +`<rect x="246" y="64" width="84" height="38" rx="9" fill="#FFFDF6" stroke="${F.K}" stroke-width="2"/><text x="288" y="88" text-anchor="middle" style="fill:${F.K};font-size:15px;font-weight:600;${F.FONT}">Nein</text>`
+         +`<rect x="148" y="120" width="182" height="36" rx="9" fill="#ECE8E0" stroke="#B4B2A9" stroke-width="2" stroke-dasharray="5 4"/><text x="248" y="143" text-anchor="middle" style="fill:#888780;font-size:13px;font-weight:600;${F.FONT}">Berechnen</text>`+F.schloss(176,132)
+         +`<g class="stamp" style="--d:2.8s"><rect x="148" y="64" width="84" height="38" rx="9" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2.8"/><text x="190" y="88" text-anchor="middle" style="fill:#085041;font-size:15px;font-weight:600;${F.FONT}">Ja ✓</text></g>`
+         +`<g class="pop" style="--d:3.8s"><rect x="148" y="120" width="182" height="36" rx="9" fill="#9FE1CB" stroke="#0F6E56" stroke-width="2.4"/><text x="239" y="143" text-anchor="middle" style="fill:#085041;font-size:13px;font-weight:600;${F.FONT}">Berechnen ›</text></g>`
+         +F.fig(70,146,{hair:'tuft',c:'o',aR:[24,-10],blick:1});
+     }},
+    {n:'Alte Zahlen melden sich', d:8000,
+     t:'Mit einer Zählung von vorgestern rechnet BäckereiOS nicht stillschweigend weiter. Es sagt, wie alt die Zahl ist, und bittet darum, neu zu zählen.',
+     m(F){
+       return F.ort('froster',{licht:110})
+         +`<g class="pop" style="--d:.3s">`+F.karte(166,34,178,90,'Froster-Bestand',[{t:'zuletzt gezählt: vorgestern',farbe:'#A32D2D'},{t:'Bitte neu zählen',gestrichelt:true}],'#F7C1C1')+`</g>`
+         +F.fig(100,146,{hair:'cap',c:'b',blick:1,aR:[20,10]})+F.klemmbrett(132,166)
+         +F.bub(14,62,112,'Zähl ich neu.',96,120,1.6);
+     }},
+    {n:'Klartext statt Rätsel', d:8500,
+     t:'Und wenn doch etwas schiefgeht, sagt BäckereiOS, was los ist: im Klartext auf dem Bildschirm, nicht versteckt und nicht nur „fehlgeschlagen“. Damit man es melden kann, ohne zu raten.',
+     m(F){
+       return F.ort('backstube',{licht:110,regal:'',lampe:false})
+         +F.tablet(128,34,216,140,
+            `<rect x="144" y="52" width="184" height="46" rx="6" fill="#FCEBEB" stroke="#E24B4A" stroke-width="2"/>`
+           +`<text x="154" y="71" style="fill:#A32D2D;font-size:12px;font-weight:600;${F.FONT}">Speichern ging nicht:</text><text x="154" y="88" style="fill:#A32D2D;font-size:12px;${F.FONT}">Keine Verbindung zum Netz.</text>`
+           +`<rect x="144" y="110" width="110" height="30" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.8"/><text x="199" y="130" text-anchor="middle" style="fill:#633806;font-size:12px;font-weight:600;${F.FONT}">Noch einmal</text>`)
+         +F.fig(64,146,{hair:'bun',c:'g',blick:1})
+         +F.schluss('daumen');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

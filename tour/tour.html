@@ -6,8 +6,11 @@
 <title>BäckereiOS · Satellit – Einblick</title>
 <!--
   BäckereiOS · Satellit – Demo-Tour, Übersichtsseite tour/tour.html
-  Stand: 10.11.2026, 21:42 Uhr MEZ (Bau-Chat Tour Stufe 1). Vorher 10.10.2026 (Gerüst, Doku 2026-10-09_DEMO_TOUR.md)
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2). Vorher 10.10.2026 (Gerüst, Doku 2026-10-09_DEMO_TOUR.md)
   ÄNDERUNGEN
+    2026-11-10 · 22:12 · Tour Stufe 2 (Anweisung Kontroll-Chat 10.11., 22:10): Kacheln in sechs Gruppen (Willkommen · Planen und Backen ·
+      Miteinander · Wie BäckereiOS gedacht ist · Morgen · Zum Schluss), alle 17 Geschichten; Reihenfolge = Kette der
+      Weiter-Knöpfe. Gruppentexte vom Kontroll-Chat, Kachel-Einträge wörtlich aus dem Entwurf. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
     2026-11-10 · 21:42 · Tour Stufe 1 (Anweisung Kontroll-Chat 10.11., 19:17; Entwurf Ideen-Chat, 13. Fassung):
       Absatz zu Crumble in der Einleitung (Bild ../hamster_figur/loch/winken.png), Kachel „Crumble and Friends“
       neu, „Kaputt? Gemeldet.“ von „Morgen“ nach „Heute“ (die Reparaturanfrage läuft). Bild-Bausteine für die
@@ -204,18 +207,36 @@ const VERBINDUNGEN=[
 
 /* Kachel-Gruppen. Reihenfolge = Anzeige. */
 const GRUPPEN=[
-  {marke:'03 · Heute', titel:'Was BäckereiOS heute kann', sub:'Läuft – jeden Tag, in echt. Kachel antippen, die Geschichte startet.', kacheln:[
-    {name:'Crumble and Friends', bild:'hamster', status:'bereit', href:'freunde.html'},
+  {marke:'03 · Willkommen', titel:'Wer hier mitspielt', sub:'Crumble und seine Freunde stellen sich vor. Kachel antippen, die Geschichte startet.', kacheln:[
+    {name:'Crumble and Friends', bild:'hamster', status:'bereit', href:'freunde.html'}
+  ]},
+  {marke:'04 · Planen und Backen', titel:'Vom Froster bis zum Ofen', sub:'Läuft – jeden Tag, in echt.', kacheln:[
     {name:'Die Produktionskette', bild:'kette',   status:'bereit', href:'produktionskette.html'},
+    {name:'Der Schnellrechner',   bild:'rechner', status:'bereit', href:'schnellrechner.html'},
+    {name:'Hamstertage',           bild:'hamster', status:'bereit', href:'hamstertage.html'},
+    {name:'Woher weiß BäckereiOS das?', bild:'balken', status:'bereit', href:'verbrauch.html'},
+    {name:'Jedes Produkt hat seine Karte', bild:'blatt', status:'bereit', href:'produkte.html'},
+    {name:'Nachts in der Teigecke',bild:'mond',   status:'bereit', href:'teigecke.html'},
+    {name:'Fehler, die gar nicht erst passieren', bild:'schild', status:'bereit', href:'sicher.html'}
+  ]},
+  {marke:'05 · Miteinander', titel:'Damit alle Bescheid wissen', sub:'Läuft auch – für die Menschen in der Backstube.', kacheln:[
     {name:'Der Wunschtag',        bild:'kalender',status:'bereit', href:'wunschtag.html'},
     {name:'Krank – und nun?',     bild:'kreuz',   status:'bereit', href:'krank.html'},
-    {name:'Nachts in der Teigecke',bild:'mond',   status:'bereit', href:'teigecke.html'},
+    {name:'Jedem sein Konto',      bild:'konto',   status:'bereit', href:'konten.html'},
+    {name:'Nachricht für dich',    bild:'brief',   status:'bereit', href:'nachrichten.html'},
     {name:'Kaputt? Gemeldet.',     bild:'schluessel',status:'bereit', href:'meldestation.html'}
   ]},
-  {marke:'04 · Morgen', titel:'Wo es hinwill', sub:'Gestrichelt heißt bei uns: in Planung. Auch hier: antippen und zuschauen.', kacheln:[
-    {name:'Teigmengen auf dem Plan', bild:'waage',    status:'folgt', geplant:true},
+  {marke:'06 · Wie BäckereiOS gedacht ist', titel:'Was dahintersteckt', sub:'Wofür BäckereiOS da ist – und wofür nicht.', kacheln:[
+    {name:'Papier darf bleiben',   bild:'blatt',   status:'bereit', href:'papier.html'},
+    {name:'Was BäckereiOS nicht tut', bild:'auge', status:'bereit', href:'nicht.html'}
+  ]},
+  {marke:'07 · Morgen', titel:'Wo es hinwill', sub:'Gestrichelt heißt bei uns: in Planung. Auch hier: antippen und zuschauen.', kacheln:[
     {name:'Das Lager weiß Bescheid', bild:'tor',      status:'bereit', href:'lager.html', geplant:true},
+    {name:'Teigmengen auf dem Plan', bild:'waage',    status:'folgt', geplant:true},
     {name:'Filialen im Netz',        bild:'haus',     status:'folgt', geplant:true}
+  ]},
+  {marke:'08 · Zum Schluss', titel:'Wer das baut', sub:'Der Abspann.', kacheln:[
+    {name:'Von einem Bäcker für Bäcker', bild:'mond', status:'bereit', href:'bauer.html'}
   ]}
 ];
 

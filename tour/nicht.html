@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Was BäckereiOS nicht tut · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Was BäckereiOS nicht tut
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → papier, weiter → lager. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Was BäckereiOS nicht tut',
+  untertitel:'Helfen, nicht kontrollieren',
+  zurueck:{href:'papier.html', name:'Papier darf bleiben'},
+  weiter:{href:'lager.html', name:'Das Lager weiß Bescheid'},
+  szenen:[
+    {n:'Die Sorge', d:7500,
+     t:'Ein neues System im Betrieb, und sofort ist die Frage da: Guckt mir das Ding jetzt auf die Finger? Die Antwort ist nein, und zwar mit Absicht.',
+     m(F){
+       return F.ort('backstube',{licht:240,regal:'l',lampe:false})
+         +F.stationTablet(256)
+         +`<g class="pop" style="--d:1s">`+F.auge(256,58,false,1)+`</g>`
+         +`<text class="pop" x="286" y="52" style="--d:1.4s;fill:#BA7517;font-size:24px;font-weight:700;${F.FONT}">?</text>`
+         +F.fig(120,146,{c:'r',muetze:true,mund:'sorge',blick:1})
+         +F.bub(10,84,150,'Guckt das mir zu?',108,124,.6);
+     }},
+    {n:'Keine Lesebestätigung', d:9000,
+     t:'Niemand sieht, wer eine Nachricht wann gelesen hat. Es gibt keine Häkchen und keine Liste. Wer etwas wirklich wissen muss, fragt nach, so wie früher auch.',
+     m(F){
+       return F.ort('backstube',{licht:110,regal:'',lampe:false})
+         +F.karte(140,30,200,100,'Nachricht',[{t:'„Lieferung kommt früher.“',fett:true},{t:' '},{t:'gelesen von: …',farbe:'#B4B2A9'}],'#B5D4F4')
+         +`<g class="stamp" style="--d:1.4s"><path d="M152 104 h130" stroke="#E24B4A" stroke-width="3" stroke-linecap="round"/></g>`
+         +`<g class="stamp" style="--d:2s">`+F.auge(296,170,true,1)+`</g>`
+         +F.fig(72,146,{hair:'tuft',c:'o',blick:1});
+     }},
+    {n:'Die Wand bleibt', d:9000,
+     t:'BäckereiOS will nicht die einzige Wahrheit sein. Aushänge hängen weiter an der Wand, und wer kein Konto hat oder keins möchte, erfährt trotzdem alles Wichtige.',
+     m(F){
+       return F.ort('backstube',{licht:180,regal:'',lampe:false})
+         +F.blatt(30,28,108,136,'Aushang')+`<circle cx="84" cy="32" r="5" fill="#D85A30" stroke="${F.K}" stroke-width="1.6"/>`
+         +F.fig(190,146,{hair:'cap',c:'b',blick:-1,aL:[-20,-8]})
+         +F.fig(290,146,{hair:'bun',c:'g',blick:-1})+F.tab(262,182)
+         +`<g class="pop" style="--d:1.4s">`+F.chip(190,96,'ohne Konto','middle')+F.chip(290,96,'mit Konto','middle')+`</g>`;
+     }},
+    {n:'Mit Namen, unter vier Augen', d:8500,
+     t:'Kritik gibt es in der Nachrichtenzentrale nur mit Namen und nur unter vier Augen. Nichts wird an die große Glocke gehängt.',
+     m(F){
+       return F.ort('buero',{licht:180})
+         +F.fig(100,146,{c:'n',brille:true,blick:1,aR:[16,6]})
+         +F.fig(262,146,{hair:'tuft',c:'p',blick:-1,aL:[-16,6]})
+         +`<g class="pop" style="--d:.8s"><rect x="126" y="50" width="110" height="34" rx="10" fill="#FCEBEB" stroke="#E24B4A" stroke-width="2"/><circle cx="142" cy="67" r="5.5" fill="#E24B4A"/>`
+         +`<text x="154" y="72" style="fill:${F.K};font-size:12px;font-weight:600;${F.FONT}">Kritik · Franz</text></g>`
+         +`<path class="pop" style="--d:1.4s" d="M128 108 Q181 86 234 108" fill="none" stroke="${F.K}" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>`;
+     }},
+    {n:'Der Mensch entscheidet', d:9000,
+     t:'BäckereiOS rechnet, erinnert und schlägt vor. Entschieden wird von Menschen: welcher Plan gilt, welche Stufe gesetzt wird, was repariert ist. Dafür ist es gebaut – als Werkzeug, nicht als Aufpasser.',
+     m(F){
+       return F.ort('bos',{licht:120})+F.mitte(110,70)
+         +F.paper(180,70,'stay','--d:.6s;--dx:50px;--dy:20px')
+         +`<g class="pop" style="--d:1.2s">`+F.chip(110,112,'schlägt vor','middle')+`</g>`
+         +F.fig(262,146,{hair:'bun',c:'g',blick:-1,aL:[-22,-10]})
+         +`<g class="stamp" style="--d:2s"><rect x="216" y="44" width="108" height="34" rx="9" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2.6"/><text x="270" y="66" text-anchor="middle" style="fill:#085041;font-size:14px;font-weight:600;${F.FONT}">entscheidet</text></g>`
+         +F.schluss('daumen',null,{x:150});
+     }}
+  ]
+});
+</script>
+</body>
+</html>

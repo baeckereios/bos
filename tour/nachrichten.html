@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nachricht für dich · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Nachricht für dich – die Nachrichtenzentrale
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → konten, weiter → meldestation. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Nachricht für dich',
+  untertitel:'Die Nachrichtenzentrale',
+  zurueck:{href:'konten.html', name:'Jedem sein Konto'},
+  weiter:{href:'meldestation.html', name:'Kaputt? Gemeldet.'},
+  szenen:[
+    {n:'Der Zettel an der Wand', d:7500,
+     t:'Früher hing eine wichtige Info als Zettel an der Wand, zwischen zwanzig anderen. Wer Frühschicht hatte, sah ihn vielleicht. Wer Nachtschicht hatte, eher nicht.',
+     m(F){
+       const farben=['#FFFDF6','#FAEEDA','#E6F1FB','#EAF3DE','#FBEAF0','#FFFDF6','#FAEEDA','#E6F1FB'];
+       let z='';farben.forEach((f,i)=>{const x=166+(i%4)*42,y=40+Math.floor(i/4)*52,d=((i*37)%9)-4;
+         z+=`<g transform="rotate(${d} ${x+17} ${y+20})"><rect x="${x}" y="${y}" width="34" height="42" rx="2" fill="${f}" stroke="${F.K}" stroke-width="1.5"/>`
+           +`<path d="M${x+6} ${y+12} h22 M${x+6} ${y+20} h22 M${x+6} ${y+28} h14" stroke="#C9B79A" stroke-width="1.4" stroke-linecap="round"/><circle cx="${x+17}" cy="${y+4}" r="2.6" fill="#D85A30" stroke="${F.K}" stroke-width="1"/></g>`;});
+       return F.ort('backstube',{licht:110,regal:'',lampe:false})
+         +`<rect x="152" y="26" width="190" height="126" rx="6" fill="#D9B48C" stroke="${F.K}" stroke-width="2.4"/>`+z
+         +`<g class="zittern" style="--d:.6s"><rect x="236" y="70" width="46" height="34" rx="2" fill="#FFFDF6" stroke="#E24B4A" stroke-width="2.4"/>`
+         +`<text x="259" y="91" text-anchor="middle" style="fill:#A32D2D;font-size:10px;font-weight:700;${F.FONT}">WICHTIG</text></g>`
+         +F.rein(F.fig(82,146,{hair:'tuft',c:'o',blick:-1,schlaf:false}),{von:230,d:.3,dauer:1.8})
+         +`<text class="pop" x="34" y="100" style="--d:2.4s;fill:#BA7517;font-size:24px;font-weight:700;${F.FONT}">?</text>`;
+     }},
+    {n:'An wen?', d:8500,
+     t:'In der Nachrichtenzentrale wählt Franz zuerst, wer es lesen soll: einzelne Kollegen, eine ganze Rolle wie „alle Backstube“ oder eine Gruppe wie „Nachtschicht“. Gruppen gehen quer durch alle Bereiche.',
+     m(F){
+       const zeile=(y,art,name,an,d)=>`<g class="pop" style="--d:${d}s"><rect x="146" y="${y}" width="188" height="26" rx="13" fill="${an?'#E1F5EE':'#FFFDF6'}" stroke="${an?'#0F6E56':F.K}" stroke-width="${an?2.4:1.5}"/>`
+         +`<text x="158" y="${y+17}" style="fill:${F.SOFT};font-size:10px;${F.FONT}">${art}</text><text x="204" y="${y+17}" style="fill:${F.K};font-size:12px;${an?'font-weight:600;':''}${F.FONT}">${name}</text>`
+         +(an?`<path d="M312 ${y+13} l4 4 l8 -8" stroke="#0F6E56" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`:'')+`</g>`;
+       return F.ort('buero')
+         +F.figTab(66,146,{c:'n',brille:true,blick:1})
+         +`<rect x="134" y="22" width="212" height="150" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2"/><path d="M134 48 v-16 a10 10 0 0 1 10 -10 h192 a10 10 0 0 1 10 10 v16z" fill="#B5D4F4" stroke="${F.K}" stroke-width="2.2"/>`
+         +`<text x="240" y="40" text-anchor="middle" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">Neue Nachricht · an:</text>`
+         +zeile(60,'Einzeln','Paul',false,.4)+zeile(94,'Rolle','alle Backstube',false,.8)+zeile(128,'Gruppe','Nachtschicht',true,1.4);
+     }},
+    {n:'Was für eine Nachricht?', d:8500,
+     t:'Jede Nachricht hat eine Art: Nachricht, Info, Lob oder Kritik, immer als Farbe mit Wort. Lob darf gern an viele gehen. Kritik bleibt immer unter vier Augen und trägt immer einen Namen.',
+     m(F){
+       const art=(x,f,r,t,d)=>`<g class="pop" style="--d:${d}s"><rect x="${x}" y="18" width="${t.length*7+34}" height="26" rx="13" fill="${f}" stroke="${r}" stroke-width="2"/><circle cx="${x+15}" cy="31" r="5.5" fill="${r}"/>`
+         +`<text x="${x+26}" y="36" style="fill:${F.K};font-size:12px;font-weight:600;${F.FONT}">${t}</text></g>`;
+       return F.ort('backstube',{licht:250,regal:'',lampe:false})
+         +art(10,'#F1EFE8','#888780','Nachricht',.2)+art(118,'#E6F1FB','#378ADD','Info',.5)+art(190,'#EAF3DE','#639922','Lob',.8)+art(256,'#FCEBEB','#E24B4A','Kritik',1.1)
+         +`<g class="stamp" style="--d:1.8s">`+F.karte(18,70,176,84,'Lob',[{t:'„Starke Nacht, Ben!“',fett:true},{t:'von Paul',farbe:F.SOFT}],'#C0DD97')+`</g>`
+         +F.fig(262,146,{c:'t',mund:'wow',aL:[-14,-16],aR:[14,-16],huepf:true,blick:-1});
+     }},
+    {n:'Die Zahl an der Kachel', d:8500,
+     t:'Bei Paul erscheint eine Zahl an der Kachel. Er liest, antwortet kurz oder gibt einen Daumen. Wer wann gelesen hat, zeigt BäckereiOS niemandem: Es soll helfen, nicht kontrollieren.',
+     m(F){
+       const brief=`<rect x="250" y="62" width="34" height="34" rx="8" fill="#B5D4F4" stroke="${F.K}" stroke-width="1.6"/><path d="M257 73 h20 v13 h-20z M257 73 l10 8 l10 -8" fill="#FFFDF6" stroke="${F.K}" stroke-width="1.5" stroke-linejoin="round"/>`;
+       return F.ort('zuhause',{licht:100})
+         +`<rect x="196" y="24" width="104" height="176" rx="16" fill="#3A2A22" stroke="${F.K}" stroke-width="2.4"/><rect x="204" y="36" width="88" height="152" rx="8" fill="#FFFDF6"/>`
+         +F.kacheln(212,62,['#FAC775',null,'#C0DD97','#CECBF6','#9FE1CB','#F5C4B3'],2,34).replace(/stroke-dasharray="3 3"/,'stroke-dasharray="0" opacity="0"')+brief
+         +`<g class="stamp" style="--d:1s"><circle cx="286" cy="62" r="11" fill="#E24B4A" stroke="${F.K}" stroke-width="1.8"/><text x="286" y="66.5" text-anchor="middle" style="fill:#FFFFFF;font-size:12px;font-weight:700;${F.FONT}">2</text></g>`
+         +F.fig(92,146,{hair:'tuft',c:'o',aR:[24,-8],blick:1})
+         +`<g class="pop" style="--d:2.4s"><rect x="30" y="56" width="104" height="30" rx="15" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2"/><text x="82" y="76" text-anchor="middle" style="fill:${F.K};font-size:13px;${F.FONT}">👍 Daumen</text></g>`;
+     }},
+    {n:'Der Aushang', d:8500,
+     t:'Was alle wissen müssen, wird ein Aushang. Er erscheint bei jedem Konto, auch auf den Tablets der Stationen, und lässt sich für die Wand ausdrucken. Gewöhnliche Nachrichten räumt BäckereiOS nach 40 Tagen von selbst weg.',
+     m(F){
+       return F.ort('backstube',{licht:180,regal:'',lampe:false})
+         +F.blatt(22,22,128,160,'Aushang')
+         +`<circle cx="86" cy="26" r="5" fill="#D85A30" stroke="${F.K}" stroke-width="1.6"/>`
+         +F.paper(150,100,'fly','--d:.8s;--dx:70px;--dy:10px')
+         +F.stationTablet(262,'Rondo')
+         +`<g class="pop" style="--d:1.8s"><rect x="229" y="103" width="66" height="16" rx="3" fill="#FAC775" stroke="${F.K}" stroke-width="1.4"/><text x="262" y="115" text-anchor="middle" style="fill:${F.K};font-size:9px;font-weight:700;${F.FONT}">AUSHANG</text></g>`
+         +F.fig(184,146,{hair:'cap',c:'b',blick:1,aR:[20,-8]});
+     }},
+    {n:'Die Tour des Fahrers', d:10000,
+     t:'Und so soll es weitergehen: Einer Filiale fehlt etwas, also schreibt sie mit einem Tipp an „Tour Fred“. Die Nachricht landet genau bei den Filialen, die Fred anfährt, auch wenn eine Aushilfe gar nicht weiß, welche das sind. Fred bringt es einfach mit.',
+     m(F){
+       const laden=(x,blass)=>`<g transform="translate(${x} 130) scale(.36)" ${blass?'opacity=".4"':''}>${F.filiale(0)}</g>`;
+       return F.ort('strasse')
+         +`<rect x="6" y="207" width="232" height="5" rx="2.5" fill="#D4537E"/>`
+         +laden(10)+laden(92)+laden(174)+laden(262,true)
+         +`<g class="pop" style="--d:.9s">`+F.chip(122,104,'Tour Fred','middle')+`</g>`
+         +F.chip(290,112,'andere Tour','middle')
+         +F.bub(6,54,172,'Hat jemand Tüten übrig?',38,140,.3)
+         +F.paper(40,148,'stay','--d:1.5s;--dx:80px;--dy:0px')
+         +F.paper(40,148,'stay','--d:1.9s;--dx:162px;--dy:0px')
+         +`<g transform="translate(96 178) scale(.3)">`+F.lkw(F.kopf(254,136,{c:'p',hair:'tuft',gross:.4}))+`</g>`
+         +F.stempel(262,46,'Touren-Gruppen','in Planung')
+         +F.schluss('winken',null,{x:332});
+     }}
+  ]
+});
+</script>
+</body>
+</html>

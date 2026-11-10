@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Der Schnellrechner · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Der Schnellrechner
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → produktionskette, weiter → hamstertage. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Der Schnellrechner',
+  untertitel:'Eine Frage, eine Antwort',
+  zurueck:{href:'produktionskette.html', name:'Die Produktionskette'},
+  weiter:{href:'hamstertage.html', name:'Hamstertage'},
+  szenen:[
+    {n:'Reicht das?', d:7000,
+     t:'Donnerstagnacht. Paul steht am Froster und fragt sich: Reichen die Croissants bis Samstag? Oder muss ich heute noch welche machen? Früher hieß das: schätzen, nachrechnen, hoffen.',
+     m(F){
+       const fr=(x,y,d)=>`<text class="pop" x="${x}" y="${y}" style="--d:${d}s;fill:#BA7517;font-size:26px;font-weight:700;${F.FONT}">?</text>`;
+       return F.ort('froster',{licht:120})+F.schild(12,22,'Froster')
+         +F.frosterSchrank(214)
+         +F.fig(120,146,{hair:'tuft',c:'o',mund:'sorge',blick:1})
+         +fr(72,104,.6)+fr(156,96,1)+fr(112,86,1.4);
+     }},
+    {n:'Zwei Angaben', d:7500,
+     t:'Im Schnellrechner wählt Paul nur zwei Dinge: das Produkt und den Tag, bis zu dem es reichen soll. Mehr muss er nicht wissen.',
+     m(F){
+       return F.ort('backstube',{nacht:true,licht:90,regal:'',fenster:false})
+         +F.figTab(70,146,{hair:'tuft',c:'o',blick:1})
+         +`<g class="pop" style="--d:.4s">`+F.karte(140,34,190,120,'Schnellrechner',[
+            {t:'Produkt:  Croissant',fett:true},{t:'Reichen bis:  Samstag',fett:true},{t:' '},{t:'Berechnen ›',farbe:'#0F6E56',fett:true}],'#FAC775')+`</g>`
+         +F.haken(300,74,1.1)+F.haken(300,93,1.6);
+     }},
+    {n:'BäckereiOS rechnet', d:8500,
+     t:'Den Rest weiß BäckereiOS schon: Freitags gehen im Schnitt 7 Bleche weg, samstags 11. Im Froster liegen 12. Und es prüft, ob ein Feiertag oder ein Hamstertag dazwischen liegt. Gerechnet wird mit derselben Produktionskette wie an den Stationen.',
+     m(F){
+       const k=(x,y,t,d)=>`<g class="pop" style="--d:${d}s"><rect x="${x}" y="${y}" width="118" height="30" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.8"/>`
+         +`<text x="${x+59}" y="${y+20}" text-anchor="middle" style="fill:#633806;font-size:11px;${F.FONT}">${t}</text></g>`;
+       return F.ort('bos',{licht:250})
+         +k(12,24,'Fr 7 · Sa 11 Bleche',.2)+k(12,110,'Froster: 12 Bleche',.5)+k(12,196,'Feiertag? Nein 🐹',.8)
+         +F.paper(134,40,'fly','--d:1.1s;--dx:76px;--dy:70px')
+         +F.paper(134,125,'fly','--d:1.4s;--dx:76px;--dy:0px')
+         +F.paper(134,210,'fly','--d:1.7s;--dx:76px;--dy:-80px')
+         +F.mitte(250,125)
+         +`<g class="pop" style="--d:2.6s">`+F.uhr(250,52)+`</g>`;
+     }},
+    {n:'Frisch gezählt?', d:8000,
+     t:'Ist die letzte Zählung im Froster älter als einen Tag, rechnet BäckereiOS nicht einfach mit alten Zahlen weiter. Es fragt nach – lieber kurz zählen als falsch backen.',
+     m(F){
+       return F.ort('froster',{licht:110})
+         +`<g class="pop" style="--d:.3s">`+F.karte(172,34,172,90,'Froster-Bestand',[{t:'zuletzt gezählt: vorgestern',farbe:'#A32D2D'},{t:'Bitte neu zählen',gestrichelt:true}],'#F7C1C1')+`</g>`
+         +F.fig(110,146,{hair:'tuft',c:'o',aR:[22,-6],mund:'wow',blick:1})
+         +F.bub(14,62,112,'Mach ich!',104,118,1.6);
+     }},
+    {n:'Die Antwort', d:7500,
+     t:'Am Ende steht eine klare Zahl: 7 und 11 gebraucht, 12 sind da – also 6 Bleche Croissants bis Samstag. Genau dafür ist der Schnellrechner da, und deshalb benutzen ihn so viele.',
+     m(F){
+       return F.ort('backstube',{nacht:true,licht:100,regal:'',fenster:false})
+         +`<g class="stamp" style="--d:.4s">`+F.karte(156,40,190,96,'Croissant bis Samstag',[{t:'7 + 11 − 12 =',farbe:'#5F5E5A'},{t:'Noch produzieren: 6 Bleche',hinter:'#E1F5EE',fett:true}],'#9FE1CB')+`</g>`
+         +F.fig(96,146,{hair:'tuft',c:'o',aL:[-14,-16],aR:[14,-16],huepf:true})
+         +F.bub(14,56,96,'Passt!',90,112,1.4)
+         +F.schluss('daumen');
+     }}
+  ]
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Von einem Bäcker für Bäcker · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Von einem Bäcker für Bäcker
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → lager, Ende. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Von einem Bäcker für Bäcker',
+  untertitel:'Wie BäckereiOS entsteht',
+  zurueck:{href:'lager.html', name:'Das Lager weiß Bescheid'},
+  szenen:[
+    {n:'Am Anfang war ein Froster', d:8000,
+     t:'BäckereiOS kommt aus keinem Softwarehaus. Gebaut hat es ein Bäcker aus der Nachtschicht. Am Anfang stand eine einzige Seite: die Inventur für den Froster.',
+     m(F){
+       return F.ort('froster',{licht:110})
+         +F.frosterRegal(224)
+         +F.figTab(96,146,{c:'u',muetze:true,blick:1})
+         +`<g class="pop" style="--d:1s">`+F.karte(14,30,150,62,'Froster-Inventur',['eine Seite, mehr nicht'],'#B5D4F4')+`</g>`;
+     }},
+    {n:'Nach der Schicht', d:8000,
+     t:'Gebaut wird nach der Schicht, wenn die Backstube längst wieder ruhig ist. Stück für Stück, Nacht für Nacht.',
+     m(F){
+       return F.ort('zuhause',{licht:170})
+         +F.tisch(110,172,150)
+         +F.tablet(142,112,86,60,`<path d="M156 130 h44 M156 140 h58 M156 150 h30" stroke="#C9B79A" stroke-width="3" stroke-linecap="round"/>`)
+         +F.fig(64,146,{c:'u',blick:1,aR:[26,-2]})
+         +`<g class="hz-zzz"><text x="238" y="100" style="fill:${F.K};font-size:13px;font-weight:700;${F.FONT}">…</text></g>`;
+     }},
+    {n:'Aus Problemen werden Satelliten', d:9500,
+     t:'Jedes Programm ist aus einem echten Problem entstanden: ein verlorener Zettel, eine doppelte Fahrt, eine Frage um drei Uhr nachts. So kreisen heute viele kleine Satelliten um eine gemeinsame Mitte.',
+     m(F){
+       const sat=[['Schnellrechner',70,34],['Wunschtag',288,40],['Teigecke',50,112],['Reparatur',306,118],['Nachrichten',76,196],['Wochenplan',286,198],['Hamstertage',180,222]];
+       return F.ort('bos')+F.mitte(180,118)
+         +sat.map(([n,x,y],k)=>`<g class="pop" style="--d:${.3+k*.3}s"><path d="M${x} ${y+10} L180 118" stroke="#9FD9B8" stroke-width="2" stroke-dasharray="3 5"/>`+F.chip(x,y,n,'middle')+`</g>`).join('')
+         +F.mitte(180,118);
+     }},
+    {n:'Die Backstube baut mit', d:8500,
+     t:'Die besten Ideen kommen aus der Backstube selbst: ein Kniff am Teig, ein Wunsch an der Station, ein „Das nervt jeden Tag“. BäckereiOS hört zu.',
+     m(F){
+       return F.ort('backstube',{regal:'',lampe:false})
+         +F.fig(60,146,{hair:'tuft',c:'o',blick:1,aR:[20,-6]})
+         +F.fig(300,146,{hair:'bun',c:'g',blick:-1,aL:[-20,-6]})
+         +F.figTab(180,146,{c:'u',muetze:true})
+         +F.bub(8,58,150,'Mach das doch so …',64,120,.5)
+         +F.bub(206,58,146,'Das nervt jeden Tag.',292,120,1.4)
+         +F.paper(96,150,'fly','--d:2s;--dx:70px;--dy:26px')+F.paper(264,150,'fly','--d:2.4s;--dx:-70px;--dy:26px');
+     }},
+    {n:'Fertig ist es nie', d:9500,
+     t:'Fertig ist BäckereiOS nie, und das soll auch so sein. Danke fürs Zuschauen. Und jetzt: ausprobieren.',
+     m(F){
+       const reihe=[['o','tuft'],['r',''],['t',''],['g','bun'],['u',''],['n',''],['b','cap'],['p','tuft'],['v','tuft']];
+       let s=F.ort('backstube',{licht:160,regal:'',lampe:false})+F.lichter(8);
+       reihe.forEach(([c,h],k)=>{
+         s+=`<g class="pop" style="--d:${.15+k*.12}s">`+F.fig(22+k*33,150,{c,hair:h,brille:c==='n',muetze:c==='r'||c==='u',gross:.5,huepf:k%2===0,winken:k%2===1,blick:1})+`</g>`;});
+       return s+F.loch(326,236,'lachen',1.6,56)+F.bub(176,80,150,'Danke fürs Zuschauen!',314,152,2.4);
+     }}
+  ]
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Woher weiß BäckereiOS das? · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Geschichte: Woher weiß BäckereiOS das?
+  Stand: 10.11.2026, 22:12 Uhr MEZ (Bau-Chat Tour Stufe 2)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Figuren frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 22:12 · Erstfassung im Repo (Tour Stufe 2, Anweisung Kontroll-Chat 10.11., 22:10), gezeichnet und geschrieben
+      vom Ideen-Chat (Entwurf 13. Fassung), Szenen und Texte unverändert übernommen.
+      Kette (folgt der Übersicht): zurück → hamstertage, weiter → produkte. SESSION_2026-11-10_TOUR_FREUNDE_STUFE2_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Woher weiß BäckereiOS das?',
+  untertitel:'Die Verbrauchsberechnung',
+  zurueck:{href:'hamstertage.html', name:'Hamstertage'},
+  weiter:{href:'produkte.html', name:'Jedes Produkt hat seine Karte'},
+  szenen:[
+    {n:'Der Backzettel', d:7500,
+     t:'Jede Nacht entsteht ein Backzettel: was gebacken wurde und wie viel. Früher wanderte er danach ins Altpapier, und das Wissen darauf gleich mit.',
+     m(F){
+       return F.ort('backstube',{nacht:true,licht:130,regal:''})
+         +F.blatt(150,34,104,134,'Backzettel')
+         +F.papierkorb(292)
+         +`<path class="pop" style="--d:1.4s" d="M258 120 q26 0 30 34" fill="none" stroke="${F.K}" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>`
+         +F.fig(84,146,{hair:'tuft',c:'o',blick:1,aR:[24,-4]});
+     }},
+    {n:'Ein Foto genügt', d:9000,
+     t:'Heute wird der Zettel fotografiert. BäckereiOS liest die Zahlen vom Foto ab und rechnet jede Zeile nach. Passt eine Zahl nicht, wird die Zeile rot, und ein Mensch schaut noch einmal aufs Foto.',
+     m(F){
+       const ecke=(x,y,a,b)=>`<path d="M${x} ${y+b*12} v${-b*12} h${a*12}" fill="none" stroke="#378ADD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+       return F.ort('backstube',{nacht:true,licht:90,regal:'',fenster:false})
+         +F.blatt(150,30,104,134,'Backzettel')
+         +`<g class="pop" style="--d:.6s">`+ecke(142,22,1,1)+ecke(262,22,-1,1)+ecke(142,172,1,-1)+ecke(262,172,-1,-1)+`</g>`
+         +`<rect class="pop" style="--d:2s" x="166" y="106" width="72" height="13" rx="3" fill="#FCEBEB" stroke="#E24B4A" stroke-width="1.8"/>`
+         +`<g class="pop" style="--d:1.2s">`+F.haken(248,84,1.2)+`</g>`+F.haken(248,134,1.5)
+         +`<g class="pop" style="--d:2.4s">`+F.chip(304,104,'bitte prüfen','middle')+`</g>`
+         +F.figTab(72,146,{hair:'tuft',c:'o',blick:1});
+     }},
+    {n:'Montag ist nicht Samstag', d:8500,
+     t:'Aus den Zetteln entsteht der Schnitt je Wochentag. Montage werden mit Montagen verglichen, Samstage mit Samstagen. Denn ein Samstag ist kein Montag.',
+     m(F){
+       return F.ort('bos',{licht:180})
+         +F.balken(84,190,[.42,.38,.45,.5,.66,1],['Mo','Di','Mi','Do','Fr','Sa'],{h:120,b:22,farben:['#B5D4F4','#B5D4F4','#B5D4F4','#B5D4F4','#FAC775','#F0997B']})
+         +F.chip(180,22,'Schnitt je Wochentag','middle');
+     }},
+    {n:'Wie weit zurück?', d:9000,
+     t:'Wie weit BäckereiOS zurückschaut, lässt sich einstellen: die letzten paar gleichen Wochentage oder alle aus einem festen Zeitraum. So bleibt der Schnitt frisch und kippt trotzdem nicht bei jeder Laune.',
+     m(F){
+       let s=F.ort('bos',{ton:'creme'});
+       const gitter=(x0,titel,an,d)=>{let g=`<g class="pop" style="--d:${d}s">`+F.chip(x0+70,26,titel,'middle');
+         for(let r=0;r<5;r++)for(let c=0;c<6;c++){const on=an(r,c);
+           g+=`<rect x="${x0+c*23}" y="${58+r*23}" width="19" height="19" rx="4" fill="${on?'#FAC775':'#FFFDF6'}" stroke="${on?'#BA7517':'#C9B79A'}" stroke-width="${on?2:1.2}"/>`;}
+         return g+`</g>`;};
+       s+=gitter(22,'Feste Anzahl',(r,c)=>c===5&&r>=2,.3)+gitter(196,'Fester Zeitraum',(r,c)=>c===5,1.2);
+       return s+F.text(28,192,'die letzten drei Samstage',1)+F.text(202,192,'alle Samstage im Zeitraum',1);
+     }},
+    {n:'Ausreißer zählen nicht', d:9000,
+     t:'Weicht eine Zahl stark ab, markiert BäckereiOS sie von selbst, und ein Tipp dreht das wieder um. Einen ganzen Tag, etwa vor dem Feiertag, nimmt ein Mensch mit einem Schalter heraus. Gespeichert bleibt alles, mitgezählt wird es nicht.',
+     m(F){
+       return F.ort('bos',{licht:180})
+         +F.balken(70,190,[.4,.44,.38,1,.42,.4],['Sa','Sa','Sa','Sa','Sa','Sa'],{h:130,b:26,aus:3})
+         +`<g class="stamp" style="--d:1.6s">`+F.chip(190,24,'zählt nicht für den Schnitt','middle')+`</g>`
+         +`<path class="pop" style="--d:1.9s" d="M190 46 v10" stroke="${F.K}" stroke-width="2" stroke-linecap="round"/>`;
+     }},
+    {n:'Davon lebt alles', d:8000,
+     t:'Auf diesem Schnitt bauen der Schnellrechner, die Stationen und der Wochenplan auf. Darum lohnt sich das eine Foto jede Nacht.',
+     m(F){
+       return F.ort('bos')+F.mitte(180,70)
+         +F.paper(180,98,'stay','--d:.6s;--dx:-118px;--dy:66px')+F.paper(180,98,'stay','--d:.9s;--dx:-22px;--dy:66px')+F.paper(180,98,'stay','--d:1.2s;--dx:66px;--dy:66px')
+         +`<g class="pop" style="--d:1.5s">`+F.chip(62,184,'Schnellrechner','middle')+F.chip(158,184,'Stationen','middle')+F.chip(246,184,'Wochenplan','middle')+`</g>`
+         +F.schluss('daumen');
+     }}
+  ]
+});
+</script>
+</body>
+</html>
