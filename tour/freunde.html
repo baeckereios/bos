@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crumble and Friends · BäckereiOS Einblick</title>
+<!--
+  BäckereiOS · Satellit – Demo-Tour, Vorstellung: Crumble and Friends
+  Stand: 10.11.2026, 21:42 Uhr MEZ (Bau-Chat Tour Stufe 1)
+  Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
+  Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 21:42 · Tour Stufe 1 (Anweisung Kontroll-Chat 10.11., 19:17; Entwurf Ideen-Chat, 13. Fassung):
+      neu: Crumble stellt sich vor, danach seine Freunde (4 Szenen).
+      Kette Stufe 1: weiter → produktionskette. SESSION_2026-11-10_TOUR_FREUNDE_STUFE1_BAU.md
+-->
+<link rel="stylesheet" href="tour_geschichte.css">
+<script>
+  function tourLadefehler(datei){
+    document.addEventListener('DOMContentLoaded',function(){
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="err" role="alert" style="margin:16px">'+datei+' konnte nicht geladen werden. Liegt die Datei im selben Ordner?</div>');
+    });
+  }
+</script>
+<script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
+<script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
+</head>
+<body>
+<script>
+window.BOS_TOUR && BOS_TOUR.geschichte({
+  titel:'Crumble and Friends',
+  untertitel:'Wer euch durch BäckereiOS führt',
+  weiter:{href:'produktionskette.html', name:'Die Produktionskette'},
+  szenen:[
+    {n:'Hallo!', d:7000,
+     t:'Das ist Crumble. Er wohnt in BäckereiOS und kennt hier jede Ecke. Schon an der Tür schaut er aus seinem Loch und begrüßt jeden, der hereinkommt.',
+     m(F){
+       return F.ort('backstube',{licht:256,regal:'l'})
+         +F.logo(118,160,26)
+         +F.loch(256,224,'winken',.2,90)
+         +F.bub(24,96,172,'Hallo, ich bin Crumble!',232,136,1.2);
+     }},
+    {n:'Dein Assistent', d:8500,
+     t:'In BäckereiOS ist Crumble dein Assistent. Er läuft über den Schreibtisch, sagt Bescheid, wenn noch etwas offen ist, und hat Tipps aus der Backstube parat. Dabei ist er eher Lehrmeister: ernst gemeint, aber nie stocksteif.',
+     m(F){
+       const farben=['#FAC775','#B5D4F4','#C0DD97','#F5C4B3','#CECBF6','#9FE1CB'];
+       let k='';farben.forEach((f,i)=>{k+=`<rect x="${34+(i%3)*40}" y="${56+Math.floor(i/3)*40}" width="30" height="30" rx="7" fill="${f}" stroke="${F.K}" stroke-width="1.6"/>`;});
+       const schirm=k+`<rect x="23" y="158" width="206" height="22" rx="4" fill="#EFE6D4"/><circle cx="38" cy="169" r="5" fill="#D98E2B"/><path d="M52 169 h34" stroke="#C9B79A" stroke-width="4" stroke-linecap="round"/>`
+         +F.bueste(188,158,'pfote',.5,62);
+       const tipp=`<g class="pop" style="--d:2.4s"><rect x="190" y="30" width="158" height="30" rx="6" fill="#FAEEDA" stroke="#BA7517" stroke-width="1.8"/>`
+         +`<text x="269" y="50" text-anchor="middle" style="fill:#633806;font-size:12px;${F.FONT}">Tipp: Altes zuerst raus.</text></g>`;
+       return F.ort('bos',{ton:'creme',licht:140})
+         +F.tablet(14,38,224,152,schirm)
+         +`<path d="M96 190 l-10 30 h80 l-10 -30z" fill="#3A2A22" stroke="${F.K}" stroke-width="2.2" stroke-linejoin="round"/>`
+         +F.bub(198,74,150,'Inventur noch offen!',204,112,1.2)+tipp;
+     }},
+    {n:'Und Maskottchen', d:8000,
+     t:'Und er ist unser Maskottchen. Im Bildschirmschoner hat er seinen Spielplatz, dort macht er Blödsinn zum Zugucken und Lachen. Wem er zu viel wird: ein Knopf, und er hält sich zurück.',
+     m(F){
+       return F.ort('bos',{ton:'creme'})
+         +F.loch(66,150,'zwinkern',.3,62)
+         +F.loch(182,222,'wangen',1.1,70)
+         +F.loch(296,158,'gaehnen',1.9,62)
+         +`<g class="pop" style="--d:2.8s">`+F.schalter(118,18,'Crumble',true)+`</g>`;
+     }},
+    {n:'Seine Freunde', d:9000,
+     t:'Die Geschichten dieser Tour spielen seine Freunde: hinten Paul, Fritz, Pauline und Franz, vorn Ben, Karl, Fred und Hannes. Sie arbeiten in verschiedenen Ecken – BäckereiOS sorgt dafür, dass jeder vom anderen weiß. Und am Ende jeder Geschichte schaut Crumble kurz vorbei.',
+     m(F){
+       const hinten=[['o','tuft','Paul'],['r','','Fritz'],['g','bun','Pauline'],['n','','Franz']];
+       const vorn=[['t','','Ben'],['b','cap','Karl'],['p','tuft','Fred'],['v','tuft','Hannes']];
+       let s=F.ort('backstube',{licht:160,regal:'',lampe:false})+F.lichter(8);
+       hinten.forEach(([c,h,n],k)=>{const x=70+k*76;
+         s+=F.rein(F.fig(x,126,{c,hair:h,brille:c==='n',muetze:c==='r',gross:.62,blick:k<2?1:-1}),{von:-120-k*76,d:.1+k*.25,dauer:1.1})+F.namensschild(x,112-(c==='r'?12:0),n,1.5+k*.15);});
+       vorn.forEach(([c,h,n],k)=>{const x=32+k*76;
+         s+=F.rein(F.fig(x,152,{c,hair:h,gross:c==='t'?.56:.62,winken:k===0,blick:k<2?1:-1}),{von:380-k*76,d:1.1+k*.25,dauer:1.1})+F.namensschild(x,228,n,2.6+k*.15);});
+       return s+F.loch(330,236,'lachen',3.2,48);
+     }}
+  ]
+});
+</script>
+</body>
+</html>

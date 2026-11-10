@@ -13,14 +13,32 @@
   Regeln (Doku 2026-10-09_DEMO_TOUR.md):
   - Keine Bedienanleitung. Jede Szene beantwortet mindestens eine der fünf Fragen:
     Was kann BäckereiOS? Wozu? Was will es erreichen? Stärken? Zukunftspläne?
-  - Nur erfundene Namen (Paul orange 'o', Pauline grün 'g', Karl blau 'b', Frühschicht koralle 'r').
+  - Nur erfundene Namen. Besetzung (Crumble and Friends; Farbe = Schürze, Kürzel für o.c):
+      Paul orange 'o' (hair:'tuft') · Pauline grün 'g' (hair:'bun', Schleife) · Karl blau 'b' (hair:'cap')
+      Fritz koralle 'r' (Frühschicht) · Franz grau 'n' mit Brille (Produktionsleitung) · Ben türkis 't' (Azubi)
+      Hannes violett 'v' (Haustechnik) · Fred rosa 'p' (Fahrer)
+  - Crumble selbst ist kein gezeichneter Hamster, sondern das echte Bild aus ../hamster_figur/loch/
+    (F.loch, F.bueste). In der letzten Szene jeder Geschichte kommt er unten rechts aus dem Loch: F.schluss(...).
   - Keine echten Mengen oder Betriebszahlen (Seite ist öffentlich).
   - Geplantes immer gestrichelt: geplant:true oben, F.stempel(...) in der Szene.
   - Produktionsleitung neutral bis positiv zeigen.
-  - Bühne 360 × 250, Boden bei y = 212. Figur mit Kopf bei y = 118 steht auf dem Boden.
+  - Bühne 360 × 250, Boden bei y = 212. Figur mit Kopf bei y = 146 steht auf dem Boden.
+  - Hintergrund weich ohne Kontur (F.ort), Requisiten davor mit brauner Kontur. Keine Herzen.
 
-  Bausteine in m(F): F.bg, F.fig, F.tab, F.paper, F.bub, F.schild, F.mitte, F.logo,
-  F.stempel, F.uhr, F.text, Farben/Stile F.INK, F.SOFT, F.S0, F.SF – siehe tour_figuren.js.
+  Bausteine in m(F):
+    aus tour_figuren.js:  F.bg, F.fig, F.tab, F.paper, F.bub, F.schild, F.mitte, F.logo, F.stempel, F.uhr, F.text,
+                          Farben/Stile F.INK, F.SOFT, F.S0, F.SF (F.fig zeichnet seit tour_freunde.js einen Hamster;
+                          die alten Strichmännchen gibt es noch als F.figStrich)
+    aus tour_freunde.js:  F.fig-Zusätze o.winken, o.huepf, o.schlaf, o.muetze, o.krank, o.gross, o.blick, o.kunde,
+                          o.mund 'lachen'|'wow'|'sorge' · F.figTab, F.kopf, F.rein, F.loch, F.bueste, F.namensschild,
+                          F.chip, F.lichter, F.status, F.schluss
+    aus tour_kulisse.js:  F.ort('backstube'|'froster'|'buero'|'werkstatt'|'lager'|'zuhause'|'strasse'|'hof'|'bos'|'tisch', o)
+                          und die Requisiten (kessel, wagen, ofen, lkw, bett, monitor, drucker, kalender, qr, dkey, bund …)
+    Genaue Optionen stehen jeweils im Kopf der Datei.
+
+  ÄNDERUNGEN
+    2026-11-10 · 21:43 · Tour Stufe 1: neue Ladereihenfolge (tour_freunde.js, tour_kulisse.js), Besetzung Crumble and Friends,
+      Bausteinliste ergänzt, Beispielszenen mit F.ort und F.schluss. SESSION_2026-11-10_TOUR_FREUNDE_STUFE1_BAU.md
 -->
 <link rel="stylesheet" href="tour_geschichte.css">
 <script>
@@ -32,6 +50,8 @@
   }
 </script>
 <script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
 <script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
 </head>
 <body>
@@ -46,15 +66,15 @@ window.BOS_TOUR && BOS_TOUR.geschichte({
     {n:'Erste Szene', d:7000,
      t:'Bildunterschrift: ein bis drei Sätze, erzählend.',
      m(F){
-       return F.bg('#F1EFE8','#D3D1C7')
-         +F.schild(14,20,'Ort')
-         +F.fig(180,118,{hair:'tuft',c:'o'})
-         +F.bub(40,50,120,'Hallo!',170,100,.5);
+       return F.ort('backstube')
+         +F.fig(180,146,{hair:'tuft',c:'o',winken:true})
+         +F.bub(40,60,120,'Hallo!',165,118,.5);
      }},
     {n:'Ausblick', d:6500,
      t:'Falls etwas noch geplant ist: ehrlich zeigen.',
      m(F){
-       return F.bg('#FAEEDA')+F.stempel(180,125,'Etwas Neues','in Planung');
+       return F.ort('bos')+F.stempel(180,125,'Etwas Neues','in Planung')
+         +F.schluss('winken');
      }}
   ]
 });

@@ -5,11 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kaputt? Gemeldet. · BäckereiOS Einblick</title>
 <!--
-  BäckereiOS · Satellit – Demo-Tour, Geschichte 5: Meldestation (in Planung)
-  Stand: 10.10.2026 (Doku 2026-10-09_DEMO_TOUR.md)
+  BäckereiOS · Satellit – Demo-Tour, Geschichte 5: Kaputt? Gemeldet. (Reparaturanfrage)
+  Stand: 10.11.2026, 21:42 Uhr MEZ (Bau-Chat Tour Stufe 1)
   Nur das Drehbuch. Aufbau und Steuerung kommen aus tour_abspieler.js,
-  die Zeichnungen aus tour_figuren.js.
+  die Zeichnungen aus tour_figuren.js, tour_freunde.js (Crumble and Friends) und tour_kulisse.js (Orte, Requisiten).
   Öffentliche Seite: keine Anmeldung, keine Datenbank. Personen frei erfunden.
+
+  ÄNDERUNGEN
+    2026-11-10 · 21:42 · Tour Stufe 1 (Anweisung Kontroll-Chat 10.11., 19:17; Entwurf Ideen-Chat, 13. Fassung):
+      Szenen neu gezeichnet, neue Texte: die Reparaturanfrage läuft, „in Planung“ entfällt (6 Szenen).
+      Kette Stufe 1: zurück → teigecke, weiter → lager. SESSION_2026-11-10_TOUR_FREUNDE_STUFE1_BAU.md
+    2026-10-10 · Erstfassung (Doku 2026-10-09_DEMO_TOUR.md).
 -->
 <link rel="stylesheet" href="tour_geschichte.css">
 <script>
@@ -21,61 +27,88 @@
   }
 </script>
 <script src="tour_figuren.js" onerror="tourLadefehler('tour_figuren.js')"></script>
+<script src="tour_freunde.js" onerror="tourLadefehler('tour_freunde.js')"></script>
+<script src="tour_kulisse.js" onerror="tourLadefehler('tour_kulisse.js')"></script>
 <script src="tour_abspieler.js" onerror="tourLadefehler('tour_abspieler.js')"></script>
 </head>
 <body>
 <script>
 window.BOS_TOUR && BOS_TOUR.geschichte({
   titel:'Kaputt? Gemeldet.',
-  untertitel:'Ein Draht zur Haustechnik – in Planung',
-  geplant:true,
+  untertitel:'Die Reparaturanfrage',
   zurueck:{href:'teigecke.html', name:'Nachts in der Teigecke'},
   weiter:{href:'lager.html', name:'Das Lager weiß Bescheid'},
   szenen:[
     {n:'Da klemmt was', d:7000,
      t:'Die Tür vom Etagenofen klemmt. Früher wurde das irgendwem erzählt und landete manchmal nie beim Haustechniker.',
      m(F){
-       return F.bg('#FAECE7','#F5C4B3')
-         +`<g class="zittern" style="--d:.4s"><rect x="190" y="50" width="140" height="150" rx="6" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/>`
-         +[0,1,2].map(i=>`<rect x="204" y="${62+i*44}" width="112" height="34" rx="4" style="stroke:${F.INK};stroke-width:2;fill:#F1EFE8"/>`).join('')
-         +`<rect x="204" y="106" width="112" height="34" rx="4" style="stroke:#E24B4A;stroke-width:2.6;fill:#FCEBEB"/></g>`
-         +`<path class="pop" style="--d:.8s" d="M300 96 l8 -10 l-2 9 l8 -6" stroke="#E24B4A" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
-         +F.text(260,214+14,'Etagenofen',1,'middle')
-         +F.fig(100,124,{hair:'bun',c:'g',mund:'wow'})
-         +F.bub(14,44,140,'Die Tür klemmt!',96,104,.6);
+       return F.ort('backstube',{licht:110,regal:'',lampe:false})+F.schild(12,14,'Am Etagenofen')
+         +`<g class="zittern" style="--d:.4s">`+F.ofen(196,{kaputt:1})+`</g>`
+         +`<path class="pop" style="--d:.8s" d="M312 108 l8 -10 l-2 9 l8 -6" stroke="#E24B4A" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+         +F.fig(100,146,{hair:'bun',c:'g',mund:'wow',blick:1})
+         +F.bub(14,64,140,'Die Tür klemmt!',98,122,.6);
      }},
-    {n:'Gemeldet', d:7500,
-     t:'Am Ofen hängt ein QR-Code. Pauline hält ihr Gerät davor, und die Meldung für genau diesen Ofen ist schon geöffnet. Ein Satz dazu, abschicken, fertig.',
+    {n:'Gemeldet', d:8000,
+     t:'Pauline öffnet die Reparaturanfrage und schreibt in einem Satz, was los ist. Kein Suchen in Gerätelisten, kein langes Formular. Abschicken – die Anfrage steht auf Rot: gemeldet.',
      m(F){
-       let q='';[[0,0],[2,0],[0,2],[1,1],[2,2],[3,1],[1,3],[3,3]].forEach(([a,b])=>q+=`<rect x="${206+a*7}" y="${110+b*7}" width="6" height="6" fill="${F.INK}"/>`);
-       return F.bg('#FAECE7','#F5C4B3')
-         +`<rect x="190" y="50" width="140" height="150" rx="6" style="stroke:${F.INK};stroke-width:2.2;fill:#D3D1C7"/>`
-         +`<rect x="200" y="104" width="38" height="38" rx="3" style="${F.SF}"/>${q}`
-         +F.fig(120,124,{hair:'bun',c:'g',aR:[22,-6]})+F.tab(140,128)
-         +F.haken(166,118,1)
-         +F.paper(152,136,'fly','--d:1.4s;--dx:-150px;--dy:-110px');
+       return F.ort('backstube',{licht:80,regal:'',lampe:false})
+         +F.figTab(66,146,{hair:'bun',c:'g',blick:1})
+         +F.karte(134,30,208,112,'Reparaturanfrage',[
+            {t:'„Etagenofen: Tür klemmt“',fett:true},
+            {t:'in eigenen Worten',farbe:F.SOFT},
+            {t:'Absenden ›',farbe:'#0F6E56',fett:true}
+          ],'#F5C4B3')
+         +F.status(238,156,'rot','gemeldet',1.6,'middle');
      }},
-    {n:'Beim Haustechniker', d:7500,
-     t:'Hannes von der Haustechnik sieht alle Meldungen an einem Ort, mit Gerät, Datum und Absender. Er hakt ab: gesehen.',
+    {n:'Gesehen', d:8000,
+     t:'Bei Hannes von der Haustechnik liegen alle Anfragen in einem Posteingang. Er tippt auf „gesehen“, und aus Rot wird Gelb. Jetzt wissen alle, die mitlesen dürfen: Es ist angekommen.',
      m(F){
-       return F.bg('#EEEDFE','#CECBF6')
-         +F.karte(150,34,190,120,'Meldungen',[
-            {t:'Etagenofen · Tür klemmt',fett:true},
-            {t:'heute · Backstube',farbe:F.SOFT},
-            '☑ gesehen'
+       return F.ort('werkstatt')
+         +F.karte(150,30,196,96,'Posteingang',[
+            {t:'Etagenofen: Tür klemmt',fett:true},
+            {t:'Pauline · heute',farbe:F.SOFT}
           ],'#CECBF6')
-         +F.fig(80,124,{hair:'tuft',c:'v',aR:[18,-2]})
-         +`<path d="M58 158 l-10 10 m4 -14 a6 6 0 1 0 8 8" style="${F.S0}"/>`
-         +F.haken(318,120,1);
+         +F.status(248,140,'rot','gemeldet',.2,'middle',104)
+         +F.status(248,140,'gelb','gesehen',1.8,'middle',104)
+         +F.schluessel(34,200)
+         +F.fig(84,146,{hair:'tuft',c:'v',aR:[22,-6],blick:1});
      }},
-    {n:'Alle sehen den Stand', d:8000,
-     t:'Hannes trägt ein, wann er repariert. In der Backstube sieht jeder: ist gemeldet, kommt am Donnerstag. Niemand meldet doppelt, niemand wartet ins Leere. Das ist noch in Planung.',
+    {n:'Jeder sieht den Stand', d:8500,
+     t:'Zu jeder Anfrage gibt es einen Verlauf wie bei einer Paketverfolgung und einen kurzen Chat. Karl sieht: schon gemeldet, Hannes kommt am Donnerstag. Niemand meldet doppelt, niemand wartet ins Leere.',
      m(F){
-       return F.bg('#F1EFE8','#D3D1C7')
-         +F.karte(30,30,170,96,'Etagenofen',[{t:'☑ gesehen',farbe:'#3B6D11'},{t:'Reparatur: Donnerstag',fett:true}],'#C0DD97')
-         +F.fig(270,124,{hair:'cap',c:'b'})
-         +F.bub(214,52,122,'Schon gemeldet.',264,104,.6)
-         +F.stempel(116,180,'Meldestation','in Planung');
+       const pkt=(y,f,t,d,voll)=>`<g class="pop" style="--d:${d}s"><circle cx="40" cy="${y}" r="6.5" fill="${voll?f:'#FFFDF6'}" stroke="${F.K}" stroke-width="1.8"/>`
+         +`<text x="54" y="${y+4}" style="fill:${F.K};font-size:12px;${voll?'font-weight:600;':''}${F.FONT}">${t}</text></g>`;
+       return F.ort('backstube',{licht:270,regal:''})
+         +`<rect x="18" y="24" width="184" height="158" rx="10" fill="#FFFDF6" stroke="${F.K}" stroke-width="2.2"/><path d="M18 50 v-16 a10 10 0 0 1 10 -10 h164 a10 10 0 0 1 10 10 v16z" fill="#F5C4B3" stroke="${F.K}" stroke-width="2.2"/>`
+         +`<text x="110" y="42" text-anchor="middle" style="fill:${F.K};font-size:13px;font-weight:600;${F.FONT}">Etagenofen</text>`
+         +`<path d="M40 70 V122" stroke="${F.K}" stroke-width="1.8" stroke-dasharray="1 0"/>`
+         +pkt(70,'#E24B4A','gemeldet · Mittwoch',.3,true)+pkt(96,'#F7C86A','gesehen · Mittwoch',.8,true)+pkt(122,'#639922','repariert',1.3,false)
+         +`<g class="pop" style="--d:2s"><rect x="26" y="142" width="168" height="28" rx="14" fill="#EEEDFE" stroke="${F.K}" stroke-width="1.6"/>`
+         +`<text x="110" y="161" text-anchor="middle" style="fill:${F.K};font-size:11px;${F.FONT}">Hannes: Komme Donnerstag.</text></g>`
+         +F.fig(274,146,{hair:'cap',c:'b',blick:-1})
+         +F.bub(214,66,128,'Schon gemeldet.',266,122,2.6);
+     }},
+    {n:'Repariert', d:7500,
+     t:'Donnerstag: Die Tür läuft wieder. Hannes setzt die Anfrage auf Grün. Nach einer Woche wandert sie von selbst ins Archiv.',
+     m(F){
+       return F.ort('backstube',{licht:110,regal:'',lampe:false})
+         +F.ofen(196)
+         +F.status(266,14,'gruen','repariert',1.4,'middle')
+         +F.fig(104,146,{hair:'tuft',c:'v',aL:[-14,-16],aR:[24,-2],blick:1})+F.schluessel(150,172)
+         +F.bub(14,62,120,'Läuft wieder!',98,118,.6);
+     }},
+    {n:'Noch schneller: der QR-Code', d:8500,
+     t:'An den Stikkenöfen klebt zusätzlich ein QR-Code. Scannen, mit dem eigenen Konto anmelden, und die Seite der Maschine ist offen – mit einem großen Knopf für die Reparaturanfrage. So weiß die Haustechnik gleich, um welches Gerät es geht.',
+     m(F){
+       return F.ort('backstube',{licht:90,regal:'',lampe:false})
+         +F.stikkenofen(186,{qr:true})
+         +F.fig(110,146,{c:'t',aR:[26,-8],blick:1})+F.tab(144,152)
+         +`<path class="pop" style="--d:.8s" d="M176 158 q20 -30 92 -40" stroke="#378ADD" stroke-width="2.2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>`
+         +`<g class="pop" style="--d:1.4s">`+F.karte(10,20,176,84,'Stikkenofen',[
+            {t:'Infos zur Maschine'},
+            {t:'Reparatur melden ›',farbe:'#A32D2D',fett:true}
+          ],'#F5C4B3')+`</g>`
+         +F.schluss('daumen',null,{x:330});
      }}
   ]
 });

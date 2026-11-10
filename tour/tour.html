@@ -5,8 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BäckereiOS · Satellit – Einblick</title>
 <!--
-  BäckereiOS · Satellit – Demo-Tour, Übersichtsseite tour/tour.html (Gerüst)
-  Stand: 10.10.2026 (Ideen-Chat, Doku 2026-10-09_DEMO_TOUR.md)
+  BäckereiOS · Satellit – Demo-Tour, Übersichtsseite tour/tour.html
+  Stand: 10.11.2026, 21:42 Uhr MEZ (Bau-Chat Tour Stufe 1). Vorher 10.10.2026 (Gerüst, Doku 2026-10-09_DEMO_TOUR.md)
+  ÄNDERUNGEN
+    2026-11-10 · 21:42 · Tour Stufe 1 (Anweisung Kontroll-Chat 10.11., 19:17; Entwurf Ideen-Chat, 13. Fassung):
+      Absatz zu Crumble in der Einleitung (Bild ../hamster_figur/loch/winken.png), Kachel „Crumble and Friends“
+      neu, „Kaputt? Gemeldet.“ von „Morgen“ nach „Heute“ (die Reparaturanfrage läuft). Bild-Bausteine für die
+      Geschichten aus Stufe 2 schon dabei (ungenutzt). Netzkarte unverändert. SESSION_2026-11-10_TOUR_FREUNDE_STUFE1_BAU.md
   Öffentliche Seite: keine Anmeldung, keine Datenbank, keine Firebase-Einbindung.
   Verlinkt von der Anmeldeseite (../index.html), erreichbar unter …/bos/tour/tour.html. Bewusst NICHT index.html: Verwechslungsgefahr mit der Anmeldeseite. Design angelehnt an den Bootscreen
   (Sternenhimmel, Schriftzug, kreisende Satelliten), aber eigenständiger Code.
@@ -77,6 +82,9 @@ h2{font-family:Georgia,"Times New Roman",serif;font-size:24px;margin:0 0 6px;tex
   text-decoration:none;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;
   border:2px solid transparent;transition:transform .15s}
 a.kachel:hover,a.kachel:focus-visible{transform:translateY(-3px);outline:none;border-color:var(--amber)}
+.intro .crumble{display:flex;gap:14px;align-items:center}
+.intro .crumble img{flex:0 0 auto;width:84px;height:auto}
+.intro .crumble span{text-align:left}
 .kachel .bild{position:absolute;inset:6px 0 50px 0;display:flex;align-items:center;justify-content:center}
 .kachel .bild svg{width:auto;height:72%;max-width:62%}
 .kachel .name{position:relative;background:rgba(255,253,246,.94);padding:6px 8px;font-size:12.5px;
@@ -133,6 +141,10 @@ footer a{color:var(--muted)}
       Vom Froster bis zum Wochenplan, vom Büro bis in die Nachtschicht.
       <strong>Jeder soll in jeder Schicht klarkommen.</strong></p>
     <p>Die kleinen Geschichten hier zeigen, was heute schon läuft und wo die Reise hingeht.</p>
+    <p class="crumble"><img src="../hamster_figur/loch/winken.png" alt="Crumble, der Hamster von BäckereiOS, winkt" width="84" height="100">
+      <span>Durch die Geschichten führt <strong>Crumble</strong>, unser Hamster. In BäckereiOS ist er Assistent und Maskottchen zugleich:
+      Er sagt Bescheid, wenn etwas offen ist, hat Tipps aus der Backstube parat und sorgt dafür, dass es bei aller Arbeit auch etwas zu lachen gibt.
+      Die Rollen in den Geschichten spielen seine Freunde.</span></p>
   </div>
   </div>
  </section>
@@ -193,14 +205,15 @@ const VERBINDUNGEN=[
 /* Kachel-Gruppen. Reihenfolge = Anzeige. */
 const GRUPPEN=[
   {marke:'03 · Heute', titel:'Was BäckereiOS heute kann', sub:'Läuft – jeden Tag, in echt. Kachel antippen, die Geschichte startet.', kacheln:[
+    {name:'Crumble and Friends', bild:'hamster', status:'bereit', href:'freunde.html'},
     {name:'Die Produktionskette', bild:'kette',   status:'bereit', href:'produktionskette.html'},
     {name:'Der Wunschtag',        bild:'kalender',status:'bereit', href:'wunschtag.html'},
     {name:'Krank – und nun?',     bild:'kreuz',   status:'bereit', href:'krank.html'},
-    {name:'Nachts in der Teigecke',bild:'mond',   status:'bereit', href:'teigecke.html'}
+    {name:'Nachts in der Teigecke',bild:'mond',   status:'bereit', href:'teigecke.html'},
+    {name:'Kaputt? Gemeldet.',     bild:'schluessel',status:'bereit', href:'meldestation.html'}
   ]},
   {marke:'04 · Morgen', titel:'Wo es hinwill', sub:'Gestrichelt heißt bei uns: in Planung. Auch hier: antippen und zuschauen.', kacheln:[
     {name:'Teigmengen auf dem Plan', bild:'waage',    status:'folgt', geplant:true},
-    {name:'Kaputt? Gemeldet.',       bild:'schluessel',status:'bereit', href:'meldestation.html', geplant:true},
     {name:'Das Lager weiß Bescheid', bild:'tor',      status:'bereit', href:'lager.html', geplant:true},
     {name:'Filialen im Netz',        bild:'haus',     status:'folgt', geplant:true}
   ]}
@@ -210,6 +223,14 @@ const GRUPPEN=[
 const INK='#2C2C2A';
 const S=`stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
 const BILDER={
+  balken:`<svg viewBox="0 0 100 100"><path d="M14 84h72" ${S}/><rect x="22" y="52" width="14" height="32" ${S} fill="#B5D4F4"/><rect x="43" y="38" width="14" height="46" ${S} fill="#FAC775"/><rect x="64" y="18" width="14" height="66" ${S} fill="#F0997B"/></svg>`,
+  schild:`<svg viewBox="0 0 100 100"><path d="M50 14l30 10v24q0 24-30 38q-30-14-30-38V24z" ${S} fill="#9FE1CB"/><path d="M37 50l9 9l18-19" ${S}/></svg>`,
+  blatt:`<svg viewBox="0 0 100 100"><path d="M26 12h34l16 16v60H26z" ${S} fill="#FFFFFF"/><path d="M38 44h26M38 58h26M38 72h16" ${S}/></svg>`,
+  auge:`<svg viewBox="0 0 100 100"><path d="M12 50Q50 16 88 50Q50 84 12 50z" ${S} fill="#FFFFFF"/><circle cx="50" cy="50" r="11" ${S} fill="#B5D4F4"/><path d="M20 82L80 18" stroke="#E24B4A" stroke-width="7" stroke-linecap="round"/></svg>`,
+  brief:`<svg viewBox="0 0 100 100"><rect x="14" y="26" width="72" height="50" rx="7" ${S} fill="#B5D4F4"/><path d="M16 30l34 26l34-26" ${S}/></svg>`,
+  konto:`<svg viewBox="0 0 100 100"><circle cx="40" cy="34" r="15" ${S} fill="#FAC775"/><path d="M14 84q0-28 26-28q14 0 21 9" ${S}/><circle cx="70" cy="62" r="9" ${S} fill="#9FE1CB"/><path d="M70 71v17M70 80h8M70 87h6" ${S}/></svg>`,
+  hamster:`<svg viewBox="0 0 100 100"><circle cx="26" cy="28" r="13" ${S} fill="#F5C4B3"/><circle cx="74" cy="28" r="13" ${S} fill="#F5C4B3"/><ellipse cx="50" cy="54" rx="36" ry="32" ${S} fill="#FAC775"/><circle cx="38" cy="48" r="4.5" fill="${INK}"/><circle cx="62" cy="48" r="4.5" fill="${INK}"/><path d="M43 62q7 7 14 0" ${S}/></svg>`,
+  rechner:`<svg viewBox="0 0 100 100"><rect x="22" y="12" width="56" height="76" rx="9" ${S} fill="#FFFFFF"/><rect x="32" y="22" width="36" height="16" rx="3" ${S} fill="#9FE1CB"/><path d="M36 54h.1M50 54h.1M64 54h.1M36 70h.1M50 70h.1M64 70h.1" ${S}/></svg>`,
   kette:`<svg viewBox="0 0 100 100"><rect x="10" y="38" width="24" height="24" rx="5" ${S} fill="#B5D4F4"/><rect x="66" y="38" width="24" height="24" rx="5" ${S} fill="#C0DD97"/><circle cx="50" cy="50" r="9" ${S} fill="#9FE1CB"/><path d="M34 50h7M59 50h7" ${S}/></svg>`,
   kalender:`<svg viewBox="0 0 100 100"><rect x="16" y="22" width="68" height="62" rx="8" ${S} fill="#FFFFFF"/><path d="M16 40h68M34 14v14M66 14v14" ${S}/><circle cx="62" cy="62" r="9" fill="#EF9F27"/></svg>`,
   kreuz:`<svg viewBox="0 0 100 100"><rect x="18" y="18" width="64" height="64" rx="14" ${S} fill="#F5C4B3"/><path d="M50 34v32M34 50h32" ${S}/></svg>`,
