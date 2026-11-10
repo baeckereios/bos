@@ -1,4 +1,33 @@
 <!--
+  2026-11-10 · 08:13 · v0.2 · Feature + Fix
+    Stikken-Verteilung, Zebra-Fix, Namen an einer Stelle, App-Kennung
+    (Anweisung Kontroll-Chat 08.11., 06:52; Go mit Auflagen 10.11., 07:57).
+    - Dritter Druckschalter „Stikken“ (beim Öffnen aus, nur Sitzung): Seite 1
+      bekommt unter den Anmerkungen nur die Zeile „Stikken-Verteilung: siehe
+      Seite 2“, die Zeichnung steht ab einem eigenen Blatt mit Kopfzeile.
+      Tag 'so' und 'mo' mit tagLabel aus naechstesWochenende(); Tage nie
+      gemischt, Buchstaben laufen über beide Tage. Rechnen und Zeichnen in
+      ../bos_stikken.js. Nur Sorten mit stikke:true (nicht Käsebrötchen,
+      Mohn/Sesam, Extra-Zeilen). Keine Bleche → Zeile „Stikken: keine Bleche
+      zum Absetzen.“, kein Blatt 2. Fehler → Zeile auf Seite 1 und
+      Fehlerfeld, Zettel wird trotzdem gedruckt.
+    - Zebra: ein durchlaufender Zähler über die gedruckten Produktzeilen;
+      die Trennzeile „Käsebrötchen“ zählt nicht, „Käsebrötchen belegen“ zählt
+      (vorher Extra-Zeilen ab 0, stimmte nur zufällig).
+    - Namen aus ./druckzentrale_sorten.js, hier nur noch die REIHENFOLGE.
+      Neu Mehrzahl („Buttercroissants“ …, „Mini-Buttercroissants“).
+      DOM-IDs af-buttercroissant-* → af-butter-*, af-schokocroissant-* →
+      af-schoko-*, af-laugenecken-* → af-laugen-* (keine andere Datei greift
+      darauf zu, Paket 10.11., 07:32). Fehlt die Sortenliste: Meldung, keine
+      Zeilen, kein Druck.
+    - BOS_APP_ID 'absetz_formular' → 'druckzentrale_absetz' (wie Registry und
+      bos_permissions.js; vorher ungeprüft für jede Rolle offen, Ulf 10.11.:
+      „Wie die Kachel“).
+    - Fehlerfeld über dem Drucken-Knopf, window.onerror und
+      unhandledrejection dorthin (Checkliste §7a).
+    - Hilfe: „Die drei Schalter“, Absatz Stikken.
+    SESSION_2026-11-08_STIKKEN_VERTEILUNG_BAU.md
+
   2026-09-03 · v0.1 · Feature
     Erstversion. Rebuild von "Modul I" aus der Alt-System-Druckzentrale
     (druckzentrale_modul_i.js, Referenzdatei lag vor: druckzentrale.zip,
@@ -115,6 +144,9 @@
   .btn-main { width: 100%; margin-top: var(--bos-space-md, 18px); }
   .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
+  [hidden] { display: none !important; }
+  .fehler-feld { margin-top: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red); font-size: var(--bos-font-sm, 0.82rem); line-height: 1.5; white-space: pre-line; }
+
   .datum-hint { text-align: center; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-xs, 10px); letter-spacing: .04em; }
 
   .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 9999; display: flex; align-items: flex-end; }
@@ -130,7 +162,7 @@
 </head>
 <body>
 
-<script>var BOS_APP_ID = 'absetz_formular';</script>
+<script>var BOS_APP_ID = 'druckzentrale_absetz';</script>  <!-- = id in bos_app_registry.js (10.11.2026) -->
 <script src="../bos_app_registry.js"></script>
 <script src="../bos_launcher_profiles.js"></script>
 <script src="../bos_permissions.js"></script>
@@ -138,6 +170,8 @@
 <script src="../bos_access_guard.js"></script>
 
 <script src="../bos_druck.js"></script>
+<script src="druckzentrale_sorten.js"></script>
+<script src="../bos_stikken.js"></script>
 
 <div class="af-chrome">
   <div class="af-header">
@@ -167,7 +201,7 @@
 
     <div class="af-sep-row">Käsebrötchen</div>
     <div class="af-row">
-      <span class="af-row-name">Käsebrötchen belegen</span>
+      <span class="af-row-name" id="af-kaese-name"></span><!-- Name aus druckzentrale_sorten.js -->
       <select class="bos-input" id="af-kaese-so"></select>
       <select class="bos-input" id="af-kaese-mo"></select>
     </div>
@@ -198,7 +232,9 @@
     <div class="druck-optionen">
       <button class="pill active" data-toggle="kopf" onclick="toggleOption('kopf')">Kopf/Fuß</button>
       <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
+      <button class="pill" data-toggle="stikken" onclick="toggleOption('stikken')">Stikken</button>
     </div>
+    <div class="fehler-feld" id="af-fehler" role="alert" hidden></div>
     <button class="btn btn-amber btn-main" onclick="drucken()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="6 9 6 2 18 2 18 9"/>
@@ -230,9 +266,19 @@
       <p>Über „+ Zeile hinzufügen" lässt sich ein zusätzliches Produkt eintragen. Diese Zeilen merkt sich das Gerät für den nächsten Ausdruck — aber nur auf diesem Gerät, nicht geräteübergreifend.</p>
     </div>
     <div class="sec">
-      <h3>Die zwei Schalter vor dem Drucken</h3>
+      <h3>Die drei Schalter vor dem Drucken</h3>
       <p><strong>Kopf/Fuß:</strong> BäckereiOS-Logo mit Datum/Uhrzeit oben, Fußzeile unten. Ausgeschaltet druckt nur der reine Inhalt.</p>
       <p><strong>Farbe:</strong> Ausgeschaltet druckt der komplette Ausdruck in Graustufen.</p>
+      <p><strong>Stikken:</strong> Beim Öffnen immer aus. Eingeschaltet kommt ein Vorschlag dazu, wie die abzusetzenden Bleche auf die Stikken verteilt werden.</p>
+    </div>
+    <div class="sec">
+      <h3>Stikken-Verteilung</h3>
+      <p>Die Verteilung steht auf einem eigenen Blatt (Seite 2). Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: siehe Seite 2“. Oben auf Seite 2 stehen Formular, Datum und Uhrzeit, damit das Blatt auch allein zuzuordnen ist.</p>
+      <p>Jede Stikke hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an die echte Stikke schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
+      <p>Jeder Tag bekommt eigene Stikken, Sonntag und Montag kommen nie auf eine Stikke. Die Buchstaben laufen über beide Tage durch (zum Beispiel Sonntag A und B, Montag C). Unter dem Buchstaben steht der Tag.</p>
+      <p>Auf die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht drauf.</p>
+      <p>Sorten dürfen auf einer Stikke gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken geteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als eine Stikke Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt auf eine weitere.</p>
+      <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt keine Seite 2. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
     </div>
     <div class="sec">
       <h3>Wichtig</h3>
@@ -243,14 +289,46 @@
 </div>
 
 <script>
-  /* ── Fixe Produktzeilen ─────────────────────────────────────── */
-  var PRODUKTE = [
-    { id: 'buttercroissant', label: 'Buttercroissant' },
-    { id: 'schokocroissant', label: 'Schokocroissant' },
-    { id: 'laugenecken',     label: 'Laugenecken' },
-    { id: 'minibutter',      label: 'Mini Buttercroissant' },
-    { id: 'minischoko',      label: 'Mini Schokocroissant' }
-  ];
+  /* ── Fehler sichtbar (Checkliste §7a) ──────────────────────────── */
+  function zeigeFehler(text) {
+    var el = document.getElementById('af-fehler');
+    if (!el) return;
+    el.textContent = el.textContent ? el.textContent + '\n' + text : text;
+    el.hidden = false;
+  }
+  function leereFehler() {
+    var el = document.getElementById('af-fehler');
+    if (el) { el.textContent = ''; el.hidden = true; }
+  }
+  window.onerror = function (msg, quelle, zeile) {
+    zeigeFehler('Fehler: ' + msg + (quelle ? ' (' + String(quelle).split('/').pop() + ':' + zeile + ')' : ''));
+  };
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    zeigeFehler('Fehler: ' + (r && r.message ? r.message : String(r)));
+  });
+
+  /* ── Fixe Produktzeilen ─────────────────────────────────────────
+     Nur die REIHENFOLGE steht hier; Namen und „kommt auf die Stikken“
+     kommen aus druckzentrale_sorten.js (eine Stelle für beide Zettel,
+     10.11.2026). DOM-IDs je Zeile: af-<kennung>-so / af-<kennung>-mo.
+     Käsebrötchen steht als eigener Block mit Trennzeile im Markup,
+     nur sein Name kommt aus der Liste. */
+  var REIHENFOLGE = ['butter', 'schoko', 'laugen', 'minibutter', 'minischoko'];
+  var PRODUKTE = [];      // gefüllt aus der Sortenliste: { kennung, name, stikke }
+  var KAESE_NAME = '';
+
+  function ladeSorten() {
+    if (!window.BOS_DRUCKZENTRALE_SORTEN) {
+      throw new Error('Sortenliste fehlt: druckzentrale_sorten.js wurde nicht geladen. ' +
+                      'Seite neu laden; bleibt es, fehlt die Datei auf dem Server.');
+    }
+    KAESE_NAME = BOS_DRUCKZENTRALE_SORTEN.name('kaese');
+    return REIHENFOLGE.map(function (k) {
+      var s = BOS_DRUCKZENTRALE_SORTEN.sorte(k);   // unbekannt → Error
+      return { kennung: s.kennung, name: s.name, stikke: s.stikke };
+    });
+  }
 
   function escapeHtml(str) {
     return String(str)
@@ -295,13 +373,14 @@
       var r = document.createElement('div');
       r.className = 'af-row';
       r.innerHTML =
-        '<span class="af-row-name">' + escapeHtml(p.label) + '</span>' +
-        '<select class="bos-input" id="af-' + p.id + '-so"></select>' +
-        '<select class="bos-input" id="af-' + p.id + '-mo"></select>';
+        '<span class="af-row-name">' + escapeHtml(p.name) + '</span>' +
+        '<select class="bos-input" id="af-' + p.kennung + '-so"></select>' +
+        '<select class="bos-input" id="af-' + p.kennung + '-mo"></select>';
       wrap.appendChild(r);
-      buildSelect(document.getElementById('af-' + p.id + '-so'), 50);
-      buildSelect(document.getElementById('af-' + p.id + '-mo'), 50);
+      buildSelect(document.getElementById('af-' + p.kennung + '-so'), 50);
+      buildSelect(document.getElementById('af-' + p.kennung + '-mo'), 50);
     });
+    if (KAESE_NAME) document.getElementById('af-kaese-name').textContent = KAESE_NAME;
     buildSelect(document.getElementById('af-kaese-so'), 50);
     buildSelect(document.getElementById('af-kaese-mo'), 50);
     buildSelect(document.getElementById('af-mohn'), 20);
@@ -362,7 +441,8 @@
   }
 
   /* ── Druckoptionen ──────────────────────────────────────────────── */
-  var druckOptionen = { kopf: true, farbe: true };
+  /* stikken: beim Öffnen aus (Ulf 08.11.2026, 06:43), nur für die Sitzung */
+  var druckOptionen = { kopf: true, farbe: true, stikken: false };
   function toggleOption(art) {
     druckOptionen[art] = !druckOptionen[art];
     document.querySelectorAll('[data-toggle="' + art + '"]').forEach(function(btn) {
@@ -391,10 +471,61 @@
     '.af-block-head{background:#e8e8e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:5px 10px;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;border-bottom:1px solid #ccc;}',
     '.af-block-body{padding:10px;font-size:10pt;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
     '.af-anm-label{font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#777;margin-bottom:6px;}',
-    '.af-anm-text{border:1px solid #bbb;padding:10px 12px;min-height:90px;}'
+    '.af-anm-text{border:1px solid #bbb;padding:10px 12px;min-height:90px;}',
+    '.dz-stikken-fehler{margin-top:4mm;font-size:10pt;font-weight:700;color:#000;border:1.5px solid #000;padding:2mm 3mm;}'
   ].join('\n');
 
+  /* ── Stikken-Verteilung (../bos_stikken.js) ──────────────────────
+     Seite 1: nur eine Zeile unter den Anmerkungen. Zeichnung ab eigenem
+     Blatt mit Kopfzeile (Freigabe KC 10.11., A1). Je Tag eigene Stikken
+     (tag 'so'/'mo', tagLabel wie die Spaltenköpfe). Fehler → Zeile auf
+     Seite 1 + Fehlerfeld, Zettel wird trotzdem gedruckt (§7a). */
+  function formatZeit(d) {
+    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });   // wie bos_druck.js
+  }
+  function stikkenPosten(dates) {
+    var posten = [];
+    [['so', dates.soLabel], ['mo', dates.moLabel]].forEach(function (t) {
+      PRODUKTE.filter(function (p) { return p.stikke; }).forEach(function (p) {
+        posten.push({ kennung: p.kennung, name: p.name, tag: t[0], tagLabel: t[1],
+                      bleche: document.getElementById('af-' + p.kennung + '-' + t[0]).value });
+      });
+    });
+    return posten;
+  }
+  function stikkenTeile(dates, jetzt) {
+    try {
+      if (!window.BOS_STIKKEN) {
+        throw new Error('Rechenteil bos_stikken.js ist nicht geladen. Seite neu laden; bleibt es, fehlt die Datei auf dem Server.');
+      }
+      var stikken = BOS_STIKKEN.verteile(stikkenPosten(dates));
+      return {
+        seite1: BOS_STIKKEN.hinweisHTML(stikken),
+        ab2: BOS_STIKKEN.zeichneHTML(stikken, {
+          kopfzeile: 'Absetz-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
+        })
+      };
+    } catch (err) {
+      console.error('[Absetz-Formular] Stikken-Verteilung:', err);
+      zeigeFehler('Stikken-Verteilung nicht möglich: ' + err.message);
+      return {
+        seite1: '<div class="dz-stikken-fehler">Stikken-Verteilung nicht möglich: ' + escapeHtml(err.message) + '</div>',
+        ab2: ''
+      };
+    }
+  }
+
   function drucken() {
+    leereFehler();
+    if (!PRODUKTE.length) {
+      zeigeFehler('Drucken nicht möglich: Die Produktzeilen fehlen, weil die Sortenliste nicht geladen ist. Seite neu laden.');
+      return;
+    }
+    /* Zebra: EIN Zähler über alle gedruckten Produktzeilen; die
+       Trennzeile „Käsebrötchen“ zählt nicht (10.11.2026) */
+    var zeile = 0;
+    function zebra() { return (zeile++ % 2 === 0) ? 'af-zebra' : ''; }
+
     var dates = naechstesWochenende();
     var gruss = document.getElementById('af-gruss').value.trim();
 
@@ -405,11 +536,11 @@
     html += '<thead><tr><th>Produkt</th><th class="af-c">' + dates.soLabel + '</th><th class="af-c">' + dates.moLabel + '</th></tr></thead>';
     html += '<tbody>';
 
-    PRODUKTE.forEach(function(p, i) {
-      var so = document.getElementById('af-' + p.id + '-so').value;
-      var mo = document.getElementById('af-' + p.id + '-mo').value;
-      html += '<tr class="' + (i % 2 === 0 ? 'af-zebra' : '') + '">' +
-              '<td>' + escapeHtml(p.label) + '</td>' +
+    PRODUKTE.forEach(function(p) {
+      var so = document.getElementById('af-' + p.kennung + '-so').value;
+      var mo = document.getElementById('af-' + p.kennung + '-mo').value;
+      html += '<tr class="' + zebra() + '">' +
+              '<td>' + escapeHtml(p.name) + '</td>' +
               '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span></td>' +
               '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
     });
@@ -417,21 +548,19 @@
     html += '<tr class="af-sep-row"><td>Käsebrötchen</td><td class="af-c">' + dates.soLabel + '</td><td class="af-c">' + dates.moLabel + '</td></tr>';
     var kso = document.getElementById('af-kaese-so').value;
     var kmo = document.getElementById('af-kaese-mo').value;
-    html += '<tr><td>Käsebrötchen belegen</td>' +
+    html += '<tr class="' + zebra() + '"><td>' + escapeHtml(KAESE_NAME) + '</td>' +
             '<td class="af-c"><span class="af-box">' + (kso || '&nbsp;') + '</span></td>' +
             '<td class="af-c"><span class="af-box">' + (kmo || '&nbsp;') + '</span></td></tr>';
 
-    var extraI = 0;
     document.querySelectorAll('.af-extra-row').forEach(function(el) {
       var name = el.querySelector('input').value.trim();
       var sels = el.querySelectorAll('select');
       var so = sels[0].value, mo = sels[1].value;
       if (!name && !so && !mo) return;
-      html += '<tr class="' + (extraI % 2 === 0 ? 'af-zebra' : '') + '">' +
+      html += '<tr class="' + zebra() + '">' +
               '<td>' + escapeHtml(name || '—') + '</td>' +
               '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span></td>' +
               '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
-      extraI++;
     });
 
     html += '</tbody></table>';
@@ -446,14 +575,23 @@
     html += '<div class="af-anm-label">Anmerkungen</div>' +
             '<div class="af-anm-text">' + (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
 
+    var extraCSS = PRINT_CSS;
+    var stikken = null;
+    if (druckOptionen.stikken) {
+      stikken = stikkenTeile(dates, new Date());
+      html += stikken.seite1;
+      if (window.BOS_STIKKEN) extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
+    }
+
     html += '</div>';
+    if (stikken) html += stikken.ab2;   // ab eigenem Blatt (break-before im Rechenteil)
 
     BOS_DRUCK.drucken({
       inhaltHTML: html,
       appName: 'Absetz-Formular',
       mitKopf: druckOptionen.kopf,
       farbig: druckOptionen.farbe,
-      extraCSS: PRINT_CSS
+      extraCSS: extraCSS
     });
   }
 
@@ -470,6 +608,13 @@
   document.getElementById('datum-hint').textContent = 'Ausdruck-Datum: ' + formatDatum(new Date());
 
   /* ── Init ───────────────────────────────────────────────────────── */
+  try {
+    PRODUKTE = ladeSorten();
+  } catch (err) {
+    console.error('[Absetz-Formular] Sortenliste:', err);
+    zeigeFehler(err.message);
+    PRODUKTE = [];
+  }
   renderRows();
   initExtra();
   var dates = naechstesWochenende();
