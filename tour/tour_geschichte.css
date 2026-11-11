@@ -1,7 +1,11 @@
 /*
   BäckereiOS · Satellit – Demo-Tour
   Gemeinsames Aussehen aller Geschichten-Seiten.
-  Stand: 10.10.2026 (Grundgerüst, Doku 2026-10-09_DEMO_TOUR.md)
+  Stand: 11.11.2026, 05:15 Uhr MEZ (Bau-Chat Tempo-Knopf). Vorher 10.10.2026 (Grundgerüst, Doku 2026-10-09_DEMO_TOUR.md)
+  ÄNDERUNGEN
+    2026-11-11 · 05:15 · Tempo-Knopf in der Steuerleiste (.ctrl .tempo), unter 396 px Fensterbreite in eigener
+      Zeile rechtsbündig (.umbruch). Steuerleiste darf umbrechen statt seitlich überzulaufen.
+      SESSION_2026-11-11_TOUR_TEMPO_KNOPF_BAU.md
 */
 :root{
   --bg:#16120f; --bg2:#211b16; --cream:#f3ead8; --muted:#a89c88;
@@ -30,7 +34,7 @@ svg.stage{width:100%;height:auto;display:block;border-radius:14px;
 .cap{font-size:17px;line-height:1.6;min-height:6.6em;margin:8px 0 12px}
 .err{background:var(--err-bg);color:var(--err);padding:10px 12px;border-radius:10px;font-size:14px;margin:8px 0}
 .err[hidden]{display:none}
-.ctrl{display:flex;align-items:center;gap:8px}
+.ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .ctrl button{background:var(--bg2);color:var(--cream);border:1px solid var(--line);border-radius:999px;
   height:44px;min-width:44px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .ctrl button:hover,.ctrl button:focus-visible{border-color:var(--muted)}
@@ -38,6 +42,18 @@ svg.stage{width:100%;height:auto;display:block;border-radius:14px;
 .dots{flex:1;display:flex;justify-content:center;gap:6px}
 .dots span{width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .3s}
 .dots span.on{background:var(--amber)}
+/* Tempo-Knopf: Wort statt Symbol; feste Mindestbreite für „Langsam“, damit die Leiste beim Umschalten nicht springt */
+.ctrl button.tempo{font:inherit;font-size:14px;font-weight:600;letter-spacing:.02em;min-width:96px;margin-left:auto}
+.ctrl .umbruch{display:none}
+/* Schmale Geräte: Mit 7 Szenenpunkten braucht die Leiste mit Knopf 364 px Inhalt + 2 × 16 px Rand = 396 px
+   (gemessen 11.11. in Chromium: 3 Rundknöpfe je 48, Tempo 96, Punkte 92, 4 Lücken je 8) → darunter eigene Zeile.
+   Für alle Geschichten gleich, egal wie viele Punkte, damit die Leiste beim Wechsel nicht springt.
+   flex-wrap oben fängt zusätzlich größere Schriften ab: dann bricht der Knopf von selbst um. */
+@media (max-width:395px){
+  .ctrl{row-gap:0}
+  .ctrl .umbruch{display:block;flex-basis:100%;height:0}
+  .ctrl button.tempo{margin-top:8px}
+}
 .weiter{display:flex;justify-content:space-between;gap:10px;margin:28px 0 0}
 .weiter a{flex:1;color:var(--muted);text-decoration:none;font-size:14px;border:1px solid var(--line);
   border-radius:12px;padding:10px 12px}
