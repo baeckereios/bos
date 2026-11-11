@@ -2,6 +2,9 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-11 · 07:09 · Lager Stufe 2, #120 (Freigabe KC 11.11. 06:43): neuer
+       Eintrag lager_zaehlen (Kachel „Lager zählen“, Bereich Produktion, nur
+       über den Haken lagerZaehlen, kein roles, kein direkt). Sonst unverändert.
      2026-11-11 · 01:15 · Zusammengeführt (Kontroll-Chat Lager): Lieferung Lager
        Stufe 1 (gebaut auf Paket 01.11., 22:25) mit Stand Paket 10.11., 09:33
        (Eintrag produktionsplaner_bestellungen). Nur beide Einträge behalten.
@@ -585,6 +588,24 @@ window.BOS_APPS = [
     // Lieferanten. Pflegen nur Rolle admin (Regel RK §30). Lila wie die anderen
     // Admin-Werkzeuge. bos_permissions.js: "lager_editor: true" nur bei admin.
     // Siehe lager/LAGER_EDITOR_DOKU.md.
+  },
+  {
+    id: 'lager_zaehlen',
+    // NEU 11.11.2026 (Lager Stufe 2, #120; Freigabe KC 11.11. 06:43): Zählseite.
+    // Standort wählen → Ort für Ort zählen (Zählkarte bos_zaehlkarte.js).
+    // KEIN roles-Feld und KEINE Zeile in bos_permissions.js: die Kachel hängt am
+    // Haken lagerZaehlen (bos_access.js, nie fail-open). Das Schloss ist die
+    // Liste lagerZaehlenStandorte im Konto, die die Datenbank-Regel prüft
+    // (RK §31); Rolle admin darf immer zählen. Beide Felder setzt die
+    // Kontenverwaltung (Gruppe „Lager zählen“). Kein direkt: QR kommt später.
+    // Siehe lager/LAGER_ZAEHLEN_DOKU.md.
+    bereich: 'produktion',
+    name: 'Lager zählen',
+    icon: '🧮',
+    color: '#8b5a2b',
+    url: 'lager/lager_zaehlen.html',
+    status: 'live',
+    haken: ['lagerZaehlen']
   },
   {
     id: 'konten_verwaltung',

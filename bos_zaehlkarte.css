@@ -1,0 +1,53 @@
+/* ================================================================
+   BäckereiOS · Zählkarte — Aussehen des gemeinsamen Bausteins (bos_zaehlkarte.js)
+   Nur Design-Tokens (bos_design_tokens.css), Ersatzwerte wie dort.
+   Ausstehend/Fehler laufen auf --bos-warn bzw. --bos-red, nicht auf den Akzent (Checkliste §3a).
+   CHANGELOG
+     2026-11-11 · 06:54 · v1 · Erstfassung (Lager Stufe 2, #120)
+   ================================================================ */
+.zk-ort { margin: 0 0 14px; }
+.zk-ort-kopf { display: flex; align-items: baseline; gap: 10px; padding: 14px 12px 6px; margin: 0;
+  font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; color: var(--bos-text, #f3ece1); }
+.zk-zahl { font-family: var(--bos-font-body, 'Barlow', sans-serif); font-size: .78rem; color: var(--bos-text-dim, #ab9c8a); font-weight: 600; }
+.zk-zeile { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: var(--bos-tap-min, 44px); padding: 10px 14px; border: 0; border-bottom: 1px solid var(--bos-border, rgba(255,255,255,0.08));
+  background: var(--bos-surface, #221b14); color: var(--bos-text, #f3ece1); font: inherit; text-align: left; cursor: pointer; }
+.zk-zeile:active { background: var(--bos-surface-raised, #2b2218); }
+.zk-name { display: flex; flex-direction: column; font-weight: 600; }
+.zk-unter { font-size: .78rem; color: var(--bos-text-dim, #ab9c8a); font-weight: 400; }
+.zk-zeichen { white-space: nowrap; font-weight: 700; font-size: 1.05rem; }
+.zk-offen { color: var(--bos-text-faint, #736656); }
+.zk-null { color: var(--bos-text-dim, #ab9c8a); }
+.zk-gezaehlt { color: var(--bos-green, #4caf7d); }
+.zk-wartet { color: var(--bos-warn, #c07a10); }
+.zk-fehler { color: var(--bos-red, #d6584a); }
+.zk-fehlertext { padding: 4px 14px 8px; font-size: .8rem; color: var(--bos-red, #d6584a); background: var(--bos-surface, #221b14); }
+.zk-leer { padding: 10px 14px; color: var(--bos-text-faint, #736656); font-size: .85rem; }
+
+/* Karte (Overlay) */
+.zk-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); display: flex; align-items: flex-end; justify-content: center; z-index: 60; }
+.zk-overlay[hidden] { display: none; }
+.zk-sheet { width: 100%; max-width: 620px; max-height: 94vh; overflow-y: auto; background: var(--bos-bg, #16120e);
+  border-radius: var(--bos-radius-lg, 22px) var(--bos-radius-lg, 22px) 0 0; padding: 10px 12px 18px; box-shadow: var(--bos-shadow-lg, 0 20px 56px rgba(0,0,0,0.6)); }
+.zk-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.zk-titel { flex: 1; min-width: 0; text-align: center; }
+.zk-titel-name { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.25rem; font-weight: 700; color: var(--bos-text, #f3ece1); }
+.zk-titel-unter { font-size: .85rem; color: var(--bos-text-dim, #ab9c8a); }
+.zk-nav { min-width: var(--bos-tap-min, 44px); min-height: var(--bos-tap-min, 44px); border: 1px solid var(--bos-border, rgba(255,255,255,0.08));
+  border-radius: var(--bos-radius-md, 14px); background: var(--bos-surface, #221b14); color: var(--bos-text, #f3ece1); font-size: 1.3rem; cursor: pointer; }
+.zk-nav:disabled { opacity: .35; cursor: default; }
+.zk-raster { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.zk-knopf { min-width: 48px; min-height: 48px; flex: 0 0 auto; padding: 0 10px; border: 1px solid var(--bos-border-strong, rgba(255,255,255,0.18));
+  border-radius: var(--bos-radius-md, 14px); background: var(--bos-surface-raised, #2b2218); color: var(--bos-text, #f3ece1);
+  font: 700 1.1rem var(--bos-font-body, 'Barlow', sans-serif); cursor: pointer; }
+.zk-knopf:active { background: var(--bos-amber, #c07a10); color: var(--bos-bg, #16120e); }
+.zk-knopf:disabled { opacity: .3; cursor: default; }
+.zk-markiert { outline: 3px solid var(--bos-amber, #c07a10); outline-offset: 1px; }
+.zk-voll { flex: 1 1 100%; min-height: 56px; background: var(--bos-amber, #c07a10); color: var(--bos-bg, #16120e); border-color: var(--bos-amber, #c07a10); }
+.zk-eingabe { display: flex; gap: 6px; margin-top: 12px; }
+.zk-feld { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; border: 1px solid var(--bos-border-strong, rgba(255,255,255,0.18));
+  border-radius: var(--bos-radius-md, 14px); background: var(--bos-surface, #221b14); color: var(--bos-text, #f3ece1); font: 600 1.1rem var(--bos-font-body, 'Barlow', sans-serif); }
+.zk-ok { background: var(--bos-surface, #221b14); }
+.zk-zurueck { background: var(--bos-surface, #221b14); }
+.zk-hinweis { font-size: .85rem; color: var(--bos-text-dim, #ab9c8a); margin: 4px 0; }
+.zk-meldung { min-height: 1.3em; margin-top: 8px; font-size: .9rem; color: var(--bos-warn, #c07a10); }

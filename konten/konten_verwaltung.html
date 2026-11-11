@@ -7,6 +7,21 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-11-11 · 07:11 · v-Lager-2 · Feature (Lager Stufe 2, #120; Bauplan 06:35, Freigabe KC 06:43
+      mit A11; Kern-Freigabe Ulf 06:41, K1, Frage 6)
+      Rein additiv. (a) Neue Gruppe „📦 Lager zählen“ in der Konto-Karte (Stammdaten) unter
+      der Nachrichten-Gruppe: ein Haken je aktivem Standort aus lager_standorte, geladen EINMAL
+      je Seitenaufruf beim ersten Öffnen einer Konto-Karte über adminFirestore
+      (ladeLagerStandorteEinmal); Fehler mit Code + err.message in der Gruppe, console.error
+      dazu. Archivierte oder unbekannte Standorte, die noch am Konto stehen: grau, nur abhaken.
+      Für alle Konto-Arten, keine Art-Sperre; Hinweis für Rolle admin und (A11) für Ort-Konten.
+      bearbeitung[].lagerZaehlenStandorte (Kopie), toggleKontoLagerZaehlen; gespeichert in
+      tatsaechlichSpeichern() über BOS_ACCOUNTS.setzeLagerZaehlenRecht (Liste + Haken
+      lagerZaehlen zusammen), nur wenn sich die Liste geändert hat. (b) Text am Haken
+      „🧺 Wagen & Zutaten pflegen“: Gebinde raus (Name und Gebinde nur noch im Lager).
+      (c) Ein Hilfe-Abschnitt zur neuen Gruppe (mit dem Satz zum Stationskonto, A11).
+      Keine anderen Haken, keine Rollen, keine Regel in dieser Datei.
+      lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
     2026-10-29 · 16:14 · v-Zugriff-Texte-1 · Anzeige (Anweisung Kontroll-Chat allgemein 29.10., 01:33;
       Kern-Datei, Freigabe Ulf über den Auftrag)
       Reiter „Zugriffe“ (Konto-Karte) und „Rechte“ (Rollen-Karte), beide über
@@ -828,6 +843,10 @@ var helpData = {
       text: "Jedes Konto sieht BOS in einer eigenen Farbe: Akzent und Grundton der Flächen, auf jeder Seite. Statusfarben (Rot, Gelb, Grün, Warnung) und Ausgedrucktes bleiben immer gleich. Voreingestellt ist das Profil der Rolle („Nach Rolle: …“). Für Azubis zum Beispiel „Apfel“ wählen. Wählst du das Profil, das die Rolle ohnehin hat, springt die Auswahl auf „Nach Rolle“ — das Konto folgt dann bei einem Rollenwechsel der neuen Rolle. Eine neu angelegte Rolle hat noch kein eigenes Profil und bekommt Honig. Gespeichert wird mit „Änderungen speichern“, sichtbar wird es beim nächsten Anmelden. Jeder kann sein Profil in seinen Einstellungen für sich ändern; das hier ist die Vorgabe."
     },
     {
+      heading: "Was ist die Gruppe „📦 Lager zählen“?",
+      text: "In der Konto-Karte (Stammdaten) steht je Standort des Lagers ein Haken. Angehakt heißt: dieses Konto darf an diesem Standort zählen, die Datenbank prüft das bei jeder Zahl. Mit mindestens einem Haken erscheint die Kachel „Lager zählen“ beim nächsten Anmelden. Die Standorte legst du im Lager an (Reiter „Standorte“). Rolle admin darf überall zählen, braucht für die Kachel aber auch einen Haken. Ein Stationskonto ist das gemeinsame Konto eines Tablets (z. B. das der Backstube). Hakst du dort einen Standort an, darf jeder an diesem Tablet dort zählen. Ob du das willst, entscheidest du je Konto. Ein archivierter Standort, der noch an einem Konto hängt, steht grau da und lässt sich nur noch abhaken."
+    },
+    {
       heading: "Warum das Admin-Passwort schon beim Öffnen?",
       text: "Die Kontenliste zeigt, wer welche Karte hat. Das geht niemanden außer dem Admin etwas an. Deshalb darf jedes Konto nur sein eigenes Dokument lesen, die ganze Liste nur die gesonderte Admin-Anmeldung. Sie bleibt bestehen, solange die Seite offen ist, wird nie auf dem Gerät gespeichert und endet beim Verlassen der Seite, mit 🔒 Sperren oder von selbst nach 5 Minuten ohne Eingabe (eine Minute vorher erscheint oben ein Hinweis)."
     },
@@ -1084,6 +1103,7 @@ function initBearbeitung() {
       nachrichtenSchreiben: !!k.nachrichtenSchreiben,           // NEU 27.10.2026, Nachrichtenzentrale 1b
       nachrichtenBekanntmachung: !!k.nachrichtenBekanntmachung, // NEU 27.10.2026
       nachrichtenEmpfangen: !!k.nachrichtenEmpfangen,           // NEU 27.10.2026 (nur Ort-Konten)
+      lagerZaehlenStandorte: lagerListeVon(k),                  // NEU 11.11.2026, Lager Stufe 2 — Kopie, nie dieselbe Liste wie im Konto
       farbschema: (typeof k.farbschema === 'string' && k.farbschema) ? k.farbschema : null, // NEU 15.10.2026, #72 Stufe B — null = „Nach Rolle“
       farbHinweis: null
     };
@@ -1276,7 +1296,7 @@ var KONTO_KARTEN_TABS = [
         '</div>' +
         '<div class="detail-section full">' +
           '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckePflege ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckePflege\', this.checked)">' +
-          '<span class="cb-label">🧺 Wagen &amp; Zutaten pflegen — Wagen beschriften, Zuhause der Zutaten, Gebinde, Schilder (nichts an den Teigen)</span></label>' +
+          '<span class="cb-label">🧺 Wagen &amp; Zutaten pflegen — Wagen beschriften, Zuhause der Zutaten, Schilder (Name und Gebinde nur im Lager; nichts an den Teigen)</span></label>' +
         '</div>' +
         '<div class="detail-section full">' +
           '<label class="checkbox-feld"><input type="checkbox" ' + (b.teigeckeTeige ? 'checked' : '') + ' onchange="toggleKontoTeigecke(\'teigeckeTeige\', this.checked)">' +
@@ -1292,7 +1312,8 @@ var KONTO_KARTEN_TABS = [
           '<span class="cb-label">🥨 Weitere Teige pflegen — Teige der Stationen (Rondo, Frühschicht, Brötchenstraße): Name, Stationen, Ausbeute, Hefe, Kessel. Produkte zuordnen braucht zusätzlich die Rolle admin</span></label>' +
         '</div>' +
         reparaturHakenHTML(k, b) +
-        nachrichtenHakenHTML(k, b)   // NEU 27.10.2026, Nachrichtenzentrale 1b
+        nachrichtenHakenHTML(k, b) +  // NEU 27.10.2026, Nachrichtenzentrale 1b
+        lagerZaehlenHTML(k, b)        // NEU 11.11.2026, Lager Stufe 2
       );
     }
   },
@@ -1352,6 +1373,7 @@ function oeffneKontoKarte(kontoId) {
   renderKontoKarte();
   document.getElementById('kontoKarteOverlay').classList.remove('hidden');
   ladeZugriffTexteEinmal();   // 29.10.2026: Beschreibungen der Zugriffe, einmal, im Hintergrund
+  ladeLagerStandorteEinmal(); // 11.11.2026: Standorte für die Gruppe „Lager zählen“, einmal, im Hintergrund
 }
 function kontoKarteNav(delta) {
   var pos = kontoKarteListe.indexOf(kontoKarteId);
@@ -1517,6 +1539,115 @@ function toggleKontoNachrichten(feld, checked) {
   if (!kontoKarteId || !erlaubt) return;
   bearbeitung[kontoKarteId][feld] = checked;
   markiereGeaendert();
+}
+
+// NEU 11.11.2026, Lager Stufe 2 (#120; Freigabe KC 11.11. 06:43, K1, Ulf 06:41).
+// Eigene Gruppe „📦 Lager zählen“ unter der Nachrichten-Gruppe: ein Haken je
+// aktivem Standort aus lager_standorte. Gespeichert wird die LISTE
+// lagerZaehlenStandorte (das Schloss, Regel lzRecht(), RK §31) und dazu
+// lagerZaehlen (= Liste nicht leer, öffnet die Kachel) — beides in EINEM Setzer
+// (BOS_ACCOUNTS.setzeLagerZaehlenRecht), in derselben Sammelaktion wie alle
+// Haken. Für alle Konto-Arten, ohne Art-Sperre (Ulf 06:41, Frage 6).
+// Standorte laden EINMAL je Seitenaufruf beim ersten Öffnen einer Konto-Karte,
+// im Hintergrund, über adminFirestore (wie die Zugriff-Texte). Fehler mit Code
+// und err.message sichtbar in der Gruppe, console.error dazu.
+// Archivierte Standorte, die noch an einem Konto stehen, erscheinen grau: man
+// kann sie nur abhaken, nie neu setzen.
+var lagerStandorte = { stand: 'aus', liste: [], fehler: '' };   // aus | laedt | da | fehler
+
+function lagerListeVon(k) {
+  return (k && Array.isArray(k.lagerZaehlenStandorte))
+    ? k.lagerZaehlenStandorte.filter(function (x) { return typeof x === 'string' && x !== ''; })
+    : [];
+}
+function gleicheLagerListe(a, b) {
+  if (a.length !== b.length) return false;
+  var x = a.slice().sort(), y = b.slice().sort();
+  for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
+}
+function ladeLagerStandorteEinmal() {
+  if (lagerStandorte.stand !== 'aus') return;
+  lagerStandorte.stand = 'laedt';
+  new Promise(function (ja) {
+    if (!window.BOS_ACCOUNTS || typeof window.BOS_ACCOUNTS.adminFirestore !== 'function') throw Object.assign(new Error('bos_accounts.js nicht geladen — Seite hart neu laden'), { code: 'bos/skripte' });
+    ja(window.BOS_ACCOUNTS.adminFirestore().collection('lager_standorte').get());
+  }).then(function (snap) {
+    var liste = [];
+    snap.forEach(function (d) {
+      var x = d.data() || {};
+      liste.push({ id: d.id, name: String(x.name || d.id), sort: typeof x.sort === 'number' ? x.sort : 0, geloescht: x.geloescht === true });
+    });
+    liste.sort(function (a, b) { return (a.sort - b.sort) || a.name.localeCompare(b.name, 'de'); });
+    lagerStandorte.liste = liste;
+    lagerStandorte.stand = 'da';
+  }, function (err) {
+    console.error('[Konten & Rollen] Lager-Standorte nicht geladen', (err && err.code) || '', (err && err.message) || String(err));
+    var c = (err && err.code) || '';
+    var grund = c === 'permission-denied' ? 'Die Regel lässt die Standorte nicht lesen (neue Regel für Lager Stufe 2 wohl noch nicht eingesetzt). '
+      : c === 'unavailable' ? 'Kein Netz oder keine Antwort der Datenbank. '
+      : c === 'bos/skripte' ? 'Ein Skript fehlt. ' : '';
+    lagerStandorte.fehler = 'Standorte nicht geladen: ' + grund + '[' + (c || 'ohne Code') + ': ' + ((err && err.message) || String(err)) + ']';
+    lagerStandorte.stand = 'fehler';
+  }).then(function () {
+    var el = document.getElementById('lagerZaehlenGruppe');
+    var k = kontoKarteId && alleKonten.filter(function (x) { return x.id === kontoKarteId; })[0];
+    if (el && k && bearbeitung[k.id]) el.outerHTML = lagerZaehlenHTML(k, bearbeitung[k.id]);
+  });
+}
+function lagerZaehlenHTML(k, b) {
+  var kopf = '<div class="detail-section full" id="lagerZaehlenGruppe"><div><div class="haken-gruppe-titel">📦 Lager zählen</div>';
+  var fuss = '</div></div>';
+  var hinweise = [];
+  if (b.role === 'admin') hinweise.push('Rolle admin darf an allen Standorten zählen. Die Kachel „Lager zählen“ erscheint aber erst, wenn mindestens ein Standort angehakt ist.');
+  if (k && k.art === 'ort') hinweise.push('Ein Stationskonto ist das gemeinsame Konto eines Tablets (z. B. das der Backstube). Hakst du dort einen Standort an, darf jeder an diesem Tablet dort zählen. Ob du das willst, entscheidest du je Konto.');
+  var hinweisHTML = hinweise.map(function (t) { return '<div class="haken-gruppe-hinweis">' + esc(t) + '</div>'; }).join('');
+  if (lagerStandorte.stand === 'aus' || lagerStandorte.stand === 'laedt') {
+    return kopf + '<div class="haken-gruppe-hinweis">Standorte werden geladen …</div>' + hinweisHTML + fuss;
+  }
+  if (lagerStandorte.stand === 'fehler') {
+    return kopf + '<div class="haken-gruppe-hinweis" style="color:var(--bos-red)">' + esc(lagerStandorte.fehler) + ' Die Haken dieser Gruppe bleiben, wie sie sind. Seite neu laden, um es nochmal zu versuchen.</div>' + hinweisHTML + fuss;
+  }
+  var vorher = lagerListeVon(k);
+  var jetzt = b.lagerZaehlenStandorte || [];
+  var nachId = {};
+  lagerStandorte.liste.forEach(function (st) { nachId[st.id] = st; });
+  var zeilen = lagerStandorte.liste.filter(function (st) { return !st.geloescht; }).map(function (st) {
+    return '<label class="checkbox-feld"><input type="checkbox" ' + (jetzt.indexOf(st.id) !== -1 ? 'checked' : '') +
+      ' onchange="toggleKontoLagerZaehlen(\'' + esc(st.id) + '\', this.checked)">' +
+      '<span class="cb-label">' + esc(st.name) + '</span></label>';
+  });
+  // Archiviert oder unbekannt, aber am Konto (oder in der Bearbeitung) noch gesetzt: grau, nur abhaken.
+  vorher.concat(jetzt).filter(function (id, i, a) { return a.indexOf(id) === i; }).forEach(function (id) {
+    var st = nachId[id];
+    if (st && !st.geloescht) return;
+    var an = jetzt.indexOf(id) !== -1;
+    var name = st ? st.name + ' (archiviert)' : 'Unbekannter Standort (' + id + ')';
+    zeilen.push('<label class="checkbox-feld" style="opacity:.55"><input type="checkbox" ' + (an ? 'checked' : 'disabled') +
+      ' onchange="toggleKontoLagerZaehlen(\'' + esc(id) + '\', this.checked)">' +
+      '<span class="cb-label">' + esc(name) + ' — nur noch abhaken</span></label>');
+  });
+  if (!zeilen.length) {
+    return kopf + '<div class="haken-gruppe-hinweis">Noch keine Standorte angelegt — im Lager (Reiter „Standorte“) anlegen, dann hier anhaken.</div>' + hinweisHTML + fuss;
+  }
+  return kopf + zeilen.join('') +
+    '<div class="haken-gruppe-hinweis">Angehakt = darf an diesem Standort zählen. Die Datenbank prüft jeden Standort selbst.</div>' + hinweisHTML + fuss;
+}
+function toggleKontoLagerZaehlen(standortId, checked) {
+  if (!kontoKarteId) return;
+  var b = bearbeitung[kontoKarteId];
+  var liste = (b.lagerZaehlenStandorte || []).slice();
+  var i = liste.indexOf(standortId);
+  if (checked) {
+    var st = lagerStandorte.liste.filter(function (x) { return x.id === standortId; })[0];
+    if (!st || st.geloescht) { renderKontoKarte(); return; }   // nie neu setzen, was archiviert oder unbekannt ist
+    if (i === -1) liste.push(standortId);
+  } else if (i !== -1) {
+    liste.splice(i, 1);
+  }
+  b.lagerZaehlenStandorte = liste;
+  markiereGeaendert();
+  renderKontoKarte();
 }
 
 // Verknüpft ein Konto mit einer SchichtPlaner-Person (schreibt bosKontoId
@@ -2727,6 +2858,14 @@ function tatsaechlichSpeichern() {
         aufgaben.push(window.BOS_ACCOUNTS[setzer](window.db, k.id, will));
       }
     });
+    // NEU 11.11.2026, Lager Stufe 2: Standort-Liste, selbe Sammelaktion. Nur
+    // schreiben, wenn sich die Liste geändert hat (oder der Kachel-Haken nicht
+    // zur Liste passt); der Setzer schreibt Liste und Haken zusammen.
+    var lagerVorher = lagerListeVon(k);
+    var lagerNachher = b.lagerZaehlenStandorte || [];
+    if (!gleicheLagerListe(lagerVorher, lagerNachher) || (k.lagerZaehlen === true) !== (lagerNachher.length > 0)) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeLagerZaehlenRecht(window.db, k.id, lagerNachher));
+    }
     // NEU 15.10.2026, Farbprofile Stufe B: selbe Sammelaktion. Gegen die NEUE
     // Rolle normalisiert (gleich wie Rolle = Feld löschen); unbekannte, nicht
     // angefasste ID bleibt stehen.

@@ -9,6 +9,10 @@
    RK §30), Dokumente bauen und prüfen, Startlisten, Archivsperren,
    Plausibilität Kategorie ↔ Lagerort, „Steckt in …“, Übernahme aus der
    Teigecke, Sortierung nach Ort / nach Kategorie.
+   Seit Stufe 2 (RK §31): Standorte, Standort am Lagerort, Zählliste je
+   Standort, Kennung des Stands (artikelId__ortId), Zählgang, Bausteine der
+   Zählung und des Stands. Raster und Karte liegen NICHT hier, sondern im
+   gemeinsamen Baustein bos_zaehlkarte.js (auch für den Froster gedacht).
 
    WICHTIG — keine Daten in dieser Datei: keine Artikel-, Lieferanten-
    oder Rezeptangaben. Das Repo ist öffentlich. Die Startlisten sind
@@ -16,10 +20,21 @@
    liest nur die Zutaten-KENNUNGEN der Teige.
 
    WARNUNG: FELDER und GRENZEN müssen zur Regel passen
-   (_regeln/_protokolle/firestore_regeln_2026-11-02_lager.rules,
+   (_regeln/_protokolle/firestore_regeln_2026-11-11_lager_zaehlen.rules,
    Blöcke lager_*). test_lager.js vergleicht beides — immer beide ändern.
 
    CHANGELOG
+     2026-11-11 · 06:50 · v2 · Feature (Lager Stufe 2, #120; Freigabe Kontroll-Chat
+       11.11. 06:43 mit A9–A11, Kern-Freigabe Ulf 06:41)
+       Neu: COL.standorte/zaehlungen/stand, FELDER lager_standorte und
+       lager_orte.standortId, FELDER_ZAEHLUNG, FELDER_STAND, standortDokument,
+       ortIdErlaubt (A9: kein „__“, nicht mit „_“ beginnen), standId,
+       startlisteFehlende (Startliste nur gegen AKTIVE Namen, B16),
+       orteNachStandort, nachStandortUndOrt, zaehlliste, erlaubteStandorte,
+       zaehlStatus (Zählgang 12 Stunden, Ulf 06:41), zaehlungDokument,
+       standDokument, Archivsperre Standort. STARTLISTE_ORTE bleibt nur für
+       Tests (K2, Ulf 06:41: Startliste der Lagerorte entfällt).
+       lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
      2026-11-02 · 00:58 · v1 · Erstfassung (Lager Stufe 1, #120)
        ANWEISUNG_2026-11-01_LAGER_STUFE1_BAUPLAN.md, Freigabe Kontroll-Chat
        01.11. 23:03 (A1–A8) und 02.11. 00:17 (A1+), Kern-Freigabe Ulf 00:39.
@@ -30,20 +45,27 @@
 
   var COL = {
     artikel: 'lager_artikel', orte: 'lager_orte', kategorien: 'lager_kategorien',
-    lieferanten: 'lager_lieferanten', sicherungen: 'lager_sicherungen'
+    lieferanten: 'lager_lieferanten', sicherungen: 'lager_sicherungen',
+    standorte: 'lager_standorte', zaehlungen: 'lager_zaehlungen', stand: 'lager_stand'   /* Stufe 2, RK §31 */
   };
   /* = hasOnly der Regel ohne sicherungId, geaendertVon, geaendertAm */
   var FELDER = {
     lager_artikel: ['name', 'kategorieId', 'bereich', 'gebinde', 'inhaltMenge', 'inhaltEinheit', 'orte',
       'zaehlRaster', 'quellen', 'standardLieferantId', 'teigecke', 'teigeckeGruppe', 'geloescht'],
-    lager_orte: ['name', 'sort', 'temperatur', 'folge', 'geloescht'],
+    lager_orte: ['name', 'sort', 'temperatur', 'folge', 'standortId', 'geloescht'],
+    lager_standorte: ['name', 'sort', 'geloescht'],
     lager_kategorien: ['name', 'sort', 'temperatur', 'geloescht'],
     lager_lieferanten: ['name', 'liefertage', 'bestellweg', 'kontakt', 'geloescht']
   };
   var HERKUNFT = ['sicherungId', 'geaendertVon', 'geaendertAm'];
+  /* Stufe 2 (RK §31): = hasOnly der Regel, ganz (diese Dokumente tragen keine Sicherung) */
+  var FELDER_ZAEHLUNG = ['artikelId', 'ortId', 'standortId', 'wert', 'ersetzt', 'geraetZeit', 'konto', 'ts'];
+  var FELDER_STAND = ['artikelId', 'ortId', 'standortId', 'wert', 'zaehlungId', 'konto', 'ts'];
+  var STAND_TRENNER = '__';   /* A9: kommt in keiner Ort-Kennung vor */
   var GRENZEN = {
     name: 60, gebinde: 30, kontakt: 120, orte: 10, quellen: 5, folge: 300,
-    zaehlRasterMax: 48, minuteMax: 1439, artikelNr: 40
+    zaehlRasterMax: 48, minuteMax: 1439, artikelNr: 40,
+    wertMax: 99999, nachkomma: 1, zaehlgangStunden: 12   /* Stufe 2: Regel wert <= 99999; Ulf 06:41: eine Nachkommastelle, 12 Stunden */
   };
   var BEREICHE = ['', 'baeckerei', 'konditorei', 'beide'];
   var EINHEITEN = ['', 'kg', 'l', 'stk'];   /* = teigecke_logik.js EINHEITEN */
@@ -55,7 +77,9 @@
   var ID_MUSTER = /^[A-Za-z0-9_]{2,40}$/;
   var GEBINDE_VORSCHLAEGE = ['Sack', 'Karton', 'Eimer', 'Kanister', 'Beutel', 'Dose', 'Flasche', 'Palette', 'Stück'];
 
-  /* Startlisten: allgemeine Wörter (Ulf 01.11.2026, 20:50; Konzept §3.2). */
+  /* Startlisten: allgemeine Wörter (Ulf 01.11.2026, 20:50; Konzept §3.2).
+     STARTLISTE_ORTE wird seit Stufe 2 nicht mehr angeboten (K2, Ulf 11.11., 06:41),
+     bleibt nur für die Prüfwerkzeuge stehen. */
   var STARTLISTE_ORTE = [
     { name: 'Kühlung 1', temperatur: 'gekuehlt' }, { name: 'Kühlung 2', temperatur: 'gekuehlt' },
     { name: 'Kühlung 3', temperatur: 'gekuehlt' }, { name: 'Kühlung 4', temperatur: 'gekuehlt' },
@@ -134,7 +158,12 @@
     var d = { name: String(e.name || '').trim(), sort: istZahl(e.sort) ? e.sort : 0,
       temperatur: TEMP_ORT.indexOf(e.temperatur) !== -1 ? e.temperatur : 'ungekuehlt', geloescht: e.geloescht === true };
     if (Array.isArray(e.folge) && e.folge.length) d.folge = e.folge.filter(function (x, i, a) { return typeof x === 'string' && a.indexOf(x) === i; });
+    if (typeof e.standortId === 'string' && e.standortId) d.standortId = e.standortId;   /* Stufe 2: kein Vorgabewert, fehlt = noch ohne Standort */
     return d;
+  }
+  function standortDokument(e) {
+    e = e || {};
+    return { name: String(e.name || '').trim(), sort: istZahl(e.sort) ? e.sort : 0, geloescht: e.geloescht === true };
   }
   function kategorieDokument(e) {
     e = e || {};
@@ -153,7 +182,8 @@
     if (typeof e.kontakt === 'string' && e.kontakt.trim()) d.kontakt = e.kontakt.trim();
     return d;
   }
-  var BAUER = { lager_artikel: artikelDokument, lager_orte: ortDokument, lager_kategorien: kategorieDokument, lager_lieferanten: lieferantDokument };
+  var BAUER = { lager_artikel: artikelDokument, lager_orte: ortDokument, lager_kategorien: kategorieDokument, lager_lieferanten: lieferantDokument,
+    lager_standorte: standortDokument };
 
   /* ---------- Prüfen: dieselben Grenzen wie die Regel, plus Namen eindeutig ----------
      liefert eine Liste von Texten (leer = in Ordnung). liste = alle Dokumente der Sammlung. */
@@ -191,7 +221,8 @@
     return teile.join(' · ');
   }
 
-  /* ---------- Plausibilität Kategorie ↔ Lagerort (Hinweis, keine Sperre) ---------- */
+  /* ---------- Plausibilität Kategorie ↔ Lagerort (Hinweis, keine Sperre) ----------
+     Stufe 2: Der STANDORT spielt hier keine Rolle (Standort und Temperatur sind unabhängig, L10). */
   function plausibel(a, kategorienMap, orteMap) {
     var k = kategorienMap && kategorienMap[a.kategorieId];
     if (!k || !k.temperatur) return [];
@@ -212,10 +243,12 @@
   function teigeMitArtikel(id, teige) {
     return aktiv(teige).filter(function (t) { return ['zutaten', 'vorstufeZutaten', 'beiBedarf'].some(function (f) { return (t[f] || []).indexOf(id) !== -1; }); });
   }
+  function orteDesStandorts(sid, orte) { return aktiv(orte).filter(function (o) { return o.standortId === sid; }); }
   /* Sperrtext oder '' */
   function archivSperre(col, id, d) {
     var namen = function (l) { return l.map(function (x) { return x.name; }).join(', '); };
     var l;
+    if (col === COL.standorte && (l = orteDesStandorts(id, d.orte)).length) return 'Archivieren geht nicht: zu diesem Standort gehören noch die Lagerorte ' + namen(l) + '.';
     if (col === COL.orte && (l = artikelAmOrt(id, d.artikel)).length) return 'Archivieren geht nicht: an diesem Ort liegen noch ' + namen(l) + '.';
     if (col === COL.kategorien && (l = artikelDerKategorie(id, d.artikel)).length) return 'Archivieren geht nicht: zu dieser Kategorie gehören noch ' + namen(l) + '.';
     if (col === COL.lieferanten && (l = artikelDesLieferanten(id, d.artikel)).length) return 'Archivieren geht nicht: dieser Lieferant liefert noch ' + namen(l) + '.';
@@ -303,6 +336,89 @@
     return max + 10;
   }
 
+  /* ================= Stufe 2: Standorte und Zählen (RK §31) ================= */
+
+  /* A9: Ort-Kennungen ohne „__“ und nicht mit „_“ am Anfang. Dann ist die
+     Stand-Kennung artikelId + '__' + ortId eindeutig: die letzte Fundstelle
+     von „__“ ist immer der Trenner. Der Editor vergibt Auto-Kennungen
+     (collection().doc(), nur Buchstaben und Ziffern). */
+  function ortIdErlaubt(id) { return typeof id === 'string' && ID_MUSTER.test(id) && id.charAt(0) !== '_' && id.indexOf(STAND_TRENNER) === -1; }
+  function standId(artikelId, ortId) { return String(artikelId) + STAND_TRENNER + String(ortId); }
+  function standIdZerlegt(sid) {
+    var s = String(sid || ''), i = s.lastIndexOf(STAND_TRENNER);
+    return i <= 0 ? null : { artikelId: s.slice(0, i), ortId: s.slice(i + STAND_TRENNER.length) };
+  }
+
+  /* Startliste: nur Namen, die nicht schon AKTIV da sind (B16 — das Archiv zählt nicht). */
+  function startlisteFehlende(vorlage, liste) {
+    var da = {}; aktiv(liste).forEach(function (x) { da[norm(x.name)] = true; });
+    return (vorlage || []).filter(function (v) { return !da[norm(v.name)]; });
+  }
+
+  /* Lagerorte nach Standort: „Noch ohne Standort“ zuerst (auch Standort archiviert/unbekannt),
+     dann die aktiven Standorte nach Reihenfolge, darin die Orte nach Rundgang. Leere Standorte bleiben sichtbar. */
+  function orteNachStandort(orte, standorte) {
+    var sm = nachId(aktiv(standorte)), akt = aktiv(orte), g = [];
+    var ohne = akt.filter(function (o) { return !sm[o.standortId]; }).sort(nachSort);
+    if (ohne.length) g.push({ schluessel: '_ohne', titel: 'Noch ohne Standort', orte: ohne });
+    aktiv(standorte).slice().sort(nachSort).forEach(function (s) {
+      g.push({ schluessel: s.id, titel: s.name, standort: s, orte: akt.filter(function (o) { return o.standortId === s.id; }).sort(nachSort) });
+    });
+    return g;
+  }
+  /* Artikel „nach Ort“ mit Standort-Überschriften: [{ standort|null, titel, gruppen: <nachOrt-Gruppen> }]
+     „Ohne festen Ort“ bleibt als erste Gruppe ohne Standort-Überschrift. */
+  function nachStandortUndOrt(artikel, orte, standorte) {
+    var gruppen = nachOrt(artikel, orte), aus = [], ohneOrt = gruppen.filter(function (x) { return x.schluessel === '_ohne'; });
+    if (ohneOrt.length) aus.push({ schluessel: '_ohneort', titel: '', standort: null, gruppen: ohneOrt });
+    orteNachStandort(orte, standorte).forEach(function (sg) {
+      var ids = sg.orte.map(function (o) { return o.id; });
+      var gr = ids.map(function (id) { return gruppen.filter(function (x) { return x.schluessel === id; })[0]; }).filter(Boolean);
+      aus.push({ schluessel: sg.schluessel, titel: sg.titel, standort: sg.standort || null, gruppen: gr });
+    });
+    return aus;
+  }
+
+  /* Welche Standorte darf dieses Konto zählen? Rolle admin: alle aktiven (Ventil K1).
+     Sonst die aktiven aus konto.lagerZaehlenStandorte. Archivierte nie. */
+  function erlaubteStandorte(konto, standorte) {
+    var k = konto || {}, liste = Array.isArray(k.lagerZaehlenStandorte) ? k.lagerZaehlenStandorte : [];
+    return aktiv(standorte).filter(function (s) { return k.role === 'admin' || liste.indexOf(s.id) !== -1; }).sort(nachSort);
+  }
+
+  /* Zählliste eines Standorts: seine aktiven Orte nach Rundgang, je Ort die aktiven Artikel,
+     die dort fest hingehören (artikel.orte), in der Reihenfolge des Ortes (folge, dann Name).
+     [{ ort, artikel: [...] }] — Orte ohne Artikel bleiben drin (die Seite zeigt sie). */
+  function zaehlliste(standortId, orte, artikel) {
+    var akt = aktiv(artikel);
+    return aktiv(orte).filter(function (o) { return o.standortId === standortId; }).sort(nachSort).map(function (o) {
+      return { ort: o, artikel: artikelInFolge(o, akt.filter(function (a) { return (a.orte || []).indexOf(o.id) !== -1; })) };
+    });
+  }
+
+  /* Zeichen in der Zählliste: 'gezaehlt' (✓, Zahl > 0), 'null' (–, bewusst 0), 'offen' (○).
+     Gezählt gilt nur im laufenden Zählgang: Stand jünger als GRENZEN.zaehlgangStunden.
+     stand = { wert, tsMs } (die Seite rechnet den Zeitstempel in Millisekunden um). */
+  function zaehlStatus(stand, jetztMs, stunden) {
+    var h = istZahl(stunden) ? stunden : GRENZEN.zaehlgangStunden;
+    if (!stand || !istZahl(stand.wert) || !istZahl(stand.tsMs)) return { zeichen: 'offen', wert: null };
+    if (jetztMs - stand.tsMs > h * 3600000) return { zeichen: 'offen', wert: null };
+    return { zeichen: stand.wert === 0 ? 'null' : 'gezaehlt', wert: stand.wert };
+  }
+
+  /* Bausteine für den Batch (ts setzt die Seite als serverTimestamp). */
+  function zaehlungDokument(e) {
+    var d = { artikelId: String(e.artikelId), ortId: String(e.ortId), standortId: String(e.standortId), wert: e.wert, konto: String(e.konto) };
+    if (typeof e.ersetzt === 'string' && e.ersetzt) d.ersetzt = e.ersetzt;
+    if (istGanz(e.geraetZeit)) d.geraetZeit = e.geraetZeit;
+    return d;
+  }
+  function standDokument(zaehlungId, z) {
+    return { artikelId: z.artikelId, ortId: z.ortId, standortId: z.standortId, wert: z.wert, zaehlungId: zaehlungId, konto: z.konto };
+  }
+  /* Eingabe-Grenze der Regel: Zahl, 0 … wertMax. Kommastellen prüft der Baustein. */
+  function wertGueltig(w) { return istZahl(w) && w >= 0 && w <= GRENZEN.wertMax; }
+
   var api = {
     COL: COL, FELDER: FELDER, HERKUNFT: HERKUNFT, GRENZEN: GRENZEN, BEREICHE: BEREICHE, EINHEITEN: EINHEITEN,
     TEMP_ORT: TEMP_ORT, TEMP_KATEGORIE: TEMP_KATEGORIE, BESTELLWEGE: BESTELLWEGE, TAGE: TAGE, TAG_TEXT: TAG_TEXT,
@@ -319,7 +435,14 @@
     archivSperre: archivSperre, teigeckeAusSperre: teigeckeAusSperre, stecktIn: stecktIn,
     uebernahmeKandidaten: uebernahmeKandidaten, uebernahmeDokument: uebernahmeDokument,
     artikelInFolge: artikelInFolge, nachOrt: nachOrt, nachKategorie: nachKategorie, suche: suche,
-    verschiebe: verschiebe, naechsteSort: naechsteSort
+    verschiebe: verschiebe, naechsteSort: naechsteSort,
+    /* Stufe 2 */
+    FELDER_ZAEHLUNG: FELDER_ZAEHLUNG, FELDER_STAND: FELDER_STAND, STAND_TRENNER: STAND_TRENNER,
+    standortDokument: standortDokument, orteDesStandorts: orteDesStandorts, ortIdErlaubt: ortIdErlaubt,
+    standId: standId, standIdZerlegt: standIdZerlegt, startlisteFehlende: startlisteFehlende,
+    orteNachStandort: orteNachStandort, nachStandortUndOrt: nachStandortUndOrt, erlaubteStandorte: erlaubteStandorte,
+    zaehlliste: zaehlliste, zaehlStatus: zaehlStatus, zaehlungDokument: zaehlungDokument, standDokument: standDokument,
+    wertGueltig: wertGueltig
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_LAGER_LOGIK = api;

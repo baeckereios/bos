@@ -4,6 +4,7 @@
   MODUL: teigecke/teigecke_nacht.html — BrotTeigRechner (bis 16.10.2026 „Teigecke Nacht“; Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-11-11 · 06:50 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules (Lager Stufe 2, #120; Freigabe KC 11.11. 06:43, Anweisung §3.5; RK §31). REGEL_FASSUNG und sonst alles unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
     2026-11-02 · 00:56 · Lager Stufe 1 (#120; Kern-Freigabe Ulf 02.11. 00:39): nur Laden. Zutaten kommen aus Lager-Stamm + Teigecken-Blatt (L.zutatenAusStamm, gleiches Format wie bisher); COL.stamm = lager_artikel (nur lesen), Schlüssel COL.zutaten bleibt. Rechnung, Einsammelliste, Mehl-Regel, Silo unverändert. REGEL_FASSUNG lager-2026-11-02, REGEL_DATEI firestore_regeln_2026-11-02_lager.rules. lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
     2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
     2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
@@ -1210,7 +1211,7 @@ window.addEventListener('offline', planeRender);
    kein Schreiben, keine Daten. Nur „permission-denied“ vom SERVER zählt als
    „alt“; ohne Netz oder bei anderen Fehlern bleibt es still (unbekannt). */
 const REGEL_FASSUNG = 'lager-2026-11-02';   /* Mehl-Regel, Langzeit, Jahreszeit (RK §19) + Lager-Stamm lesen (RK §30) */
-const REGEL_DATEI = 'firestore_regeln_2026-11-02_lager.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
+const REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
 async function pruefeRegelstand() {
   try {
     await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' });

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: lager/lager_zaehlen.html — Lager zählen (Bestand je Standort, Ort und Artikel)
+  Doku:  lager/LAGER_ZAEHLEN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Logik: lager/lager_logik.js (Zählliste, Stand-Kennung, Zählgang); Liste + Karte: ../bos_zaehlkarte.js
+  Regel: RK §31 (firestore_regeln_2026-11-11_lager_zaehlen.rules) — zählen darf, wer den Standort in
+         bos_accounts/<kennung>.lagerZaehlenStandorte trägt, oder die Rolle admin. Jede Zählung wird
+         nur angehängt (lager_zaehlungen) und setzt im selben Vorgang lager_stand/<artikel>__<ort>.
+  Nur zählen: kein Stift, keine Pflege (Konzept 30.10., 15:20). Kachel über Registry-Feld haken:
+  ['lagerZaehlen'] (Wahrheitswert im Konto; die Liste der Standorte ist das Schloss).
+  Ohne Netz (Variante A, Ulf 11.11., 06:41): Firestore puffert im Speicher der offenen Seite;
+  die Seite zeigt ⏳ und fragt beim Schließen, solange etwas wartet. Kein Zeitlimit als Fehler.
+  CHANGELOG
+    2026-11-11 · 07:04 · v1 · Erstfassung (Lager Stufe 2, #120; Freigabe Kontroll-Chat 11.11. 06:43,
+      Ulfs Antworten 06:41: Variante A, Zählgang 12 Stunden, eine Nachkommastelle, kein QR)
+      Nachtrag 07:19: Regelstand nicht prüfbar (z. B. kein Netz beim Öffnen) → Satz mit Grund
+      (code — message) in der Regel-Leiste statt nur console.warn (Projektregel Fehlermeldungen).
+      lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Lager zählen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- MUSS vor bos_design_tokens.css stehen (Theme + Farbprofil des Kontos) -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<link rel="stylesheet" href="../bos_zaehlkarte.css">
+<style>
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --raised: var(--bos-surface-raised, #2b2218);
+    --amber: var(--bos-amber, #c07a10);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --red: var(--bos-red, #d6584a);
+    --warn: var(--bos-warn, #c07a10);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --font: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--bos-font-body, 'Barlow', sans-serif); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 60px; }
+  header { background: var(--surface); padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 20; }
+  header h1 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; }
+  header .meta { font-size: .72rem; color: var(--dim); text-align: right; }
+  .help-btn { background: transparent; border: 1px solid var(--border); color: var(--amber); padding: 6px 11px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+  .btn { font-family: var(--font); font-size: .8rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: none; border-radius: 7px; padding: 9px 13px; cursor: pointer; min-height: 44px; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .hinweis { margin: 10px 14px 0; padding: 10px 12px; border-radius: 8px; font-size: .86rem; line-height: 1.45; border: 1px solid var(--border); }
+  .hinweis.rot { border-color: var(--red); }
+  .hinweis.warn { border-color: var(--warn); color: var(--warn); }
+  #fehlerLeiste { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid var(--red); border-radius: 8px; font-size: .82rem; line-height: 1.45; }
+  #fehlerLeiste ul { margin: 6px 0 0 18px; }
+  #fehlerLeiste .kopf { display: flex; justify-content: space-between; font-weight: 700; color: var(--red); }
+  .hidden { display: none !important; }
+  .standort-wahl { display: grid; gap: 10px; padding: 18px 14px; }
+  .standort-knopf { min-height: 64px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.25rem; cursor: pointer; text-align: left; padding: 0 18px; }
+  .standort-kopf { display: flex; align-items: center; gap: 10px; padding: 12px 14px 4px; }
+  .standort-kopf h2 { flex: 1; font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.3rem; }
+  .leer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: .95rem; line-height: 1.5; }
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 50; display: flex; align-items: flex-end; }
+  .sheet { background: var(--surface); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 14px 20px 24px; border-top: 1px solid var(--border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 14px; }
+  .sheet h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.15rem; margin: 0 0 14px; }
+  .sheet .sec { margin-bottom: 16px; }
+  .sheet .sec h3 { font-size: .9rem; color: var(--amber); margin: 0 0 4px; }
+  .sheet .sec p { font-size: .88rem; line-height: 1.5; }
+  #helpSheet { z-index: 70; }
+  #toast { position: fixed; bottom: 18px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; background: var(--raised); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: .9rem; z-index: 90; text-align: center; }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'lager_zaehlen';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <h1 data-i18n="titel">Lager zählen</h1>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div class="meta"><div id="kontoZeile">—</div></div>
+    <button id="helpOpenBtn" class="help-btn" title="Hilfe" aria-label="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="regelLeiste" class="hinweis rot hidden" role="alert"></div>
+<div id="fehlerLeiste" class="hidden" role="alert">
+  <div class="kopf"><span data-i18n="fehler_titel">⚠︎ Fehler</span><button type="button" class="btn btn-outline" id="fehlerZuBtn" style="min-height:32px;padding:4px 10px" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+<div id="wartetLeiste" class="hinweis warn hidden" role="status"></div>
+<div id="hinweisZeile" class="leer hidden" role="status"></div>
+
+<section id="wahl" class="standort-wahl hidden" aria-label="Standort wählen"></section>
+<section id="zaehlen" class="hidden">
+  <div class="standort-kopf"><h2 id="standortName">—</h2><button type="button" class="btn btn-outline" id="wechselBtn" data-i18n="wechseln">Standort wechseln</button></div>
+  <div id="zkListe"></div>
+</section>
+<main id="lade" class="leer" data-i18n="lade">Lade Daten …</main>
+
+<div id="zkKarte" class="zk-overlay" hidden></div>
+
+<div id="helpSheet" class="sheet-overlay hidden">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-handle"></div>
+    <h2 id="helpTitle"></h2>
+    <div id="helpContent"></div>
+    <button type="button" class="btn btn-outline" id="helpCloseBtn" data-i18n="schliessen">Schließen</button>
+  </div>
+</div>
+<div id="toast" class="hidden" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="lager_logik.js"></script>
+<script src="../bos_zaehlkarte.js"></script>
+<script src="../bos_ungespeichert.js"></script>
+
+<script>
+'use strict';
+/* ==================================================================
+   Lager zählen — Seitenlogik. Liste und Karte: bos_zaehlkarte.js (gemeinsamer
+   Baustein, kennt keine Datenbank). Hier: Laden, Rechte, Standortwahl,
+   Schreiben (Zählung + Stand in EINEM Batch), Fehler, „wartet aufs Netz“.
+   Keine Daten in dieser Datei: keine Standort-, Orts- oder Artikelnamen.
+   ================================================================== */
+const LG = window.BOS_LAGER_LOGIK;
+const ZK = window.BOS_ZAEHLKARTE;
+const COL = LG.COL;
+const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
+const REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const WARTE_HINWEIS_MS = 20000;   /* danach „kein Netz, wird gesammelt“ — KEIN Fehler (Variante A) */
+const SPEICHER_STANDORT = 'bos_lager_zaehlen_standort';
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  titel: 'Lager zählen', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  wechseln: 'Standort wechseln', kein_konto: 'Keine Anmeldung erkannt.',
+  kein_standort: 'Dir ist noch kein Standort zum Zählen freigegeben. Das stellt die Kontenverwaltung ein.',
+  keine_orte: 'Hier gibt es noch keine Lagerorte. Lagerorte und ihren Standort pflegt die Seite „Lager“.',
+  wartet: '⏳ {n} Tipps warten aufs Netz. Seite offen lassen.',
+  wartet_eins: '⏳ 1 Tipp wartet aufs Netz. Seite offen lassen.',
+  wartet_lange: ' Kein Netz — die Tipps werden gesammelt und nachgeschickt, sobald wieder Netz da ist.',
+  abgelehnt: 'Nicht gezählt: {grund}',
+  regel_alt: '⚠︎ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Zählen wird abgelehnt. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  regel_unbekannt: 'Regelstand „{fassung}“ ließ sich nicht prüfen (wohl kein Netz). Zählen geht trotzdem; was die Datenbank ablehnt, steht dann am Eintrag. [{grund}]',
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: kein Haken für diesen Standort, oder die Regeln sind älter als diese Seite.',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_laden: 'Laden „{was}“', err_zaehlen: 'Zählen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen',
+  zk_keine_eintraege: '(noch keine Artikel)', zk_ende: 'Fertig mit {standort}.', zk_weiter_in: 'Weiter in {ort}',
+  zk_getippt: 'Getippt: {w} — der nächste Tipp hier ersetzt ihn.', zk_nichts_zurueck: 'Noch kein Tipp zum Zurücknehmen.'
+};
+function t(k, w) {
+  let s = I18N_DE[k]; if (s === undefined) s = k;
+  Object.keys(w || {}).forEach(function (x) { s = s.split('{' + x + '}').join(String(w[x])); });
+  return s;
+}
+function wendeI18nAn() { document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); }); }
+const esc = LG.esc;
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, konto: null, geladen: false, regelstand: 'unbekannt',
+  standorte: [], orte: [], artikel: [], stand: {},   /* stand: { artikelId__ortId: { wert, tsMs, ausstehend } } */
+  standortId: null,
+  wartet: {},        /* zaehlungId → { sid, seit } */
+  abgelehnt: {},     /* artikelId__ortId → Text */
+  geladenTeile: {}
+};
+
+/* ---------- Fehler sichtbar (Checkliste §7a) ---------- */
+function erklaerung(err) {
+  const c = (err && err.code) || '';
+  if (c === 'permission-denied') return t('err_perm');
+  if (c === 'unavailable') return t('err_netz');
+  return '';
+}
+function fehlerText(kontext, err) {
+  const roh = (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err));
+  return kontext + ': ' + [erklaerung(err), roh].filter(Boolean).join(' · ');
+}
+function zeigeFehler(kontext, err) {
+  console.error('[Lager zählen] ' + kontext, err);
+  const li = document.createElement('li');
+  li.textContent = fehlerText(kontext, err);
+  const liste = document.getElementById('fehlerListe');
+  liste.insertBefore(li, liste.firstChild);
+  while (liste.children.length > 6) liste.removeChild(liste.lastChild);
+  document.getElementById('fehlerLeiste').classList.remove('hidden');
+}
+window.addEventListener('error', function (e) { zeigeFehler(t('err_unbehandelt'), { message: (e.message || 'unbekannt') + ' (' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?') + ')' }); });
+window.addEventListener('unhandledrejection', function (e) { zeigeFehler(t('err_unbehandelt'), e.reason || { message: 'unbekannt' }); });
+let toastTimer = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.add('hidden'); }, 3000);
+}
+
+/* ---------- Laden ---------- */
+function tsMs(ts) {
+  if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
+  if (ts && typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1e6);
+  return Date.now();   /* gerade selbst geschrieben, Serverzeit noch unterwegs */
+}
+let abos = [];
+function abo(col, ziel) {
+  return window.db.collection(col).onSnapshot({ includeMetadataChanges: true }, function (snap) {
+    if (ziel === 'stand') {
+      const m = {};
+      snap.forEach(function (d) {
+        const x = d.data({ serverTimestamps: 'estimate' }) || {};
+        m[d.id] = { wert: x.wert, tsMs: tsMs(x.ts), ausstehend: !!(d.metadata && d.metadata.hasPendingWrites), zaehlungId: x.zaehlungId };
+      });
+      S.stand = m;
+    } else {
+      const a = []; snap.forEach(function (d) { a.push(Object.assign({ id: d.id }, d.data())); });
+      S[ziel] = a;
+    }
+    S.geladenTeile[ziel] = true;
+    planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: col }), err); S.geladenTeile[ziel] = true; planeRender(); });
+}
+function abonniere() {
+  abos.forEach(function (f) { f(); });
+  abos = [abo(COL.standorte, 'standorte'), abo(COL.orte, 'orte'), abo(COL.artikel, 'artikel'), abo(COL.stand, 'stand')];
+}
+async function pruefeRegelstand() {
+  try { await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }); S.regelstand = 'passt'; }
+  catch (err) {
+    S.regelstand = err && err.code === 'permission-denied' ? 'alt' : 'unbekannt';
+    if (S.regelstand === 'unbekannt') { console.warn('[Lager zählen] Regelstand nicht prüfbar:', err && err.message); S.regelGrund = (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)); }
+  }
+  const el = document.getElementById('regelLeiste');
+  el.textContent = S.regelstand === 'unbekannt' ? t('regel_unbekannt', { fassung: REGEL_FASSUNG, grund: S.regelGrund || '' }) : t('regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
+  el.classList.toggle('hidden', S.regelstand === 'passt');
+}
+async function start() {
+  wendeI18nAn(); renderHilfe();
+  if (!window.db || !window.BOS_AUTH_READY || !LG || !ZK) { zeigeFehler(t('err_laden', { was: 'Grundlagen' }), new Error('window.db, BOS_AUTH_READY, lager_logik.js oder bos_zaehlkarte.js fehlt')); return; }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; } catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); }
+  S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+  document.getElementById('kontoZeile').textContent = S.kennung || t('kein_konto');
+  if (S.kennung) {
+    try { const k = await window.db.collection('bos_accounts').doc(S.kennung).get(); S.konto = k.exists ? k.data() : null; }
+    catch (err) { zeigeFehler(t('err_konto'), err); }
+  }
+  try { const w = localStorage.getItem(SPEICHER_STANDORT); if (w) S.standortId = w; } catch (e) { /* Speicher gesperrt: dann eben wählen */ }
+  abonniere();
+  S.geladen = true;
+  planeRender();
+  if (S.kennung) pruefeRegelstand();
+}
+
+/* ---------- Rechte und Standort ---------- */
+function konto() { return S.konto && S.konto.freigeschaltet === true ? S.konto : null; }
+function erlaubte() { return konto() ? LG.erlaubteStandorte(konto(), S.standorte) : []; }
+function waehle(id) {
+  S.standortId = id;
+  try { if (id) localStorage.setItem(SPEICHER_STANDORT, id); else localStorage.removeItem(SPEICHER_STANDORT); } catch (e) { /* egal */ }
+  if (karte) karte.neuerGang();
+  planeRender();
+}
+
+/* ---------- Daten für den Baustein ---------- */
+function standort() { return LG.nachId(S.standorte)[S.standortId] || null; }
+function zaehlDaten() {
+  const st = standort();
+  return {
+    standort: st ? { id: st.id, name: st.name } : null,
+    orte: st ? LG.zaehlliste(st.id, S.orte, S.artikel).map(function (g) {
+      return { id: g.ort.id, name: g.ort.name, eintraege: g.artikel.map(function (a) { return { id: a.id, name: a.name, unter: LG.gebindeText(a), _artikel: a }; }) };
+    }) : []
+  };
+}
+function zaehlStatus(e, ort) {
+  const sid = LG.standId(e.id, ort.id), st = S.stand[sid];
+  const s = LG.zaehlStatus(st ? { wert: st.wert, tsMs: st.tsMs } : null, Date.now(), LG.GRENZEN.zaehlgangStunden);
+  return { zeichen: s.zeichen, wert: s.wert, ausstehend: !!(st && st.ausstehend), fehler: S.abgelehnt[sid] || '' };
+}
+
+/* ---------- Schreiben: Zählung (nur anhängen) + Stand in EINEM Batch (RK §31) ---------- */
+function beiTipp(e, ort, wert, info) {
+  const db = window.db;
+  const ortDok = LG.nachId(S.orte)[ort.id] || {};   /* Standort des ORTES (die Regel prüft genau den) */
+  const zRef = db.collection(COL.zaehlungen).doc(), zid = zRef.id;
+  const sid = LG.standId(e.id, ort.id);
+  const z = LG.zaehlungDokument({ artikelId: e.id, ortId: ort.id, standortId: ortDok.standortId || '', wert: wert, ersetzt: info && info.ersetzt, geraetZeit: Date.now(), konto: S.kennung });
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  batch.set(zRef, Object.assign({}, z, { ts: ts }));
+  batch.set(db.collection(COL.stand).doc(sid), Object.assign(LG.standDokument(zid, z), { ts: ts }));
+  delete S.abgelehnt[sid];
+  S.wartet[zid] = { sid: sid, seit: Date.now() };
+  zeigeWartet();
+  batch.commit().then(function () {
+    delete S.wartet[zid]; zeigeWartet(); planeRender();
+  }, function (err) {
+    delete S.wartet[zid];
+    S.abgelehnt[sid] = t('abgelehnt', { grund: [erklaerung(err), (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err))].filter(Boolean).join(' · ') });
+    zeigeFehler(t('err_zaehlen') + ' „' + e.name + '“ (' + ort.name + ')', err);
+    zeigeWartet(); planeRender();
+  });
+  return { id: zid };
+}
+function anzahlWartet() { return Object.keys(S.wartet).length; }
+function zeigeWartet() {
+  const n = anzahlWartet(), el = document.getElementById('wartetLeiste');
+  if (!n) { el.classList.add('hidden'); return; }
+  const lange = Object.keys(S.wartet).some(function (k) { return Date.now() - S.wartet[k].seit > WARTE_HINWEIS_MS; });
+  el.textContent = (n === 1 ? t('wartet_eins') : t('wartet', { n: n })) + (lange ? t('wartet_lange') : '');
+  el.classList.remove('hidden');
+}
+setInterval(function () { if (anzahlWartet()) zeigeWartet(); }, 5000);
+
+/* ---------- Rendern ---------- */
+let karte = null;
+let renderGeplant = false;
+function planeRender() { if (renderGeplant) return; renderGeplant = true; requestAnimationFrame(function () { renderGeplant = false; render(); }); }
+function fertigGeladen() { return ['standorte', 'orte', 'artikel', 'stand'].every(function (k) { return S.geladenTeile[k]; }); }
+function render() {
+  if (!S.geladen) return;
+  const lade = document.getElementById('lade'), wahl = document.getElementById('wahl'), zl = document.getElementById('zaehlen'), hz = document.getElementById('hinweisZeile');
+  if (!fertigGeladen()) return;
+  lade.classList.add('hidden');
+  const erl = erlaubte();
+  hz.classList.add('hidden'); wahl.classList.add('hidden'); zl.classList.add('hidden');
+  if (!S.kennung) { hz.textContent = t('kein_konto'); hz.classList.remove('hidden'); return; }
+  if (!erl.length) { hz.textContent = t('kein_standort'); hz.classList.remove('hidden'); return; }
+  if (S.standortId && !erl.some(function (s) { return s.id === S.standortId; })) S.standortId = null;
+  if (!S.standortId && erl.length === 1) S.standortId = erl[0].id;
+  if (!S.standortId) {
+    wahl.innerHTML = erl.map(function (s) { return '<button type="button" class="standort-knopf" data-standort="' + esc(s.id) + '">' + esc(s.name) + '</button>'; }).join('');
+    wahl.classList.remove('hidden');
+    return;
+  }
+  zl.classList.remove('hidden');
+  document.getElementById('standortName').textContent = standort().name;
+  document.getElementById('wechselBtn').classList.toggle('hidden', erl.length < 2);
+  const d = zaehlDaten();
+  if (!d.orte.length) { document.getElementById('zkListe').innerHTML = '<div class="leer">' + esc(t('keine_orte')) + '</div>'; return; }
+  if (!karte) {
+    karte = ZK.erzeuge({
+      liste: document.getElementById('zkListe'), karte: document.getElementById('zkKarte'), t: t,
+      daten: zaehlDaten,
+      plan: function (e) { return ZK.einstufig(e._artikel && e._artikel.zaehlRaster); },
+      eingabe: { nachkomma: LG.GRENZEN.nachkomma, max: LG.GRENZEN.wertMax },
+      status: zaehlStatus, beiTipp: beiTipp, hinweis: toast
+    });
+  }
+  karte.aktualisiere();
+}
+document.getElementById('wahl').addEventListener('click', function (ev) { const b = ev.target.closest('[data-standort]'); if (b) waehle(b.getAttribute('data-standort')); });
+document.getElementById('wechselBtn').addEventListener('click', function () { if (karte) karte.schliesse(); waehle(null); });
+document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; });
+
+/* ---------- Ausstehende Tipps melden (Checkliste §7b) ---------- */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () { return anzahlWartet() > 0; });
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in LAGER_ZAEHLEN_DOKU.md) ---------- */
+const helpData = {
+  title: 'Lager zählen — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'Hier zählst du, was in einem Lager liegt. Du wählst den Standort, läufst die Lagerorte in der Reihenfolge des Rundgangs ab und tippst je Artikel, wie viele Gebinde da sind: Säcke, Kartons, Eimer. Gepflegt wird hier nichts, das macht die Seite „Lager“.' },
+    { heading: 'Standort wählen', text: 'Oben stehen die Standorte, an denen du zählen darfst. Ist es nur einer, geht es gleich los. „Standort wechseln“ bringt dich zurück zur Auswahl. Wer wo zählen darf, steht in der Kontenverwaltung.' },
+    { heading: 'Die Liste', text: 'Je Lagerort stehen die Artikel, die dort fest hingehören. Rechts steht ○ für noch nicht gezählt, – für bewusst 0 und die Zahl mit ✓ für gezählt. Gezählt gilt 12 Stunden lang; danach steht der Artikel wieder auf ○, damit du beim nächsten Mal siehst, was offen ist. Die alte Zahl steht nicht da, damit wirklich gezählt und nicht nur bestätigt wird.' },
+    { heading: 'Die Karte', text: 'Antippen öffnet die Karte. Die Zahlenknöpfe gehen von 0 bis zur Palettengröße, „voll“ ist die ganze Palette mit einem Tipp. Ein Tipp speichert und springt zum nächsten Artikel, nach dem letzten Artikel eines Ortes zum nächsten Ort. Mit ‹ › blätterst du ohne zu zählen, ✕ schließt.' },
+    { heading: 'Zahlenfeld', text: 'Passt kein Knopf, tippst du die Zahl ins Feld und drückst OK oder die Eingabetaste. Halbe gehen mit Komma, zum Beispiel 2,5 — eine Stelle hinter dem Komma.' },
+    { heading: '0 ist nicht „nicht gezählt“', text: 'Liegt nichts da, tippst du 0. Dann steht – in der Liste. Einen Artikel, den du nicht anfasst, speichert die Seite gar nicht; er bleibt ○. Das ist wichtig, damit später kein falscher Verbrauch herauskommt.' },
+    { heading: 'Vertippt?', text: '„↶ Zurück“ bringt dich zur Karte deines letzten Tipps, die Zahl ist markiert. Tipp dort die richtige Zahl, sie ersetzt die falsche. Mehrmals Zurück geht auch.' },
+    { heading: 'Ohne Netz', text: 'Hat das Lager kein Netz, zählst du einfach weiter. Oben steht dann „⏳ … Tipps warten aufs Netz“, und die Tipps gehen raus, sobald wieder Netz da ist. Lass die Seite so lange offen; schließt du sie vorher, fragt sie nach. Öffnen musst du die Seite mit Netz, am besten vor der Tür.' },
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler stehen oben im roten Kasten, mit der echten Meldung. Wird ein Tipp abgelehnt, steht am Artikel ⚠︎ mit dem Grund, und der Tipp zählt nicht. „Keine Berechtigung“ heißt meistens: kein Haken für diesen Standort.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('helpTitle').textContent = helpData.title;
+  document.getElementById('helpContent').innerHTML = helpData.sections.map(function (s) { return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>'; }).join('');
+}
+document.getElementById('helpOpenBtn').addEventListener('click', function () { document.getElementById('helpSheet').classList.remove('hidden'); });
+document.getElementById('helpCloseBtn').addEventListener('click', function () { document.getElementById('helpSheet').classList.add('hidden'); });
+document.getElementById('helpSheet').addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

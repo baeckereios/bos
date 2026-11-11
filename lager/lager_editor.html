@@ -1,12 +1,26 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
 <!--
-  MODUL: lager/lager_editor.html — Lager (Artikelstamm, Lagerorte, Kategorien, Lieferanten)
+  MODUL: lager/lager_editor.html — Lager (Artikelstamm, Lagerorte, Standorte, Kategorien, Lieferanten)
   Doku:  lager/LAGER_EDITOR_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (BOS_LAGER_LOGIK, mit node testbar)
-  Regel: RK §30 (firestore_regeln_2026-11-02_lager.rules) — lesen jedes Konto, schreiben Rolle admin,
-         je Dokument eine Sicherung der Vorversion in lager_sicherungen im selben Vorgang.
+  Regel: RK §30/§31 (firestore_regeln_2026-11-11_lager_zaehlen.rules) — lesen jedes Konto, schreiben
+         Rolle admin, je Dokument eine Sicherung der Vorversion in lager_sicherungen im selben Vorgang.
+         Gezählt wird NICHT hier, sondern auf lager/lager_zaehlen.html (Zählen und Pflegen getrennt).
   CHANGELOG
+    2026-11-11 · 06:52 · v2 · Feature (Lager Stufe 2, #120; Freigabe Kontroll-Chat 11.11. 06:43 mit A9–A11,
+      Ulfs Antworten und Kern-Freigabe 06:41)
+      Neuer Reiter „Standorte“ (lager_standorte, Pflege Rolle admin, Archivsperre solange aktive
+      Lagerorte dranhängen). Lagerort bekommt optional standortId (Auswahl ohne Vorgabewert,
+      „Noch ohne Standort“); Liste „Lagerorte“ und Artikel „nach Ort“ nach Standort gruppiert,
+      ▲▼ innerhalb des Standorts. Standort und Temperatur unabhängig (L10).
+      Startliste (B16): Knopf richtet sich nach AKTIVEN Einträgen, legt nur fehlende aktive Namen
+      an (LG.startlisteFehlende); Startliste der Lagerorte entfällt (K2, Ulf 06:41).
+      aktiveListe() hieß falsch (lieferte auch das Archiv) → alleEintraege(). REGEL_FASSUNG
+      lager-zaehlen-2026-11-11. Hilfe nachgezogen (Standorte, Zählen auf eigener Seite).
+      Nachtrag 07:18: Text der leeren Kategorien-Liste („legt die aus dem Konzept an, die noch
+      fehlen“ statt „die sieben“, weil archivierte gleichen Namens nicht zählen).
+      lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
     2026-11-02 · 01:03 · v1 · Feature (Lager Stufe 1, #120)
       Erstfassung. ANWEISUNG_2026-11-01_LAGER_STUFE1_BAUPLAN.md, Freigabe Kontroll-Chat
       01.11. 23:03 (A1–A8) und 02.11. 00:17 (A1+), Kern-Freigabe Ulf 02.11. 00:39.
@@ -74,6 +88,8 @@
   .gruppe-kopf h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.05rem; }
   .gruppe-kopf .klein { color: var(--dim); font-size: .75rem; }
   .gruppe-kopf.ohne h2 { color: var(--dim); }
+  .standort-kopf { margin: 18px 10px 0; padding: 8px 4px 4px; border-bottom: 2px solid var(--amber); font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.2rem; }
+  .standort-kopf.ohne { color: var(--dim); border-bottom-color: var(--faint); }
   table.liste { width: 100%; border-collapse: collapse; }
   table.liste thead th { background: var(--surface); color: var(--dim); font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; padding: 6px; text-align: left; border-bottom: 1px solid var(--border); }
   table.liste tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; }
@@ -246,29 +262,30 @@
 const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
 const COL_TEIGECKE = { blaetter: 'teigecke_zutaten', orte: 'teigecke_orte', teige: 'teigecke_teige' };
-const REGEL_FASSUNG = 'lager-2026-11-02';
-const REGEL_DATEI = 'firestore_regeln_2026-11-02_lager.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
+const REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SCHREIB_ZEITLIMIT_MS = 20000;
 const SPEICHER_SORTIERUNG = 'bos_lager_sortierung';
 
 /* ---------- i18n (Checkliste §6) ---------- */
 const I18N_DE = {
-  titel: 'Lager', untertitel: 'Artikel, Lagerorte, Kategorien, Lieferanten', lade: 'Lade Daten …',
+  titel: 'Lager', untertitel: 'Artikel, Lagerorte, Standorte, Kategorien, Lieferanten', lade: 'Lade Daten …',
   fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen', neu_laden: '↻ Neu laden',
   suche: 'Suchen …',
-  reiter_artikel: 'Artikel', reiter_orte: 'Lagerorte', reiter_kategorien: 'Kategorien', reiter_lieferanten: 'Lieferanten',
+  reiter_artikel: 'Artikel', reiter_orte: 'Lagerorte', reiter_standorte: 'Standorte', reiter_kategorien: 'Kategorien', reiter_lieferanten: 'Lieferanten',
   reiter_uebernahme: 'Aus der Teigecke übernehmen',
   nach_ort: 'nach Ort', nach_kategorie: 'nach Kategorie',
-  neu_artikel: '＋ Artikel', neu_ort: '＋ Lagerort', neu_kategorie: '＋ Kategorie', neu_lieferant: '＋ Lieferant',
-  startliste_orte: 'Startliste anlegen (7 Lagerorte)', startliste_kategorien: 'Startliste anlegen (7 Kategorien)',
+  neu_artikel: '＋ Artikel', neu_ort: '＋ Lagerort', neu_standort: '＋ Standort', neu_kategorie: '＋ Kategorie', neu_lieferant: '＋ Lieferant',
+  startliste_kategorien: 'Startliste anlegen ({n} Kategorien)',
   startliste_frage: '{n} Einträge anlegen: {liste}. Später jederzeit umbenennen oder ergänzen.',
   startliste_fertig: '✓ {n} angelegt',
   sp_name: 'Name', sp_kategorie: 'Kategorie', sp_orte: 'Lagerorte', sp_gebinde: 'Gebinde', sp_zaehlart: 'Zählart', sp_lieferant: 'Standard-Lieferant',
-  sp_temperatur: 'Temperatur', sp_reihenfolge: 'Reihenfolge', sp_artikel: 'Artikel', sp_liefertage: 'Liefertage (bestellen bis)', sp_bestellweg: 'Bestellweg',
-  ohne_kategorie: 'Noch ohne Kategorie', ohne_ort: 'Ohne festen Ort', bereich_offen: 'Bereich offen',
+  sp_temperatur: 'Temperatur', sp_reihenfolge: 'Reihenfolge', sp_artikel: 'Artikel', sp_lagerorte: 'Lagerorte', sp_liefertage: 'Liefertage (bestellen bis)', sp_bestellweg: 'Bestellweg',
+  ohne_kategorie: 'Noch ohne Kategorie', ohne_ort: 'Ohne festen Ort', ohne_standort: 'Noch ohne Standort', bereich_offen: 'Bereich offen',
   leer_artikel: 'Noch keine Artikel. Mit „＋ Artikel“ den ersten anlegen.',
-  leer_ort: 'Noch keine Lagerorte. „Startliste anlegen“ legt die sieben aus dem Konzept an.',
-  leer_kategorie: 'Noch keine Kategorien. „Startliste anlegen“ legt die sieben aus dem Konzept an.',
+  leer_ort: 'Noch keine Lagerorte. Mit „＋ Lagerort“ den ersten anlegen.',
+  leer_standort: 'Noch keine Standorte. Mit „＋ Standort“ anlegen, zum Beispiel einen je Gebäude.',
+  leer_kategorie: 'Noch keine Kategorien. „Startliste anlegen“ legt die aus dem Konzept an, die noch fehlen.',
   leer_lieferant: 'Noch keine Lieferanten. Mit „＋ Lieferant“ anlegen.',
   leer_suche: 'Keine Treffer für „{text}“.',
   gruppe_leer: 'noch nichts',
@@ -287,7 +304,7 @@ const I18N_DE = {
   f_inhalt: 'Inhalt je Gebinde', f_inhalt_hilfe: 'Was in einem Gebinde drin ist, z. B. 25 kg oder 180 Stück. Freiwillig.',
   f_orte: 'Feste Lagerorte', f_orte_hilfe: 'Wo der Vorrat fest hingehört — einer, mehrere oder keiner. Liegt etwas nur zeitweise woanders (Angebotsware), kommt das später beim Zählen dazu.',
   f_orte_keine: 'Noch keine Lagerorte angelegt (Reiter Lagerorte).',
-  f_zaehlart: 'Zählart', f_zaehl_zahl: 'Zahlenfeld', f_zaehl_raster: 'Raster bis', f_zaehl_hilfe: 'Für das Zählen (kommt als Nächstes): Raster zum Antippen, z. B. bis 24 Säcke auf der Palette, mit Knopf „voll“. Ein Zahlenfeld gibt es immer zusätzlich.',
+  f_zaehlart: 'Zählart', f_zaehl_zahl: 'Zahlenfeld', f_zaehl_raster: 'Raster bis', f_zaehl_hilfe: 'Für die Seite „Lager zählen“: Raster zum Antippen, z. B. bis 24 Säcke auf der Palette, mit Knopf „voll“. Ein Zahlenfeld gibt es immer zusätzlich.',
   f_quellen: 'Lieferanten', f_quellen_hilfe: 'Von wem der Artikel kommt, mit dessen Artikelnummer. Einer ist der Standard.',
   f_quellen_keine: 'Noch keine Lieferanten angelegt (Reiter Lieferanten).', f_quelle_dazu: '＋ Lieferant dazu', f_artikelnr: 'Artikelnummer', f_standard: 'Standard',
   f_liefertage_std: 'Liefertage des Standard-Lieferanten (nur zum Lesen, gepflegt am Lieferanten)', f_kein_standard: 'Kein Standard-Lieferant gewählt.',
@@ -296,6 +313,9 @@ const I18N_DE = {
   f_zuhause: 'Zuhause in der Teigecke', f_zuhause_hilfe: 'Wo der offene Sack steht. Gesetzt wird es auf der Seite Teigecke · Orte (Haken 🧺 Wagen & Zutaten).',
   f_zuhause_ohne: 'noch ohne Zuhause', f_steckt: 'Steckt in …', f_steckt_hilfe: 'Abgeleitet aus den Teigen (welche Zutaten sie haben) und den Broten (aus welchem Teig). Nur zum Lesen.',
   f_steckt_leer: 'in keinem Teig', f_steckt_ohne: '—',
+  f_standort: 'Standort', f_standort_ohne: '— noch ohne Standort —',
+  f_standort_hilfe: 'In welchem Gebäude der Ort liegt. Gezählt wird je Standort, und wer zählen darf, steht je Standort in der Kontenverwaltung. Hat nichts mit der Temperatur zu tun.',
+  status_ohne_standort: '{n} Lagerorte ohne Standort',
   f_temperatur_ort: 'Temperatur', f_temperatur_ort_hilfe: 'Was der Ort bietet. Daran prüft BOS, ob Kühlware oder TK dort richtig liegt (nur ein Hinweis).',
   f_temperatur_kat: 'Braucht', f_temperatur_kat_hilfe: 'Was Artikel dieser Kategorie brauchen. „egal“ = keine Prüfung.',
   f_folge_hilfe: 'So stehen die Artikel dieses Orts beim Zählen, in der Reihenfolge des Rundgangs. Ohne eigene Reihenfolge alphabetisch.',
@@ -336,7 +356,7 @@ const esc = LG.esc;
 /* ---------- Zustand ---------- */
 const S = {
   kennung: null, istAdmin: false, geladen: false, regelstand: 'unbekannt',
-  artikel: [], orte: [], kategorien: [], lieferanten: [],
+  artikel: [], orte: [], standorte: [], kategorien: [], lieferanten: [],
   blaetter: [], teigeckeOrte: [], teige: [], produkte: [],
   ansicht: 'artikel', sortierung: 'ort', suche: '', zeigeArchiv: false,
   karte: null,   /* { col, id (null = neu), roh, entwurf, reiter, ids, geaendert } */
@@ -433,7 +453,7 @@ function abo(col, ziel) {
 }
 function abonniere() {
   abos.forEach(function (f) { f(); });
-  abos = [abo(COL.artikel, 'artikel'), abo(COL.orte, 'orte'), abo(COL.kategorien, 'kategorien'), abo(COL.lieferanten, 'lieferanten'),
+  abos = [abo(COL.artikel, 'artikel'), abo(COL.orte, 'orte'), abo(COL.standorte, 'standorte'), abo(COL.kategorien, 'kategorien'), abo(COL.lieferanten, 'lieferanten'),
     abo(COL_TEIGECKE.blaetter, 'blaetter'), abo(COL_TEIGECKE.orte, 'teigeckeOrte'), abo(COL_TEIGECKE.teige, 'teige')];
 }
 async function ladeProdukte() {
@@ -480,16 +500,21 @@ function km() { return LG.nachId(S.kategorien); }
 function omap() { return LG.nachId(S.orte); }
 function lm() { return LG.nachId(S.lieferanten); }
 function kandidaten() { return LG.uebernahmeKandidaten(S.blaetter, S.artikel); }
-function aktiveListe(col) { return S[nameVon(col)]; }
-function nameVon(col) { return { lager_artikel: 'artikel', lager_orte: 'orte', lager_kategorien: 'kategorien', lager_lieferanten: 'lieferanten' }[col]; }
-function colVon(ansicht) { return { artikel: COL.artikel, orte: COL.orte, kategorien: COL.kategorien, lieferanten: COL.lieferanten }[ansicht]; }
+/* ALLE Einträge einer Sammlung, das Archiv eingeschlossen (hieß bis Stufe 1 irreführend alleEintraege(), B16).
+   Nur aktive: LG.aktiv(alleEintraege(col)). */
+function alleEintraege(col) { return S[nameVon(col)]; }
+function nameVon(col) { return { lager_artikel: 'artikel', lager_orte: 'orte', lager_standorte: 'standorte', lager_kategorien: 'kategorien', lager_lieferanten: 'lieferanten' }[col]; }
+function colVon(ansicht) { return { artikel: COL.artikel, orte: COL.orte, standorte: COL.standorte, kategorien: COL.kategorien, lieferanten: COL.lieferanten }[ansicht]; }
+function smap() { return LG.nachId(S.standorte); }
+/* Gruppe eines Lagerorts für ▲▼: sein aktiver Standort, sonst „ohne“ */
+function ortGruppe(o) { const st = smap()[o.standortId]; return st && !st.geloescht ? o.standortId : '_ohne'; }
 function fokusIn(el) { const a = document.activeElement; return !!(a && el && el.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }
 function render() {
   if (!S.geladen) return;
   renderTabs();
   renderUmschalter();
   const neu = document.getElementById('neuBtn');
-  neu.textContent = t({ artikel: 'neu_artikel', orte: 'neu_ort', kategorien: 'neu_kategorie', lieferanten: 'neu_lieferant' }[S.ansicht] || 'neu_artikel');
+  neu.textContent = t({ artikel: 'neu_artikel', orte: 'neu_ort', standorte: 'neu_standort', kategorien: 'neu_kategorie', lieferanten: 'neu_lieferant' }[S.ansicht] || 'neu_artikel');
   neu.disabled = !!sperrGrund() || S.ansicht === 'uebernahme';
   if (!fokusIn(document.getElementById('inhalt'))) {
     if (S.ansicht === 'artikel') renderArtikel();
@@ -501,9 +526,9 @@ function render() {
 }
 function renderTabs() {
   const n = kandidaten().length;
-  const reiter = ['artikel', 'orte', 'kategorien', 'lieferanten'].concat(n ? ['uebernahme'] : []);
+  const reiter = ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'].concat(n ? ['uebernahme'] : []);
   if (!n && S.ansicht === 'uebernahme') S.ansicht = 'artikel';
-  const anzahl = { artikel: LG.aktiv(S.artikel).length, orte: LG.aktiv(S.orte).length, kategorien: LG.aktiv(S.kategorien).length, lieferanten: LG.aktiv(S.lieferanten).length, uebernahme: n };
+  const anzahl = { artikel: LG.aktiv(S.artikel).length, orte: LG.aktiv(S.orte).length, standorte: LG.aktiv(S.standorte).length, kategorien: LG.aktiv(S.kategorien).length, lieferanten: LG.aktiv(S.lieferanten).length, uebernahme: n };
   document.getElementById('tabLeiste').innerHTML = reiter.map(function (r) {
     return '<button type="button" class="tab-btn' + (S.ansicht === r ? ' aktiv' : '') + '" data-aktion="ansicht" data-wert="' + r + '">' + esc(t('reiter_' + r)) + ' <span class="anzahl">[' + anzahl[r] + ']</span></button>';
   }).join('');
@@ -524,6 +549,8 @@ function renderStatus() {
   if (ohneKat) teile.push(t('status_ohne_kat', { n: ohneKat }));
   if (ohneBer) teile.push(t('status_ohne_bereich', { n: ohneBer }));
   if (plaus) teile.push(t('status_plaus', { n: plaus }));
+  const ohneSt = LG.aktiv(S.orte).filter(function (o) { return ortGruppe(o) === '_ohne'; }).length;
+  if (ohneSt && LG.aktiv(S.standorte).length) teile.push(t('status_ohne_standort', { n: ohneSt }));
   if (!online()) teile.push(t('offline'));
   document.getElementById('statusBar').textContent = teile.join(' · ');
 }
@@ -552,18 +579,25 @@ function renderArtikel() {
   if (!LG.aktiv(S.artikel).length) html = '<div class="leer">' + esc(t('leer_artikel')) + '</div>';
   else if (!liste.length) html = '<div class="leer">' + esc(t('leer_suche', { text: S.suche })) + '</div>';
   else {
-    const gruppen = S.sortierung === 'ort' ? LG.nachOrt(liste, S.orte) : LG.nachKategorie(liste, S.kategorien);
-    gruppen.forEach(function (g) {
-      if (!g.artikel.length && S.suche) return;
-      html += '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '"><h2>' + esc(g.titel) + '</h2><span class="klein">' + g.artikel.length + '</span></div>' +
+    const gruppeHTML = function (g) {
+      if (!g.artikel.length && S.suche) return '';
+      return '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '"><h2>' + esc(g.titel) + '</h2><span class="klein">' + g.artikel.length + '</span></div>' +
         (g.artikel.length ? artikelTabelle(g.artikel, S.sortierung === 'ort') : '<div class="leer" style="padding:10px">' + esc(t('gruppe_leer')) + '</div>');
-    });
+    };
+    if (S.sortierung === 'ort') {
+      /* Stufe 2: Überschrift je Standort, darunter die Orte; ohne Standorte wie in Stufe 1 */
+      const mitSt = LG.aktiv(S.standorte).length > 0;
+      LG.nachStandortUndOrt(liste, S.orte, S.standorte).forEach(function (sg) {
+        if (mitSt && sg.titel) html += '<div class="standort-kopf' + (sg.schluessel === '_ohne' ? ' ohne' : '') + '">' + esc(sg.titel) + '</div>';
+        sg.gruppen.forEach(function (g) { html += gruppeHTML(g); });
+      });
+    } else LG.nachKategorie(liste, S.kategorien).forEach(function (g) { html += gruppeHTML(g); });
   }
   html += archivHTML(COL.artikel);
   el.innerHTML = html;
 }
 function archivHTML(col) {
-  const arch = (aktiveListe(col) || []).filter(function (x) { return x.geloescht; });
+  const arch = (alleEintraege(col) || []).filter(function (x) { return x.geloescht; });
   if (!arch.length) return '';
   let html = '<div class="pflege-leiste"><button type="button" class="btn btn-outline" data-aktion="archiv-umschalten">' + esc(S.zeigeArchiv ? t('archiv_verbergen') : t('archiv_zeigen', { n: arch.length })) + '</button></div>';
   if (!S.zeigeArchiv) return html;
@@ -573,32 +607,49 @@ function archivHTML(col) {
 }
 function renderListe(ansicht) {
   const col = colVon(ansicht), el = document.getElementById('inhalt');
-  const liste = LG.aktiv(aktiveListe(col)).slice().sort(ansicht === 'lieferanten' ? LG.nachName : LG.nachSort);
+  const liste = LG.aktiv(alleEintraege(col)).slice().sort(ansicht === 'lieferanten' ? LG.nachName : LG.nachSort);
   let html = '';
-  const start = ansicht === 'orte' ? 'startliste_orte' : ansicht === 'kategorien' ? 'startliste_kategorien' : null;
   if (!liste.length) {
-    html += '<div class="leer">' + esc(t({ orte: 'leer_ort', kategorien: 'leer_kategorie', lieferanten: 'leer_lieferant' }[ansicht])) + '</div>';
-    if (start && !(aktiveListe(col) || []).length) html += '<div class="pflege-leiste" style="justify-content:center"><button type="button" class="btn btn-amber" data-aktion="startliste" data-col="' + col + '"' + (sperrGrund() ? ' disabled' : '') + '>' + esc(t(start)) + '</button></div>';
-  } else {
-    const kopf = ansicht === 'lieferanten'
-      ? '<th>' + esc(t('sp_name')) + '</th><th>' + esc(t('sp_liefertage')) + '</th><th class="weg-schmal">' + esc(t('sp_bestellweg')) + '</th><th>' + esc(t('sp_artikel')) + '</th>'
-      : '<th>' + esc(t('sp_reihenfolge')) + '</th><th>' + esc(t('sp_name')) + '</th><th>' + esc(t('sp_temperatur')) + '</th><th>' + esc(t('sp_artikel')) + '</th>';
-    html += '<table class="liste"><thead><tr>' + kopf + '</tr></thead><tbody>' + liste.map(function (x, i) {
-      if (ansicht === 'lieferanten') {
+    html += '<div class="leer">' + esc(t({ orte: 'leer_ort', standorte: 'leer_standort', kategorien: 'leer_kategorie', lieferanten: 'leer_lieferant' }[ansicht])) + '</div>';
+    /* B16: der Knopf richtet sich nach den AKTIVEN Einträgen; das Archiv zählt nicht. Nur Kategorien (K2). */
+    const fehlend = ansicht === 'kategorien' ? LG.startlisteFehlende(LG.STARTLISTE_KATEGORIEN, alleEintraege(col)) : [];
+    if (fehlend.length) html += '<div class="pflege-leiste" style="justify-content:center"><button type="button" class="btn btn-amber" data-aktion="startliste" data-col="' + col + '"' + (sperrGrund() ? ' disabled' : '') + '>' + esc(t('startliste_kategorien', { n: fehlend.length })) + '</button></div>';
+  } else if (ansicht === 'lieferanten') {
+    html += '<table class="liste"><thead><tr><th>' + esc(t('sp_name')) + '</th><th>' + esc(t('sp_liefertage')) + '</th><th class="weg-schmal">' + esc(t('sp_bestellweg')) + '</th><th>' + esc(t('sp_artikel')) + '</th></tr></thead><tbody>' +
+      liste.map(function (x) {
         return '<tr data-aktion="oeffne" data-col="' + col + '" data-id="' + esc(x.id) + '"><td>' + esc(x.name) + '</td><td class="dim">' + esc(LG.liefertageText(x) || '—') + '</td>' +
           '<td class="dim weg-schmal">' + esc(t('bestellweg_' + (x.bestellweg || ''))) + '</td><td class="dim">' + LG.artikelDesLieferanten(x.id, S.artikel).length + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  } else if (ansicht === 'orte' && LG.aktiv(S.standorte).length) {
+    /* Stufe 2: nach Standort gruppiert, ▲▼ innerhalb des Standorts */
+    LG.orteNachStandort(S.orte, S.standorte).forEach(function (g) {
+      html += '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '"><h2>' + esc(g.titel) + '</h2><span class="klein">' + g.orte.length + '</span></div>';
+      html += g.orte.length ? sortTabelle(col, g.orte) : '<div class="leer" style="padding:10px">' + esc(t('gruppe_leer')) + '</div>';
+    });
+  } else html += sortTabelle(col, liste);
+  html += archivHTML(col);
+  el.innerHTML = html;
+}
+/* Tabelle mit ▲▼ für Orte, Standorte, Kategorien (liste schon sortiert, eine Gruppe) */
+function sortTabelle(col, liste) {
+  const darf = !sperrGrund();
+  const zweite = col === COL.standorte ? 'sp_lagerorte' : 'sp_temperatur';
+  return '<table class="liste"><thead><tr><th>' + esc(t('sp_reihenfolge')) + '</th><th>' + esc(t('sp_name')) + '</th><th>' + esc(t(zweite)) + '</th><th>' + esc(t('sp_artikel')) + '</th></tr></thead><tbody>' +
+    liste.map(function (x, i) {
+      let zweitWert, n;
+      if (col === COL.standorte) {
+        const orte = LG.orteDesStandorts(x.id, S.orte);
+        zweitWert = String(orte.length);
+        n = LG.aktiv(S.artikel).filter(function (a) { return (a.orte || []).some(function (o) { return orte.some(function (y) { return y.id === o; }); }); }).length;
+      } else {
+        zweitWert = x.temperatur ? t('temp_' + x.temperatur) : t('temp_egal');
+        n = col === COL.orte ? LG.artikelAmOrt(x.id, S.artikel).length : LG.artikelDerKategorie(x.id, S.artikel).length;
       }
-      const n = ansicht === 'orte' ? LG.artikelAmOrt(x.id, S.artikel).length : LG.artikelDerKategorie(x.id, S.artikel).length;
-      const temp = x.temperatur ? t('temp_' + x.temperatur) : t('temp_egal');
-      const darf = !sperrGrund();
       return '<tr data-aktion="oeffne" data-col="' + col + '" data-id="' + esc(x.id) + '"><td style="white-space:nowrap">' +
         '<button type="button" class="pfeil" data-aktion="sort" data-col="' + col + '" data-id="' + esc(x.id) + '" data-r="-1" aria-label="' + esc(t('hoch')) + '"' + (i === 0 || !darf ? ' disabled' : '') + '>▲</button> ' +
         '<button type="button" class="pfeil" data-aktion="sort" data-col="' + col + '" data-id="' + esc(x.id) + '" data-r="1" aria-label="' + esc(t('runter')) + '"' + (i === liste.length - 1 || !darf ? ' disabled' : '') + '>▼</button></td>' +
-        '<td>' + esc(x.name) + '</td><td class="dim">' + esc(temp) + '</td><td class="dim">' + n + '</td></tr>';
+        '<td>' + esc(x.name) + '</td><td class="dim">' + esc(zweitWert) + '</td><td class="dim">' + n + '</td></tr>';
     }).join('') + '</tbody></table>';
-  }
-  html += archivHTML(col);
-  el.innerHTML = html;
 }
 
 /* ---------- Karte ---------- */
@@ -606,17 +657,23 @@ function leerEntwurf(col) {
   if (col === COL.artikel) return LG.artikelDokument({});
   if (col === COL.orte) return LG.ortDokument({ sort: LG.naechsteSort(S.orte) });
   if (col === COL.kategorien) return LG.kategorieDokument({ sort: LG.naechsteSort(S.kategorien) });
+  if (col === COL.standorte) return LG.standortDokument({ sort: LG.naechsteSort(S.standorte) });
   return LG.lieferantDokument({});
 }
 function entwurfAus(col, roh) { return LG.BAUER[col](roh); }
 function idsFuer(col) {
   if (col === COL.artikel) {
     const liste = sichtbareArtikel(), ids = [];
-    const gruppen = S.sortierung === 'ort' ? LG.nachOrt(liste, S.orte) : LG.nachKategorie(liste, S.kategorien);
+    const gruppen = S.sortierung === 'ort'
+      ? [].concat.apply([], LG.nachStandortUndOrt(liste, S.orte, S.standorte).map(function (sg) { return sg.gruppen; }))
+      : LG.nachKategorie(liste, S.kategorien);
     gruppen.forEach(function (g) { g.artikel.forEach(function (a) { if (ids.indexOf(a.id) === -1) ids.push(a.id); }); });
     return ids;
   }
-  return LG.aktiv(aktiveListe(col)).slice().sort(col === COL.lieferanten ? LG.nachName : LG.nachSort).map(function (x) { return x.id; });
+  if (col === COL.orte) {
+    return [].concat.apply([], LG.orteNachStandort(S.orte, S.standorte).map(function (g) { return g.orte.map(function (o) { return o.id; }); }));
+  }
+  return LG.aktiv(alleEintraege(col)).slice().sort(col === COL.lieferanten ? LG.nachName : LG.nachSort).map(function (x) { return x.id; });
 }
 function reiterFuer(col) {
   if (col === COL.artikel) return ['k_stammdaten', 'k_lagerung', 'k_bezug', 'k_teigecke'];
@@ -625,7 +682,7 @@ function reiterFuer(col) {
 }
 function oeffneKarte(col, id) {
   if (S.karte && S.karte.geaendert && !window.confirm(t('verwerfen_frage'))) return;
-  const roh = id ? (LG.nachId(aktiveListe(col))[id] || null) : null;
+  const roh = id ? (LG.nachId(alleEintraege(col))[id] || null) : null;
   if (id && !roh) return;
   const ids = idsFuer(col);
   S.karte = { col: col, id: id || null, roh: roh, entwurf: roh ? entwurfAus(col, roh) : leerEntwurf(col), reiter: reiterFuer(col)[0], ids: ids, geaendert: false };
@@ -653,6 +710,7 @@ function aktualisiereKarteKopf() {
   document.getElementById('karteName').textContent = e.name || t('neuer_eintrag');
   const unter = [];
   if (k.col === COL.artikel) { const kat = km()[e.kategorieId]; unter.push(kat ? kat.name : t('ohne_kategorie')); if (!e.bereich) unter.push(t('bereich_offen')); else unter.push(t('bereich_' + e.bereich)); }
+  if (k.col === COL.orte) { const st = smap()[e.standortId]; unter.push(st && !st.geloescht ? st.name : t('ohne_standort')); }
   if (k.roh && k.roh.geloescht) unter.push(t('archiviert_et'));
   document.getElementById('karteUnter').textContent = unter.join(' · ');
   const i = k.id ? k.ids.indexOf(k.id) : -1;
@@ -679,6 +737,7 @@ function zeichneKarte() {
   if (k.col === COL.artikel) html = artikelReiter(k, dis);
   else if (k.col === COL.orte) html = k.reiter === 'k_artikelfolge' ? folgeReiter(k, dis) : ortReiter(k, dis);
   else if (k.col === COL.kategorien) html = kategorieReiter(k, dis);
+  else if (k.col === COL.standorte) html = standortReiter(k, dis);
   else html = lieferantReiter(k, dis);
   body.innerHTML = html;
   aktualisiereKarteKopf();
@@ -744,7 +803,13 @@ function artikelReiter(k, dis) {
 }
 function ortReiter(k, dis) {
   const e = k.entwurf;
+  /* Stufe 2: Standort ohne Vorgabewert. Ein archivierter, noch gesetzter Standort bleibt sichtbar wählbar. */
+  const st = LG.aktiv(S.standorte).slice().sort(LG.nachSort);
+  const akt = smap()[e.standortId];
+  if (akt && akt.geloescht) st.push(akt);
+  const opt = [{ wert: '', text: t('f_standort_ohne') }].concat(st.map(function (x) { return { wert: x.id, text: x.name + (x.geloescht ? ' (' + t('archiviert_et') + ')' : '') }; }));
   return feld(t('f_name'), eingabe('name', e.name, 'maxlength="' + LG.GRENZEN.name + '" autocomplete="off"' + dis)) +
+    feld(t('f_standort'), auswahl('standortId', e.standortId || '', opt, dis), t('f_standort_hilfe')) +
     feld(t('f_temperatur_ort'), auswahl('temperatur', e.temperatur, LG.TEMP_ORT.map(function (x) { return { wert: x, text: t('temp_' + x) }; }), dis), t('f_temperatur_ort_hilfe'));
 }
 function folgeReiter(k, dis) {
@@ -756,6 +821,10 @@ function folgeReiter(k, dis) {
       '<button type="button" class="pfeil" data-aktion="folge" data-i="' + i + '" data-r="-1"' + (i === 0 ? ' disabled' : '') + dis + ' aria-label="' + esc(t('hoch')) + '">▲</button>' +
       '<button type="button" class="pfeil" data-aktion="folge" data-i="' + i + '" data-r="1"' + (i === liste.length - 1 ? ' disabled' : '') + dis + ' aria-label="' + esc(t('runter')) + '">▼</button></div>';
   }).join('') + '<div class="pflege-leiste" style="padding-left:0"><button type="button" class="btn btn-outline" data-aktion="folge-alphabet"' + dis + '>' + esc(t('f_folge_alphabet')) + '</button></div>';
+}
+function standortReiter(k, dis) {
+  const e = k.entwurf;
+  return feld(t('f_name'), eingabe('name', e.name, 'maxlength="' + LG.GRENZEN.name + '" autocomplete="off"' + dis));
 }
 function kategorieReiter(k, dis) {
   const e = k.entwurf;
@@ -784,7 +853,7 @@ function nimmEingabe(el) {
     if (f === 'inhaltMenge') { const n = zahlAus(el.value); if (n === undefined) delete e.inhaltMenge; else e.inhaltMenge = n; }
     else if (f === 'zaehlRaster') { const n = zahlAus(el.value); if (n === undefined) delete e.zaehlRaster; else e.zaehlRaster = n; }
     else if (f === 'gebinde' || f === 'kontakt') { if (el.value.trim()) e[f] = el.value; else delete e[f]; }
-    else if (f === 'inhaltEinheit' || f === 'bestellweg') { if (el.value) e[f] = el.value; else delete e[f]; }
+    else if (f === 'inhaltEinheit' || f === 'bestellweg' || f === 'standortId') { if (el.value) e[f] = el.value; else delete e[f]; }
     else e[f] = el.value;
   }
   if (el.hasAttribute('data-quelle')) e.quellen[el.getAttribute('data-quelle')] = el.value;
@@ -807,7 +876,7 @@ function bauDokument(k) {
   }
   const d = LG.BAUER[k.col](e);
   if (k.roh) d.geloescht = k.roh.geloescht === true;
-  return { daten: d, fehler: LG.pruefe(k.col, d, k.id, aktiveListe(k.col)) };
+  return { daten: d, fehler: LG.pruefe(k.col, d, k.id, alleEintraege(k.col)) };
 }
 async function speichereKarte() {
   const k = S.karte; if (!k || S.speichertGerade) return;
@@ -822,10 +891,10 @@ async function archiviereKarte() {
   karteFehler('');
   const zurueck = k.roh.geloescht === true;
   if (!zurueck) {
-    const sp = LG.archivSperre(k.col, k.id, { artikel: S.artikel, teige: S.teige });
+    const sp = LG.archivSperre(k.col, k.id, { artikel: S.artikel, teige: S.teige, orte: S.orte });
     if (sp) { karteFehler(sp); return; }
   } else {
-    const gleich = LG.aktiv(aktiveListe(k.col)).filter(function (x) { return x.id !== k.id && LG.norm(x.name) === LG.norm(k.roh.name); })[0];
+    const gleich = LG.aktiv(alleEintraege(k.col)).filter(function (x) { return x.id !== k.id && LG.norm(x.name) === LG.norm(k.roh.name); })[0];
     if (gleich) { karteFehler('„' + k.roh.name + '“ gibt es schon.'); return; }
   }
   const d = LG.BAUER[k.col](k.roh); d.geloescht = !zurueck;
@@ -859,7 +928,9 @@ async function fuehreAus(k, daten, aktion, okText) {
 }
 /* Reihenfolge ▲▼ (Orte, Kategorien): zwei Dokumente tauschen ihre sort-Zahl, ein Vorgang */
 async function verschiebeSort(col, id, r) {
-  const liste = LG.aktiv(aktiveListe(col)).slice().sort(LG.nachSort);
+  let liste = LG.aktiv(alleEintraege(col)).slice().sort(LG.nachSort);
+  /* Stufe 2: Lagerorte tauschen nur innerhalb ihres Standorts (so wie die Liste sie zeigt) */
+  if (col === COL.orte) { const x = liste.filter(function (o) { return o.id === id; })[0]; if (x) { const g = ortGruppe(x); liste = liste.filter(function (o) { return ortGruppe(o) === g; }); } }
   const i = liste.findIndex(function (x) { return x.id === id; }), j = i + r;
   if (i < 0 || j < 0 || j >= liste.length) return;
   const a = liste[i], b = liste[j];
@@ -870,9 +941,12 @@ async function verschiebeSort(col, id, r) {
   try { await schreibe([{ col: col, id: a.id, daten: da, aktion: 'aendern', vorher: a }, { col: col, id: b.id, daten: db2, aktion: 'aendern', vorher: b }]); }
   catch (err) { zeigeFehler(t('err_speichern'), err); }
 }
+/* B16 + K2: nur Kategorien; legt nur Namen an, die nicht schon AKTIV da sind (Archiv zählt nicht) */
 async function legeStartlisteAn(col) {
-  const vorlage = col === COL.orte ? LG.STARTLISTE_ORTE : LG.STARTLISTE_KATEGORIEN;
-  if ((aktiveListe(col) || []).length) return;
+  if (col !== COL.kategorien) return;
+  if (LG.aktiv(alleEintraege(col)).length) return;
+  const vorlage = LG.startlisteFehlende(LG.STARTLISTE_KATEGORIEN, alleEintraege(col));
+  if (!vorlage.length) return;
   if (!window.confirm(t('startliste_frage', { n: vorlage.length, liste: vorlage.map(function (x) { return x.name; }).join(', ') }))) return;
   const auftraege = vorlage.map(function (v, i) { return { col: col, id: null, daten: LG.BAUER[col](Object.assign({ sort: (i + 1) * 10 }, v)), aktion: 'anlegen', vorher: null }; });
   try { const n = await schreibeReihe(auftraege, function (i, n) { document.getElementById('statusBar').textContent = t('reihe_laeuft', { i: i, n: n }); }); toast(t('startliste_fertig', { n: n })); }
@@ -994,18 +1068,19 @@ document.addEventListener('keydown', function (e) {
 const helpData = {
   title: 'Lager — was ist das hier?',
   sections: [
-    { heading: 'Wofür ist diese Seite?', text: 'Hier steht jeder Artikel, der irgendwo bei uns lagert: Rohstoffe, Kühlware, TK-Ware, Konserven, Verpackung, Reinigung. Zu jedem Artikel pflegst du, was er ist (Kategorie), wo er fest liegt (Lagerorte), in welchem Gebinde er kommt, wie er gezählt wird und von welchem Lieferanten. Das Zählen selbst kommt als Nächstes; diese Seite ist die Liste, auf die es sich stützt.' },
-    { heading: 'Die vier Reiter', text: '„Artikel“ ist die eigentliche Liste. „Lagerorte“ sind die Räume, in denen der Vorrat steht (Kühlungen, Froster, Vorratslager), in der Reihenfolge des Rundgangs. „Kategorien“ sagen, was etwas ist und ob es Kühlung oder Tiefkühlung braucht. „Lieferanten“ tragen ihre Liefertage und bis wann bestellt sein muss. Solange Zutaten der Teigecke noch nicht im Lager stehen, gibt es einen fünften Reiter „Aus der Teigecke übernehmen“.' },
+    { heading: 'Wofür ist diese Seite?', text: 'Hier steht jeder Artikel, der irgendwo bei uns lagert: Rohstoffe, Kühlware, TK-Ware, Konserven, Verpackung, Reinigung. Zu jedem Artikel pflegst du, was er ist (Kategorie), wo er fest liegt (Lagerorte), in welchem Gebinde er kommt, wie er gezählt wird und von welchem Lieferanten. Gezählt wird auf der eigenen Seite „Lager zählen“; diese Seite ist die Liste, auf die sie sich stützt.' },
+    { heading: 'Die Reiter', text: '„Artikel“ ist die eigentliche Liste. „Lagerorte“ sind die Räume und Regale, in denen der Vorrat steht, in der Reihenfolge des Rundgangs. „Standorte“ sind die Gebäude, zu denen die Lagerorte gehören. „Kategorien“ sagen, was etwas ist und ob es Kühlung oder Tiefkühlung braucht. „Lieferanten“ tragen ihre Liefertage und bis wann bestellt sein muss. Solange Zutaten der Teigecke noch nicht im Lager stehen, gibt es einen weiteren Reiter „Aus der Teigecke übernehmen“.' },
+    { heading: 'Standorte', text: 'Ein Standort ist ein Gebäude, zum Beispiel die Backstube oder ein Vorratslager. Jeder Lagerort gehört zu einem Standort; das wählst du in der Karte des Lagerorts. Solange keiner gewählt ist, steht der Ort unter „Noch ohne Standort“, und an ihm kann nicht gezählt werden. Der Standort sagt nichts über die Temperatur: ein TK-Raum kann in jedem Standort stehen. Gezählt wird je Standort, und wer wo zählen darf, steht in der Kontenverwaltung.' },
     { heading: 'Nach Ort oder nach Kategorie', text: 'Im Reiter Artikel schaltest du oben um. „Nach Ort“ zeigt die Artikel so, wie man beim Zählen durch die Räume geht; ein Artikel an zwei Orten steht unter beiden. „Nach Kategorie“ zeigt sie so, wie man pflegt und bestellt. Ganz oben stehen jeweils die Artikel, denen noch etwas fehlt (ohne festen Ort, noch ohne Kategorie). Das Suchfeld sucht über alle Artikel.' },
     { heading: 'Eine Karte bearbeiten', text: 'Antippen öffnet die Karte. Oben blätterst du mit ‹ › durch die Liste, ✕ schließt. Die Reiter der Karte: Stammdaten (Name, Kategorie, Bereich, Gebinde und Inhalt), Lagerung (feste Lagerorte, Zählart), Bezug (Lieferanten mit Artikelnummer, einer ist Standard) und Teigecke. „💾 Speichern“ schreibt genau diese Karte; vorher wird die alte Fassung automatisch gesichert. Steht oben „noch nicht gespeichert“, fragt die Seite nach, bevor du weggehst.' },
     { heading: 'Gebinde und Inhalt', text: 'Gebinde ist das, was du beim Zählen in der Hand hast: Sack, Karton, Eimer. Inhalt ist, was drin ist: 25 kg, 180 Stück. Beides zusammen steht in der Liste, zum Beispiel „Sack · 25 kg“.' },
-    { heading: 'Zählart', text: '„Raster bis 24“ heißt: Beim Zählen gibt es Knöpfe zum Antippen von 0 bis 24 und einen Knopf „voll“ — gut für Säcke auf der Palette. „Zahlenfeld“ heißt: Zahl eintippen. Ein Zahlenfeld gibt es beim Zählen immer zusätzlich.' },
+    { heading: 'Zählart', text: '„Raster bis 24“ heißt: Beim Zählen gibt es Knöpfe zum Antippen von 0 bis 24 und einen Knopf „voll“ — gut für Säcke auf der Palette. „Zahlenfeld“ heißt: Zahl eintippen. Ein Zahlenfeld gibt es beim Zählen immer zusätzlich. Gezählt wird auf der Seite „Lager zählen“.' },
     { heading: 'Der gelbe Hinweis „Lagerort“', text: 'Gehört ein Artikel zu einer Kategorie, die Kühlung braucht, und liegt er fest an einem ungekühlten Ort, zeigt die Seite ⚠︎. Dasselbe bei TK-Ware an einem Ort ohne Tiefkühlung. Das ist nur ein Hinweis, keine Sperre — manchmal ist es richtig so.' },
     { heading: 'Lieferanten und „bestellt bis“', text: 'Am Lieferanten hakst du die Liefertage an. Daneben steht für jeden Liefertag, bis wann bestellt sein muss: Wochentag und Uhrzeit, zum Beispiel „bis Sonntag 14:00“. Das steht am Lieferanten, nicht an jedem Artikel — ändert sich ein Tag, änderst du ihn einmal. In der Artikelkarte siehst du die Tage des Standard-Lieferanten zum Lesen.' },
     { heading: 'Teigecke', text: 'Ist ein Artikel „in der Teigecke handverwogen“, sieht ihn die Teigecke: in der Rezept-Auswahl, auf der Seite „Orte“ und im BrotTeigRechner. Name, Gebinde und Gruppe pflegst du nur hier. Das Zuhause (welcher Wagen) setzen die Kollegen mit dem Haken 🧺 Wagen & Zutaten auf der Seite Teigecke · Orte; hier steht es nur zum Lesen. „Steckt in …“ zeigt, in welchen Teigen die Zutat steht und welche Brote aus diesen Teigen kommen.' },
     { heading: 'Aus der Teigecke übernehmen', text: 'Einmalig: Die Zutaten, die es in der Teigecke schon gibt, kommen mit „Übernehmen“ ins Lager — mit derselben Kennung, also bleiben alle Rezepte gültig. Name, Inhalt, Gruppe und Archiv werden mitgenommen; Kategorie und Bereich bleiben offen, die trägst du danach ein. Die Teigecke selbst wird dabei nicht angefasst. Bis zur Übernahme kann in der Teigecke niemand ein Zuhause setzen; das ist gewollt.' },
-    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Ein Lagerort lässt sich erst archivieren, wenn kein Artikel mehr fest dort liegt; eine Kategorie, wenn kein Artikel mehr dazugehört; ein Lieferant, wenn er keinen Artikel mehr liefert; ein Artikel, wenn er in keinem Teig mehr steht. Archiviertes steht unten im Archiv und lässt sich wiederherstellen.' },
-    { heading: 'Wer darf was?', text: 'Sehen darf das Lager jeder mit Konto. Ändern darf nur die Rolle admin — dieselbe Regel wie bei den Produkten. Fehlt dir die Rolle, steht oben ein Hinweis, und alle Felder sind gesperrt.' },
+    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Ein Standort lässt sich erst archivieren, wenn kein Lagerort mehr zu ihm gehört; ein Lagerort, wenn kein Artikel mehr fest dort liegt; eine Kategorie, wenn kein Artikel mehr dazugehört; ein Lieferant, wenn er keinen Artikel mehr liefert; ein Artikel, wenn er in keinem Teig mehr steht. Archiviertes steht unten im Archiv und lässt sich wiederherstellen.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf das Lager jeder mit Konto. Ändern darf nur die Rolle admin — dieselbe Regel wie bei den Produkten. Fehlt dir die Rolle, steht oben ein Hinweis, und alle Felder sind gesperrt. Zählen ist etwas anderes: dafür gibt es je Standort einen Haken in der Kontenverwaltung.' },
     { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ heißt: keine Rolle admin, oder die Regeln in der Datenbank sind älter als diese Seite — dann steht oben zusätzlich ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat den frischen Stand geladen, deine Eingaben stehen noch da, einfach prüfen und noch einmal speichern. Ohne Netz lässt sich nichts ändern.' }
   ]
 };

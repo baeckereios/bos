@@ -54,6 +54,8 @@
      Kette: ein get je fehlendem Glied (ersetzt), höchstens GRENZEN.KETTE.
 
    CHANGELOG
+     2026-11-11 · 06:50 · v1.2b · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules
+       (Lager Stufe 2, #120; RK §31). Sonst unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
      2026-11-02 · 01:05 · v1.2a · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-02_lager.rules
        (Lager Stufe 1, #120; RK §30). Sonst unverändert. lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
      2026-10-28 · 01:08 · v1.2 · Nacharbeit N1 (Kontroll-Chat 27.10. 19:52): Nachtrag nur mit Schreib-Haken —
@@ -81,7 +83,7 @@
 
   /* Regelstand (RK §13). REGEL_DATEI = neueste Datei, die REGEL_FASSUNG erfüllt (Pflege bei jeder neuen Regel). */
   var REGEL_FASSUNG = 'nachrichten-offen-2026-10-27';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-02_lager.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';
   /* Die Fassungen, die RK §29 erfüllen: 1d (offen: Kästchen, Nachtrag, Sammelpfad) vorn, dahinter die drei von 1b
      (Hauptform, flache Listen, Rückfall B — Bau-Doku 1b §6 Nr. 13). Mit einer alten Fassung schreibt die Seite wie 1c
      (kein Kästchen, kein Feld antwortenOffen — F34). */

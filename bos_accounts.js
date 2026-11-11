@@ -48,6 +48,8 @@
        nachrichtenSchreiben: boolean,      // NEU 27.10.2026 (Nachrichtenzentrale 1b) — „✉️ Nachrichten schreiben“; Regel nzHaken() (RK §29)
        nachrichtenBekanntmachung: boolean, // NEU 27.10.2026 — „📌 Bekanntmachungen“ (schließt Kritik an Gruppen/Einzelne ein, E32)
        nachrichtenEmpfangen: boolean,      // NEU 27.10.2026 — „📬 Nachrichten empfangen“, NUR bei art 'ort' (Filiale); Stationen bekommen ihn nicht (U2). Personen-Konten empfangen immer
+       lagerZaehlen: boolean,              // NEU 11.11.2026 (Lager Stufe 2, #120) — öffnet die Kachel „Lager zählen“ (Registry haken). true genau dann, wenn lagerZaehlenStandorte nicht leer ist
+       lagerZaehlenStandorte: string[],    // NEU 11.11.2026 — IDs aus lager_standorte, an denen das Konto zählen darf; das Schloss (Regel lzRecht(), RK §31). Rolle admin darf immer
        erstelltAm: Firestore-Timestamp
      }
 
@@ -83,6 +85,15 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-11-11 · 07:09 · v-Lager-2 · Feature (Lager Stufe 2, #120; Freigabe KC
+       11.11. 06:43, Kern-Freigabe Ulf): neue Felder lagerZaehlen und
+       lagerZaehlenStandorte, Setzer setzeLagerZaehlenRecht(db, schluessel,
+       liste) nach dem Muster der Haken-Setzer (holeAdminApp). Schreibt beide
+       Felder in EINEM update: die Liste ist das Schloss (Regel lzRecht(),
+       RK §31), der Haken nur die Kachel. Leere Liste → [] und false.
+       Kommentar an setzeTeigeckePflegeRecht() auf den Stand „Wagen & Zutaten
+       pflegen“ nachgezogen (Gebinde nur im Lager). Sonst unverändert.
+       lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
      2026-10-27 · 23:29 (26.10.) · v-Nachrichten-1 · Feature (Nachrichtenzentrale Stufe 1b, #131;
        Bauplan 23:05, Go Kontroll-Chat 23:12, Auflagen A1–A5; Kern-Datei-Freigabe Ulf 15:33)
        Nur Zusätze: drei Haken-Setzer nach dem Reparatur-Muster —
@@ -382,8 +393,11 @@ window.BOS_ACCOUNTS = (function () {
 
   /**
    * NEU (28.09.2026, Teigecke Stufe 1). Admin-Funktion, vorher
-   * adminReauth(passwort). Setzt den Haken „Teigecke pflegen“: wer ihn hat,
-   * darf Orte, Zutaten und Teige der Teigecke ändern. Einzelne Personen,
+   * adminReauth(passwort). Setzt den Haken „Teigecke pflegen“ — heute in der
+   * Oberfläche „Wagen & Zutaten pflegen“: Wagen beschriften, Zuhause der
+   * Zutaten, Schilder. Name und Gebinde der Zutaten pflegt nur noch das Lager
+   * (Stufe 1, 02.11.2026); an den Teigen ändert dieser Haken nichts (die haben
+   * eigene Haken, siehe unten). Stand des Kommentars 11.11.2026. Einzelne Personen,
    * nicht Rollen (Ulf: „nur ich oder ausgesuchte Leute“ — Zutaten sollen
    * feste Orte haben). Anders als beim Taskboard-Haken prüft hier die
    * Firestore-Regel serverseitig (darfTeigeckePflegen(), RK §10) — der
@@ -452,6 +466,21 @@ window.BOS_ACCOUNTS = (function () {
   }
   async function setzeNachrichtenEmpfangenRecht(db, schluessel, wert) {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ nachrichtenEmpfangen: !!wert });
+  }
+
+  /**
+   * NEU (11.11.2026, Lager Stufe 2, #120). Admin-Funktion wie die Haken-Setzer.
+   * liste = IDs aus lager_standorte, an denen das Konto zählen darf. Schreibt
+   * BEIDE Felder in einem update: lagerZaehlenStandorte ist das Schloss (die
+   * Regel lzRecht() prüft den Standort jeder Zählung darin, RK §31),
+   * lagerZaehlen nur die Kachel (Registry haken, bos_access.js — kontoHaken
+   * nimmt nur Felder, die genau true sind). Leere Liste → [] und false.
+   * Rolle admin darf ohne Liste zählen (Regel), braucht für die Kachel aber
+   * auch den Haken.
+   */
+  async function setzeLagerZaehlenRecht(db, schluessel, liste) {
+    var ids = Array.isArray(liste) ? liste.filter(function (x) { return typeof x === 'string' && x !== ''; }) : [];
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ lagerZaehlenStandorte: ids, lagerZaehlen: ids.length > 0 });
   }
 
   /**
@@ -582,6 +611,7 @@ window.BOS_ACCOUNTS = (function () {
     setzeNachrichtenSchreibenRecht: setzeNachrichtenSchreibenRecht,           // NEU 27.10.2026, Nachrichtenzentrale 1b
     setzeNachrichtenBekanntmachungRecht: setzeNachrichtenBekanntmachungRecht, // NEU 27.10.2026
     setzeNachrichtenEmpfangenRecht: setzeNachrichtenEmpfangenRecht,           // NEU 27.10.2026 (nur Ort-Konten)
+    setzeLagerZaehlenRecht: setzeLagerZaehlenRecht,                           // NEU 11.11.2026, Lager Stufe 2
     setzeFarbschema: setzeFarbschema,
     loescheKonto: loescheKonto,
     ladeAlleKonten: ladeAlleKonten,
