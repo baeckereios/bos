@@ -5,6 +5,17 @@
   Doku:  teigecke/TEIGECKE_REZEPTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit „Orte“)
   CHANGELOG
+    2026-11-02 · 01:16 · Feature (Lager Stufe 1, #120; Kern-Freigabe Ulf 02.11. 00:39)
+      Freigabe KC 01.11. 23:03 (A1–A8) und 02.11. 00:17. Zutaten kommen aus
+      Lager-Stamm + Teigecken-Blatt (L.zutatenAusStamm), Schlüssel COL.zutaten
+      bleibt (A6). Ändert sich die Zutatenliste bei offener Strecke, zeichnet
+      die Strecke sich neu (nur ohne Fokus in einem Feld; rechneZutaten). „＋ neue Zutat“ in der Auswahl öffnet jetzt das Lager in einem
+      neuen Tab (nur Rolle admin, sonst grau mit Grund); der neue Artikel kommt
+      über das Live-Abo von selbst in die Auswahl, die Strecke bleibt offen.
+      Entfallen: Blatt „Neue Zutat“ (oeffneNeueZutat, speichereNeueZutat), die
+      Seite schreibt keine Zutaten mehr (FELDER/HAKEN_FUER ohne teigecke_zutaten).
+      REGEL_FASSUNG lager-2026-11-02, REGEL_DATEI firestore_regeln_2026-11-02_lager.rules.
+      lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
     2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
     2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
     2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
@@ -155,12 +166,14 @@ const L = window.BOS_TEIGECKE_LOGIK;
 const COL = {
   orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', teigwerte: 'teigecke_teigwerte',
   rezeptmengen: 'teigecke_rezeptmengen', sicherungen: 'teigecke_sicherungen',
-  weitereTeige: 'teigrechner_teige'   /* 16.10.2026 (#67): nur lesen, Teige der Stationen */
+  weitereTeige: 'teigrechner_teige',   /* 16.10.2026 (#67): nur lesen, Teige der Stationen */
+  stamm: 'lager_artikel'               /* 02.11.2026 (RK §30): nur lesen — Name, Gebinde, Gruppe der Zutaten */
 };
+const LAGER_SEITE = '../lager/lager_editor.html';
 /* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§14/§18).
    test_teigecke.js vergleicht beides automatisch. Teige: dieselbe Liste wie
-   bisher auf der Nachtseite. Zutaten: dieselbe wie auf „Orte“ (hier nur
-   „＋ neue Zutat“ aus der Strecke). */
+   bisher auf der Nachtseite. Zutaten schreibt diese Seite seit 02.11.2026 nicht
+   mehr (neue Zutaten legt die Rolle admin im Lager an). */
 const FELDER = {
   teigecke_teige: ['name', 'istSauerteig', 'mitSauer', 'ohneSchuettwasser', 'hinweisOben', 'zutaten', 'vorstufe',
     'vorstufeZutaten', 'vorstufeHinweis', 'beiBedarf', 'sauerJeKg', 'hefeJeKg', 'vorstufeJeKg', 'anstellgutAnteil',
@@ -170,16 +183,15 @@ const FELDER = {
   teigecke_teigwerte: ['wasserLiterJeKg', 'wasserRefBrote', 'wasserRefKg', 'wasserRefLiter', 'tabelle', 'einwaage',
     'kesselMaxKg', 'kesselrestKg', 'mehlKgJeKg', 'mehlRefBrote', 'mehlRefKg', 'mehlRefZugabeKg', 'mehlZutatId',
     'langzeitHefeSommerG', 'langzeitHefeSommerBeiKg', 'langzeitHefeWinterG', 'langzeitHefeWinterBeiKg'],
-  teigecke_rezeptmengen: ['eingabe'],
-  teigecke_zutaten: ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'gruppe', 'geloescht']
+  teigecke_rezeptmengen: ['eingabe']
 };
 /* Welcher Haken darf welche Collection schreiben (Konzept §6.1a, RK §18). */
 const HAKEN_FUER = {
   teigecke_teige: 'rezepte', teigecke_rezeptmengen: 'rezepte',
-  teigecke_teigwerte: 'teige', teigecke_zutaten: 'wagen'
+  teigecke_teigwerte: 'teige'
 };
-const REGEL_FASSUNG = 'teigecke-nacht-2026-10-08';   /* Rezeptmengen, gruppe (RK §18) + langzeit (RK §19) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_FASSUNG = 'lager-2026-11-02';   /* Rezeptmengen, gruppe (RK §18), langzeit (RK §19), Lager-Stamm lesen (RK §30) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-02_lager.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 const VORSTUFEN_VORSCHLAG = ['Quellstück', 'Brühstück', 'Kochstück', 'Vorteig'];
 const PROBE_BROTE = 60;   /* Proberechnung in der Zusammenfassung (Anweisung §4 B5) */
 const SCHRITTE = 5;
@@ -282,15 +294,15 @@ const I18N_DE = {
   s4_schuettwasser: 'Schüttwasser (L)', s4_schuettwasser_hilfe: 'Leer oder 0 = dieser Teig hat kein Schüttwasser. Die Wasserregel (wie viel nachts weniger) pflegst du weiter in der Nachtseite.',
   s4_hefe: 'Hefe', s4_hefe_hilfe: 'Leer = ohne Hefe.', s4_zeilen: 'Weitere Zutaten', s4_zeile_plus: '＋ Zeile', s4_zeile_weg: 'Zeile entfernen',
   s4_menge: 'Menge', s4_silo: 'Silo — zählt in der Summe, steht nie auf der Einsammelliste',
-  s_zutat_waehlen: '— Zutat wählen —', s_wasser: 'Wasser', s_neue_zutat: '＋ neue Zutat …', s_neue_zutat_ohne: '＋ neue Zutat (braucht 🧺 Wagen & Zutaten)',
+  s_zutat_waehlen: '— Zutat wählen —', s_wasser: 'Wasser', s_neue_zutat: '＋ neue Zutat im Lager anlegen …', s_neue_zutat_ohne: '＋ neue Zutat (legt der Admin im Lager an)',
   v_schuettwasser: 'Schüttwasser muss eine Zahl ab 0 sein (oder leer).', v_hefe_kg: 'Hefe muss eine Zahl über 0 kg sein (oder leer).',
   v_zeile: 'Zeile {n}: Menge muss eine Zahl über 0 sein (oder leer).',
   v_zeile_ohne_zutat: 'Zeile {n}: Menge ohne Zutat — bitte die Zutat wählen oder die Zeile entfernen.',
   v_zeile_ohne_zutat_vs: 'Vorstufe, Zeile {n}: Menge ohne Zutat — bitte „Wasser“ oder eine Zutat wählen.',
   v_hefe_ohne_zutat: 'Hefe: Menge ohne Zutat — bitte die Hefe-Zutat wählen.',
   /* Neue Zutat */
-  nz_titel: 'Neue Zutat', nz_gruppe: 'Gruppe', nz_hilfe: 'Speichert sofort, mit Sicherung. Das Zuhause gibst du ihr auf der Seite „Orte“.',
-  nz_fertig: '✓ „{name}“ angelegt',
+  nz_lager: 'Das Lager ist in einem neuen Tab offen. Lege die Zutat dort an (mit „in der Teigecke handverwogen“) — sie erscheint hier von selbst in der Auswahl. Die Strecke bleibt offen.',
+  nz_lager_gesperrt: 'Der neue Tab ließ sich nicht öffnen. Speichere zuerst die Strecke und öffne dann das Lager.',
   gruppe_mehle: 'Mehle & Schrote', gruppe_koerner: 'Körner & Saaten', gruppe_fluessig: 'Flüssiges', gruppe_salz_backmittel: 'Salz & Backmittel',
   gruppe_vorstufen: 'Vorstufen & Anstellgut', gruppe_kuehlung: 'Kühlung', gruppe_silo: 'Silo (WinBack dosiert)', gruppe_sonstiges: 'Sonstiges',
   /* Schritt 5 */
@@ -344,6 +356,7 @@ const S = {
   kennung: null, haken: { wagen: false, teige: false, rezepte: false }, rolle: null,
   ansicht: 'liste', zeigeArchiv: false,
   orte: [], zutaten: [], teige: [], teigwerte: {}, rezeptmengen: [],
+  zutatenBlaetter: [], stamm: null, zutatenSig: undefined,   /* 02.11.2026: S.zutaten = L.zutatenAusStamm(stamm, zutatenBlaetter) */
   produkte: [], produkteOk: false, produkteAusSpiegel: null,
   weitereTeige: [],          // 16.10.2026 (#67): [{ id, name, geloescht }] der Teige der Stationen, nur zur Anzeige und Kennungsprüfung
   geladen: false,
@@ -363,6 +376,16 @@ let abos = [];
 /* ---------- Kurzwege ---------- */
 const tm = function () { return L.nachId(S.teige); };
 const zm = function () { return L.nachId(S.zutaten); };
+/* 02.11.2026 (Lager Stufe 1): Zutaten = Lager-Stamm + Blatt. Ändert sich die Liste wirklich
+   (z. B. im Lager angelegt, während die Strecke offen ist), zeichnet sich die Strecke neu, damit
+   der Artikel in der Auswahl steht — nur wenn gerade kein Feld den Fokus hat (Eingaben stehen in S.strecke). */
+function rechneZutaten() {
+  S.zutaten = L.zutatenAusStamm(S.stamm, S.zutatenBlaetter);
+  const sig = S.zutaten.map(function (z) { return [z.id, z.name, z.gruppe || '', z.geloescht ? 1 : 0].join('|'); }).join(';');
+  if (sig === S.zutatenSig) return;
+  const vorher = S.zutatenSig; S.zutatenSig = sig;
+  if (vorher !== undefined && S.ansicht === 'strecke' && S.strecke && !fokusIn(document.getElementById('ansichtStrecke'))) zeichneStrecke();
+}
 const pm = function () { return L.produktMap(S.produkte); };
 function produktName(k) { const p = pm()[k]; return p ? p.name : k; }
 /* 16.10.2026 (#67): kennt auch die Teige der Stationen (Name statt Kennung). */
@@ -408,7 +431,8 @@ function abonniereStamm() {
   abos.forEach(function (ab) { ab(); });
   abos = [
     aboCollection('orte', function (a) { S.orte = a; }),          /* nur für „Startdaten einlesen“ (kopiert) */
-    aboCollection('zutaten', function (a) { S.zutaten = a; }),
+    aboCollection('zutaten', function (a) { S.zutatenBlaetter = a; rechneZutaten(); }),
+    aboCollection('stamm', function (a) { S.stamm = a; rechneZutaten(); }),
     aboCollection('teige', function (a) { S.teige = a; }),
     aboCollection('teigwerte', function (a) { S.teigwerte = L.nachId(a); }),
     /* 16.10.2026 (#67): Teige der Stationen — nur Kennung, Name, archiviert */
@@ -740,7 +764,8 @@ function jaNein(aktion, wertJa) {
   }).join('') + '</div>';
 }
 /* Zutatenauswahl, vorsortiert nach Gruppe (Anweisung §4 C). „＋ neue Zutat“ steht
-   direkt in der Auswahl (ohne Haken 🧺 grau, mit Grund). */
+   direkt in der Auswahl und öffnet das Lager (seit 02.11.2026; ohne Rolle admin
+   grau, mit Grund). */
 function zutatAuswahl(attr, gewaehlt, mitWasser) {
   const aktive = L.nachId(L.aktiv(S.zutaten));
   let html = '<select class="bos-input rz-zutat" ' + attr + '><option value="">' + esc(t('s_zutat_waehlen')) + '</option>';
@@ -751,8 +776,8 @@ function zutatAuswahl(attr, gewaehlt, mitWasser) {
     }).join('') + '</optgroup>';
   });
   if (gewaehlt && gewaehlt !== L.WASSER_ID && !aktive[gewaehlt]) html += '<option value="' + esc(gewaehlt) + '" selected>' + esc(t('unbekannt') + ' (' + gewaehlt + ')') + '</option>';
-  const darf = S.haken.wagen && online();
-  html += '<option value="__neu__"' + (darf ? '' : ' disabled') + '>' + esc(t(S.haken.wagen ? 's_neue_zutat' : 's_neue_zutat_ohne')) + '</option>';
+  const darf = istAdmin() && online();
+  html += '<option value="__neu__"' + (darf ? '' : ' disabled') + '>' + esc(t(istAdmin() ? 's_neue_zutat' : 's_neue_zutat_ohne')) + '</option>';
   return html + '</select>';
 }
 function einheitAuswahl(attr, einheit) {
@@ -1081,7 +1106,7 @@ function eingabeStrecke(el) {
   aktualisiereZusammenfassung();
 }
 function zeilenListe(art) { return art === 'vorstufe' ? S.strecke.z.vorstufe.zeilen : S.strecke.z.zeilen; }
-/* Auswahlfelder (Zutat, Einheit). „＋ neue Zutat“ öffnet das Blatt. */
+/* Auswahlfelder (Zutat, Einheit). „＋ neue Zutat“ öffnet das Lager in einem neuen Tab. */
 function auswahlStrecke(el) {
   const st = S.strecke;
   if (!st) return;
@@ -1096,52 +1121,23 @@ function auswahlStrecke(el) {
     } };
   }
   if (!ziel) return;
-  if (el.value === '__neu__') { el.value = ziel.alt || ''; oeffneNeueZutat(ziel); return; }
+  if (el.value === '__neu__') { el.value = ziel.alt || ''; oeffneLagerFuerZutat(); return; }
   ziel.setze(el.value);
   st.geaendert = true;
   zeichneStrecke();   /* Silo-Hinweis, Summe */
 }
 
-/* ---------- „＋ neue Zutat“ direkt aus der Auswahl (Anweisung §4 C) ---------- */
-function oeffneNeueZutat(ziel) {
-  editZustand = { typ: 'neuzutat', ziel: ziel };
-  oeffneEdit(t('nz_titel'),
-    feldHTML(t('f_name'), eingabe('fName', '', 'maxlength="60" autocomplete="off"')) +
-    feldHTML(t('nz_gruppe'), '<select class="bos-input" id="fGruppe">' + L.GRUPPEN.map(function (g) {
-      return '<option value="' + g + '"' + (g === L.GRUPPE_VORGABE ? ' selected' : '') + '>' + esc(t('gruppe_' + g)) + '</option>';
-    }).join('') + '</select>', t('nz_hilfe')),
-    [{ aktion: 'neuzutat-speichern', text: t('speichern'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
-  const f = document.getElementById('fName'); if (f) f.focus();
-}
-async function speichereNeueZutat() {
-  const z = editZustand;
-  if (!z || z.typ !== 'neuzutat') return;
-  const name = wert('fName'), gruppe = wert('fGruppe');
-  let fehler = pruefeText(t('f_name'), name, 60);
-  if (!fehler && L.namensKonflikt(S.zutaten, name, null)) fehler = t('v_name_doppelt', { wert: name });
-  /* auch gegen archivierte (namensKonflikt sieht nur aktive) */
-  if (!fehler && S.zutaten.some(function (x) { return x.geloescht && L.norm(x.name) === L.norm(name); })) fehler = t('v_name_doppelt_archiv', { wert: name });
-  if (fehler) { editFehler(fehler); return; }
-  const daten = { name: name, ortId: '', gebindeEinheit: '', geloescht: false };
-  if (L.GRUPPEN.indexOf(gruppe) !== -1) daten.gruppe = gruppe;
-  const knoepfe = document.querySelectorAll('#editKnoepfe button');
-  knoepfe.forEach(function (b) { b.disabled = true; });
-  document.getElementById('editInfo').textContent = '…';
-  try {
-    const id = await schreibe(COL.zutaten, null, daten, 'anlegen', null);
-    /* sofort in der Auswahl, auch bevor der Live-Abruf nachzieht */
-    if (!S.zutaten.some(function (x) { return x.id === id; })) S.zutaten = S.zutaten.concat([Object.assign({ id: id }, daten)]);
-    z.ziel.setze(id);
-    if (S.strecke) S.strecke.geaendert = true;
-    schliesseEdit();
-    toast(t('nz_fertig', { name: name }));
-    if (S.strecke) zeichneStrecke();
-  } catch (err) {
-    document.getElementById('editInfo').textContent = '';
-    editFehler(fehlerText(t('err_speichern'), err));
-    zeigeFehler(t('err_speichern'), err);
-    knoepfe.forEach(function (b) { b.disabled = false; });
-  }
+/* ---------- „＋ neue Zutat“: seit 02.11.2026 im Lager (eine Tür) ----------
+   Neuer Tab, damit die Strecke offen bleibt; das Live-Abo von lager_artikel
+   bringt den neuen Artikel ohne Neuladen in die Auswahl. Lässt das Gerät
+   keinen neuen Tab zu (PWA/Kiosk, Probe A8), sagt die Seite das. */
+function oeffneLagerFuerZutat() {
+  /* Mit 'noopener' liefert window.open auch dann null, wenn der Tab aufgeht —
+     ob es geklappt hat, sieht nur Ulf am Gerät. Nur ein Wurf heißt sicher: nein. */
+  /* Fokus aus der Auswahl nehmen: sonst zeichnet sich die Strecke beim Zurückkommen nicht neu (rechneZutaten). */
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  try { window.open(LAGER_SEITE, '_blank', 'noopener'); toast(t('nz_lager')); }
+  catch (err) { zeigeFehler(t('nz_lager_gesperrt'), err); }
 }
 
 /* ==================================================================
@@ -1430,7 +1426,6 @@ document.addEventListener('click', function (e) {
     case 'konflikt-behalten': if (st) { st.konflikt = ''; speichereStrecke(); } break;
     case 'konflikt-neu': if (st) { const k = st.z.kennung; st.geaendert = false; schliesseStrecke(); oeffneStrecke(k); } break;
     /* Blätter */
-    case 'neuzutat-speichern': speichereNeueZutat(); break;
     case 'chip': {
       if (!editZustand || !editZustand.auswahl) break;
       const menge = editZustand.auswahl[el.getAttribute('data-feld')];
@@ -1468,12 +1463,12 @@ const helpData = {
     { heading: 'Ein Rezept eintippen: die Strecke', text: 'Teig antippen oder „＋ Neuer Teig“. Die Strecke hat fünf Schritte: Name, Brote, Sauer & Vorstufe, Hauptteig, Zusammenfassung. Mit „Weiter“ und „Zurück“ (oder den Nummern oben) gehst du vor und zurück, ohne dass etwas verloren geht. Gespeichert wird erst am Ende. Ab Schritt 3 steht unten „Summe bisher“. Was du eintippst, steht nur auf diesem Bildschirm — gehst du vorher weg, fragt die Seite nach.' },
     { heading: 'Schritt 1 und 2: Name und Brote', text: 'Unter dem Namen siehst du die Kennung, die BOS daraus bildet (aus „Kürbis-Käse Kruste“ wird „kuerbis_kaese_kruste“). Nach dem ersten Speichern bleibt sie fest. Zeigen schon Brote auf diese Kennung (weil sie im Produkt-Editor schon diesem Teig zugeordnet sind), steht das unter dem Namen, und in Schritt 2 sind sie schon angehakt. In Schritt 2 hakst du die Brote an, die aus dem Teig gemacht werden — vorn alle Brote, über das Suchfeld alles andere — und trägst je Brot die Einwaage in g ein: das Teiggewicht, nicht das Ausbackgewicht. Hängt ein Brot schon an einem anderen Teig, steht das darunter; anhaken zieht es um. Ohne Brot darfst du speichern, aber dann rechnet die Nacht den Teig nicht. Brote umhängen darf nur ein Konto mit der Rolle admin, wie im Produkt-Editor.' },
     { heading: 'Schritt 3: Sauer, Vorstufe & Führung', text: 'Sauerteig im Teig? Bei ja trägst du ein, wie viel kg Sauer im Rezept stehen. Vorteig, Brühstück oder Quellstück? Bei ja: Name, wie viel kg davon in den Teig kommen, und ein Schritt so, wie er angesetzt wird, als Zeilen (z. B. 3 kg Schrot und 9 L Wasser). „Wasser“ steht fest in der Auswahl. Dazu der Behälter und wie viele Schritte höchstens in einen Behälter passen (leer = ohne Grenze). Die Nacht zeigt daraus die passenden Anzahlen zur Wahl. Zuletzt: Langzeitteig? Bei ja steht der Teig in der Nacht vor dem Backtag in der Teige-Liste (eigene Gruppe „Langzeitteig für …“), mit der Anzahl aus der Prognose und der Hefe aus einem Sommer- oder Winterwert; am Backtag wird er nur aufgearbeitet. Eine Vorstufe rechnet die Nacht bei einem Langzeitteig nicht (sie müsste zwei Nächte vorher stehen) — das steht dann rot daneben.' },
-    { heading: 'Schritt 4: Hauptteig', text: 'Oben zwei feste Zeilen: Schüttwasser in L (leer oder 0 = dieser Teig hat kein Schüttwasser) und Hefe (Zutat wählen, kg eintragen; leer = ohne Hefe). Darunter die übrigen Zutaten als Zeilen: Zutat wählen, Menge, kg oder L. Die Auswahl ist nach Gruppen sortiert. Fehlt eine Zutat, legst du sie direkt in der Auswahl mit „＋ neue Zutat“ an (Name und Gruppe; braucht den Haken 🧺 Wagen & Zutaten). Zutaten der Gruppe Silo zählen in der Summe mit, stehen aber nie auf der Einsammelliste.' },
+    { heading: 'Schritt 4: Hauptteig', text: 'Oben zwei feste Zeilen: Schüttwasser in L (leer oder 0 = dieser Teig hat kein Schüttwasser) und Hefe (Zutat wählen, kg eintragen; leer = ohne Hefe). Darunter die übrigen Zutaten als Zeilen: Zutat wählen, Menge, kg oder L. Die Auswahl ist nach Gruppen sortiert. Fehlt eine Zutat, öffnest du mit „＋ neue Zutat im Lager anlegen“ das Lager in einem neuen Tab und legst sie dort an (nur Rolle admin); sie erscheint danach von selbst in der Auswahl. Zutaten der Gruppe Silo zählen in der Summe mit, stehen aber nie auf der Einsammelliste.' },
     { heading: 'Schritt 5: Zusammenfassung', text: 'Hier steht die Teigsumme, Hefe, Sauer und Vorstufe je kg Teig, ob der Teig Schüttwasser hat, je Brot „ergibt … kg Teig ≈ … Brote“ (nur zur Info) und was am Brot geändert wird. Die Proberechnung zeigt, was die Nacht bei 60 Broten sagen würde — mit denselben Rechnungen wie nachts. Unter „Hinweise & Sonstiges“ pflegst du den Hinweis oben in der Karte, den Hinweis zur Vorstufe, „nur bei Bedarf“, die Reihenfolge und das Archivieren.' },
     { heading: 'Speichern in zwei Schritten', text: 'Erst das Rezept (Teig, Einwaagen und Mengen in einem Rutsch), dann die Brote. Jeder Schritt sagt selbst, ob es geklappt hat, mit der echten Meldung, wenn nicht, und lässt sich einzeln wiederholen. Klappt das Rezept und nur das Umhängen der Brote nicht, bleibt das Rezept gespeichert. Was sich nicht geändert hat, wird nicht geschrieben.' },
     { heading: 'Ein altes Rezept ohne Mengen', text: 'Teige aus den Startdaten haben Werte je kg, aber keine eingetippten Mengen. Öffnest du so einen Teig und tippst keine Mengen, bleiben alle Werte je kg genau, wie sie sind („Mengen unvollständig“). Erst wenn alle Mengen dastehen, rechnet BOS neu. Tippst du nur die Hefe, wird nur die Hefe je kg auf die bisherige Rezeptbasis umgerechnet.' },
     { heading: 'Was nicht hier gepflegt wird', text: 'Die Wasserregel (wie viel Wasser nachts weniger), die Tabelle nach Außentemperatur und den Kessel pflegst du weiter im „BrotTeigRechner“ (früher „Teigecke Nacht“) unter „Anpassen“. Orte, Zuhause und Gruppe einer Zutat auf der Seite „Orte“. Neue Produkte legst du im Produkt-Editor an — die Strecke legt keine Produkte an. Die Teige von Rondo, Frühschicht und Brötchenstraße pflegst du unter „Teige (Stationen)“; hängt ein Produkt dort, steht hier „hängt an …“ mit dem Namen.' },
-    { heading: 'Wer darf was?', text: 'Sehen darf die Liste jeder mit Konto. Rezepte eintippen und die Mengen sehen darf nur, wer den Haken 📜 Rezepte hat — die Mengen sind geheim und werden nur dann geladen. Einwaagen speichert der Haken 🥣 Teige, neue Zutaten der Haken 🧺 Wagen & Zutaten, Brote umhängen die Rolle admin. Fehlt etwas, sagt die Seite, was.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf die Liste jeder mit Konto. Rezepte eintippen und die Mengen sehen darf nur, wer den Haken 📜 Rezepte hat — die Mengen sind geheim und werden nur dann geladen. Einwaagen speichert der Haken 🥣 Teige, neue Zutaten legt die Rolle admin im Lager an, Brote umhängen die Rolle admin. Fehlt etwas, sagt die Seite, was.' },
     { heading: 'Startdaten und Archiv', text: '„Startdaten einlesen“ liest Teige und Einwaagen aus der Startdaten-Datei ein (die liegt nur bei Ulf, nie im Programmordner). Was es schon gibt, wird übersprungen. Archivierte Teige stehen unten im Archiv und lassen sich wiederherstellen. Einen Teig archivieren kannst du erst, wenn kein Brot mehr auf ihn zeigt.' },
     { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten und beim Speichern direkt am Schritt, mit der echten Meldung des Systems. „Keine Berechtigung“ hat drei mögliche Gründe: Dir fehlt der Haken oder die Rolle, du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt hier nie), oder die Firestore-Regeln sind älter als die Seite — dann steht oben ein roter Hinweis mit der Regeldatei. „Inzwischen von … geändert“ heißt: jemand war schneller; du entscheidest, ob du frisch öffnest oder deine Eingabe speicherst. Ohne Netz lässt sich hier nichts ändern.' }
   ]

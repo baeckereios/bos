@@ -104,6 +104,7 @@
      'abgebrochen'        Hochladen vom Nutzer abgebrochen (verworfen)
 
    CHANGELOG
+     2026-11-02 · 01:05 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-02_lager.rules (Lager Stufe 1, #120; Kern-Freigabe Ulf 02.11. 00:39; RK §30). Sonst unverändert. lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
      2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
      2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
      2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
@@ -135,7 +136,7 @@ window.BOS_MELDUNGEN = (function () {
   var TAG_MS = 24 * 60 * 60 * 1000;
   var SEITE = 20;
   var REGEL_FASSUNG = 'reparatur-2026-10-10';
-  var REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-02_lager.rules';
   var GRENZEN = { text: 500, nachricht: 300, geraet: 60, name: 40, grund: 300 };
   var STATUS = ['gemeldet', 'gesehen', 'repariert'];
   var DRINGLICHKEIT = ['normal', 'dringend'];

@@ -46,6 +46,9 @@
    produktionsleitung, admin — genau wie produktionsplaner_uebersicht und
    gleich dem roles-Feld der Registry (sonst fail-open für alle, F-7).
    SESSION_2026-11-08_PRODUKTIONSPLANER_FROSTER_BESTELLUNGEN_BAU.md */
+/* ERGÄNZT 02.11.2026 (Lager Stufe 1, #120): "lager_editor" nur bei admin —
+   Registry roles ['admin'], sonst fail-open für alle. Das Schloss ist die
+   Regel (RK §30: schreiben nur Rolle admin). lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md */
 /* ERGÄNZT 23.10.2026 (Maschinenseite Stufe A, Ulf U1 22:22): "maschinenseite"
    bei backstube, konditorei, produktionsleitung, admin und — als erster
    Eintrag dieser Rolle — haustechnik. Gleich dem roles-Feld der Registry
@@ -249,6 +252,7 @@ window.BOS_PERMISSIONS = {
     "teigrechner_teige": true,
     "teigrechner": true,
     "nfc_qr_zentrale": true,
-    "maschinenseite": true
+    "maschinenseite": true,
+    "lager_editor": true
   }
 };

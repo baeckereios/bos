@@ -5,6 +5,22 @@
   Doku:  teigecke/TEIGECKE_ORTE_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Gerüst: teigecke_seite.js + teigecke_seite.css (gemeinsam mit den anderen Teigecke-Seiten)
   CHANGELOG
+    2026-11-02 · 00:54 · v0.4 · Feature (Lager Stufe 1, #120; Kern-Freigabe Ulf 02.11. 00:39)
+      ANWEISUNG_2026-11-01_LAGER_STUFE1_BAUPLAN.md + Freigabe KC 01.11. 23:03 (A1–A8)
+      und 02.11. 00:17 (A1+). Name, Gebinde, Gruppe und Archiv einer Zutat stehen
+      jetzt im Lager-Stamm (lager_artikel, Rolle admin). Die Seite liest Stamm und
+      Teigecken-Blatt und rechnet daraus S.zutaten im bisherigen Format
+      (L.zutatenAusStamm). Mit Haken bleibt nur das ZUHAUSE: „Zutat bearbeiten“
+      zeigt Name/Gebinde/Gruppe nur zum Lesen, „Zutaten hierher holen“ bleibt.
+      Entfallen: „＋ Zutat“ (für Rolle admin jetzt Link ins Lager), Zutat
+      archivieren, Zutaten-Archiv mit Wiederherstellen, „Zutaten einlesen“.
+      Geschrieben wird das rohe Blatt mit neuem ortId; alte Felder eines Blatts
+      von vor der Übernahme gehen unverändert mit (FELDER unverändert, Regel:
+      diff nur ortId, RK §30). Zutaten ohne Stamm (vor der Übernahme): Zuhause
+      gesperrt mit Grund. COL-Schlüssel „zutaten“ bleibt (A6); rohe Blätter in
+      S.zutatenBlaetter, uebernimmFrischSeite() für das Gerüst.
+      REGEL_FASSUNG lager-2026-11-02, REGEL_DATEI firestore_regeln_2026-11-02_lager.rules.
+      lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
     2026-10-27 · 19:17 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten_offen.rules (Nachrichtenzentrale Stufe 1d, Go des Kontroll-Chats 18:55, A5; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1D_BAU.md
     2026-10-27 · 00:06 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-27_nachrichten.rules (Nachrichtenzentrale Stufe 1b, Nacharbeit N1 des Kontroll-Chats 00:01; RK §29). Sonst unverändert. nachrichtenzentrale/_protokolle/SESSION_2026-10-27_NACHRICHTENZENTRALE_STUFE_1B_BAU.md
     2026-10-24 · 07:46 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-10-24_maschinen_b.rules (Maschinenseite Stufe B, Bauplan Go KC 24.10. 00:32, Kern-Freigabe Ulf F6 00:32; zwölf Stellen). Fassung (REGEL_FASSUNG) und Logik unverändert. SESSION_2026-10-24_MASCHINENSEITE_STUFE_B_BAU.md
@@ -141,7 +157,6 @@
   </div>
 </div>
 
-<input type="file" id="importDatei" accept=".json,application/json" hidden>
 <div id="toast" role="status" hidden></div>
 <div id="schildMessung" aria-hidden="true"></div>
 
@@ -154,7 +169,9 @@
    teigecke_logik.js sind allgemeine Wörter, nur Vorschläge.
    ================================================================== */
 const L = window.BOS_TEIGECKE_LOGIK;
-const COL = { orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', sicherungen: 'teigecke_sicherungen' };
+const COL = { orte: 'teigecke_orte', zutaten: 'teigecke_zutaten', teige: 'teigecke_teige', sicherungen: 'teigecke_sicherungen',
+  stamm: 'lager_artikel' };   /* 02.11.2026 (RK §30): nur lesen — Name, Gebinde, Gruppe der Zutaten */
+const LAGER_SEITE = '../lager/lager_editor.html';
 /* Muss 1:1 zu den hasOnly-Listen der Firestore-Regel passen (RK §10/§14).
    test_teigecke.js vergleicht beides automatisch. */
 const FELDER = {
@@ -164,8 +181,8 @@ const FELDER = {
 const HAKEN_FUER = {
   teigecke_orte: 'wagen', teigecke_zutaten: 'wagen'
 };
-const REGEL_FASSUNG = 'teigecke-rezepte-2026-10-07';   /* seit 08.10.2026: die Seite schreibt das Feld gruppe (RK §18) */
-const REGEL_DATEI = 'firestore_regeln_2026-10-27_nachrichten_offen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_FASSUNG = 'lager-2026-11-02';   /* seit 02.11.2026: Blatt nur noch Zuhause, Stamm lesen (RK §30) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-02_lager.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 /* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
    Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
 try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }
@@ -196,11 +213,10 @@ const I18N_DE = {
   keine_schilder: 'Kein Ort zum Drucken vorhanden.',
   err_drucken: 'Drucken',
   neu_ort: '＋ Ort',
-  neu_zutat: '＋ Zutat',
+  neu_zutat_lager: '＋ Zutat im Lager anlegen',
   e_titel_ort: 'Ort bearbeiten',
   e_titel_ort_neu: 'Neuer Ort',
   e_titel_zutat: 'Zutat bearbeiten',
-  e_titel_zutat_neu: 'Neue Zutat',
   f_name: 'Name',
   f_art: 'Art',
   ort_art_ort: 'anderer Ort',
@@ -210,20 +226,21 @@ const I18N_DE = {
   f_sort_hilfe: 'Kleinere Zahl = weiter vorne in der Einsammelliste. Leer = hinten, nach Kennung sortiert.',
   f_zuhause: 'Zuhause',
   f_zuhause_ohne: '— noch ohne Zuhause —',
-  f_gebinde: 'Gebinde (optional)',
-  f_gebinde_hilfe: 'Größe des Sacks/Eimers, z. B. 25 und kg. Nur zur Anzeige; wird später für den Verbrauch in Gebinden gebraucht.',
-  f_einheit_leer: '—',
+  f_gebinde: 'Gebinde',
   f_gruppe: 'Gruppe',
   f_gruppe_hilfe: 'Sortiert die Auswahl in der Rezept-Strecke. „Silo“ heißt: dosiert WinBack, braucht kein Zuhause und steht nie auf der Einsammelliste.',
+  f_leer: '—',
+  zutat_im_lager: 'Name, Gebinde und Gruppe pflegt der Admin im Lager. Hier setzt du nur das Zuhause.',
+  zutat_im_lager_link: 'Im Lager öffnen ›',
+  zutat_nicht_uebernommen: 'Diese Zutat ist noch nicht ins Lager übernommen. Ein Zuhause setzen geht erst danach (Lager → „Aus der Teigecke übernehmen“).',
+  holen_nicht_uebernommen: 'erst im Lager übernehmen',
   gruppe_mehle: 'Mehle & Schrote', gruppe_koerner: 'Körner & Saaten', gruppe_fluessig: 'Flüssiges', gruppe_salz_backmittel: 'Salz & Backmittel',
   gruppe_vorstufen: 'Vorstufen & Anstellgut', gruppe_kuehlung: 'Kühlung', gruppe_silo: 'Silo (WinBack dosiert)', gruppe_sonstiges: 'Sonstiges',
   silo_karte: '🏭 Aus dem Silo',
   silo_karte_text: 'Dosiert WinBack, kein Zuhause nötig. Steht nie auf der Einsammelliste.',
   v_name_doppelt: '„{wert}“ gibt es schon.',
   v_sort: 'Reihenfolge muss eine Zahl sein.',
-  v_gebinde: 'Gebindegröße muss eine Zahl über 0 sein.',
   sperre_ort: 'Archivieren geht nicht: an diesem Ort liegen noch {liste}. Erst ein anderes Zuhause geben.',
-  sperre_zutat: 'Archivieren geht nicht: die Zutat steht noch in {liste}. Erst dort herausnehmen.',
   archivieren: 'Archivieren',
   archiviert: '✓ Archiviert',
   wiederherstellen: '↩ Wiederherstellen',
@@ -240,13 +257,6 @@ const I18N_DE = {
   lade: 'Lade Daten …',
   fehler_titel: '⚠ Fehler',
   ausblenden: 'ausblenden',
-  import_json: 'Die Datei ist kein gültiges JSON: {msg}',
-  import_los: 'Übernehmen ({n} Einträge)',
-  import_nichts: 'Nichts Neues in der Datei.',
-  import_fehler_titel: 'Fehler — so wird nichts übernommen:',
-  import_hinweise_titel: 'Hinweise:',
-  import_haken_fehlen: 'Für diese Datei fehlen dir die Haken: {liste}. Es wird nichts geschrieben.',
-  haken_wagen: '🧺 Wagen & Zutaten',
   folge_hoch: 'nach oben',
   folge_runter: 'nach unten',
   produkte_spiegel: 'Produktliste vom Gerät (Stand {zeit})',
@@ -260,7 +270,6 @@ const I18N_DE = {
   ohne_zuhause_karte: 'Antippen und ein Zuhause wählen — oder an einem Ort „Zutaten hierher holen“.',
   ohne_zuhause_erst_ort: 'Erst einen Ort anlegen, dann die Zutaten dorthin holen.',
   archiv_orte: 'Orte',
-  archiv_zutaten: 'Zutaten',
   zur_nacht: '‹ BrotTeigRechner',
   suche_label: 'Kennung suchen',
   suche_knopf: 'Öffnen',
@@ -307,13 +316,6 @@ const I18N_DE = {
   bereich_wort_fertig: '✓ Wort an {n} Ort(en) geändert — Schilder neu drucken',
   reihe_laeuft: 'Schreibe {i} von {n} …',
   reihe_abbruch: 'Abgebrochen bei {i} von {n}. Alles davor ist gespeichert; einfach noch einmal ausführen.',
-  startdaten: '📂 Zutaten einlesen',
-  import_titel: 'Zutaten aus der Startdaten-Datei einlesen',
-  import_zusammenfassung_zutaten: 'Neu: {zutaten} Zutaten. Schon vorhanden (wird übersprungen): {vorhanden}.',
-  import_fertig: '✓ Übernommen: {n} Zutaten, jede mit eigener Sicherung.',
-  import_orte_nicht: 'Die Datei enthält {n} Ort(e). Orte werden nicht mehr eingelesen — sie werden hier von Hand angelegt, BOS vergibt die Nummer.',
-  import_ort_ignoriert: '{n} Zutat(en) nennen in der Datei einen Ort. Das wird überlesen; sie kommen ohne Zuhause an.',
-  import_teige_nicht: 'Die Datei enthält {n} Teig(e). Teige liest die Seite „Teige & Rezepte“ ein, nicht diese Seite.',
   qr_ohne_hinweis: 'BäckereiOS ist noch nicht online. Schilder werden deshalb ohne Code gedruckt, mit einem leeren Feld an seiner Stelle. Nach dem Online-Gang die Schilder einmal neu drucken.',
   qr_ohne_toast: 'Schild ohne Code gedruckt, weil BäckereiOS noch nicht online ist. Nach dem Online-Gang einmal neu drucken.',
   druck_zu_voll_titel: 'Zu viele Zutaten für ein Blatt',
@@ -326,6 +328,7 @@ const S = {
   kennung: null, haken: { wagen: false, teige: false, rezepte: false },
   pflegeModus: false, zeigeArchiv: false,
   orte: [], zutaten: [], teige: [], orteGeladen: false, geladen: false,
+  zutatenBlaetter: [], stamm: null, istAdminRolle: false,   /* 02.11.2026: S.zutaten = L.zutatenAusStamm(stamm, zutatenBlaetter) */
   verbindung: { ausCache: {}, ausstehend: {}, letzteServerZeit: null },
   regelstand: 'unbekannt',  // 'passt' | 'alt' | 'unbekannt' (pruefeRegelstand)
   startOrt: null, treffer: null, sucheMeldung: '', sucheText: ''
@@ -342,6 +345,22 @@ let abos = [];
 /* ---------- Kurzwege ---------- */
 const zm = function () { return L.nachId(S.zutaten); };
 const om = function () { return L.nachId(S.orte); };
+/* ---------- Lager-Stamm + Blatt (02.11.2026, RK §30) ---------- */
+function rechneZutaten() { S.zutaten = L.zutatenAusStamm(S.stamm, S.zutatenBlaetter); }
+function blattVon(id) { return L.nachId(S.zutatenBlaetter)[id] || null; }
+/* Das Blatt mit neuem Zuhause: das rohe Blatt (alte Felder unverändert, A1+) oder
+   ein neues nur mit ortId. nurErlaubteFelder() lässt Herkunft und Sicherung weg. */
+function blattMitZuhause(id, ortId) {
+  const roh = blattVon(id);
+  return { daten: Object.assign({}, roh || {}, { ortId: ortId }), vorher: roh, aktion: roh ? 'aendern' : 'anlegen' };
+}
+/* Gerüst-Haken (teigecke_seite.js uebernimmFrisch): frisches Blatt in die Rohliste. */
+function uebernimmFrischSeite(col, id, frisch) {
+  if (col !== COL.zutaten) return false;
+  S.zutatenBlaetter = S.zutatenBlaetter.filter(function (x) { return x.id !== id; }).concat(frisch ? [Object.assign({ id: id }, frisch)] : []);
+  rechneZutaten();
+  return true;
+}
 function pflegtWagen() { return S.pflegeModus && S.haken.wagen && online(); }
 function ortText(o) { return o.kennung + (o.bereichName ? ' · ' + o.bereichName : '') + (o.name ? ' · ' + o.name : ''); }
 function standHeute() {
@@ -376,8 +395,9 @@ function abonniereStamm() {
   abos.forEach(function (ab) { ab(); });
   abos = [
     aboCollection('orte', function (a) { S.orte = a; S.orteGeladen = true; pruefeStartOrt(); }),
-    aboCollection('zutaten', function (a) { S.zutaten = a; }),
-    aboCollection('teige', function (a) { S.teige = a; })   /* nur lesen: Löschschutz der Zutaten */
+    aboCollection('zutaten', function (a) { S.zutatenBlaetter = a; rechneZutaten(); }),
+    aboCollection('stamm', function (a) { S.stamm = a; rechneZutaten(); }),   /* nicht lesbar: Fehler sichtbar, S.stamm bleibt null (altes Format) */
+    aboCollection('teige', function (a) { S.teige = a; })
   ];
 }
 function pruefeStartOrt() {
@@ -413,6 +433,11 @@ async function start() {
   try { S.startOrt = new URLSearchParams(window.location.search).get('ort'); }
   catch (err) { zeigeFehler(t('err_adresse'), err); }
   await ladeKonto();
+  /* Rolle admin nur für den Link „＋ Zutat im Lager anlegen“ (die Lager-Seite prüft selbst). */
+  if (S.kennung) {
+    try { const k = await window.BOS_ACCOUNTS.ladeKonto(window.db, S.kennung); S.istAdminRolle = !!(k && k.role === 'admin'); }
+    catch (err) { zeigeFehler(t('err_konto'), err); }
+  }
   S.pflegeModus = !!S.haken.wagen;   /* Einrichtungs-Seite: mit Haken gleich im Stift */
   abonniereStamm();
   S.geladen = true;
@@ -457,7 +482,7 @@ function ortKarteHTML(ort, zutaten, archiv) {
 }
 function archivHTML(name) {
   const arch = (S[name] || []).filter(function (x) { return x.geloescht; });
-  let html = '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-umschalten">' + esc(t(S.zeigeArchiv ? 'archiv_verbergen' : 'archiv_zeigen')) + ' (' + esc(t(name === 'orte' ? 'archiv_orte' : 'archiv_zutaten')) + ': ' + arch.length + ')</button></div>';
+  let html = '<div class="pflege-leiste"><button type="button" class="link-btn" data-aktion="archiv-umschalten">' + esc(t(S.zeigeArchiv ? 'archiv_verbergen' : 'archiv_zeigen')) + ' (' + esc(t('archiv_orte')) + ': ' + arch.length + ')</button></div>';
   if (!S.zeigeArchiv) return html;
   if (!arch.length) return html + '<p class="status">' + esc(t('archiv_leer')) + '</p>';
   return html + arch.slice().sort(name === 'orte' ? L.kennungVergleich : function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); }).map(function (x) {
@@ -488,9 +513,9 @@ function renderOrte() {
   if (orte.length) html += '<button type="button" class="bos-btn" data-aktion="alle-schilder">' + esc(t('alle_schilder')) + '</button>';
   if (pflegtWagen()) {
     html += '<button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-ort">' + esc(t('neu_ort')) + '</button>' +
-      '<button type="button" class="bos-btn bos-btn--amber" data-aktion="neu-zutat">' + esc(t('neu_zutat')) + '</button>' +
-      '<button type="button" class="bos-btn" data-aktion="startdaten">' + esc(t('startdaten')) + '</button>';
+      '';
   }
+  if (S.istAdminRolle) html += '<a class="bos-btn" href="' + LAGER_SEITE + '" target="_blank" rel="noopener">' + esc(t('neu_zutat_lager')) + '</a>';
   if (S.pflegeModus && S.haken.wagen && !online()) html += '<span class="klein">' + esc(t('offline_pflege')) + '</span>';
   html += '</div>';
   /* Silo-Zutaten (Gruppe Silo) brauchen kein Zuhause: eigene kleine Karte (08.10.2026). */
@@ -517,7 +542,7 @@ function renderOrte() {
   const fremd = orte.filter(function (o) { return !L.kennungZerlegen(o.kennung); });
   if (fremd.length) html += '<div class="bereich-kopf"><h2 class="bos-title">' + esc(t('bereich_fremd')) + '</h2></div><div class="hinweis rot">' + esc(t('bereich_fremd_text')) + '</div>' +
     fremd.map(function (o) { return ortKarteHTML(o, inhalt[o.id] || [], false); }).join('');
-  if (pflegtWagen()) html += archivHTML('orte') + archivHTML('zutaten');
+  if (pflegtWagen()) html += archivHTML('orte');   /* Zutaten-Archiv seit 02.11.2026 im Lager */
   el.innerHTML = html;
   const feld = document.getElementById('sucheFeld');
   if (feld && S.sucheText) feld.value = S.sucheText;
@@ -593,25 +618,27 @@ function bereichGewechselt() {
   zeichneOrtForm(gemerkt);
 }
 
-/* ---------- Formular: Zutat (wie bisher auf der Nachtseite) ---------- */
+/* ---------- Formular: Zutat — seit 02.11.2026 nur noch das Zuhause ----------
+   Name, Gebinde und Gruppe kommen aus dem Lager-Stamm und stehen hier nur zum
+   Lesen (pflegt die Rolle admin im Lager). */
 function oeffneZutat(id) {
-  const z = id ? zm()[id] : { name: '', ortId: '', gebindeEinheit: '' };
-  if (id && !z) return;
-  editZustand = { typ: 'zutat', id: id || null };
+  const z = id ? zm()[id] : null;
+  if (!z) return;
+  editZustand = { typ: 'zutat', id: id };
   const orte = L.aktiv(S.orte).slice().sort(L.kennungVergleich);
   const optionen = '<option value="">' + esc(t('f_zuhause_ohne')) + '</option>' + orte.map(function (o) {
     return '<option value="' + esc(o.id) + '"' + (o.id === z.ortId ? ' selected' : '') + '>' + esc(ortText(o)) + '</option>';
   }).join('');
-  const einheiten = L.EINHEITEN.map(function (e) { return '<option value="' + e + '"' + ((z.gebindeEinheit || '') === e ? ' selected' : '') + '>' + esc(e || t('f_einheit_leer')) + '</option>'; }).join('');
-  oeffneEdit(t(id ? 'e_titel_zutat' : 'e_titel_zutat_neu'),
-    feldHTML(t('f_name'), eingabe('fName', z.name, 'maxlength="60"')) +
-    feldHTML(t('f_zuhause'), '<select class="bos-input" id="fOrt">' + optionen + '</select>') +
-    feldHTML(t('f_gebinde'), '<div class="feld-zeile">' + eingabe('fGebinde', typeof z.gebindeGroesse === 'number' ? z.gebindeGroesse : '', 'inputmode="decimal"') +
-      '<select class="bos-input" id="fEinheit" style="max-width:110px">' + einheiten + '</select></div>', t('f_gebinde_hilfe')) +
-    feldHTML(t('f_gruppe'), '<select class="bos-input" id="fGruppe">' + L.GRUPPEN.map(function (g) {
-      return '<option value="' + g + '"' + (L.gruppeVon(z) === g ? ' selected' : '') + '>' + esc(t('gruppe_' + g)) + '</option>';
-    }).join('') + '</select>', t('f_gruppe_hilfe')),
-    [{ aktion: 'speichern', text: t('speichern'), klasse: 'bos-btn--amber' }].concat(id ? [{ aktion: 'archivieren', text: t('archivieren'), klasse: 'gefahr' }] : []).concat([{ aktion: 'abbrechen', text: t('abbrechen') }]));
+  const offen = z._quelle === 'blatt';   /* noch nicht übernommen: die Regel lehnt das Zuhause ab */
+  const lesen = function (label, wertText) { return feldHTML(label, '<div class="kennung-vorschau">' + esc(wertText || t('f_leer')) + '</div>'); };
+  oeffneEdit(t('e_titel_zutat'),
+    lesen(t('f_name'), z.name) +
+    lesen(t('f_gebinde'), L.gebindeText(z)) +
+    lesen(t('f_gruppe'), t('gruppe_' + L.gruppeVon(z))) +
+    '<p class="feld-hilfe">' + esc(t(offen ? 'zutat_nicht_uebernommen' : 'zutat_im_lager')) +
+      (S.istAdminRolle ? ' <a class="link-btn" href="' + LAGER_SEITE + '" target="_blank" rel="noopener">' + esc(t('zutat_im_lager_link')) + '</a>' : '') + '</p>' +
+    feldHTML(t('f_zuhause'), '<select class="bos-input" id="fOrt"' + (offen ? ' disabled' : '') + '>' + optionen + '</select>'),
+    (offen ? [] : [{ aktion: 'speichern', text: t('speichern'), klasse: 'bos-btn--amber' }]).concat([{ aktion: 'abbrechen', text: t('abbrechen') }]));
 }
 
 /* ---------- Speichern ---------- */
@@ -620,17 +647,38 @@ async function speichereEdit() {
   if (!z) return;
   if (z.typ === 'ort') return speichereOrt();
   if (z.typ !== 'zutat') return;
-  const name = wert('fName'), ortId = wert('fOrt'), gebText = wert('fGebinde'), einheit = wert('fEinheit'), gruppe = wert('fGruppe');
-  let fehler = pruefeText(t('f_name'), name, 60);
-  if (!fehler && L.namensKonflikt(S.zutaten, name, z.id)) fehler = t('v_name_doppelt', { wert: name });
-  let geb;
-  if (!fehler && gebText) { geb = parseZahl(gebText); if (!(geb > 0)) fehler = t('v_gebinde'); }
-  const daten = { name: name, ortId: ortId, gebindeEinheit: einheit, geloescht: false };
-  if (L.GRUPPEN.indexOf(gruppe) !== -1) daten.gruppe = gruppe;
-  if (L.istZahl(geb) && geb > 0) daten.gebindeGroesse = geb;
-  if (fehler) { editFehler(fehler); return; }
-  const vorher = z.id ? (zm()[z.id] || null) : null;
-  await fuehreSchreibenAus(COL.zutaten, z.id, daten, z.id ? 'aendern' : 'anlegen', vorher, t('gespeichert'));
+  const zut = zm()[z.id];
+  if (!zut) return;
+  if (zut._quelle === 'blatt') { editFehler(t('zutat_nicht_uebernommen')); return; }
+  const b = blattMitZuhause(z.id, wert('fOrt'));
+  if (b.vorher) { await fuehreSchreibenAus(COL.zutaten, z.id, b.daten, b.aktion, b.vorher, t('gespeichert')); return; }
+  /* Erstes Zuhause (es gibt noch kein Blatt): Bei einer Ablehnung prüfen, ob ein
+     anderes Gerät das Blatt inzwischen angelegt hat — dann Konflikt statt
+     „keine Berechtigung“ (konfliktText kennt vorher == null nicht). */
+  const knoepfe = document.querySelectorAll('#editKnoepfe button');
+  knoepfe.forEach(function (x) { x.disabled = true; });
+  document.getElementById('editInfo').textContent = '…';
+  try {
+    await schreibe(COL.zutaten, z.id, b.daten, b.aktion, null);
+    schliesseEdit(); toast(t('gespeichert')); render();
+  } catch (err) {
+    document.getElementById('editInfo').textContent = '';
+    if (err && err.code === 'permission-denied') {
+      let frisch = null;
+      try { const snap = await window.db.collection(COL.zutaten).doc(z.id).get({ source: 'server' }); frisch = snap.exists ? snap.data() : null; }
+      catch (e2) { zeigeFehler(t('err_gegenlesen'), e2); }
+      if (frisch) {
+        console.error('[Teigecke] Zuhause abgelehnt: Blatt inzwischen angelegt', err);
+        uebernimmFrisch(COL.zutaten, z.id, frisch);
+        oeffneZutat(z.id);
+        editFehler(t('konflikt', { wer: frisch.geaendertVon || '?' }));
+        return;
+      }
+    }
+    editFehler(fehlerText(t('err_speichern'), err));
+    zeigeFehler(t('err_speichern'), err);
+    knoepfe.forEach(function (x) { x.disabled = false; });
+  }
 }
 async function speichereOrt() {
   const z = editZustand;
@@ -684,18 +732,13 @@ async function archiviereEdit() {
     if (dort.length) { editFehler(t('sperre_ort', { liste: dort.map(function (x) { return x.name; }).join(', ') })); return; }
     const ort = om()[z.id];
     await fuehreSchreibenAus(COL.orte, z.id, Object.assign({}, ort, { geloescht: true }), 'archivieren', ort, t('archiviert'));
-  } else if (z.typ === 'zutat') {
-    const teige = L.teigeMitZutat(z.id, S.teige);
-    if (teige.length) { editFehler(t('sperre_zutat', { liste: teige.map(function (x) { return x.name; }).join(', ') })); return; }
-    const zut = zm()[z.id];
-    await fuehreSchreibenAus(COL.zutaten, z.id, Object.assign({}, zut, { geloescht: true }), 'archivieren', zut, t('archiviert'));
   }
+  /* Zutaten archivieren: seit 02.11.2026 im Lager (dieselbe Sperre „steht noch in Teig …“). */
 }
 async function stelleWiederHer(name, id) {
   const dok = L.nachId(S[name])[id];
   if (!dok) return;
   if (!S.haken[HAKEN_FUER[COL[name]]]) { zeigeFehler(t('wiederherstellen'), { message: t('err_haken_fehlt') }); return; }
-  if (name === 'zutaten' && L.namensKonflikt(S.zutaten, dok.name, id)) { zeigeFehler(t('wiederherstellen'), { message: t('v_name_doppelt', { wert: dok.name }) }); return; }
   try {
     await schreibe(COL[name], id, Object.assign({}, dok, { geloescht: false }), 'wiederherstellen', dok);
     toast(t('wiederhergestellt'));
@@ -741,11 +784,13 @@ function oeffneHolen(ortId) {
   inhalt._ohne = L.trenneSilo(inhalt._ohne).rest;   /* Silo-Zutaten brauchen kein Zuhause (08.10.2026) */
   const andere = L.aktiv(S.zutaten).filter(function (x) { return x.ortId && x.ortId !== ortId && om()[x.ortId] && !om()[x.ortId].geloescht; })
     .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de'); });
+  /* Noch nicht ins Lager übernommen: Zuhause lehnt die Regel ab → grau mit Grund. */
+  const chip = function (x, text) { return x._quelle === 'blatt' ? { id: x.id, text: text + ' (' + t('holen_nicht_uebernommen') + ')', gesperrt: true } : { id: x.id, text: text }; };
   oeffneEdit(t('holen_titel', { kennung: ort.kennung }),
     '<div class="bos-label">' + esc(t('holen_ohne', { n: inhalt._ohne.length })) + '</div><div class="hol-liste">' +
-    (inhalt._ohne.length ? chipAuswahlHTML('holen', inhalt._ohne.map(function (x) { return { id: x.id, text: x.name }; })) : '<p class="feld-hilfe">' + esc(t('holen_keine')) + '</p>') + '</div>' +
+    (inhalt._ohne.length ? chipAuswahlHTML('holen', inhalt._ohne.map(function (x) { return chip(x, x.name); })) : '<p class="feld-hilfe">' + esc(t('holen_keine')) + '</p>') + '</div>' +
     (andere.length ? '<details><summary class="klein">' + esc(t('holen_andere', { n: andere.length })) + '</summary><div class="hol-liste">' +
-      chipAuswahlHTML('holen', andere.map(function (x) { return { id: x.id, text: x.name + ' (' + om()[x.ortId].kennung + ')' }; })) + '</div></details>' : ''),
+      chipAuswahlHTML('holen', andere.map(function (x) { return chip(x, x.name + ' (' + om()[x.ortId].kennung + ')'); })) + '</div></details>' : ''),
     [{ aktion: 'holen-speichern', text: t('holen_los'), klasse: 'bos-btn--amber' }, { aktion: 'abbrechen', text: t('abbrechen') }]);
 }
 async function speichereHolen() {
@@ -753,7 +798,7 @@ async function speichereHolen() {
   if (!z || z.typ !== 'holen') return;
   const ids = Array.from(z.auswahl.holen);
   if (!ids.length) { editFehler(t('holen_nichts')); return; }
-  const auftraege = ids.map(function (id) { const alt = zm()[id]; return { col: COL.zutaten, id: id, daten: Object.assign({}, alt, { ortId: z.id }), aktion: 'aendern', vorher: alt }; });
+  const auftraege = ids.map(function (id) { const b = blattMitZuhause(id, z.id); return { col: COL.zutaten, id: id, daten: b.daten, aktion: b.aktion, vorher: b.vorher }; });
   await schreibeReihe(t('holen_titel', { kennung: om()[z.id].kennung }), auftraege, t('holen_fertig', { n: ids.length, kennung: om()[z.id].kennung }));
 }
 
@@ -806,57 +851,8 @@ async function speichereBereichWort() {
   await schreibeReihe(t('bereich_wort_titel', { bereich: z.bereich }), auftraege, t('bereich_wort_fertig', { n: betroffen.length }));
 }
 
-/* ---------- Startdaten: nur noch neue ZUTATEN (Ulf, 03.10.2026) ----------
-   Orte werden von Hand angelegt (BOS vergibt die Nummer); Teige liest die
-   Nachtseite bzw. später „Teige & Rezepte“ ein. */
-let importZustand = null;
-function starteImport() { const i = document.getElementById('importDatei'); i.value = ''; i.click(); }
-document.getElementById('importDatei').addEventListener('change', function (e) {
-  const datei = e.target.files && e.target.files[0];
-  if (!datei) return;
-  const leser = new FileReader();
-  leser.onerror = function () { zeigeFehler(t('import_titel'), leser.error || new Error('Datei nicht lesbar')); };
-  leser.onload = function () {
-    let json;
-    try { json = JSON.parse(leser.result); }
-    catch (err) { oeffneEdit(t('import_titel'), '<p class="sheet-fehler">' + esc(t('import_json', { msg: err.message })) + '</p>', [{ aktion: 'abbrechen', text: t('schliessen') }]); return; }
-    const hinweise = [];
-    let nurZutaten = json;
-    if (json && typeof json === 'object' && !Array.isArray(json)) {
-      if (Array.isArray(json.orte) && json.orte.length) hinweise.push(t('import_orte_nicht', { n: json.orte.length }));
-      const mitOrt = Array.isArray(json.zutaten) ? json.zutaten.filter(function (x) { return x && x.ort; }).length : 0;
-      if (mitOrt) hinweise.push(t('import_ort_ignoriert', { n: mitOrt }));
-      if (Array.isArray(json.teige) && json.teige.length) hinweise.push(t('import_teige_nicht', { n: json.teige.length }));
-      nurZutaten = { version: json.version, zutaten: Array.isArray(json.zutaten) ? json.zutaten.map(function (x) {
-        if (!x || typeof x !== 'object') return x;
-        const k = Object.assign({}, x); delete k.ort; return k;
-      }) : json.zutaten };
-    }
-    const ergebnis = L.importPlan(nurZutaten, { orte: [], zutaten: S.zutaten, teige: [] }, []);
-    const neu = ergebnis.plan.zutaten.filter(function (x) { return x.aktion === 'neu'; });
-    const vorhanden = ergebnis.plan.zutaten.length - neu.length;
-    if (neu.length && !S.haken.wagen) ergebnis.fehler.push(t('import_haken_fehlen', { liste: t('haken_wagen') }));
-    importZustand = { neu: neu };
-    let html = '<p class="sheet-info">' + esc(t('import_zusammenfassung_zutaten', { zutaten: neu.length, vorhanden: vorhanden })) + '</p>';
-    if (ergebnis.fehler.length) html += '<p class="sheet-fehler">' + esc(t('import_fehler_titel')) + '</p><ul class="import-liste">' + ergebnis.fehler.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
-    const alleHinweise = hinweise.concat(ergebnis.hinweise);
-    if (alleHinweise.length) html += '<p class="sheet-info">' + esc(t('import_hinweise_titel')) + '</p><ul class="import-liste">' + alleHinweise.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
-    const knoepfe = [];
-    if (!ergebnis.fehler.length && neu.length) knoepfe.push({ aktion: 'import-los', text: t('import_los', { n: neu.length }), klasse: 'bos-btn--amber' });
-    else if (!ergebnis.fehler.length) html += '<p class="sheet-info">' + esc(t('import_nichts')) + '</p>';
-    knoepfe.push({ aktion: 'abbrechen', text: t('abbrechen') });
-    editZustand = { typ: 'import' };
-    oeffneEdit(t('import_titel'), html, knoepfe);
-  };
-  leser.readAsText(datei);
-});
-async function fuehreImportAus() {
-  if (!importZustand) return;
-  const auftraege = importZustand.neu.map(function (e) { return { col: COL.zutaten, id: null, daten: L.zutatDokument(e.daten, {}), aktion: 'anlegen', vorher: null }; });
-  importZustand = null;
-  await schreibeReihe(t('import_titel'), auftraege, t('import_fertig', { n: auftraege.length }));
-}
-
+/* ---------- Startdaten: entfallen 02.11.2026 ----------
+   Neue Zutaten legt die Rolle admin im Lager an (lager/lager_editor.html). */
 /* ---------- Drucken (immer über bos_druck.js, nie direkt) ----------
    Die Schrift der Zutatenliste wird je Schild eingepasst: größte Schrift,
    bei der nichts über das Blatt läuft (gemessen in einem unsichtbaren
@@ -916,7 +912,6 @@ document.addEventListener('click', function (e) {
     case 'druck-trotzdem': { const ids = (editZustand && editZustand.orte) || []; schliesseEdit(); druckeSchilder(ids.map(function (x) { return om()[x]; }).filter(Boolean), true); break; }
     case 'neu-ort': oeffneOrt(null); break;
     case 'bearbeiten-ort': oeffneOrt(id); break;
-    case 'neu-zutat': oeffneZutat(null); break;
     case 'bearbeiten-zutat': oeffneZutat(id); break;
     case 'ort-art':
       if (editZustand) { editZustand.art = el.getAttribute('data-art'); document.querySelectorAll('#fArt .chip').forEach(function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-art') === editZustand.art ? 'true' : 'false'); }); }
@@ -943,8 +938,6 @@ document.addEventListener('click', function (e) {
     case 'abbrechen': schliesseEdit(); break;
     case 'wiederherstellen': stelleWiederHer(el.getAttribute('data-col'), id); break;
     case 'archiv-umschalten': S.zeigeArchiv = !S.zeigeArchiv; render(); break;
-    case 'startdaten': starteImport(); break;
-    case 'import-los': fuehreImportAus(); break;
   }
 });
 document.addEventListener('change', function (e) {
@@ -975,14 +968,14 @@ const helpData = {
     { heading: 'Wofür ist diese Seite?', text: 'Hier richtest du die Teigecke ein: Orte anlegen, jeder Zutat ihr Zuhause geben, Schilder drucken. Das ist Arbeit in Ruhe, nicht für nebenbei am Kneter. Nachts sagt der „BrotTeigRechner“ (früher „Teigecke Nacht“) beim Einsammeln nur noch, an welchem Ort etwas steht.' },
     { heading: 'Was ist eine Kennung?', text: 'Jeder Ort hat eine Kennung aus einem Buchstaben und einer Nummer, zum Beispiel B01. Der Buchstabe ist der Bereich (B = Backstube, K = Kühlung …), die Nummer zählt BOS von selbst hoch: B01, B02, B03. Einmal B01, immer B01 — die Kennung bleibt bei ihrem Ort, egal was sich an seinem Inhalt ändert. Fällt ein Ort weg, bleibt seine Nummer leer; ein neuer Ort bekommt immer die nächste Nummer am Ende.' },
     { heading: 'Einen Ort anlegen', text: 'Oben „✎ Pflegen“ einschalten, dann „＋ Ort“. Bereich wählen oder mit „neuer Bereich“ einen Buchstaben und ein Wort dazu festlegen. Die Kennung siehst du als Vorschau, tippen kannst du sie nicht. Name, Beschreibung und „Reihenfolge im Gang“ sind freiwillig. „Reihenfolge im Gang“ sortiert die Orte nachts in der Einsammelliste: kleinere Zahl = weiter vorn.' },
-    { heading: 'Zutaten ein Zuhause geben', text: 'Oben steht „Noch ohne Zuhause“ mit allen Zutaten, die noch nirgends wohnen. Am schnellsten geht es am Ort selbst: „＋ Zutaten hierher“, alle antippen, die dorthin gehören, „Hierher holen“. Einzelne Zutaten änderst du durch Antippen (Name, Zuhause, Gebinde). Neue Zutaten legst du mit „＋ Zutat“ an oder liest sie mit „Zutaten einlesen“ aus der Startdaten-Datei ein.' },
-    { heading: 'Gruppe einer Zutat', text: 'In „Zutat bearbeiten“ steht als viertes Feld die Gruppe (Mehle & Schrote, Körner & Saaten, Flüssiges, Salz & Backmittel, Vorstufen & Anstellgut, Kühlung, Silo, Sonstiges). Sie sortiert die Auswahl, wenn du ein Rezept eintippst. Ohne Angabe gilt „Sonstiges“. Zutaten der Gruppe Silo dosiert WinBack: Sie brauchen kein Zuhause und stehen deshalb nicht unter „Noch ohne Zuhause“, sondern in der Karte „Aus dem Silo“.' },
+    { heading: 'Zutaten ein Zuhause geben', text: 'Oben steht „Noch ohne Zuhause“ mit allen Zutaten, die noch nirgends wohnen. Am schnellsten geht es am Ort selbst: „＋ Zutaten hierher“, alle antippen, die dorthin gehören, „Hierher holen“. Einzelne Zutaten öffnest du durch Antippen und wählst dort das Zuhause. Name, Gebinde und Gruppe pflegt der Admin im Lager; dort entstehen auch neue Zutaten.' },
+    { heading: 'Gruppe einer Zutat', text: 'Jede Zutat hat eine Gruppe (Mehle & Schrote, Körner & Saaten, Flüssiges, Salz & Backmittel, Vorstufen & Anstellgut, Kühlung, Silo, Sonstiges). Sie steht in „Zutat bearbeiten“ zum Lesen und wird im Lager gepflegt. Sie sortiert die Auswahl, wenn du ein Rezept eintippst. Ohne Angabe gilt „Sonstiges“. Zutaten der Gruppe Silo dosiert WinBack: Sie brauchen kein Zuhause und stehen deshalb nicht unter „Noch ohne Zuhause“, sondern in der Karte „Aus dem Silo“.' },
     { heading: 'Reihenfolge auf dem Schild', text: 'Mit „↕ Reihenfolge“ schiebst du die Zutaten eines Orts mit den Pfeilen ▲▼ in die Reihenfolge, in der sie auf dem Schild stehen sollen. Ohne eigene Reihenfolge stehen sie alphabetisch. Das hat nichts mit der „Reihenfolge im Gang“ zu tun.' },
     { heading: 'Schilder drucken', text: '„🖨 Schild“ druckt das Schild eines Orts, „Alle Schilder drucken“ alle hintereinander: DIN A4 quer, ein Ort je Blatt. Links groß die Kennung, rechts die Zutaten mit Gebinde, unten links ein QR-Code (solange BäckereiOS noch nicht online ist: ein leeres Feld). Die Schrift wird so groß gewählt, wie es auf das Blatt passt. Passt es gar nicht, sagt die Seite das vor dem Druck. Im Druckdialog auf „Querformat“ achten.' },
     { heading: 'Der QR-Code', text: 'Wer den QR-Code mit dem Handy scannt, landet nach der Anmeldung direkt auf der Karte dieses Orts: Zutat ändern, Schild neu drucken, fertig. Du kannst eine Kennung auch oben ins Suchfeld tippen. Solange BäckereiOS noch nicht online ist, druckt die Seite das Schild ohne Code: an seiner Stelle bleibt ein leeres Feld. Die Seite sagt das oben und beim Drucken. Nach dem Online-Gang die Schilder einmal neu drucken, dann ist der Code drauf.' },
     { heading: 'Wort eines Bereichs ändern', text: 'Neben dem Bereich steht „Wort ändern“. Das neue Wort gilt für alle Orte des Bereichs; danach die Schilder neu drucken. Der Buchstabe bleibt, sobald ein Bereich einen Ort hat.' },
-    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Einen Ort kannst du erst archivieren, wenn dort keine Zutat mehr wohnt; eine Zutat erst, wenn sie in keinem Teig mehr steht. Archiviertes steht unten im Archiv und lässt sich wiederherstellen.' },
-    { heading: 'Wer darf was?', text: 'Sehen darf die Orte jeder mit Konto. Ändern kann nur, wer in der Kontenverwaltung den Haken „🧺 Wagen & Zutaten“ hat. Die Haken „Teige“ und „Rezepte“ gelten hier nicht.' },
+    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Einen Ort kannst du erst archivieren, wenn dort keine Zutat mehr wohnt. Archivierte Orte stehen unten im Archiv und lassen sich wiederherstellen. Zutaten archiviert der Admin im Lager — erst, wenn sie in keinem Teig mehr stehen.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf die Orte jeder mit Konto. Orte anlegen, Schilder ordnen und Zutaten ein Zuhause geben kann nur, wer in der Kontenverwaltung den Haken „🧺 Wagen & Zutaten“ hat. Die Haken „Teige“ und „Rezepte“ gelten hier nicht. Name, Gebinde und Gruppe einer Zutat ändert nur die Rolle admin im Lager.' },
     { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ hat drei mögliche Gründe: Dir fehlt der Haken, du bist mit dem Generalschlüssel 👑 angemeldet (der schreibt hier nie), oder die Firestore-Regeln sind älter als diese Seite — dann steht oben ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat neu geladen, einfach noch einmal speichern. Ohne Netz lässt sich hier nichts ändern.' }
   ]
 };

@@ -35,6 +35,14 @@
      #editFehler #editInfo #editKnoepfe
 
    CHANGELOG
+     2026-11-02 · 00:53 · v0.3 · Ergänzung (Lager Stufe 1, #120; Kern-Freigabe Ulf 00:39)
+       Nur angehängt, am Anfang von uebernimmFrisch(): Stellt die Seite eine
+       Funktion uebernimmFrischSeite(col, id, frisch) bereit und liefert sie
+       true, ist der Fall erledigt. Grund: Die Orte-Seite hält die rohen
+       Teigecken-Blätter getrennt von der zusammengerechneten Liste S.zutaten
+       (teigecke_logik.js zutatenAusStamm). schreibe(), schreibeMehrere(),
+       nurErlaubteFelder(), schreibSperre() unverändert. Die Nachtseite hat
+       ihre eigene Kopie und braucht den Haken nicht (schreibt keine Zutaten).
      2026-10-08 · 08:22 · v0.2 · Ergänzung (Etappe 2, Schub 2)
        Neu, nur angehängt: schreibeMehrere(auftraege) — mehrere Dokumente,
        jedes mit eigener Sicherung, in EINEM Batch (Rezept-Strecke: Teig +
@@ -302,6 +310,9 @@ async function konfliktText(col, id, vorher) {
 /* Frischen Serverstand sofort in S übernehmen — das Formular öffnet damit,
    auch wenn der Live-Abruf (onSnapshot) noch nicht nachgezogen hat. */
 function uebernimmFrisch(col, id, frisch) {
+  /* NEU 02.11.2026 (Lager Stufe 1, A6): Die Seite darf den Fall selbst übernehmen
+     (Orte: rohe Blätter liegen in S.zutatenBlaetter, S.zutaten wird daraus gerechnet). */
+  if (typeof uebernimmFrischSeite === 'function' && uebernimmFrischSeite(col, id, frisch)) return;
   const dok = frisch ? Object.assign({ id: id }, frisch) : null;
   if (col === COL.einstellungen) { S.einstellungen = dok || {}; return; }
   if (col === COL.teigwerte) { if (dok) S.teigwerte[id] = dok; else delete S.teigwerte[id]; return; }

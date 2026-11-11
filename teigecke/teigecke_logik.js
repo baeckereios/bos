@@ -15,6 +15,13 @@
    bewusst Platzhalter.
 
    CHANGELOG
+     2026-11-02 · 00:52 · v0.14 · Feature (Lager Stufe 1, #120)
+       ANWEISUNG_2026-11-01_LAGER_STUFE1_BAUPLAN.md, Freigabe KC 01.11. 23:03
+       (A1–A8) und 02.11. 00:17 (A1+), Kern-Freigabe Ulf 02.11. 00:39.
+       Nur angehängt: zutatenAusStamm(stamm, blaetter), BLATT_FELDER. Baut aus
+       Lager-Stamm und Teigecken-Blatt die Zutatenliste im bisherigen Format.
+       Keine bestehende Funktion geändert.
+       lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
      2026-10-16 · 17:51 · v0.13 · Ergänzung (Teigrechner Stufe 1, #67, §4 F)
        ANWEISUNG_2026-10-16_TEIGRECHNER_STUFE1.md, Freigabe Kontroll-Chat 16:37.
        unbekannterTeig(produkte, teige, weitere) und broteOhneTeig(…, weitere):
@@ -1005,6 +1012,49 @@
   }
 
   /* ================================================================
+     ZUTATEN AUS LAGER-STAMM + TEIGECKEN-BLATT (Lager Stufe 1, 02.11.2026)
+     Seit RK §30 stehen Name, Gebinde, Gruppe und Archiv einer Zutat im
+     Lager-Stamm (lager_artikel, pflegt Rolle admin). Das Teigecken-Blatt
+     (teigecke_zutaten, gleiche Dokument-ID) trägt nur noch das Zuhause.
+     Diese Funktion baut daraus die Zutatenliste im BISHERIGEN Format, damit
+     alles, was S.zutaten liest (Einsammelliste, Mehl-Regel, Silo, Schild,
+     Strecke), unverändert bleibt. Regeln (Bauplan §4.3, Auflage A2):
+       1. Gibt es zur ID einen Stamm, entscheidet allein der Stamm: name,
+          gebindeGroesse (← inhaltMenge), gebindeEinheit (← inhaltEinheit),
+          gruppe (← teigeckeGruppe), geloescht. Vom Blatt zählt nur ortId.
+          Stamm teigecke !== true → keine Zutat, auch wenn das Blatt einen
+          Namen trägt.
+       2. Kein Stamm, Blatt mit eigenem name (Stand vor der Übernahme)
+          → das Blatt unverändert im alten Format.
+       3. Kein Stamm, Blatt ohne name → keine Zutat.
+     stamm/blaetter: rohe Listen [{ id, … }] wie aus dem Live-Abo; stamm
+     null = nicht lesbar (dann gilt für alle IDs Regel 2/3).
+     Reihenfolge wie Firestore: nach Dokument-ID. _quelle sagt, woher die
+     Zutat kommt ('stamm' | 'blatt'); sonst nur die bisherigen Felder.
+     ================================================================ */
+  var BLATT_FELDER = ['ortId'];
+  function zutatenAusStamm(stamm, blaetter) {
+    var sm = nachId(stamm || []), bm = nachId(blaetter || []);
+    var ids = Object.keys(sm).concat(Object.keys(bm).filter(function (id) { return !sm[id]; }));
+    ids.sort(function (a, b) { return a < b ? -1 : a > b ? 1 : 0; });
+    var aus = [];
+    ids.forEach(function (id) {
+      var st = sm[id], bl = bm[id];
+      if (st) {
+        if (st.teigecke !== true) return;
+        var z = { id: id, name: typeof st.name === 'string' ? st.name : '', ortId: (bl && typeof bl.ortId === 'string') ? bl.ortId : '',
+          gebindeEinheit: st.inhaltEinheit || '', geloescht: st.geloescht === true, _quelle: 'stamm' };
+        if (istZahl(st.inhaltMenge) && st.inhaltMenge > 0) z.gebindeGroesse = st.inhaltMenge;
+        if (GRUPPEN.indexOf(st.teigeckeGruppe) !== -1) z.gruppe = st.teigeckeGruppe;
+        aus.push(z);
+        return;
+      }
+      if (bl && typeof bl.name === 'string') aus.push(Object.assign({}, bl, { _quelle: 'blatt' }));
+    });
+    return aus;
+  }
+
+  /* ================================================================
      REZEPT-STRECKE (Etappe 2, Schub 2, 08.10.2026) — reine Funktionen.
      Die Strecke füllt dieselben Felder wie Startdaten und altes Formular:
      teigecke_teige (je kg Teig, Zutaten-Kennungen), teigecke_teigwerte
@@ -1313,7 +1363,8 @@
     broteSchaetzung: broteSchaetzung, probeNacht: probeNacht,
     mehlRegelKgJeKg: mehlRegelKgJeKg, istLangzeit: istLangzeit, langzeitTeigeFuer: langzeitTeigeFuer, planTeige: planTeige,
     langzeitHefe: langzeitHefe, grammText: grammText, langzeitZahlen: langzeitZahlen, vornachtLangzeit: vornachtLangzeit,
-    vorstufeStufe: vorstufeStufe, REITER: REITER, reiterAusAdresse: reiterAusAdresse
+    vorstufeStufe: vorstufeStufe, REITER: REITER, reiterAusAdresse: reiterAusAdresse,
+    BLATT_FELDER: BLATT_FELDER, zutatenAusStamm: zutatenAusStamm
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_TEIGECKE_LOGIK = api;

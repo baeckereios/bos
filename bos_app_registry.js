@@ -2,10 +2,17 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-11 · 01:15 · Zusammengeführt (Kontroll-Chat Lager): Lieferung Lager
+       Stufe 1 (gebaut auf Paket 01.11., 22:25) mit Stand Paket 10.11., 09:33
+       (Eintrag produktionsplaner_bestellungen). Nur beide Einträge behalten.
      2026-11-08 · 15:38 · Produktionsplaner Schritt 1 (Go Kontroll-Chat
        08.11., 14:45, Freigabe §3): neuer Eintrag produktionsplaner_bestellungen
        (Kind-Kachel „Bestellungen“ im Hub produktionsplaner, direkt:
        'anmeldung', Rollen wie die Übersicht). Sonst unverändert.
+     2026-11-02 · 01:04 · Lager Stufe 1, #120 (Freigabe KC 01.11. 23:03 /
+       02.11. 00:17): neuer Eintrag lager_editor (Kachel „Lager“, Bereich
+       Verwaltung, nur Rolle admin, kein direkt — nicht für QR/NFC gedacht).
+       bos_permissions.js: lager_editor nur im admin-Block. Sonst unverändert.
      2026-10-27 · 08:12 · Nachrichtenzentrale Stufe 1c, #131 (Bauplan, Go KC
        07:54): Eintrag nachrichtenzentrale bekommt url
        'nachrichtenzentrale/nachrichtenzentrale.html' und status 'live'.
@@ -564,6 +571,20 @@ window.BOS_APPS = [
     direkt: 'anmeldung',
     status: 'live',
     roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung', 'haustechnik']
+  },
+  {
+    id: 'lager_editor',
+    bereich: 'verwaltung',
+    name: 'Lager',
+    icon: '📦',
+    color: '#8b5cf6',
+    url: 'lager/lager_editor.html',
+    status: 'live',
+    roles: ['admin']
+    // NEU 02.11.2026 (Lager Stufe 1, #120): Artikelstamm, Lagerorte, Kategorien,
+    // Lieferanten. Pflegen nur Rolle admin (Regel RK §30). Lila wie die anderen
+    // Admin-Werkzeuge. bos_permissions.js: "lager_editor: true" nur bei admin.
+    // Siehe lager/LAGER_EDITOR_DOKU.md.
   },
   {
     id: 'konten_verwaltung',
