@@ -24,6 +24,14 @@
    Blöcke lager_*). test_lager.js vergleicht beides — immer beide ändern.
 
    CHANGELOG
+     2026-11-11 · 20:42 · v3 · Feature (Lager Ordneransicht, #120/#168; Freigabe Kontroll-Chat 20:30)
+       Neu, nur rechnend (kein Firestore, kein DOM): ORDNER_INTELLIGENT (Liste der intelligenten
+       Ordner, Reihenfolge = Baum), TEMP_ZEICHEN, ordnerKontext, ordnerBaum (Standort → Temperatur
+       → Lagerort, Kategorien, Lieferanten), zerlegeOrdner, ordnerGueltig, startordner (F2: gemerkt,
+       sonst Unsortiert solange nicht leer, sonst Alle Artikel), ordnerInhalt, ordnerZeile,
+       blaetterIds (A19: jeder Artikel einmal), pfad, vorfahren, sucheUeberAlles (mit Pfad),
+       archivListe, ortErsetzen/ortDazu/ortWeg (Grenze GRENZEN.orte), standHinweis (A17).
+       Datenmodell, FELDER, pruefe(), Regeln unverändert.
      2026-11-11 · 06:50 · v2 · Feature (Lager Stufe 2, #120; Freigabe Kontroll-Chat
        11.11. 06:43 mit A9–A11, Kern-Freigabe Ulf 06:41)
        Neu: COL.standorte/zaehlungen/stand, FELDER lager_standorte und
@@ -419,6 +427,272 @@
   /* Eingabe-Grenze der Regel: Zahl, 0 … wertMax. Kommastellen prüft der Baustein. */
   function wertGueltig(w) { return istZahl(w) && w >= 0 && w <= GRENZEN.wertMax; }
 
+  /* =================================================================
+     Ordneransicht (L16, #168). Baum, Ordner-Inhalt, Pfad, Suche — nur
+     berechnet, nichts gespeichert. Kennungen der Ordner (Text):
+       i:<id>                 intelligenter Ordner (ORDNER_INTELLIGENT)
+       a:standorte|kategorien|lieferanten   Abschnittskopf
+       s:<standortId>         Standort
+       t:<standortId>:<temp>  Temperatur-Zwischenüberschrift (klickbar, „Gesamtkühlung“)
+       o:<ortId>              Lagerort
+       k:<kategorieId>  l:<lieferantId>
+       x:startliste           Handlung „Startliste anlegen“ (nur Kategorien, B16/K2)
+     Wörter für die Anzeige stehen NICHT hier, sondern im Wörterbuch der
+     Seite (schluessel = i18n-Schlüssel). Daten-Namen kommen aus den Daten.
+     ================================================================= */
+  /* Ein neuer intelligenter Ordner = ein Eintrag (§2a). kx = Kontext aus ordnerKontext(). */
+  var ORDNER_INTELLIGENT = [
+    { id: 'alle', zeichen: '📦', art: 'artikel', immer: true, filter: function () { return true; } },
+    { id: 'unsortiert', zeichen: '📥', art: 'artikel', immer: true, filter: function (a, kx) { return !(a.orte || []).some(function (o) { return kx.om[o]; }); } },
+    { id: 'pruefen', zeichen: '⚠︎', art: 'artikel', filter: function (a, kx) { return plausibel(a, kx.km, kx.om).length > 0; } },
+    { id: 'ohne_kat', zeichen: '🏷', art: 'artikel', filter: function (a, kx) { return !kx.km[a.kategorieId]; } },
+    { id: 'ohne_ber', zeichen: '◌', art: 'artikel', filter: function (a) { return !a.bereich; } },
+    { id: 'orte_ohne', zeichen: '📍', art: 'orte', filter: function (o, kx) { return !kx.sm[o.standortId]; } },
+    { id: 'uebernahme', zeichen: '⇣', art: 'eigen', zahl: function (kx) { return kx.kandidaten; } },
+    { id: 'teigecke', zeichen: '🥖', art: 'artikel', filter: function (a) { return a.teigecke === true; } },
+    { id: 'archiv', zeichen: '🗄', art: 'eigen', zahl: function (kx) { return kx.archiv; } }
+  ];
+  var TEMP_ZEICHEN = { ungekuehlt: '▫', gekuehlt: '❄', tk: '🧊' };
+  var ORDNER_SPALTEN = ['standorte', 'kategorien', 'lieferanten'];
+
+  /* daten = { artikel, orte, standorte, kategorien, lieferanten, kandidaten (Zahl) } */
+  function ordnerKontext(daten) {
+    var d = daten || {};
+    var alle = ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'];
+    var archiv = 0;
+    alle.forEach(function (k) { archiv += (d[k] || []).filter(function (x) { return x && x.geloescht; }).length; });
+    return {
+      artikel: aktiv(d.artikel), orte: aktiv(d.orte), standorte: aktiv(d.standorte), kategorien: aktiv(d.kategorien), lieferanten: aktiv(d.lieferanten),
+      om: nachId(aktiv(d.orte)), sm: nachId(aktiv(d.standorte)), km: nachId(aktiv(d.kategorien)), lm: nachId(aktiv(d.lieferanten)),
+      kandidaten: istZahl(d.kandidaten) ? d.kandidaten : 0, archiv: archiv, roh: d
+    };
+  }
+  function tempVon(o) { return TEMP_ORT.indexOf(o && o.temperatur) !== -1 ? o.temperatur : 'ungekuehlt'; }
+  function artikelAnOrten(ids, kx) {
+    var m = {}; ids.forEach(function (i) { m[i] = true; });
+    return kx.artikel.filter(function (a) { return (a.orte || []).some(function (o) { return m[o]; }); });
+  }
+  function intelligentZahl(e, kx) {
+    if (e.zahl) return e.zahl(kx);
+    if (e.art === 'orte') return kx.orte.filter(function (o) { return e.filter(o, kx); }).length;
+    return kx.artikel.filter(function (a) { return e.filter(a, kx); }).length;
+  }
+  /* Baum als Knoten für bos_ordnerbaum.js. opt.liste = ORDNER_INTELLIGENT (zum Testen austauschbar). */
+  function ordnerBaum(daten, opt) {
+    var kx = ordnerKontext(daten), o = opt || {}, liste = o.liste || ORDNER_INTELLIGENT, wurzel = [];
+    liste.forEach(function (e) {
+      var n = intelligentZahl(e, kx);
+      if (!e.immer && !n) return;
+      var k = { id: 'i:' + e.id, art: 'intelligent', schluessel: 'ordner_' + e.id, zeichen: e.zeichen, zahl: n, kinder: [] };
+      if (e.art === 'orte') {
+        k.kinder = kx.orte.filter(function (x) { return e.filter(x, kx); }).sort(nachSort).map(function (x) {
+          return { id: 'o:' + x.id, art: 'ort', name: x.name, zahl: artikelAmOrt(x.id, kx.artikel).length, mitKarte: true, kinder: [] };
+        });
+      }
+      wurzel.push(k);
+    });
+    var st = { id: 'a:standorte', art: 'abschnitt', schluessel: 'abschnitt_standorte', hinzu: 'hinzu_standort', kinder: [] };
+    kx.standorte.slice().sort(nachSort).forEach(function (s) {
+      var orte = kx.orte.filter(function (x) { return x.standortId === s.id; }).sort(nachSort);
+      var sk = { id: 's:' + s.id, art: 'standort', name: s.name, zahl: artikelAnOrten(orte.map(function (x) { return x.id; }), kx).length, mitKarte: true, hinzu: 'hinzu_ort', kinder: [] };
+      TEMP_ORT.forEach(function (tp) {
+        var to = orte.filter(function (x) { return tempVon(x) === tp; });
+        if (!to.length) return;
+        sk.kinder.push({ id: 't:' + s.id + ':' + tp, art: 'temperatur', schluessel: 'temp_' + tp, zeichen: TEMP_ZEICHEN[tp],
+          zahl: artikelAnOrten(to.map(function (x) { return x.id; }), kx).length,
+          kinder: to.map(function (x) { return { id: 'o:' + x.id, art: 'ort', name: x.name, zahl: artikelAmOrt(x.id, kx.artikel).length, mitKarte: true, kinder: [] }; }) });
+      });
+      st.kinder.push(sk);
+    });
+    wurzel.push(st);
+    var ka = { id: 'a:kategorien', art: 'abschnitt', schluessel: 'abschnitt_kategorien', hinzu: 'hinzu_kategorie', kinder: [] };
+    kx.kategorien.slice().sort(nachSort).forEach(function (k) { ka.kinder.push({ id: 'k:' + k.id, art: 'kategorie', name: k.name, zahl: artikelDerKategorie(k.id, kx.artikel).length, mitKarte: true, kinder: [] }); });
+    var fehlt = !kx.kategorien.length ? startlisteFehlende(STARTLISTE_KATEGORIEN, (daten || {}).kategorien) : [];
+    if (fehlt.length) ka.kinder.push({ id: 'x:startliste', art: 'aktion', schluessel: 'startliste_kategorien', werte: { n: fehlt.length }, kinder: [] });
+    wurzel.push(ka);
+    var li = { id: 'a:lieferanten', art: 'abschnitt', schluessel: 'abschnitt_lieferanten', hinzu: 'hinzu_lieferant', kinder: [] };
+    kx.lieferanten.slice().sort(nachName).forEach(function (l) { li.kinder.push({ id: 'l:' + l.id, art: 'lieferant', name: l.name, zahl: artikelDesLieferanten(l.id, kx.artikel).length, mitKarte: true, kinder: [] }); });
+    wurzel.push(li);
+    return wurzel;
+  }
+  function zerlegeOrdner(sel) {
+    var s = String(sel || ''), i = s.indexOf(':');
+    if (i < 1) return null;
+    var art = s.slice(0, i), rest = s.slice(i + 1);
+    if (art === 't') { var j = rest.lastIndexOf(':'); return j < 1 ? null : { art: 't', id: rest.slice(0, j), temperatur: rest.slice(j + 1) }; }
+    return { art: art, id: rest };
+  }
+  /* Gibt es den Ordner (noch)? Für den gemerkten Ordner. */
+  function ordnerGueltig(sel, daten, opt) {
+    var z = zerlegeOrdner(sel); if (!z) return false;
+    var kx = ordnerKontext(daten), liste = (opt && opt.liste) || ORDNER_INTELLIGENT;
+    if (z.art === 'i') { var e = liste.filter(function (x) { return x.id === z.id; })[0]; return !!e && (e.immer || intelligentZahl(e, kx) > 0); }
+    if (z.art === 'a') return ORDNER_SPALTEN.indexOf(z.id) !== -1;
+    if (z.art === 's') return !!kx.sm[z.id];
+    if (z.art === 't') return !!kx.sm[z.id] && kx.orte.some(function (o) { return o.standortId === z.id && tempVon(o) === z.temperatur; });
+    if (z.art === 'o') return !!kx.om[z.id];
+    if (z.art === 'k') return !!kx.km[z.id];
+    if (z.art === 'l') return !!kx.lm[z.id];
+    return false;
+  }
+  /* Startordner (Ulf F2, 20:29): gemerkter, wenn gültig; sonst „Unsortiert“, solange dort etwas liegt; sonst „Alle Artikel“. */
+  function startordner(daten, gemerkt) {
+    if (gemerkt && ordnerGueltig(gemerkt, daten)) return gemerkt;
+    var kx = ordnerKontext(daten);
+    return intelligentZahl(ORDNER_INTELLIGENT[1], kx) > 0 ? 'i:unsortiert' : 'i:alle';
+  }
+  /* Eine Artikelzeile. ortId = Ort des Ordners (oder null). Marken (§11): heute Teigecke, Prüfen, liegt auch in / liegt in. zahl: Platz für Stufe 3. */
+  function ordnerZeile(a, ortId, kx, ohneKategorie) {
+    var marken = [];
+    if (a.teigecke === true) marken.push({ art: 'teigecke' });
+    var p = plausibel(a, kx.km, kx.om);
+    if (p.length) marken.push({ art: 'pruefen', text: p.join(' ') });
+    var orte = (a.orte || []).filter(function (o) { return kx.om[o]; }).map(function (o) { return kx.om[o]; }).sort(nachSort);
+    var andere = orte.filter(function (o) { return o.id !== ortId; }).map(function (o) { return o.name; });
+    if (ortId && andere.length) marken.push({ art: 'auchin', orte: andere });
+    if (!ortId && andere.length) marken.push({ art: 'liegtin', orte: andere });
+    var kat = kx.km[a.kategorieId], l = kx.lm[a.standardLieferantId];
+    var unter = [];
+    if (!ohneKategorie && kat) unter.push(kat.name);
+    var g = gebindeText(a); if (g) unter.push(g);
+    unter.push(zaehlText(a));
+    if (l) unter.push(l.name);
+    return { artikel: a, id: a.id, ortId: ortId || null, marken: marken, unter: unter, zahl: null };
+  }
+  /* Inhalt eines Ordners. opt.sortierung: 'ort' | 'kategorie' (nur „Alle Artikel“).
+     art: 'artikel' (gruppen mit zeilen) · 'orte' (Liste mit ▲▼) · 'liste' (Abschnitt) · 'eigen' (Seite zeichnet selbst) · null (unbekannt) */
+  function ordnerInhalt(sel, daten, opt) {
+    var z = zerlegeOrdner(sel), kx = ordnerKontext(daten), o = opt || {}, liste = o.liste || ORDNER_INTELLIGENT;
+    var nachNameZeilen = function (arr, ohneKat) { return arr.slice().sort(nachName).map(function (a) { return ordnerZeile(a, null, kx, ohneKat); }); };
+    if (!z) return { art: null };
+    if (z.art === 'i') {
+      var e = liste.filter(function (x) { return x.id === z.id; })[0];
+      if (!e) return { art: null };
+      if (e.art === 'eigen') return { art: 'eigen', id: e.id };
+      if (e.art === 'orte') return { art: 'orte', orte: kx.orte.filter(function (x) { return e.filter(x, kx); }).sort(nachSort) };
+      if (e.id === 'alle') {
+        if (o.sortierung === 'kategorie') {
+          return { art: 'artikel', gruppen: nachKategorie(kx.artikel, kx.kategorien).map(function (g) {
+            return { schluessel: g.schluessel, titel: g.titel, kategorieId: g.schluessel === '_ohne' ? null : g.schluessel, zeilen: g.artikel.map(function (a) { return ordnerZeile(a, null, kx, true); }) };
+          }) };
+        }
+        var gr = [];
+        nachStandortUndOrt(kx.artikel, kx.orte, kx.standorte).forEach(function (sg) {
+          sg.gruppen.forEach(function (g) {
+            var oid = g.schluessel === '_ohne' ? null : g.schluessel;
+            gr.push({ schluessel: g.schluessel, titel: g.titel, standortTitel: sg.titel || '', ortId: oid, zeilen: g.artikel.map(function (a) { return ordnerZeile(a, oid, kx); }) });
+          });
+        });
+        return { art: 'artikel', gruppen: gr };
+      }
+      return { art: 'artikel', gruppen: [{ schluessel: e.id, titel: '', zeilen: nachNameZeilen(kx.artikel.filter(function (a) { return e.filter(a, kx); })) }] };
+    }
+    if (z.art === 'a') return ORDNER_SPALTEN.indexOf(z.id) !== -1 ? { art: 'liste', col: COL[z.id] } : { art: null };
+    if (z.art === 's') return kx.sm[z.id] ? { art: 'orte', standortId: z.id, orte: kx.orte.filter(function (x) { return x.standortId === z.id; }).sort(nachSort) } : { art: null };
+    if (z.art === 't') {
+      var to = kx.orte.filter(function (x) { return x.standortId === z.id && tempVon(x) === z.temperatur; }).sort(nachSort);
+      return { art: 'artikel', gesamt: true, gruppen: to.map(function (x) {
+        return { schluessel: x.id, titel: x.name, ortId: x.id, zeilen: artikelInFolge(x, artikelAmOrt(x.id, kx.artikel)).map(function (a) { return ordnerZeile(a, x.id, kx); }) };
+      }) };
+    }
+    if (z.art === 'o') {
+      var ort = kx.om[z.id]; if (!ort) return { art: null };
+      return { art: 'artikel', ortId: ort.id, gruppen: [{ schluessel: ort.id, titel: '', ortId: ort.id, zeilen: artikelInFolge(ort, artikelAmOrt(ort.id, kx.artikel)).map(function (a) { return ordnerZeile(a, ort.id, kx); }) }] };
+    }
+    if (z.art === 'k') return kx.km[z.id] ? { art: 'artikel', kategorieId: z.id, gruppen: [{ schluessel: z.id, titel: '', zeilen: nachNameZeilen(artikelDerKategorie(z.id, kx.artikel), true) }] } : { art: null };
+    if (z.art === 'l') return kx.lm[z.id] ? { art: 'artikel', lieferantId: z.id, gruppen: [{ schluessel: z.id, titel: '', zeilen: nachNameZeilen(artikelDesLieferanten(z.id, kx.artikel)) }] } : { art: null };
+    return { art: null };
+  }
+  /* A19: Reihenfolge für ‹ › — jeder Artikel nur einmal, beim ersten Vorkommen. */
+  function blaetterIds(inhalt) {
+    var ids = [];
+    ((inhalt && inhalt.gruppen) || []).forEach(function (g) { (g.zeilen || []).forEach(function (z) { if (ids.indexOf(z.id) === -1) ids.push(z.id); }); });
+    return ids;
+  }
+  /* Pfad eines Ordners: [{ id, name } | { id, schluessel, zeichen }] — von außen nach innen. */
+  function pfad(sel, daten) {
+    var z = zerlegeOrdner(sel), kx = ordnerKontext(daten);
+    if (!z) return [];
+    var stK = function (s) { return { id: 's:' + s.id, name: s.name }; };
+    var tK = function (sid, tp) { return { id: 't:' + sid + ':' + tp, schluessel: 'temp_' + tp, zeichen: TEMP_ZEICHEN[tp] }; };
+    if (z.art === 'i') return [{ id: sel, schluessel: 'ordner_' + z.id }];
+    if (z.art === 'a') return [{ id: sel, schluessel: 'abschnitt_' + z.id }];
+    if (z.art === 's') return kx.sm[z.id] ? [stK(kx.sm[z.id])] : [];
+    if (z.art === 't') return kx.sm[z.id] ? [stK(kx.sm[z.id]), tK(z.id, z.temperatur)] : [];
+    if (z.art === 'o') {
+      var o = kx.om[z.id]; if (!o) return [];
+      var s = kx.sm[o.standortId];
+      return s ? [stK(s), tK(s.id, tempVon(o)), { id: sel, name: o.name }] : [{ id: 'i:orte_ohne', schluessel: 'ordner_orte_ohne' }, { id: sel, name: o.name }];
+    }
+    if (z.art === 'k') return kx.km[z.id] ? [{ id: 'a:kategorien', schluessel: 'abschnitt_kategorien' }, { id: sel, name: kx.km[z.id].name }] : [];
+    if (z.art === 'l') return kx.lm[z.id] ? [{ id: 'a:lieferanten', schluessel: 'abschnitt_lieferanten' }, { id: sel, name: kx.lm[z.id].name }] : [];
+    return [];
+  }
+  /* Wo liegt der Ordner im Baum? Kennungen der Vorfahren (zum Aufklappen). */
+  function vorfahren(sel, daten) {
+    var ids = pfad(sel, daten).map(function (x) { return x.id; }).filter(function (id) { return id !== sel; });
+    if (/^[st]:/.test(sel) || (ids[0] && /^s:/.test(ids[0]))) ids.unshift('a:standorte');
+    return ids;
+  }
+  /* Suche über alles (aktive Einträge). Artikel: Name, Gebinde, Artikelnummern. Ein Artikel an n Orten hat n Pfade. */
+  function sucheUeberAlles(daten, text) {
+    var n = norm(text), kx = ordnerKontext(daten), aus = [];
+    if (!n) return { treffer: [], archiv: 0 };
+    var passt = function (s) { return norm(s).indexOf(n) !== -1; };
+    var artikelPasst = function (a) { return passt(a.name) || passt(a.gebinde) || (istKarte(a.quellen) && Object.keys(a.quellen).some(function (k) { return passt(a.quellen[k]); })); };
+    kx.artikel.filter(artikelPasst).sort(nachName).forEach(function (a) {
+      var orte = (a.orte || []).filter(function (o) { return kx.om[o]; });
+      aus.push({ art: 'artikel', id: a.id, name: a.name, pfade: orte.length ? orte.map(function (o) { return pfad('o:' + o, daten); }) : [[{ id: 'i:unsortiert', schluessel: 'ordner_unsortiert' }]] });
+    });
+    kx.orte.filter(function (o) { return passt(o.name); }).sort(nachName).forEach(function (o) { aus.push({ art: 'ort', id: 'o:' + o.id, name: o.name, pfade: [pfad('o:' + o.id, daten).slice(0, -1)] }); });
+    kx.standorte.filter(function (s) { return passt(s.name); }).sort(nachName).forEach(function (s) { aus.push({ art: 'standort', id: 's:' + s.id, name: s.name, pfade: [[{ id: 'a:standorte', schluessel: 'abschnitt_standorte' }]] }); });
+    kx.kategorien.filter(function (k) { return passt(k.name); }).sort(nachName).forEach(function (k) { aus.push({ art: 'kategorie', id: 'k:' + k.id, name: k.name, pfade: [[{ id: 'a:kategorien', schluessel: 'abschnitt_kategorien' }]] }); });
+    kx.lieferanten.filter(function (l) { return passt(l.name); }).sort(nachName).forEach(function (l) { aus.push({ art: 'lieferant', id: 'l:' + l.id, name: l.name, pfade: [[{ id: 'a:lieferanten', schluessel: 'abschnitt_lieferanten' }]] }); });
+    var archiv = 0, d = daten || {};
+    ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'].forEach(function (k) { archiv += (d[k] || []).filter(function (x) { return x && x.geloescht && passt(x.name); }).length; });
+    return { treffer: aus, archiv: archiv };
+  }
+  /* Archiv: je Sammlung die archivierten Einträge nach Name. */
+  function archivListe(daten) {
+    var d = daten || {};
+    return ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'].map(function (k) {
+      return { col: COL[k], eintraege: (d[k] || []).filter(function (x) { return x && x.geloescht; }).sort(nachName) };
+    }).filter(function (g) { return g.eintraege.length; });
+  }
+  /* Verschieben / Liegt auch hier / Hier entfernen — neue orte-Liste oder { fehler }. Nur das Feld orte ändert sich. */
+  function ortErsetzen(a, alt, neu) {
+    var l = ((a && a.orte) || []).slice();
+    if (!neu || neu === alt) return { fehler: 'gleich' };
+    var i = l.indexOf(alt);
+    if (l.indexOf(neu) !== -1) { if (i !== -1) l.splice(i, 1); return { orte: l }; }   /* liegt dort schon: nur vom alten weg */
+    if (i === -1) { if (l.length >= GRENZEN.orte) return { fehler: 'grenze' }; l.push(neu); return { orte: l }; }
+    l[i] = neu;
+    return { orte: l };
+  }
+  function ortDazu(a, ort) {
+    var l = ((a && a.orte) || []).slice();
+    if (!ort) return { fehler: 'gleich' };
+    if (l.indexOf(ort) !== -1) return { fehler: 'schon' };
+    if (l.length >= GRENZEN.orte) return { fehler: 'grenze' };
+    l.push(ort);
+    return { orte: l };
+  }
+  function ortWeg(a, ort) {
+    var l = ((a && a.orte) || []).slice(), i = l.indexOf(ort);
+    if (i === -1) return { fehler: 'nicht_da' };
+    l.splice(i, 1);
+    return { orte: l };
+  }
+  /* A17: Was sagt die Rückfrage über den gezählten Stand am alten Ort?
+     stand = { wert, tsMs } | null (gelesen im Moment der Handlung). altOrt/neuOrt = Ort-Dokumente (neuOrt null bei „entfernen“). */
+  function standHinweis(stand, jetztMs, altOrt, neuOrt, stunden) {
+    var s = zaehlStatus(stand, jetztMs, stunden);
+    return {
+      imZaehlgang: s.zeichen !== 'offen', wert: s.zeichen !== 'offen' ? s.wert : null,
+      andererStandort: !!(neuOrt && altOrt && (neuOrt.standortId || '') !== (altOrt.standortId || ''))
+    };
+  }
+
   var api = {
     COL: COL, FELDER: FELDER, HERKUNFT: HERKUNFT, GRENZEN: GRENZEN, BEREICHE: BEREICHE, EINHEITEN: EINHEITEN,
     TEMP_ORT: TEMP_ORT, TEMP_KATEGORIE: TEMP_KATEGORIE, BESTELLWEGE: BESTELLWEGE, TAGE: TAGE, TAG_TEXT: TAG_TEXT,
@@ -442,7 +716,12 @@
     standId: standId, standIdZerlegt: standIdZerlegt, startlisteFehlende: startlisteFehlende,
     orteNachStandort: orteNachStandort, nachStandortUndOrt: nachStandortUndOrt, erlaubteStandorte: erlaubteStandorte,
     zaehlliste: zaehlliste, zaehlStatus: zaehlStatus, zaehlungDokument: zaehlungDokument, standDokument: standDokument,
-    wertGueltig: wertGueltig
+    wertGueltig: wertGueltig,
+    /* Ordneransicht (#168) */
+    ORDNER_INTELLIGENT: ORDNER_INTELLIGENT, TEMP_ZEICHEN: TEMP_ZEICHEN, ordnerKontext: ordnerKontext, ordnerBaum: ordnerBaum,
+    zerlegeOrdner: zerlegeOrdner, ordnerGueltig: ordnerGueltig, startordner: startordner, ordnerInhalt: ordnerInhalt, ordnerZeile: ordnerZeile,
+    blaetterIds: blaetterIds, pfad: pfad, vorfahren: vorfahren, sucheUeberAlles: sucheUeberAlles, archivListe: archivListe,
+    ortErsetzen: ortErsetzen, ortDazu: ortDazu, ortWeg: ortWeg, standHinweis: standHinweis, tempVon: tempVon
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_LAGER_LOGIK = api;

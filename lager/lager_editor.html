@@ -7,7 +7,22 @@
   Regel: RK §30/§31 (firestore_regeln_2026-11-11_lager_zaehlen.rules) — lesen jedes Konto, schreiben
          Rolle admin, je Dokument eine Sicherung der Vorversion in lager_sicherungen im selben Vorgang.
          Gezählt wird NICHT hier, sondern auf lager/lager_zaehlen.html (Zählen und Pflegen getrennt).
+  Ansicht: Ordnerbaum (bos_ordnerbaum.js) + Inhalt, seit v3 (Ordneransicht, #168).
   CHANGELOG
+    2026-11-11 · 20:42 · v3 · Feature (Lager Ordneransicht, #120/#168; Bauplan 20:22, Freigabe Kontroll-Chat
+      20:30 mit A16–A19, Ulf 20:29: F1 nein, F2 „Unsortiert“ zuerst)
+      Fünf Reiter und Umschalter-Leiste ersetzt durch Baum + Inhalt (L16): Baum aus LG.ordnerBaum,
+      gezeichnet von bos_ordnerbaum.js; Inhalt aus LG.ordnerInhalt. Intelligente Ordner (Liste in
+      lager_logik.js), Standort → Temperatur (klickbar, Gesamtkühlung) → Lagerort, Kategorien,
+      Lieferanten. Schmal (< 900 px Fensterbreite): Pfad oben klappt den Baum über die Fläche.
+      Ordner und Aufgeklapptes je Gerät gemerkt. Startordner F2. ✎ = Karte, ⋯ = Menü (A16).
+      Artikel-Menü: Karte · Verschieben nach … · Liegt auch hier … · Hier entfernen über den Baum
+      als Auswahl, Schreiben über schreibe() mit Sicherung (kein neuer Weg, Regel gleich); Rückfrage
+      mit gezähltem Stand, gelesen per get im Moment der Handlung (A17). ‹ › ohne Doppelte (A19).
+      Suche über alles mit Pfad. Statuszähler öffnen ihre Ordner. Regelstand nicht prüfbar → Satz
+      mit Grund (A12). Neu mit Vorgaben aus dem Ordner. Karten, Speichern, Übernahme, Archivsperren
+      unverändert. Hilfe neu (Doku gleich).
+      lager/_protokolle/SESSION_2026-11-11_LAGER_ORDNERANSICHT_BAU.md
     2026-11-11 · 06:52 · v2 · Feature (Lager Stufe 2, #120; Freigabe Kontroll-Chat 11.11. 06:43 mit A9–A11,
       Ulfs Antworten und Kern-Freigabe 06:41)
       Neuer Reiter „Standorte“ (lager_standorte, Pflege Rolle admin, Archivsperre solange aktive
@@ -40,6 +55,7 @@
 <!-- MUSS vor bos_design_tokens.css stehen (Theme + Farbprofil des Kontos) -->
 <script src="../bos_theme_sync.js"></script>
 <link rel="stylesheet" href="../bos_design_tokens.css">
+<link rel="stylesheet" href="../bos_ordnerbaum.css">
 <style>
   :root {
     --bg: var(--bos-bg, #16120e);
@@ -71,11 +87,6 @@
   .toolbar .sep { width: 1px; height: 24px; background: var(--border); }
   #suchfeld { font-family: var(--font); font-size: .85rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 9px 10px; width: 190px; min-height: 40px; }
   #statusBar { font-size: .75rem; color: var(--dim); margin-left: auto; }
-  .tab-leiste { display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border); }
-  .tab-leiste::-webkit-scrollbar { display: none; }
-  .tab-btn { font-family: var(--font); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 8px 13px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--dim); white-space: nowrap; cursor: pointer; flex-shrink: 0; min-height: 40px; }
-  .tab-btn .anzahl { color: var(--amber); font-size: .72rem; }
-  .tab-btn.aktiv { border-color: var(--amber); color: var(--text); box-shadow: inset 0 -3px 0 var(--amber); }
   #fehlerLeiste { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid var(--red); border-radius: 8px; font-size: .82rem; line-height: 1.45; }
   #fehlerLeiste ul { margin: 6px 0 0 18px; }
   #fehlerLeiste .kopf { display: flex; justify-content: space-between; font-weight: 700; color: var(--red); }
@@ -158,6 +169,43 @@
   .ue-inhalt { overflow-y: auto; padding: 4px 22px 10px; font-size: .86rem; line-height: 1.45; flex: 1; }
   .ue-fuss { padding: 12px 22px 18px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); }
   #ueStatus { flex-basis: 100%; font-size: .82rem; }
+  /* ---------- Ordneransicht (#168): Baum + Inhalt. Grenze 900 px Fensterbreite (= BREIT_AB_PX im Skript) ---------- */
+  .pfad-btn { display: none; flex: 1 1 100%; justify-content: flex-start; text-transform: none; letter-spacing: 0; font-size: .9rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #baumSpalte { display: none; background: var(--surface); }
+  .baum-kopf { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  #statusBar .status-link { background: none; border: 0; color: var(--dim); font: inherit; font-size: .75rem; text-decoration: underline dotted; cursor: pointer; padding: 6px 0; min-height: 32px; }
+  @media (max-width: 899.98px) {
+    .pfad-btn { display: inline-flex; }
+    body.baum-offen #baumSpalte { display: block; position: fixed; inset: 0; z-index: 40; overflow-y: auto; }
+  }
+  @media (min-width: 900px) {
+    .lager-rahmen { display: grid; grid-template-columns: 290px minmax(0, 1fr); align-items: start; }
+    #baumSpalte { display: block; position: sticky; top: 64px; max-height: calc(100vh - 64px); overflow-y: auto; border-right: 1px solid var(--border); }
+    .baum-kopf { display: none; }
+  }
+  .inhalt-kopf { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 6px; }
+  .pfad { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; min-width: 0; }
+  .pfad-teil { background: none; border: 0; color: var(--dim); font: inherit; font-size: .85rem; cursor: pointer; padding: 8px 2px; min-height: 40px; }
+  .pfad-sep { color: var(--faint); }
+  .pfad-ende { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.15rem; }
+  .inhalt-aktionen { display: flex; flex-wrap: wrap; gap: 6px; }
+  .inhalt-hinweis { padding: 0 14px 8px; color: var(--dim); font-size: .8rem; line-height: 1.4; }
+  .gruppe-link { background: none; border: 0; color: inherit; cursor: pointer; padding: 0; text-align: left; }
+  .gruppe-link h2 { text-decoration: underline dotted; text-underline-offset: 4px; }
+  .zeilen { border-top: 1px solid var(--border); }
+  .zeile { display: flex; align-items: center; gap: 8px; padding: 8px 6px 8px 14px; border-bottom: 1px solid var(--border); cursor: pointer; min-height: 52px; }
+  .zeile:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+  .zeile.archiviert { opacity: .5; }
+  .zeile-haupt { flex: 1 1 auto; min-width: 0; }
+  .zeile-name { font-size: .92rem; font-weight: 600; line-height: 1.5; }
+  .zeile-name .etikett { margin: 2px 0 2px 6px; }
+  .zeile-unter { font-size: .76rem; color: var(--dim); line-height: 1.35; overflow-wrap: anywhere; }
+  .zeile-zahl { flex: 0 0 auto; min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .zeile-zahl:empty { min-width: 0; }
+  .zeile-menue { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font-size: 1.1rem; cursor: pointer; }
+  .marke-auch { text-transform: none; letter-spacing: 0; }
+  .menue-sheet .menue-punkt { display: block; width: 100%; margin: 0 0 8px; text-align: left; text-transform: none; letter-spacing: 0; font-size: .95rem; min-height: 48px; }
+  .auswahl-sheet #auswahlBaum { margin: 6px -20px 12px; border-top: 1px solid var(--border); }
   #toast { position: fixed; bottom: 18px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; background: var(--raised); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: .85rem; z-index: 90; text-align: center; }
   @media (max-width: 560px) {
     .quelle-zeile { grid-template-columns: 1fr 1fr; }
@@ -192,15 +240,18 @@
 </div>
 
 <div class="toolbar">
+  <button type="button" class="btn btn-outline pfad-btn" id="pfadBtn" data-aktion="baum-auf" aria-expanded="false" aria-controls="baumSpalte">—</button>
   <button type="button" class="btn btn-outline" data-aktion="neu-laden" data-i18n="neu_laden">↻ Neu laden</button>
   <input type="search" id="suchfeld" autocomplete="off" aria-label="Suchen">
-  <span id="umschalter"></span>
-  <span class="sep"></span>
-  <button type="button" class="btn btn-amber" id="neuBtn" data-aktion="neu">＋</button>
   <span id="statusBar">—</span>
 </div>
-<div id="tabLeiste" class="tab-leiste"></div>
-<main id="inhalt"><div class="leer" data-i18n="lade">Lade Daten …</div></main>
+<div class="lager-rahmen">
+  <nav id="baumSpalte" aria-label="Ordner">
+    <div class="baum-kopf"><span data-i18n="baum_titel">Ordner</span><button type="button" class="karte-close" data-aktion="baum-zu" aria-label="Schließen">✕</button></div>
+    <div id="baum"></div>
+  </nav>
+  <main id="inhalt"><div class="leer" data-i18n="lade">Lade Daten …</div></main>
+</div>
 
 <div id="karteOverlay" class="sheet-overlay hidden">
   <div class="karte-sheet" role="dialog" aria-modal="true" aria-labelledby="karteName">
@@ -241,6 +292,23 @@
     <button type="button" class="btn btn-outline" id="helpCloseBtn" data-i18n="schliessen">Schließen</button>
   </div>
 </div>
+<div id="menueOverlay" class="sheet-overlay hidden">
+  <div class="sheet menue-sheet" role="dialog" aria-modal="true" aria-labelledby="menueTitel">
+    <div class="sheet-handle"></div>
+    <h2 id="menueTitel"></h2>
+    <div id="menueInhalt"></div>
+    <button type="button" class="btn btn-outline" data-aktion="menue-zu" data-i18n="abbrechen">Abbrechen</button>
+  </div>
+</div>
+<div id="auswahlOverlay" class="sheet-overlay hidden">
+  <div class="sheet auswahl-sheet" role="dialog" aria-modal="true" aria-labelledby="auswahlTitel">
+    <div class="sheet-handle"></div>
+    <h2 id="auswahlTitel"></h2>
+    <div id="auswahlHinweis" class="inhalt-hinweis"></div>
+    <div id="auswahlBaum"></div>
+    <button type="button" class="btn btn-outline" data-aktion="auswahl-zu" data-i18n="abbrechen">Abbrechen</button>
+  </div>
+</div>
 <div id="toast" class="hidden" role="status"></div>
 <datalist id="gebindeVorschlaege"></datalist>
 
@@ -250,6 +318,7 @@
 <script src="../bos_firebase_config.js"></script>
 <script src="../bos_produkte.js"></script>
 <script src="lager_logik.js"></script>
+<script src="../bos_ordnerbaum.js"></script>
 <script src="../bos_ungespeichert.js"></script>
 
 <script>
@@ -266,30 +335,54 @@ const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
 const REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SCHREIB_ZEITLIMIT_MS = 20000;
 const SPEICHER_SORTIERUNG = 'bos_lager_sortierung';
+const SPEICHER_ORDNER = 'bos_lager_ordner';          /* Ordneransicht: zuletzt gewählter Ordner je Gerät */
+const SPEICHER_OFFEN = 'bos_lager_baum_offen';      /* Ordneransicht: aufgeklappte Ordner je Gerät */
+const BREIT_AB_PX = 900;                              /* ab dieser Fensterbreite Baum und Inhalt nebeneinander (= CSS @media) */
 
 /* ---------- i18n (Checkliste §6) ---------- */
 const I18N_DE = {
   titel: 'Lager', untertitel: 'Artikel, Lagerorte, Standorte, Kategorien, Lieferanten', lade: 'Lade Daten …',
   fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen', neu_laden: '↻ Neu laden',
-  suche: 'Suchen …',
-  reiter_artikel: 'Artikel', reiter_orte: 'Lagerorte', reiter_standorte: 'Standorte', reiter_kategorien: 'Kategorien', reiter_lieferanten: 'Lieferanten',
-  reiter_uebernahme: 'Aus der Teigecke übernehmen',
+  suche: 'Suchen in allem …',
+  baum_titel: 'Ordner', ordner_waehlen: 'Ordner wählen', pfad_suche: 'Suche: „{text}“',
+  ordner_alle: 'Alle Artikel', ordner_unsortiert: 'Unsortiert', ordner_pruefen: 'Prüfen', ordner_ohne_kat: 'Ohne Kategorie', ordner_ohne_ber: 'Bereich offen',
+  ordner_orte_ohne: 'Lagerorte ohne Standort', ordner_uebernahme: 'Aus der Teigecke übernehmen', ordner_teigecke: 'Teigecke', ordner_archiv: 'Archiv',
+  abschnitt_standorte: 'Standorte', abschnitt_kategorien: 'Kategorien', abschnitt_lieferanten: 'Lieferanten',
+  hinzu_standort: 'Standort anlegen', hinzu_ort: 'Lagerort', hinzu_kategorie: 'Kategorie anlegen', hinzu_lieferant: 'Lieferant anlegen',
+  ob_karte: 'Karte öffnen', ob_auf: 'Aufklappen', ob_zu: 'Zuklappen', ob_markiert: 'liegt hier schon', ob_leer: 'Nichts da.',
+  karte_oeffnen: '✎ Karte', reihenfolge_aendern: 'Reihenfolge ändern',
+  gesamt_hinweis: 'Alle Lagerorte dieser Temperatur an diesem Standort, nach Ort. Einen Ort antippen öffnet ihn.',
+  rundgang_hinweis: 'Die Lagerorte dieses Standorts in der Reihenfolge des Rundgangs (so stehen sie auch beim Zählen). Antippen öffnet den Ort, ✎ seine Karte.',
+  orte_ohne_hinweis: 'An diesen Lagerorten kann nicht gezählt werden, bis sie einen Standort haben (✎ → Standort).',
+  leer_ordner: 'Hier ist nichts.', leer_ort_artikel: 'Hier liegt noch nichts.', leer_standort_orte: 'Hier gibt es noch keine Lagerorte.',
+  leer_unsortiert: 'Alle Artikel haben einen festen Lagerort.', aus_unsortiert: 'Aus „Unsortiert“ holen …', leer_archiv: 'Das Archiv ist leer.',
+  marke_auch_in: '⇄ liegt auch in {orte}', marke_auch_in_mehr: '⇄ liegt auch in {ort} und {n} weiteren', marke_liegt_in: '⇄ liegt in {orte}', marke_liegt_in_mehr: '⇄ liegt in {ort} und {n} weiteren',
+  menue_aria: 'Mehr zu {name}', menue_karte: '✎ Karte öffnen', menue_verschieben: 'Verschieben nach …', menue_dazu: 'Liegt auch hier …', menue_weg: 'Hier entfernen', abbrechen: 'Abbrechen',
+  auswahl_verschieben: 'Verschieben nach …', auswahl_dazu: 'Liegt auch hier …',
+  auswahl_hinweis_verschieben: '„{name}“ liegt in {ort}. Wohin damit? ✓ = liegt dort schon.', auswahl_hinweis_dazu: 'Wo liegt „{name}“ noch? ✓ = liegt dort schon.',
+  verschoben: '✓ {name} liegt jetzt in {ort}', dazu_ok: '✓ {name} liegt jetzt auch in {ort}', weg_ok: '✓ {name} liegt nicht mehr in {ort}',
+  verschieben_frage: '„{name}“ von {von} nach {nach} verschieben?', weg_frage: '„{name}“ aus {ort} entfernen?', weg_unsortiert: ' Er liegt dann nirgends mehr fest und steht unter „Unsortiert“.',
+  stand_gezaehlt: ' Gezählt wurde er in {ort} zuletzt mit {wert}. Diese Zählung bleibt beim alten Ort.', stand_neu: ' In {ort} ist er noch nicht gezählt.',
+  stand_anderer: ' Achtung: {ort} liegt an einem anderen Standort ({nach} statt {von}).', stand_unbekannt: ' Ob er dort schon gezählt ist, ließ sich nicht prüfen ({grund}). Es geht trotzdem.',
+  err_orte: 'Lagerorte ändern', orte_grenze: 'Höchstens {n} feste Lagerorte je Artikel.', orte_schon: 'Der Artikel liegt dort schon.', orte_gleich: 'Das ist derselbe Ort.', orte_nicht_da: 'Der Artikel liegt dort nicht (mehr).',
+  err_baum: 'Baum bauen', baum_kaputt: 'Der Baum ließ sich nicht darstellen (die Meldung steht im roten Kasten). Weiter geht es hier über „Alle Artikel“, die Zähler unten und die Suche.',
+  archiv_lager_artikel: 'Artikel', archiv_lager_orte: 'Lagerorte', archiv_lager_standorte: 'Standorte', archiv_lager_kategorien: 'Kategorien', archiv_lager_lieferanten: 'Lieferanten',
+  suche_archiv: '{n} Treffer im Archiv →', suche_art_ort: 'Lagerort', suche_art_standort: 'Standort', suche_art_kategorie: 'Kategorie', suche_art_lieferant: 'Lieferant',
+  regel_unbekannt: 'Regelstand „{fassung}“ ließ sich nicht prüfen (wohl kein Netz). Was die Datenbank ablehnt, steht dann im roten Kasten. [{grund}]',
   nach_ort: 'nach Ort', nach_kategorie: 'nach Kategorie',
   neu_artikel: '＋ Artikel', neu_ort: '＋ Lagerort', neu_standort: '＋ Standort', neu_kategorie: '＋ Kategorie', neu_lieferant: '＋ Lieferant',
   startliste_kategorien: 'Startliste anlegen ({n} Kategorien)',
   startliste_frage: '{n} Einträge anlegen: {liste}. Später jederzeit umbenennen oder ergänzen.',
   startliste_fertig: '✓ {n} angelegt',
-  sp_name: 'Name', sp_kategorie: 'Kategorie', sp_orte: 'Lagerorte', sp_gebinde: 'Gebinde', sp_zaehlart: 'Zählart', sp_lieferant: 'Standard-Lieferant',
-  sp_temperatur: 'Temperatur', sp_reihenfolge: 'Reihenfolge', sp_artikel: 'Artikel', sp_lagerorte: 'Lagerorte', sp_liefertage: 'Liefertage (bestellen bis)', sp_bestellweg: 'Bestellweg',
-  ohne_kategorie: 'Noch ohne Kategorie', ohne_ort: 'Ohne festen Ort', ohne_standort: 'Noch ohne Standort', bereich_offen: 'Bereich offen',
+  sp_name: 'Name', sp_temperatur: 'Temperatur', sp_reihenfolge: 'Reihenfolge', sp_artikel: 'Artikel', sp_lagerorte: 'Lagerorte', sp_liefertage: 'Liefertage (bestellen bis)', sp_bestellweg: 'Bestellweg',
+  ohne_kategorie: 'Noch ohne Kategorie', ohne_standort: 'Noch ohne Standort', bereich_offen: 'Bereich offen',
   leer_artikel: 'Noch keine Artikel. Mit „＋ Artikel“ den ersten anlegen.',
-  leer_ort: 'Noch keine Lagerorte. Mit „＋ Lagerort“ den ersten anlegen.',
-  leer_standort: 'Noch keine Standorte. Mit „＋ Standort“ anlegen, zum Beispiel einen je Gebäude.',
+    leer_standort: 'Noch keine Standorte. Mit „＋ Standort“ anlegen, zum Beispiel einen je Gebäude.',
   leer_kategorie: 'Noch keine Kategorien. „Startliste anlegen“ legt die aus dem Konzept an, die noch fehlen.',
   leer_lieferant: 'Noch keine Lieferanten. Mit „＋ Lieferant“ anlegen.',
   leer_suche: 'Keine Treffer für „{text}“.',
   gruppe_leer: 'noch nichts',
-  archiv_zeigen: 'Archiv zeigen ({n})', archiv_verbergen: 'Archiv verbergen', archiviert_et: 'archiviert',
+  archiviert_et: 'archiviert',
   teigecke_et: 'Teigecke', plaus_et: '⚠︎ Lagerort',
   temp_ungekuehlt: 'ungekühlt', temp_gekuehlt: 'gekühlt', temp_tk: 'TK', temp_egal: 'egal',
   bereich_: '— offen —', bereich_baeckerei: 'Bäckerei', bereich_konditorei: 'Konditorei', bereich_beide: 'beide',
@@ -303,10 +396,10 @@ const I18N_DE = {
   f_gebinde: 'Gebinde', f_gebinde_hilfe: 'Was du beim Zählen in der Hand hast: Sack, Karton, Eimer … Freier Text, Vorschläge beim Tippen.',
   f_inhalt: 'Inhalt je Gebinde', f_inhalt_hilfe: 'Was in einem Gebinde drin ist, z. B. 25 kg oder 180 Stück. Freiwillig.',
   f_orte: 'Feste Lagerorte', f_orte_hilfe: 'Wo der Vorrat fest hingehört — einer, mehrere oder keiner. Liegt etwas nur zeitweise woanders (Angebotsware), kommt das später beim Zählen dazu.',
-  f_orte_keine: 'Noch keine Lagerorte angelegt (Reiter Lagerorte).',
+  f_orte_keine: 'Noch keine Lagerorte angelegt (im Baum unter einem Standort „＋ Lagerort“).',
   f_zaehlart: 'Zählart', f_zaehl_zahl: 'Zahlenfeld', f_zaehl_raster: 'Raster bis', f_zaehl_hilfe: 'Für die Seite „Lager zählen“: Raster zum Antippen, z. B. bis 24 Säcke auf der Palette, mit Knopf „voll“. Ein Zahlenfeld gibt es immer zusätzlich.',
   f_quellen: 'Lieferanten', f_quellen_hilfe: 'Von wem der Artikel kommt, mit dessen Artikelnummer. Einer ist der Standard.',
-  f_quellen_keine: 'Noch keine Lieferanten angelegt (Reiter Lieferanten).', f_quelle_dazu: '＋ Lieferant dazu', f_artikelnr: 'Artikelnummer', f_standard: 'Standard',
+  f_quellen_keine: 'Noch keine Lieferanten angelegt (im Baum bei „Lieferanten“ ＋).', f_quelle_dazu: '＋ Lieferant dazu', f_artikelnr: 'Artikelnummer', f_standard: 'Standard',
   f_liefertage_std: 'Liefertage des Standard-Lieferanten (nur zum Lesen, gepflegt am Lieferanten)', f_kein_standard: 'Kein Standard-Lieferant gewählt.',
   f_teigecke: 'In der Teigecke handverwogen', f_teigecke_hilfe: 'Nur dann sieht die Teigecke den Artikel: in der Rezept-Auswahl, auf „Orte“ und im BrotTeigRechner.',
   f_gruppe: 'Gruppe in der Teigecke', f_gruppe_hilfe: 'Sortiert die Rezept-Auswahl und die Mehl-Regel. „Silo“ heißt: dosiert WinBack, braucht kein Zuhause, steht nie auf der Einsammelliste.',
@@ -358,7 +451,9 @@ const S = {
   kennung: null, istAdmin: false, geladen: false, regelstand: 'unbekannt',
   artikel: [], orte: [], standorte: [], kategorien: [], lieferanten: [],
   blaetter: [], teigeckeOrte: [], teige: [], produkte: [],
-  ansicht: 'artikel', sortierung: 'ort', suche: '', zeigeArchiv: false,
+  sortierung: 'ort', suche: '',
+  ordner: null, inhalt: null, suchIds: [], baum: null, baumKnoten: [], baumFehler: '', baumOffen: false, menue: null, auswahl: null, auswahlBaum: null,
+  da: { artikel: false, orte: false, standorte: false, kategorien: false, lieferanten: false },
   karte: null,   /* { col, id (null = neu), roh, entwurf, reiter, ids, geaendert } */
   speichertGerade: false, ue: null,
   verbindung: { offline: false }
@@ -448,6 +543,7 @@ function abo(col, ziel) {
   return window.db.collection(col).onSnapshot({ includeMetadataChanges: true }, function (snap) {
     S.verbindung.offline = !!snap.metadata.fromCache && !navigator.onLine;
     S[ziel] = mitId(snap);
+    if (S.da[ziel] === false) S.da[ziel] = true;
     planeRender();
   }, function (err) { zeigeFehler(t('err_laden', { was: col }), err); });
 }
@@ -463,14 +559,22 @@ async function ladeProdukte() {
 }
 async function pruefeRegelstand() {
   try { await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }); S.regelstand = 'passt'; }
-  catch (err) { S.regelstand = err && err.code === 'permission-denied' ? 'alt' : 'unbekannt'; if (S.regelstand === 'unbekannt') console.warn('[Lager] Regelstand nicht prüfbar:', err && err.message); }
+  catch (err) {
+    S.regelstand = err && err.code === 'permission-denied' ? 'alt' : 'unbekannt';
+    /* A12: der Grund steht sichtbar in der Leiste (wie auf der Zählseite), console.warn zusätzlich */
+    if (S.regelstand === 'unbekannt') { console.warn('[Lager] Regelstand nicht prüfbar:', err && err.message); S.regelGrund = (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)); }
+  }
   const el = document.getElementById('regelLeiste');
-  el.textContent = t('regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
-  el.classList.toggle('hidden', S.regelstand !== 'alt');
+  el.textContent = S.regelstand === 'unbekannt' ? t('regel_unbekannt', { fassung: REGEL_FASSUNG, grund: S.regelGrund || '' }) : t('regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
+  el.classList.toggle('hidden', S.regelstand === 'passt');
 }
 async function start() {
   wendeI18nAn(); renderHilfe();
   document.getElementById('suchfeld').placeholder = t('suche');
+  S.baum = BOS_ORDNERBAUM.erzeuge({ wurzel: document.getElementById('baum'), t: function (k, w) { return I18N_DE[k] !== undefined ? t(k, w) : null; },
+    knoten: function () { return S.baumKnoten; }, gewaehlt: function () { return S.suche.trim() ? null : S.ordner; }, offen: gemerkteOffen(),
+    beiWahl: waehleOrdner, beiKarte: karteZuOrdner, beiHinzu: hinzuAmOrdner, hinzuGesperrt: sperrGrund,
+    beiUmschalten: function (id, auf, alle) { merke(SPEICHER_OFFEN, JSON.stringify(alle)); } });
   document.getElementById('gebindeVorschlaege').innerHTML = LG.GEBINDE_VORSCHLAEGE.map(function (g) { return '<option value="' + esc(g) + '">'; }).join('');
   if (!window.db || !window.BOS_AUTH_READY) { zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt')); return; }
   let nutzer = null;
@@ -493,148 +597,167 @@ async function start() {
 window.addEventListener('online', function () { planeRender(); });
 window.addEventListener('offline', function () { planeRender(); });
 
-/* ---------- Rendern ---------- */
+/* ---------- Rendern: Baum + Inhalt (Ordneransicht, #168, L16) ----------
+   Der Baum kommt aus LG.ordnerBaum (berechnet, nichts gespeichert), gezeichnet vom
+   gemeinsamen Baustein bos_ordnerbaum.js. Der Inhalt kommt aus LG.ordnerInhalt.
+   EIN ZEICHEN, EIN VERHALTEN (A16): ✎ öffnet überall direkt eine Karte, ⋯ öffnet überall ein Menü. */
 let renderGeplant = false;
 function planeRender() { if (renderGeplant) return; renderGeplant = true; requestAnimationFrame(function () { renderGeplant = false; render(); }); }
 function km() { return LG.nachId(S.kategorien); }
 function omap() { return LG.nachId(S.orte); }
 function lm() { return LG.nachId(S.lieferanten); }
 function kandidaten() { return LG.uebernahmeKandidaten(S.blaetter, S.artikel); }
-/* ALLE Einträge einer Sammlung, das Archiv eingeschlossen (hieß bis Stufe 1 irreführend alleEintraege(), B16).
+/* ALLE Einträge einer Sammlung, das Archiv eingeschlossen (hieß bis Stufe 1 irreführend aktiveListe(), B16).
    Nur aktive: LG.aktiv(alleEintraege(col)). */
 function alleEintraege(col) { return S[nameVon(col)]; }
 function nameVon(col) { return { lager_artikel: 'artikel', lager_orte: 'orte', lager_standorte: 'standorte', lager_kategorien: 'kategorien', lager_lieferanten: 'lieferanten' }[col]; }
-function colVon(ansicht) { return { artikel: COL.artikel, orte: COL.orte, standorte: COL.standorte, kategorien: COL.kategorien, lieferanten: COL.lieferanten }[ansicht]; }
 function smap() { return LG.nachId(S.standorte); }
 /* Gruppe eines Lagerorts für ▲▼: sein aktiver Standort, sonst „ohne“ */
 function ortGruppe(o) { const st = smap()[o.standortId]; return st && !st.geloescht ? o.standortId : '_ohne'; }
 function fokusIn(el) { const a = document.activeElement; return !!(a && el && el.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }
+function daten() { return { artikel: S.artikel, orte: S.orte, standorte: S.standorte, kategorien: S.kategorien, lieferanten: S.lieferanten, kandidaten: kandidaten().length }; }
+function alleDa() { return ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'].every(function (k) { return S.da[k]; }); }
+function teilText(x) { return (x.zeichen ? x.zeichen + ' ' : '') + (x.name != null ? x.name : t(x.schluessel, x.werte)); }
+function pfadText(p) { return (p || []).map(teilText).join(' › '); }
+/* ---------- Merken je Gerät (try/catch: Speicher kann gesperrt sein) ---------- */
+function lies(schluessel) { try { return localStorage.getItem(schluessel); } catch (e) { return null; } }
+function merke(schluessel, wert) { try { localStorage.setItem(schluessel, wert); } catch (e) { console.warn('[Lager] Merken nicht möglich:', e && e.message); } }
+function gemerkteOffen() { try { const a = JSON.parse(lies(SPEICHER_OFFEN) || '[]'); return Array.isArray(a) ? a.filter(function (x) { return typeof x === 'string'; }) : []; } catch (e) { return []; } }
+/* ---------- schmal / breit (Fensterbreite, nicht Gerät: im Launcher läuft die Seite in einem iframe) ---------- */
+const BREIT = window.matchMedia ? window.matchMedia('(min-width: ' + BREIT_AB_PX + 'px)') : null;
+function istBreit() { return !BREIT || BREIT.matches; }
+function setzeBaumOffen(auf) {
+  S.baumOffen = !!auf && !istBreit();
+  document.body.classList.toggle('baum-offen', S.baumOffen);
+  const b = document.getElementById('pfadBtn'); if (b) b.setAttribute('aria-expanded', String(S.baumOffen));
+  if (S.baumOffen && S.ordner) S.baum.scrolleZu(S.ordner);
+}
+if (BREIT) { const f = function () { if (istBreit()) setzeBaumOffen(false); planeRender(); }; if (BREIT.addEventListener) BREIT.addEventListener('change', f); else if (BREIT.addListener) BREIT.addListener(f); }
+
+/* ---------- Baum ---------- */
+function wandle(liste) {
+  return (liste || []).map(function (k) {
+    return { id: k.id, name: k.name != null ? k.name : t(k.schluessel, k.werte), zeichen: k.zeichen, zahl: k.zahl, art: k.art,
+      mitKarte: !!k.mitKarte, hinzu: k.hinzu ? t(k.hinzu) : null, hinzuAls: k.art === 'standort' ? 'zeile' : 'knopf', kinder: wandle(k.kinder) };
+  });
+}
+function renderBaum() {
+  try { S.baumKnoten = wandle(LG.ordnerBaum(daten())); S.baumFehler = ''; }
+  catch (err) { if (!S.baumFehler) { zeigeFehler(t('err_baum'), err); S.ordner = 'i:alle'; } S.baumFehler = (err && err.message) || String(err); S.baumKnoten = []; }
+  S.baum.zeichne();
+}
+function waehleOrdner(id) {
+  if (id === 'x:startliste') { legeStartlisteAn(COL.kategorien); return; }
+  S.ordner = id;
+  merke(SPEICHER_ORDNER, id);
+  if (S.suche) { S.suche = ''; document.getElementById('suchfeld').value = ''; }
+  S.baum.klappeAuf(LG.vorfahren(id, daten()));
+  setzeBaumOffen(false);
+  render();
+  document.getElementById('inhalt').scrollTop = 0;
+}
+const KARTEN_COL = { s: 'lager_standorte', o: 'lager_orte', k: 'lager_kategorien', l: 'lager_lieferanten' };
+function karteZuOrdner(id) { const z = LG.zerlegeOrdner(id); if (z && KARTEN_COL[z.art]) oeffneKarte(KARTEN_COL[z.art], z.id); }
+function hinzuAmOrdner(id) {
+  const z = LG.zerlegeOrdner(id); if (!z) return;
+  if (z.art === 'a') oeffneKarte(COL[z.id], null);
+  else if (z.art === 's') oeffneKarte(COL.orte, null, { vorgabe: { standortId: z.id } });
+}
 function render() {
   if (!S.geladen) return;
-  renderTabs();
-  renderUmschalter();
-  const neu = document.getElementById('neuBtn');
-  neu.textContent = t({ artikel: 'neu_artikel', orte: 'neu_ort', standorte: 'neu_standort', kategorien: 'neu_kategorie', lieferanten: 'neu_lieferant' }[S.ansicht] || 'neu_artikel');
-  neu.disabled = !!sperrGrund() || S.ansicht === 'uebernahme';
-  if (!fokusIn(document.getElementById('inhalt'))) {
-    if (S.ansicht === 'artikel') renderArtikel();
-    else if (S.ansicht === 'uebernahme') renderUebernahmeReiter();
-    else renderListe(S.ansicht);
-  }
+  if (!S.ordner && alleDa()) { S.ordner = LG.startordner(daten(), lies(SPEICHER_ORDNER)); S.baum.klappeAuf(LG.vorfahren(S.ordner, daten())); }
+  else if (S.ordner && alleDa() && !LG.ordnerGueltig(S.ordner, daten())) S.ordner = LG.startordner(daten(), null);
+  renderBaum();
+  renderPfadKnopf();
+  if (!fokusIn(document.getElementById('inhalt'))) renderInhalt();
   renderStatus();
   if (S.karte && !document.getElementById('karteOverlay').classList.contains('hidden')) aktualisiereKarteKopf();
 }
-function renderTabs() {
-  const n = kandidaten().length;
-  const reiter = ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'].concat(n ? ['uebernahme'] : []);
-  if (!n && S.ansicht === 'uebernahme') S.ansicht = 'artikel';
-  const anzahl = { artikel: LG.aktiv(S.artikel).length, orte: LG.aktiv(S.orte).length, standorte: LG.aktiv(S.standorte).length, kategorien: LG.aktiv(S.kategorien).length, lieferanten: LG.aktiv(S.lieferanten).length, uebernahme: n };
-  document.getElementById('tabLeiste').innerHTML = reiter.map(function (r) {
-    return '<button type="button" class="tab-btn' + (S.ansicht === r ? ' aktiv' : '') + '" data-aktion="ansicht" data-wert="' + r + '">' + esc(t('reiter_' + r)) + ' <span class="anzahl">[' + anzahl[r] + ']</span></button>';
-  }).join('');
-}
-function renderUmschalter() {
-  const el = document.getElementById('umschalter');
-  el.innerHTML = S.ansicht !== 'artikel' ? '' : ['ort', 'kategorie'].map(function (w) {
-    return '<button type="button" class="btn btn-outline' + (S.sortierung === w ? ' aktiv' : '') + '" data-aktion="sortierung" data-wert="' + w + '" aria-pressed="' + (S.sortierung === w) + '">' + esc(t('nach_' + w)) + '</button>';
-  }).join(' ');
-  document.getElementById('suchfeld').classList.toggle('hidden', S.ansicht !== 'artikel');
+function renderPfadKnopf() {
+  const b = document.getElementById('pfadBtn');
+  b.textContent = (S.suche.trim() ? t('pfad_suche', { text: S.suche.trim() }) : (S.ordner ? pfadText(LG.pfad(S.ordner, daten())) : t('ordner_waehlen'))) + ' ▾';
 }
 function renderStatus() {
   const akt = LG.aktiv(S.artikel), kat = km(), om = omap();
-  const teile = [t('status_artikel', { n: akt.length })];
+  const teile = [{ text: t('status_artikel', { n: akt.length }), ordner: 'i:alle' }];
   const ohneKat = akt.filter(function (a) { return !kat[a.kategorieId] || kat[a.kategorieId].geloescht; }).length;
   const ohneBer = akt.filter(function (a) { return !a.bereich; }).length;
   const plaus = akt.filter(function (a) { return LG.plausibel(a, kat, om).length; }).length;
-  if (ohneKat) teile.push(t('status_ohne_kat', { n: ohneKat }));
-  if (ohneBer) teile.push(t('status_ohne_bereich', { n: ohneBer }));
-  if (plaus) teile.push(t('status_plaus', { n: plaus }));
+  if (ohneKat) teile.push({ text: t('status_ohne_kat', { n: ohneKat }), ordner: 'i:ohne_kat' });
+  if (ohneBer) teile.push({ text: t('status_ohne_bereich', { n: ohneBer }), ordner: 'i:ohne_ber' });
+  if (plaus) teile.push({ text: t('status_plaus', { n: plaus }), ordner: 'i:pruefen' });
   const ohneSt = LG.aktiv(S.orte).filter(function (o) { return ortGruppe(o) === '_ohne'; }).length;
-  if (ohneSt && LG.aktiv(S.standorte).length) teile.push(t('status_ohne_standort', { n: ohneSt }));
-  if (!online()) teile.push(t('offline'));
-  document.getElementById('statusBar').textContent = teile.join(' · ');
+  if (ohneSt && LG.aktiv(S.standorte).length) teile.push({ text: t('status_ohne_standort', { n: ohneSt }), ordner: 'i:orte_ohne' });
+  if (!online()) teile.push({ text: t('offline') });
+  document.getElementById('statusBar').innerHTML = teile.map(function (x) {
+    return x.ordner ? '<button type="button" class="status-link" data-aktion="ordner" data-wert="' + esc(x.ordner) + '">' + esc(x.text) + '</button>' : '<span>' + esc(x.text) + '</span>';
+  }).join(' · ');
 }
-function artikelZeile(a, mitOrt) {
-  const kat = km()[a.kategorieId], om = omap(), l = lm()[a.standardLieferantId];
-  const plaus = LG.plausibel(a, km(), om);
-  const orte = (a.orte || []).map(function (o) { return om[o] ? om[o].name : '?'; }).join(', ');
-  return '<tr class="' + (a.geloescht ? 'archiviert' : '') + '" data-aktion="oeffne" data-col="' + COL.artikel + '" data-id="' + esc(a.id) + '">' +
-    '<td>' + esc(a.name) + (a.teigecke ? '<span class="etikett">' + esc(t('teigecke_et')) + '</span>' : '') + (plaus.length ? '<span class="etikett warn-text" title="' + esc(plaus.join(' ')) + '">' + esc(t('plaus_et')) + '</span>' : '') +
-      (a.geloescht ? '<span class="etikett">' + esc(t('archiviert_et')) + '</span>' : '') + '</td>' +
-    '<td class="dim">' + esc(mitOrt ? (kat && !kat.geloescht ? kat.name : '—') : (orte || '—')) + '</td>' +
-    '<td class="dim">' + esc(LG.gebindeText(a) || '—') + '</td>' +
-    '<td class="dim weg-schmal">' + esc(LG.zaehlText(a)) + '</td>' +
-    '<td class="dim weg-schmal">' + esc(l ? l.name : '—') + '</td></tr>';
+
+/* ---------- Inhalt ---------- */
+function knopf(aktion, text, extra) { return '<button type="button" class="btn btn-outline" data-aktion="' + aktion + '"' + (extra || '') + '>' + esc(text) + '</button>'; }
+function gesperrtAttr() { const g = sperrGrund(); return g ? ' disabled title="' + esc(g) + '"' : ''; }
+function kopfHTML(inh) {
+  const z = LG.zerlegeOrdner(S.ordner) || {};
+  const p = LG.pfad(S.ordner, daten());
+  let html = '<div class="inhalt-kopf"><nav class="pfad" aria-label="Pfad">' + p.map(function (x, i) {
+    return i === p.length - 1 ? '<h2 class="pfad-ende">' + esc(teilText(x)) + '</h2>' : '<button type="button" class="pfad-teil" data-aktion="ordner" data-wert="' + esc(x.id) + '">' + esc(teilText(x)) + '</button><span class="pfad-sep">›</span>';
+  }).join('') + '</nav><div class="inhalt-aktionen">';
+  if (KARTEN_COL[z.art]) html += '<button type="button" class="btn btn-outline" data-aktion="ordner-karte" aria-label="' + esc(t('karte_oeffnen')) + '">' + esc(t('karte_oeffnen')) + '</button>';
+  if (z.art === 'o') html += knopf('folge-oeffnen', t('reihenfolge_aendern'));
+  if (z.art === 'o' || z.art === 'k' || z.art === 'l' || S.ordner === 'i:unsortiert' || S.ordner === 'i:alle') html += knopf('neu-artikel', t('neu_artikel'), gesperrtAttr());
+  if (z.art === 's' || z.art === 't' || S.ordner === 'i:orte_ohne') html += knopf('neu-ort', t('neu_ort'), gesperrtAttr());
+  if (z.art === 'a') html += knopf('neu-abschnitt', t({ standorte: 'neu_standort', kategorien: 'neu_kategorie', lieferanten: 'neu_lieferant' }[z.id]), gesperrtAttr());
+  if (S.ordner === 'i:alle') html += ['ort', 'kategorie'].map(function (w) {
+    return '<button type="button" class="btn btn-outline' + (S.sortierung === w ? ' aktiv' : '') + '" data-aktion="sortierung" data-wert="' + w + '" aria-pressed="' + (S.sortierung === w) + '">' + esc(t('nach_' + w)) + '</button>';
+  }).join('');
+  html += '</div></div>';
+  if (z.art === 't') html += '<div class="inhalt-hinweis">' + esc(t('gesamt_hinweis')) + '</div>';
+  return html;
 }
-function artikelTabelle(liste, mitOrt) {
-  return '<table class="liste"><thead><tr><th>' + esc(t('sp_name')) + '</th><th>' + esc(t(mitOrt ? 'sp_kategorie' : 'sp_orte')) + '</th><th>' + esc(t('sp_gebinde')) + '</th>' +
-    '<th class="weg-schmal">' + esc(t('sp_zaehlart')) + '</th><th class="weg-schmal">' + esc(t('sp_lieferant')) + '</th></tr></thead><tbody>' +
-    liste.map(function (a) { return artikelZeile(a, mitOrt); }).join('') + '</tbody></table>';
+function markenHTML(z) {
+  return z.marken.map(function (m) {
+    if (m.art === 'teigecke') return '<span class="etikett">' + esc(t('teigecke_et')) + '</span>';
+    if (m.art === 'pruefen') return '<span class="etikett warn-text" title="' + esc(m.text) + '">' + esc(t('plaus_et')) + '</span>';
+    if (m.art === 'auchin') return '<span class="etikett marke-auch">' + esc(m.orte.length > 2 ? t('marke_auch_in_mehr', { ort: m.orte[0], n: m.orte.length - 1 }) : t('marke_auch_in', { orte: m.orte.join(', ') })) + '</span>';
+    if (m.art === 'liegtin') return '<span class="etikett marke-auch">' + esc(m.orte.length > 2 ? t('marke_liegt_in_mehr', { ort: m.orte[0], n: m.orte.length - 1 }) : t('marke_liegt_in', { orte: m.orte.join(', ') })) + '</span>';
+    return '';
+  }).join('');
 }
-function sichtbareArtikel() { return LG.suche(LG.aktiv(S.artikel), S.suche); }
-function renderArtikel() {
-  const el = document.getElementById('inhalt');
-  const liste = sichtbareArtikel();
-  let html = '';
-  if (!LG.aktiv(S.artikel).length) html = '<div class="leer">' + esc(t('leer_artikel')) + '</div>';
-  else if (!liste.length) html = '<div class="leer">' + esc(t('leer_suche', { text: S.suche })) + '</div>';
-  else {
-    const gruppeHTML = function (g) {
-      if (!g.artikel.length && S.suche) return '';
-      return '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '"><h2>' + esc(g.titel) + '</h2><span class="klein">' + g.artikel.length + '</span></div>' +
-        (g.artikel.length ? artikelTabelle(g.artikel, S.sortierung === 'ort') : '<div class="leer" style="padding:10px">' + esc(t('gruppe_leer')) + '</div>');
-    };
-    if (S.sortierung === 'ort') {
-      /* Stufe 2: Überschrift je Standort, darunter die Orte; ohne Standorte wie in Stufe 1 */
-      const mitSt = LG.aktiv(S.standorte).length > 0;
-      LG.nachStandortUndOrt(liste, S.orte, S.standorte).forEach(function (sg) {
-        if (mitSt && sg.titel) html += '<div class="standort-kopf' + (sg.schluessel === '_ohne' ? ' ohne' : '') + '">' + esc(sg.titel) + '</div>';
-        sg.gruppen.forEach(function (g) { html += gruppeHTML(g); });
-      });
-    } else LG.nachKategorie(liste, S.kategorien).forEach(function (g) { html += gruppeHTML(g); });
+function zeileHTML(z) {
+  const a = z.artikel;
+  return '<div class="zeile' + (a.geloescht ? ' archiviert' : '') + '" data-aktion="oeffne" data-col="' + COL.artikel + '" data-id="' + esc(a.id) + '">' +
+    '<div class="zeile-haupt"><div class="zeile-name">' + esc(a.name) + markenHTML(z) + '</div><div class="zeile-unter">' + esc(z.unter.join(' · ')) + '</div></div>' +
+    '<span class="zeile-zahl">' + (z.zahl == null ? '' : esc(z.zahl)) + '</span>' +
+    '<button type="button" class="zeile-menue" data-aktion="menue" data-id="' + esc(a.id) + '" data-ort="' + esc(z.ortId || '') + '" aria-label="' + esc(t('menue_aria', { name: a.name })) + '">⋯</button></div>';
+}
+function artikelHTML(inh) {
+  const z = LG.zerlegeOrdner(S.ordner) || {};
+  const n = inh.gruppen.reduce(function (s, g) { return s + g.zeilen.length; }, 0);
+  if (!n) {
+    if (z.art === 'o') return '<div class="leer">' + esc(t('leer_ort_artikel')) + '<div class="pflege-leiste" style="justify-content:center">' + knopf('neu-artikel', t('neu_artikel'), gesperrtAttr()) + knopf('ordner', t('aus_unsortiert'), ' data-wert="i:unsortiert"') + '</div></div>';
+    if (S.ordner === 'i:alle') return '<div class="leer">' + esc(t('leer_artikel')) + '</div>';
+    if (S.ordner === 'i:unsortiert') return '<div class="leer">' + esc(t('leer_unsortiert')) + '</div>';
+    return '<div class="leer">' + esc(t('leer_ordner')) + '</div>';
   }
-  html += archivHTML(COL.artikel);
-  el.innerHTML = html;
+  const mitSt = LG.aktiv(S.standorte).length > 0;
+  let html = '', letzterSt = null;
+  inh.gruppen.forEach(function (g) {
+    if (S.ordner === 'i:alle' && S.sortierung === 'ort' && mitSt && g.standortTitel && g.standortTitel !== letzterSt) { html += '<div class="standort-kopf">' + esc(g.standortTitel) + '</div>'; letzterSt = g.standortTitel; }
+    if (g.titel) {
+      const ziel = g.ortId ? 'o:' + g.ortId : (g.kategorieId ? 'k:' + g.kategorieId : '');
+      html += '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '">' + (ziel ? '<button type="button" class="gruppe-link" data-aktion="ordner" data-wert="' + esc(ziel) + '"><h2>' + esc(g.titel) + '</h2></button>' : '<h2>' + esc(g.titel) + '</h2>') + '<span class="klein">' + g.zeilen.length + '</span></div>';
+    }
+    html += g.zeilen.length ? '<div class="zeilen">' + g.zeilen.map(zeileHTML).join('') + '</div>' : '<div class="leer" style="padding:10px">' + esc(t('gruppe_leer')) + '</div>';
+  });
+  return html;
 }
-function archivHTML(col) {
-  const arch = (alleEintraege(col) || []).filter(function (x) { return x.geloescht; });
-  if (!arch.length) return '';
-  let html = '<div class="pflege-leiste"><button type="button" class="btn btn-outline" data-aktion="archiv-umschalten">' + esc(S.zeigeArchiv ? t('archiv_verbergen') : t('archiv_zeigen', { n: arch.length })) + '</button></div>';
-  if (!S.zeigeArchiv) return html;
-  return html + '<table class="liste"><tbody>' + arch.slice().sort(LG.nachName).map(function (x) {
-    return '<tr class="archiviert" data-aktion="oeffne" data-col="' + col + '" data-id="' + esc(x.id) + '"><td>' + esc(x.name) + '<span class="etikett">' + esc(t('archiviert_et')) + '</span></td></tr>';
-  }).join('') + '</tbody></table>';
-}
-function renderListe(ansicht) {
-  const col = colVon(ansicht), el = document.getElementById('inhalt');
-  const liste = LG.aktiv(alleEintraege(col)).slice().sort(ansicht === 'lieferanten' ? LG.nachName : LG.nachSort);
-  let html = '';
-  if (!liste.length) {
-    html += '<div class="leer">' + esc(t({ orte: 'leer_ort', standorte: 'leer_standort', kategorien: 'leer_kategorie', lieferanten: 'leer_lieferant' }[ansicht])) + '</div>';
-    /* B16: der Knopf richtet sich nach den AKTIVEN Einträgen; das Archiv zählt nicht. Nur Kategorien (K2). */
-    const fehlend = ansicht === 'kategorien' ? LG.startlisteFehlende(LG.STARTLISTE_KATEGORIEN, alleEintraege(col)) : [];
-    if (fehlend.length) html += '<div class="pflege-leiste" style="justify-content:center"><button type="button" class="btn btn-amber" data-aktion="startliste" data-col="' + col + '"' + (sperrGrund() ? ' disabled' : '') + '>' + esc(t('startliste_kategorien', { n: fehlend.length })) + '</button></div>';
-  } else if (ansicht === 'lieferanten') {
-    html += '<table class="liste"><thead><tr><th>' + esc(t('sp_name')) + '</th><th>' + esc(t('sp_liefertage')) + '</th><th class="weg-schmal">' + esc(t('sp_bestellweg')) + '</th><th>' + esc(t('sp_artikel')) + '</th></tr></thead><tbody>' +
-      liste.map(function (x) {
-        return '<tr data-aktion="oeffne" data-col="' + col + '" data-id="' + esc(x.id) + '"><td>' + esc(x.name) + '</td><td class="dim">' + esc(LG.liefertageText(x) || '—') + '</td>' +
-          '<td class="dim weg-schmal">' + esc(t('bestellweg_' + (x.bestellweg || ''))) + '</td><td class="dim">' + LG.artikelDesLieferanten(x.id, S.artikel).length + '</td></tr>';
-      }).join('') + '</tbody></table>';
-  } else if (ansicht === 'orte' && LG.aktiv(S.standorte).length) {
-    /* Stufe 2: nach Standort gruppiert, ▲▼ innerhalb des Standorts */
-    LG.orteNachStandort(S.orte, S.standorte).forEach(function (g) {
-      html += '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '"><h2>' + esc(g.titel) + '</h2><span class="klein">' + g.orte.length + '</span></div>';
-      html += g.orte.length ? sortTabelle(col, g.orte) : '<div class="leer" style="padding:10px">' + esc(t('gruppe_leer')) + '</div>';
-    });
-  } else html += sortTabelle(col, liste);
-  html += archivHTML(col);
-  el.innerHTML = html;
-}
-/* Tabelle mit ▲▼ für Orte, Standorte, Kategorien (liste schon sortiert, eine Gruppe) */
+/* Tabelle mit ▲▼ für Orte, Standorte, Kategorien (liste schon sortiert, eine Gruppe). Zeile = Ordner öffnen, ✎ = Karte (A16). */
 function sortTabelle(col, liste) {
   const darf = !sperrGrund();
   const zweite = col === COL.standorte ? 'sp_lagerorte' : 'sp_temperatur';
-  return '<table class="liste"><thead><tr><th>' + esc(t('sp_reihenfolge')) + '</th><th>' + esc(t('sp_name')) + '</th><th>' + esc(t(zweite)) + '</th><th>' + esc(t('sp_artikel')) + '</th></tr></thead><tbody>' +
+  const vor = { lager_orte: 'o:', lager_standorte: 's:', lager_kategorien: 'k:' }[col];
+  return '<table class="liste"><thead><tr><th>' + esc(t('sp_reihenfolge')) + '</th><th>' + esc(t('sp_name')) + '</th><th>' + esc(t(zweite)) + '</th><th>' + esc(t('sp_artikel')) + '</th><th></th></tr></thead><tbody>' +
     liste.map(function (x, i) {
       let zweitWert, n;
       if (col === COL.standorte) {
@@ -642,35 +765,176 @@ function sortTabelle(col, liste) {
         zweitWert = String(orte.length);
         n = LG.aktiv(S.artikel).filter(function (a) { return (a.orte || []).some(function (o) { return orte.some(function (y) { return y.id === o; }); }); }).length;
       } else {
-        zweitWert = x.temperatur ? t('temp_' + x.temperatur) : t('temp_egal');
+        zweitWert = x.temperatur ? (LG.TEMP_ZEICHEN[x.temperatur] && col === COL.orte ? LG.TEMP_ZEICHEN[x.temperatur] + ' ' : '') + t('temp_' + x.temperatur) : t('temp_egal');
         n = col === COL.orte ? LG.artikelAmOrt(x.id, S.artikel).length : LG.artikelDerKategorie(x.id, S.artikel).length;
       }
-      return '<tr data-aktion="oeffne" data-col="' + col + '" data-id="' + esc(x.id) + '"><td style="white-space:nowrap">' +
+      return '<tr data-aktion="ordner" data-wert="' + esc(vor + x.id) + '"><td style="white-space:nowrap">' +
         '<button type="button" class="pfeil" data-aktion="sort" data-col="' + col + '" data-id="' + esc(x.id) + '" data-r="-1" aria-label="' + esc(t('hoch')) + '"' + (i === 0 || !darf ? ' disabled' : '') + '>▲</button> ' +
         '<button type="button" class="pfeil" data-aktion="sort" data-col="' + col + '" data-id="' + esc(x.id) + '" data-r="1" aria-label="' + esc(t('runter')) + '"' + (i === liste.length - 1 || !darf ? ' disabled' : '') + '>▼</button></td>' +
-        '<td>' + esc(x.name) + '</td><td class="dim">' + esc(zweitWert) + '</td><td class="dim">' + n + '</td></tr>';
+        '<td>' + esc(x.name) + '</td><td class="dim">' + esc(zweitWert) + '</td><td class="dim">' + n + '</td>' +
+        '<td><button type="button" class="pfeil" data-aktion="oeffne" data-col="' + col + '" data-id="' + esc(x.id) + '" aria-label="' + esc(t('karte_oeffnen')) + ': ' + esc(x.name) + '">✎</button></td></tr>';
     }).join('') + '</tbody></table>';
+}
+function orteHTML(inh) {
+  if (!inh.orte.length) return '<div class="leer">' + esc(t(inh.standortId ? 'leer_standort_orte' : 'leer_ordner')) + (inh.standortId ? '<div class="pflege-leiste" style="justify-content:center">' + knopf('neu-ort', t('neu_ort'), gesperrtAttr()) + '</div>' : '') + '</div>';
+  return '<div class="inhalt-hinweis">' + esc(t(inh.standortId ? 'rundgang_hinweis' : 'orte_ohne_hinweis')) + '</div>' + sortTabelle(COL.orte, inh.orte);
+}
+function listeHTML(col) {
+  const liste = LG.aktiv(alleEintraege(col)).slice().sort(col === COL.lieferanten ? LG.nachName : LG.nachSort);
+  if (!liste.length) {
+    let html = '<div class="leer">' + esc(t({ lager_standorte: 'leer_standort', lager_kategorien: 'leer_kategorie', lager_lieferanten: 'leer_lieferant' }[col])) + '</div>';
+    /* B16: der Knopf richtet sich nach den AKTIVEN Einträgen; das Archiv zählt nicht. Nur Kategorien (K2). */
+    const fehlend = col === COL.kategorien ? LG.startlisteFehlende(LG.STARTLISTE_KATEGORIEN, alleEintraege(col)) : [];
+    if (fehlend.length) html += '<div class="pflege-leiste" style="justify-content:center"><button type="button" class="btn btn-amber" data-aktion="startliste" data-col="' + col + '"' + gesperrtAttr() + '>' + esc(t('startliste_kategorien', { n: fehlend.length })) + '</button></div>';
+    return html;
+  }
+  if (col !== COL.lieferanten) return sortTabelle(col, liste);
+  return '<table class="liste"><thead><tr><th>' + esc(t('sp_name')) + '</th><th>' + esc(t('sp_liefertage')) + '</th><th class="weg-schmal">' + esc(t('sp_bestellweg')) + '</th><th>' + esc(t('sp_artikel')) + '</th><th></th></tr></thead><tbody>' +
+    liste.map(function (x) {
+      return '<tr data-aktion="ordner" data-wert="l:' + esc(x.id) + '"><td>' + esc(x.name) + '</td><td class="dim">' + esc(LG.liefertageText(x) || '—') + '</td>' +
+        '<td class="dim weg-schmal">' + esc(t('bestellweg_' + (x.bestellweg || ''))) + '</td><td class="dim">' + LG.artikelDesLieferanten(x.id, S.artikel).length + '</td>' +
+        '<td><button type="button" class="pfeil" data-aktion="oeffne" data-col="' + COL.lieferanten + '" data-id="' + esc(x.id) + '" aria-label="' + esc(t('karte_oeffnen')) + ': ' + esc(x.name) + '">✎</button></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+function archivOrdnerHTML() {
+  const gruppen = LG.archivListe(daten());
+  if (!gruppen.length) return '<div class="leer">' + esc(t('leer_archiv')) + '</div>';
+  return gruppen.map(function (g) {
+    return '<div class="gruppe-kopf"><h2>' + esc(t('archiv_' + g.col)) + '</h2><span class="klein">' + g.eintraege.length + '</span></div><table class="liste"><tbody>' + g.eintraege.map(function (x) {
+      return '<tr class="archiviert" data-aktion="oeffne" data-col="' + g.col + '" data-id="' + esc(x.id) + '"><td>' + esc(x.name) + '<span class="etikett">' + esc(t('archiviert_et')) + '</span></td></tr>';
+    }).join('') + '</tbody></table>';
+  }).join('');
+}
+function sucheHTML() {
+  const r = LG.sucheUeberAlles(daten(), S.suche);
+  S.suchIds = r.treffer.filter(function (x) { return x.art === 'artikel'; }).map(function (x) { return x.id; });
+  let html = '<div class="inhalt-kopf"><nav class="pfad"><h2 class="pfad-ende">' + esc(t('pfad_suche', { text: S.suche.trim() })) + '</h2></nav></div>';
+  if (!r.treffer.length) html += '<div class="leer">' + esc(t('leer_suche', { text: S.suche.trim() })) + '</div>';
+  html += '<div class="zeilen">' + r.treffer.map(function (x) {
+    if (x.art === 'artikel') {
+      return x.pfade.map(function (p) {
+        return '<div class="zeile treffer" data-aktion="oeffne" data-col="' + COL.artikel + '" data-id="' + esc(x.id) + '"><div class="zeile-haupt"><div class="zeile-name">' + esc(x.name) + '</div><div class="zeile-unter">' + esc(pfadText(p)) + '</div></div></div>';
+      }).join('');
+    }
+    return '<div class="zeile treffer" data-aktion="ordner" data-wert="' + esc(x.id) + '"><div class="zeile-haupt"><div class="zeile-name">' + esc(x.name) + ' <span class="etikett">' + esc(t('suche_art_' + x.art)) + '</span></div><div class="zeile-unter">' + esc(pfadText(x.pfade[0])) + '</div></div></div>';
+  }).join('') + '</div>';
+  if (r.archiv) html += '<div class="pflege-leiste">' + knopf('ordner', t('suche_archiv', { n: r.archiv }), ' data-wert="i:archiv"') + '</div>';
+  return html;
+}
+function renderInhalt() {
+  const el = document.getElementById('inhalt');
+  if (!S.ordner) { el.innerHTML = '<div class="leer">' + esc(t('lade')) + '</div>'; return; }
+  if (S.suche.trim()) { S.inhalt = null; el.innerHTML = sucheHTML(); return; }
+  let inh;
+  try { inh = LG.ordnerInhalt(S.ordner, daten(), { sortierung: S.sortierung }); }
+  catch (err) { zeigeFehler(t('err_baum'), err); inh = LG.ordnerInhalt('i:alle', daten(), { sortierung: S.sortierung }); }
+  S.inhalt = inh;
+  let html = (S.baumFehler ? '<div class="hinweis rot">' + esc(t('baum_kaputt')) + '</div>' : '') + kopfHTML(inh);
+  if (inh.art === 'artikel') html += artikelHTML(inh);
+  else if (inh.art === 'orte') html += orteHTML(inh);
+  else if (inh.art === 'liste') html += listeHTML(inh.col);
+  else if (inh.art === 'eigen') html += inh.id === 'archiv' ? archivOrdnerHTML() : uebernahmeHTML();
+  else html += '<div class="leer">' + esc(t('leer_ordner')) + '</div>';
+  el.innerHTML = html;
+}
+
+/* ---------- Artikel-Menü ⋯ (A16) und Auswahl-Baum (Verschieben, Liegt auch hier) ---------- */
+function oeffneMenue(artikelId, ortId) {
+  const a = LG.nachId(S.artikel)[artikelId]; if (!a) return;
+  S.menue = { id: artikelId, ortId: ortId || null };
+  const ort = ortId ? omap()[ortId] : null;
+  document.getElementById('menueTitel').textContent = a.name + (ort ? ' · ' + ort.name : '');
+  const g = gesperrtAttr();
+  document.getElementById('menueInhalt').innerHTML =
+    '<button type="button" class="btn btn-outline menue-punkt" data-aktion="menue-karte">' + esc(t('menue_karte')) + '</button>' +
+    (ort ? '<button type="button" class="btn btn-outline menue-punkt" data-aktion="menue-verschieben"' + g + '>' + esc(t('menue_verschieben')) + '</button>' : '') +
+    '<button type="button" class="btn btn-outline menue-punkt" data-aktion="menue-dazu"' + g + '>' + esc(t('menue_dazu')) + '</button>' +
+    (ort ? '<button type="button" class="btn btn-gefahr menue-punkt" data-aktion="menue-weg"' + g + '>' + esc(t('menue_weg')) + '</button>' : '') +
+    (sperrGrund() ? '<div class="inhalt-hinweis">' + esc(sperrGrund()) + '</div>' : '');
+  document.getElementById('menueOverlay').classList.remove('hidden');
+}
+function schliesseMenue() { S.menue = null; document.getElementById('menueOverlay').classList.add('hidden'); }
+function oeffneAuswahl(art) {
+  const m = S.menue; if (!m) return;
+  const a = LG.nachId(S.artikel)[m.id]; if (!a) return;
+  schliesseMenue();
+  const orte = a.orte || [];
+  const st = LG.ordnerBaum(daten()).filter(function (k) { return k.id === 'a:standorte' || k.id === 'i:orte_ohne'; });
+  const offen = [];
+  const mach = function (liste) {
+    return wandle(liste).map(function f(k) {
+      const z = LG.zerlegeOrdner(k.id);
+      if (k.kinder.length) offen.push(k.id);
+      if (z && z.art === 'o') { k.markiert = orte.indexOf(z.id) !== -1; k.waehlbar = art === 'dazu' ? !k.markiert : z.id !== m.ortId; }
+      k.mitKarte = false; k.hinzu = null; k.kinder = k.kinder.map(f);
+      return k;
+    });
+  };
+  S.auswahl = { art: art, id: m.id, ortId: m.ortId, knoten: mach(st) };
+  const ort = m.ortId ? omap()[m.ortId] : null;
+  document.getElementById('auswahlTitel').textContent = t(art === 'dazu' ? 'auswahl_dazu' : 'auswahl_verschieben');
+  document.getElementById('auswahlHinweis').textContent = t(art === 'dazu' ? 'auswahl_hinweis_dazu' : 'auswahl_hinweis_verschieben', { name: a.name, ort: ort ? ort.name : '' });
+  S.auswahlBaum = BOS_ORDNERBAUM.erzeuge({ wurzel: document.getElementById('auswahlBaum'), modus: 'auswahl', t: function (k, w) { return I18N_DE[k] !== undefined ? t(k, w) : null; },
+    knoten: function () { return S.auswahl ? S.auswahl.knoten : []; }, offen: offen,
+    beiWahl: function (id) { const x = S.auswahl; if (!x) return; schliesseAuswahl(); aendereOrte(x.art, x.id, x.ortId, LG.zerlegeOrdner(id).id); } });
+  S.auswahlBaum.zeichne();
+  document.getElementById('auswahlOverlay').classList.remove('hidden');
+}
+function schliesseAuswahl() { S.auswahl = null; document.getElementById('auswahlOverlay').classList.add('hidden'); document.getElementById('auswahlBaum').innerHTML = ''; }
+function zahlText(w) { return String(w).replace('.', ','); }
+function tsMs(ts) { if (ts && typeof ts.toMillis === 'function') return ts.toMillis(); if (ts && typeof ts.seconds === 'number') return ts.seconds * 1000; return Date.now(); }
+/* A17: gezählter Stand am alten Ort — nur im Moment der Handlung gelesen (ein get, kein Abo). Er bleibt liegen (Geschichte),
+   die Regel bleibt. Schlägt das Lesen fehl, steht der Grund in der Rückfrage, und die Handlung bleibt möglich. */
+async function standTeil(a, altId, neuId) {
+  const alt = omap()[altId] || { name: '?' }, neu = neuId ? omap()[neuId] : null;
+  let stand = null, grund = '';
+  try {
+    const s = await window.db.collection(COL.stand).doc(LG.standId(a.id, altId)).get();
+    if (s.exists) { const d = s.data() || {}; stand = { wert: d.wert, tsMs: tsMs(d.ts) }; }
+  } catch (err) { console.error('[Lager] Stand lesen', err); grund = (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)); }
+  const h = LG.standHinweis(stand, Date.now(), alt, neu);
+  let text = '';
+  if (grund) text += t('stand_unbekannt', { grund: grund });
+  else if (h.imZaehlgang) text += t('stand_gezaehlt', { wert: zahlText(h.wert), ort: alt.name }) + (neu ? t('stand_neu', { ort: neu.name }) : '');
+  if (neu && h.andererStandort) { const sm = smap(); text += t('stand_anderer', { ort: neu.name, nach: (sm[neu.standortId] || {}).name || t('ohne_standort'), von: (sm[alt.standortId] || {}).name || t('ohne_standort') }); }
+  return { fragen: !!grund || h.imZaehlgang, text: text };
+}
+async function aendereOrte(art, artikelId, altId, neuId) {
+  const a = LG.nachId(S.artikel)[artikelId]; if (!a) return;
+  if (S.karte && S.karte.geaendert && S.karte.col === COL.artikel && S.karte.id === artikelId && !window.confirm(t('verwerfen_frage'))) return;
+  const r = art === 'verschieben' ? LG.ortErsetzen(a, altId, neuId) : art === 'dazu' ? LG.ortDazu(a, neuId) : LG.ortWeg(a, altId);
+  if (r.fehler) { zeigeFehler(t('err_orte'), { code: 'bos/' + r.fehler, message: t('orte_' + r.fehler, { n: LG.GRENZEN.orte }) }); return; }
+  const om = omap(), altName = altId && om[altId] ? om[altId].name : '', neuName = neuId && om[neuId] ? om[neuId].name : '';
+  if (art === 'verschieben' || art === 'weg') {
+    const st = await standTeil(a, altId, art === 'verschieben' ? neuId : null);
+    if (art === 'weg') { if (!window.confirm(t('weg_frage', { name: a.name, ort: altName }) + (r.orte.some(function (o) { return om[o]; }) ? '' : t('weg_unsortiert')) + st.text)) return; }
+    else if (st.fragen || st.text) { if (!window.confirm(t('verschieben_frage', { name: a.name, von: altName, nach: neuName }) + st.text)) return; }
+  }
+  const d = LG.BAUER[COL.artikel](a);
+  d.orte = r.orte; d.geloescht = a.geloescht === true;
+  const f = LG.pruefe(COL.artikel, d, a.id, S.artikel);
+  if (f.length) { zeigeFehler(t('err_orte'), { code: 'bos/pruefung', message: f.join(' ') }); return; }
+  try {
+    await schreibe([{ col: COL.artikel, id: a.id, daten: d, aktion: 'aendern', vorher: a }]);
+    toast(t({ verschieben: 'verschoben', dazu: 'dazu_ok', weg: 'weg_ok' }[art], { name: a.name, ort: art === 'weg' ? altName : neuName }));
+  } catch (err) { zeigeFehler(t('err_speichern'), err); }
 }
 
 /* ---------- Karte ---------- */
-function leerEntwurf(col) {
-  if (col === COL.artikel) return LG.artikelDokument({});
-  if (col === COL.orte) return LG.ortDokument({ sort: LG.naechsteSort(S.orte) });
+function leerEntwurf(col, vorgabe) {
+  const v = vorgabe || {};
+  if (col === COL.artikel) return LG.artikelDokument(v);
+  if (col === COL.orte) return LG.ortDokument(Object.assign({ sort: LG.naechsteSort(S.orte) }, v));
   if (col === COL.kategorien) return LG.kategorieDokument({ sort: LG.naechsteSort(S.kategorien) });
   if (col === COL.standorte) return LG.standortDokument({ sort: LG.naechsteSort(S.standorte) });
   return LG.lieferantDokument({});
 }
 function entwurfAus(col, roh) { return LG.BAUER[col](roh); }
+/* Reihenfolge für ‹ ›: die des offenen Ordners. A19: ein Artikel an mehreren Orten desselben Ordners nur einmal. */
 function idsFuer(col) {
-  if (col === COL.artikel) {
-    const liste = sichtbareArtikel(), ids = [];
-    const gruppen = S.sortierung === 'ort'
-      ? [].concat.apply([], LG.nachStandortUndOrt(liste, S.orte, S.standorte).map(function (sg) { return sg.gruppen; }))
-      : LG.nachKategorie(liste, S.kategorien);
-    gruppen.forEach(function (g) { g.artikel.forEach(function (a) { if (ids.indexOf(a.id) === -1) ids.push(a.id); }); });
-    return ids;
-  }
+  if (col === COL.artikel) return S.suche.trim() ? S.suchIds.filter(function (x, i, a) { return a.indexOf(x) === i; }) : LG.blaetterIds(S.inhalt);
   if (col === COL.orte) {
+    if (S.inhalt && S.inhalt.art === 'orte') return S.inhalt.orte.map(function (o) { return o.id; });
     return [].concat.apply([], LG.orteNachStandort(S.orte, S.standorte).map(function (g) { return g.orte.map(function (o) { return o.id; }); }));
   }
   return LG.aktiv(alleEintraege(col)).slice().sort(col === COL.lieferanten ? LG.nachName : LG.nachSort).map(function (x) { return x.id; });
@@ -680,12 +944,15 @@ function reiterFuer(col) {
   if (col === COL.orte) return ['k_stammdaten', 'k_artikelfolge'];
   return ['k_stammdaten'];
 }
-function oeffneKarte(col, id) {
+/* extra: { vorgabe: { … } (neu: Ort, Kategorie, Lieferant, Standort aus dem Ordner), reiter: 'k_…' (gleich auf diesem Reiter) } */
+function oeffneKarte(col, id, extra) {
   if (S.karte && S.karte.geaendert && !window.confirm(t('verwerfen_frage'))) return;
+  const x = extra || {};
   const roh = id ? (LG.nachId(alleEintraege(col))[id] || null) : null;
   if (id && !roh) return;
   const ids = idsFuer(col);
-  S.karte = { col: col, id: id || null, roh: roh, entwurf: roh ? entwurfAus(col, roh) : leerEntwurf(col), reiter: reiterFuer(col)[0], ids: ids, geaendert: false };
+  const reiter = reiterFuer(col).indexOf(x.reiter) !== -1 ? x.reiter : reiterFuer(col)[0];
+  S.karte = { col: col, id: id || null, roh: roh, entwurf: roh ? entwurfAus(col, roh) : leerEntwurf(col, x.vorgabe), reiter: reiter, ids: ids, geaendert: false };
   document.getElementById('karteFehler').classList.add('hidden');
   document.getElementById('karteOverlay').classList.remove('hidden');
   zeichneKarte();
@@ -803,7 +1070,8 @@ function artikelReiter(k, dis) {
 }
 function ortReiter(k, dis) {
   const e = k.entwurf;
-  /* Stufe 2: Standort ohne Vorgabewert. Ein archivierter, noch gesetzter Standort bleibt sichtbar wählbar. */
+  /* Stufe 2: Standort ohne Vorgabewert — außer „＋ Lagerort“ aus einem Standort- oder Temperatur-Ordner (Ordneransicht §4,
+     dann ist der Standort die bewusste Wahl). „Noch ohne Standort“ bleibt wählbar. Ein archivierter, noch gesetzter Standort bleibt sichtbar wählbar. */
   const st = LG.aktiv(S.standorte).slice().sort(LG.nachSort);
   const akt = smap()[e.standortId];
   if (akt && akt.geloescht) st.push(akt);
@@ -953,10 +1221,25 @@ async function legeStartlisteAn(col) {
   catch (err) { zeigeFehler(t('err_speichern'), err); }
 }
 
+/* ---------- Neu aus dem Ordner: Vorgaben (§4 Bauplan) ---------- */
+function vorgabeArtikel() {
+  const z = LG.zerlegeOrdner(S.ordner) || {};
+  if (z.art === 'o') return { orte: [z.id] };
+  if (z.art === 'k') return { kategorieId: z.id };
+  if (z.art === 'l') { const q = {}; q[z.id] = ''; return { quellen: q, standardLieferantId: z.id }; }
+  return {};
+}
+function vorgabeOrt() {
+  const z = LG.zerlegeOrdner(S.ordner) || {};
+  if (z.art === 's') return { standortId: z.id };
+  if (z.art === 't') return { standortId: z.id, temperatur: z.temperatur };
+  return {};
+}
+
 /* ---------- Übernahme aus der Teigecke (A1: nur der Stamm entsteht) ---------- */
-function renderUebernahmeReiter() {
-  const k = kandidaten(), el = document.getElementById('inhalt');
-  el.innerHTML = '<div class="hinweis akzent">' + esc(k.length ? t('ue_erklaerung', { n: k.length }) : t('ue_leer')) + '</div>' +
+function uebernahmeHTML() {
+  const k = kandidaten();
+  return '<div class="hinweis akzent">' + esc(k.length ? t('ue_erklaerung', { n: k.length }) : t('ue_leer')) + '</div>' +
     (k.length ? '<div class="pflege-leiste"><button type="button" class="btn btn-amber" data-aktion="ue-oeffnen"' + (sperrGrund() ? ' disabled' : '') + '>' + esc(t('ue_los', { n: k.length })) + '</button></div>' +
       '<div style="padding:0 14px"><ul class="ue-liste">' + k.map(ueZeile).join('') + '</ul></div>' : '');
 }
@@ -992,7 +1275,7 @@ async function fuehreUebernahmeAus() {
     st.textContent = t('ue_fertig', { n: liste.length });
     los.classList.add('hidden');
     document.getElementById('ueZuBtn').textContent = t('ue_zu');
-    S.sortierung = 'kategorie'; S.ansicht = 'artikel';
+    S.sortierung = 'kategorie'; S.ordner = 'i:alle'; merke(SPEICHER_ORDNER, S.ordner); merke(SPEICHER_SORTIERUNG, S.sortierung);
   } catch (err) {
     const name = liste[i - 1] ? liste[i - 1].name : '?';
     st.textContent = t('ue_abbruch', { i: i, n: liste.length, name: name }) + ' ' + fehlerText(t('err_speichern'), err);
@@ -1011,13 +1294,25 @@ document.addEventListener('click', function (ev) {
   const a = el.getAttribute('data-aktion');
   const k = S.karte;
   switch (a) {
-    case 'ansicht': S.ansicht = el.getAttribute('data-wert'); S.zeigeArchiv = false; render(); break;
-    case 'sortierung': S.sortierung = el.getAttribute('data-wert'); try { localStorage.setItem(SPEICHER_SORTIERUNG, S.sortierung); } catch (e) { /* egal */ } render(); break;
+    case 'ordner': waehleOrdner(el.getAttribute('data-wert')); break;
+    case 'ordner-karte': karteZuOrdner(S.ordner); break;
+    case 'folge-oeffnen': { const z = LG.zerlegeOrdner(S.ordner); if (z && z.art === 'o') oeffneKarte(COL.orte, z.id, { reiter: 'k_artikelfolge' }); break; }
+    case 'neu-artikel': oeffneKarte(COL.artikel, null, { vorgabe: vorgabeArtikel() }); break;
+    case 'neu-ort': oeffneKarte(COL.orte, null, { vorgabe: vorgabeOrt() }); break;
+    case 'neu-abschnitt': { const z = LG.zerlegeOrdner(S.ordner); if (z && z.art === 'a') oeffneKarte(COL[z.id], null); break; }
+    case 'baum-auf': setzeBaumOffen(!S.baumOffen); break;
+    case 'baum-zu': setzeBaumOffen(false); break;
+    case 'sortierung': S.sortierung = el.getAttribute('data-wert'); merke(SPEICHER_SORTIERUNG, S.sortierung); render(); break;
     case 'neu-laden': abonniere(); ladeProdukte(); toast(t('lade')); break;
-    case 'neu': oeffneKarte(colVon(S.ansicht === 'uebernahme' ? 'artikel' : S.ansicht), null); break;
-    case 'oeffne': if (ev.target.closest('[data-aktion="sort"]')) break; oeffneKarte(el.getAttribute('data-col'), el.getAttribute('data-id')); break;
+    case 'oeffne': if (ev.target.closest('[data-aktion="sort"]') || ev.target.closest('[data-aktion="menue"]')) break; oeffneKarte(el.getAttribute('data-col'), el.getAttribute('data-id')); break;
     case 'sort': ev.stopPropagation(); verschiebeSort(el.getAttribute('data-col'), el.getAttribute('data-id'), Number(el.getAttribute('data-r'))); break;
-    case 'archiv-umschalten': S.zeigeArchiv = !S.zeigeArchiv; render(); break;
+    case 'menue': ev.stopPropagation(); oeffneMenue(el.getAttribute('data-id'), el.getAttribute('data-ort')); break;
+    case 'menue-zu': schliesseMenue(); break;
+    case 'menue-karte': { const m = S.menue; schliesseMenue(); if (m) oeffneKarte(COL.artikel, m.id); break; }
+    case 'menue-verschieben': oeffneAuswahl('verschieben'); break;
+    case 'menue-dazu': oeffneAuswahl('dazu'); break;
+    case 'menue-weg': { const m = S.menue; schliesseMenue(); if (m) aendereOrte('weg', m.id, m.ortId, null); break; }
+    case 'auswahl-zu': schliesseAuswahl(); break;
     case 'startliste': legeStartlisteAn(el.getAttribute('data-col')); break;
     case 'karte-zu': schliesseKarte(false); break;
     case 'karte-nav': karteNav(Number(el.getAttribute('data-r'))); break;
@@ -1036,7 +1331,7 @@ document.addEventListener('click', function (ev) {
 });
 document.addEventListener('input', function (ev) {
   const el = ev.target;
-  if (el.id === 'suchfeld') { S.suche = el.value; renderArtikel(); renderStatus(); return; }
+  if (el.id === 'suchfeld') { S.suche = el.value; renderInhalt(); renderPfadKnopf(); S.baum.zeichne(); return; }
   if (el.closest && el.closest('#karteBody') && el.tagName === 'INPUT' && el.type !== 'checkbox' && el.type !== 'radio') nimmEingabe(el);
 });
 document.addEventListener('change', function (ev) {
@@ -1053,9 +1348,14 @@ document.addEventListener('change', function (ev) {
 });
 document.getElementById('karteOverlay').addEventListener('click', function (e) { if (e.target === this) schliesseKarte(false); });
 document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; });
+document.getElementById('menueOverlay').addEventListener('click', function (e) { if (e.target === this) schliesseMenue(); });
+document.getElementById('auswahlOverlay').addEventListener('click', function (e) { if (e.target === this) schliesseAuswahl(); });
 document.addEventListener('keydown', function (e) {
-  if (!S.karte || document.getElementById('karteOverlay').classList.contains('hidden')) return;
-  if (e.key === 'Escape') schliesseKarte(false);
+  if (e.key !== 'Escape') return;
+  if (S.auswahl) { schliesseAuswahl(); return; }
+  if (S.menue) { schliesseMenue(); return; }
+  if (S.karte && !document.getElementById('karteOverlay').classList.contains('hidden')) { schliesseKarte(false); return; }
+  if (S.baumOffen) setzeBaumOffen(false);
 });
 
 /* ---------- Ungespeichertes melden (Checkliste §7b) ---------- */
@@ -1069,19 +1369,23 @@ const helpData = {
   title: 'Lager — was ist das hier?',
   sections: [
     { heading: 'Wofür ist diese Seite?', text: 'Hier steht jeder Artikel, der irgendwo bei uns lagert: Rohstoffe, Kühlware, TK-Ware, Konserven, Verpackung, Reinigung. Zu jedem Artikel pflegst du, was er ist (Kategorie), wo er fest liegt (Lagerorte), in welchem Gebinde er kommt, wie er gezählt wird und von welchem Lieferanten. Gezählt wird auf der eigenen Seite „Lager zählen“; diese Seite ist die Liste, auf die sie sich stützt.' },
-    { heading: 'Die Reiter', text: '„Artikel“ ist die eigentliche Liste. „Lagerorte“ sind die Räume und Regale, in denen der Vorrat steht, in der Reihenfolge des Rundgangs. „Standorte“ sind die Gebäude, zu denen die Lagerorte gehören. „Kategorien“ sagen, was etwas ist und ob es Kühlung oder Tiefkühlung braucht. „Lieferanten“ tragen ihre Liefertage und bis wann bestellt sein muss. Solange Zutaten der Teigecke noch nicht im Lager stehen, gibt es einen weiteren Reiter „Aus der Teigecke übernehmen“.' },
-    { heading: 'Standorte', text: 'Ein Standort ist ein Gebäude, zum Beispiel die Backstube oder ein Vorratslager. Jeder Lagerort gehört zu einem Standort; das wählst du in der Karte des Lagerorts. Solange keiner gewählt ist, steht der Ort unter „Noch ohne Standort“, und an ihm kann nicht gezählt werden. Der Standort sagt nichts über die Temperatur: ein TK-Raum kann in jedem Standort stehen. Gezählt wird je Standort, und wer wo zählen darf, steht in der Kontenverwaltung.' },
-    { heading: 'Nach Ort oder nach Kategorie', text: 'Im Reiter Artikel schaltest du oben um. „Nach Ort“ zeigt die Artikel so, wie man beim Zählen durch die Räume geht; ein Artikel an zwei Orten steht unter beiden. „Nach Kategorie“ zeigt sie so, wie man pflegt und bestellt. Ganz oben stehen jeweils die Artikel, denen noch etwas fehlt (ohne festen Ort, noch ohne Kategorie). Das Suchfeld sucht über alle Artikel.' },
-    { heading: 'Eine Karte bearbeiten', text: 'Antippen öffnet die Karte. Oben blätterst du mit ‹ › durch die Liste, ✕ schließt. Die Reiter der Karte: Stammdaten (Name, Kategorie, Bereich, Gebinde und Inhalt), Lagerung (feste Lagerorte, Zählart), Bezug (Lieferanten mit Artikelnummer, einer ist Standard) und Teigecke. „💾 Speichern“ schreibt genau diese Karte; vorher wird die alte Fassung automatisch gesichert. Steht oben „noch nicht gespeichert“, fragt die Seite nach, bevor du weggehst.' },
+    { heading: 'Der Baum', text: 'Die Seite ist aufgebaut wie ein Dateimanager. Links (auf schmalem Bildschirm hinter dem Pfad oben, ein Tipp darauf klappt ihn auf) steht der Baum: oben die festen Ordner „Alle Artikel“ und „Unsortiert“, dazu Ordner, die nur auftauchen, wenn es dort etwas gibt (Prüfen, Ohne Kategorie, Bereich offen, Lagerorte ohne Standort, Aus der Teigecke übernehmen, Teigecke, Archiv). Darunter die Standorte, unter jedem Standort die Temperaturen (ungekühlt, gekühlt, TK) und darin die Lagerorte, ganz unten Kategorien und Lieferanten. Den Namen antippen öffnet den Ordner, ▸ klappt nur auf und zu. Die Zahl daneben ist die Zahl der Artikel. Die Seite merkt sich auf diesem Gerät, welcher Ordner offen war.' },
+    { heading: '✎ und ⋯', text: '✎ öffnet immer direkt die Karte: am Standort, am Lagerort, an Kategorie und Lieferant, oben im Ordner und in den Listen. ⋯ öffnet immer ein Menü: an einem Artikel „Karte öffnen“, „Verschieben nach …“, „Liegt auch hier …“ und „Hier entfernen“. ＋ legt an, und zwar gleich am richtigen Platz: „＋ Lagerort“ unter einem Standort hat den Standort schon gesetzt, „＋ Artikel“ in einem Lagerort den Ort.' },
+    { heading: 'Standorte', text: 'Ein Standort ist ein Gebäude, zum Beispiel die Backstube oder ein Vorratslager. Jeder Lagerort gehört zu einem Standort; das wählst du in der Karte des Lagerorts. Solange keiner gewählt ist, steht der Ort im Ordner „Lagerorte ohne Standort“, und an ihm kann nicht gezählt werden. Der Standort sagt nichts über die Temperatur: ein TK-Raum kann in jedem Standort stehen. Tippst du unter einem Standort auf „❄ gekühlt“, siehst du alles, was an diesem Standort gekühlt liegt, nach Ort. Im Standort selbst stehen seine Lagerorte in der Reihenfolge des Rundgangs; mit ▲▼ änderst du sie. Gezählt wird je Standort, und wer wo zählen darf, steht in der Kontenverwaltung.' },
+    { heading: 'Alle Artikel: nach Ort oder nach Kategorie', text: 'Im Ordner „Alle Artikel“ schaltest du oben um. „Nach Ort“ zeigt die Artikel so, wie man beim Zählen durch die Räume geht. „Nach Kategorie“ zeigt sie so, wie man pflegt und bestellt. Ganz oben stehen jeweils die Artikel, denen noch etwas fehlt (ohne festen Ort, noch ohne Kategorie).' },
+    { heading: 'Ein Artikel an mehreren Orten', text: 'Liegt ein Artikel an zwei Orten, steht er in beiden Ordnern, mit „⇄ liegt auch in …“. Es ist trotzdem nur ein Artikel; eine Änderung an der Karte gilt überall.' },
+    { heading: 'Verschieben und „Liegt auch hier“', text: 'Über ⋯ am Artikel. „Verschieben nach …“ und „Liegt auch hier …“ zeigen denselben Baum zum Auswählen; ✓ heißt, er liegt dort schon. „Hier entfernen“ nimmt ihn nur aus diesem Ort; liegt er sonst nirgends, steht er danach in „Unsortiert“. Wurde er am alten Ort im laufenden Zählgang schon gezählt, fragt die Seite vorher: Die Zählung bleibt beim alten Ort, am neuen ist er noch nicht gezählt. Liegt der neue Ort an einem anderen Standort, steht das in der Frage. „Unsortiert“ ist der Ordner, den du abarbeitest, bevor gezählt werden kann: Dort stehen die Artikel ohne festen Lagerort.' },
+    { heading: 'Suchen', text: 'Das Suchfeld sucht in allem: Artikel (Name, Gebinde, Artikelnummer), Lagerorte, Standorte, Kategorien und Lieferanten. Jeder Treffer zeigt, wo er steht, zum Beispiel „Backstube › ❄ gekühlt › Kühlung 1“; ein Artikel an zwei Orten steht zweimal da. Archiviertes sucht es nicht mit, sagt aber, wie viele Treffer dort wären.' },
+    { heading: 'Eine Karte bearbeiten', text: 'Einen Artikel antippen öffnet seine Karte. Oben blätterst du mit ‹ › durch den offenen Ordner (ein Artikel, der dort mehrfach steht, kommt nur einmal dran), ✕ schließt. Die Reiter der Karte: Stammdaten (Name, Kategorie, Bereich, Gebinde und Inhalt), Lagerung (feste Lagerorte, Zählart), Bezug (Lieferanten mit Artikelnummer, einer ist Standard) und Teigecke. „💾 Speichern“ schreibt genau diese Karte; vorher wird die alte Fassung automatisch gesichert. Steht oben „noch nicht gespeichert“, fragt die Seite nach, bevor du weggehst.' },
     { heading: 'Gebinde und Inhalt', text: 'Gebinde ist das, was du beim Zählen in der Hand hast: Sack, Karton, Eimer. Inhalt ist, was drin ist: 25 kg, 180 Stück. Beides zusammen steht in der Liste, zum Beispiel „Sack · 25 kg“.' },
     { heading: 'Zählart', text: '„Raster bis 24“ heißt: Beim Zählen gibt es Knöpfe zum Antippen von 0 bis 24 und einen Knopf „voll“ — gut für Säcke auf der Palette. „Zahlenfeld“ heißt: Zahl eintippen. Ein Zahlenfeld gibt es beim Zählen immer zusätzlich. Gezählt wird auf der Seite „Lager zählen“.' },
-    { heading: 'Der gelbe Hinweis „Lagerort“', text: 'Gehört ein Artikel zu einer Kategorie, die Kühlung braucht, und liegt er fest an einem ungekühlten Ort, zeigt die Seite ⚠︎. Dasselbe bei TK-Ware an einem Ort ohne Tiefkühlung. Das ist nur ein Hinweis, keine Sperre — manchmal ist es richtig so.' },
+    { heading: 'Der gelbe Hinweis „Lagerort“', text: 'Gehört ein Artikel zu einer Kategorie, die Kühlung braucht, und liegt er fest an einem ungekühlten Ort, zeigt die Seite ⚠︎. Dasselbe bei TK-Ware an einem Ort ohne Tiefkühlung. Das ist nur ein Hinweis, keine Sperre — manchmal ist es richtig so. Alle Artikel mit diesem Hinweis stehen im Ordner „Prüfen“.' },
     { heading: 'Lieferanten und „bestellt bis“', text: 'Am Lieferanten hakst du die Liefertage an. Daneben steht für jeden Liefertag, bis wann bestellt sein muss: Wochentag und Uhrzeit, zum Beispiel „bis Sonntag 14:00“. Das steht am Lieferanten, nicht an jedem Artikel — ändert sich ein Tag, änderst du ihn einmal. In der Artikelkarte siehst du die Tage des Standard-Lieferanten zum Lesen.' },
     { heading: 'Teigecke', text: 'Ist ein Artikel „in der Teigecke handverwogen“, sieht ihn die Teigecke: in der Rezept-Auswahl, auf der Seite „Orte“ und im BrotTeigRechner. Name, Gebinde und Gruppe pflegst du nur hier. Das Zuhause (welcher Wagen) setzen die Kollegen mit dem Haken 🧺 Wagen & Zutaten auf der Seite Teigecke · Orte; hier steht es nur zum Lesen. „Steckt in …“ zeigt, in welchen Teigen die Zutat steht und welche Brote aus diesen Teigen kommen.' },
-    { heading: 'Aus der Teigecke übernehmen', text: 'Einmalig: Die Zutaten, die es in der Teigecke schon gibt, kommen mit „Übernehmen“ ins Lager — mit derselben Kennung, also bleiben alle Rezepte gültig. Name, Inhalt, Gruppe und Archiv werden mitgenommen; Kategorie und Bereich bleiben offen, die trägst du danach ein. Die Teigecke selbst wird dabei nicht angefasst. Bis zur Übernahme kann in der Teigecke niemand ein Zuhause setzen; das ist gewollt.' },
-    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Ein Standort lässt sich erst archivieren, wenn kein Lagerort mehr zu ihm gehört; ein Lagerort, wenn kein Artikel mehr fest dort liegt; eine Kategorie, wenn kein Artikel mehr dazugehört; ein Lieferant, wenn er keinen Artikel mehr liefert; ein Artikel, wenn er in keinem Teig mehr steht. Archiviertes steht unten im Archiv und lässt sich wiederherstellen.' },
+    { heading: 'Aus der Teigecke übernehmen', text: 'Den Ordner gibt es nur, solange Zutaten der Teigecke noch nicht im Lager stehen. Einmalig: Die Zutaten, die es in der Teigecke schon gibt, kommen mit „Übernehmen“ ins Lager — mit derselben Kennung, also bleiben alle Rezepte gültig. Name, Inhalt, Gruppe und Archiv werden mitgenommen; Kategorie und Bereich bleiben offen, die trägst du danach ein. Die Teigecke selbst wird dabei nicht angefasst. Bis zur Übernahme kann in der Teigecke niemand ein Zuhause setzen; das ist gewollt.' },
+    { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Ein Standort lässt sich erst archivieren, wenn kein Lagerort mehr zu ihm gehört; ein Lagerort, wenn kein Artikel mehr fest dort liegt; eine Kategorie, wenn kein Artikel mehr dazugehört; ein Lieferant, wenn er keinen Artikel mehr liefert; ein Artikel, wenn er in keinem Teig mehr steht. Archiviertes steht im Ordner „Archiv“ und lässt sich dort über die Karte wiederherstellen.' },
     { heading: 'Wer darf was?', text: 'Sehen darf das Lager jeder mit Konto. Ändern darf nur die Rolle admin — dieselbe Regel wie bei den Produkten. Fehlt dir die Rolle, steht oben ein Hinweis, und alle Felder sind gesperrt. Zählen ist etwas anderes: dafür gibt es je Standort einen Haken in der Kontenverwaltung.' },
-    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ heißt: keine Rolle admin, oder die Regeln in der Datenbank sind älter als diese Seite — dann steht oben zusätzlich ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat den frischen Stand geladen, deine Eingaben stehen noch da, einfach prüfen und noch einmal speichern. Ohne Netz lässt sich nichts ändern.' }
+    { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ heißt: keine Rolle admin, oder die Regeln in der Datenbank sind älter als diese Seite — dann steht oben zusätzlich ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat den frischen Stand geladen, deine Eingaben stehen noch da, einfach prüfen und noch einmal speichern. Ohne Netz lässt sich nichts ändern. Lässt sich beim Öffnen nicht prüfen, ob die Regeln passen (meist kein Netz), steht oben ein Satz mit dem Grund.' }
   ]
 };
 function renderHilfe() {

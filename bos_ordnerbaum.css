@@ -1,0 +1,31 @@
+/* ================================================================
+   BäckereiOS · Ordnerbaum — Aussehen des gemeinsamen Bausteins (bos_ordnerbaum.js)
+   Nur Design-Tokens (bos_design_tokens.css), Ersatzwerte wie dort.
+   Gewählt läuft auf den Akzent (Bedienung), nicht auf Warn/Rot (Checkliste §3a).
+   CHANGELOG
+     2026-11-11 · 20:33 · v1 · Erstfassung (Lager Ordneransicht, #120/#168)
+   ================================================================ */
+.ob-zeile { display: flex; align-items: center; gap: 2px; min-height: var(--bos-tap-min, 44px);
+  padding: 0 6px 0 calc(var(--ob-tiefe, 0) * 16px + 2px); border-bottom: 1px solid var(--bos-border, rgba(255,255,255,0.08)); }
+.ob-zeile.ob-gewaehlt { background: color-mix(in srgb, var(--bos-amber, #c07a10) 14%, transparent); box-shadow: inset 3px 0 0 var(--bos-amber, #c07a10); }
+.ob-klappe { flex: 0 0 var(--bos-tap-min, 44px); width: var(--bos-tap-min, 44px); min-height: var(--bos-tap-min, 44px); display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--bos-text-dim, #ab9c8a); font-size: .95rem; cursor: pointer; padding: 0; }
+.ob-leer-klappe { cursor: default; }
+.ob-name { flex: 1 1 auto; min-width: 0; min-height: var(--bos-tap-min, 44px); display: flex; align-items: center; gap: 8px; border: 0; background: transparent;
+  color: var(--bos-text, #f3ece1); font: inherit; font-size: .9rem; text-align: left; cursor: pointer; padding: 0 4px; }
+.ob-name:disabled { color: var(--bos-text-faint, #736656); cursor: default; }
+.ob-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-zeichen { flex: 0 0 auto; width: 1.3em; text-align: center; }
+.ob-haken { margin-left: auto; color: var(--bos-green, #4caf7d); font-weight: 700; }
+.ob-zahl { flex: 0 0 auto; min-width: 2em; text-align: right; font-size: .75rem; color: var(--bos-text-dim, #ab9c8a); font-variant-numeric: tabular-nums; }
+.ob-knopf { flex: 0 0 auto; min-width: 40px; min-height: 40px; border: 1px solid transparent; border-radius: var(--bos-radius-sm, 6px); background: transparent;
+  color: var(--bos-text-dim, #ab9c8a); font-size: 1rem; cursor: pointer; }
+.ob-knopf:hover, .ob-knopf:focus-visible { border-color: var(--bos-border-strong, rgba(255,255,255,0.18)); color: var(--bos-text, #f3ece1); }
+.ob-knopf:disabled { opacity: .35; cursor: default; }
+.ob-art-abschnitt { margin-top: 10px; border-bottom-color: var(--bos-border-strong, rgba(255,255,255,0.18)); }
+.ob-art-abschnitt .ob-name { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bos-text-dim, #ab9c8a); }
+.ob-art-standort .ob-name { font-weight: 700; }
+.ob-art-temperatur .ob-name { font-size: .82rem; color: var(--bos-text-dim, #ab9c8a); }
+.ob-art-aktion .ob-name, .ob-hinzu { color: var(--bos-amber, #c07a10); font-size: .82rem; }
+.ob-markiert .ob-name { font-weight: 700; }
+.ob-leer { padding: 12px; color: var(--bos-text-faint, #736656); font-size: .85rem; }
