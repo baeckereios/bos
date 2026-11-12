@@ -9,6 +9,14 @@
          Gezählt wird NICHT hier, sondern auf lager/lager_zaehlen.html (Zählen und Pflegen getrennt).
   Ansicht: Ordnerbaum (bos_ordnerbaum.js) + Inhalt, seit v3 (Ordneransicht, #168).
   CHANGELOG
+    2026-11-12 · 07:53 · v4 · Feature (Zuhause im Lager, L19/L21; Bauplan 07:24, Freigabe Kontroll-Chat 07:46 mit A20–A23)
+      Das Zuhause einer Teigecke-Zutat (welcher Wagen, ortId am Blatt teigecke_zutaten) wird jetzt hier gesetzt:
+      Reiter Teigecke und ⋯ „Wagen wählen …“ (sofort gespeichert), Ordner Teigecke nach Wagen gruppiert mit
+      „＋ Zutaten hierher …“, Wagen in der Unterzeile. Schreiben: schreibeZuhause() — Sicherung in
+      teigecke_sicherungen + Blatt in EINEM Batch, wie bisher teigecke_seite.js schreibe() (Regel unverändert).
+      Wer: Rolle admin + Haken 🧺 (Konto-Feld teigeckePflege). Fehler beim Laden der Wagen in der Auswahl sichtbar.
+      A23: intelligente Ordner im Abschnitt ÜBERSICHT (einklappbar, gemerkt, beim ersten Mal offen).
+      lager/_protokolle/SESSION_2026-11-12_LAGER_ZUHAUSE_BAU.md
     2026-11-11 · 20:42 · v3 · Feature (Lager Ordneransicht, #120/#168; Bauplan 20:22, Freigabe Kontroll-Chat
       20:30 mit A16–A19, Ulf 20:29: F1 nein, F2 „Unsortiert“ zuerst)
       Fünf Reiter und Umschalter-Leiste ersetzt durch Baum + Inhalt (L16): Baum aus LG.ordnerBaum,
@@ -204,6 +212,12 @@
   .zeile-zahl:empty { min-width: 0; }
   .zeile-menue { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font-size: 1.1rem; cursor: pointer; }
   .marke-auch { text-transform: none; letter-spacing: 0; }
+  /* Zuhause im Lager: Wagen-Auswahl und „＋ Zutaten hierher …“ im selben Blatt wie das Menü */
+  .menue-sheet .menue-punkt.an { border-color: var(--amber); color: var(--text); }
+  .menue-sheet .hierher-titel { font-size: .8rem; color: var(--dim); margin: 4px 0 8px; }
+  .menue-sheet .chips { margin-bottom: 10px; }
+  .menue-sheet details { margin: 4px 0 10px; } .menue-sheet summary { cursor: pointer; color: var(--dim); font-size: .85rem; min-height: 32px; }
+  .wagen-leiste { padding: 0 14px 6px; }
   .menue-sheet .menue-punkt { display: block; width: 100%; margin: 0 0 8px; text-align: left; text-transform: none; letter-spacing: 0; font-size: .95rem; min-height: 48px; }
   .auswahl-sheet #auswahlBaum { margin: 6px -20px 12px; border-top: 1px solid var(--border); }
   #toast { position: fixed; bottom: 18px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; background: var(--raised); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: .85rem; z-index: 90; text-align: center; }
@@ -330,13 +344,14 @@
    ================================================================== */
 const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
-const COL_TEIGECKE = { blaetter: 'teigecke_zutaten', orte: 'teigecke_orte', teige: 'teigecke_teige' };
+const COL_TEIGECKE = { blaetter: 'teigecke_zutaten', orte: 'teigecke_orte', teige: 'teigecke_teige', sicherungen: 'teigecke_sicherungen' };
 const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
 const REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SCHREIB_ZEITLIMIT_MS = 20000;
 const SPEICHER_SORTIERUNG = 'bos_lager_sortierung';
 const SPEICHER_ORDNER = 'bos_lager_ordner';          /* Ordneransicht: zuletzt gewählter Ordner je Gerät */
 const SPEICHER_OFFEN = 'bos_lager_baum_offen';      /* Ordneransicht: aufgeklappte Ordner je Gerät */
+const UEBERSICHT_ZU = '-a:uebersicht';                /* A23: Vermerk in SPEICHER_OFFEN „ÜBERSICHT zugeklappt“ */
 const BREIT_AB_PX = 900;                              /* ab dieser Fensterbreite Baum und Inhalt nebeneinander (= CSS @media) */
 
 /* ---------- i18n (Checkliste §6) ---------- */
@@ -347,7 +362,7 @@ const I18N_DE = {
   baum_titel: 'Ordner', ordner_waehlen: 'Ordner wählen', pfad_suche: 'Suche: „{text}“',
   ordner_alle: 'Alle Artikel', ordner_unsortiert: 'Unsortiert', ordner_pruefen: 'Prüfen', ordner_ohne_kat: 'Ohne Kategorie', ordner_ohne_ber: 'Bereich offen',
   ordner_orte_ohne: 'Lagerorte ohne Standort', ordner_uebernahme: 'Aus der Teigecke übernehmen', ordner_teigecke: 'Teigecke', ordner_archiv: 'Archiv',
-  abschnitt_standorte: 'Standorte', abschnitt_kategorien: 'Kategorien', abschnitt_lieferanten: 'Lieferanten',
+  abschnitt_uebersicht: 'Übersicht', abschnitt_standorte: 'Standorte', abschnitt_kategorien: 'Kategorien', abschnitt_lieferanten: 'Lieferanten',
   hinzu_standort: 'Standort anlegen', hinzu_ort: 'Lagerort', hinzu_kategorie: 'Kategorie anlegen', hinzu_lieferant: 'Lieferant anlegen',
   ob_karte: 'Karte öffnen', ob_auf: 'Aufklappen', ob_zu: 'Zuklappen', ob_markiert: 'liegt hier schon', ob_leer: 'Nichts da.',
   karte_oeffnen: '✎ Karte', reihenfolge_aendern: 'Reihenfolge ändern',
@@ -403,7 +418,16 @@ const I18N_DE = {
   f_liefertage_std: 'Liefertage des Standard-Lieferanten (nur zum Lesen, gepflegt am Lieferanten)', f_kein_standard: 'Kein Standard-Lieferant gewählt.',
   f_teigecke: 'In der Teigecke handverwogen', f_teigecke_hilfe: 'Nur dann sieht die Teigecke den Artikel: in der Rezept-Auswahl, auf „Orte“ und im BrotTeigRechner.',
   f_gruppe: 'Gruppe in der Teigecke', f_gruppe_hilfe: 'Sortiert die Rezept-Auswahl und die Mehl-Regel. „Silo“ heißt: dosiert WinBack, braucht kein Zuhause, steht nie auf der Einsammelliste.',
-  f_zuhause: 'Zuhause in der Teigecke', f_zuhause_hilfe: 'Wo der offene Sack steht. Gesetzt wird es auf der Seite Teigecke · Orte (Haken 🧺 Wagen & Zutaten).',
+  f_zuhause: 'Zuhause in der Teigecke', f_zuhause_hilfe: 'Wo der offene Sack steht (welcher Wagen). „Wagen wählen …“ wird sofort gespeichert, unabhängig von „Speichern“ der Karte.',
+  zh_knopf: 'Wagen wählen …', zh_titel: 'Wagen für „{name}“', zh_ohne: '— noch ohne Zuhause —', zh_jetzt: 'jetzt hier',
+  zh_kein_haken: 'Den Wagen setzt, wer den Haken 🧺 Wagen & Zutaten hat (Kontenverwaltung).', zh_erst_speichern: 'Erst die Karte speichern (Haken „handverwogen“), dann den Wagen wählen.',
+  zh_silo: 'Silo braucht kein Zuhause.', zh_nicht_teigecke: 'Nur für Artikel, die in der Teigecke handverwogen werden.', zh_neu: 'Erst die Karte speichern, dann den Wagen wählen.',
+  zh_wagen_laden: 'Die Wagen werden noch geladen …', zh_wagen_fehler: 'Wagen ließen sich nicht laden ({grund}).', zh_keine_wagen: 'Es gibt noch keine Wagen. Die legst du auf der Seite Teigecke · Orte an.',
+  zh_gesetzt: '{name}: Zuhause {wagen}', zh_entfernt: '{name}: jetzt ohne Zuhause', err_zuhause: 'Zuhause setzen „{name}“', zh_konflikt: 'Jemand war schneller ({wer}). Der neue Stand ist geladen, bitte noch einmal wählen.',
+  menue_wagen: '🥖 Wagen wählen …', hierher_knopf: '＋ Zutaten hierher …', hierher_titel: 'Zutaten nach {wagen}', hierher_ohne: 'Noch ohne Zuhause ({n}) — antippen, was hierher gehört',
+  hierher_andere: 'Aus anderen Wagen ({n})', hierher_keine: 'Keine Zutat ohne Zuhause.', hierher_los: 'Hierher legen', hierher_nichts: 'Nichts ausgewählt.',
+  hierher_fertig: '{n} nach {wagen} gelegt.', hierher_teil: '{n} von {m} nach {wagen} gelegt, der Rest steht im roten Kasten.', hierher_lauf: 'Lege {i} von {n} …', wagen_leer: 'In diesem Wagen wohnt noch nichts.',
+  marke_wagen: '🥖',
   f_zuhause_ohne: 'noch ohne Zuhause', f_steckt: 'Steckt in …', f_steckt_hilfe: 'Abgeleitet aus den Teigen (welche Zutaten sie haben) und den Broten (aus welchem Teig). Nur zum Lesen.',
   f_steckt_leer: 'in keinem Teig', f_steckt_ohne: '—',
   f_standort: 'Standort', f_standort_ohne: '— noch ohne Standort —',
@@ -453,7 +477,10 @@ const S = {
   blaetter: [], teigeckeOrte: [], teige: [], produkte: [],
   sortierung: 'ort', suche: '',
   ordner: null, inhalt: null, suchIds: [], baum: null, baumKnoten: [], baumFehler: '', baumOffen: false, menue: null, auswahl: null, auswahlBaum: null,
-  da: { artikel: false, orte: false, standorte: false, kategorien: false, lieferanten: false },
+  da: { artikel: false, orte: false, standorte: false, kategorien: false, lieferanten: false, blaetter: false, teigeckeOrte: false },
+  ladeFehler: {},          /* Zuhause: Fehler beim Laden der Blätter/Wagen, für die Wagen-Auswahl */
+  wagenHaken: false,       /* Konto hat 🧺 Wagen & Zutaten (teigeckePflege) — die Regel verlangt ihn fürs Blatt */
+  hierher: null,           /* „＋ Zutaten hierher …“: { wagenId, auswahl: Set } */
   karte: null,   /* { col, id (null = neu), roh, entwurf, reiter, ids, geaendert } */
   speichertGerade: false, ue: null,
   verbindung: { offline: false }
@@ -545,7 +572,7 @@ function abo(col, ziel) {
     S[ziel] = mitId(snap);
     if (S.da[ziel] === false) S.da[ziel] = true;
     planeRender();
-  }, function (err) { zeigeFehler(t('err_laden', { was: col }), err); });
+  }, function (err) { S.ladeFehler[ziel] = err; zeigeFehler(t('err_laden', { was: col }), err); planeRender(); });
 }
 function abonniere() {
   abos.forEach(function (f) { f(); });
@@ -574,14 +601,14 @@ async function start() {
   S.baum = BOS_ORDNERBAUM.erzeuge({ wurzel: document.getElementById('baum'), t: function (k, w) { return I18N_DE[k] !== undefined ? t(k, w) : null; },
     knoten: function () { return S.baumKnoten; }, gewaehlt: function () { return S.suche.trim() ? null : S.ordner; }, offen: gemerkteOffen(),
     beiWahl: waehleOrdner, beiKarte: karteZuOrdner, beiHinzu: hinzuAmOrdner, hinzuGesperrt: sperrGrund,
-    beiUmschalten: function (id, auf, alle) { merke(SPEICHER_OFFEN, JSON.stringify(alle)); } });
+    beiUmschalten: function (id, auf, alle) { merkeOffen(alle); } });
   document.getElementById('gebindeVorschlaege').innerHTML = LG.GEBINDE_VORSCHLAEGE.map(function (g) { return '<option value="' + esc(g) + '">'; }).join('');
   if (!window.db || !window.BOS_AUTH_READY) { zeigeFehler(t('err_laden', { was: 'bos_firebase_config.js' }), new Error('window.db oder window.BOS_AUTH_READY fehlt')); return; }
   let nutzer = null;
   try { nutzer = await window.BOS_AUTH_READY; } catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); }
   S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
   if (S.kennung) {
-    try { const k = await window.db.collection('bos_accounts').doc(S.kennung).get(); const d = k.exists ? k.data() : null; S.istAdmin = !!(d && d.role === 'admin' && d.freigeschaltet === true); }
+    try { const k = await window.db.collection('bos_accounts').doc(S.kennung).get(); const d = k.exists ? k.data() : null; S.istAdmin = !!(d && d.role === 'admin' && d.freigeschaltet === true); S.wagenHaken = !!(d && d.freigeschaltet === true && d.teigeckePflege === true); }
     catch (err) { zeigeFehler(t('err_konto'), err); }
   }
   document.getElementById('kontoZeile').textContent = S.kennung ? S.kennung + (S.istAdmin ? ' · admin' : '') : t('kein_konto');
@@ -615,14 +642,26 @@ function smap() { return LG.nachId(S.standorte); }
 /* Gruppe eines Lagerorts für ▲▼: sein aktiver Standort, sonst „ohne“ */
 function ortGruppe(o) { const st = smap()[o.standortId]; return st && !st.geloescht ? o.standortId : '_ohne'; }
 function fokusIn(el) { const a = document.activeElement; return !!(a && el && el.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }
-function daten() { return { artikel: S.artikel, orte: S.orte, standorte: S.standorte, kategorien: S.kategorien, lieferanten: S.lieferanten, kandidaten: kandidaten().length }; }
+function daten() {
+  const d = { artikel: S.artikel, orte: S.orte, standorte: S.standorte, kategorien: S.kategorien, lieferanten: S.lieferanten, kandidaten: kandidaten().length };
+  if (S.da.teigeckeOrte && S.da.blaetter) { d.blaetter = S.blaetter; d.teigeckeOrte = S.teigeckeOrte; }   /* Zuhause: Wagen in Unterzeile und Ordner Teigecke */
+  return d;
+}
 function alleDa() { return ['artikel', 'orte', 'standorte', 'kategorien', 'lieferanten'].every(function (k) { return S.da[k]; }); }
 function teilText(x) { return (x.zeichen ? x.zeichen + ' ' : '') + (x.name != null ? x.name : t(x.schluessel, x.werte)); }
 function pfadText(p) { return (p || []).map(teilText).join(' › '); }
 /* ---------- Merken je Gerät (try/catch: Speicher kann gesperrt sein) ---------- */
 function lies(schluessel) { try { return localStorage.getItem(schluessel); } catch (e) { return null; } }
 function merke(schluessel, wert) { try { localStorage.setItem(schluessel, wert); } catch (e) { console.warn('[Lager] Merken nicht möglich:', e && e.message); } }
-function gemerkteOffen() { try { const a = JSON.parse(lies(SPEICHER_OFFEN) || '[]'); return Array.isArray(a) ? a.filter(function (x) { return typeof x === 'string'; }) : []; } catch (e) { return []; } }
+function gemerkteOffen() {
+  let a = [];
+  try { const g = JSON.parse(lies(SPEICHER_OFFEN) || '[]'); a = Array.isArray(g) ? g.filter(function (x) { return typeof x === 'string'; }) : []; } catch (e) { a = []; }
+  /* A23: ÜBERSICHT ist beim ersten Mal offen. Zugeklappt merkt sich das Gerät als Vermerk „-a:uebersicht“ in derselben Liste
+     (eine Liste aus der Zeit vor A23 kennt den Abschnitt noch nicht → offen). */
+  if (a.indexOf(UEBERSICHT_ZU) === -1 && a.indexOf('a:uebersicht') === -1) a.push('a:uebersicht');
+  return a.filter(function (x) { return x !== UEBERSICHT_ZU; });
+}
+function merkeOffen(alle) { merke(SPEICHER_OFFEN, JSON.stringify(alle.concat(alle.indexOf('a:uebersicht') === -1 ? [UEBERSICHT_ZU] : []))); }
 /* ---------- schmal / breit (Fensterbreite, nicht Gerät: im Launcher läuft die Seite in einem iframe) ---------- */
 const BREIT = window.matchMedia ? window.matchMedia('(min-width: ' + BREIT_AB_PX + 'px)') : null;
 function istBreit() { return !BREIT || BREIT.matches; }
@@ -630,7 +669,7 @@ function setzeBaumOffen(auf) {
   S.baumOffen = !!auf && !istBreit();
   document.body.classList.toggle('baum-offen', S.baumOffen);
   const b = document.getElementById('pfadBtn'); if (b) b.setAttribute('aria-expanded', String(S.baumOffen));
-  if (S.baumOffen && S.ordner) S.baum.scrolleZu(S.ordner);
+  if (S.baumOffen && S.ordner) { S.baum.klappeAuf(LG.vorfahren(S.ordner, daten())); S.baum.scrolleZu(S.ordner); }   /* A23: Ast des gewählten Ordners auf */
 }
 if (BREIT) { const f = function () { if (istBreit()) setzeBaumOffen(false); planeRender(); }; if (BREIT.addEventListener) BREIT.addEventListener('change', f); else if (BREIT.addListener) BREIT.addListener(f); }
 
@@ -638,7 +677,7 @@ if (BREIT) { const f = function () { if (istBreit()) setzeBaumOffen(false); plan
 function wandle(liste) {
   return (liste || []).map(function (k) {
     return { id: k.id, name: k.name != null ? k.name : t(k.schluessel, k.werte), zeichen: k.zeichen, zahl: k.zahl, art: k.art,
-      mitKarte: !!k.mitKarte, hinzu: k.hinzu ? t(k.hinzu) : null, hinzuAls: k.art === 'standort' ? 'zeile' : 'knopf', kinder: wandle(k.kinder) };
+      mitKarte: !!k.mitKarte, hinzu: k.hinzu ? t(k.hinzu) : null, hinzuAls: k.art === 'standort' ? 'zeile' : 'knopf', nurKlappen: !!k.nurKlappen, kinder: wandle(k.kinder) };
   });
 }
 function renderBaum() {
@@ -748,7 +787,8 @@ function artikelHTML(inh) {
       const ziel = g.ortId ? 'o:' + g.ortId : (g.kategorieId ? 'k:' + g.kategorieId : '');
       html += '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '">' + (ziel ? '<button type="button" class="gruppe-link" data-aktion="ordner" data-wert="' + esc(ziel) + '"><h2>' + esc(g.titel) + '</h2></button>' : '<h2>' + esc(g.titel) + '</h2>') + '<span class="klein">' + g.zeilen.length + '</span></div>';
     }
-    html += g.zeilen.length ? '<div class="zeilen">' + g.zeilen.map(zeileHTML).join('') + '</div>' : '<div class="leer" style="padding:10px">' + esc(t('gruppe_leer')) + '</div>';
+    if (inh.wagen && g.wagenId) html += '<div class="pflege-leiste wagen-leiste">' + knopf('zutaten-hierher', t('hierher_knopf'), ' data-wert="' + esc(g.wagenId) + '"' + (hierherGrund() ? ' disabled title="' + esc(hierherGrund()) + '"' : '')) + '</div>';
+    html += g.zeilen.length ? '<div class="zeilen">' + g.zeilen.map(zeileHTML).join('') + '</div>' : '<div class="leer" style="padding:10px">' + esc(t(inh.wagen && g.wagenId ? 'wagen_leer' : 'gruppe_leer')) + '</div>';
   });
   return html;
 }
@@ -850,16 +890,130 @@ function oeffneMenue(artikelId, ortId) {
     (ort ? '<button type="button" class="btn btn-outline menue-punkt" data-aktion="menue-verschieben"' + g + '>' + esc(t('menue_verschieben')) + '</button>' : '') +
     '<button type="button" class="btn btn-outline menue-punkt" data-aktion="menue-dazu"' + g + '>' + esc(t('menue_dazu')) + '</button>' +
     (ort ? '<button type="button" class="btn btn-gefahr menue-punkt" data-aktion="menue-weg"' + g + '>' + esc(t('menue_weg')) + '</button>' : '') +
+    (a.teigecke === true ? '<button type="button" class="btn btn-outline menue-punkt" data-aktion="menue-wagen"' + (zuhauseGrund(a.id) ? ' disabled title="' + esc(zuhauseGrund(a.id)) + '"' : '') + '>' + esc(t('menue_wagen')) + '</button>' : '') +
     (sperrGrund() ? '<div class="inhalt-hinweis">' + esc(sperrGrund()) + '</div>' : '');
   document.getElementById('menueOverlay').classList.remove('hidden');
 }
-function schliesseMenue() { S.menue = null; document.getElementById('menueOverlay').classList.add('hidden'); }
+function schliesseMenue() { S.menue = null; S.wagenWahl = null; S.hierher = null; document.getElementById('menueOverlay').classList.add('hidden'); }
+/* ---------- Zuhause der Teigecke-Zutaten (L19) ----------
+   Die Wahrheit bleibt im Feld ortId am Blatt teigecke_zutaten/{artikelId}. Geschrieben wird wie bisher in
+   Teigecke · Orte: Sicherung in teigecke_sicherungen + Blatt in EINEM Batch (Regel: darfWagen(), Herkunft,
+   teigeckeGesichert, Stamm teigecke == true). Eigene Handlung, sofort gespeichert (Bauplan §3.4). */
+function zuhauseGrund(artikelId) {
+  const g = sperrGrund(); if (g) return g;
+  if (!S.wagenHaken) return t('zh_kein_haken');
+  if (!artikelId) return t('zh_neu');
+  const a = LG.nachId(S.artikel)[artikelId];
+  const k = S.karte;
+  if (k && k.col === COL.artikel && k.id === artikelId && k.entwurf && (k.entwurf.teigecke !== (a && a.teigecke === true) || (k.entwurf.teigeckeGruppe || '') !== ((a && a.teigeckeGruppe) || ''))) return t('zh_erst_speichern');
+  const sp = LG.zuhauseSperre(a);
+  if (sp === 'silo') return t('zh_silo');
+  if (sp) return t('zh_nicht_teigecke');
+  if (S.ladeFehler.teigeckeOrte || S.ladeFehler.blaetter) return t('zh_wagen_fehler', { grund: fehlerText('', S.ladeFehler.teigeckeOrte || S.ladeFehler.blaetter).replace(/^:\s*/, '') });
+  if (!S.da.teigeckeOrte || !S.da.blaetter) return t('zh_wagen_laden');
+  return '';
+}
+function hierherGrund() {
+  const g = sperrGrund(); if (g) return g;
+  if (!S.wagenHaken) return t('zh_kein_haken');
+  if (S.ladeFehler.teigeckeOrte || S.ladeFehler.blaetter) return t('zh_wagen_fehler', { grund: fehlerText('', S.ladeFehler.teigeckeOrte || S.ladeFehler.blaetter).replace(/^:\s*/, '') });
+  return '';
+}
+function zuhauseKnopf(k) {
+  const g = zuhauseGrund(k.id);
+  return '<div class="pflege-leiste" style="margin-top:6px">' + knopf('wagen-waehlen', t('zh_knopf'), ' data-id="' + esc(k.id || '') + '"' + (g ? ' disabled title="' + esc(g) + '"' : '')) + '</div>';
+}
+function oeffneWagenWahl(artikelId) {
+  const a = LG.nachId(S.artikel)[artikelId]; if (!a) return;
+  const g = zuhauseGrund(artikelId);
+  if (g) { toast(g); return; }
+  S.menue = null; S.hierher = null; S.wagenWahl = artikelId;
+  const jetzt = LG.zuhauseVon(a, LG.ordnerKontext(daten()));
+  const wagen = LG.wagenSortiert(S.teigeckeOrte);
+  const punkt = function (wert, text, an) { return '<button type="button" class="btn btn-outline menue-punkt' + (an ? ' an' : '') + '" data-aktion="wagen-setzen" data-wert="' + esc(wert) + '"' + (an ? ' aria-pressed="true"' : '') + '>' + esc(text) + (an ? ' · ' + esc(t('zh_jetzt')) : '') + '</button>'; };
+  document.getElementById('menueTitel').textContent = t('zh_titel', { name: a.name });
+  document.getElementById('menueInhalt').innerHTML = punkt('', t('zh_ohne'), !jetzt.wagen) +
+    (wagen.length ? wagen.map(function (w) { return punkt(w.id, LG.wagenText(w), jetzt.wagen && jetzt.wagen.id === w.id); }).join('') : '<div class="inhalt-hinweis">' + esc(t('zh_keine_wagen')) + '</div>');
+  document.getElementById('menueOverlay').classList.remove('hidden');
+}
+async function schreibeZuhause(artikelId, ortId) {
+  const g = zuhauseGrund(artikelId);
+  if (g) { const e = new Error(g); e.code = 'gesperrt'; throw e; }
+  const roh = LG.nachId(S.blaetter)[artikelId] || null;
+  const b = LG.blattMitZuhause(roh, ortId);
+  const db = window.db;
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+  const sichRef = db.collection(COL_TEIGECKE.sicherungen).doc();
+  const ref = db.collection(COL_TEIGECKE.blaetter).doc(artikelId);
+  const batch = db.batch();
+  batch.set(sichRef, { collection: COL_TEIGECKE.blaetter, dokId: artikelId, aktion: b.aktion, vorher: b.vorher, konto: S.kennung, ts: ts });
+  batch.set(ref, Object.assign({}, b.daten, { sicherungId: sichRef.id, geaendertVon: S.kennung, geaendertAm: ts }));
+  try { await mitZeitlimit(batch.commit()); }
+  catch (err) {
+    /* Abgelehnt: war ein anderes Gerät schneller (Blatt inzwischen anders)? Dann Konflikt statt Rätsel (wie Orte). */
+    if (err && err.code === 'permission-denied') {
+      let frisch = null;
+      try { const sn = await db.collection(COL_TEIGECKE.blaetter).doc(artikelId).get({ source: 'server' }); frisch = sn.exists ? sn.data() : null; }
+      catch (e2) { zeigeFehler(t('err_gegenlesen'), e2); }
+      if (frisch && (!roh || frisch.sicherungId !== roh.sicherungId)) {
+        S.blaetter = S.blaetter.filter(function (x) { return x.id !== artikelId; }).concat([Object.assign({ id: artikelId }, frisch)]);
+        const k = new Error(t('zh_konflikt', { wer: frisch.geaendertVon || '?' })); k.code = 'konflikt'; throw k;
+      }
+    }
+    throw err;
+  }
+  return b;
+}
+async function setzeZuhause(artikelId, ortId) {
+  const a = LG.nachId(S.artikel)[artikelId]; if (!a) return;
+  try {
+    await schreibeZuhause(artikelId, ortId);
+    const w = ortId ? LG.nachId(S.teigeckeOrte)[ortId] : null;
+    toast(w ? t('zh_gesetzt', { name: a.name, wagen: w.kennung }) : t('zh_entfernt', { name: a.name }));
+  } catch (err) { zeigeFehler(t('err_zuhause', { name: a.name }), err); }
+  render(); if (S.karte) zeichneKarte();
+}
+function oeffneHierher(wagenId) {
+  const w = LG.nachId(S.teigeckeOrte)[wagenId]; if (!w) return;
+  const g = hierherGrund(); if (g) { toast(g); return; }
+  S.menue = null; S.wagenWahl = null; S.hierher = { wagenId: wagenId, auswahl: new Set() };
+  const k = LG.zuhauseKandidaten(daten(), wagenId);
+  const chip = function (id, text) { return '<button type="button" class="chip" data-aktion="hierher-chip" data-id="' + esc(id) + '" aria-pressed="false">' + esc(text) + '</button>'; };
+  document.getElementById('menueTitel').textContent = t('hierher_titel', { wagen: LG.wagenText(w) });
+  document.getElementById('menueInhalt').innerHTML =
+    '<div class="hierher-titel">' + esc(t('hierher_ohne', { n: k.ohne.length })) + '</div>' +
+    (k.ohne.length ? '<div class="chips">' + k.ohne.map(function (a) { return chip(a.id, a.name); }).join('') + '</div>' : '<p class="inhalt-hinweis">' + esc(t('hierher_keine')) + '</p>') +
+    (k.andere.length ? '<details><summary>' + esc(t('hierher_andere', { n: k.andere.length })) + '</summary><div class="chips">' + k.andere.map(function (x) { return chip(x.artikel.id, x.artikel.name + ' (' + x.wagen.kennung + ')'); }).join('') + '</div></details>' : '') +
+    '<div id="hierherStatus" class="inhalt-hinweis"></div>' +
+    '<button type="button" class="btn btn-amber menue-punkt" data-aktion="hierher-los">' + esc(t('hierher_los')) + '</button>';
+  document.getElementById('menueOverlay').classList.remove('hidden');
+}
+async function legeHierher() {
+  const h = S.hierher; if (!h) return;
+  const ids = Array.from(h.auswahl);
+  const st = document.getElementById('hierherStatus');
+  if (!ids.length) { if (st) st.textContent = t('hierher_nichts'); return; }
+  const w = LG.nachId(S.teigeckeOrte)[h.wagenId];
+  const am = LG.nachId(S.artikel);
+  let ok = 0, i = 0;
+  for (const id of ids) {
+    i++; if (st) st.textContent = t('hierher_lauf', { i: i, n: ids.length });
+    try { await schreibeZuhause(id, h.wagenId); ok++; }
+    catch (err) { zeigeFehler(t('err_zuhause', { name: (am[id] && am[id].name) || id }), err); }
+  }
+  schliesseMenue();
+  toast(ok === ids.length ? t('hierher_fertig', { n: ok, wagen: w ? w.kennung : '' }) : t('hierher_teil', { n: ok, m: ids.length, wagen: w ? w.kennung : '' }));
+  render();
+}
+
 function oeffneAuswahl(art) {
   const m = S.menue; if (!m) return;
   const a = LG.nachId(S.artikel)[m.id]; if (!a) return;
   schliesseMenue();
   const orte = a.orte || [];
-  const st = LG.ordnerBaum(daten()).filter(function (k) { return k.id === 'a:standorte' || k.id === 'i:orte_ohne'; });
+  /* A23: „Lagerorte ohne Standort“ steht im Abschnitt ÜBERSICHT — für die Auswahl wie bisher oben neben den Standorten */
+  const oben = LG.ordnerBaum(daten()), ue = oben.filter(function (k) { return k.id === 'a:uebersicht'; })[0];
+  const st = oben.filter(function (k) { return k.id === 'a:standorte'; }).concat((ue ? ue.kinder : []).filter(function (k) { return k.id === 'i:orte_ohne'; }));
   const offen = [];
   const mach = function (liste) {
     return wandle(liste).map(function f(k) {
@@ -1064,7 +1218,7 @@ function artikelReiter(k, dis) {
   return '<div class="cb-zeile"><input type="checkbox" class="cb" id="fTeigecke" data-aktion-change="teigecke"' + (e.teigecke ? ' checked' : '') + (sperre ? ' disabled' : '') + dis + '><label for="fTeigecke">' + esc(t('f_teigecke')) + '</label></div>' +
     '<div class="hilfe" style="font-size:.78rem;color:var(--dim)">' + esc(sperre || t('f_teigecke_hilfe')) + '</div>' +
     (e.teigecke ? feld(t('f_gruppe'), auswahl('teigeckeGruppe', e.teigeckeGruppe || 'sonstiges', LG.TEIGECKE_GRUPPEN.map(function (g) { return { wert: g, text: t('gruppe_' + g) }; }), dis), t('f_gruppe_hilfe')) +
-      feld(t('f_zuhause'), '<div class="lesewert">' + esc(zuhause) + '</div>', t('f_zuhause_hilfe')) +
+      feld(t('f_zuhause'), '<div class="lesewert">' + esc(zuhause) + '</div>' + zuhauseKnopf(k), zuhauseGrund(k.id) || t('f_zuhause_hilfe')) +
       feld(t('f_steckt'), steckt.length ? '<div class="lesewert">' + steckt.map(function (s) { return '<b>' + esc(s.teig) + '</b>' + (s.brote.length ? ' → ' + esc(s.brote.join(', ')) : ''); }).join('<br>') + '</div>' : '<div class="lesewert dim">' + esc(t('f_steckt_leer')) + '</div>', t('f_steckt_hilfe'))
       : feld(t('f_steckt'), '<div class="lesewert dim">' + esc(t('f_steckt_ohne')) + '</div>'));
 }
@@ -1308,6 +1462,12 @@ document.addEventListener('click', function (ev) {
     case 'sort': ev.stopPropagation(); verschiebeSort(el.getAttribute('data-col'), el.getAttribute('data-id'), Number(el.getAttribute('data-r'))); break;
     case 'menue': ev.stopPropagation(); oeffneMenue(el.getAttribute('data-id'), el.getAttribute('data-ort')); break;
     case 'menue-zu': schliesseMenue(); break;
+    case 'menue-wagen': { const m = S.menue; schliesseMenue(); if (m) oeffneWagenWahl(m.id); break; }
+    case 'wagen-waehlen': oeffneWagenWahl(el.getAttribute('data-id')); break;
+    case 'wagen-setzen': { const id = S.wagenWahl; schliesseMenue(); if (id) setzeZuhause(id, el.getAttribute('data-wert')); break; }
+    case 'zutaten-hierher': oeffneHierher(el.getAttribute('data-wert')); break;
+    case 'hierher-chip': { const h = S.hierher; if (!h) break; const id = el.getAttribute('data-id'); if (h.auswahl.has(id)) h.auswahl.delete(id); else h.auswahl.add(id); el.setAttribute('aria-pressed', String(h.auswahl.has(id))); break; }
+    case 'hierher-los': legeHierher(); break;
     case 'menue-karte': { const m = S.menue; schliesseMenue(); if (m) oeffneKarte(COL.artikel, m.id); break; }
     case 'menue-verschieben': oeffneAuswahl('verschieben'); break;
     case 'menue-dazu': oeffneAuswahl('dazu'); break;
@@ -1369,8 +1529,8 @@ const helpData = {
   title: 'Lager — was ist das hier?',
   sections: [
     { heading: 'Wofür ist diese Seite?', text: 'Hier steht jeder Artikel, der irgendwo bei uns lagert: Rohstoffe, Kühlware, TK-Ware, Konserven, Verpackung, Reinigung. Zu jedem Artikel pflegst du, was er ist (Kategorie), wo er fest liegt (Lagerorte), in welchem Gebinde er kommt, wie er gezählt wird und von welchem Lieferanten. Gezählt wird auf der eigenen Seite „Lager zählen“; diese Seite ist die Liste, auf die sie sich stützt.' },
-    { heading: 'Der Baum', text: 'Die Seite ist aufgebaut wie ein Dateimanager. Links (auf schmalem Bildschirm hinter dem Pfad oben, ein Tipp darauf klappt ihn auf) steht der Baum: oben die festen Ordner „Alle Artikel“ und „Unsortiert“, dazu Ordner, die nur auftauchen, wenn es dort etwas gibt (Prüfen, Ohne Kategorie, Bereich offen, Lagerorte ohne Standort, Aus der Teigecke übernehmen, Teigecke, Archiv). Darunter die Standorte, unter jedem Standort die Temperaturen (ungekühlt, gekühlt, TK) und darin die Lagerorte, ganz unten Kategorien und Lieferanten. Den Namen antippen öffnet den Ordner, ▸ klappt nur auf und zu. Die Zahl daneben ist die Zahl der Artikel. Die Seite merkt sich auf diesem Gerät, welcher Ordner offen war.' },
-    { heading: '✎ und ⋯', text: '✎ öffnet immer direkt die Karte: am Standort, am Lagerort, an Kategorie und Lieferant, oben im Ordner und in den Listen. ⋯ öffnet immer ein Menü: an einem Artikel „Karte öffnen“, „Verschieben nach …“, „Liegt auch hier …“ und „Hier entfernen“. ＋ legt an, und zwar gleich am richtigen Platz: „＋ Lagerort“ unter einem Standort hat den Standort schon gesetzt, „＋ Artikel“ in einem Lagerort den Ort.' },
+    { heading: 'Der Baum', text: 'Die Seite ist aufgebaut wie ein Dateimanager. Links (auf schmalem Bildschirm hinter dem Pfad oben, ein Tipp darauf klappt ihn auf) steht der Baum: oben im Abschnitt „Übersicht“ die festen Ordner „Alle Artikel“ und „Unsortiert“, dazu Ordner, die nur auftauchen, wenn es dort etwas gibt (Prüfen, Ohne Kategorie, Bereich offen, Lagerorte ohne Standort, Aus der Teigecke übernehmen, Teigecke, Archiv). Darunter die Standorte, unter jedem Standort die Temperaturen (ungekühlt, gekühlt, TK) und darin die Lagerorte, ganz unten Kategorien und Lieferanten. Den Namen antippen öffnet den Ordner, ▸ klappt nur auf und zu. Jeder Abschnitt (Übersicht, Standorte, Kategorien, Lieferanten) klappt mit ▸ auf und zu; bei „Übersicht“ auch ein Tipp auf den Namen, denn der Kopf ist selbst kein Ordner. Liegt der offene Ordner in einem zugeklappten Abschnitt, klappt er beim Öffnen des Baums von selbst auf. Die Zahl daneben ist die Zahl der Artikel. Die Seite merkt sich auf diesem Gerät, welcher Ordner offen war.' },
+    { heading: '✎ und ⋯', text: '✎ öffnet immer direkt die Karte: am Standort, am Lagerort, an Kategorie und Lieferant, oben im Ordner und in den Listen. ⋯ öffnet immer ein Menü: an einem Artikel „Karte öffnen“, „Verschieben nach …“, „Liegt auch hier …“ und „Hier entfernen“, bei Teigecke-Zutaten dazu „🥖 Wagen wählen …“. ＋ legt an, und zwar gleich am richtigen Platz: „＋ Lagerort“ unter einem Standort hat den Standort schon gesetzt, „＋ Artikel“ in einem Lagerort den Ort.' },
     { heading: 'Standorte', text: 'Ein Standort ist ein Gebäude, zum Beispiel die Backstube oder ein Vorratslager. Jeder Lagerort gehört zu einem Standort; das wählst du in der Karte des Lagerorts. Solange keiner gewählt ist, steht der Ort im Ordner „Lagerorte ohne Standort“, und an ihm kann nicht gezählt werden. Der Standort sagt nichts über die Temperatur: ein TK-Raum kann in jedem Standort stehen. Tippst du unter einem Standort auf „❄ gekühlt“, siehst du alles, was an diesem Standort gekühlt liegt, nach Ort. Im Standort selbst stehen seine Lagerorte in der Reihenfolge des Rundgangs; mit ▲▼ änderst du sie. Gezählt wird je Standort, und wer wo zählen darf, steht in der Kontenverwaltung.' },
     { heading: 'Alle Artikel: nach Ort oder nach Kategorie', text: 'Im Ordner „Alle Artikel“ schaltest du oben um. „Nach Ort“ zeigt die Artikel so, wie man beim Zählen durch die Räume geht. „Nach Kategorie“ zeigt sie so, wie man pflegt und bestellt. Ganz oben stehen jeweils die Artikel, denen noch etwas fehlt (ohne festen Ort, noch ohne Kategorie).' },
     { heading: 'Ein Artikel an mehreren Orten', text: 'Liegt ein Artikel an zwei Orten, steht er in beiden Ordnern, mit „⇄ liegt auch in …“. Es ist trotzdem nur ein Artikel; eine Änderung an der Karte gilt überall.' },
@@ -1381,10 +1541,10 @@ const helpData = {
     { heading: 'Zählart', text: '„Raster bis 24“ heißt: Beim Zählen gibt es Knöpfe zum Antippen von 0 bis 24 und einen Knopf „voll“ — gut für Säcke auf der Palette. „Zahlenfeld“ heißt: Zahl eintippen. Ein Zahlenfeld gibt es beim Zählen immer zusätzlich. Gezählt wird auf der Seite „Lager zählen“.' },
     { heading: 'Der gelbe Hinweis „Lagerort“', text: 'Gehört ein Artikel zu einer Kategorie, die Kühlung braucht, und liegt er fest an einem ungekühlten Ort, zeigt die Seite ⚠︎. Dasselbe bei TK-Ware an einem Ort ohne Tiefkühlung. Das ist nur ein Hinweis, keine Sperre — manchmal ist es richtig so. Alle Artikel mit diesem Hinweis stehen im Ordner „Prüfen“.' },
     { heading: 'Lieferanten und „bestellt bis“', text: 'Am Lieferanten hakst du die Liefertage an. Daneben steht für jeden Liefertag, bis wann bestellt sein muss: Wochentag und Uhrzeit, zum Beispiel „bis Sonntag 14:00“. Das steht am Lieferanten, nicht an jedem Artikel — ändert sich ein Tag, änderst du ihn einmal. In der Artikelkarte siehst du die Tage des Standard-Lieferanten zum Lesen.' },
-    { heading: 'Teigecke', text: 'Ist ein Artikel „in der Teigecke handverwogen“, sieht ihn die Teigecke: in der Rezept-Auswahl, auf der Seite „Orte“ und im BrotTeigRechner. Name, Gebinde und Gruppe pflegst du nur hier. Das Zuhause (welcher Wagen) setzen die Kollegen mit dem Haken 🧺 Wagen & Zutaten auf der Seite Teigecke · Orte; hier steht es nur zum Lesen. „Steckt in …“ zeigt, in welchen Teigen die Zutat steht und welche Brote aus diesen Teigen kommen.' },
-    { heading: 'Aus der Teigecke übernehmen', text: 'Den Ordner gibt es nur, solange Zutaten der Teigecke noch nicht im Lager stehen. Einmalig: Die Zutaten, die es in der Teigecke schon gibt, kommen mit „Übernehmen“ ins Lager — mit derselben Kennung, also bleiben alle Rezepte gültig. Name, Inhalt, Gruppe und Archiv werden mitgenommen; Kategorie und Bereich bleiben offen, die trägst du danach ein. Die Teigecke selbst wird dabei nicht angefasst. Bis zur Übernahme kann in der Teigecke niemand ein Zuhause setzen; das ist gewollt.' },
+    { heading: 'Teigecke', text: 'Ist ein Artikel „in der Teigecke handverwogen“, sieht ihn die Teigecke: in der Rezept-Auswahl, auf der Seite „Orte“ und im BrotTeigRechner. Name, Gebinde und Gruppe pflegst du nur hier. Auch das Zuhause (welcher Wagen) setzt du hier: im Reiter Teigecke oder über ⋯ mit „Wagen wählen …“, das wird sofort gespeichert. Dafür brauchst du die Rolle admin und den Haken 🧺 Wagen & Zutaten. Mehrere auf einmal: Ordner „Teigecke“, dort steht jeder Wagen mit seinen Zutaten und „＋ Zutaten hierher …“. Silo-Zutaten brauchen kein Zuhause. Die Wagen selbst, ihre Reihenfolge auf dem Schild und das Drucken bleiben auf der Seite Teigecke · Orte, die das Zuhause nur noch anzeigt. „Steckt in …“ zeigt, in welchen Teigen die Zutat steht und welche Brote aus diesen Teigen kommen.' },
+    { heading: 'Aus der Teigecke übernehmen', text: 'Den Ordner gibt es nur, solange Zutaten der Teigecke noch nicht im Lager stehen. Einmalig: Die Zutaten, die es in der Teigecke schon gibt, kommen mit „Übernehmen“ ins Lager — mit derselben Kennung, also bleiben alle Rezepte gültig. Name, Inhalt, Gruppe und Archiv werden mitgenommen; Kategorie und Bereich bleiben offen, die trägst du danach ein. Die Teigecke selbst wird dabei nicht angefasst. Erst nach der Übernahme lässt sich ein Zuhause setzen; das ist gewollt.' },
     { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Ein Standort lässt sich erst archivieren, wenn kein Lagerort mehr zu ihm gehört; ein Lagerort, wenn kein Artikel mehr fest dort liegt; eine Kategorie, wenn kein Artikel mehr dazugehört; ein Lieferant, wenn er keinen Artikel mehr liefert; ein Artikel, wenn er in keinem Teig mehr steht. Archiviertes steht im Ordner „Archiv“ und lässt sich dort über die Karte wiederherstellen.' },
-    { heading: 'Wer darf was?', text: 'Sehen darf das Lager jeder mit Konto. Ändern darf nur die Rolle admin — dieselbe Regel wie bei den Produkten. Fehlt dir die Rolle, steht oben ein Hinweis, und alle Felder sind gesperrt. Zählen ist etwas anderes: dafür gibt es je Standort einen Haken in der Kontenverwaltung.' },
+    { heading: 'Wer darf was?', text: 'Sehen darf das Lager jeder mit Konto. Ändern darf nur die Rolle admin — dieselbe Regel wie bei den Produkten. Fehlt dir die Rolle, steht oben ein Hinweis, und alle Felder sind gesperrt. Zählen ist etwas anderes: dafür gibt es je Standort einen Haken in der Kontenverwaltung. Den Wagen einer Teigecke-Zutat setzt, wer Rolle admin und den Haken 🧺 Wagen & Zutaten hat.' },
     { heading: 'Wenn etwas schiefgeht', text: 'Fehler erscheinen oben in einem roten Kasten, mit der echten Meldung des Systems. „Keine Berechtigung“ heißt: keine Rolle admin, oder die Regeln in der Datenbank sind älter als diese Seite — dann steht oben zusätzlich ein roter Hinweis mit der Regeldatei, die eingesetzt werden muss. „Inzwischen von … geändert“ heißt: jemand war schneller; die Seite hat den frischen Stand geladen, deine Eingaben stehen noch da, einfach prüfen und noch einmal speichern. Ohne Netz lässt sich nichts ändern. Lässt sich beim Öffnen nicht prüfen, ob die Regeln passen (meist kein Netz), steht oben ein Satz mit dem Grund.' }
   ]
 };

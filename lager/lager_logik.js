@@ -24,6 +24,14 @@
    Blöcke lager_*). test_lager.js vergleicht beides — immer beide ändern.
 
    CHANGELOG
+     2026-11-12 · 07:52 · v4 · Feature (Zuhause im Lager, L19/L21, Freigabe Kontroll-Chat 12.11. 07:46; A23)
+       Zuhause der Teigecke-Zutaten: TEIGECKE_BLATT_FELDER, blattMitZuhause (umgezogen aus teigecke_orte.html),
+       wagenText, wagenVergleich, wagenSortiert, zuhauseVon, teigeckeGruppen (Ordner Teigecke nach Wagen),
+       zuhauseKandidaten („＋ Zutaten hierher …“), zuhauseSperre. ordnerKontext kennt Blätter und Wagen, wenn
+       die Seite sie mitgibt; ordnerZeile zeigt den Wagen in der Unterzeile. A23: ordnerBaum stellt die
+       intelligenten Ordner in den Abschnitt a:uebersicht (Kopf ohne Inhalt, nurKlappen); vorfahren kennt ihn.
+       Datenmodell, FELDER, pruefe(), Regel unverändert.
+       lager/_protokolle/SESSION_2026-11-12_LAGER_ZUHAUSE_BAU.md
      2026-11-11 · 20:42 · v3 · Feature (Lager Ordneransicht, #120/#168; Freigabe Kontroll-Chat 20:30)
        Neu, nur rechnend (kein Firestore, kein DOM): ORDNER_INTELLIGENT (Liste der intelligenten
        Ordner, Reihenfolge = Baum), TEMP_ZEICHEN, ordnerKontext, ordnerBaum (Standort → Temperatur
@@ -464,7 +472,9 @@
     return {
       artikel: aktiv(d.artikel), orte: aktiv(d.orte), standorte: aktiv(d.standorte), kategorien: aktiv(d.kategorien), lieferanten: aktiv(d.lieferanten),
       om: nachId(aktiv(d.orte)), sm: nachId(aktiv(d.standorte)), km: nachId(aktiv(d.kategorien)), lm: nachId(aktiv(d.lieferanten)),
-      kandidaten: istZahl(d.kandidaten) ? d.kandidaten : 0, archiv: archiv, roh: d
+      kandidaten: istZahl(d.kandidaten) ? d.kandidaten : 0, archiv: archiv, roh: d,
+      /* Zuhause im Lager (L19): Teigecke-Blätter und Wagen, nur wenn die Seite sie mitgibt */
+      mitWagen: Array.isArray(d.teigeckeOrte), bm: nachId(d.blaetter || []), wagen: aktiv(d.teigeckeOrte || []), wm: nachId(aktiv(d.teigeckeOrte || []))
     };
   }
   function tempVon(o) { return TEMP_ORT.indexOf(o && o.temperatur) !== -1 ? o.temperatur : 'ungekuehlt'; }
@@ -480,6 +490,8 @@
   /* Baum als Knoten für bos_ordnerbaum.js. opt.liste = ORDNER_INTELLIGENT (zum Testen austauschbar). */
   function ordnerBaum(daten, opt) {
     var kx = ordnerKontext(daten), o = opt || {}, liste = o.liste || ORDNER_INTELLIGENT, wurzel = [];
+    /* A23 (KC 12.11.): die intelligenten Ordner stehen im Abschnitt ÜBERSICHT. Der Kopf ist kein Ordner (nurKlappen). */
+    var ue = { id: 'a:uebersicht', art: 'abschnitt', schluessel: 'abschnitt_uebersicht', nurKlappen: true, kinder: [] };
     liste.forEach(function (e) {
       var n = intelligentZahl(e, kx);
       if (!e.immer && !n) return;
@@ -489,8 +501,9 @@
           return { id: 'o:' + x.id, art: 'ort', name: x.name, zahl: artikelAmOrt(x.id, kx.artikel).length, mitKarte: true, kinder: [] };
         });
       }
-      wurzel.push(k);
+      ue.kinder.push(k);
     });
+    wurzel.push(ue);
     var st = { id: 'a:standorte', art: 'abschnitt', schluessel: 'abschnitt_standorte', hinzu: 'hinzu_standort', kinder: [] };
     kx.standorte.slice().sort(nachSort).forEach(function (s) {
       var orte = kx.orte.filter(function (x) { return x.standortId === s.id; }).sort(nachSort);
@@ -557,6 +570,8 @@
     var g = gebindeText(a); if (g) unter.push(g);
     unter.push(zaehlText(a));
     if (l) unter.push(l.name);
+    var zh = a.teigecke === true && kx.mitWagen ? zuhauseVon(a, kx) : null;   /* L19: Wagen in der Unterzeile, Silo braucht keinen */
+    if (zh && !zh.silo) unter.push('🥖 ' + (zh.wagen ? zh.wagen.kennung : 'noch ohne Zuhause'));
     return { artikel: a, id: a.id, ortId: ortId || null, marken: marken, unter: unter, zahl: null };
   }
   /* Inhalt eines Ordners. opt.sortierung: 'ort' | 'kategorie' (nur „Alle Artikel“).
@@ -569,6 +584,7 @@
       var e = liste.filter(function (x) { return x.id === z.id; })[0];
       if (!e) return { art: null };
       if (e.art === 'eigen') return { art: 'eigen', id: e.id };
+      if (e.id === 'teigecke' && kx.mitWagen) return { art: 'artikel', wagen: true, gruppen: teigeckeGruppen(kx) };   /* L19 */
       if (e.art === 'orte') return { art: 'orte', orte: kx.orte.filter(function (x) { return e.filter(x, kx); }).sort(nachSort) };
       if (e.id === 'alle') {
         if (o.sortierung === 'kategorie') {
@@ -632,6 +648,7 @@
   function vorfahren(sel, daten) {
     var ids = pfad(sel, daten).map(function (x) { return x.id; }).filter(function (id) { return id !== sel; });
     if (/^[st]:/.test(sel) || (ids[0] && /^s:/.test(ids[0]))) ids.unshift('a:standorte');
+    if (/^i:/.test(sel) || (ids[0] && /^i:/.test(ids[0]))) ids.unshift('a:uebersicht');   /* A23 */
     return ids;
   }
   /* Suche über alles (aktive Einträge). Artikel: Name, Gebinde, Artikelnummern. Ein Artikel an n Orten hat n Pfade. */
@@ -693,6 +710,73 @@
     };
   }
 
+  /* ================================================================
+     ZUHAUSE DER TEIGECKE-ZUTATEN IM LAGER (L19, Bauplan 12.11. 07:24, Freigabe KC 07:46)
+     Die Wahrheit bleibt im Feld ortId am Teigecke-Blatt (teigecke_zutaten/{artikelId}).
+     Das Lager ist seit diesem Schritt der einzige Schreiber; Teigecke · Orte zeigt nur an.
+     ================================================================ */
+  /* = FELDER.teigecke_zutaten der Orte-Seite vor diesem Bau (A1+): die alten Felder werden unverändert
+     mitgeschrieben, nur ortId ändert sich — die Regel erlaubt per diff() nur ortId + Herkunft. */
+  var TEIGECKE_BLATT_FELDER = ['name', 'ortId', 'gebindeGroesse', 'gebindeEinheit', 'gruppe', 'geloescht'];
+  var WAGEN_KENNUNG = /^([A-Z])([0-9]{2,3})$/;   /* = teigecke_logik.js KENNUNG_ORT */
+  /* Blatt mit neuem Zuhause (umgezogen aus teigecke_orte.html blattMitZuhause): das rohe Blatt mit neuem
+     ortId, oder ein neues nur mit ortId. vorher = rohes Blatt ohne id (für die Sicherung). */
+  function blattMitZuhause(roh, ortId) {
+    var d = {};
+    if (roh) TEIGECKE_BLATT_FELDER.forEach(function (k) { if (roh[k] !== undefined) d[k] = roh[k]; });
+    d.ortId = String(ortId || '');
+    var vorher = null;
+    if (roh) { vorher = Object.assign({}, roh); delete vorher.id; }
+    return { daten: d, vorher: vorher, aktion: roh ? 'aendern' : 'anlegen' };
+  }
+  function wagenText(w) { return w ? w.kennung + (w.bereichName ? ' · ' + w.bereichName : '') + (w.name ? ' · ' + w.name : '') : ''; }
+  function wagenVergleich(a, b) {   /* = teigecke_logik.js kennungVergleich */
+    var za = WAGEN_KENNUNG.exec(String(a.kennung || '').trim().toUpperCase()), zb = WAGEN_KENNUNG.exec(String(b.kennung || '').trim().toUpperCase());
+    if (za && zb) return za[1] === zb[1] ? parseInt(za[2], 10) - parseInt(zb[2], 10) : (za[1] < zb[1] ? -1 : 1);
+    if (za || zb) return za ? -1 : 1;
+    return String(a.kennung || '').localeCompare(String(b.kennung || ''), 'de', { numeric: true });
+  }
+  function wagenSortiert(teigeckeOrte) { return aktiv(teigeckeOrte).slice().sort(wagenVergleich); }
+  /* Zuhause eines Artikels: Silo braucht keins; ein archivierter oder unbekannter Wagen zählt als „ohne“
+     (wie teigecke_logik.js ortInhalt). */
+  function zuhauseVon(a, kx) {
+    var b = kx.bm[a.id], oid = b && b.ortId ? b.ortId : '';
+    return { silo: a.teigeckeGruppe === 'silo', ortId: oid, wagen: oid && kx.wm[oid] ? kx.wm[oid] : null };
+  }
+  /* Ordner „Teigecke“ nach Wagen: „Noch ohne Zuhause“ zuerst, dann jeder aktive Wagen (auch leer, damit man
+     ihn füllen kann) in Kennungsfolge, zuletzt Silo. */
+  function teigeckeGruppen(kx) {
+    var ohne = [], silo = [], je = {};
+    kx.wagen.forEach(function (w) { je[w.id] = []; });
+    kx.artikel.filter(function (a) { return a.teigecke === true; }).forEach(function (a) {
+      var zh = zuhauseVon(a, kx);
+      if (zh.silo) silo.push(a); else if (zh.wagen) je[zh.wagen.id].push(a); else ohne.push(a);
+    });
+    var zeilen = function (arr) { return arr.slice().sort(nachName).map(function (a) { return ordnerZeile(a, null, kx); }); };
+    var gr = [];
+    if (ohne.length) gr.push({ schluessel: '_ohne', titel: 'Noch ohne Zuhause', wagenId: '', zeilen: zeilen(ohne) });
+    kx.wagen.slice().sort(wagenVergleich).forEach(function (w) { gr.push({ schluessel: 'w:' + w.id, titel: wagenText(w), wagenId: w.id, zeilen: zeilen(je[w.id]) }); });
+    if (silo.length) gr.push({ schluessel: '_silo', titel: 'Silo · braucht kein Zuhause', wagenId: null, zeilen: zeilen(silo) });
+    return gr;
+  }
+  /* „＋ Zutaten hierher …“ (Ersatz für „Hierher holen“ in Orte): ohne Zuhause zuerst, dann aus anderen Wagen. Silo nie. */
+  function zuhauseKandidaten(daten, wagenId) {
+    var kx = ordnerKontext(daten), ohne = [], andere = [];
+    kx.artikel.filter(function (a) { return a.teigecke === true; }).sort(nachName).forEach(function (a) {
+      var zh = zuhauseVon(a, kx);
+      if (zh.silo) return;
+      if (!zh.wagen) ohne.push(a);
+      else if (zh.wagen.id !== wagenId) andere.push({ artikel: a, wagen: zh.wagen });
+    });
+    return { ohne: ohne, andere: andere };
+  }
+  /* Grund, warum ein Artikel (so wie gespeichert) kein Zuhause bekommt: 'nicht_teigecke' | 'silo' | '' */
+  function zuhauseSperre(gespeichert) {
+    if (!gespeichert || gespeichert.teigecke !== true || gespeichert.geloescht) return 'nicht_teigecke';
+    if (gespeichert.teigeckeGruppe === 'silo') return 'silo';
+    return '';
+  }
+
   var api = {
     COL: COL, FELDER: FELDER, HERKUNFT: HERKUNFT, GRENZEN: GRENZEN, BEREICHE: BEREICHE, EINHEITEN: EINHEITEN,
     TEMP_ORT: TEMP_ORT, TEMP_KATEGORIE: TEMP_KATEGORIE, BESTELLWEGE: BESTELLWEGE, TAGE: TAGE, TAG_TEXT: TAG_TEXT,
@@ -721,7 +805,9 @@
     ORDNER_INTELLIGENT: ORDNER_INTELLIGENT, TEMP_ZEICHEN: TEMP_ZEICHEN, ordnerKontext: ordnerKontext, ordnerBaum: ordnerBaum,
     zerlegeOrdner: zerlegeOrdner, ordnerGueltig: ordnerGueltig, startordner: startordner, ordnerInhalt: ordnerInhalt, ordnerZeile: ordnerZeile,
     blaetterIds: blaetterIds, pfad: pfad, vorfahren: vorfahren, sucheUeberAlles: sucheUeberAlles, archivListe: archivListe,
-    ortErsetzen: ortErsetzen, ortDazu: ortDazu, ortWeg: ortWeg, standHinweis: standHinweis, tempVon: tempVon
+    ortErsetzen: ortErsetzen, ortDazu: ortDazu, ortWeg: ortWeg, standHinweis: standHinweis, tempVon: tempVon,
+    TEIGECKE_BLATT_FELDER: TEIGECKE_BLATT_FELDER, blattMitZuhause: blattMitZuhause, wagenText: wagenText, wagenVergleich: wagenVergleich,
+    wagenSortiert: wagenSortiert, zuhauseVon: zuhauseVon, teigeckeGruppen: teigeckeGruppen, zuhauseKandidaten: zuhauseKandidaten, zuhauseSperre: zuhauseSperre
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_LAGER_LOGIK = api;

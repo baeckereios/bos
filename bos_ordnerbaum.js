@@ -21,12 +21,16 @@
    (Menü) gibt es im Baum nicht.
 
    Knoten: { id, name, zeichen, zahl, art, kinder: [...], mitKarte, hinzu: 'Text'|null,
-             hinzuAls: 'knopf' | 'zeile', waehlbar (auswahl), markiert (auswahl), aus: 'Grund' (grau) }
+             hinzuAls: 'knopf' | 'zeile', waehlbar (auswahl), markiert (auswahl), aus: 'Grund' (grau),
+             nurKlappen (navigation: Kopf ohne Inhalt, der Name klappt auf und zu statt zu wählen) }
    Keine Farben im JS, nur Klassen (bos_ordnerbaum.css mit Design-Tokens).
 
    CHANGELOG
      2026-11-11 · 20:45 · v1 · Erstfassung (Lager Ordneransicht, #120/#168; Bauplan 20:22,
        Freigabe Kontroll-Chat 20:30 mit A16–A19)
+     2026-11-12 · 08:39 · v2 · nurKlappen (Zuhause im Lager, A23 der Freigabe 07:46): ein Kopf ohne Inhalt
+       (Lager: ÜBERSICHT) — der Name klappt wie der Pfeil (data-ob="klappe", aria-expanded), kein ✎, kein ＋, keine
+       Zahl, wählt nichts. Sonst unverändert.
    ================================================================ */
 (function (global) {
   'use strict';
@@ -86,7 +90,9 @@
       html += klapp
         ? '<button type="button" class="ob-klappe" data-ob="klappe" aria-label="' + esc(t(offen[k.id] ? 'ob_zu' : 'ob_auf')) + '">' + (offen[k.id] ? '▾' : '▸') + '</button>'
         : '<span class="ob-klappe ob-leer-klappe" aria-hidden="true"></span>';
-      html += '<button type="button" class="ob-name" data-ob="wahl"' + (waehlbar ? '' : ' disabled') + (k.aus ? ' title="' + esc(k.aus) + '"' : '') + '>' +
+      /* nurKlappen (v2): ein Kopf ohne Inhalt — der Name klappt wie der Pfeil, statt zu wählen */
+      var nk = modus === 'navigation' && k.nurKlappen && klapp;
+      html += '<button type="button" class="ob-name" data-ob="' + (nk ? 'klappe' : 'wahl') + '"' + (nk ? ' aria-expanded="' + !!offen[k.id] + '"' : '') + (waehlbar || nk ? '' : ' disabled') + (k.aus ? ' title="' + esc(k.aus) + '"' : '') + '>' +
         (k.zeichen ? '<span class="ob-zeichen">' + esc(k.zeichen) + '</span>' : '') + '<span class="ob-text">' + esc(k.name) + '</span>' +
         (modus === 'auswahl' && k.markiert ? '<span class="ob-haken" title="' + esc(t('ob_markiert')) + '">✓</span>' : '') + '</button>';
       html += k.zahl != null ? '<span class="ob-zahl">' + esc(k.zahl) + '</span>' : '';
@@ -138,7 +144,7 @@
         var id = z.getAttribute('data-ob-id');
         var liste = sichtbar(o.knoten ? o.knoten() : [], offen), i = -1;
         for (var n = 0; n < liste.length; n++) if (liste[n].id === id) i = n;
-        var fokus = function (j) { if (j < 0 || j >= liste.length) return; var el = wurzel.querySelector('[data-ob-id="' + String(liste[j].id).replace(/"/g, '\\"') + '"] [data-ob="wahl"]'); if (el) el.focus(); };
+        var fokus = function (j) { if (j < 0 || j >= liste.length) return; var el = wurzel.querySelector('[data-ob-id="' + String(liste[j].id).replace(/"/g, '\\"') + '"]  .ob-name'); if (el) el.focus(); };
         if (ev.key === 'ArrowDown') { ev.preventDefault(); fokus(i + 1); }
         else if (ev.key === 'ArrowUp') { ev.preventDefault(); fokus(i - 1); }
         else if (ev.key === 'ArrowRight' && i >= 0 && aufklappbar(liste[i].knoten) && !offen[id]) { ev.preventDefault(); umschalten(id, true); fokus(i); }
