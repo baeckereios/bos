@@ -1,4 +1,19 @@
 <!--
+  2026-11-14 · 07:19 · v0.4 · Feature
+    Stikken-Verteilung Stufe 2a (Anweisung KC 14.11., 06:50; Go 07:00, G1–G3).
+    - Rest an: jede Stikken-Sorte als Rechnung „[Benötigt] − [Rest] = ▢ Bleche
+      absetzen“; das Ergebnis-Kästchen sieht aus wie auf dem Zettel (Anzeige,
+      kein Feld), „–“ solange nichts eingetragen, bei Rest > benötigt 0 und
+      darunter „2 mehr als benötigt“. Kopf „Benötigt · Rest · Absetzen“ direkt
+      über der ersten Stikken-Sorte (nicht mehr über Mohn + Sesam). „Will
+      haben“ → „Benötigt“, „gewollt“ → „benötigt“. Rest aus: wie vor Stufe 2.
+    - Posten tragen `trennung` aus der Sortenliste; zeichneHTML bekommt eine
+      Messfunktion (Canvas mit BOS_STIKKEN.SCHRIFT). Falsche Trennstellen:
+      leiser Hinweis über dem Drucken-Knopf, kein Druckstopp (G1). Klappt die
+      Prüfung selbst nicht, steht der Grund (err.message) im selben Feld.
+    - Hilfe angepasst.
+    SESSION_2026-11-14_STIKKEN_2A_BAU.md
+
   2026-11-14 · 06:23 · v0.3 · Feature
     Stikken-Verteilung Stufe 2: Rest und Reste-Stikken (Anweisung KC
     14.11., 05:46, Fassung 3; Go 06:02 mit F1–F6).
@@ -179,14 +194,20 @@
   [hidden] { display: none !important; }
   .fh-card-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm, 12px); margin-bottom: var(--bos-space-2xs, 6px); }
   .fh-card-kopf .field-label { margin: 0; }
-  .fh-th-rest { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); padding-top: var(--bos-space-2xs, 6px); font-family: var(--font-label); font-size: var(--bos-font-xs, 0.7rem); text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
+  /* Rest an (Stufe 2a): Rechnung „Benötigt − Rest = Absetzen“ je Stikken-Sorte */
+  .fh-th-rest { display: flex; align-items: flex-end; gap: var(--bos-space-sm, 12px); padding-top: var(--bos-space-xs, 8px); font-family: var(--font-label); font-size: var(--bos-font-xs, 0.7rem); text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
   .fh-th-rest .fh-th-name { flex: 1; min-width: 150px; }
-  .fh-th-rest .fh-th { width: 70px; flex: 0 0 auto; }
-  .fh-th-rest .fh-th-setzt { width: 150px; }
+  .fh-th-rest .fh-th { width: 70px; flex: 0 0 auto; text-align: center; }
+  .fh-th-rest .fh-th-op { width: 14px; flex: 0 0 auto; }
+  .fh-th-rest .fh-th-erg { width: 44px; flex: 0 0 auto; text-align: center; }
+  .fh-th-rest .fh-th-suffix { width: 110px; flex: 0 0 auto; }
   .fh-rest-teil { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); flex: 0 0 auto; }
-  .fh-setzt { width: 150px; font-size: var(--bos-font-sm, 0.82rem); font-weight: 700; color: var(--text); }
-  .fh-setzt.mehr { color: var(--amber); }
+  .fh-op { width: 14px; text-align: center; font-size: 1.35rem; font-weight: 800; color: var(--text); line-height: 1; }
+  .fh-ergebnis { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 36px; box-sizing: border-box; padding: 0 6px; background: #fff; color: #000; border: 2px solid #000; border-radius: 2px; font-weight: 900; font-size: 1.05rem; }
+  .fh-rest-teil .fh-suffix { width: 110px; }
+  .fh-mehr { flex-basis: 100%; text-align: right; font-size: var(--bos-font-sm, 0.8rem); color: var(--amber); margin-top: -4px; }
   .rest-an .fh-suffix-stikke { display: none; }
+  #fh-produkte:not(.rest-an) .fh-mehr { display: none; }
   .fh-fremd { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) 0; border-top: 1px dashed var(--border); margin-top: var(--bos-space-2xs, 6px); }
   .fh-fremd-label { font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.92rem); }
   .fh-fremd input { flex: 1 1 180px; min-width: 150px; }
@@ -239,9 +260,6 @@
       <span class="field-label">Produkte</span>
       <button class="pill" id="fh-rest-pill" onclick="toggleRest()">Rest</button>
     </div>
-    <div class="fh-th-rest" id="fh-th-rest" hidden>
-      <span class="fh-th-name"></span><span class="fh-th">Will haben</span><span class="fh-th">Rest</span><span class="fh-th fh-th-setzt">setzt ab</span>
-    </div>
     <div id="fh-rows"></div>
     <div class="fh-fremd" id="fh-fremd" hidden>
       <span class="fh-fremd-label">Steht auch mit drin</span>
@@ -272,6 +290,7 @@
       <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
       <button class="pill" data-toggle="stikken" onclick="toggleOption('stikken')">Stikken</button>
     </div>
+    <div class="fh-rest-info" id="fh-trenn-info" hidden></div>
     <div class="fehler-feld" id="fh-fehler" role="alert" hidden></div>
     <button class="btn btn-amber btn-main" onclick="drucken()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -315,11 +334,12 @@
       <p>Jeder Stikken hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an den echten Stikken schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
       <p>In die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht hinein.</p>
       <p>Sorten dürfen in einem Stikken gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken aufgeteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als ein Stikken Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt in einen weiteren.</p>
+      <p>Lange Namen werden auf dem Stikken-Blatt nur an festen Stellen getrennt, zum Beispiel „Schoko-“ / „croissants“. Wird es in einem Stikken eng, wird die Schrift dort etwas kleiner. Die Bleche-Zahl bleibt immer groß.</p>
       <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt kein eigenes Blatt. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
     </div>
     <div class="sec">
       <h3>Rest und Reste-Stikken</h3>
-      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Dann gibt es je Sorte drei Angaben: <strong>Will haben</strong>, <strong>Rest</strong> (alte Bleche im Reste-Stikken) und daneben „setzt ab“. Auf den Zettel kommt nur, was abgesetzt wird, neben der Zahl ein kurzer Hinweis wie „+2 alte im Reste-Stikken“.</p>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Dann wird je Sorte gerechnet: <strong>Benötigt</strong> − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = Bleche absetzen. Das Ergebnis im weißen Kästchen kommt genau so auf den Zettel, daneben ein kurzer Hinweis wie „+2 alte im Reste-Stikken“. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
       <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
       <p>Auf dem Stikken-Blatt steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
       <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
@@ -375,7 +395,7 @@
     }
     return REIHENFOLGE.map(function (r) {
       var s = BOS_DRUCKZENTRALE_SORTEN.sorte(r.kennung);   // unbekannt → Error
-      return { kennung: s.kennung, name: s.name, stikke: s.stikke, suffix: r.suffix };
+      return { kennung: s.kennung, name: s.name, stikke: s.stikke, trennung: s.trennung, suffix: r.suffix };
     });
   }
 
@@ -419,7 +439,18 @@
     buildSelect(document.getElementById('fh-mohn'), 20, 0.5);
     buildSelect(document.getElementById('fh-sesam'), 20, 0.5);
 
+    var kopfGesetzt = false;
     FIXE_ROWS.forEach(function(item) {
+      if (item.stikke && !kopfGesetzt) {         // Kopf direkt über der ersten Stikken-Sorte (Stufe 2a)
+        var kopf = document.createElement('div');
+        kopf.className = 'fh-th-rest';
+        kopf.id = 'fh-th-rest';
+        kopf.hidden = !restAn;
+        kopf.innerHTML = '<span class="fh-th-name"></span><span class="fh-th">Benötigt</span><span class="fh-th-op"></span>' +
+          '<span class="fh-th">Rest</span><span class="fh-th-op"></span><span class="fh-th-erg">Absetzen</span><span class="fh-th-suffix"></span>';
+        wrap.appendChild(kopf);
+        kopfGesetzt = true;
+      }
       var r = document.createElement('div');
       r.className = 'fh-row';
       r.innerHTML =
@@ -427,10 +458,14 @@
         '<select class="bos-input" id="fh-' + item.kennung + '"></select>' +
         (item.stikke ?
           '<span class="fh-rest-teil" hidden>' +
+            '<span class="fh-op" aria-hidden="true">−</span>' +
             '<select class="bos-input" id="fh-rest-' + item.kennung + '" aria-label="Rest ' + escapeHtml(item.name) + '"></select>' +
-            '<span class="fh-setzt" id="fh-setzt-' + item.kennung + '"></span>' +
+            '<span class="fh-op" aria-hidden="true">=</span>' +
+            '<output class="fh-ergebnis" id="fh-erg-' + item.kennung + '" aria-label="Absetzen ' + escapeHtml(item.name) + '">–</output>' +
+            '<span class="fh-suffix">' + escapeHtml(item.suffix) + '</span>' +
           '</span>' : '') +
-        '<span class="fh-suffix' + (item.stikke ? ' fh-suffix-stikke' : '') + '">' + escapeHtml(item.suffix) + '</span>';
+        '<span class="fh-suffix' + (item.stikke ? ' fh-suffix-stikke' : '') + '">' + escapeHtml(item.suffix) + '</span>' +
+        (item.stikke ? '<div class="fh-mehr" id="fh-mehr-' + item.kennung + '" hidden></div>' : '');
       wrap.appendChild(r);
       buildSelect(document.getElementById('fh-' + item.kennung), 30);
       document.getElementById('fh-' + item.kennung).addEventListener('change', aktualisiereRest);
@@ -552,7 +587,7 @@
   }
   function stikkenPosten() {
     return FIXE_ROWS.filter(function (z) { return z.stikke; }).map(function (z) {
-      return { kennung: z.kennung, name: z.name, bleche: document.getElementById('fh-' + z.kennung).value, tag: 'heute' };
+      return { kennung: z.kennung, name: z.name, trennung: z.trennung, bleche: document.getElementById('fh-' + z.kennung).value, tag: 'heute' };
     });
   }
   /* ── Rest und Reste-Stikken (Stufe 2, 14.11.2026) ────────────────
@@ -575,6 +610,29 @@
     if (!window.BOS_STIKKEN) throw new Error(RECHENTEIL_FEHLT);
     return BOS_STIKKEN.plane(stikkenPosten(), { rest: restAn ? restEingabe() : null });
   }
+  /* Messen mit genau der Druckschrift (G2): Canvas, Breite in mm */
+  var messKontext = null;
+  function messeText(text, pt, gewicht) {
+    if (!messKontext) messKontext = document.createElement('canvas').getContext('2d');
+    messKontext.font = (gewicht || 400) + ' ' + pt + 'pt ' + BOS_STIKKEN.SCHRIFT;
+    return messKontext.measureText(text).width * 25.4 / 96;
+  }
+  /* Falsche Trennstellen (G1): leiser Hinweis über dem Drucken-Knopf, nie ein Druckstopp */
+  function zeigeTrennHinweis(plan) {
+    var el = document.getElementById('fh-trenn-info');
+    if (!el) return;
+    var texte = plan && plan.trennungHinweise ? plan.trennungHinweise : [];
+    el.textContent = texte.join('\n');
+    el.hidden = !texte.length;
+  }
+  function pruefeTrennstellen() {
+    try { if (window.BOS_STIKKEN && FIXE_ROWS.length) zeigeTrennHinweis(BOS_STIKKEN.plane(stikkenPosten())); }
+    catch (err) {
+      console.error('[Frühschicht-Formular] Trennstellen:', err);
+      var el = document.getElementById('fh-trenn-info');
+      if (el) { el.textContent = 'Trennstellen nicht prüfbar: ' + err.message; el.hidden = false; }
+    }
+  }
   function postenAus(plan, kennung) {
     var treffer = null;
     plan.posten.forEach(function (p) { if (p.kennung === kennung) treffer = p; });
@@ -584,7 +642,8 @@
     restAn = !restAn;
     document.getElementById('fh-rest-pill').classList.toggle('active', restAn);
     document.getElementById('fh-produkte').classList.toggle('rest-an', restAn);
-    document.getElementById('fh-th-rest').hidden = !restAn;
+    var kopf = document.getElementById('fh-th-rest');
+    if (kopf) kopf.hidden = !restAn;
     document.getElementById('fh-fremd').hidden = !restAn;
     document.querySelectorAll('.fh-rest-teil').forEach(function (el) { el.hidden = !restAn; });
     aktualisiereRest();
@@ -599,17 +658,22 @@
       FIXE_ROWS.forEach(function (z) {
         if (!z.stikke) return;
         var pe = postenAus(plan, z.kennung);
-        var el = document.getElementById('fh-setzt-' + z.kennung);
-        if (!pe || (!pe.will && !pe.rest)) { el.textContent = ''; el.classList.remove('mehr'); return; }
-        el.textContent = 'setzt ab ' + pe.setztAb + (pe.mehrAlsGewollt ? ' (' + pe.mehrAlsGewollt + ' mehr als gewollt)' : '');
-        el.classList.toggle('mehr', pe.mehrAlsGewollt > 0);
+        var erg = document.getElementById('fh-erg-' + z.kennung);
+        var mehr = document.getElementById('fh-mehr-' + z.kennung);
+        erg.textContent = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '–';
+        mehr.textContent = pe && pe.mehrAlsGewollt ? pe.mehrAlsGewollt + ' mehr als benötigt' : '';
+        mehr.hidden = !(pe && pe.mehrAlsGewollt);
       });
       texte = plan.hinweise.slice();
     } catch (err) {
       console.error('[Frühschicht-Formular] Rest:', err);
       texte = [err.message];
       istFehler = true;
-      FIXE_ROWS.forEach(function (z) { if (z.stikke) document.getElementById('fh-setzt-' + z.kennung).textContent = ''; });
+      FIXE_ROWS.forEach(function (z) {
+        if (!z.stikke) return;
+        document.getElementById('fh-erg-' + z.kennung).textContent = '–';
+        document.getElementById('fh-mehr-' + z.kennung).hidden = true;
+      });
     }
     info.textContent = texte.join('\n');
     info.classList.toggle('fehler', istFehler);
@@ -693,6 +757,7 @@
     html += '<div class="fs-anmerkungen"><div class="fs-anmerkungen-label">Anmerkungen</div>' +
             (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
 
+    zeigeTrennHinweis(plan);
     var extraCSS = PRINT_CSS;
     var ab2 = '';
     if (druckOptionen.stikken) {
@@ -700,7 +765,8 @@
         var jetzt = new Date();
         html += BOS_STIKKEN.hinweisHTML(plan);
         ab2 = BOS_STIKKEN.zeichneHTML(plan, {
-          kopfzeile: 'Frühschicht-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
+          kopfzeile: 'Frühschicht-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr',
+          messen: messeText
         });
         extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
       } else {
@@ -742,6 +808,7 @@
     FIXE_ROWS = [];
   }
   renderFixedRows();
+  pruefeTrennstellen();   // G1: falsche Trennstellen gleich beim Öffnen zeigen
   initExtra();
   for (var i = 0; i < 3; i++) fhAddNotizRow();
 </script>

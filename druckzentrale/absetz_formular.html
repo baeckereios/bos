@@ -1,4 +1,39 @@
 <!--
+  2026-11-14 · 08:19 · v0.5 · Feature
+    Stikken-Verteilung Stufe 3: Samstag (Anweisung KC 14.11., 07:55; Go 08:05, H1–H3).
+    - Tage als EINE Liste (wochenendTage): mit Samstag sa, so, mo, sonst so, mo.
+      Samstag = Tag vor dem errechneten Sonntag. Spaltenköpfe, Felder,
+      Käse-Trennzeile, Extra-Zeilen, Posten/tage, Druck-Tabelle, Meta-Zeile,
+      Fremd-Label, Rest-Zeile und Mohn-Überschrift laufen darüber.
+    - Schalter „Samstag“ vor „Rest“: beim Öffnen an, wenn heute Freitag ist
+      (Gerätezeit, Ulf S2), sonst aus; nur Sitzung. Aus: Samstagswerte bleiben
+      bis zum Neuladen stehen, werden aber weder gerechnet noch gedruckt.
+    - Rest folgt dem ersten Tag („Sa 14.11.: 26 − Rest [2] = ▢24▢ absetzen“),
+      Rest-Zahlen bleiben beim Umschalten stehen. Gerechnet nur in plane().
+    - Mohn-Überschrift „Mohn- und Sesambrötchen für ⟨erster Tag⟩“ (S5).
+    - H2: Spaltenköpfe genau über den Feldern (gleicher Abstand wie die
+      Zeilen) und eine feste letzte Spalte in der Breite des „×“ in allen
+      Zeilen; das „×“ bleibt am Ende der Extra-Zeilen.
+    - H3: Extra-Zeilen speichern { name, sa, so, mo } unter demselben
+      Schlüssel; alte Einträge ohne sa laden mit leerem Samstag.
+    - Froster-Zeile auf den Tagesblättern kommt aus ../bos_stikken.js v2.2.
+    - Hilfe angepasst.
+    SESSION_2026-11-14_STIKKEN_SAMSTAG_BAU.md
+
+  2026-11-14 · 07:19 · v0.4 · Feature
+    Stikken-Verteilung Stufe 2a (Anweisung KC 14.11., 06:50; Go 07:00, G1–G3).
+    - Rest an: zweite Zeile je Stikken-Sorte als Rechnung „So 15.11.: 20 −
+      Rest [2] = ▢18▢ absetzen“; die Sonntagszahl nur angezeigt, das
+      Ergebnis-Kästchen wie das Sonntags-Kästchen auf dem Zettel, „–“ solange
+      nichts eingetragen, bei Rest > benötigt 0 und „2 mehr als benötigt“.
+      „gewollt“ → „benötigt“. Rest aus: wie vor Stufe 2.
+    - Posten tragen `trennung` aus der Sortenliste; zeichneHTML bekommt eine
+      Messfunktion (Canvas mit BOS_STIKKEN.SCHRIFT). Falsche Trennstellen:
+      leiser Hinweis über dem Drucken-Knopf, kein Druckstopp (G1). Klappt die
+      Prüfung selbst nicht, steht der Grund (err.message) im selben Feld.
+    - Hilfe angepasst.
+    SESSION_2026-11-14_STIKKEN_2A_BAU.md
+
   2026-11-14 · 06:23 · v0.3 · Feature
     Stikken-Verteilung Stufe 2: Rest und Reste-Stikken, ein Tag je Blatt
     (Anweisung KC 14.11., 05:46, Fassung 3; Go 06:02 mit F1–F6).
@@ -129,9 +164,11 @@
 
   #af-gruss { width: 100%; resize: vertical; min-height: 50px; font-weight: 700; }
 
-  .af-th-row { display: flex; align-items: center; padding: 0 0 var(--bos-space-2xs, 6px); font-family: var(--font-label); font-size: var(--bos-font-xs, 0.68rem); text-transform: uppercase; letter-spacing: .05em; color: var(--faint); border-bottom: 1px solid var(--border-soft); margin-bottom: var(--bos-space-2xs, 6px); }
+  .af-th-row { display: flex; align-items: center; gap: var(--bos-space-sm, 10px); padding: 0 0 var(--bos-space-2xs, 6px); font-family: var(--font-label); font-size: var(--bos-font-xs, 0.68rem); text-transform: uppercase; letter-spacing: .05em; color: var(--faint); border-bottom: 1px solid var(--border-soft); margin-bottom: var(--bos-space-2xs, 6px); }
   .af-th-name { flex: 1; }
   .af-th-day { width: 64px; text-align: center; flex-shrink: 0; }
+  /* H2 (Stufe 3): feste letzte Spalte in der Breite des „×“, in allen Zeilen — so stehen die Köpfe genau über den Feldern */
+  .af-th-x, .af-x-slot { width: 28px; flex: 0 0 28px; }
 
   .af-row { display: flex; align-items: center; gap: var(--bos-space-sm, 10px); padding: var(--bos-space-2xs, 7px) 0; border-bottom: 1px solid var(--border-soft); }
   .af-row:last-child { border-bottom: none; }
@@ -141,10 +178,10 @@
 
   select.bos-input { -webkit-appearance: none; appearance: none; cursor: pointer; }
 
-  .af-extra-row { display: flex; align-items: center; gap: var(--bos-space-xs, 8px); padding: var(--bos-space-2xs, 6px) 0; }
+  .af-extra-row { display: flex; align-items: center; gap: var(--bos-space-sm, 10px); padding: var(--bos-space-2xs, 6px) 0; }
   .af-extra-row input[type=text] { flex: 1; }
   .af-extra-row select { width: 64px; flex: 0 0 auto; }
-  .af-extra-del { background: none; border: none; color: var(--dim); font-size: var(--bos-font-lg, 1.1rem); cursor: pointer; padding: 0 4px; flex: 0 0 auto; }
+  .af-extra-del { background: none; border: none; color: var(--dim); font-size: var(--bos-font-lg, 1.1rem); cursor: pointer; padding: 0; width: 28px; flex: 0 0 28px; text-align: center; }
   .af-extra-del:hover { color: var(--red); }
   .af-add-btn { background: transparent; border: 1px dashed var(--border); color: var(--dim); border-radius: var(--radius-sm); padding: var(--bos-space-2xs, 7px) var(--bos-space-sm, 12px); font-family: var(--font-label); font-size: var(--bos-font-sm, 0.78rem); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; margin-top: var(--bos-space-xs, 8px); }
   .af-add-btn:hover { border-color: var(--amber); color: var(--amber); }
@@ -166,11 +203,16 @@
   [hidden] { display: none !important; }
   .af-card-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm, 10px); margin-bottom: var(--bos-space-2xs, 6px); }
   .af-card-kopf .field-label { margin: 0; }
+  .af-pills { display: flex; gap: var(--bos-space-xs, 8px); }
   .af-rest-teil { display: flex; align-items: center; gap: var(--bos-space-sm, 10px); flex: 0 0 auto; }
   .af-rest-teil select { width: 64px; }
   .af-rest-label { font-size: var(--bos-font-sm, 0.8rem); color: var(--dim); }
-  .af-setzt { width: 170px; font-size: var(--bos-font-sm, 0.8rem); font-weight: 700; color: var(--text); }
-  .af-setzt.mehr { color: var(--amber); }
+  /* Rest an (Stufe 2a): Rechnung „So: 20 − Rest [2] = ▢18▢ absetzen“ */
+  .af-so-zahl { min-width: 24px; text-align: right; font-weight: 800; color: var(--text); font-size: var(--bos-font-md, 0.95rem); }
+  .af-op { width: 12px; text-align: center; font-size: 1.3rem; font-weight: 800; color: var(--text); line-height: 1; }
+  .af-ergebnis { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 34px; box-sizing: border-box; padding: 0 6px; background: #fff; color: #000; border: 2px solid #000; border-radius: 2px; font-weight: 900; font-size: 1.05rem; }
+  .af-mehr { flex-basis: 100%; order: 6; text-align: right; font-size: var(--bos-font-sm, 0.8rem); color: var(--amber); }
+  #af-produkte:not(.rest-an) .af-mehr { display: none; }
   /* VARIANTE-ANFANG */
   /* Rest als zweite Zeile unter der Sorte (gewählt, Prüfbild 14.11.: Spalten von Käsebrötchen und Extra-Zeilen bleiben bündig) */
   .rest-an .af-row.af-mit-rest { flex-wrap: wrap; }
@@ -231,12 +273,17 @@
   <div class="card" id="af-produkte">
     <div class="af-card-kopf">
       <span class="field-label">Produkte</span>
-      <button class="pill" id="af-rest-pill" onclick="toggleRest()">Rest</button>
+      <span class="af-pills">
+        <button class="pill" id="af-sa-pill" onclick="toggleSamstag()">Samstag</button>
+        <button class="pill" id="af-rest-pill" onclick="toggleRest()">Rest</button>
+      </span>
     </div>
     <div class="af-th-row">
       <span class="af-th-name">Produkt</span>
+      <span class="af-th-day af-sa" id="af-th-sa" hidden>Sa</span>
       <span class="af-th-day" id="af-th-so">So</span>
       <span class="af-th-day" id="af-th-mo">Mo</span>
+      <span class="af-th-x"></span>
     </div>
     <div id="af-rows"></div>
     <div class="af-fremd" id="af-fremd" hidden>
@@ -250,8 +297,10 @@
     <div class="af-sep-row">Käsebrötchen</div>
     <div class="af-row">
       <span class="af-row-name" id="af-kaese-name"></span><!-- Name aus druckzentrale_sorten.js -->
+      <select class="bos-input af-sa" id="af-kaese-sa" hidden></select>
       <select class="bos-input" id="af-kaese-so"></select>
       <select class="bos-input" id="af-kaese-mo"></select>
+      <span class="af-x-slot"></span>
     </div>
 
     <div id="af-extra-rows"></div>
@@ -259,7 +308,7 @@
   </div>
 
   <div class="card">
-    <span class="field-label">Mohn und Sesam</span>
+    <span class="field-label" id="af-mosa-titel">Mohn- und Sesambrötchen</span>
     <div class="af-mosa-row">
       Bitte <select class="bos-input" id="af-mohn"></select>
       <span>Bleche Mohnbrötchen</span>
@@ -282,6 +331,7 @@
       <button class="pill active" data-toggle="farbe" onclick="toggleOption('farbe')">Farbe</button>
       <button class="pill" data-toggle="stikken" onclick="toggleOption('stikken')">Stikken</button>
     </div>
+    <div class="af-rest-info" id="af-trenn-info" hidden></div>
     <div class="fehler-feld" id="af-fehler" role="alert" hidden></div>
     <button class="btn btn-amber btn-main" onclick="drucken()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -303,7 +353,7 @@
     <h2>Hilfe · Absetz-Formular</h2>
     <div class="sec">
       <h3>Wofür ist diese Seite?</h3>
-      <p>Der Wochenend-Zettel — was am Sonntag und was am Montag von welchem Produkt abgesetzt werden soll, in zwei getrennten Spalten. Die Spaltenköpfe zeigen automatisch das nächste Sonntag-/Montag-Datum.</p>
+      <p>Der Zettel für mehrere Tage — was am Sonntag und am Montag (mit dem Schalter „Samstag“ auch am Samstag) von welchem Produkt abgesetzt werden soll, je Tag eine eigene Spalte. Die Spaltenköpfe zeigen automatisch die Daten des nächsten Wochenendes.</p>
     </div>
     <div class="sec">
       <h3>Grußzeile</h3>
@@ -311,7 +361,13 @@
     </div>
     <div class="sec">
       <h3>Extra-Zeilen</h3>
-      <p>Über „+ Zeile hinzufügen" lässt sich ein zusätzliches Produkt eintragen. Diese Zeilen merkt sich das Gerät für den nächsten Ausdruck — aber nur auf diesem Gerät, nicht geräteübergreifend.</p>
+      <p>Über „+ Zeile hinzufügen" lässt sich ein zusätzliches Produkt eintragen. Diese Zeilen merkt sich das Gerät mit Name und Zahlen für den nächsten Ausdruck — aber nur auf diesem Gerät, nicht geräteübergreifend.</p>
+    </div>
+    <div class="sec">
+      <h3>Samstag</h3>
+      <p>Wird schon freitags für die nächsten Tage abgesetzt, oben bei den Produkten den Schalter <strong>Samstag</strong> einschalten. Freitags ist er beim Öffnen schon an, an allen anderen Tagen aus. Dann hat jede Zeile vor Sonntag eine Spalte für Samstag, auch Käsebrötchen und Extra-Zeilen.</p>
+      <p>Mit Samstag ist der Samstag der erste Tag: Rest und „Steht auch mit drin“ gehören dann zum Samstag, und oben über Mohn und Sesam steht „Mohn- und Sesambrötchen für Samstag“. Ohne Samstag gilt das alles für Sonntag.</p>
+      <p>Wird der Samstag wieder ausgeschaltet, bleiben die eingetragenen Samstagszahlen bis zum Neuladen stehen, werden aber nicht gedruckt und nicht gerechnet.</p>
     </div>
     <div class="sec">
       <h3>Die drei Schalter vor dem Drucken</h3>
@@ -321,25 +377,27 @@
     </div>
     <div class="sec">
       <h3>Stikken-Verteilung</h3>
-      <p>Die Verteilung steht auf eigenen Blättern, jeder Tag auf seinem eigenen. Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: auf eigenen Blättern für Sonntag und Montag“. Oben auf jedem Blatt steht groß der Tag, darüber Formular, Datum und Uhrzeit, damit es auch allein zuzuordnen ist.</p>
+      <p>Die Verteilung steht auf eigenen Blättern, jeder Tag auf seinem eigenen. Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: auf eigenen Blättern für Sonntag und Montag“ (mit Samstag „für Samstag, Sonntag und Montag“). Oben auf jedem Blatt steht groß der Tag, darüber Formular, Datum und Uhrzeit, damit es auch allein zuzuordnen ist.</p>
       <p>Jeder Stikken hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an den echten Stikken schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
-      <p>Jeder Tag bekommt eigene Stikken, Sonntag und Montag kommen nie in einen Stikken. Die Buchstaben laufen über beide Tage durch (zum Beispiel Sonntag A und B, Montag C). Unter dem Buchstaben steht der Tag noch einmal.</p>
+      <p>Jeder Tag bekommt eigene Stikken, zwei Tage kommen nie in einen Stikken. Die Buchstaben laufen über alle Tage durch (zum Beispiel Sonntag A und B, Montag C). Unter dem Buchstaben steht der Tag noch einmal.</p>
+      <p>Haben mindestens zwei Tage Stikken, steht unter dem Tag die Reihenfolge im Froster, zum Beispiel „Im Froster: Samstag vorn · Sonntag dahinter · Montag ganz hinten“. Der Tag des Blatts ist fett. Der nächste Tag steht immer vorn.</p>
       <p>In die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht hinein.</p>
       <p>Sorten dürfen in einem Stikken gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken aufgeteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als ein Stikken Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt in einen weiteren.</p>
+      <p>Lange Namen werden auf dem Stikken-Blatt nur an festen Stellen getrennt, zum Beispiel „Schoko-“ / „croissants“. Wird es in einem Stikken eng, wird die Schrift dort etwas kleiner. Die Bleche-Zahl bleibt immer groß.</p>
       <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt kein eigenes Blatt. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
     </div>
     <div class="sec">
       <h3>Rest und Reste-Stikken</h3>
-      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (Sonntag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann „Rest“ (alte Bleche im Reste-Stikken) und daneben „setzt ab“. Auf den Zettel kommt nur, was abgesetzt wird, unter der Zahl ein kurzer Hinweis wie „+2 alte im Reste-Stikken“.</p>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (ohne Samstag Sonntag, mit Samstag Samstag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann die Rechnung für diesen Tag: Benötigt − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = absetzen. Das Ergebnis im weißen Kästchen kommt genau so in sein Kästchen auf dem Zettel, darunter ein kurzer Hinweis wie „+2 alte im Reste-Stikken“. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
       <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
-      <p>Auf dem Blatt des Sonntags steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
+      <p>Auf dem Blatt des ersten Tages steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
       <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
       <p>Passt laut Eingabe mehr in den Reste-Stikken, als er Fächer hat, wird nicht gedruckt, und der Grund steht über dem Drucken-Knopf. Den Schalter „Rest“ ausschalten, dann druckt der Zettel wieder ohne Rest.</p>
       <p>Die Rest-Angaben werden nicht gespeichert und nicht in die Froster-Inventur übernommen.</p>
     </div>
     <div class="sec">
       <h3>Wichtig</h3>
-      <p>Die eingetragenen Mengen selbst werden nicht gespeichert — nur die Extra-Zeilen. Nach dem Neuladen der Seite sind die Mengen wieder leer.</p>
+      <p>Die eingetragenen Mengen werden nicht gespeichert — nach dem Neuladen der Seite sind sie wieder leer. Ausnahme sind die Extra-Zeilen: Die merkt sich das Gerät mit Name und Zahlen.</p>
     </div>
     <button class="secondary" onclick="schliesseHilfe()">Schließen</button>
   </div>
@@ -368,7 +426,8 @@
   /* ── Fixe Produktzeilen ─────────────────────────────────────────
      Nur die REIHENFOLGE steht hier; Namen und „kommt in die Stikken“
      kommen aus druckzentrale_sorten.js (eine Stelle für beide Zettel,
-     10.11.2026). DOM-IDs je Zeile: af-<kennung>-so / af-<kennung>-mo.
+     10.11.2026). DOM-IDs je Zeile: af-<kennung>-<tag> mit tag sa/so/mo
+     (sa seit Stufe 3, immer angelegt, ausgeblendet wenn Samstag aus).
      Käsebrötchen steht als eigener Block mit Trennzeile im Markup,
      nur sein Name kommt aus der Liste. */
   var REIHENFOLGE = ['butter', 'schoko', 'laugen', 'minibutter', 'minischoko'];
@@ -383,7 +442,7 @@
     KAESE_NAME = BOS_DRUCKZENTRALE_SORTEN.name('kaese');
     return REIHENFOLGE.map(function (k) {
       var s = BOS_DRUCKZENTRALE_SORTEN.sorte(k);   // unbekannt → Error
-      return { kennung: s.kennung, name: s.name, stikke: s.stikke };
+      return { kennung: s.kennung, name: s.name, stikke: s.stikke, trennung: s.trennung };
     });
   }
 
@@ -427,6 +486,32 @@
     };
   }
 
+  /* ── Tage als EINE Liste (Stufe 3) ─────────────────────────────────
+     Mit Samstag: sa, so, mo; ohne: so, mo. Samstag = Tag vor dem
+     errechneten Sonntag, Montag = Tag danach. Alles, was Tage kennt
+     (Spalten, Posten, Druck, Rest, Mohn-Überschrift), läuft über diese
+     Liste — ein weiterer Tag wäre hier ein Eintrag mehr. */
+  var WOCHENTAG_NAME = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  var WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  function tagEintrag(kennung, datum) {
+    var tm = pad(datum.getDate()) + '.' + pad(datum.getMonth() + 1) + '.';
+    return { kennung: kennung, datum: datum, label: WOCHENTAG_KURZ[datum.getDay()] + ' ' + tm,
+             name: WOCHENTAG_NAME[datum.getDay()], titel: WOCHENTAG_NAME[datum.getDay()] + ', ' + tm };
+  }
+  function wochenendTage(mitSamstag) {
+    var w = naechstesWochenende();
+    var liste = [];
+    if (mitSamstag) { var sa = new Date(w.so); sa.setDate(w.so.getDate() - 1); liste.push(tagEintrag('sa', sa)); }
+    liste.push(tagEintrag('so', w.so));
+    liste.push(tagEintrag('mo', w.mo));
+    return liste;
+  }
+  /* Schalter „Samstag“ (Ulf S2): beim Öffnen an, wenn heute Freitag ist
+     (Gerätezeit), sonst aus. Nur Sitzung, nichts gespeichert. */
+  var samstagAn = new Date().getDay() === 5;
+  function aktiveTage() { return wochenendTage(samstagAn); }
+  function ersterTag() { return aktiveTage()[0]; }   // Rest, Fremd und Mohn gehören zum ersten Tag (R5, S5)
+
   function renderRows() {
     var wrap = document.getElementById('af-rows');
     wrap.innerHTML = '';
@@ -435,18 +520,27 @@
       r.className = 'af-row' + (p.stikke ? ' af-mit-rest' : '');
       r.innerHTML =
         '<span class="af-row-name">' + escapeHtml(p.name) + '</span>' +
+        '<select class="bos-input af-sa" id="af-' + p.kennung + '-sa" hidden></select>' +
         '<select class="bos-input" id="af-' + p.kennung + '-so"></select>' +
-        (p.stikke ?                                   // Rest nur beim ersten Tag (R5)
+        (p.stikke ?                                   // Rest nur beim ersten Tag (R5); Beschriftung setzt zeigeTage()
           '<span class="af-rest-teil" hidden>' +
-            '<span class="af-rest-label">Rest ' + escapeHtml(naechstesWochenende().soLabel) + '</span>' +
+            '<span class="af-rest-label af-rest-tag"></span>' +
+            '<b class="af-so-zahl" id="af-sozahl-' + p.kennung + '"></b>' +
+            '<span class="af-op" aria-hidden="true">−</span>' +
+            '<span class="af-rest-label">Rest</span>' +
             '<select class="bos-input" id="af-rest-' + p.kennung + '" aria-label="Rest ' + escapeHtml(p.name) + '"></select>' +
-            '<span class="af-setzt" id="af-setzt-' + p.kennung + '"></span>' +
+            '<span class="af-op" aria-hidden="true">=</span>' +
+            '<output class="af-ergebnis" id="af-erg-' + p.kennung + '" aria-label="Absetzen ' + escapeHtml(p.name) + '">–</output>' +
+            '<span class="af-rest-label">absetzen</span>' +
           '</span>' : '') +
-        '<select class="bos-input" id="af-' + p.kennung + '-mo"></select>';
+        '<select class="bos-input" id="af-' + p.kennung + '-mo"></select>' +
+        '<span class="af-x-slot"></span>' +
+        (p.stikke ? '<div class="af-mehr" id="af-mehr-' + p.kennung + '" hidden></div>' : '');
       wrap.appendChild(r);
-      buildSelect(document.getElementById('af-' + p.kennung + '-so'), 50);
-      buildSelect(document.getElementById('af-' + p.kennung + '-mo'), 50);
-      document.getElementById('af-' + p.kennung + '-so').addEventListener('change', aktualisiereRest);
+      ['sa', 'so', 'mo'].forEach(function (t) {
+        buildSelect(document.getElementById('af-' + p.kennung + '-' + t), 50);
+        document.getElementById('af-' + p.kennung + '-' + t).addEventListener('change', aktualisiereRest);
+      });
       if (p.stikke) {
         buildSelect(document.getElementById('af-rest-' + p.kennung), 50);
         document.getElementById('af-rest-' + p.kennung).addEventListener('change', aktualisiereRest);
@@ -458,8 +552,8 @@
     for (var n = 0; n <= 24; n++) ff.insertAdjacentHTML('beforeend', '<option value="' + n + '">' + n + '</option>');
     ff.addEventListener('change', aktualisiereRest);
     document.getElementById('af-fremd-text').addEventListener('input', aktualisiereRest);
-    document.getElementById('af-fremd-label').textContent = 'Steht auch mit drin (' + naechstesWochenende().soLabel + ')';
     if (KAESE_NAME) document.getElementById('af-kaese-name').textContent = KAESE_NAME;
+    buildSelect(document.getElementById('af-kaese-sa'), 50);
     buildSelect(document.getElementById('af-kaese-so'), 50);
     buildSelect(document.getElementById('af-kaese-mo'), 50);
     buildSelect(document.getElementById('af-mohn'), 20);
@@ -472,35 +566,42 @@
   function ladeExtra() {
     try {
       var d = JSON.parse(localStorage.getItem(EXTRA_LS_KEY));
-      return Array.isArray(d) ? d.filter(function(x) { return x && (x.name || x.so || x.mo); }) : [];
+      return Array.isArray(d) ? d.filter(function(x) { return x && (x.name || x.sa || x.so || x.mo); }) : [];
     } catch(e) { return []; }
   }
   function speichereExtra() {
     var rows = [];
     document.querySelectorAll('.af-extra-row').forEach(function(el) {
-      var sels = el.querySelectorAll('select');
-      rows.push({ name: el.querySelector('input').value, so: sels[0].value, mo: sels[1].value });
+      var w = extraWerte(el);   // H3: sa dazu, gleicher Schlüssel; alte Einträge ohne sa laden mit leerem Samstag
+      rows.push({ name: el.querySelector('input').value, sa: w.sa, so: w.so, mo: w.mo });
     });
     try { localStorage.setItem(EXTRA_LS_KEY, JSON.stringify(rows)); } catch(e) {}
   }
-  function machExtraZeile(name, so, mo) {
+  function extraWerte(el) {
+    var w = {};
+    el.querySelectorAll('select[data-tag]').forEach(function (s) { w[s.getAttribute('data-tag')] = s.value; });
+    return w;
+  }
+  function machExtraZeile(name, sa, so, mo) {
     var div = document.createElement('div');
     div.className = 'af-extra-row';
     div.innerHTML =
       '<input type="text" class="bos-input" placeholder="Produkt…">' +
-      '<select class="bos-input"></select>' +
-      '<select class="bos-input"></select>' +
+      '<select class="bos-input af-sa" data-tag="sa"></select>' +
+      '<select class="bos-input" data-tag="so"></select>' +
+      '<select class="bos-input" data-tag="mo"></select>' +
       '<button class="af-extra-del" title="Entfernen">×</button>';
     var inp = div.querySelector('input');
-    var sels = div.querySelectorAll('select');
     inp.value = name || '';
-    buildSelect(sels[0], 50);
-    buildSelect(sels[1], 50);
-    if (so) sels[0].value = so;
-    if (mo) sels[1].value = mo;
+    var werte = { sa: sa, so: so, mo: mo };
+    div.querySelectorAll('select[data-tag]').forEach(function (sel) {
+      buildSelect(sel, 50);
+      var v = werte[sel.getAttribute('data-tag')];
+      if (v) sel.value = v;
+      sel.addEventListener('change', speichereExtra);
+    });
+    div.querySelector('.af-sa').hidden = !samstagAn;
     inp.addEventListener('input', speichereExtra);
-    sels[0].addEventListener('change', speichereExtra);
-    sels[1].addEventListener('change', speichereExtra);
     div.querySelector('.af-extra-del').addEventListener('click', function() {
       div.remove();
       speichereExtra();
@@ -509,13 +610,13 @@
   }
   function afAddExtraRow() {
     var wrap = document.getElementById('af-extra-rows');
-    wrap.appendChild(machExtraZeile('', '', ''));
+    wrap.appendChild(machExtraZeile('', '', '', ''));
     speichereExtra();
   }
   function initExtra() {
     var wrap = document.getElementById('af-extra-rows');
     ladeExtra().forEach(function(item) {
-      wrap.appendChild(machExtraZeile(item.name, item.so, item.mo));
+      wrap.appendChild(machExtraZeile(item.name, item.sa, item.so, item.mo));
     });
   }
 
@@ -558,24 +659,25 @@
   /* ── Stikken-Verteilung (../bos_stikken.js) ──────────────────────
      Seite 1: nur eine Zeile unter den Anmerkungen. Zeichnung ab eigenem
      Blatt mit Kopfzeile (Freigabe KC 10.11., A1). Je Tag eigene Stikken
-     (tag 'so'/'mo', tagLabel wie die Spaltenköpfe). Fehler → Zeile auf
+     (tag sa/so/mo aus aktiveTage(), tagLabel wie die Spaltenköpfe). Fehler → Zeile auf
      Seite 1 + Fehlerfeld, Zettel wird trotzdem gedruckt (§7a). */
   function formatZeit(d) {
     return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });   // wie bos_druck.js
   }
-  function stikkenPosten(dates) {
+  function stikkenPosten(tage) {
     var posten = [];
-    [['so', dates.soLabel], ['mo', dates.moLabel]].forEach(function (t) {
+    tage.forEach(function (t) {               // Reihenfolge der Liste = erster Tag zuerst (plane() nimmt Rest für ihn)
       PRODUKTE.filter(function (p) { return p.stikke; }).forEach(function (p) {
-        posten.push({ kennung: p.kennung, name: p.name, tag: t[0], tagLabel: t[1],
-                      bleche: document.getElementById('af-' + p.kennung + '-' + t[0]).value });
+        posten.push({ kennung: p.kennung, name: p.name, trennung: p.trennung, tag: t.kennung, tagLabel: t.label,
+                      bleche: document.getElementById('af-' + p.kennung + '-' + t.kennung).value });
       });
     });
     return posten;
   }
   /* ── Rest und Reste-Stikken (Stufe 2, 14.11.2026) ────────────────
      Schalter „Rest“: beim Öffnen aus, nur Sitzung, nichts gespeichert.
-     Rest gilt dem ersten Tag (Sonntag). Gerechnet nur in BOS_STIKKEN.plane(). */
+     Rest gilt dem ersten Tag (ohne Samstag Sonntag, mit Samstag Samstag).
+     Gerechnet nur in BOS_STIKKEN.plane(). */
   var restAn = false;
   var RECHENTEIL_FEHLT = 'Rechenteil bos_stikken.js ist nicht geladen. Seite neu laden; bleibt es, fehlt die Datei auf dem Server.';
 
@@ -589,12 +691,34 @@
       faecher: document.getElementById('af-fremd-faecher').value
     } };
   }
-  function planeJetzt(dates) {
+  function planeJetzt(tage) {
     if (!window.BOS_STIKKEN) throw new Error(RECHENTEIL_FEHLT);
-    return BOS_STIKKEN.plane(stikkenPosten(dates), {
-      rest: restAn ? restEingabe() : null,
-      tage: { so: { titel: dates.soTitel, name: dates.soName }, mo: { titel: dates.moTitel, name: dates.moName } }
-    });
+    var info = {};
+    tage.forEach(function (t) { info[t.kennung] = { titel: t.titel, name: t.name }; });
+    return BOS_STIKKEN.plane(stikkenPosten(tage), { rest: restAn ? restEingabe() : null, tage: info });
+  }
+  /* Messen mit genau der Druckschrift (G2): Canvas, Breite in mm */
+  var messKontext = null;
+  function messeText(text, pt, gewicht) {
+    if (!messKontext) messKontext = document.createElement('canvas').getContext('2d');
+    messKontext.font = (gewicht || 400) + ' ' + pt + 'pt ' + BOS_STIKKEN.SCHRIFT;
+    return messKontext.measureText(text).width * 25.4 / 96;
+  }
+  /* Falsche Trennstellen (G1): leiser Hinweis über dem Drucken-Knopf, nie ein Druckstopp */
+  function zeigeTrennHinweis(plan) {
+    var el = document.getElementById('af-trenn-info');
+    if (!el) return;
+    var texte = plan && plan.trennungHinweise ? plan.trennungHinweise : [];
+    el.textContent = texte.join('\n');
+    el.hidden = !texte.length;
+  }
+  function pruefeTrennstellen() {
+    try { if (window.BOS_STIKKEN && PRODUKTE.length) zeigeTrennHinweis(BOS_STIKKEN.plane(stikkenPosten(aktiveTage()))); }
+    catch (err) {
+      console.error('[Absetz-Formular] Trennstellen:', err);
+      var el = document.getElementById('af-trenn-info');
+      if (el) { el.textContent = 'Trennstellen nicht prüfbar: ' + err.message; el.hidden = false; }
+    }
   }
   function postenAus(plan, kennung, tag) {
     var treffer = null;
@@ -609,27 +733,51 @@
     document.querySelectorAll('.af-rest-teil').forEach(function (el) { el.hidden = !restAn; });
     aktualisiereRest();
   }
+  /* Schalter „Samstag“: Spalte zeigen/verstecken, Beschriftungen nach dem ersten Tag */
+  function toggleSamstag() {
+    samstagAn = !samstagAn;
+    zeigeTage();
+    aktualisiereRest();
+  }
+  function zeigeTage() {
+    var tage = aktiveTage(), erster = tage[0];
+    document.getElementById('af-sa-pill').classList.toggle('active', samstagAn);
+    document.querySelectorAll('.af-sa').forEach(function (el) { el.hidden = !samstagAn; });
+    tage.forEach(function (t) { document.getElementById('af-th-' + t.kennung).textContent = t.label; });
+    document.getElementById('af-wochenend-meta').textContent = tage.map(function (t) { return t.label; }).join(' / ');
+    document.querySelectorAll('.af-rest-tag').forEach(function (el) { el.textContent = erster.label + ':'; });
+    document.getElementById('af-fremd-label').textContent = 'Steht auch mit drin (' + erster.label + ')';
+    document.getElementById('af-mosa-titel').textContent = 'Mohn- und Sesambrötchen für ' + erster.name;
+  }
   function aktualisiereRest() {
     var info = document.getElementById('af-rest-info');
     if (!info) return;
     if (!restAn) { info.hidden = true; return; }
     var texte = [], istFehler = false;
     try {
-      var plan = planeJetzt(naechstesWochenende());
+      var erster = ersterTag();
+      var plan = planeJetzt(aktiveTage());
       PRODUKTE.forEach(function (p) {
         if (!p.stikke) return;
-        var pe = postenAus(plan, p.kennung, 'so');
-        var el = document.getElementById('af-setzt-' + p.kennung);
-        if (!pe || (!pe.will && !pe.rest)) { el.textContent = ''; el.classList.remove('mehr'); return; }
-        el.textContent = 'setzt ab ' + pe.setztAb + (pe.mehrAlsGewollt ? ' (' + pe.mehrAlsGewollt + ' mehr als gewollt)' : '');
-        el.classList.toggle('mehr', pe.mehrAlsGewollt > 0);
+        var pe = postenAus(plan, p.kennung, erster.kennung);
+        var wert = document.getElementById('af-' + p.kennung + '-' + erster.kennung).value;
+        document.getElementById('af-sozahl-' + p.kennung).textContent = wert;   // Zahl des ersten Tages; leer statt „–“ (sonst „– −“)
+        var erg = document.getElementById('af-erg-' + p.kennung);
+        var mehr = document.getElementById('af-mehr-' + p.kennung);
+        erg.textContent = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '–';
+        mehr.textContent = pe && pe.mehrAlsGewollt ? pe.mehrAlsGewollt + ' mehr als benötigt' : '';
+        mehr.hidden = !(pe && pe.mehrAlsGewollt);
       });
       texte = plan.hinweise.slice();
     } catch (err) {
       console.error('[Absetz-Formular] Rest:', err);
       texte = [err.message];
       istFehler = true;
-      PRODUKTE.forEach(function (p) { if (p.stikke) document.getElementById('af-setzt-' + p.kennung).textContent = ''; });
+      PRODUKTE.forEach(function (p) {
+        if (!p.stikke) return;
+        document.getElementById('af-erg-' + p.kennung).textContent = '–';
+        document.getElementById('af-mehr-' + p.kennung).hidden = true;
+      });
     }
     info.textContent = texte.join('\n');
     info.classList.toggle('fehler', istFehler);
@@ -647,13 +795,13 @@
     var zeile = 0;
     function zebra() { return (zeile++ % 2 === 0) ? 'af-zebra' : ''; }
 
-    var dates = naechstesWochenende();
+    var tage = aktiveTage(), erster = tage[0];
     /* Plan nur, wenn Rest oder Stikken an. F1: Bei Rest an kein Druck ohne
        gültigen Plan. Bei Rest aus wie Stufe 1: Zettel trotzdem, Fehlerzeile. */
     var plan = null, planFehler = null;
     if (restAn || druckOptionen.stikken) {
       try {
-        plan = planeJetzt(dates);
+        plan = planeJetzt(tage);
       } catch (err) {
         console.error('[Absetz-Formular] Stikken/Rest:', err);
         if (restAn) {
@@ -669,49 +817,51 @@
     var html = '<div class="af-page">';
     html += '<div class="af-gruss">' + (gruss ? escapeHtml(gruss).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
 
-    html += '<table class="af-table"><colgroup><col class="af-col-name"><col class="af-col-day"><col class="af-col-day"></colgroup>';
-    html += '<thead><tr><th>Produkt</th><th class="af-c">' + dates.soLabel + '</th><th class="af-c">' + dates.moLabel + '</th></tr></thead>';
+    /* Eine Spalte je aktivem Tag. Zwei Tage: Breiten wie bisher (CSS),
+       mehr Tage: Breiten inline, damit der Zwei-Tage-Zettel unverändert bleibt. */
+    var breite = tage.length === 2 ? null : Math.floor(66 / tage.length);
+    var colTag = '<col class="af-col-day"' + (breite ? ' style="width:' + breite + '%"' : '') + '>';
+    html += '<table class="af-table"><colgroup><col class="af-col-name"' + (breite ? ' style="width:' + (100 - breite * tage.length) + '%"' : '') + '>' +
+            tage.map(function () { return colTag; }).join('') + '</colgroup>';
+    html += '<thead><tr><th>Produkt</th>' + tage.map(function (t) { return '<th class="af-c">' + t.label + '</th>'; }).join('') + '</tr></thead>';
     html += '<tbody>';
+    function kaestchen(wert, hinweis) {
+      return '<td class="af-c"><span class="af-box">' + (wert || '&nbsp;') + '</span>' +
+             (hinweis ? '<div class="af-rest-hinweis">' + escapeHtml(hinweis) + '</div>' : '') + '</td>';
+    }
 
     PRODUKTE.forEach(function(p) {
-      var so = document.getElementById('af-' + p.kennung + '-so').value;
-      var mo = document.getElementById('af-' + p.kennung + '-mo').value;
-      var hinweis = '';
-      if (restAn && p.stikke) {                    // Sonntags-Kästchen = setzt ab, darunter der Hinweis (R6)
-        var pe = postenAus(plan, p.kennung, 'so');
-        so = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '';
-        hinweis = BOS_STIKKEN.restHinweis(pe);
-      }
-      html += '<tr class="' + zebra() + '">' +
-              '<td>' + escapeHtml(p.name) + '</td>' +
-              '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span>' +
-                (hinweis ? '<div class="af-rest-hinweis">' + escapeHtml(hinweis) + '</div>' : '') + '</td>' +
-              '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
+      html += '<tr class="' + zebra() + '">' + '<td>' + escapeHtml(p.name) + '</td>' +
+              tage.map(function (t) {
+                var wert = document.getElementById('af-' + p.kennung + '-' + t.kennung).value;
+                var hinweis = '';
+                if (restAn && p.stikke && t === erster) {   // Kästchen des ersten Tages = absetzen, darunter der Hinweis (R6)
+                  var pe = postenAus(plan, p.kennung, t.kennung);
+                  wert = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '';
+                  hinweis = BOS_STIKKEN.restHinweis(pe);
+                }
+                return kaestchen(wert, hinweis);
+              }).join('') + '</tr>';
     });
 
-    html += '<tr class="af-sep-row"><td>Käsebrötchen</td><td class="af-c">' + dates.soLabel + '</td><td class="af-c">' + dates.moLabel + '</td></tr>';
-    var kso = document.getElementById('af-kaese-so').value;
-    var kmo = document.getElementById('af-kaese-mo').value;
+    html += '<tr class="af-sep-row"><td>Käsebrötchen</td>' + tage.map(function (t) { return '<td class="af-c">' + t.label + '</td>'; }).join('') + '</tr>';
     html += '<tr class="' + zebra() + '"><td>' + escapeHtml(KAESE_NAME) + '</td>' +
-            '<td class="af-c"><span class="af-box">' + (kso || '&nbsp;') + '</span></td>' +
-            '<td class="af-c"><span class="af-box">' + (kmo || '&nbsp;') + '</span></td></tr>';
+            tage.map(function (t) { return kaestchen(document.getElementById('af-kaese-' + t.kennung).value); }).join('') + '</tr>';
 
     document.querySelectorAll('.af-extra-row').forEach(function(el) {
       var name = el.querySelector('input').value.trim();
-      var sels = el.querySelectorAll('select');
-      var so = sels[0].value, mo = sels[1].value;
-      if (!name && !so && !mo) return;
+      var w = extraWerte(el);
+      if (!name && !tage.some(function (t) { return w[t.kennung]; })) return;   // nur aktive Tage zählen
       html += '<tr class="' + zebra() + '">' +
               '<td>' + escapeHtml(name || '—') + '</td>' +
-              '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span></td>' +
-              '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
+              tage.map(function (t) { return kaestchen(w[t.kennung]); }).join('') + '</tr>';
     });
 
     html += '</tbody></table>';
 
     var mohn = document.getElementById('af-mohn').value;
     var sesam = document.getElementById('af-sesam').value;
-    html += '<div class="af-block"><div class="af-block-head">Mohn und Sesam</div>' +
+    html += '<div class="af-block"><div class="af-block-head">Mohn- und Sesambrötchen für ' + escapeHtml(erster.name) + '</div>' +
             '<div class="af-block-body">Bitte <span class="af-box">' + (mohn || '&nbsp;') + '</span> Bleche Mohnbrötchen + ' +
             '<span class="af-box">' + (sesam || '&nbsp;') + '</span> Bleche Sesambrötchen fertig machen</div></div>';
 
@@ -719,6 +869,7 @@
     html += '<div class="af-anm-label">Anmerkungen</div>' +
             '<div class="af-anm-text">' + (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
 
+    zeigeTrennHinweis(plan);
     var extraCSS = PRINT_CSS;
     var ab2 = '';
     if (druckOptionen.stikken) {
@@ -726,7 +877,8 @@
         var jetzt = new Date();
         html += BOS_STIKKEN.hinweisHTML(plan);
         ab2 = BOS_STIKKEN.zeichneHTML(plan, {
-          kopfzeile: 'Absetz-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
+          kopfzeile: 'Absetz-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr',
+          messen: messeText
         });
         extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
       } else {
@@ -768,11 +920,9 @@
     PRODUKTE = [];
   }
   renderRows();
+  pruefeTrennstellen();   // G1: falsche Trennstellen gleich beim Öffnen zeigen
   initExtra();
-  var dates = naechstesWochenende();
-  document.getElementById('af-th-so').textContent = dates.soLabel;
-  document.getElementById('af-th-mo').textContent = dates.moLabel;
-  document.getElementById('af-wochenend-meta').textContent = dates.soLabel + ' / ' + dates.moLabel;
+  zeigeTage();   // Spaltenköpfe, Meta-Zeile, Rest-/Fremd-Beschriftung, Mohn-Überschrift, Schalter Samstag
 
   /* Grußzeile: Auto-Resize */
   var grussEl = document.getElementById('af-gruss');
