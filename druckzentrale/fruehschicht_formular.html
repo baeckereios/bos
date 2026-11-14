@@ -1,4 +1,12 @@
 <!--
+  2026-11-14 · 22:25 · v0.5 · Feature
+    Stikken-Verteilung Stufe 3a, J1 (Freigabe KC 14.11., 19:38; Ulf „Ja, gleich mit“):
+    Druck Seite 1 — vor der ersten festen Zeile, deren Sorte nicht stikke:true
+    hat (heute „Käsebrötchen belegen“), eine Abstandszeile (4,5 mm, ohne Grund),
+    diese Zeile oben mit 2px schwarzer Linie. Regel hängt an stikke aus
+    druckzentrale_sorten.js, nicht am Namen. Zebra zählt nur Produktzeilen.
+    Bildschirm unverändert. SESSION_2026-11-14_STIKKEN_3A_BAU.md
+
   2026-11-14 · 07:19 · v0.4 · Feature
     Stikken-Verteilung Stufe 2a (Anweisung KC 14.11., 06:50; Go 07:00, G1–G3).
     - Rest an: jede Stikken-Sorte als Rechnung „[Benötigt] − [Rest] = ▢ Bleche
@@ -567,6 +575,8 @@
     '.fs-gruss{font-weight:700;font-size:11pt;margin-bottom:16px;line-height:1.5;}',
     '.fs-item{display:flex;align-items:center;padding:6px 0;font-size:10pt;page-break-inside:avoid;break-inside:avoid;}',
     '.fs-item.fs-zebra{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
+    '.fs-abstand{height:4.5mm;}',                                  /* Stufe 3a (J1): Abstand vor dem ersten Nicht-Stikken-Block */
+    '.fs-item.fs-block-anfang{border-top:2px solid #000;}',
     '.fs-name{width:220px;font-weight:700;flex-shrink:0;}',
     '.fs-box{display:inline-block;min-width:34px;border:1px solid #000;padding:3px 10px;text-align:center;font-weight:700;}',
     '.fs-sep{margin:0 6px;font-weight:700;}',
@@ -716,7 +726,10 @@
             '<span class="fs-box">' + (mohn || '&nbsp;') + '</span><span class="fs-sep">/</span>' +
             '<span class="fs-box">' + (sesam || '&nbsp;') + '</span></div>';
 
+    var blockGesetzt = false;   // Stufe 3a (J1): Abstand + Linie vor der ersten festen Zeile ohne stikke
     FIXE_ROWS.forEach(function(item) {
+      var neuerBlock = !item.stikke && !blockGesetzt;
+      if (neuerBlock) { blockGesetzt = true; html += '<div class="fs-abstand"></div>'; }   // zählt nicht im Zebra
       var val = document.getElementById('fh-' + item.kennung).value;
       var suffix = item.suffix;
       if (restAn && item.stikke) {                 // Kästchen = setzt ab, daneben der Hinweis (R6)
@@ -725,7 +738,7 @@
         var hinweis = BOS_STIKKEN.restHinweis(pe);
         if (hinweis) suffix += ' · ' + hinweis;
       }
-      html += '<div class="fs-item' + zebra() + '">' +
+      html += '<div class="fs-item' + zebra() + (neuerBlock ? ' fs-block-anfang' : '') + '">' +
               '<span class="fs-name">' + escapeHtml(item.name) + '</span>' +
               '<span class="fs-box">' + (val || '&nbsp;') + '</span>' +
               '<span class="fs-suffix">' + escapeHtml(suffix) + '</span></div>';

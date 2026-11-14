@@ -1,4 +1,19 @@
 <!--
+  2026-11-14 · 22:25 · v0.6 · Feature
+    Stikken-Verteilung Stufe 3a (Anweisung KC 14.11., 08:47; Go 19:38, J1/J2).
+    - Rechenzeile (Rest an) als eigenes, kleineres Band links unter dem
+      Sortennamen („↳ Sa 14.11.: 26 − [Rest] = ▢24▢ absetzen“), nicht mehr unter
+      den Tagesspalten. Grund --bos-amber-glow-soft, Streifen var(--amber) wie
+      der aktive Rest-Knopf; nur Design-Tokens, hell und dunkel. Felder 25 px
+      statt 33 px; Ergebnis-Kästchen bleibt weiß/schwarz/fett.
+    - „Rest“ steht grau in der leeren Auswahl, das Wort davor entfällt
+      (Ulf 08:44). Rechenzeile blass, solange weder Zahl am ersten Tag noch
+      Rest eingetragen ist (zeigeRestZustand), bedienbar bleibt sie.
+    - „N mehr als benötigt“ links unter dem Band.
+    - Druck Seite 1: Abstandszeile (4,5 mm, ohne Grund) vor „Käsebrötchen“,
+      Trennzeile oben 2px schwarz; Zebra zählt nur Produktzeilen (Ulf 08:47).
+    - Hilfe ergänzt. SESSION_2026-11-14_STIKKEN_3A_BAU.md
+
   2026-11-14 · 08:19 · v0.5 · Feature
     Stikken-Verteilung Stufe 3: Samstag (Anweisung KC 14.11., 07:55; Go 08:05, H1–H3).
     - Tage als EINE Liste (wochenendTage): mit Samstag sa, so, mo, sonst so, mo.
@@ -211,12 +226,25 @@
   .af-so-zahl { min-width: 24px; text-align: right; font-weight: 800; color: var(--text); font-size: var(--bos-font-md, 0.95rem); }
   .af-op { width: 12px; text-align: center; font-size: 1.3rem; font-weight: 800; color: var(--text); line-height: 1; }
   .af-ergebnis { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 34px; box-sizing: border-box; padding: 0 6px; background: #fff; color: #000; border: 2px solid #000; border-radius: 2px; font-weight: 900; font-size: 1.05rem; }
-  .af-mehr { flex-basis: 100%; order: 6; text-align: right; font-size: var(--bos-font-sm, 0.8rem); color: var(--amber); }
+  .af-mehr { flex-basis: 100%; order: 6; text-align: left; padding-left: 29px; font-size: var(--bos-font-xs, 0.72rem); color: var(--amber); }
   #af-produkte:not(.rest-an) .af-mehr { display: none; }
   /* VARIANTE-ANFANG */
   /* Rest als zweite Zeile unter der Sorte (gewählt, Prüfbild 14.11.: Spalten von Käsebrötchen und Extra-Zeilen bleiben bündig) */
   .rest-an .af-row.af-mit-rest { flex-wrap: wrap; }
-  .af-row.af-mit-rest .af-rest-teil { order: 5; flex-basis: 100%; justify-content: flex-end; padding-top: 2px; }
+  /* Stufe 3a: Rechenzeile als eigenes, kleineres Band links unter dem Sortennamen, nicht unter den Tagesspalten
+     (Ulf 08:40). Band = getönter Grund + Streifen in der Farbe des aktiven Rest-Knopfs; nur Design-Tokens. */
+  .rest-an .af-row.af-mit-rest { row-gap: 4px; }
+  .rest-an .af-row.af-mit-rest::after { content: ''; flex-basis: 100%; height: 0; order: 4; }   /* Umbruch vor dem Band */
+  .af-row.af-mit-rest .af-rest-teil { order: 5; flex: 0 1 auto; justify-content: flex-start; gap: 7px; margin-left: 14px;
+    padding: 3px 10px 3px 8px; background: var(--bos-amber-glow-soft, var(--bg-soft)); border-left: 3px solid var(--amber);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: var(--bos-font-sm, 0.8rem); }
+  .af-rest-teil select { width: 50px; height: 25px; padding: 0 6px; font-size: var(--bos-font-sm, 0.8rem); line-height: 1; }   /* ~¾ der Tagesfelder (33 px) */
+  .af-rest-teil select.leer { color: var(--faint); }                 /* leere Auswahl zeigt grau „Rest“ (Ulf 08:44) */
+  .af-rest-teil .af-so-zahl { font-size: var(--bos-font-sm, 0.82rem); min-width: 18px; }
+  .af-rest-teil .af-op { width: 10px; font-size: 1rem; }
+  .af-rest-teil .af-ergebnis { min-width: 32px; height: 25px; font-size: 0.85rem; padding: 0 5px; }
+  .af-pfeil { color: var(--amber); font-weight: 800; }
+  .af-rest-teil.blass { opacity: 0.45; }                            /* weder Zahl am ersten Tag noch Rest: blass, aber bedienbar */
   /* VARIANTE-ENDE */
   .af-fremd { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bos-space-sm, 10px); padding: var(--bos-space-xs, 10px) 0; border-top: 1px dashed var(--border); margin-top: var(--bos-space-2xs, 6px); }
   .af-fremd-label { font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.9rem); }
@@ -388,7 +416,7 @@
     </div>
     <div class="sec">
       <h3>Rest und Reste-Stikken</h3>
-      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (ohne Samstag Sonntag, mit Samstag Samstag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann die Rechnung für diesen Tag: Benötigt − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = absetzen. Das Ergebnis im weißen Kästchen kommt genau so in sein Kästchen auf dem Zettel, darunter ein kurzer Hinweis wie „+2 alte im Reste-Stikken“. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (ohne Samstag Sonntag, mit Samstag Samstag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann links in einem schmalen Band die Rechnung für diesen Tag: Benötigt − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = absetzen. Im leeren Feld steht grau „Rest“. Solange bei einer Sorte noch nichts eingetragen ist, ist ihre Rechnung blass. Das Ergebnis im weißen Kästchen kommt genau so in sein Kästchen auf dem Zettel, darunter ein kurzer Hinweis wie „+2 alte im Reste-Stikken“. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
       <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
       <p>Auf dem Blatt des ersten Tages steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
       <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
@@ -524,10 +552,10 @@
         '<select class="bos-input" id="af-' + p.kennung + '-so"></select>' +
         (p.stikke ?                                   // Rest nur beim ersten Tag (R5); Beschriftung setzt zeigeTage()
           '<span class="af-rest-teil" hidden>' +
+            '<span class="af-pfeil" aria-hidden="true">↳</span>' +
             '<span class="af-rest-label af-rest-tag"></span>' +
             '<b class="af-so-zahl" id="af-sozahl-' + p.kennung + '"></b>' +
             '<span class="af-op" aria-hidden="true">−</span>' +
-            '<span class="af-rest-label">Rest</span>' +
             '<select class="bos-input" id="af-rest-' + p.kennung + '" aria-label="Rest ' + escapeHtml(p.name) + '"></select>' +
             '<span class="af-op" aria-hidden="true">=</span>' +
             '<output class="af-ergebnis" id="af-erg-' + p.kennung + '" aria-label="Absetzen ' + escapeHtml(p.name) + '">–</output>' +
@@ -543,6 +571,7 @@
       });
       if (p.stikke) {
         buildSelect(document.getElementById('af-rest-' + p.kennung), 50);
+        document.getElementById('af-rest-' + p.kennung).options[0].textContent = 'Rest';   // Stufe 3a: „Rest“ steht im Feld (Ulf 08:44)
         document.getElementById('af-rest-' + p.kennung).addEventListener('change', aktualisiereRest);
       }
     });
@@ -646,7 +675,8 @@
     '.af-table tr.af-zebra td{background:#f2f2f2;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
     '.af-table td.af-c{text-align:center;}',
     '.af-box{display:inline-block;min-width:30px;border:1px solid #000;padding:3px 8px;text-align:center;font-weight:700;}',
-    '.af-sep-row td{background:#e8e8e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:5px 8px;border-top:1.5px solid #aaa;border-bottom:1px solid #ccc;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;}',
+    '.af-table tr.af-abstand td{height:4.5mm;padding:0;border:none;background:none;}',   /* Stufe 3a: Abstand vor Käse, zählt nicht im Zebra */
+    '.af-sep-row td{background:#e8e8e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:5px 8px;border-top:2px solid #000;border-bottom:1px solid #ccc;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;}',
     '.af-block{border:1px solid #ccc;margin-bottom:16px;}',
     '.af-block-head{background:#e8e8e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:5px 10px;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#555;border-bottom:1px solid #ccc;}',
     '.af-block-body{padding:10px;font-size:10pt;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
@@ -749,10 +779,23 @@
     document.getElementById('af-fremd-label').textContent = 'Steht auch mit drin (' + erster.label + ')';
     document.getElementById('af-mosa-titel').textContent = 'Mohn- und Sesambrötchen für ' + erster.name;
   }
+  /* Stufe 3a: leere Rest-Auswahl grau („Rest“), Rechenzeile blass, solange weder
+     eine Zahl am ersten Tag noch ein Rest drinsteht — bedienbar bleibt sie immer */
+  function zeigeRestZustand() {
+    var erster = ersterTag();
+    PRODUKTE.forEach(function (p) {
+      if (!p.stikke) return;
+      var rest = document.getElementById('af-rest-' + p.kennung);
+      var wert = document.getElementById('af-' + p.kennung + '-' + erster.kennung).value;
+      rest.classList.toggle('leer', !rest.value);
+      rest.closest('.af-rest-teil').classList.toggle('blass', !wert && !rest.value);
+    });
+  }
   function aktualisiereRest() {
     var info = document.getElementById('af-rest-info');
     if (!info) return;
     if (!restAn) { info.hidden = true; return; }
+    zeigeRestZustand();
     var texte = [], istFehler = false;
     try {
       var erster = ersterTag();
@@ -844,6 +887,7 @@
               }).join('') + '</tr>';
     });
 
+    html += '<tr class="af-abstand"><td colspan="' + (tage.length + 1) + '"></td></tr>';   // Croissants und Käse als zwei Blöcke (Ulf 08:47)
     html += '<tr class="af-sep-row"><td>Käsebrötchen</td>' + tage.map(function (t) { return '<td class="af-c">' + t.label + '</td>'; }).join('') + '</tr>';
     html += '<tr class="' + zebra() + '"><td>' + escapeHtml(KAESE_NAME) + '</td>' +
             tage.map(function (t) { return kaestchen(document.getElementById('af-kaese-' + t.kennung).value); }).join('') + '</tr>';
