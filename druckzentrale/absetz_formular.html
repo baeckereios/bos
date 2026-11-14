@@ -1,4 +1,23 @@
 <!--
+  2026-11-14 · 06:23 · v0.3 · Feature
+    Stikken-Verteilung Stufe 2: Rest und Reste-Stikken, ein Tag je Blatt
+    (Anweisung KC 14.11., 05:46, Fassung 3; Go 06:02 mit F1–F6).
+    - Schalter „Rest“ im Kasten Produkte (beim Öffnen aus, nur Sitzung):
+      nur beim ERSTEN Tag (Sonntag, R5) je Stikken-Sorte „Rest“ (1–50) und
+      live „setzt ab“, dazu „Steht auch mit drin“ (Text ≤ 40) und „Fächer“
+      (0–24). Gerechnet nur in ../bos_stikken.js (plane()).
+    - Druck mit Rest: im Sonntags-Kästchen „setzt ab“, darunter klein z. B.
+      „+2 alte im Reste-Stikken“ (R6). Rest aus: Druck wie v0.2.
+    - F1: Rest an und Rechenteil wirft → kein Druck, Grund im Fehlerfeld und
+      live unter den Fremd-Feldern; Ausweg: Rest aus.
+    - Tage an plane() mit Titel („Sonntag, 15.11.“) und Name („Sonntag“):
+      jeder Tag auf eigenem Blatt, Tag groß oben; Hinweiszeile „Stikken-
+      Verteilung: auf eigenen Blättern für Sonntag und Montag“.
+      naechstesWochenende() liefert dafür zusätzlich soTitel/moTitel/soName/moName.
+    - Begriff „der Stikken“ in der Hilfe; neuer Abschnitt „Rest und
+      Reste-Stikken“.
+    SESSION_2026-11-14_STIKKEN_REST_BAU.md
+
   2026-11-10 · 08:13 · v0.2 · Feature + Fix
     Stikken-Verteilung, Zebra-Fix, Namen an einer Stelle, App-Kennung
     (Anweisung Kontroll-Chat 08.11., 06:52; Go mit Auflagen 10.11., 07:57).
@@ -145,6 +164,25 @@
   .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
   [hidden] { display: none !important; }
+  .af-card-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm, 10px); margin-bottom: var(--bos-space-2xs, 6px); }
+  .af-card-kopf .field-label { margin: 0; }
+  .af-rest-teil { display: flex; align-items: center; gap: var(--bos-space-sm, 10px); flex: 0 0 auto; }
+  .af-rest-teil select { width: 64px; }
+  .af-rest-label { font-size: var(--bos-font-sm, 0.8rem); color: var(--dim); }
+  .af-setzt { width: 170px; font-size: var(--bos-font-sm, 0.8rem); font-weight: 700; color: var(--text); }
+  .af-setzt.mehr { color: var(--amber); }
+  /* VARIANTE-ANFANG */
+  /* Rest als zweite Zeile unter der Sorte (gewählt, Prüfbild 14.11.: Spalten von Käsebrötchen und Extra-Zeilen bleiben bündig) */
+  .rest-an .af-row.af-mit-rest { flex-wrap: wrap; }
+  .af-row.af-mit-rest .af-rest-teil { order: 5; flex-basis: 100%; justify-content: flex-end; padding-top: 2px; }
+  /* VARIANTE-ENDE */
+  .af-fremd { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bos-space-sm, 10px); padding: var(--bos-space-xs, 10px) 0; border-top: 1px dashed var(--border); margin-top: var(--bos-space-2xs, 6px); }
+  .af-fremd-label { font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.9rem); }
+  .af-fremd input { flex: 1 1 180px; min-width: 150px; }
+  .af-fremd select { width: 64px; flex: 0 0 auto; }
+  .af-fremd .af-suffix { font-size: var(--bos-font-sm, 0.8rem); color: var(--dim); }
+  .af-rest-info { font-size: var(--bos-font-sm, 0.8rem); color: var(--dim); line-height: 1.5; white-space: pre-line; padding-bottom: var(--bos-space-2xs, 6px); }
+  .af-rest-info.fehler { color: var(--red); }
   .fehler-feld { margin-top: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red); font-size: var(--bos-font-sm, 0.82rem); line-height: 1.5; white-space: pre-line; }
 
   .datum-hint { text-align: center; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-xs, 10px); letter-spacing: .04em; }
@@ -190,14 +228,24 @@
     <textarea id="af-gruss" class="bos-input" rows="2">Guten Morgen! Bitte setzt folgende Sachen ab:</textarea>
   </div>
 
-  <div class="card">
-    <span class="field-label">Produkte</span>
+  <div class="card" id="af-produkte">
+    <div class="af-card-kopf">
+      <span class="field-label">Produkte</span>
+      <button class="pill" id="af-rest-pill" onclick="toggleRest()">Rest</button>
+    </div>
     <div class="af-th-row">
       <span class="af-th-name">Produkt</span>
       <span class="af-th-day" id="af-th-so">So</span>
       <span class="af-th-day" id="af-th-mo">Mo</span>
     </div>
     <div id="af-rows"></div>
+    <div class="af-fremd" id="af-fremd" hidden>
+      <span class="af-fremd-label" id="af-fremd-label">Steht auch mit drin</span>
+      <input type="text" class="bos-input" id="af-fremd-text" maxlength="40" placeholder="z. B. Dinkelschoko-Zwerge">
+      <select class="bos-input" id="af-fremd-faecher"></select>
+      <span class="af-suffix">Fächer</span>
+    </div>
+    <div class="af-rest-info" id="af-rest-info" hidden></div>
 
     <div class="af-sep-row">Käsebrötchen</div>
     <div class="af-row">
@@ -269,16 +317,25 @@
       <h3>Die drei Schalter vor dem Drucken</h3>
       <p><strong>Kopf/Fuß:</strong> BäckereiOS-Logo mit Datum/Uhrzeit oben, Fußzeile unten. Ausgeschaltet druckt nur der reine Inhalt.</p>
       <p><strong>Farbe:</strong> Ausgeschaltet druckt der komplette Ausdruck in Graustufen.</p>
-      <p><strong>Stikken:</strong> Beim Öffnen immer aus. Eingeschaltet kommt ein Vorschlag dazu, wie die abzusetzenden Bleche auf die Stikken verteilt werden.</p>
+      <p><strong>Stikken:</strong> Beim Öffnen immer aus. Eingeschaltet kommt ein Vorschlag dazu, wie die abzusetzenden Bleche in die Stikken verteilt werden.</p>
     </div>
     <div class="sec">
       <h3>Stikken-Verteilung</h3>
-      <p>Die Verteilung steht auf einem eigenen Blatt (Seite 2). Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: siehe Seite 2“. Oben auf Seite 2 stehen Formular, Datum und Uhrzeit, damit das Blatt auch allein zuzuordnen ist.</p>
-      <p>Jede Stikke hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an die echte Stikke schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
-      <p>Jeder Tag bekommt eigene Stikken, Sonntag und Montag kommen nie auf eine Stikke. Die Buchstaben laufen über beide Tage durch (zum Beispiel Sonntag A und B, Montag C). Unter dem Buchstaben steht der Tag.</p>
-      <p>Auf die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht drauf.</p>
-      <p>Sorten dürfen auf einer Stikke gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken geteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als eine Stikke Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt auf eine weitere.</p>
-      <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt keine Seite 2. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
+      <p>Die Verteilung steht auf eigenen Blättern, jeder Tag auf seinem eigenen. Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: auf eigenen Blättern für Sonntag und Montag“. Oben auf jedem Blatt steht groß der Tag, darüber Formular, Datum und Uhrzeit, damit es auch allein zuzuordnen ist.</p>
+      <p>Jeder Stikken hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an den echten Stikken schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
+      <p>Jeder Tag bekommt eigene Stikken, Sonntag und Montag kommen nie in einen Stikken. Die Buchstaben laufen über beide Tage durch (zum Beispiel Sonntag A und B, Montag C). Unter dem Buchstaben steht der Tag noch einmal.</p>
+      <p>In die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht hinein.</p>
+      <p>Sorten dürfen in einem Stikken gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken aufgeteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als ein Stikken Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt in einen weiteren.</p>
+      <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt kein eigenes Blatt. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
+    </div>
+    <div class="sec">
+      <h3>Rest und Reste-Stikken</h3>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (Sonntag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann „Rest“ (alte Bleche im Reste-Stikken) und daneben „setzt ab“. Auf den Zettel kommt nur, was abgesetzt wird, unter der Zahl ein kurzer Hinweis wie „+2 alte im Reste-Stikken“.</p>
+      <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
+      <p>Auf dem Blatt des Sonntags steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
+      <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
+      <p>Passt laut Eingabe mehr in den Reste-Stikken, als er Fächer hat, wird nicht gedruckt, und der Grund steht über dem Drucken-Knopf. Den Schalter „Rest“ ausschalten, dann druckt der Zettel wieder ohne Rest.</p>
+      <p>Die Rest-Angaben werden nicht gespeichert und nicht in die Froster-Inventur übernommen.</p>
     </div>
     <div class="sec">
       <h3>Wichtig</h3>
@@ -309,7 +366,7 @@
   });
 
   /* ── Fixe Produktzeilen ─────────────────────────────────────────
-     Nur die REIHENFOLGE steht hier; Namen und „kommt auf die Stikken“
+     Nur die REIHENFOLGE steht hier; Namen und „kommt in die Stikken“
      kommen aus druckzentrale_sorten.js (eine Stelle für beide Zettel,
      10.11.2026). DOM-IDs je Zeile: af-<kennung>-so / af-<kennung>-mo.
      Käsebrötchen steht als eigener Block mit Trennzeile im Markup,
@@ -359,10 +416,14 @@
     var tageBisSo = (7 - dow) % 7 || 7;
     var so = new Date(heute); so.setDate(heute.getDate() + tageBisSo);
     var mo = new Date(so); mo.setDate(so.getDate() + 1);
+    var WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
     return {
       so: so, mo: mo,
       soLabel: 'So ' + pad(so.getDate()) + '.' + pad(so.getMonth() + 1) + '.',
-      moLabel: 'Mo ' + pad(mo.getDate()) + '.' + pad(mo.getMonth() + 1) + '.'
+      moLabel: 'Mo ' + pad(mo.getDate()) + '.' + pad(mo.getMonth() + 1) + '.',
+      soName: WOCHENTAGE[so.getDay()], moName: WOCHENTAGE[mo.getDay()],
+      soTitel: WOCHENTAGE[so.getDay()] + ', ' + pad(so.getDate()) + '.' + pad(so.getMonth() + 1) + '.',
+      moTitel: WOCHENTAGE[mo.getDay()] + ', ' + pad(mo.getDate()) + '.' + pad(mo.getMonth() + 1) + '.'
     };
   }
 
@@ -371,15 +432,33 @@
     wrap.innerHTML = '';
     PRODUKTE.forEach(function(p) {
       var r = document.createElement('div');
-      r.className = 'af-row';
+      r.className = 'af-row' + (p.stikke ? ' af-mit-rest' : '');
       r.innerHTML =
         '<span class="af-row-name">' + escapeHtml(p.name) + '</span>' +
         '<select class="bos-input" id="af-' + p.kennung + '-so"></select>' +
+        (p.stikke ?                                   // Rest nur beim ersten Tag (R5)
+          '<span class="af-rest-teil" hidden>' +
+            '<span class="af-rest-label">Rest ' + escapeHtml(naechstesWochenende().soLabel) + '</span>' +
+            '<select class="bos-input" id="af-rest-' + p.kennung + '" aria-label="Rest ' + escapeHtml(p.name) + '"></select>' +
+            '<span class="af-setzt" id="af-setzt-' + p.kennung + '"></span>' +
+          '</span>' : '') +
         '<select class="bos-input" id="af-' + p.kennung + '-mo"></select>';
       wrap.appendChild(r);
       buildSelect(document.getElementById('af-' + p.kennung + '-so'), 50);
       buildSelect(document.getElementById('af-' + p.kennung + '-mo'), 50);
+      document.getElementById('af-' + p.kennung + '-so').addEventListener('change', aktualisiereRest);
+      if (p.stikke) {
+        buildSelect(document.getElementById('af-rest-' + p.kennung), 50);
+        document.getElementById('af-rest-' + p.kennung).addEventListener('change', aktualisiereRest);
+      }
     });
+    /* Fremd-Fächer 0–24 (F4: Standard leer = 0) */
+    var ff = document.getElementById('af-fremd-faecher');
+    ff.innerHTML = '<option value=""></option>';
+    for (var n = 0; n <= 24; n++) ff.insertAdjacentHTML('beforeend', '<option value="' + n + '">' + n + '</option>');
+    ff.addEventListener('change', aktualisiereRest);
+    document.getElementById('af-fremd-text').addEventListener('input', aktualisiereRest);
+    document.getElementById('af-fremd-label').textContent = 'Steht auch mit drin (' + naechstesWochenende().soLabel + ')';
     if (KAESE_NAME) document.getElementById('af-kaese-name').textContent = KAESE_NAME;
     buildSelect(document.getElementById('af-kaese-so'), 50);
     buildSelect(document.getElementById('af-kaese-mo'), 50);
@@ -472,6 +551,7 @@
     '.af-block-body{padding:10px;font-size:10pt;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
     '.af-anm-label{font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#777;margin-bottom:6px;}',
     '.af-anm-text{border:1px solid #bbb;padding:10px 12px;min-height:90px;}',
+    '.af-rest-hinweis{font-size:7.5pt;line-height:1.2;margin-top:1mm;color:#000;font-weight:400;}',
     '.dz-stikken-fehler{margin-top:4mm;font-size:10pt;font-weight:700;color:#000;border:1.5px solid #000;padding:2mm 3mm;}'
   ].join('\n');
 
@@ -493,26 +573,67 @@
     });
     return posten;
   }
-  function stikkenTeile(dates, jetzt) {
+  /* ── Rest und Reste-Stikken (Stufe 2, 14.11.2026) ────────────────
+     Schalter „Rest“: beim Öffnen aus, nur Sitzung, nichts gespeichert.
+     Rest gilt dem ersten Tag (Sonntag). Gerechnet nur in BOS_STIKKEN.plane(). */
+  var restAn = false;
+  var RECHENTEIL_FEHLT = 'Rechenteil bos_stikken.js ist nicht geladen. Seite neu laden; bleibt es, fehlt die Datei auf dem Server.';
+
+  function restEingabe() {
+    var bleche = {};
+    PRODUKTE.forEach(function (p) {
+      if (p.stikke) bleche[p.kennung] = document.getElementById('af-rest-' + p.kennung).value;
+    });
+    return { bleche: bleche, fremd: {
+      text: document.getElementById('af-fremd-text').value,
+      faecher: document.getElementById('af-fremd-faecher').value
+    } };
+  }
+  function planeJetzt(dates) {
+    if (!window.BOS_STIKKEN) throw new Error(RECHENTEIL_FEHLT);
+    return BOS_STIKKEN.plane(stikkenPosten(dates), {
+      rest: restAn ? restEingabe() : null,
+      tage: { so: { titel: dates.soTitel, name: dates.soName }, mo: { titel: dates.moTitel, name: dates.moName } }
+    });
+  }
+  function postenAus(plan, kennung, tag) {
+    var treffer = null;
+    plan.posten.forEach(function (p) { if (p.kennung === kennung && p.tag === tag) treffer = p; });
+    return treffer;
+  }
+  function toggleRest() {
+    restAn = !restAn;
+    document.getElementById('af-rest-pill').classList.toggle('active', restAn);
+    document.getElementById('af-produkte').classList.toggle('rest-an', restAn);
+    document.getElementById('af-fremd').hidden = !restAn;
+    document.querySelectorAll('.af-rest-teil').forEach(function (el) { el.hidden = !restAn; });
+    aktualisiereRest();
+  }
+  function aktualisiereRest() {
+    var info = document.getElementById('af-rest-info');
+    if (!info) return;
+    if (!restAn) { info.hidden = true; return; }
+    var texte = [], istFehler = false;
     try {
-      if (!window.BOS_STIKKEN) {
-        throw new Error('Rechenteil bos_stikken.js ist nicht geladen. Seite neu laden; bleibt es, fehlt die Datei auf dem Server.');
-      }
-      var stikken = BOS_STIKKEN.verteile(stikkenPosten(dates));
-      return {
-        seite1: BOS_STIKKEN.hinweisHTML(stikken),
-        ab2: BOS_STIKKEN.zeichneHTML(stikken, {
-          kopfzeile: 'Absetz-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
-        })
-      };
+      var plan = planeJetzt(naechstesWochenende());
+      PRODUKTE.forEach(function (p) {
+        if (!p.stikke) return;
+        var pe = postenAus(plan, p.kennung, 'so');
+        var el = document.getElementById('af-setzt-' + p.kennung);
+        if (!pe || (!pe.will && !pe.rest)) { el.textContent = ''; el.classList.remove('mehr'); return; }
+        el.textContent = 'setzt ab ' + pe.setztAb + (pe.mehrAlsGewollt ? ' (' + pe.mehrAlsGewollt + ' mehr als gewollt)' : '');
+        el.classList.toggle('mehr', pe.mehrAlsGewollt > 0);
+      });
+      texte = plan.hinweise.slice();
     } catch (err) {
-      console.error('[Absetz-Formular] Stikken-Verteilung:', err);
-      zeigeFehler('Stikken-Verteilung nicht möglich: ' + err.message);
-      return {
-        seite1: '<div class="dz-stikken-fehler">Stikken-Verteilung nicht möglich: ' + escapeHtml(err.message) + '</div>',
-        ab2: ''
-      };
+      console.error('[Absetz-Formular] Rest:', err);
+      texte = [err.message];
+      istFehler = true;
+      PRODUKTE.forEach(function (p) { if (p.stikke) document.getElementById('af-setzt-' + p.kennung).textContent = ''; });
     }
+    info.textContent = texte.join('\n');
+    info.classList.toggle('fehler', istFehler);
+    info.hidden = !texte.length;
   }
 
   function drucken() {
@@ -527,6 +648,22 @@
     function zebra() { return (zeile++ % 2 === 0) ? 'af-zebra' : ''; }
 
     var dates = naechstesWochenende();
+    /* Plan nur, wenn Rest oder Stikken an. F1: Bei Rest an kein Druck ohne
+       gültigen Plan. Bei Rest aus wie Stufe 1: Zettel trotzdem, Fehlerzeile. */
+    var plan = null, planFehler = null;
+    if (restAn || druckOptionen.stikken) {
+      try {
+        plan = planeJetzt(dates);
+      } catch (err) {
+        console.error('[Absetz-Formular] Stikken/Rest:', err);
+        if (restAn) {
+          zeigeFehler('Drucken nicht möglich: ' + err.message +
+                      ' Eingaben bei Rest prüfen oder den Schalter „Rest“ ausschalten, dann druckt der Zettel ohne Rest.');
+          return;
+        }
+        planFehler = err;
+      }
+    }
     var gruss = document.getElementById('af-gruss').value.trim();
 
     var html = '<div class="af-page">';
@@ -539,9 +676,16 @@
     PRODUKTE.forEach(function(p) {
       var so = document.getElementById('af-' + p.kennung + '-so').value;
       var mo = document.getElementById('af-' + p.kennung + '-mo').value;
+      var hinweis = '';
+      if (restAn && p.stikke) {                    // Sonntags-Kästchen = setzt ab, darunter der Hinweis (R6)
+        var pe = postenAus(plan, p.kennung, 'so');
+        so = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '';
+        hinweis = BOS_STIKKEN.restHinweis(pe);
+      }
       html += '<tr class="' + zebra() + '">' +
               '<td>' + escapeHtml(p.name) + '</td>' +
-              '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span></td>' +
+              '<td class="af-c"><span class="af-box">' + (so || '&nbsp;') + '</span>' +
+                (hinweis ? '<div class="af-rest-hinweis">' + escapeHtml(hinweis) + '</div>' : '') + '</td>' +
               '<td class="af-c"><span class="af-box">' + (mo || '&nbsp;') + '</span></td></tr>';
     });
 
@@ -576,15 +720,23 @@
             '<div class="af-anm-text">' + (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
 
     var extraCSS = PRINT_CSS;
-    var stikken = null;
+    var ab2 = '';
     if (druckOptionen.stikken) {
-      stikken = stikkenTeile(dates, new Date());
-      html += stikken.seite1;
-      if (window.BOS_STIKKEN) extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
+      if (plan) {
+        var jetzt = new Date();
+        html += BOS_STIKKEN.hinweisHTML(plan);
+        ab2 = BOS_STIKKEN.zeichneHTML(plan, {
+          kopfzeile: 'Absetz-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
+        });
+        extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
+      } else {
+        zeigeFehler('Stikken-Verteilung nicht möglich: ' + planFehler.message);
+        html += '<div class="dz-stikken-fehler">Stikken-Verteilung nicht möglich: ' + escapeHtml(planFehler.message) + '</div>';
+      }
     }
 
     html += '</div>';
-    if (stikken) html += stikken.ab2;   // ab eigenem Blatt (break-before im Rechenteil)
+    html += ab2;   // ab eigenem Blatt (break-before im Rechenteil)
 
     BOS_DRUCK.drucken({
       inhaltHTML: html,

@@ -1,4 +1,22 @@
 <!--
+  2026-11-14 · 06:23 · v0.3 · Feature
+    Stikken-Verteilung Stufe 2: Rest und Reste-Stikken (Anweisung KC
+    14.11., 05:46, Fassung 3; Go 06:02 mit F1–F6).
+    - Schalter „Rest“ im Kasten Produkte (beim Öffnen aus, nur Sitzung):
+      je Stikken-Sorte „Will haben“, „Rest“ (0–30) und live „setzt ab“,
+      darunter „Steht auch mit drin“ (Text ≤ 40) und „Fächer“ (0–24).
+      Gerechnet nur in ../bos_stikken.js (plane()), hier keine Rechnung.
+    - Druck mit Rest: im Kästchen „setzt ab“, daneben z. B. „+2 alte im
+      Reste-Stikken“ (R6). Rest aus: Druck wie v0.2.
+    - F1: Rest an und Rechenteil wirft (z. B. alte Bleche + Fremdes > 24)
+      → kein Druck, Grund im Fehlerfeld und live unter den Fremd-Feldern;
+      Ausweg: Rest aus.
+    - Stikken-Blatt über plane(): Reste-Stikken als erste Säule, Legende.
+      Hinweiszeile „Stikken-Verteilung: auf eigenem Blatt“.
+    - Begriff „der Stikken“ in der Hilfe; neuer Abschnitt „Rest und
+      Reste-Stikken“.
+    SESSION_2026-11-14_STIKKEN_REST_BAU.md
+
   2026-11-10 · 08:13 · v0.2 · Feature + Fix
     Stikken-Verteilung, Zebra-Fix, Namen an einer Stelle, App-Kennung
     (Anweisung Kontroll-Chat 08.11., 06:52; Go mit Auflagen 10.11., 07:57).
@@ -159,6 +177,22 @@
   .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
   [hidden] { display: none !important; }
+  .fh-card-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--bos-space-sm, 12px); margin-bottom: var(--bos-space-2xs, 6px); }
+  .fh-card-kopf .field-label { margin: 0; }
+  .fh-th-rest { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); padding-top: var(--bos-space-2xs, 6px); font-family: var(--font-label); font-size: var(--bos-font-xs, 0.7rem); text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
+  .fh-th-rest .fh-th-name { flex: 1; min-width: 150px; }
+  .fh-th-rest .fh-th { width: 70px; flex: 0 0 auto; }
+  .fh-th-rest .fh-th-setzt { width: 150px; }
+  .fh-rest-teil { display: flex; align-items: center; gap: var(--bos-space-sm, 12px); flex: 0 0 auto; }
+  .fh-setzt { width: 150px; font-size: var(--bos-font-sm, 0.82rem); font-weight: 700; color: var(--text); }
+  .fh-setzt.mehr { color: var(--amber); }
+  .rest-an .fh-suffix-stikke { display: none; }
+  .fh-fremd { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) 0; border-top: 1px dashed var(--border); margin-top: var(--bos-space-2xs, 6px); }
+  .fh-fremd-label { font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.92rem); }
+  .fh-fremd input { flex: 1 1 180px; min-width: 150px; }
+  .fh-fremd select { width: 70px; flex: 0 0 auto; }
+  .fh-rest-info { font-size: var(--bos-font-sm, 0.82rem); color: var(--dim); line-height: 1.5; white-space: pre-line; }
+  .fh-rest-info.fehler { color: var(--red); }
   .fehler-feld { margin-top: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red); font-size: var(--bos-font-sm, 0.82rem); line-height: 1.5; white-space: pre-line; }
 
   .datum-hint { text-align: center; font-size: var(--bos-font-xs, 0.72rem); color: var(--faint); margin-top: var(--bos-space-xs, 10px); letter-spacing: .04em; }
@@ -200,9 +234,22 @@
 
 <div class="content">
 
-  <div class="card">
-    <span class="field-label">Produkte</span>
+  <div class="card" id="fh-produkte">
+    <div class="fh-card-kopf">
+      <span class="field-label">Produkte</span>
+      <button class="pill" id="fh-rest-pill" onclick="toggleRest()">Rest</button>
+    </div>
+    <div class="fh-th-rest" id="fh-th-rest" hidden>
+      <span class="fh-th-name"></span><span class="fh-th">Will haben</span><span class="fh-th">Rest</span><span class="fh-th fh-th-setzt">setzt ab</span>
+    </div>
     <div id="fh-rows"></div>
+    <div class="fh-fremd" id="fh-fremd" hidden>
+      <span class="fh-fremd-label">Steht auch mit drin</span>
+      <input type="text" class="bos-input" id="fh-fremd-text" maxlength="40" placeholder="z. B. Dinkelschoko-Zwerge">
+      <select class="bos-input" id="fh-fremd-faecher"></select>
+      <span class="fh-suffix">Fächer</span>
+    </div>
+    <div class="fh-rest-info" id="fh-rest-info" hidden></div>
     <div id="fh-extra-rows"></div>
     <button class="fh-add-btn" onclick="fhAddExtraRow()">+ Zeile hinzufügen</button>
   </div>
@@ -260,15 +307,24 @@
       <h3>Die drei Schalter vor dem Drucken</h3>
       <p><strong>Kopf/Fuß:</strong> BäckereiOS-Logo mit Datum/Uhrzeit oben, Fußzeile unten. Ausgeschaltet druckt nur der reine Inhalt.</p>
       <p><strong>Farbe:</strong> Ausgeschaltet druckt der komplette Ausdruck in Graustufen.</p>
-      <p><strong>Stikken:</strong> Beim Öffnen immer aus. Eingeschaltet kommt ein Vorschlag dazu, wie die abzusetzenden Bleche auf die Stikken verteilt werden.</p>
+      <p><strong>Stikken:</strong> Beim Öffnen immer aus. Eingeschaltet kommt ein Vorschlag dazu, wie die abzusetzenden Bleche in die Stikken verteilt werden.</p>
     </div>
     <div class="sec">
       <h3>Stikken-Verteilung</h3>
-      <p>Die Verteilung steht auf einem eigenen Blatt (Seite 2). Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: siehe Seite 2“. Oben auf Seite 2 stehen Formular, Datum und Uhrzeit, damit das Blatt auch allein zuzuordnen ist.</p>
-      <p>Jede Stikke hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an die echte Stikke schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
-      <p>Auf die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht drauf.</p>
-      <p>Sorten dürfen auf einer Stikke gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken geteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als eine Stikke Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt auf eine weitere.</p>
-      <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt keine Seite 2. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
+      <p>Die Verteilung steht auf einem eigenen Blatt. Seite 1 bleibt wie immer, unter den Anmerkungen steht nur „Stikken-Verteilung: auf eigenem Blatt“. Oben auf dem Blatt stehen Formular, Datum und Uhrzeit, damit es auch allein zuzuordnen ist.</p>
+      <p>Jeder Stikken hat 24 Fächer und bekommt einen Buchstaben (A, B, C …). Den Buchstaben auf Kreppband an den echten Stikken schreiben, dann passen Zettel und Wagen zusammen. Fach 1 ist oben, freie Fächer bleiben unten.</p>
+      <p>In die Stikken kommen nur Buttercroissants, Schokocroissants, Laugenecken, Mini-Buttercroissants und Mini-Schokocroissants. Käsebrötchen, Mohn/Sesam und Extra-Zeilen kommen nicht hinein.</p>
+      <p>Sorten dürfen in einem Stikken gemischt werden. Eine Sorte wird aber nicht auf zwei Stikken aufgeteilt, lieber bleiben Fächer frei. Nur wenn eine Sorte allein mehr Bleche hat, als ein Stikken Fächer hat, bekommt sie zuerst volle Stikken, und der Rest kommt in einen weiteren.</p>
+      <p>Ist bei den Stikken-Sorten nichts eingetragen, steht auf Seite 1 „Stikken: keine Bleche zum Absetzen.“ und es gibt kein eigenes Blatt. Klappt die Verteilung nicht, steht der Grund rot über dem Drucken-Knopf und auf dem Zettel. Gedruckt wird trotzdem.</p>
+    </div>
+    <div class="sec">
+      <h3>Rest und Reste-Stikken</h3>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Dann gibt es je Sorte drei Angaben: <strong>Will haben</strong>, <strong>Rest</strong> (alte Bleche im Reste-Stikken) und daneben „setzt ab“. Auf den Zettel kommt nur, was abgesetzt wird, neben der Zahl ein kurzer Hinweis wie „+2 alte im Reste-Stikken“.</p>
+      <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
+      <p>Auf dem Stikken-Blatt steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
+      <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
+      <p>Passt laut Eingabe mehr in den Reste-Stikken, als er Fächer hat, wird nicht gedruckt, und der Grund steht über dem Drucken-Knopf. Den Schalter „Rest“ ausschalten, dann druckt der Zettel wieder ohne Rest.</p>
+      <p>Die Rest-Angaben werden nicht gespeichert und nicht in die Froster-Inventur übernommen.</p>
     </div>
     <div class="sec">
       <h3>Wichtig</h3>
@@ -299,7 +355,7 @@
   });
 
   /* ── Fixe Produktzeilen ─────────────────────────────────────────
-     Nur die REIHENFOLGE steht hier; Namen und „kommt auf die Stikken“
+     Nur die REIHENFOLGE steht hier; Namen und „kommt in die Stikken“
      kommen aus druckzentrale_sorten.js (eine Stelle für beide Zettel,
      10.11.2026). DOM-ID je Zeile: fh-<kennung>. */
   var REIHENFOLGE = [
@@ -369,10 +425,24 @@
       r.innerHTML =
         '<span class="fh-row-name">' + escapeHtml(item.name) + '</span>' +
         '<select class="bos-input" id="fh-' + item.kennung + '"></select>' +
-        '<span class="fh-suffix">' + escapeHtml(item.suffix) + '</span>';
+        (item.stikke ?
+          '<span class="fh-rest-teil" hidden>' +
+            '<select class="bos-input" id="fh-rest-' + item.kennung + '" aria-label="Rest ' + escapeHtml(item.name) + '"></select>' +
+            '<span class="fh-setzt" id="fh-setzt-' + item.kennung + '"></span>' +
+          '</span>' : '') +
+        '<span class="fh-suffix' + (item.stikke ? ' fh-suffix-stikke' : '') + '">' + escapeHtml(item.suffix) + '</span>';
       wrap.appendChild(r);
       buildSelect(document.getElementById('fh-' + item.kennung), 30);
+      document.getElementById('fh-' + item.kennung).addEventListener('change', aktualisiereRest);
+      if (item.stikke) {
+        buildSelect(document.getElementById('fh-rest-' + item.kennung), 30);
+        document.getElementById('fh-rest-' + item.kennung).addEventListener('change', aktualisiereRest);
+      }
     });
+    /* Fremd-Fächer 0–24 (F4: Standard leer = 0, sonst stünde beim Einschalten sofort Fremdes drin) */
+    buildSelect(document.getElementById('fh-fremd-faecher'), 24);
+    document.getElementById('fh-fremd-faecher').addEventListener('change', aktualisiereRest);
+    document.getElementById('fh-fremd-text').addEventListener('input', aktualisiereRest);
   }
 
   /* ── Extra-Zeilen (localStorage, nur dieses Gerät) ─────────────── */
@@ -485,26 +555,65 @@
       return { kennung: z.kennung, name: z.name, bleche: document.getElementById('fh-' + z.kennung).value, tag: 'heute' };
     });
   }
-  function stikkenTeile(jetzt) {
+  /* ── Rest und Reste-Stikken (Stufe 2, 14.11.2026) ────────────────
+     Schalter „Rest“: beim Öffnen aus, nur Sitzung, nichts gespeichert.
+     Gerechnet wird nur in BOS_STIKKEN.plane(); das Formular zeigt an. */
+  var restAn = false;
+  var RECHENTEIL_FEHLT = 'Rechenteil bos_stikken.js ist nicht geladen. Seite neu laden; bleibt es, fehlt die Datei auf dem Server.';
+
+  function restEingabe() {
+    var bleche = {};
+    FIXE_ROWS.forEach(function (z) {
+      if (z.stikke) bleche[z.kennung] = document.getElementById('fh-rest-' + z.kennung).value;
+    });
+    return { bleche: bleche, fremd: {
+      text: document.getElementById('fh-fremd-text').value,
+      faecher: document.getElementById('fh-fremd-faecher').value
+    } };
+  }
+  function planeJetzt() {
+    if (!window.BOS_STIKKEN) throw new Error(RECHENTEIL_FEHLT);
+    return BOS_STIKKEN.plane(stikkenPosten(), { rest: restAn ? restEingabe() : null });
+  }
+  function postenAus(plan, kennung) {
+    var treffer = null;
+    plan.posten.forEach(function (p) { if (p.kennung === kennung) treffer = p; });
+    return treffer;
+  }
+  function toggleRest() {
+    restAn = !restAn;
+    document.getElementById('fh-rest-pill').classList.toggle('active', restAn);
+    document.getElementById('fh-produkte').classList.toggle('rest-an', restAn);
+    document.getElementById('fh-th-rest').hidden = !restAn;
+    document.getElementById('fh-fremd').hidden = !restAn;
+    document.querySelectorAll('.fh-rest-teil').forEach(function (el) { el.hidden = !restAn; });
+    aktualisiereRest();
+  }
+  function aktualisiereRest() {
+    var info = document.getElementById('fh-rest-info');
+    if (!info) return;
+    if (!restAn) { info.hidden = true; return; }
+    var texte = [], istFehler = false;
     try {
-      if (!window.BOS_STIKKEN) {
-        throw new Error('Rechenteil bos_stikken.js ist nicht geladen. Seite neu laden; bleibt es, fehlt die Datei auf dem Server.');
-      }
-      var stikken = BOS_STIKKEN.verteile(stikkenPosten());
-      return {
-        seite1: BOS_STIKKEN.hinweisHTML(stikken),
-        ab2: BOS_STIKKEN.zeichneHTML(stikken, {
-          kopfzeile: 'Frühschicht-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
-        })
-      };
+      var plan = planeJetzt();
+      FIXE_ROWS.forEach(function (z) {
+        if (!z.stikke) return;
+        var pe = postenAus(plan, z.kennung);
+        var el = document.getElementById('fh-setzt-' + z.kennung);
+        if (!pe || (!pe.will && !pe.rest)) { el.textContent = ''; el.classList.remove('mehr'); return; }
+        el.textContent = 'setzt ab ' + pe.setztAb + (pe.mehrAlsGewollt ? ' (' + pe.mehrAlsGewollt + ' mehr als gewollt)' : '');
+        el.classList.toggle('mehr', pe.mehrAlsGewollt > 0);
+      });
+      texte = plan.hinweise.slice();
     } catch (err) {
-      console.error('[Frühschicht-Formular] Stikken-Verteilung:', err);
-      zeigeFehler('Stikken-Verteilung nicht möglich: ' + err.message);
-      return {
-        seite1: '<div class="dz-stikken-fehler">Stikken-Verteilung nicht möglich: ' + escapeHtml(err.message) + '</div>',
-        ab2: ''
-      };
+      console.error('[Frühschicht-Formular] Rest:', err);
+      texte = [err.message];
+      istFehler = true;
+      FIXE_ROWS.forEach(function (z) { if (z.stikke) document.getElementById('fh-setzt-' + z.kennung).textContent = ''; });
     }
+    info.textContent = texte.join('\n');
+    info.classList.toggle('fehler', istFehler);
+    info.hidden = !texte.length;
   }
 
   function drucken() {
@@ -512,6 +621,23 @@
     if (!FIXE_ROWS.length) {
       zeigeFehler('Drucken nicht möglich: Die Produktzeilen fehlen, weil die Sortenliste nicht geladen ist. Seite neu laden.');
       return;
+    }
+    /* Plan nur, wenn Rest oder Stikken an. F1: Bei Rest an kein Druck ohne
+       gültigen Plan (die abgezogenen Zahlen wären nicht belastbar). Bei
+       Rest aus wie Stufe 1: Zettel trotzdem, Fehlerzeile statt Zeichnung. */
+    var plan = null, planFehler = null;
+    if (restAn || druckOptionen.stikken) {
+      try {
+        plan = planeJetzt();
+      } catch (err) {
+        console.error('[Frühschicht-Formular] Stikken/Rest:', err);
+        if (restAn) {
+          zeigeFehler('Drucken nicht möglich: ' + err.message +
+                      ' Eingaben bei Rest prüfen oder den Schalter „Rest“ ausschalten, dann druckt der Zettel ohne Rest.');
+          return;
+        }
+        planFehler = err;
+      }
     }
     /* Zebra: EIN Zähler über alle gedruckten Produktzeilen (10.11.2026) */
     var zeile = 0;
@@ -528,10 +654,17 @@
 
     FIXE_ROWS.forEach(function(item) {
       var val = document.getElementById('fh-' + item.kennung).value;
+      var suffix = item.suffix;
+      if (restAn && item.stikke) {                 // Kästchen = setzt ab, daneben der Hinweis (R6)
+        var pe = postenAus(plan, item.kennung);
+        val = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '';
+        var hinweis = BOS_STIKKEN.restHinweis(pe);
+        if (hinweis) suffix += ' · ' + hinweis;
+      }
       html += '<div class="fs-item' + zebra() + '">' +
               '<span class="fs-name">' + escapeHtml(item.name) + '</span>' +
               '<span class="fs-box">' + (val || '&nbsp;') + '</span>' +
-              '<span class="fs-suffix">' + escapeHtml(item.suffix) + '</span></div>';
+              '<span class="fs-suffix">' + escapeHtml(suffix) + '</span></div>';
     });
 
     document.querySelectorAll('.fh-extra-row').forEach(function(el) {
@@ -561,15 +694,23 @@
             (anm ? escapeHtml(anm).replace(/\n/g, '<br>') : '&nbsp;') + '</div>';
 
     var extraCSS = PRINT_CSS;
-    var stikken = null;
+    var ab2 = '';
     if (druckOptionen.stikken) {
-      stikken = stikkenTeile(new Date());
-      html += stikken.seite1;
-      if (window.BOS_STIKKEN) extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
+      if (plan) {
+        var jetzt = new Date();
+        html += BOS_STIKKEN.hinweisHTML(plan);
+        ab2 = BOS_STIKKEN.zeichneHTML(plan, {
+          kopfzeile: 'Frühschicht-Formular · ' + formatDatum(jetzt) + ' · ' + formatZeit(jetzt) + ' Uhr'
+        });
+        extraCSS += '\n' + BOS_STIKKEN.DRUCK_CSS;
+      } else {
+        zeigeFehler('Stikken-Verteilung nicht möglich: ' + planFehler.message);
+        html += '<div class="dz-stikken-fehler">Stikken-Verteilung nicht möglich: ' + escapeHtml(planFehler.message) + '</div>';
+      }
     }
 
     html += '</div>';
-    if (stikken) html += stikken.ab2;   // ab eigenem Blatt (break-before im Rechenteil)
+    html += ab2;   // ab eigenem Blatt (break-before im Rechenteil)
 
     BOS_DRUCK.drucken({
       inhaltHTML: html,
