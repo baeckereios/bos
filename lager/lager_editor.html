@@ -9,6 +9,14 @@
          Gezählt wird NICHT hier, sondern auf lager/lager_zaehlen.html (Zählen und Pflegen getrennt).
   Ansicht: Ordnerbaum (bos_ordnerbaum.js) + Inhalt, seit v3 (Ordneransicht, #168).
   CHANGELOG
+    2026-11-16 · 04:37 · v5 · Feature (Baum neu ordnen, A24/L25; Freigabe Kontroll-Chat 16.11. 04:27 mit A25/A26)
+      Baum nach Abschnitten: „ohne …“-Ordner unten in ihrem Abschnitt (kursiv, gedämpft: .ob-art-ohne), „Unsortiert“
+      heißt „ohne Lagerort“, neu „ohne Lieferant“, neuer Abschnitt TEIGECKE (Kopf = Ordner nach Wagen, je Wagen ein
+      Ordner mit „＋ Zutaten hierher …“, für admin Link „Wagen in Teigecke · Orte ›“). Statuszeile aus LG.statusZaehler:
+      „n Artikel“ und nur Zähler über 0 (A25/A26). Gemerkte alte Kennungen (bos_lager_ordner, bos_lager_baum_offen)
+      werden abgebildet und zurückgeschrieben (LG.ordnerAltNeu); ein gemerkter Wagen-Ordner gilt, bis die Wagen da sind.
+      Auswahl-Baum ohne „ohne Lagerort“ und ohne TEIGECKE (L19). Hilfe nachgezogen. Daten, Regel, Speichern unverändert.
+      lager/_protokolle/SESSION_2026-11-12_LAGER_BAUM_NEU_BAU.md
     2026-11-12 · 07:53 · v4 · Feature (Zuhause im Lager, L19/L21; Bauplan 07:24, Freigabe Kontroll-Chat 07:46 mit A20–A23)
       Das Zuhause einer Teigecke-Zutat (welcher Wagen, ortId am Blatt teigecke_zutaten) wird jetzt hier gesetzt:
       Reiter Teigecke und ⋯ „Wagen wählen …“ (sofort gespeichert), Ordner Teigecke nach Wagen gruppiert mit
@@ -107,6 +115,8 @@
   .gruppe-kopf h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.05rem; }
   .gruppe-kopf .klein { color: var(--dim); font-size: .75rem; }
   .gruppe-kopf.ohne h2 { color: var(--dim); }
+  /* A24: „ohne …“-Ordner unten in ihrem Abschnitt, sichtbar abgesetzt (Baustein unverändert, nur die Klasse der Knoten-Art) */
+  .ob-art-ohne .ob-name { font-style: italic; color: var(--dim); }
   .standort-kopf { margin: 18px 10px 0; padding: 8px 4px 4px; border-bottom: 2px solid var(--amber); font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.2rem; }
   .standort-kopf.ohne { color: var(--dim); border-bottom-color: var(--faint); }
   table.liste { width: 100%; border-collapse: collapse; }
@@ -360,9 +370,11 @@ const I18N_DE = {
   fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen', neu_laden: '↻ Neu laden',
   suche: 'Suchen in allem …',
   baum_titel: 'Ordner', ordner_waehlen: 'Ordner wählen', pfad_suche: 'Suche: „{text}“',
-  ordner_alle: 'Alle Artikel', ordner_unsortiert: 'Unsortiert', ordner_pruefen: 'Prüfen', ordner_ohne_kat: 'Ohne Kategorie', ordner_ohne_ber: 'Bereich offen',
-  ordner_orte_ohne: 'Lagerorte ohne Standort', ordner_uebernahme: 'Aus der Teigecke übernehmen', ordner_teigecke: 'Teigecke', ordner_archiv: 'Archiv',
-  abschnitt_uebersicht: 'Übersicht', abschnitt_standorte: 'Standorte', abschnitt_kategorien: 'Kategorien', abschnitt_lieferanten: 'Lieferanten',
+  ordner_alle: 'Alle Artikel', ordner_ohne_ort: 'ohne Lagerort', ordner_pruefen: 'Prüfen', ordner_ohne_kat: 'ohne Kategorie', ordner_ohne_ber: 'Bereich offen',
+  ordner_orte_ohne: 'Lagerorte ohne Standort', ordner_uebernahme: 'Aus der Teigecke übernehmen', ordner_ohne_lief: 'ohne Lieferant', ordner_archiv: 'Archiv',
+  ordner_wagen_ohne: 'noch ohne Zuhause', ordner_wagen_silo: 'Silo', link_wagen_orte: 'Wagen in Teigecke · Orte ›', wagen_laedt: 'Die Wagen werden noch geladen …',
+  teigecke_hinweis: 'Ein Wagen ist kein Lagerort: Hier steht nur, wo der offene Sack in der Teigecke steht. Wagen anlegen und Schilder drucken geht in Teigecke · Orte.',
+  abschnitt_uebersicht: 'Übersicht', abschnitt_standorte: 'Standorte', abschnitt_teigecke: 'Teigecke', abschnitt_kategorien: 'Kategorien', abschnitt_lieferanten: 'Lieferanten',
   hinzu_standort: 'Standort anlegen', hinzu_ort: 'Lagerort', hinzu_kategorie: 'Kategorie anlegen', hinzu_lieferant: 'Lieferant anlegen',
   ob_karte: 'Karte öffnen', ob_auf: 'Aufklappen', ob_zu: 'Zuklappen', ob_markiert: 'liegt hier schon', ob_leer: 'Nichts da.',
   karte_oeffnen: '✎ Karte', reihenfolge_aendern: 'Reihenfolge ändern',
@@ -370,13 +382,13 @@ const I18N_DE = {
   rundgang_hinweis: 'Die Lagerorte dieses Standorts in der Reihenfolge des Rundgangs (so stehen sie auch beim Zählen). Antippen öffnet den Ort, ✎ seine Karte.',
   orte_ohne_hinweis: 'An diesen Lagerorten kann nicht gezählt werden, bis sie einen Standort haben (✎ → Standort).',
   leer_ordner: 'Hier ist nichts.', leer_ort_artikel: 'Hier liegt noch nichts.', leer_standort_orte: 'Hier gibt es noch keine Lagerorte.',
-  leer_unsortiert: 'Alle Artikel haben einen festen Lagerort.', aus_unsortiert: 'Aus „Unsortiert“ holen …', leer_archiv: 'Das Archiv ist leer.',
+  leer_ohne_ort: 'Alle Artikel haben einen festen Lagerort.', aus_ohne_ort: 'Aus „ohne Lagerort“ holen …', leer_archiv: 'Das Archiv ist leer.',
   marke_auch_in: '⇄ liegt auch in {orte}', marke_auch_in_mehr: '⇄ liegt auch in {ort} und {n} weiteren', marke_liegt_in: '⇄ liegt in {orte}', marke_liegt_in_mehr: '⇄ liegt in {ort} und {n} weiteren',
   menue_aria: 'Mehr zu {name}', menue_karte: '✎ Karte öffnen', menue_verschieben: 'Verschieben nach …', menue_dazu: 'Liegt auch hier …', menue_weg: 'Hier entfernen', abbrechen: 'Abbrechen',
   auswahl_verschieben: 'Verschieben nach …', auswahl_dazu: 'Liegt auch hier …',
   auswahl_hinweis_verschieben: '„{name}“ liegt in {ort}. Wohin damit? ✓ = liegt dort schon.', auswahl_hinweis_dazu: 'Wo liegt „{name}“ noch? ✓ = liegt dort schon.',
   verschoben: '✓ {name} liegt jetzt in {ort}', dazu_ok: '✓ {name} liegt jetzt auch in {ort}', weg_ok: '✓ {name} liegt nicht mehr in {ort}',
-  verschieben_frage: '„{name}“ von {von} nach {nach} verschieben?', weg_frage: '„{name}“ aus {ort} entfernen?', weg_unsortiert: ' Er liegt dann nirgends mehr fest und steht unter „Unsortiert“.',
+  verschieben_frage: '„{name}“ von {von} nach {nach} verschieben?', weg_frage: '„{name}“ aus {ort} entfernen?', weg_unsortiert: ' Er liegt dann nirgends mehr fest und steht unter „ohne Lagerort“.',
   stand_gezaehlt: ' Gezählt wurde er in {ort} zuletzt mit {wert}. Diese Zählung bleibt beim alten Ort.', stand_neu: ' In {ort} ist er noch nicht gezählt.',
   stand_anderer: ' Achtung: {ort} liegt an einem anderen Standort ({nach} statt {von}).', stand_unbekannt: ' Ob er dort schon gezählt ist, ließ sich nicht prüfen ({grund}). Es geht trotzdem.',
   err_orte: 'Lagerorte ändern', orte_grenze: 'Höchstens {n} feste Lagerorte je Artikel.', orte_schon: 'Der Artikel liegt dort schon.', orte_gleich: 'Das ist derselbe Ort.', orte_nicht_da: 'Der Artikel liegt dort nicht (mehr).',
@@ -453,7 +465,7 @@ const I18N_DE = {
   err_laden: 'Laden „{was}“', err_speichern: 'Speichern', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen',
   err_produkte: 'Produkte lesen (für „Steckt in …“)', err_gegenlesen: 'Gegenlesen nach abgelehntem Speichern',
   offline: 'Ohne Verbindung wird nichts geändert.',
-  status_artikel: '{n} Artikel', status_ohne_kat: '{n} ohne Kategorie', status_ohne_bereich: '{n} mit Bereich offen', status_plaus: '{n} mit Lagerort-Hinweis',
+  status_artikel: '{n} Artikel', status_ohne_ort: '{n} ohne Lagerort', status_ohne_kat: '{n} ohne Kategorie', status_ohne_lief: '{n} ohne Lieferant', status_ohne_bereich: '{n} mit Bereich offen', status_plaus: '{n} mit Lagerort-Hinweis',
   ue_titel: 'Aus der Teigecke übernehmen', ue_erklaerung: 'Diese {n} Zutaten der Teigecke stehen noch nicht im Lager. „Übernehmen“ legt für jede einen Lager-Artikel mit derselben Kennung an (Name, Inhalt, Gruppe, Archiv wie in der Teigecke; Kategorie und Bereich offen). Die Teigecke selbst wird dabei nicht angefasst. Jede Zutat bekommt ihre eigene Sicherung.',
   ue_leer: 'Alle Zutaten der Teigecke stehen im Lager.', ue_los: 'Übernehmen ({n})', ue_abbrechen: 'Abbrechen', ue_zu: 'Schließen',
   ue_laeuft: 'Übernehme {i} von {n} …', ue_fertig: '✓ {n} übernommen. Sie stehen jetzt unter „Noch ohne Kategorie“.',
@@ -656,6 +668,9 @@ function merke(schluessel, wert) { try { localStorage.setItem(schluessel, wert);
 function gemerkteOffen() {
   let a = [];
   try { const g = JSON.parse(lies(SPEICHER_OFFEN) || '[]'); a = Array.isArray(g) ? g.filter(function (x) { return typeof x === 'string'; }) : []; } catch (e) { a = []; }
+  /* A24: alte Kennungen abbilden und gleich zurückschreiben */
+  const neu = a.map(LG.ordnerAltNeu);
+  if (neu.some(function (x, i) { return x !== a[i]; })) { a = neu.filter(function (x, i) { return neu.indexOf(x) === i; }); merke(SPEICHER_OFFEN, JSON.stringify(a)); }
   /* A23: ÜBERSICHT ist beim ersten Mal offen. Zugeklappt merkt sich das Gerät als Vermerk „-a:uebersicht“ in derselben Liste
      (eine Liste aus der Zeit vor A23 kennt den Abschnitt noch nicht → offen). */
   if (a.indexOf(UEBERSICHT_ZU) === -1 && a.indexOf('a:uebersicht') === -1) a.push('a:uebersicht');
@@ -704,7 +719,12 @@ function hinzuAmOrdner(id) {
 }
 function render() {
   if (!S.geladen) return;
-  if (!S.ordner && alleDa()) { S.ordner = LG.startordner(daten(), lies(SPEICHER_ORDNER)); S.baum.klappeAuf(LG.vorfahren(S.ordner, daten())); }
+  if (!S.ordner && alleDa()) {   /* A24: alte Kennung abgebildet (in startordner) und zurückgeschrieben */
+    const g = lies(SPEICHER_ORDNER);
+    S.ordner = LG.startordner(daten(), g);
+    if (g && S.ordner !== g) merke(SPEICHER_ORDNER, S.ordner);
+    S.baum.klappeAuf(LG.vorfahren(S.ordner, daten()).concat(/^a:/.test(S.ordner) ? [S.ordner] : []));   /* ein Abschnitt als Startordner zeigt seine Kinder (z. B. TEIGECKE) */
+  }
   else if (S.ordner && alleDa() && !LG.ordnerGueltig(S.ordner, daten())) S.ordner = LG.startordner(daten(), null);
   renderBaum();
   renderPfadKnopf();
@@ -717,16 +737,11 @@ function renderPfadKnopf() {
   b.textContent = (S.suche.trim() ? t('pfad_suche', { text: S.suche.trim() }) : (S.ordner ? pfadText(LG.pfad(S.ordner, daten())) : t('ordner_waehlen'))) + ' ▾';
 }
 function renderStatus() {
-  const akt = LG.aktiv(S.artikel), kat = km(), om = omap();
-  const teile = [{ text: t('status_artikel', { n: akt.length }), ordner: 'i:alle' }];
-  const ohneKat = akt.filter(function (a) { return !kat[a.kategorieId] || kat[a.kategorieId].geloescht; }).length;
-  const ohneBer = akt.filter(function (a) { return !a.bereich; }).length;
-  const plaus = akt.filter(function (a) { return LG.plausibel(a, kat, om).length; }).length;
-  if (ohneKat) teile.push({ text: t('status_ohne_kat', { n: ohneKat }), ordner: 'i:ohne_kat' });
-  if (ohneBer) teile.push({ text: t('status_ohne_bereich', { n: ohneBer }), ordner: 'i:ohne_ber' });
-  if (plaus) teile.push({ text: t('status_plaus', { n: plaus }), ordner: 'i:pruefen' });
-  const ohneSt = LG.aktiv(S.orte).filter(function (o) { return ortGruppe(o) === '_ohne'; }).length;
-  if (ohneSt && LG.aktiv(S.standorte).length) teile.push({ text: t('status_ohne_standort', { n: ohneSt }), ordner: 'i:orte_ohne' });
+  /* A25/A26: „n Artikel“ immer, sonst nur Zähler über 0 — aus LG.statusZaehler (dieselben Filter wie der Baum) */
+  const TEXT = { alle: 'status_artikel', ohne_ort: 'status_ohne_ort', ohne_kat: 'status_ohne_kat', ohne_lief: 'status_ohne_lief', ohne_ber: 'status_ohne_bereich', pruefen: 'status_plaus', orte_ohne: 'status_ohne_standort' };
+  let teile;
+  try { teile = LG.statusZaehler(daten()).map(function (x) { return { text: t(TEXT[x.id], { n: x.n }), ordner: x.ordner }; }); }
+  catch (err) { teile = []; zeigeFehler(t('err_baum'), err); }
   if (!online()) teile.push({ text: t('offline') });
   document.getElementById('statusBar').innerHTML = teile.map(function (x) {
     return x.ordner ? '<button type="button" class="status-link" data-aktion="ordner" data-wert="' + esc(x.ordner) + '">' + esc(x.text) + '</button>' : '<span>' + esc(x.text) + '</span>';
@@ -744,14 +759,17 @@ function kopfHTML(inh) {
   }).join('') + '</nav><div class="inhalt-aktionen">';
   if (KARTEN_COL[z.art]) html += '<button type="button" class="btn btn-outline" data-aktion="ordner-karte" aria-label="' + esc(t('karte_oeffnen')) + '">' + esc(t('karte_oeffnen')) + '</button>';
   if (z.art === 'o') html += knopf('folge-oeffnen', t('reihenfolge_aendern'));
-  if (z.art === 'o' || z.art === 'k' || z.art === 'l' || S.ordner === 'i:unsortiert' || S.ordner === 'i:alle') html += knopf('neu-artikel', t('neu_artikel'), gesperrtAttr());
+  if (z.art === 'o' || z.art === 'k' || z.art === 'l' || S.ordner === 'i:ohne_ort' || S.ordner === 'i:alle') html += knopf('neu-artikel', t('neu_artikel'), gesperrtAttr());
   if (z.art === 's' || z.art === 't' || S.ordner === 'i:orte_ohne') html += knopf('neu-ort', t('neu_ort'), gesperrtAttr());
-  if (z.art === 'a') html += knopf('neu-abschnitt', t({ standorte: 'neu_standort', kategorien: 'neu_kategorie', lieferanten: 'neu_lieferant' }[z.id]), gesperrtAttr());
+  if (z.art === 'a' && z.id !== 'teigecke') html += knopf('neu-abschnitt', t({ standorte: 'neu_standort', kategorien: 'neu_kategorie', lieferanten: 'neu_lieferant' }[z.id]), gesperrtAttr());
+  if (z.art === 'a' && z.id === 'teigecke' && S.istAdmin) html += '<a class="btn btn-outline" href="../teigecke/teigecke_orte.html" target="_blank" rel="noopener">' + esc(t('link_wagen_orte')) + '</a>';
+  if (z.art === 'w' && inh && inh.wagenOrdner && inh.gruppen[0] && inh.gruppen[0].wagenId) html += knopf('zutaten-hierher', t('hierher_knopf'), ' data-wert="' + esc(inh.gruppen[0].wagenId) + '"' + (hierherGrund() ? ' disabled title="' + esc(hierherGrund()) + '"' : ''));
   if (S.ordner === 'i:alle') html += ['ort', 'kategorie'].map(function (w) {
     return '<button type="button" class="btn btn-outline' + (S.sortierung === w ? ' aktiv' : '') + '" data-aktion="sortierung" data-wert="' + w + '" aria-pressed="' + (S.sortierung === w) + '">' + esc(t('nach_' + w)) + '</button>';
   }).join('');
   html += '</div></div>';
   if (z.art === 't') html += '<div class="inhalt-hinweis">' + esc(t('gesamt_hinweis')) + '</div>';
+  if ((z.art === 'a' && z.id === 'teigecke') || z.art === 'w') html += '<div class="inhalt-hinweis">' + esc(t(inh && inh.wartet ? 'wagen_laedt' : 'teigecke_hinweis')) + '</div>';
   return html;
 }
 function markenHTML(z) {
@@ -774,20 +792,23 @@ function artikelHTML(inh) {
   const z = LG.zerlegeOrdner(S.ordner) || {};
   const n = inh.gruppen.reduce(function (s, g) { return s + g.zeilen.length; }, 0);
   if (!n) {
-    if (z.art === 'o') return '<div class="leer">' + esc(t('leer_ort_artikel')) + '<div class="pflege-leiste" style="justify-content:center">' + knopf('neu-artikel', t('neu_artikel'), gesperrtAttr()) + knopf('ordner', t('aus_unsortiert'), ' data-wert="i:unsortiert"') + '</div></div>';
+    if (z.art === 'o') return '<div class="leer">' + esc(t('leer_ort_artikel')) + '<div class="pflege-leiste" style="justify-content:center">' + knopf('neu-artikel', t('neu_artikel'), gesperrtAttr()) + knopf('ordner', t('aus_ohne_ort'), ' data-wert="i:ohne_ort"') + '</div></div>';
     if (S.ordner === 'i:alle') return '<div class="leer">' + esc(t('leer_artikel')) + '</div>';
-    if (S.ordner === 'i:unsortiert') return '<div class="leer">' + esc(t('leer_unsortiert')) + '</div>';
+    if (S.ordner === 'i:ohne_ort') return '<div class="leer">' + esc(t('leer_ohne_ort')) + '</div>';
+    if (inh.wartet) return '';
+    if (inh.wagenOrdner && inh.gruppen[0] && inh.gruppen[0].wagenId) return '<div class="leer">' + esc(t('wagen_leer')) + '</div>';
     return '<div class="leer">' + esc(t('leer_ordner')) + '</div>';
   }
   const mitSt = LG.aktiv(S.standorte).length > 0;
   let html = '', letzterSt = null;
   inh.gruppen.forEach(function (g) {
     if (S.ordner === 'i:alle' && S.sortierung === 'ort' && mitSt && g.standortTitel && g.standortTitel !== letzterSt) { html += '<div class="standort-kopf">' + esc(g.standortTitel) + '</div>'; letzterSt = g.standortTitel; }
-    if (g.titel) {
-      const ziel = g.ortId ? 'o:' + g.ortId : (g.kategorieId ? 'k:' + g.kategorieId : '');
+    if (g.titel && !inh.wagenOrdner) {
+      /* A24: im Kopf TEIGECKE führt der Gruppen-Titel in den Wagen-Ordner */
+      const ziel = g.ortId ? 'o:' + g.ortId : (g.kategorieId ? 'k:' + g.kategorieId : (inh.wagen ? (g.wagenId ? 'w:' + g.wagenId : (g.schluessel === '_ohne' ? 'w:_ohne' : (g.schluessel === '_silo' ? 'w:_silo' : ''))) : ''));
       html += '<div class="gruppe-kopf' + (g.schluessel === '_ohne' ? ' ohne' : '') + '">' + (ziel ? '<button type="button" class="gruppe-link" data-aktion="ordner" data-wert="' + esc(ziel) + '"><h2>' + esc(g.titel) + '</h2></button>' : '<h2>' + esc(g.titel) + '</h2>') + '<span class="klein">' + g.zeilen.length + '</span></div>';
     }
-    if (inh.wagen && g.wagenId) html += '<div class="pflege-leiste wagen-leiste">' + knopf('zutaten-hierher', t('hierher_knopf'), ' data-wert="' + esc(g.wagenId) + '"' + (hierherGrund() ? ' disabled title="' + esc(hierherGrund()) + '"' : '')) + '</div>';
+    if (inh.wagen && g.wagenId && !inh.wagenOrdner) html += '<div class="pflege-leiste wagen-leiste">' + knopf('zutaten-hierher', t('hierher_knopf'), ' data-wert="' + esc(g.wagenId) + '"' + (hierherGrund() ? ' disabled title="' + esc(hierherGrund()) + '"' : '')) + '</div>';
     html += g.zeilen.length ? '<div class="zeilen">' + g.zeilen.map(zeileHTML).join('') + '</div>' : '<div class="leer" style="padding:10px">' + esc(t(inh.wagen && g.wagenId ? 'wagen_leer' : 'gruppe_leer')) + '</div>';
   });
   return html;
@@ -865,6 +886,7 @@ function renderInhalt() {
   const el = document.getElementById('inhalt');
   if (!S.ordner) { el.innerHTML = '<div class="leer">' + esc(t('lade')) + '</div>'; return; }
   if (S.suche.trim()) { S.inhalt = null; el.innerHTML = sucheHTML(); return; }
+  if (/^w:/.test(S.ordner) && !LG.ordnerGueltig(S.ordner, daten())) { S.ordner = 'a:teigecke'; merke(SPEICHER_ORDNER, S.ordner); }   /* A24: Wagen weg (archiviert) → TEIGECKE */
   let inh;
   try { inh = LG.ordnerInhalt(S.ordner, daten(), { sortierung: S.sortierung }); }
   catch (err) { zeigeFehler(t('err_baum'), err); inh = LG.ordnerInhalt('i:alle', daten(), { sortierung: S.sortierung }); }
@@ -1011,9 +1033,10 @@ function oeffneAuswahl(art) {
   const a = LG.nachId(S.artikel)[m.id]; if (!a) return;
   schliesseMenue();
   const orte = a.orte || [];
-  /* A23: „Lagerorte ohne Standort“ steht im Abschnitt ÜBERSICHT — für die Auswahl wie bisher oben neben den Standorten */
-  const oben = LG.ordnerBaum(daten()), ue = oben.filter(function (k) { return k.id === 'a:uebersicht'; })[0];
-  const st = oben.filter(function (k) { return k.id === 'a:standorte'; }).concat((ue ? ue.kinder : []).filter(function (k) { return k.id === 'i:orte_ohne'; }));
+  /* A24: nur STANDORTE (darin „Lagerorte ohne Standort“); „ohne Lagerort“ ist kein Ort, TEIGECKE gar nicht da (L19) */
+  const st = LG.ordnerBaum(daten()).filter(function (k) { return k.id === 'a:standorte'; }).map(function (k) {
+    return Object.assign({}, k, { kinder: k.kinder.filter(function (x) { return x.id !== 'i:ohne_ort'; }) });
+  });
   const offen = [];
   const mach = function (liste) {
     return wandle(liste).map(function f(k) {
@@ -1529,19 +1552,19 @@ const helpData = {
   title: 'Lager — was ist das hier?',
   sections: [
     { heading: 'Wofür ist diese Seite?', text: 'Hier steht jeder Artikel, der irgendwo bei uns lagert: Rohstoffe, Kühlware, TK-Ware, Konserven, Verpackung, Reinigung. Zu jedem Artikel pflegst du, was er ist (Kategorie), wo er fest liegt (Lagerorte), in welchem Gebinde er kommt, wie er gezählt wird und von welchem Lieferanten. Gezählt wird auf der eigenen Seite „Lager zählen“; diese Seite ist die Liste, auf die sie sich stützt.' },
-    { heading: 'Der Baum', text: 'Die Seite ist aufgebaut wie ein Dateimanager. Links (auf schmalem Bildschirm hinter dem Pfad oben, ein Tipp darauf klappt ihn auf) steht der Baum: oben im Abschnitt „Übersicht“ die festen Ordner „Alle Artikel“ und „Unsortiert“, dazu Ordner, die nur auftauchen, wenn es dort etwas gibt (Prüfen, Ohne Kategorie, Bereich offen, Lagerorte ohne Standort, Aus der Teigecke übernehmen, Teigecke, Archiv). Darunter die Standorte, unter jedem Standort die Temperaturen (ungekühlt, gekühlt, TK) und darin die Lagerorte, ganz unten Kategorien und Lieferanten. Den Namen antippen öffnet den Ordner, ▸ klappt nur auf und zu. Jeder Abschnitt (Übersicht, Standorte, Kategorien, Lieferanten) klappt mit ▸ auf und zu; bei „Übersicht“ auch ein Tipp auf den Namen, denn der Kopf ist selbst kein Ordner. Liegt der offene Ordner in einem zugeklappten Abschnitt, klappt er beim Öffnen des Baums von selbst auf. Die Zahl daneben ist die Zahl der Artikel. Die Seite merkt sich auf diesem Gerät, welcher Ordner offen war.' },
+    { heading: 'Der Baum', text: 'Die Seite ist aufgebaut wie ein Dateimanager. Links (auf schmalem Bildschirm hinter dem Pfad oben, ein Tipp darauf klappt ihn auf) steht der Baum in fünf Abschnitten. Oben „Übersicht“: „Alle Artikel“ und Ordner, die quer durch alles gehen und nur auftauchen, wenn es dort etwas gibt (Prüfen, Bereich offen, Aus der Teigecke übernehmen, Archiv). Dann die Standorte, unter jedem Standort die Temperaturen (ungekühlt, gekühlt, TK) und darin die Lagerorte. Dann „Teigecke“ mit den Wagen, dann Kategorien und Lieferanten. Was einem Abschnitt noch fehlt, steht kursiv ganz unten in diesem Abschnitt: „ohne Lagerort“ und „Lagerorte ohne Standort“ bei den Standorten, „ohne Kategorie“ bei den Kategorien, „ohne Lieferant“ bei den Lieferanten, jeweils nur, wenn es dort etwas gibt. Die Zeile ganz unten zählt dasselbe zusammen („3 ohne Lagerort · 2 ohne Kategorie …“); ein Tipp auf eine Zahl öffnet den Ordner. Den Namen antippen öffnet den Ordner, ▸ klappt nur auf und zu. Jeder Abschnitt klappt mit ▸ auf und zu; bei „Übersicht“ auch ein Tipp auf den Namen, denn der Kopf ist selbst kein Ordner. Liegt der offene Ordner in einem zugeklappten Abschnitt, klappt er beim Öffnen des Baums von selbst auf. Die Zahl daneben ist die Zahl der Artikel. Die Seite merkt sich auf diesem Gerät, welcher Ordner offen war.' },
     { heading: '✎ und ⋯', text: '✎ öffnet immer direkt die Karte: am Standort, am Lagerort, an Kategorie und Lieferant, oben im Ordner und in den Listen. ⋯ öffnet immer ein Menü: an einem Artikel „Karte öffnen“, „Verschieben nach …“, „Liegt auch hier …“ und „Hier entfernen“, bei Teigecke-Zutaten dazu „🥖 Wagen wählen …“. ＋ legt an, und zwar gleich am richtigen Platz: „＋ Lagerort“ unter einem Standort hat den Standort schon gesetzt, „＋ Artikel“ in einem Lagerort den Ort.' },
     { heading: 'Standorte', text: 'Ein Standort ist ein Gebäude, zum Beispiel die Backstube oder ein Vorratslager. Jeder Lagerort gehört zu einem Standort; das wählst du in der Karte des Lagerorts. Solange keiner gewählt ist, steht der Ort im Ordner „Lagerorte ohne Standort“, und an ihm kann nicht gezählt werden. Der Standort sagt nichts über die Temperatur: ein TK-Raum kann in jedem Standort stehen. Tippst du unter einem Standort auf „❄ gekühlt“, siehst du alles, was an diesem Standort gekühlt liegt, nach Ort. Im Standort selbst stehen seine Lagerorte in der Reihenfolge des Rundgangs; mit ▲▼ änderst du sie. Gezählt wird je Standort, und wer wo zählen darf, steht in der Kontenverwaltung.' },
     { heading: 'Alle Artikel: nach Ort oder nach Kategorie', text: 'Im Ordner „Alle Artikel“ schaltest du oben um. „Nach Ort“ zeigt die Artikel so, wie man beim Zählen durch die Räume geht. „Nach Kategorie“ zeigt sie so, wie man pflegt und bestellt. Ganz oben stehen jeweils die Artikel, denen noch etwas fehlt (ohne festen Ort, noch ohne Kategorie).' },
     { heading: 'Ein Artikel an mehreren Orten', text: 'Liegt ein Artikel an zwei Orten, steht er in beiden Ordnern, mit „⇄ liegt auch in …“. Es ist trotzdem nur ein Artikel; eine Änderung an der Karte gilt überall.' },
-    { heading: 'Verschieben und „Liegt auch hier“', text: 'Über ⋯ am Artikel. „Verschieben nach …“ und „Liegt auch hier …“ zeigen denselben Baum zum Auswählen; ✓ heißt, er liegt dort schon. „Hier entfernen“ nimmt ihn nur aus diesem Ort; liegt er sonst nirgends, steht er danach in „Unsortiert“. Wurde er am alten Ort im laufenden Zählgang schon gezählt, fragt die Seite vorher: Die Zählung bleibt beim alten Ort, am neuen ist er noch nicht gezählt. Liegt der neue Ort an einem anderen Standort, steht das in der Frage. „Unsortiert“ ist der Ordner, den du abarbeitest, bevor gezählt werden kann: Dort stehen die Artikel ohne festen Lagerort.' },
+    { heading: 'Verschieben und „Liegt auch hier“', text: 'Über ⋯ am Artikel. „Verschieben nach …“ und „Liegt auch hier …“ zeigen denselben Baum zum Auswählen; ✓ heißt, er liegt dort schon. „Hier entfernen“ nimmt ihn nur aus diesem Ort; liegt er sonst nirgends, steht er danach in „ohne Lagerort“. Wurde er am alten Ort im laufenden Zählgang schon gezählt, fragt die Seite vorher: Die Zählung bleibt beim alten Ort, am neuen ist er noch nicht gezählt. Liegt der neue Ort an einem anderen Standort, steht das in der Frage. „ohne Lagerort“ (unten bei den Standorten) ist der Ordner, den du abarbeitest, bevor gezählt werden kann: Dort stehen die Artikel ohne festen Lagerort. Ein Wagen der Teigecke ist kein Lagerort und steht hier deshalb nicht zur Wahl.' },
     { heading: 'Suchen', text: 'Das Suchfeld sucht in allem: Artikel (Name, Gebinde, Artikelnummer), Lagerorte, Standorte, Kategorien und Lieferanten. Jeder Treffer zeigt, wo er steht, zum Beispiel „Backstube › ❄ gekühlt › Kühlung 1“; ein Artikel an zwei Orten steht zweimal da. Archiviertes sucht es nicht mit, sagt aber, wie viele Treffer dort wären.' },
     { heading: 'Eine Karte bearbeiten', text: 'Einen Artikel antippen öffnet seine Karte. Oben blätterst du mit ‹ › durch den offenen Ordner (ein Artikel, der dort mehrfach steht, kommt nur einmal dran), ✕ schließt. Die Reiter der Karte: Stammdaten (Name, Kategorie, Bereich, Gebinde und Inhalt), Lagerung (feste Lagerorte, Zählart), Bezug (Lieferanten mit Artikelnummer, einer ist Standard) und Teigecke. „💾 Speichern“ schreibt genau diese Karte; vorher wird die alte Fassung automatisch gesichert. Steht oben „noch nicht gespeichert“, fragt die Seite nach, bevor du weggehst.' },
     { heading: 'Gebinde und Inhalt', text: 'Gebinde ist das, was du beim Zählen in der Hand hast: Sack, Karton, Eimer. Inhalt ist, was drin ist: 25 kg, 180 Stück. Beides zusammen steht in der Liste, zum Beispiel „Sack · 25 kg“.' },
     { heading: 'Zählart', text: '„Raster bis 24“ heißt: Beim Zählen gibt es Knöpfe zum Antippen von 0 bis 24 und einen Knopf „voll“ — gut für Säcke auf der Palette. „Zahlenfeld“ heißt: Zahl eintippen. Ein Zahlenfeld gibt es beim Zählen immer zusätzlich. Gezählt wird auf der Seite „Lager zählen“.' },
     { heading: 'Der gelbe Hinweis „Lagerort“', text: 'Gehört ein Artikel zu einer Kategorie, die Kühlung braucht, und liegt er fest an einem ungekühlten Ort, zeigt die Seite ⚠︎. Dasselbe bei TK-Ware an einem Ort ohne Tiefkühlung. Das ist nur ein Hinweis, keine Sperre — manchmal ist es richtig so. Alle Artikel mit diesem Hinweis stehen im Ordner „Prüfen“.' },
     { heading: 'Lieferanten und „bestellt bis“', text: 'Am Lieferanten hakst du die Liefertage an. Daneben steht für jeden Liefertag, bis wann bestellt sein muss: Wochentag und Uhrzeit, zum Beispiel „bis Sonntag 14:00“. Das steht am Lieferanten, nicht an jedem Artikel — ändert sich ein Tag, änderst du ihn einmal. In der Artikelkarte siehst du die Tage des Standard-Lieferanten zum Lesen.' },
-    { heading: 'Teigecke', text: 'Ist ein Artikel „in der Teigecke handverwogen“, sieht ihn die Teigecke: in der Rezept-Auswahl, auf der Seite „Orte“ und im BrotTeigRechner. Name, Gebinde und Gruppe pflegst du nur hier. Auch das Zuhause (welcher Wagen) setzt du hier: im Reiter Teigecke oder über ⋯ mit „Wagen wählen …“, das wird sofort gespeichert. Dafür brauchst du die Rolle admin und den Haken 🧺 Wagen & Zutaten. Mehrere auf einmal: Ordner „Teigecke“, dort steht jeder Wagen mit seinen Zutaten und „＋ Zutaten hierher …“. Silo-Zutaten brauchen kein Zuhause. Die Wagen selbst, ihre Reihenfolge auf dem Schild und das Drucken bleiben auf der Seite Teigecke · Orte, die das Zuhause nur noch anzeigt. „Steckt in …“ zeigt, in welchen Teigen die Zutat steht und welche Brote aus diesen Teigen kommen.' },
+    { heading: 'Teigecke', text: 'Ist ein Artikel „in der Teigecke handverwogen“, sieht ihn die Teigecke: in der Rezept-Auswahl, auf der Seite „Orte“ und im BrotTeigRechner. Name, Gebinde und Gruppe pflegst du nur hier. Auch das Zuhause (welcher Wagen) setzt du hier: im Reiter Teigecke oder über ⋯ mit „Wagen wählen …“, das wird sofort gespeichert. Dafür brauchst du die Rolle admin und den Haken 🧺 Wagen & Zutaten. Mehrere auf einmal: im Baum der Abschnitt „Teigecke“. Sein Kopf zeigt alle Zutaten nach Wagen, darunter hat jeder Wagen seinen eigenen Ordner (dazu „noch ohne Zuhause“ und „Silo“), jeweils mit „＋ Zutaten hierher …“. Silo-Zutaten brauchen kein Zuhause. Die Wagen selbst, ihre Reihenfolge auf dem Schild und das Drucken bleiben auf der Seite Teigecke · Orte, die das Zuhause nur noch anzeigt. „Steckt in …“ zeigt, in welchen Teigen die Zutat steht und welche Brote aus diesen Teigen kommen.' },
     { heading: 'Aus der Teigecke übernehmen', text: 'Den Ordner gibt es nur, solange Zutaten der Teigecke noch nicht im Lager stehen. Einmalig: Die Zutaten, die es in der Teigecke schon gibt, kommen mit „Übernehmen“ ins Lager — mit derselben Kennung, also bleiben alle Rezepte gültig. Name, Inhalt, Gruppe und Archiv werden mitgenommen; Kategorie und Bereich bleiben offen, die trägst du danach ein. Die Teigecke selbst wird dabei nicht angefasst. Erst nach der Übernahme lässt sich ein Zuhause setzen; das ist gewollt.' },
     { heading: 'Archivieren statt löschen', text: 'Gelöscht wird nichts. Ein Standort lässt sich erst archivieren, wenn kein Lagerort mehr zu ihm gehört; ein Lagerort, wenn kein Artikel mehr fest dort liegt; eine Kategorie, wenn kein Artikel mehr dazugehört; ein Lieferant, wenn er keinen Artikel mehr liefert; ein Artikel, wenn er in keinem Teig mehr steht. Archiviertes steht im Ordner „Archiv“ und lässt sich dort über die Karte wiederherstellen.' },
     { heading: 'Wer darf was?', text: 'Sehen darf das Lager jeder mit Konto. Ändern darf nur die Rolle admin — dieselbe Regel wie bei den Produkten. Fehlt dir die Rolle, steht oben ein Hinweis, und alle Felder sind gesperrt. Zählen ist etwas anderes: dafür gibt es je Standort einen Haken in der Kontenverwaltung. Den Wagen einer Teigecke-Zutat setzt, wer Rolle admin und den Haken 🧺 Wagen & Zutaten hat.' },

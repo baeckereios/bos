@@ -24,6 +24,15 @@
    Blöcke lager_*). test_lager.js vergleicht beides — immer beide ändern.
 
    CHANGELOG
+     2026-11-16 · 04:36 · v5 · Feature (Baum neu ordnen, A24/L25; Freigabe Kontroll-Chat 16.11. 04:27 mit A25/A26)
+       ORDNER_INTELLIGENT: Feld abschnitt (uebersicht/standorte/kategorien/lieferanten) und ohne (sichtbar
+       abgesetzt, Knoten-Art 'ohne'). „Unsortiert“ → „ohne Lagerort“ (i:ohne_ort, unten bei STANDORTE, nur bei
+       Treffern), „Lagerorte ohne Standort“ unten bei STANDORTE, „ohne Kategorie“ unten bei KATEGORIEN, neu „ohne
+       Lieferant“ (i:ohne_lief: keine aktive Bezugsquelle) unten bei LIEFERANTEN. Neuer Abschnitt TEIGECKE
+       (a:teigecke, Kopf = Ordner nach Wagen; Kinder w:_ohne, w:<wagenId>, w:_silo), i:teigecke entfällt.
+       Neu: statusZaehler (A25/A26: dieselben Filter wie der Baum), ordnerAltNeu (gemerkte alte Kennungen),
+       pfad/vorfahren nach Abschnitt. Datenmodell, FELDER, pruefe(), Regel unverändert.
+       lager/_protokolle/SESSION_2026-11-12_LAGER_BAUM_NEU_BAU.md
      2026-11-12 · 07:52 · v4 · Feature (Zuhause im Lager, L19/L21, Freigabe Kontroll-Chat 12.11. 07:46; A23)
        Zuhause der Teigecke-Zutaten: TEIGECKE_BLATT_FELDER, blattMitZuhause (umgezogen aus teigecke_orte.html),
        wagenText, wagenVergleich, wagenSortiert, zuhauseVon, teigeckeGruppen (Ordner Teigecke nach Wagen),
@@ -448,20 +457,30 @@
      Wörter für die Anzeige stehen NICHT hier, sondern im Wörterbuch der
      Seite (schluessel = i18n-Schlüssel). Daten-Namen kommen aus den Daten.
      ================================================================= */
-  /* Ein neuer intelligenter Ordner = ein Eintrag (§2a). kx = Kontext aus ordnerKontext(). */
+  /* Ein neuer intelligenter Ordner = ein Eintrag (§2a). kx = Kontext aus ordnerKontext().
+     abschnitt (A24): wo er im Baum hängt — 'uebersicht' (oben) oder unten in 'standorte' / 'kategorien' / 'lieferanten'.
+     ohne: ein „ohne …“-Ordner (Knoten-Art 'ohne', die Seite setzt ihn sichtbar ab). Reihenfolge = Reihenfolge im Abschnitt. */
   var ORDNER_INTELLIGENT = [
-    { id: 'alle', zeichen: '📦', art: 'artikel', immer: true, filter: function () { return true; } },
-    { id: 'unsortiert', zeichen: '📥', art: 'artikel', immer: true, filter: function (a, kx) { return !(a.orte || []).some(function (o) { return kx.om[o]; }); } },
-    { id: 'pruefen', zeichen: '⚠︎', art: 'artikel', filter: function (a, kx) { return plausibel(a, kx.km, kx.om).length > 0; } },
-    { id: 'ohne_kat', zeichen: '🏷', art: 'artikel', filter: function (a, kx) { return !kx.km[a.kategorieId]; } },
-    { id: 'ohne_ber', zeichen: '◌', art: 'artikel', filter: function (a) { return !a.bereich; } },
-    { id: 'orte_ohne', zeichen: '📍', art: 'orte', filter: function (o, kx) { return !kx.sm[o.standortId]; } },
-    { id: 'uebernahme', zeichen: '⇣', art: 'eigen', zahl: function (kx) { return kx.kandidaten; } },
-    { id: 'teigecke', zeichen: '🥖', art: 'artikel', filter: function (a) { return a.teigecke === true; } },
-    { id: 'archiv', zeichen: '🗄', art: 'eigen', zahl: function (kx) { return kx.archiv; } }
+    { id: 'alle', abschnitt: 'uebersicht', zeichen: '📦', art: 'artikel', immer: true, filter: function () { return true; } },
+    { id: 'pruefen', abschnitt: 'uebersicht', zeichen: '⚠︎', art: 'artikel', filter: function (a, kx) { return plausibel(a, kx.km, kx.om).length > 0; } },
+    { id: 'ohne_ber', abschnitt: 'uebersicht', zeichen: '◌', art: 'artikel', filter: function (a) { return !a.bereich; } },
+    { id: 'uebernahme', abschnitt: 'uebersicht', zeichen: '⇣', art: 'eigen', zahl: function (kx) { return kx.kandidaten; } },
+    { id: 'archiv', abschnitt: 'uebersicht', zeichen: '🗄', art: 'eigen', zahl: function (kx) { return kx.archiv; } },
+    { id: 'ohne_ort', abschnitt: 'standorte', ohne: true, zeichen: '📥', art: 'artikel', filter: function (a, kx) { return !(a.orte || []).some(function (o) { return kx.om[o]; }); } },
+    { id: 'orte_ohne', abschnitt: 'standorte', ohne: true, zeichen: '📍', art: 'orte', filter: function (o, kx) { return !kx.sm[o.standortId]; } },
+    { id: 'ohne_kat', abschnitt: 'kategorien', ohne: true, zeichen: '🏷', art: 'artikel', filter: function (a, kx) { return !kx.km[a.kategorieId]; } },
+    { id: 'ohne_lief', abschnitt: 'lieferanten', ohne: true, zeichen: '🚚', art: 'artikel', filter: function (a, kx) { return !(istKarte(a.quellen) && Object.keys(a.quellen).some(function (l) { return kx.lm[l]; })); } }
   ];
+  /* Gemerkte Kennungen von vor A24 (bos_lager_ordner, bos_lager_baum_offen) → neue. Wo sich nur der Platz änderte, blieb die Kennung. */
+  var ORDNER_ALT_NEU = { 'i:unsortiert': 'i:ohne_ort', 'i:teigecke': 'a:teigecke' };
+  function ordnerAltNeu(sel) { return Object.prototype.hasOwnProperty.call(ORDNER_ALT_NEU, sel) ? ORDNER_ALT_NEU[sel] : sel; }
+  /* Statuszeile (A25/A26): „n Artikel“ immer, dann nur Zähler über 0 — aus denselben Filtern wie der Baum. */
+  var STATUS_FOLGE = ['ohne_ort', 'ohne_kat', 'ohne_lief', 'ohne_ber', 'pruefen', 'orte_ohne'];
   var TEMP_ZEICHEN = { ungekuehlt: '▫', gekuehlt: '❄', tk: '🧊' };
   var ORDNER_SPALTEN = ['standorte', 'kategorien', 'lieferanten'];
+  var ABSCHNITTE = ['uebersicht', 'standorte', 'teigecke', 'kategorien', 'lieferanten'];
+  function eintragVon(id, liste) { return (liste || ORDNER_INTELLIGENT).filter(function (x) { return x.id === id; })[0] || null; }
+  function abschnittVon(e) { return e && ABSCHNITTE.indexOf(e.abschnitt) !== -1 && e.abschnitt !== 'teigecke' ? e.abschnitt : 'uebersicht'; }
 
   /* daten = { artikel, orte, standorte, kategorien, lieferanten, kandidaten (Zahl) } */
   function ordnerKontext(daten) {
@@ -487,23 +506,25 @@
     if (e.art === 'orte') return kx.orte.filter(function (o) { return e.filter(o, kx); }).length;
     return kx.artikel.filter(function (a) { return e.filter(a, kx); }).length;
   }
-  /* Baum als Knoten für bos_ordnerbaum.js. opt.liste = ORDNER_INTELLIGENT (zum Testen austauschbar). */
+  /* Baum als Knoten für bos_ordnerbaum.js. opt.liste = ORDNER_INTELLIGENT (zum Testen austauschbar).
+     A24: Abschnitte ÜBERSICHT, STANDORTE, TEIGECKE, KATEGORIEN, LIEFERANTEN; die Einträge der Liste hängen unten an ihrem Abschnitt. */
   function ordnerBaum(daten, opt) {
     var kx = ordnerKontext(daten), o = opt || {}, liste = o.liste || ORDNER_INTELLIGENT, wurzel = [];
-    /* A23 (KC 12.11.): die intelligenten Ordner stehen im Abschnitt ÜBERSICHT. Der Kopf ist kein Ordner (nurKlappen). */
-    var ue = { id: 'a:uebersicht', art: 'abschnitt', schluessel: 'abschnitt_uebersicht', nurKlappen: true, kinder: [] };
-    liste.forEach(function (e) {
-      var n = intelligentZahl(e, kx);
-      if (!e.immer && !n) return;
-      var k = { id: 'i:' + e.id, art: 'intelligent', schluessel: 'ordner_' + e.id, zeichen: e.zeichen, zahl: n, kinder: [] };
-      if (e.art === 'orte') {
-        k.kinder = kx.orte.filter(function (x) { return e.filter(x, kx); }).sort(nachSort).map(function (x) {
-          return { id: 'o:' + x.id, art: 'ort', name: x.name, zahl: artikelAmOrt(x.id, kx.artikel).length, mitKarte: true, kinder: [] };
-        });
-      }
-      ue.kinder.push(k);
-    });
-    wurzel.push(ue);
+    var eintraege = function (ab) {
+      return liste.filter(function (e) { return abschnittVon(e) === ab; }).map(function (e) {
+        var n = intelligentZahl(e, kx);
+        if (!e.immer && !n) return null;
+        var k = { id: 'i:' + e.id, art: e.ohne ? 'ohne' : 'intelligent', schluessel: 'ordner_' + e.id, zeichen: e.zeichen, zahl: n, kinder: [] };
+        if (e.art === 'orte') {
+          k.kinder = kx.orte.filter(function (x) { return e.filter(x, kx); }).sort(nachSort).map(function (x) {
+            return { id: 'o:' + x.id, art: 'ort', name: x.name, zahl: artikelAmOrt(x.id, kx.artikel).length, mitKarte: true, kinder: [] };
+          });
+        }
+        return k;
+      }).filter(Boolean);
+    };
+    /* A23 (KC 12.11.): Kopf ÜBERSICHT ist kein Ordner (nurKlappen). */
+    wurzel.push({ id: 'a:uebersicht', art: 'abschnitt', schluessel: 'abschnitt_uebersicht', nurKlappen: true, kinder: eintraege('uebersicht') });
     var st = { id: 'a:standorte', art: 'abschnitt', schluessel: 'abschnitt_standorte', hinzu: 'hinzu_standort', kinder: [] };
     kx.standorte.slice().sort(nachSort).forEach(function (s) {
       var orte = kx.orte.filter(function (x) { return x.standortId === s.id; }).sort(nachSort);
@@ -517,16 +538,44 @@
       });
       st.kinder.push(sk);
     });
+    st.kinder = st.kinder.concat(eintraege('standorte'));
     wurzel.push(st);
+    wurzel.push(teigeckeAbschnitt(kx));
     var ka = { id: 'a:kategorien', art: 'abschnitt', schluessel: 'abschnitt_kategorien', hinzu: 'hinzu_kategorie', kinder: [] };
     kx.kategorien.slice().sort(nachSort).forEach(function (k) { ka.kinder.push({ id: 'k:' + k.id, art: 'kategorie', name: k.name, zahl: artikelDerKategorie(k.id, kx.artikel).length, mitKarte: true, kinder: [] }); });
     var fehlt = !kx.kategorien.length ? startlisteFehlende(STARTLISTE_KATEGORIEN, (daten || {}).kategorien) : [];
     if (fehlt.length) ka.kinder.push({ id: 'x:startliste', art: 'aktion', schluessel: 'startliste_kategorien', werte: { n: fehlt.length }, kinder: [] });
+    ka.kinder = ka.kinder.concat(eintraege('kategorien'));
     wurzel.push(ka);
     var li = { id: 'a:lieferanten', art: 'abschnitt', schluessel: 'abschnitt_lieferanten', hinzu: 'hinzu_lieferant', kinder: [] };
     kx.lieferanten.slice().sort(nachName).forEach(function (l) { li.kinder.push({ id: 'l:' + l.id, art: 'lieferant', name: l.name, zahl: artikelDesLieferanten(l.id, kx.artikel).length, mitKarte: true, kinder: [] }); });
+    li.kinder = li.kinder.concat(eintraege('lieferanten'));
     wurzel.push(li);
     return wurzel;
+  }
+  /* Abschnitt TEIGECKE (A24, L19: ein Wagen ist kein Lagerort): Kopf = Ordner (Inhalt nach Wagen gruppiert), Kinder
+     „noch ohne Zuhause“ (nur mit Inhalt), jeder aktive Wagen (auch leer), Silo (nur mit Inhalt). Kein ✎, kein ＋ an den Wagen. */
+  function teigeckeAbschnitt(kx) {
+    var te = { id: 'a:teigecke', art: 'abschnitt', schluessel: 'abschnitt_teigecke', zahl: kx.artikel.filter(function (a) { return a.teigecke === true; }).length, kinder: [] };
+    if (!kx.mitWagen) return te;
+    teigeckeGruppen(kx).forEach(function (g) {
+      if (g.schluessel === '_ohne') te.kinder.push({ id: 'w:_ohne', art: 'wagen', schluessel: 'ordner_wagen_ohne', zeichen: '🚧', zahl: g.zeilen.length, kinder: [] });
+      else if (g.schluessel === '_silo') te.kinder.push({ id: 'w:_silo', art: 'wagen', schluessel: 'ordner_wagen_silo', zahl: g.zeilen.length, kinder: [] });
+      else te.kinder.push({ id: 'w:' + g.wagenId, art: 'wagen', name: g.titel, zahl: g.zeilen.length, kinder: [] });
+    });
+    return te;
+  }
+  /* Statuszeile (A25/A26). opt.liste wie ordnerBaum. „Lagerorte ohne Standort“ nur, wenn es Standorte gibt (wie bisher). */
+  function statusZaehler(daten, opt) {
+    var kx = ordnerKontext(daten), liste = (opt && opt.liste) || ORDNER_INTELLIGENT;
+    var aus = [{ id: 'alle', ordner: 'i:alle', n: kx.artikel.length }];
+    STATUS_FOLGE.forEach(function (id) {
+      var e = eintragVon(id, liste); if (!e) return;
+      if (id === 'orte_ohne' && !kx.standorte.length) return;
+      var n = intelligentZahl(e, kx);
+      if (n > 0) aus.push({ id: id, ordner: 'i:' + id, n: n });
+    });
+    return aus;
   }
   function zerlegeOrdner(sel) {
     var s = String(sel || ''), i = s.indexOf(':');
@@ -540,7 +589,8 @@
     var z = zerlegeOrdner(sel); if (!z) return false;
     var kx = ordnerKontext(daten), liste = (opt && opt.liste) || ORDNER_INTELLIGENT;
     if (z.art === 'i') { var e = liste.filter(function (x) { return x.id === z.id; })[0]; return !!e && (e.immer || intelligentZahl(e, kx) > 0); }
-    if (z.art === 'a') return ORDNER_SPALTEN.indexOf(z.id) !== -1;
+    if (z.art === 'a') return ORDNER_SPALTEN.indexOf(z.id) !== -1 || z.id === 'teigecke';
+    if (z.art === 'w') return !kx.mitWagen || z.id === '_ohne' || z.id === '_silo' || !!kx.wm[z.id];   /* bis die Wagen geladen sind: gültig */
     if (z.art === 's') return !!kx.sm[z.id];
     if (z.art === 't') return !!kx.sm[z.id] && kx.orte.some(function (o) { return o.standortId === z.id && tempVon(o) === z.temperatur; });
     if (z.art === 'o') return !!kx.om[z.id];
@@ -548,11 +598,13 @@
     if (z.art === 'l') return !!kx.lm[z.id];
     return false;
   }
-  /* Startordner (Ulf F2, 20:29): gemerkter, wenn gültig; sonst „Unsortiert“, solange dort etwas liegt; sonst „Alle Artikel“. */
+  /* Startordner (Ulf F2, 20:29): gemerkter, wenn gültig (alte Kennung vorher abgebildet, A24); sonst „ohne Lagerort“,
+     solange dort etwas liegt; sonst „Alle Artikel“. */
   function startordner(daten, gemerkt) {
-    if (gemerkt && ordnerGueltig(gemerkt, daten)) return gemerkt;
+    var g = gemerkt ? ordnerAltNeu(gemerkt) : gemerkt;
+    if (g && ordnerGueltig(g, daten)) return g;
     var kx = ordnerKontext(daten);
-    return intelligentZahl(ORDNER_INTELLIGENT[1], kx) > 0 ? 'i:unsortiert' : 'i:alle';
+    return intelligentZahl(eintragVon('ohne_ort'), kx) > 0 ? 'i:ohne_ort' : 'i:alle';
   }
   /* Eine Artikelzeile. ortId = Ort des Ordners (oder null). Marken (§11): heute Teigecke, Prüfen, liegt auch in / liegt in. zahl: Platz für Stufe 3. */
   function ordnerZeile(a, ortId, kx, ohneKategorie) {
@@ -584,7 +636,6 @@
       var e = liste.filter(function (x) { return x.id === z.id; })[0];
       if (!e) return { art: null };
       if (e.art === 'eigen') return { art: 'eigen', id: e.id };
-      if (e.id === 'teigecke' && kx.mitWagen) return { art: 'artikel', wagen: true, gruppen: teigeckeGruppen(kx) };   /* L19 */
       if (e.art === 'orte') return { art: 'orte', orte: kx.orte.filter(function (x) { return e.filter(x, kx); }).sort(nachSort) };
       if (e.id === 'alle') {
         if (o.sortierung === 'kategorie') {
@@ -602,6 +653,17 @@
         return { art: 'artikel', gruppen: gr };
       }
       return { art: 'artikel', gruppen: [{ schluessel: e.id, titel: '', zeilen: nachNameZeilen(kx.artikel.filter(function (a) { return e.filter(a, kx); })) }] };
+    }
+    if (z.art === 'a' && z.id === 'teigecke') {   /* A24: Kopf TEIGECKE = der bisherige Ordner „Teigecke“ (L19) */
+      if (kx.mitWagen) return { art: 'artikel', wagen: true, teigecke: true, gruppen: teigeckeGruppen(kx) };
+      return { art: 'artikel', teigecke: true, gruppen: [{ schluessel: 'teigecke', titel: '', zeilen: nachNameZeilen(kx.artikel.filter(function (a) { return a.teigecke === true; })) }] };
+    }
+    if (z.art === 'w') {
+      if (!kx.mitWagen) return { art: 'artikel', wagen: true, wartet: true, gruppen: [] };
+      var sch = z.id === '_ohne' || z.id === '_silo' ? z.id : 'w:' + z.id;
+      var gw = teigeckeGruppen(kx).filter(function (g) { return g.schluessel === sch; })[0];
+      if (!gw && sch.indexOf('w:') === 0) return { art: null };
+      return { art: 'artikel', wagen: true, wagenOrdner: true, gruppen: [gw || { schluessel: sch, titel: '', wagenId: z.id === '_ohne' ? '' : null, zeilen: [] }] };
     }
     if (z.art === 'a') return ORDNER_SPALTEN.indexOf(z.id) !== -1 ? { art: 'liste', col: COL[z.id] } : { art: null };
     if (z.art === 's') return kx.sm[z.id] ? { art: 'orte', standortId: z.id, orte: kx.orte.filter(function (x) { return x.standortId === z.id; }).sort(nachSort) } : { art: null };
@@ -631,14 +693,23 @@
     if (!z) return [];
     var stK = function (s) { return { id: 's:' + s.id, name: s.name }; };
     var tK = function (sid, tp) { return { id: 't:' + sid + ':' + tp, schluessel: 'temp_' + tp, zeichen: TEMP_ZEICHEN[tp] }; };
-    if (z.art === 'i') return [{ id: sel, schluessel: 'ordner_' + z.id }];
+    if (z.art === 'i') {   /* A24: ein Ordner unten in einem Abschnitt hat den Abschnitt im Pfad („Kategorien › ohne Kategorie“) */
+      var ab = abschnittVon(eintragVon(z.id));
+      return ab === 'uebersicht' ? [{ id: sel, schluessel: 'ordner_' + z.id }] : [{ id: 'a:' + ab, schluessel: 'abschnitt_' + ab }, { id: sel, schluessel: 'ordner_' + z.id }];
+    }
     if (z.art === 'a') return [{ id: sel, schluessel: 'abschnitt_' + z.id }];
+    if (z.art === 'w') {
+      var tk = { id: 'a:teigecke', schluessel: 'abschnitt_teigecke' };
+      if (z.id === '_ohne') return [tk, { id: sel, schluessel: 'ordner_wagen_ohne', zeichen: '🚧' }];
+      if (z.id === '_silo') return [tk, { id: sel, schluessel: 'ordner_wagen_silo' }];
+      return kx.wm[z.id] ? [tk, { id: sel, name: wagenText(kx.wm[z.id]) }] : [tk];
+    }
     if (z.art === 's') return kx.sm[z.id] ? [stK(kx.sm[z.id])] : [];
     if (z.art === 't') return kx.sm[z.id] ? [stK(kx.sm[z.id]), tK(z.id, z.temperatur)] : [];
     if (z.art === 'o') {
       var o = kx.om[z.id]; if (!o) return [];
       var s = kx.sm[o.standortId];
-      return s ? [stK(s), tK(s.id, tempVon(o)), { id: sel, name: o.name }] : [{ id: 'i:orte_ohne', schluessel: 'ordner_orte_ohne' }, { id: sel, name: o.name }];
+      return s ? [stK(s), tK(s.id, tempVon(o)), { id: sel, name: o.name }] : [{ id: 'a:standorte', schluessel: 'abschnitt_standorte' }, { id: 'i:orte_ohne', schluessel: 'ordner_orte_ohne' }, { id: sel, name: o.name }];
     }
     if (z.art === 'k') return kx.km[z.id] ? [{ id: 'a:kategorien', schluessel: 'abschnitt_kategorien' }, { id: sel, name: kx.km[z.id].name }] : [];
     if (z.art === 'l') return kx.lm[z.id] ? [{ id: 'a:lieferanten', schluessel: 'abschnitt_lieferanten' }, { id: sel, name: kx.lm[z.id].name }] : [];
@@ -647,8 +718,11 @@
   /* Wo liegt der Ordner im Baum? Kennungen der Vorfahren (zum Aufklappen). */
   function vorfahren(sel, daten) {
     var ids = pfad(sel, daten).map(function (x) { return x.id; }).filter(function (id) { return id !== sel; });
-    if (/^[st]:/.test(sel) || (ids[0] && /^s:/.test(ids[0]))) ids.unshift('a:standorte');
-    if (/^i:/.test(sel) || (ids[0] && /^i:/.test(ids[0]))) ids.unshift('a:uebersicht');   /* A23 */
+    var erst = ids[0] || sel, kopf = null;
+    if (/^[sto]:/.test(erst)) kopf = 'a:standorte';
+    else if (/^i:/.test(erst)) kopf = 'a:' + abschnittVon(eintragVon(erst.slice(2)));   /* A23/A24 */
+    else if (/^w:/.test(erst)) kopf = 'a:teigecke';
+    if (kopf && kopf !== sel && ids[0] !== kopf) ids.unshift(kopf);
     return ids;
   }
   /* Suche über alles (aktive Einträge). Artikel: Name, Gebinde, Artikelnummern. Ein Artikel an n Orten hat n Pfade. */
@@ -659,7 +733,7 @@
     var artikelPasst = function (a) { return passt(a.name) || passt(a.gebinde) || (istKarte(a.quellen) && Object.keys(a.quellen).some(function (k) { return passt(a.quellen[k]); })); };
     kx.artikel.filter(artikelPasst).sort(nachName).forEach(function (a) {
       var orte = (a.orte || []).filter(function (o) { return kx.om[o]; });
-      aus.push({ art: 'artikel', id: a.id, name: a.name, pfade: orte.length ? orte.map(function (o) { return pfad('o:' + o, daten); }) : [[{ id: 'i:unsortiert', schluessel: 'ordner_unsortiert' }]] });
+      aus.push({ art: 'artikel', id: a.id, name: a.name, pfade: orte.length ? orte.map(function (o) { return pfad('o:' + o, daten); }) : [pfad('i:ohne_ort', daten)] });
     });
     kx.orte.filter(function (o) { return passt(o.name); }).sort(nachName).forEach(function (o) { aus.push({ art: 'ort', id: 'o:' + o.id, name: o.name, pfade: [pfad('o:' + o.id, daten).slice(0, -1)] }); });
     kx.standorte.filter(function (s) { return passt(s.name); }).sort(nachName).forEach(function (s) { aus.push({ art: 'standort', id: 's:' + s.id, name: s.name, pfade: [[{ id: 'a:standorte', schluessel: 'abschnitt_standorte' }]] }); });
@@ -803,6 +877,7 @@
     wertGueltig: wertGueltig,
     /* Ordneransicht (#168) */
     ORDNER_INTELLIGENT: ORDNER_INTELLIGENT, TEMP_ZEICHEN: TEMP_ZEICHEN, ordnerKontext: ordnerKontext, ordnerBaum: ordnerBaum,
+    ABSCHNITTE: ABSCHNITTE, ORDNER_ALT_NEU: ORDNER_ALT_NEU, ordnerAltNeu: ordnerAltNeu, statusZaehler: statusZaehler,
     zerlegeOrdner: zerlegeOrdner, ordnerGueltig: ordnerGueltig, startordner: startordner, ordnerInhalt: ordnerInhalt, ordnerZeile: ordnerZeile,
     blaetterIds: blaetterIds, pfad: pfad, vorfahren: vorfahren, sucheUeberAlles: sucheUeberAlles, archivListe: archivListe,
     ortErsetzen: ortErsetzen, ortDazu: ortDazu, ortWeg: ortWeg, standHinweis: standHinweis, tempVon: tempVon,
