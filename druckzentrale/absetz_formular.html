@@ -1,4 +1,13 @@
 <!--
+  2026-11-16 · 01:51 · v0.7 · Feature
+    Stikken-Verteilung Stufe 3b (Anweisung KC 15.11., 04:55; Go 16.11., 01:40, K1–K4):
+    < 680 px „Steht auch mit drin“: Beschriftung eigene Zeile, darunter Text,
+    Zahl, „Fächer“, Vorgabe „z. B. Dinkel-Zwerge“; < 500 px mit drei Tagen bzw.
+    < 400 px mit zwei Tagen: Name über den Feldern, Felder (auch Käse, Extra)
+    unter ihren Köpfen, „Produkt“ im Kopf unsichtbar, Band links ohne Einzug
+    (K1: unter den Tagesfeldern seiner Sorte). Klasse tage-3 aus zeigeTage().
+    Breit (≥ 680 px) pixelgleich mit v0.6. SESSION_2026-11-15_STIKKEN_3B_HANDY_BAU.md
+
   2026-11-14 · 22:25 · v0.6 · Feature
     Stikken-Verteilung Stufe 3a (Anweisung KC 14.11., 08:47; Go 19:38, J1/J2).
     - Rechenzeile (Rest an) als eigenes, kleineres Band links unter dem
@@ -251,6 +260,38 @@
   .af-fremd input { flex: 1 1 180px; min-width: 150px; }
   .af-fremd select { width: 64px; flex: 0 0 auto; }
   .af-fremd .af-suffix { font-size: var(--bos-font-sm, 0.8rem); color: var(--dim); }
+
+  /* ── Stufe 3b: schmales Formular-Fenster (Handy) ──────────────────
+     Media Queries im Formular-Dokument (Fensterbreite, nicht Gerät).
+     Gemessen v0.6 mit Rest an: Köpfe über den Feldern mit drei Tagen ab
+     480 px, mit zwei Tagen ab 400 px; „Fächer“ rutschte zwischen 560 und
+     610 px und unter 390 px in eine eigene Zeile. Daraus:
+       < 640 px  „Steht auch mit drin“: Beschriftung eigene Zeile, darunter
+                 Text (wächst mit), Zahl, „Fächer“ (2b) — gleiche Grenze wie
+                 die Frühschicht (SCHMAL_ABFRAGE)
+       < 500 px  mit drei Tagen: Name über den Feldern, Felder unter den Köpfen
+       < 400 px  mit zwei Tagen: ebenso
+     Breit (≥ 640 px) bleibt alles wie v0.6. */
+  @media (max-width: 679.98px) {
+    .af-fremd { column-gap: 8px; }
+    .af-fremd-label { flex: 1 1 100%; }
+    .af-fremd input { flex: 1 1 0; min-width: 0; }
+    .af-fremd select { width: 56px; }
+  }
+  @media (max-width: 499.98px) {
+    #af-produkte.tage-3 .af-row, #af-produkte.tage-3 .af-extra-row { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+    #af-produkte.tage-3 .af-row-name, #af-produkte.tage-3 .af-extra-row input { flex: 1 1 100%; min-width: 0; }
+    #af-produkte.tage-3 .af-row.af-mit-rest .af-rest-teil { margin: 2px auto 0 0; gap: 5px; }   /* Band bleibt links (3a), ohne Einzug */
+    #af-produkte.tage-3 .af-th-name { min-width: 0; visibility: hidden; }   /* „Produkt“ würde die Köpfe aus der Spalte schieben */
+    #af-produkte.tage-3 .af-rest-tag { white-space: nowrap; }
+  }
+  @media (max-width: 399.98px) {
+    #af-produkte .af-row, #af-produkte .af-extra-row { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+    #af-produkte .af-row-name, #af-produkte .af-extra-row input { flex: 1 1 100%; min-width: 0; }
+    #af-produkte .af-row.af-mit-rest .af-rest-teil { margin: 2px auto 0 0; gap: 5px; }
+    #af-produkte .af-th-name { min-width: 0; visibility: hidden; }
+    #af-produkte .af-rest-tag { white-space: nowrap; }
+  }
   .af-rest-info { font-size: var(--bos-font-sm, 0.8rem); color: var(--dim); line-height: 1.5; white-space: pre-line; padding-bottom: var(--bos-space-2xs, 6px); }
   .af-rest-info.fehler { color: var(--red); }
   .fehler-feld { margin-top: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red); font-size: var(--bos-font-sm, 0.82rem); line-height: 1.5; white-space: pre-line; }
@@ -778,7 +819,15 @@
     document.querySelectorAll('.af-rest-tag').forEach(function (el) { el.textContent = erster.label + ':'; });
     document.getElementById('af-fremd-label').textContent = 'Steht auch mit drin (' + erster.label + ')';
     document.getElementById('af-mosa-titel').textContent = 'Mohn- und Sesambrötchen für ' + erster.name;
+    document.getElementById('af-produkte').classList.toggle('tage-3', tage.length === 3);   // Stufe 3b: schmale Ansicht mit drei Tagen
   }
+  /* Stufe 3b: im schmalen Fenster kürzere Vorgabe im Textfeld „Steht auch mit drin“ (nicht abgeschnitten) */
+  var SCHMAL_ABFRAGE = '(max-width: 679.98px)';
+  var schmal = window.matchMedia ? window.matchMedia(SCHMAL_ABFRAGE) : { matches: false };
+  function zeigePlatzhalter() {
+    document.getElementById('af-fremd-text').placeholder = schmal.matches ? 'z. B. Dinkel-Zwerge' : 'z. B. Dinkelschoko-Zwerge';
+  }
+  if (schmal.addEventListener) schmal.addEventListener('change', zeigePlatzhalter);
   /* Stufe 3a: leere Rest-Auswahl grau („Rest“), Rechenzeile blass, solange weder
      eine Zahl am ersten Tag noch ein Rest drinsteht — bedienbar bleibt sie immer */
   function zeigeRestZustand() {
@@ -966,6 +1015,7 @@
   renderRows();
   pruefeTrennstellen();   // G1: falsche Trennstellen gleich beim Öffnen zeigen
   initExtra();
+  zeigePlatzhalter();   // Stufe 3b
   zeigeTage();   // Spaltenköpfe, Meta-Zeile, Rest-/Fremd-Beschriftung, Mohn-Überschrift, Schalter Samstag
 
   /* Grußzeile: Auto-Resize */

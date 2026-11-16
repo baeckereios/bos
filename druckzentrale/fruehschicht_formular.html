@@ -1,4 +1,15 @@
 <!--
+  2026-11-16 · 01:51 · v0.6 · Feature
+    Stikken-Verteilung Stufe 3b (Anweisung KC 15.11., 04:55; Go 16.11., 01:40, K1–K4):
+    schmales Formular-Fenster < 680 CSS-px (Media Query im Dokument, nicht Gerät;
+    ab 680 px hat der Inhalt seine volle Breite). Kopfzeile „Benötigt · Rest ·
+    Absetzen“ entfällt; Name eigene Zeile, darunter die ganze Rechnung in einer
+    Zeile; leere Felder grau „Benötigt“/„Rest“ (zeigePlatzhalter über matchMedia,
+    beim Umschalten neu); Rest aus: Feld und „Bleche absetzen“ unter dem Namen;
+    „Steht auch mit drin“: Beschriftung eigene Zeile, darunter Text, Zahl, „Fächer“,
+    Vorgabe „z. B. Dinkel-Zwerge“. Breit (≥ 680 px) pixelgleich mit v0.5.
+    SESSION_2026-11-15_STIKKEN_3B_HANDY_BAU.md
+
   2026-11-14 · 22:25 · v0.5 · Feature
     Stikken-Verteilung Stufe 3a, J1 (Freigabe KC 14.11., 19:38; Ulf „Ja, gleich mit“):
     Druck Seite 1 — vor der ersten festen Zeile, deren Sorte nicht stikke:true
@@ -220,6 +231,32 @@
   .fh-fremd-label { font-weight: 700; color: var(--text); font-size: var(--bos-font-md, 0.92rem); }
   .fh-fremd input { flex: 1 1 180px; min-width: 150px; }
   .fh-fremd select { width: 70px; flex: 0 0 auto; }
+
+  /* ── Stufe 3b: schmales Formular-Fenster (Handy) ──────────────────
+     Grenze 640 CSS-px Breite DIESES Dokuments (Media Query im Formular, gilt
+     also auch für ein schmales Satellite-Fenster am Tablet, nicht „Gerät“).
+     Gemessen v0.5: Die Köpfe „Benötigt · Rest · Absetzen“ stehen ab 630 px über
+     ihren Feldern, darunter nicht mehr. Gleicher Wert in SCHMAL_ABFRAGE (JS).
+     Breit (≥ 640 px) bleibt alles wie v0.5. */
+  @media (max-width: 679.98px) {
+    .fh-th-rest { display: none !important; }                       /* Kopfzeile entfällt, jede Zeile spricht für sich */
+    #fh-rows .fh-row { row-gap: 6px; }
+    #fh-rows .fh-row-name { flex: 1 1 100%; min-width: 0; }         /* Name eigene Zeile, darunter die Felder linksbündig */
+    .rest-an #fh-rows .fh-row { column-gap: 6px; }
+    .rest-an #fh-rows .fh-ben { width: 80px; }                       /* Platz für die graue Vorgabe „Benötigt“ */
+    .fh-rest-teil { gap: 6px; flex: 1 1 0; min-width: 0; }          /* Basis 0: bleibt in der Zeile neben „Benötigt“ */
+    .fh-rest-teil select { width: 56px; }
+    .fh-rest-teil .fh-op { width: 10px; }
+    .fh-rest-teil .fh-ergebnis { min-width: 40px; }
+    .fh-rest-teil .fh-suffix { width: auto; flex: 1 1 0; min-width: 0; line-height: 1.15; }   /* darf bei sehr schmal zweizeilig werden, bleibt in der Zeile */
+    .fh-mehr { text-align: left; margin-top: 0; }
+    #fh-rows select.leer { color: var(--faint); }                   /* „Benötigt“/„Rest“ grau, solange leer */
+    .fh-fremd-label { flex: 1 1 100%; }                              /* 2b: Beschriftung eigene Zeile … */
+    .fh-fremd { column-gap: 8px; }
+    .fh-fremd input { flex: 1 1 0; min-width: 0; }                   /* … darunter Text (wächst mit), Zahl, „Fächer“ */
+    .fh-fremd select { width: 56px; }
+    .fh-fremd .fh-suffix { font-size: var(--bos-font-sm, 0.78rem); color: var(--dim); }
+  }
   .fh-rest-info { font-size: var(--bos-font-sm, 0.82rem); color: var(--dim); line-height: 1.5; white-space: pre-line; }
   .fh-rest-info.fehler { color: var(--red); }
   .fehler-feld { margin-top: var(--bos-space-sm, 12px); padding: var(--bos-space-xs, 10px) var(--bos-space-sm, 12px); border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red); font-size: var(--bos-font-sm, 0.82rem); line-height: 1.5; white-space: pre-line; }
@@ -463,7 +500,7 @@
       r.className = 'fh-row';
       r.innerHTML =
         '<span class="fh-row-name">' + escapeHtml(item.name) + '</span>' +
-        '<select class="bos-input" id="fh-' + item.kennung + '"></select>' +
+        '<select class="bos-input' + (item.stikke ? ' fh-ben' : '') + '" id="fh-' + item.kennung + '"></select>' +
         (item.stikke ?
           '<span class="fh-rest-teil" hidden>' +
             '<span class="fh-op" aria-hidden="true">−</span>' +
@@ -648,6 +685,26 @@
     plan.posten.forEach(function (p) { if (p.kennung === kennung) treffer = p; });
     return treffer;
   }
+  /* Stufe 3b: im schmalen Fenster zeigen leere Felder grau „Benötigt“ bzw. „Rest“
+     (statt der Kopfzeile). Breit bleiben sie leer wie bisher. Gleiche Grenze wie im CSS. */
+  var SCHMAL_ABFRAGE = '(max-width: 679.98px)';
+  var schmal = window.matchMedia ? window.matchMedia(SCHMAL_ABFRAGE) : { matches: false };
+  function zeigePlatzhalter() {
+    var an = schmal.matches && restAn;
+    FIXE_ROWS.forEach(function (item) {
+      if (!item.stikke) return;
+      [['fh-' + item.kennung, 'Benötigt'], ['fh-rest-' + item.kennung, 'Rest']].forEach(function (x) {
+        var sel = document.getElementById(x[0]);
+        if (!sel) return;
+        sel.options[0].textContent = an ? x[1] : '';
+        sel.classList.toggle('leer', !sel.value);
+      });
+    });
+    var ft = document.getElementById('fh-fremd-text');
+    if (ft) ft.placeholder = schmal.matches ? 'z. B. Dinkel-Zwerge' : 'z. B. Dinkelschoko-Zwerge';
+  }
+  if (schmal.addEventListener) schmal.addEventListener('change', zeigePlatzhalter);
+
   function toggleRest() {
     restAn = !restAn;
     document.getElementById('fh-rest-pill').classList.toggle('active', restAn);
@@ -659,6 +716,7 @@
     aktualisiereRest();
   }
   function aktualisiereRest() {
+    zeigePlatzhalter();
     var info = document.getElementById('fh-rest-info');
     if (!info) return;
     if (!restAn) { info.hidden = true; return; }
@@ -821,6 +879,7 @@
     FIXE_ROWS = [];
   }
   renderFixedRows();
+  zeigePlatzhalter();     // Stufe 3b: Vorgaben je nach Fensterbreite
   pruefeTrennstellen();   // G1: falsche Trennstellen gleich beim Öffnen zeigen
   initExtra();
   for (var i = 0; i < 3; i++) fhAddNotizRow();
