@@ -19,11 +19,27 @@
    allgemeine Wörter. Rezeptmengen werden nie gebraucht: „Steckt in …“
    liest nur die Zutaten-KENNUNGEN der Teige.
 
+   Seit Stufe 3a (RK §32): Anforderungslisten und Bestellungen
+   (lager_listen), Korrekturen, Mindestmengen, Bestand je Ort, Hauptort,
+   „Bitte nachbestellen“, Druckansicht der Liste.
+
    WARNUNG: FELDER und GRENZEN müssen zur Regel passen
-   (_regeln/_protokolle/firestore_regeln_2026-11-11_lager_zaehlen.rules,
-   Blöcke lager_*). test_lager.js vergleicht beides — immer beide ändern.
+   (_regeln/_protokolle/firestore_regeln_2026-11-16_lager_anfordern.rules,
+   Blöcke lager_*). test_lager.js und test_lager_anfordern.js vergleichen
+   beides — immer beide ändern.
 
    CHANGELOG
+     2026-11-16 · 09:52 · v6 · Feature (Lager Stufe 3a, #169; Freigabe Kontroll-Chat 16.11. 08:44/08:49 mit A27–A29,
+       Kern-Freigabe Ulf 08:42 für Regel/Konten)
+       Neu, nur rechnend: COL listen/korrekturen/mindest, FELDER_LISTE/EINTRAG/KORREKTUR/MINDEST (= Regel RK §32),
+       GRENZEN mengeMax/mindestMax/posMax/hinweisStunden, listeId, neuePosId, mengeGueltig/mengeAus/mengeText,
+       Bausteine (neueListeDokument, eintragDokument, abschlussFelder, korrekturDokument, mindestDokument),
+       offeneListe, juengsteAbgeschlossen (A28), orteImStandort/hauptort/alsHauptort (A27), buchungenAus,
+       bestandAb (T0), bestand je Ort (Bauplan §3.2), bestandAlle, bestandAmOrt, nachbestellen, listeNachOrt,
+       druckHTML/DRUCK_CSS. Geändert: archivSperre (Ort mit rechnerischem Bestand), zaehlliste (noch: „liegt hier
+       noch?“), ordnerKontext (bestand), ordnerZeile (zahl), ORDNER_INTELLIGENT + „Unter Mindestmenge“ (Übersicht).
+       Bestehende FELDER und pruefe() unverändert.
+       lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
      2026-11-16 · 04:36 · v5 · Feature (Baum neu ordnen, A24/L25; Freigabe Kontroll-Chat 16.11. 04:27 mit A25/A26)
        ORDNER_INTELLIGENT: Feld abschnitt (uebersicht/standorte/kategorien/lieferanten) und ohne (sichtbar
        abgesetzt, Knoten-Art 'ohne'). „Unsortiert“ → „ohne Lagerort“ (i:ohne_ort, unten bei STANDORTE, nur bei
@@ -71,7 +87,8 @@
   var COL = {
     artikel: 'lager_artikel', orte: 'lager_orte', kategorien: 'lager_kategorien',
     lieferanten: 'lager_lieferanten', sicherungen: 'lager_sicherungen',
-    standorte: 'lager_standorte', zaehlungen: 'lager_zaehlungen', stand: 'lager_stand'   /* Stufe 2, RK §31 */
+    standorte: 'lager_standorte', zaehlungen: 'lager_zaehlungen', stand: 'lager_stand',   /* Stufe 2, RK §31 */
+    listen: 'lager_listen', korrekturen: 'lager_korrekturen', mindest: 'lager_mindest'     /* Stufe 3a, RK §32 */
   };
   /* = hasOnly der Regel ohne sicherungId, geaendertVon, geaendertAm */
   var FELDER = {
@@ -90,7 +107,8 @@
   var GRENZEN = {
     name: 60, gebinde: 30, kontakt: 120, orte: 10, quellen: 5, folge: 300,
     zaehlRasterMax: 48, minuteMax: 1439, artikelNr: 40,
-    wertMax: 99999, nachkomma: 1, zaehlgangStunden: 12   /* Stufe 2: Regel wert <= 99999; Ulf 06:41: eine Nachkommastelle, 12 Stunden */
+    wertMax: 99999, nachkomma: 1, zaehlgangStunden: 12,   /* Stufe 2: Regel wert <= 99999; Ulf 06:41: eine Nachkommastelle, 12 Stunden */
+    mengeMax: 9999, mindestMax: 99999, posMax: 200, hinweisStunden: 24   /* Stufe 3a: Regel RK §32; A28: 24 Stunden */
   };
   var BEREICHE = ['', 'baeckerei', 'konditorei', 'beide'];
   var EINHEITEN = ['', 'kg', 'l', 'stk'];   /* = teigecke_logik.js EINHEITEN */
@@ -275,6 +293,10 @@
     var l;
     if (col === COL.standorte && (l = orteDesStandorts(id, d.orte)).length) return 'Archivieren geht nicht: zu diesem Standort gehören noch die Lagerorte ' + namen(l) + '.';
     if (col === COL.orte && (l = artikelAmOrt(id, d.artikel)).length) return 'Archivieren geht nicht: an diesem Ort liegen noch ' + namen(l) + '.';
+    /* Stufe 3a: rechnerischer Bestand am Ort (nur wenn die Seite Stand und Buchungen mitgibt) */
+    if (col === COL.orte && d.stand && (l = bestandAmOrt(d, id)).length) {
+      return 'Archivieren geht nicht: hier liegt rechnerisch noch ' + l.map(function (x) { return x.artikel.name + ' ' + mengeText(x.wert); }).join(', ') + '. Erst zählen (0), dann archivieren.';
+    }
     if (col === COL.kategorien && (l = artikelDerKategorie(id, d.artikel)).length) return 'Archivieren geht nicht: zu dieser Kategorie gehören noch ' + namen(l) + '.';
     if (col === COL.lieferanten && (l = artikelDesLieferanten(id, d.artikel)).length) return 'Archivieren geht nicht: dieser Lieferant liefert noch ' + namen(l) + '.';
     if (col === COL.artikel && (l = teigeMitArtikel(id, d.teige)).length) return 'Archivieren geht nicht: der Artikel steht noch im Teig ' + namen(l) + '. Erst dort herausnehmen.';
@@ -413,11 +435,15 @@
 
   /* Zählliste eines Standorts: seine aktiven Orte nach Rundgang, je Ort die aktiven Artikel,
      die dort fest hingehören (artikel.orte), in der Reihenfolge des Ortes (folge, dann Name).
-     [{ ort, artikel: [...] }] — Orte ohne Artikel bleiben drin (die Seite zeigt sie). */
-  function zaehlliste(standortId, orte, artikel) {
-    var akt = aktiv(artikel);
+     [{ ort, artikel: [...], noch: [...] }] — Orte ohne Artikel bleiben drin (die Seite zeigt sie).
+     Stufe 3a (B26, Bauplan §6.3): noch = aktive Artikel, die dort NICHT mehr fest liegen, aber einen Stand > 0
+     haben („liegt hier noch?“, ans Ende des Orts). stand = { artikelId__ortId: { wert } } (fehlt = keine). */
+  function zaehlliste(standortId, orte, artikel, stand) {
+    var akt = aktiv(artikel), st = stand || {};
     return aktiv(orte).filter(function (o) { return o.standortId === standortId; }).sort(nachSort).map(function (o) {
-      return { ort: o, artikel: artikelInFolge(o, akt.filter(function (a) { return (a.orte || []).indexOf(o.id) !== -1; })) };
+      var fest = akt.filter(function (a) { return (a.orte || []).indexOf(o.id) !== -1; });
+      var noch = akt.filter(function (a) { var s = st[standId(a.id, o.id)]; return fest.indexOf(a) === -1 && s && istZahl(s.wert) && s.wert > 0; }).sort(nachName);
+      return { ort: o, artikel: artikelInFolge(o, fest), noch: noch };
     });
   }
 
@@ -464,6 +490,8 @@
     { id: 'alle', abschnitt: 'uebersicht', zeichen: '📦', art: 'artikel', immer: true, filter: function () { return true; } },
     { id: 'pruefen', abschnitt: 'uebersicht', zeichen: '⚠︎', art: 'artikel', filter: function (a, kx) { return plausibel(a, kx.km, kx.om).length > 0; } },
     { id: 'ohne_ber', abschnitt: 'uebersicht', zeichen: '◌', art: 'artikel', filter: function (a) { return !a.bereich; } },
+    /* Stufe 3a: über alle Standorte; nur wenn die Seite den Bestand mitgibt (kx.bestand) */
+    { id: 'unter_mindest', abschnitt: 'uebersicht', zeichen: '📉', art: 'artikel', filter: function (a, kx) { return unterMindestIn(a, kx).length > 0; } },
     { id: 'uebernahme', abschnitt: 'uebersicht', zeichen: '⇣', art: 'eigen', zahl: function (kx) { return kx.kandidaten; } },
     { id: 'archiv', abschnitt: 'uebersicht', zeichen: '🗄', art: 'eigen', zahl: function (kx) { return kx.archiv; } },
     { id: 'ohne_ort', abschnitt: 'standorte', ohne: true, zeichen: '📥', art: 'artikel', filter: function (a, kx) { return !(a.orte || []).some(function (o) { return kx.om[o]; }); } },
@@ -493,7 +521,9 @@
       om: nachId(aktiv(d.orte)), sm: nachId(aktiv(d.standorte)), km: nachId(aktiv(d.kategorien)), lm: nachId(aktiv(d.lieferanten)),
       kandidaten: istZahl(d.kandidaten) ? d.kandidaten : 0, archiv: archiv, roh: d,
       /* Zuhause im Lager (L19): Teigecke-Blätter und Wagen, nur wenn die Seite sie mitgibt */
-      mitWagen: Array.isArray(d.teigeckeOrte), bm: nachId(d.blaetter || []), wagen: aktiv(d.teigeckeOrte || []), wm: nachId(aktiv(d.teigeckeOrte || []))
+      mitWagen: Array.isArray(d.teigeckeOrte), bm: nachId(d.blaetter || []), wagen: aktiv(d.teigeckeOrte || []), wm: nachId(aktiv(d.teigeckeOrte || [])),
+      /* Stufe 3a: { standortId: { artikelId: bestand() } }, nur wenn die Seite ihn mitgibt */
+      bestand: istKarte(d.bestand) ? d.bestand : null
     };
   }
   function tempVon(o) { return TEMP_ORT.indexOf(o && o.temperatur) !== -1 ? o.temperatur : 'ungekuehlt'; }
@@ -624,7 +654,24 @@
     if (l) unter.push(l.name);
     var zh = a.teigecke === true && kx.mitWagen ? zuhauseVon(a, kx) : null;   /* L19: Wagen in der Unterzeile, Silo braucht keinen */
     if (zh && !zh.silo) unter.push('🥖 ' + (zh.wagen ? zh.wagen.kennung : 'noch ohne Zuhause'));
-    return { artikel: a, id: a.id, ortId: ortId || null, marken: marken, unter: unter, zahl: null };
+    /* Stufe 3a: Zahl rechts = Bestand an diesem Ort (nur mit Ort und Bestand); Marke unter Mindestmenge */
+    var zahl = null, um = unterMindestIn(a, kx);
+    if (um.length) marken.push({ art: 'mindest' });
+    if (ortId && kx.bestand && kx.om[ortId] && kx.om[ortId].standortId) {
+      var bs = (kx.bestand[kx.om[ortId].standortId] || {})[a.id];
+      var bo = bs ? bs.orte.filter(function (x) { return x.ortId === ortId; })[0] : null;
+      zahl = { status: bs ? bs.status : 'unbekannt', wert: bo ? bo.wert : (bs && bs.status === 'bekannt' ? 0 : null), unterNull: !!(bo && bo.unterNull),
+        unterMindest: !!(bs && bs.unterMindest), einheit: a.gebinde || '' };
+    }
+    return { artikel: a, id: a.id, ortId: ortId || null, marken: marken, unter: unter, zahl: zahl };
+  }
+  /* Standorte, an denen ein Artikel unter der Mindestmenge liegt: [{ standort, summe, mindest }] */
+  function unterMindestIn(a, kx) {
+    if (!kx.bestand) return [];
+    return kx.standorte.slice().sort(nachSort).map(function (s) {
+      var b = (kx.bestand[s.id] || {})[a.id];
+      return b && b.unterMindest ? { standort: s, summe: b.summe, mindest: b.mindest } : null;
+    }).filter(Boolean);
   }
   /* Inhalt eines Ordners. opt.sortierung: 'ort' | 'kategorie' (nur „Alle Artikel“).
      art: 'artikel' (gruppen mit zeilen) · 'orte' (Liste mit ▲▼) · 'liste' (Abschnitt) · 'eigen' (Seite zeichnet selbst) · null (unbekannt) */
@@ -652,7 +699,11 @@
         });
         return { art: 'artikel', gruppen: gr };
       }
-      return { art: 'artikel', gruppen: [{ schluessel: e.id, titel: '', zeilen: nachNameZeilen(kx.artikel.filter(function (a) { return e.filter(a, kx); })) }] };
+      var zeilenI = nachNameZeilen(kx.artikel.filter(function (a) { return e.filter(a, kx); }));
+      if (e.id === 'unter_mindest') zeilenI.forEach(function (z) {   /* „Bestand 3 von 10 · ‹Standort›“ */
+        unterMindestIn(z.artikel, kx).forEach(function (u) { z.unter.unshift('Bestand ' + mengeText(u.summe) + ' von ' + mengeText(u.mindest) + ' · ' + u.standort.name); });
+      });
+      return { art: 'artikel', gruppen: [{ schluessel: e.id, titel: '', zeilen: zeilenI }] };
     }
     if (z.art === 'a' && z.id === 'teigecke') {   /* A24: Kopf TEIGECKE = der bisherige Ordner „Teigecke“ (L19) */
       if (kx.mitWagen) return { art: 'artikel', wagen: true, teigecke: true, gruppen: teigeckeGruppen(kx) };
@@ -851,6 +902,279 @@
     return '';
   }
 
+  /* =================================================================
+     STUFE 3a (#169, RK §32): Anforderungslisten, Bestellungen, Korrekturen,
+     Mindestmengen, Bestand je Ort. Bauplan SESSION_2026-11-12_LAGER_STUFE3A_BAU.md,
+     Freigabe KC 16.11. 08:44/08:49 (A27–A29). Nur Rechnen, kein Firestore.
+     Zeitstempel kommen als Millisekunden (die Seite rechnet um).
+     ================================================================= */
+  var FELDER_LISTE = ['art', 'standortId', 'nummer', 'status', 'pos', 'letzte', 'abgeschlossenVon', 'abgeschlossenName', 'abgeschlossenAm'];
+  var FELDER_EINTRAG = ['artikelId', 'menge', 'ortId', 'von', 'vonName', 'ts'];
+  var FELDER_KORREKTUR = ['listeId', 'posId', 'art', 'artikelId', 'ortId', 'standortId', 'statt', 'nur', 'wirktAb', 'konto', 'name', 'ts'];
+  var FELDER_MINDEST = ['artikelId', 'standortId', 'menge', 'geaendertVon', 'geaendertAm'];
+  var LISTEN_ART = { anforderung: 'a', bestellung: 'b' };
+  var POS_MUSTER = /^[A-Za-z0-9]{6,20}$/;
+  var POS_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  function listeId(standortId, art, nummer) { return String(standortId) + '__' + LISTEN_ART[art] + String(nummer); }
+  function korrekturId(lid, posId) { return String(lid) + '__' + String(posId); }
+  function mindestId(artikelId, standortId) { return String(artikelId) + '__' + String(standortId); }
+  /* Kennung eines Eintrags: 12 Zeichen. zufall() = Zahl in [0,1) (zum Testen austauschbar). */
+  function neuePosId(zufall) {
+    var z = typeof zufall === 'function' ? zufall : Math.random, s = '';
+    for (var i = 0; i < 12; i++) s += POS_ZEICHEN.charAt(Math.floor(z() * POS_ZEICHEN.length) % POS_ZEICHEN.length);
+    return s;
+  }
+  function posIdGueltig(p) { return typeof p === 'string' && POS_MUSTER.test(p); }
+  function eineStelle(x) { return Math.abs(x * 10 - Math.round(x * 10)) < 1e-9; }
+  /* Menge eines Eintrags (Gebinde): > 0, höchstens mengeMax, eine Nachkommastelle (wie beim Zählen) */
+  function mengeGueltig(m) { return istZahl(m) && m > 0 && m <= GRENZEN.mengeMax && eineStelle(m); }
+  function mindestGueltig(m) { return istZahl(m) && m >= 0 && m <= GRENZEN.mindestMax && eineStelle(m); }
+  function mengeAus(text) {
+    var t = String(text == null ? '' : text).trim().replace(',', '.');
+    if (!/^[0-9]+(\.[0-9]+)?$/.test(t)) return NaN;
+    return parseFloat(t);   /* nicht runden: 2,55 soll als ungültig auffallen (mengeGueltig), nicht still 2,6 werden */
+  }
+  function mengeText(m) { return istZahl(m) ? String(Math.round(m * 10) / 10).replace('.', ',') : ''; }
+  /* „4 Sack“ — Gebinde aus dem Stamm, sonst nur die Zahl */
+  function mengeMitGebinde(m, a) { var g = a && a.gebinde ? String(a.gebinde) : ''; return mengeText(m) + (g ? ' ' + g : ''); }
+
+  /* Bausteine (Zeitstempel setzt die Seite als serverTimestamp) */
+  function neueListeDokument(art, standortId, nummer) {
+    return { art: art, standortId: String(standortId), nummer: nummer, status: 'offen', pos: {}, letzte: '' };
+  }
+  function eintragDokument(e) {
+    return { artikelId: String(e.artikelId), menge: e.menge, ortId: String(e.ortId || ''), von: String(e.von), vonName: String(e.vonName || '') };
+  }
+  function abschlussFelder(von, name) { return { status: 'zu', abgeschlossenVon: String(von), abgeschlossenName: String(name || '') }; }
+  function korrekturDokument(liste, posId, nur) {
+    var p = (liste && liste.pos && liste.pos[posId]) || null;
+    if (!p) return null;
+    return { listeId: liste.id, posId: posId, art: liste.art, artikelId: p.artikelId, ortId: p.ortId || '', standortId: liste.standortId, statt: p.menge, nur: nur };
+  }
+  function korrekturGueltig(statt, nur) { return istZahl(statt) && istZahl(nur) && nur >= 0 && nur < statt && eineStelle(nur); }
+  function mindestDokument(artikelId, standortId, menge) { return { artikelId: String(artikelId), standortId: String(standortId), menge: menge }; }
+
+  /* Die offene Liste eines Standorts und einer Art (höchste Nummer) — oder null */
+  function offeneListe(listen, standortId, art) {
+    return (listen || []).filter(function (l) { return l && l.standortId === standortId && l.art === art && l.status === 'offen'; })
+      .sort(function (a, b) { return b.nummer - a.nummer; })[0] || null;
+  }
+  /* A28: jüngste abgeschlossene Anforderungsliste des Standorts in den letzten `stunden` Stunden — oder null */
+  function juengsteAbgeschlossen(listen, standortId, jetztMs, stunden) {
+    var h = istZahl(stunden) ? stunden : GRENZEN.hinweisStunden;
+    return (listen || []).filter(function (l) {
+      return l && l.standortId === standortId && l.art === 'anforderung' && l.status === 'zu' && istZahl(l.abgeschlossenMs) && jetztMs - l.abgeschlossenMs <= h * 3600000;
+    }).sort(function (a, b) { return b.abgeschlossenMs - a.abgeschlossenMs; })[0] || null;
+  }
+
+  /* Orte eines Artikels in einem Standort, in der Reihenfolge von artikel.orte (aktive Orte). A27: der erste ist der Hauptort. */
+  function orteImStandort(a, standortId, orteMap) {
+    return ((a && a.orte) || []).map(function (o) { return orteMap[o]; }).filter(function (o) { return o && !o.geloescht && o.standortId === standortId; });
+  }
+  function hauptort(a, standortId, orteMap) { var l = orteImStandort(a, standortId, orteMap || {}); return l.length ? l[0].id : ''; }
+  /* A27: Ort nach vorn holen („als Hauptort“) — neue orte-Liste */
+  function alsHauptort(a, ortId, standortId, orteMap) {
+    var l = ((a && a.orte) || []).slice(), i = l.indexOf(ortId);
+    if (i === -1) return { fehler: 'nicht_da' };
+    var erster = hauptort(a, standortId, orteMap);
+    if (erster === ortId) return { fehler: 'schon' };
+    var j = l.indexOf(erster);
+    l.splice(i, 1); l.splice(j, 0, ortId);
+    return { orte: l };
+  }
+
+  /* Buchungen aus abgeschlossenen Listen und Korrekturen.
+     listen: [{ id, art, standortId, nummer, status, pos, abgeschlossenMs }], korrekturen: [{ listeId, posId, art, artikelId, ortId, standortId, statt, nur, wirktMs }]
+     → [{ artikelId, ortId, standortId, menge (±), wirktMs, quelle: { art: 'liste'|'korrektur', listenArt, listeId, nummer, posId } }] */
+  function buchungenAus(listen, korrekturen) {
+    var aus = [], nr = {};
+    (listen || []).forEach(function (l) {
+      if (!l || l.status !== 'zu' || !istZahl(l.abgeschlossenMs) || !istKarte(l.pos)) return;
+      nr[l.id] = l.nummer;
+      var vz = l.art === 'bestellung' ? 1 : (l.art === 'anforderung' ? -1 : 0);
+      if (!vz) return;
+      Object.keys(l.pos).forEach(function (pid) {
+        var p = l.pos[pid];
+        if (!p || !istZahl(p.menge)) return;
+        aus.push({ artikelId: p.artikelId, ortId: p.ortId || '', standortId: l.standortId, menge: vz * p.menge, wirktMs: l.abgeschlossenMs,
+          quelle: { art: 'liste', listenArt: l.art, listeId: l.id, nummer: l.nummer, posId: pid } });
+      });
+    });
+    (korrekturen || []).forEach(function (k) {
+      if (!k || !istZahl(k.statt) || !istZahl(k.nur) || !istZahl(k.wirktMs)) return;
+      var vz = k.art === 'anforderung' ? 1 : (k.art === 'bestellung' ? -1 : 0);   /* Gegenvorzeichen */
+      if (!vz) return;
+      aus.push({ artikelId: k.artikelId, ortId: k.ortId || '', standortId: k.standortId, menge: vz * (k.statt - k.nur), wirktMs: k.wirktMs,
+        quelle: { art: 'korrektur', listenArt: k.art, listeId: k.listeId, nummer: nr[k.listeId] || null, posId: k.posId } });
+    });
+    return aus;
+  }
+  /* Ältester Zeitpunkt, ab dem Buchungen zählen können (T0, Bauplan §3.4) — oder null (noch nie gezählt) */
+  function bestandAb(stand) {
+    var t = null;
+    standListe(stand).forEach(function (s) { if (istZahl(s.tsMs) && (t === null || s.tsMs < t)) t = s.tsMs; });
+    return t;
+  }
+  function standListe(stand) {
+    if (Array.isArray(stand)) return stand;
+    var aus = []; Object.keys(stand || {}).forEach(function (k) { var s = stand[k]; if (s) { var z = standIdZerlegt(k) || {}; aus.push(Object.assign({ artikelId: z.artikelId, ortId: z.ortId }, s)); } }); return aus;
+  }
+  function runde(x) { return Math.round(x * 1000) / 1000; }
+  /* Bestand je Artikel in einem Standort (Bauplan §3.2, Freigabe §2):
+       Ort mit Zählung:   Stand + Buchungen auf diesen Ort, die NACH der Zählung wirken
+       Ort ohne Zählung:  0 + Buchungen ab der ersten Zählung des Artikels im Standort (T_erst); Position ohne Ort = Ort ''
+       nie gezählt:       'unbekannt' (nicht 0)
+     Nur aktive Artikel, aktive Orte, aktiver Standort (F8). Buchungen auf archivierte oder fremde Orte zählen nicht.
+     daten = { artikel, orte, standorte, stand, listen, korrekturen, mindest } → { artikelId: Ergebnis } */
+  function bestand(daten, standortId) {
+    var d = daten || {}, aus = {};
+    var sm = nachId(aktiv(d.standorte));
+    if (!sm[standortId]) return aus;
+    var orteS = {}; aktiv(d.orte).forEach(function (o) { if (o.standortId === standortId) orteS[o.id] = o; });
+    var standJe = {}, buchJe = {}, mindJe = {};
+    standListe(d.stand).forEach(function (s) { if (s && orteS[s.ortId] && istZahl(s.wert) && istZahl(s.tsMs)) (standJe[s.artikelId] || (standJe[s.artikelId] = {}))[s.ortId] = s; });
+    buchungenAus(d.listen, d.korrekturen).forEach(function (b) {
+      if (b.standortId !== standortId || (b.ortId !== '' && !orteS[b.ortId])) return;
+      (buchJe[b.artikelId] || (buchJe[b.artikelId] = [])).push(b);
+    });
+    (d.mindest || []).forEach(function (m) { if (m && m.standortId === standortId && istZahl(m.menge) && m.menge > 0) mindJe[m.artikelId] = m.menge; });
+    aktiv(d.artikel).forEach(function (a) {
+      var st = standJe[a.id] || {}, bu = buchJe[a.id] || [], fest = orteImStandort(a, standortId, orteS);
+      var festIds = fest.map(function (o) { return o.id; });
+      var ids = festIds.slice();
+      Object.keys(st).forEach(function (o) { if (ids.indexOf(o) === -1) ids.push(o); });
+      bu.forEach(function (b) { if (ids.indexOf(b.ortId) === -1) ids.push(b.ortId); });
+      var tErst = null;
+      Object.keys(st).forEach(function (o) { if (tErst === null || st[o].tsMs < tErst) tErst = st[o].tsMs; });
+      var mindest = Object.prototype.hasOwnProperty.call(mindJe, a.id) ? mindJe[a.id] : null;
+      if (tErst === null) {
+        if (!ids.length && mindest === null) return;
+        aus[a.id] = { artikelId: a.id, status: 'unbekannt', summe: null, orte: ids.map(function (o) { return { ortId: o, wert: null, gezaehltMs: null, buchungen: bu.filter(function (b) { return b.ortId === o; }).length, unterNull: false, fest: festIds.indexOf(o) !== -1, liegtNoch: false }; }),
+          mindest: mindest, unterMindest: false, letzteZaehlungMs: null, hauptortId: festIds[0] || '' };
+        return;
+      }
+      var summe = 0, letzte = tErst;
+      var orte = ids.map(function (o) {
+        var s = st[o], ab = s ? s.tsMs : tErst, w = s ? s.wert : 0, n = 0;
+        bu.forEach(function (b) { if (b.ortId === o && b.wirktMs > ab) { w += b.menge; n++; } });
+        w = runde(w); summe += w;
+        if (s && s.tsMs > letzte) letzte = s.tsMs;
+        var istFest = festIds.indexOf(o) !== -1;
+        return { ortId: o, wert: w, gezaehltMs: s ? s.tsMs : null, buchungen: n, unterNull: w < 0, fest: istFest, liegtNoch: !istFest && o !== '' && w > 0 };
+      });
+      summe = runde(summe);
+      aus[a.id] = { artikelId: a.id, status: 'bekannt', summe: summe, orte: orte, mindest: mindest, unterMindest: mindest !== null && summe < mindest,
+        letzteZaehlungMs: letzte, hauptortId: festIds[0] || '' };
+    });
+    return aus;
+  }
+  /* Bestand aller aktiven Standorte: { standortId: { artikelId: Ergebnis } } */
+  function bestandAlle(daten) {
+    var aus = {};
+    aktiv((daten || {}).standorte).forEach(function (s) { aus[s.id] = bestand(daten, s.id); });
+    return aus;
+  }
+  /* Was liegt an einem Ort rechnerisch noch (≠ 0)? Für die Archivsperre. [{ artikel, wert }] */
+  function bestandAmOrt(daten, ortId) {
+    var o = nachId(aktiv((daten || {}).orte))[ortId];
+    if (!o || !o.standortId) return [];
+    var b = bestand(daten, o.standortId), am = nachId(aktiv(daten.artikel)), aus = [];
+    Object.keys(b).forEach(function (aid) {
+      (b[aid].orte || []).forEach(function (x) { if (x.ortId === ortId && istZahl(x.wert) && x.wert !== 0) aus.push({ artikel: am[aid], wert: x.wert }); });
+    });
+    return aus.sort(function (x, y) { return nachName(x.artikel, y.artikel); });
+  }
+  /* Lieferant eines Artikels für „Bitte nachbestellen“: Standard-Lieferant, sonst die erste aktive Bezugsquelle, sonst null */
+  function lieferantVon(a, lm) {
+    if (a.standardLieferantId && lm[a.standardLieferantId]) return lm[a.standardLieferantId];
+    var k = istKarte(a.quellen) ? Object.keys(a.quellen).filter(function (l) { return lm[l]; }).map(function (l) { return lm[l]; }).sort(nachName) : [];
+    return k[0] || null;
+  }
+  /* „Bitte nachbestellen“: unter Mindestmenge, nach Lieferant und Name. „Noch nie gezählt“: nur Artikel MIT Mindestmenge. */
+  function nachbestellen(bestandS, daten) {
+    var am = nachId(aktiv((daten || {}).artikel)), lm = nachId(aktiv((daten || {}).lieferanten)), liste = [], nie = [];
+    Object.keys(bestandS || {}).forEach(function (aid) {
+      var b = bestandS[aid], a = am[aid];
+      if (!a || b.mindest === null) return;
+      if (b.status === 'unbekannt') nie.push(a);
+      else if (b.unterMindest) liste.push({ artikel: a, lieferant: lieferantVon(a, lm), summe: b.summe, mindest: b.mindest });
+    });
+    liste.sort(function (x, y) {
+      var lx = x.lieferant ? x.lieferant.name : '￿', ly = y.lieferant ? y.lieferant.name : '￿';
+      var c = String(lx).localeCompare(String(ly), 'de');
+      return c || nachName(x.artikel, y.artikel);
+    });
+    return { liste: liste, nieGezaehlt: nie.sort(nachName) };
+  }
+
+  /* Einträge einer Liste nach Lagerort (Rundgang), darin nach Reihenfolge des Ortes. Ohne Ort zuletzt.
+     zusammen = true: eine Zeile je Artikel und Ort (Druck, „4 Sack (2 + 2)“), sonst jeder Eintrag einzeln (Bildschirm). */
+  function listeNachOrt(liste, daten, zusammen) {
+    var d = daten || {}, pos = (liste && liste.pos) || {}, sid = liste && liste.standortId;
+    var om = nachId(d.orte || []), am = nachId(d.artikel || []);
+    var je = {};
+    Object.keys(pos).forEach(function (pid) {
+      var p = pos[pid]; if (!p) return;
+      var o = p.ortId || '';
+      (je[o] || (je[o] = [])).push({ posId: pid, eintrag: p, artikel: am[p.artikelId] || { id: p.artikelId, name: '(unbekannter Artikel)' } });
+    });
+    var reihe = aktiv(d.orte).filter(function (o) { return o.standortId === sid; }).sort(nachSort).map(function (o) { return o.id; });
+    Object.keys(je).forEach(function (o) { if (o !== '' && reihe.indexOf(o) === -1) reihe.push(o); });
+    if (je['']) reihe.push('');
+    var tsVon = function (e) { var t = e.eintrag.tsMs; return istZahl(t) ? t : 0; };
+    return reihe.filter(function (o) { return je[o]; }).map(function (o) {
+      var ort = om[o] || null, eintraege = je[o];
+      var folge = artikelInFolge(ort, aktiv(eintraege.map(function (x) { return x.artikel; })).filter(function (a, i, arr) { return arr.indexOf(a) === i; }));
+      var rang = function (aid) { var i = folge.map(function (a) { return a.id; }).indexOf(aid); return i === -1 ? 1e9 : i; };
+      eintraege.sort(function (x, y) { return (rang(x.artikel.id) - rang(y.artikel.id)) || nachName(x.artikel, y.artikel) || (tsVon(x) - tsVon(y)); });
+      var gruppe = { ortId: o, ort: ort, titel: o === '' ? '' : (ort ? ort.name : '(unbekannter Ort)'), eintraege: eintraege };
+      if (zusammen) {
+        var zeilen = [];
+        eintraege.forEach(function (x) {
+          var z = zeilen.filter(function (y) { return y.artikel.id === x.artikel.id; })[0];
+          if (!z) { z = { artikel: x.artikel, summe: 0, teile: [] }; zeilen.push(z); }
+          z.summe = Math.round((z.summe + x.eintrag.menge) * 10) / 10; z.teile.push(x.eintrag.menge);
+        });
+        gruppe.zeilen = zeilen;
+      }
+      return gruppe;
+    });
+  }
+  /* Druckansicht (A4 hochkant, schwarz-weiß). Namen nur aus den Daten. opt = { standortName, titelArt, zeitText, name,
+     nachdruck, nb: nachbestellen()-Ergebnis | null, bestandFehler: Text | '' } → HTML (ohne <html>) */
+  function druckHTML(liste, daten, opt) {
+    var o = opt || {}, h = [];
+    var kopf = (liste.art === 'bestellung' ? 'Bestellung ' : 'Anforderung ') + esc(o.standortName || '') + ' · Liste ' + esc(String(liste.nummer));
+    h.push('<h1>' + kopf + (o.nachdruck ? ' · Nachdruck' : '') + '</h1>');
+    h.push('<p class="unter">' + esc(o.zeitText || '') + (o.name ? ' · abgeschlossen von ' + esc(o.name) : '') + '</p>');
+    h.push('<table class="liste">');
+    listeNachOrt(liste, daten, true).forEach(function (g) {
+      h.push('<tr class="ort"><th colspan="2">' + esc(g.ortId === '' ? 'Ohne Lagerort' : g.titel) + '</th><td class="box">☐</td></tr>');
+      g.zeilen.forEach(function (z) {
+        var teile = z.teile.length > 1 ? ' (' + z.teile.map(mengeText).join(' + ') + ')' : '';
+        h.push('<tr><td class="name">' + esc(z.artikel.name) + '</td><td class="menge">' + esc(mengeMitGebinde(z.summe, z.artikel)) + esc(teile) + '</td><td class="box">☐</td></tr>');
+      });
+    });
+    h.push('</table>');
+    if (o.bestandFehler) h.push('<p class="fehler">⚠ Bestand nicht berechenbar: ' + esc(o.bestandFehler) + '</p>');
+    else if (o.nb) {
+      h.push('<h2>Bitte nachbestellen' + (o.nachdruck ? ' (Stand jetzt)' : ' (nach dieser Liste)') + '</h2>');
+      if (!o.nb.liste.length) h.push('<p>Nichts unter der Mindestmenge.</p>');
+      else {
+        h.push('<table class="nb">');
+        o.nb.liste.forEach(function (x) {
+          h.push('<tr><td>' + esc(x.lieferant ? x.lieferant.name : 'ohne Lieferant') + '</td><td>' + esc(x.artikel.name) + '</td><td>Bestand ' + esc(mengeMitGebinde(x.summe, x.artikel)) + ' · Mindestmenge ' + esc(mengeText(x.mindest)) + '</td></tr>');
+        });
+        h.push('</table>');
+      }
+      if (o.nb.nieGezaehlt.length) h.push('<h3>Noch nie gezählt (mit Mindestmenge)</h3><p>' + o.nb.nieGezaehlt.map(function (a) { return esc(a.name); }).join(', ') + '</p>');
+    }
+    return h.join('\n');
+  }
+  var DRUCK_CSS = 'body{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:12pt} h1{font-size:16pt;margin:0 0 2mm} h2{font-size:13pt;margin:6mm 0 2mm} h3{font-size:11pt;margin:4mm 0 1mm}' +
+    ' .unter{margin:0 0 4mm;font-size:10pt} table{border-collapse:collapse;width:100%} td,th{padding:1.2mm 2mm;border-bottom:0.3mm solid #999;text-align:left;vertical-align:top}' +
+    ' tr.ort th{font-size:12.5pt;border-bottom:0.6mm solid #000;padding-top:4mm} td.menge{white-space:nowrap} td.box{width:8mm;font-size:14pt;text-align:center} .fehler{font-weight:bold;border:0.6mm solid #000;padding:2mm}';
+
   var api = {
     COL: COL, FELDER: FELDER, HERKUNFT: HERKUNFT, GRENZEN: GRENZEN, BEREICHE: BEREICHE, EINHEITEN: EINHEITEN,
     TEMP_ORT: TEMP_ORT, TEMP_KATEGORIE: TEMP_KATEGORIE, BESTELLWEGE: BESTELLWEGE, TAGE: TAGE, TAG_TEXT: TAG_TEXT,
@@ -882,7 +1206,19 @@
     blaetterIds: blaetterIds, pfad: pfad, vorfahren: vorfahren, sucheUeberAlles: sucheUeberAlles, archivListe: archivListe,
     ortErsetzen: ortErsetzen, ortDazu: ortDazu, ortWeg: ortWeg, standHinweis: standHinweis, tempVon: tempVon,
     TEIGECKE_BLATT_FELDER: TEIGECKE_BLATT_FELDER, blattMitZuhause: blattMitZuhause, wagenText: wagenText, wagenVergleich: wagenVergleich,
-    wagenSortiert: wagenSortiert, zuhauseVon: zuhauseVon, teigeckeGruppen: teigeckeGruppen, zuhauseKandidaten: zuhauseKandidaten, zuhauseSperre: zuhauseSperre
+    wagenSortiert: wagenSortiert, zuhauseVon: zuhauseVon, teigeckeGruppen: teigeckeGruppen, zuhauseKandidaten: zuhauseKandidaten, zuhauseSperre: zuhauseSperre,
+    /* Stufe 3a (RK §32) */
+    FELDER_LISTE: FELDER_LISTE, FELDER_EINTRAG: FELDER_EINTRAG, FELDER_KORREKTUR: FELDER_KORREKTUR, FELDER_MINDEST: FELDER_MINDEST,
+    LISTEN_ART: LISTEN_ART, POS_MUSTER: POS_MUSTER, listeId: listeId, korrekturId: korrekturId, mindestId: mindestId,
+    neuePosId: neuePosId, posIdGueltig: posIdGueltig, mengeGueltig: mengeGueltig, mindestGueltig: mindestGueltig,
+    mengeAus: mengeAus, mengeText: mengeText, mengeMitGebinde: mengeMitGebinde,
+    neueListeDokument: neueListeDokument, eintragDokument: eintragDokument, abschlussFelder: abschlussFelder,
+    korrekturDokument: korrekturDokument, korrekturGueltig: korrekturGueltig, mindestDokument: mindestDokument,
+    offeneListe: offeneListe, juengsteAbgeschlossen: juengsteAbgeschlossen,
+    orteImStandort: orteImStandort, hauptort: hauptort, alsHauptort: alsHauptort,
+    buchungenAus: buchungenAus, bestandAb: bestandAb, bestand: bestand, bestandAlle: bestandAlle, bestandAmOrt: bestandAmOrt,
+    lieferantVon: lieferantVon, nachbestellen: nachbestellen, unterMindestIn: unterMindestIn,
+    listeNachOrt: listeNachOrt, druckHTML: druckHTML, DRUCK_CSS: DRUCK_CSS
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.BOS_LAGER_LOGIK = api;

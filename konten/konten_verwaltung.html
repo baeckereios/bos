@@ -7,6 +7,17 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-11-16 · 09:26 · v-Lager-3a · Feature (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44/08:49,
+      Kern-Freigabe Ulf 08:42, F1 b, F2 a)
+      Rein additiv, nach dem Muster „📦 Lager zählen“. Neue Gruppe „🧾 Lager anfordern“ unter
+      „Lager zählen“: ein Haken je aktivem Standort (lagerAnfordernStandorte = das Schloss, Regel
+      laAnfordern(), RK §32; lagerAnfordern = Kachel, beides über BOS_ACCOUNTS.setzeLagerAnfordernRecht)
+      und darunter EIN Haken „Lager bestellen“ (lagerBestellen: Bestellungen eintragen und
+      Mindestmengen pflegen, alle Standorte; Regel laBestellen(), Setzer setzeLagerBestellenRecht).
+      Standorte aus derselben einmaligen Ladung wie „Lager zählen“ (ladeLagerStandorteEinmal zeichnet
+      jetzt beide Gruppen neu). Archivierte Standorte grau, nur abhaken. Für alle Konto-Arten.
+      Ein Hilfe-Abschnitt. Keine anderen Haken, keine Rollen, keine Regel in dieser Datei.
+      lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
     2026-11-11 · 07:11 · v-Lager-2 · Feature (Lager Stufe 2, #120; Bauplan 06:35, Freigabe KC 06:43
       mit A11; Kern-Freigabe Ulf 06:41, K1, Frage 6)
       Rein additiv. (a) Neue Gruppe „📦 Lager zählen“ in der Konto-Karte (Stammdaten) unter
@@ -847,6 +858,10 @@ var helpData = {
       text: "In der Konto-Karte (Stammdaten) steht je Standort des Lagers ein Haken. Angehakt heißt: dieses Konto darf an diesem Standort zählen, die Datenbank prüft das bei jeder Zahl. Mit mindestens einem Haken erscheint die Kachel „Lager zählen“ beim nächsten Anmelden. Die Standorte legst du im Lager an (Reiter „Standorte“). Rolle admin darf überall zählen, braucht für die Kachel aber auch einen Haken. Ein Stationskonto ist das gemeinsame Konto eines Tablets (z. B. das der Backstube). Hakst du dort einen Standort an, darf jeder an diesem Tablet dort zählen. Ob du das willst, entscheidest du je Konto. Ein archivierter Standort, der noch an einem Konto hängt, steht grau da und lässt sich nur noch abhaken."
     },
     {
+      heading: "Was ist die Gruppe „🧾 Lager anfordern“?",
+      text: "Sie gehört zur Kachel „Lager anfordern“, dem Ersatz für den Zettel. Je Standort ein Haken: Angehakt heißt, dieses Konto darf dort auf die offene Liste schreiben, sie abschließen und drucken und im Archiv melden, was gefehlt hat. Die Datenbank prüft das bei jedem Eintrag. Darunter steht ein einzelner Haken „Lager bestellen“: Er gilt für alle Standorte und erlaubt, Bestellungen einzutragen und zurückzunehmen und die Mindestmengen zu pflegen. Die Kachel erscheint mit einem der beiden Haken beim nächsten Anmelden. Rolle admin darf alles, braucht für die Kachel aber auch einen Haken. Auf dem Ausdruck steht der Name aus dem Konto (bei einem Stationskonto der Ortsname)."
+    },
+    {
       heading: "Warum das Admin-Passwort schon beim Öffnen?",
       text: "Die Kontenliste zeigt, wer welche Karte hat. Das geht niemanden außer dem Admin etwas an. Deshalb darf jedes Konto nur sein eigenes Dokument lesen, die ganze Liste nur die gesonderte Admin-Anmeldung. Sie bleibt bestehen, solange die Seite offen ist, wird nie auf dem Gerät gespeichert und endet beim Verlassen der Seite, mit 🔒 Sperren oder von selbst nach 5 Minuten ohne Eingabe (eine Minute vorher erscheint oben ein Hinweis)."
     },
@@ -1104,6 +1119,8 @@ function initBearbeitung() {
       nachrichtenBekanntmachung: !!k.nachrichtenBekanntmachung, // NEU 27.10.2026
       nachrichtenEmpfangen: !!k.nachrichtenEmpfangen,           // NEU 27.10.2026 (nur Ort-Konten)
       lagerZaehlenStandorte: lagerListeVon(k),                  // NEU 11.11.2026, Lager Stufe 2 — Kopie, nie dieselbe Liste wie im Konto
+      lagerAnfordernStandorte: lagerAnfListeVon(k),             // NEU 16.11.2026, Lager Stufe 3a — Kopie
+      lagerBestellen: k.lagerBestellen === true,                // NEU 16.11.2026, Lager Stufe 3a
       farbschema: (typeof k.farbschema === 'string' && k.farbschema) ? k.farbschema : null, // NEU 15.10.2026, #72 Stufe B — null = „Nach Rolle“
       farbHinweis: null
     };
@@ -1313,7 +1330,8 @@ var KONTO_KARTEN_TABS = [
         '</div>' +
         reparaturHakenHTML(k, b) +
         nachrichtenHakenHTML(k, b) +  // NEU 27.10.2026, Nachrichtenzentrale 1b
-        lagerZaehlenHTML(k, b)        // NEU 11.11.2026, Lager Stufe 2
+        lagerZaehlenHTML(k, b) +      // NEU 11.11.2026, Lager Stufe 2
+        lagerAnfordernHTML(k, b)      // NEU 16.11.2026, Lager Stufe 3a
       );
     }
   },
@@ -1593,6 +1611,8 @@ function ladeLagerStandorteEinmal() {
     var el = document.getElementById('lagerZaehlenGruppe');
     var k = kontoKarteId && alleKonten.filter(function (x) { return x.id === kontoKarteId; })[0];
     if (el && k && bearbeitung[k.id]) el.outerHTML = lagerZaehlenHTML(k, bearbeitung[k.id]);
+    var el3 = document.getElementById('lagerAnfordernGruppe');   // 16.11.2026, Lager Stufe 3a
+    if (el3 && k && bearbeitung[k.id]) el3.outerHTML = lagerAnfordernHTML(k, bearbeitung[k.id]);
   });
 }
 function lagerZaehlenHTML(k, b) {
@@ -1648,6 +1668,77 @@ function toggleKontoLagerZaehlen(standortId, checked) {
   b.lagerZaehlenStandorte = liste;
   markiereGeaendert();
   renderKontoKarte();
+}
+
+// NEU 16.11.2026, Lager Stufe 3a (#169; Freigabe KC 16.11. 08:44, Ulf F1 b / F2 a 08:42).
+// Gruppe „🧾 Lager anfordern“ nach dem Muster „📦 Lager zählen“: ein Haken je aktivem
+// Standort → lagerAnfordernStandorte (das Schloss, Regel laAnfordern(), RK §32) und
+// lagerAnfordern (= Liste nicht leer, Kachel) in EINEM Setzer; darunter EIN Haken
+// „Lager bestellen“ (lagerBestellen, alle Standorte: Bestellungen und Mindestmengen,
+// Regel laBestellen()). Standorte aus ladeLagerStandorteEinmal (gemeinsam mit „Lager zählen“).
+function lagerAnfListeVon(k) {
+  return (k && Array.isArray(k.lagerAnfordernStandorte))
+    ? k.lagerAnfordernStandorte.filter(function (x) { return typeof x === 'string' && x !== ''; })
+    : [];
+}
+function lagerAnfordernHTML(k, b) {
+  var kopf = '<div class="detail-section full" id="lagerAnfordernGruppe"><div><div class="haken-gruppe-titel">🧾 Lager anfordern</div>';
+  var fuss = '</div></div>';
+  var bestellen = '<label class="checkbox-feld"><input type="checkbox" ' + (b.lagerBestellen ? 'checked' : '') +
+    ' onchange="toggleKontoLagerBestellen(this.checked)">' +
+    '<span class="cb-label">Lager bestellen — Bestellungen eintragen und zurücknehmen, Mindestmengen pflegen (alle Standorte)</span></label>';
+  var hinweise = [];
+  if (b.role === 'admin') hinweise.push('Rolle admin darf überall anfordern und bestellen. Die Kachel „Lager anfordern“ erscheint aber erst mit einem Haken in dieser Gruppe.');
+  if (k && k.art === 'ort') hinweise.push('Stationskonto: Hakst du hier einen Standort an, darf jeder an diesem Gerät dort anfordern und die Liste abschließen. Auf dem Ausdruck steht dann der Ortsname.');
+  var hinweisHTML = hinweise.map(function (t) { return '<div class="haken-gruppe-hinweis">' + esc(t) + '</div>'; }).join('');
+  if (lagerStandorte.stand === 'aus' || lagerStandorte.stand === 'laedt') {
+    return kopf + '<div class="haken-gruppe-hinweis">Standorte werden geladen …</div>' + bestellen + hinweisHTML + fuss;
+  }
+  if (lagerStandorte.stand === 'fehler') {
+    return kopf + '<div class="haken-gruppe-hinweis" style="color:var(--bos-red)">' + esc(lagerStandorte.fehler) + ' Die Standort-Haken dieser Gruppe bleiben, wie sie sind. Seite neu laden, um es nochmal zu versuchen.</div>' + bestellen + hinweisHTML + fuss;
+  }
+  var vorher = lagerAnfListeVon(k);
+  var jetzt = b.lagerAnfordernStandorte || [];
+  var nachId = {};
+  lagerStandorte.liste.forEach(function (st) { nachId[st.id] = st; });
+  var zeilen = lagerStandorte.liste.filter(function (st) { return !st.geloescht; }).map(function (st) {
+    return '<label class="checkbox-feld"><input type="checkbox" ' + (jetzt.indexOf(st.id) !== -1 ? 'checked' : '') +
+      ' onchange="toggleKontoLagerAnfordern(\'' + esc(st.id) + '\', this.checked)">' +
+      '<span class="cb-label">' + esc(st.name) + '</span></label>';
+  });
+  vorher.concat(jetzt).filter(function (id, i, a) { return a.indexOf(id) === i; }).forEach(function (id) {
+    var st = nachId[id];
+    if (st && !st.geloescht) return;
+    var an = jetzt.indexOf(id) !== -1;
+    var name = st ? st.name + ' (archiviert)' : 'Unbekannter Standort (' + id + ')';
+    zeilen.push('<label class="checkbox-feld" style="opacity:.55"><input type="checkbox" ' + (an ? 'checked' : 'disabled') +
+      ' onchange="toggleKontoLagerAnfordern(\'' + esc(id) + '\', this.checked)">' +
+      '<span class="cb-label">' + esc(name) + ' — nur noch abhaken</span></label>');
+  });
+  var standortTeil = zeilen.length ? zeilen.join('') + '<div class="haken-gruppe-hinweis">Angehakt = darf an diesem Standort anfordern, abschließen und drucken. Die Datenbank prüft jeden Standort selbst.</div>'
+    : '<div class="haken-gruppe-hinweis">Noch keine Standorte angelegt — im Lager (Reiter „Standorte“) anlegen, dann hier anhaken.</div>';
+  return kopf + standortTeil + bestellen + hinweisHTML + fuss;
+}
+function toggleKontoLagerAnfordern(standortId, checked) {
+  if (!kontoKarteId) return;
+  var b = bearbeitung[kontoKarteId];
+  var liste = (b.lagerAnfordernStandorte || []).slice();
+  var i = liste.indexOf(standortId);
+  if (checked) {
+    var st = lagerStandorte.liste.filter(function (x) { return x.id === standortId; })[0];
+    if (!st || st.geloescht) { renderKontoKarte(); return; }
+    if (i === -1) liste.push(standortId);
+  } else if (i !== -1) {
+    liste.splice(i, 1);
+  }
+  b.lagerAnfordernStandorte = liste;
+  markiereGeaendert();
+  renderKontoKarte();
+}
+function toggleKontoLagerBestellen(checked) {
+  if (!kontoKarteId) return;
+  bearbeitung[kontoKarteId].lagerBestellen = !!checked;
+  markiereGeaendert();
 }
 
 // Verknüpft ein Konto mit einer SchichtPlaner-Person (schreibt bosKontoId
@@ -2865,6 +2956,15 @@ function tatsaechlichSpeichern() {
     var lagerNachher = b.lagerZaehlenStandorte || [];
     if (!gleicheLagerListe(lagerVorher, lagerNachher) || (k.lagerZaehlen === true) !== (lagerNachher.length > 0)) {
       aufgaben.push(window.BOS_ACCOUNTS.setzeLagerZaehlenRecht(window.db, k.id, lagerNachher));
+    }
+    // NEU 16.11.2026, Lager Stufe 3a: wie oben, eigene Liste und eigener Haken.
+    var anfVorher = lagerAnfListeVon(k);
+    var anfNachher = b.lagerAnfordernStandorte || [];
+    if (!gleicheLagerListe(anfVorher, anfNachher) || (k.lagerAnfordern === true) !== (anfNachher.length > 0)) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeLagerAnfordernRecht(window.db, k.id, anfNachher));
+    }
+    if (!!b.lagerBestellen !== (k.lagerBestellen === true)) {
+      aufgaben.push(window.BOS_ACCOUNTS.setzeLagerBestellenRecht(window.db, k.id, b.lagerBestellen));
     }
     // NEU 15.10.2026, Farbprofile Stufe B: selbe Sammelaktion. Gegen die NEUE
     // Rolle normalisiert (gleich wie Rolle = Feld löschen); unbekannte, nicht

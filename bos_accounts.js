@@ -50,6 +50,9 @@
        nachrichtenEmpfangen: boolean,      // NEU 27.10.2026 — „📬 Nachrichten empfangen“, NUR bei art 'ort' (Filiale); Stationen bekommen ihn nicht (U2). Personen-Konten empfangen immer
        lagerZaehlen: boolean,              // NEU 11.11.2026 (Lager Stufe 2, #120) — öffnet die Kachel „Lager zählen“ (Registry haken). true genau dann, wenn lagerZaehlenStandorte nicht leer ist
        lagerZaehlenStandorte: string[],    // NEU 11.11.2026 — IDs aus lager_standorte, an denen das Konto zählen darf; das Schloss (Regel lzRecht(), RK §31). Rolle admin darf immer
+       lagerAnfordern: boolean,            // NEU 16.11.2026 (Lager Stufe 3a, #169) — öffnet die Kachel „Lager anfordern“ (Registry haken). true genau dann, wenn lagerAnfordernStandorte nicht leer ist
+       lagerAnfordernStandorte: string[],  // NEU 16.11.2026 — IDs aus lager_standorte, an denen das Konto anfordern, abschließen und Fehlendes melden darf; das Schloss (Regel laAnfordern(), RK §32). Rolle admin darf immer
+       lagerBestellen: boolean,            // NEU 16.11.2026 — Bestellungen eintragen/zurücknehmen und Mindestmengen pflegen, alle Standorte (Regel laBestellen(), RK §32); öffnet auch die Kachel „Lager anfordern“
        erstelltAm: Firestore-Timestamp
      }
 
@@ -85,6 +88,12 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-11-16 · 09:27 · v-Lager-3a · Feature (Lager Stufe 3a, #169; Freigabe KC 16.11.
+       08:44/08:49, Kern-Freigabe Ulf 08:42, F1 b / F2 a): neue Felder lagerAnfordern,
+       lagerAnfordernStandorte, lagerBestellen; Setzer setzeLagerAnfordernRecht(db,
+       schluessel, liste) (Liste + Kachel-Haken in EINEM update, wie setzeLagerZaehlenRecht)
+       und setzeLagerBestellenRecht(db, schluessel, wert). Sonst unverändert.
+       lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
      2026-11-11 · 07:09 · v-Lager-2 · Feature (Lager Stufe 2, #120; Freigabe KC
        11.11. 06:43, Kern-Freigabe Ulf): neue Felder lagerZaehlen und
        lagerZaehlenStandorte, Setzer setzeLagerZaehlenRecht(db, schluessel,
@@ -484,6 +493,20 @@ window.BOS_ACCOUNTS = (function () {
   }
 
   /**
+   * NEU (16.11.2026, Lager Stufe 3a, #169). Wie setzeLagerZaehlenRecht: liste = IDs aus
+   * lager_standorte, an denen das Konto anfordern darf. lagerAnfordernStandorte ist das
+   * Schloss (Regel laAnfordern(), RK §32), lagerAnfordern nur die Kachel. Beide in EINEM update.
+   */
+  async function setzeLagerAnfordernRecht(db, schluessel, liste) {
+    var ids = Array.isArray(liste) ? liste.filter(function (x) { return typeof x === 'string' && x !== ''; }) : [];
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ lagerAnfordernStandorte: ids, lagerAnfordern: ids.length > 0 });
+  }
+  /** NEU (16.11.2026, Lager Stufe 3a). Haken „Lager bestellen“ (Bestellungen und Mindestmengen, Regel laBestellen(), RK §32). */
+  async function setzeLagerBestellenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ lagerBestellen: !!wert });
+  }
+
+  /**
    * NEU (15.10.2026, Farbprofile Stufe B). Admin-Funktion wie die Haken-Setzer.
    * id = Profil-ID aus bos_farbprofile.js → wird gespeichert; leer/null →
    * Feld wird GELÖSCHT („Nach Rolle“), nicht mit null oder '' beschrieben.
@@ -612,6 +635,8 @@ window.BOS_ACCOUNTS = (function () {
     setzeNachrichtenBekanntmachungRecht: setzeNachrichtenBekanntmachungRecht, // NEU 27.10.2026
     setzeNachrichtenEmpfangenRecht: setzeNachrichtenEmpfangenRecht,           // NEU 27.10.2026 (nur Ort-Konten)
     setzeLagerZaehlenRecht: setzeLagerZaehlenRecht,                           // NEU 11.11.2026, Lager Stufe 2
+    setzeLagerAnfordernRecht: setzeLagerAnfordernRecht,                       // NEU 16.11.2026, Lager Stufe 3a
+    setzeLagerBestellenRecht: setzeLagerBestellenRecht,                       // NEU 16.11.2026, Lager Stufe 3a
     setzeFarbschema: setzeFarbschema,
     loescheKonto: loescheKonto,
     ladeAlleKonten: ladeAlleKonten,

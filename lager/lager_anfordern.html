@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: lager/lager_anfordern.html — Lager anfordern (Anforderungsliste statt Zettel, Bestellungen, Mindestmengen)
+  Doku:  lager/LAGER_ANFORDERN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Logik: lager/lager_logik.js (Liste, Bestand je Ort, Hauptort, „Bitte nachbestellen“, Druckansicht)
+  Regel: RK §32 (firestore_regeln_2026-11-16_lager_anfordern.rules) — lager_listen/{standortId}__{a|b}{n}:
+         je Standort und Art genau eine offene Liste; jede Änderung genau EIN Eintrag (letzte);
+         „Abschließen“ setzt die Liste auf zu und legt im selben Vorgang die nächste offene an (Transaktion).
+         Die abgeschlossene Liste IST die Buchung. Korrekturen (lager_korrekturen) nur anlegen,
+         Mindestmengen (lager_mindest) mit Haken „Lager bestellen“ oder Rolle admin.
+  Rechte: Haken „Lager anfordern“ je Standort (lagerAnfordernStandorte), „Lager bestellen“ (lagerBestellen);
+          Rolle admin darf alles. Kachel über Registry-Feld haken: ['lagerAnfordern', 'lagerBestellen'].
+  Ohne Netz: nichts ändern (Knöpfe grau mit Grund) — das Abschließen ist eine Transaktion (Bauplan §6.5).
+  Drucken: erst buchen, dann BOS_DRUCK.drucken (Iframe, nie window.print). Nachdruck bucht nie.
+  CHANGELOG
+    2026-11-16 · 09:59 · v1 · Erstfassung (Lager Stufe 3a, #169; Freigabe Kontroll-Chat 16.11. 08:44/08:49,
+      Ulf F1 b, F2 a, F3; Auflagen A27 Ort am Eintrag sichtbar und wählbar, A28 siehe Zählseite)
+      lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Lager anfordern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- MUSS vor bos_design_tokens.css stehen (Theme + Farbprofil des Kontos) -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<style>
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --raised: var(--bos-surface-raised, #2b2218);
+    --amber: var(--bos-amber, #c07a10);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --red: var(--bos-red, #d6584a);
+    --green: var(--bos-green, #4caf7d);
+    --warn: var(--bos-warn, #c07a10);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --font: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--bos-font-body, 'Barlow', sans-serif); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
+  header { background: var(--surface); padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 20; gap: 10px; }
+  header h1 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; }
+  header .meta { font-size: .72rem; color: var(--dim); text-align: right; overflow-wrap: anywhere; }
+  .help-btn { background: transparent; border: 1px solid var(--border); color: var(--amber); padding: 6px 11px; border-radius: 8px; font-size: 1rem; cursor: pointer; min-height: 40px; }
+  .btn { font-family: var(--font); font-size: .82rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-primary { background: var(--amber); color: #16120e; }
+  .btn-gross { width: 100%; min-height: 56px; font-size: .95rem; }
+  .btn-klein { min-height: 40px; padding: 6px 10px; }
+  .hinweis { margin: 10px 14px 0; padding: 10px 12px; border-radius: 8px; font-size: .86rem; line-height: 1.45; border: 1px solid var(--border); }
+  .hinweis.rot { border-color: var(--red); }
+  .hinweis.warn { border-color: var(--warn); color: var(--warn); }
+  .hinweis.gut { border-color: var(--green); }
+  #fehlerLeiste { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid var(--red); border-radius: 8px; font-size: .82rem; line-height: 1.45; }
+  #fehlerLeiste ul { margin: 6px 0 0 18px; }
+  #fehlerLeiste .kopf { display: flex; justify-content: space-between; font-weight: 700; color: var(--red); gap: 8px; }
+  .hidden { display: none !important; }
+  .standort-wahl { display: grid; gap: 10px; padding: 18px 14px; }
+  .standort-knopf { min-height: 64px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.25rem; cursor: pointer; text-align: left; padding: 0 18px; }
+  .standort-kopf { display: flex; align-items: center; gap: 10px; padding: 12px 14px 4px; flex-wrap: wrap; }
+  .standort-kopf h2 { flex: 1; font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.3rem; min-width: 0; overflow-wrap: anywhere; }
+  .reiter { display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; }
+  .reiter button { flex: 0 0 auto; background: transparent; border: 1px solid var(--border); color: var(--dim); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-family: var(--font); font-weight: 700; font-size: .85rem; cursor: pointer; }
+  .reiter button.aktiv { background: var(--raised); color: var(--text); border-color: var(--amber); }
+  .bereich { padding: 4px 14px 14px; }
+  .bereich h3 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.05rem; margin: 14px 0 6px; }
+  .unterzeile { color: var(--dim); font-size: .8rem; }
+  .ort-titel { font-family: var(--font); font-weight: 700; font-size: .92rem; color: var(--amber); margin: 14px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+  .zeile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
+  .zeile .text { flex: 1; min-width: 0; }
+  .zeile .name { font-weight: 700; overflow-wrap: anywhere; }
+  .zeile .menge { font-family: var(--font); font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+  .zeile .knoepfe { display: flex; gap: 6px; }
+  .zeile.korrigiert .menge { text-decoration: line-through; color: var(--dim); }
+  .zeile button.icon { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 8px; min-width: 44px; min-height: 44px; font-size: 1rem; cursor: pointer; }
+  .leer { text-align: center; padding: 30px 20px; color: var(--dim); font-size: .95rem; line-height: 1.5; }
+  .grund { color: var(--dim); font-size: .82rem; margin-top: 6px; text-align: center; }
+  .aktionen { display: grid; gap: 10px; margin-top: 14px; }
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 50; display: flex; align-items: flex-end; }
+  .sheet { background: var(--surface); width: 100%; max-height: 90vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 14px 18px 24px; border-top: 1px solid var(--border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 14px; }
+  .sheet h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.15rem; margin: 0 0 10px; overflow-wrap: anywhere; }
+  .sheet .sec { margin-bottom: 16px; }
+  .sheet .sec h3 { font-size: .9rem; color: var(--amber); margin: 0 0 4px; }
+  .sheet .sec p { font-size: .88rem; line-height: 1.5; }
+  .such { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; margin-bottom: 8px; }
+  .wahl-zeile { display: block; width: 100%; text-align: left; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; margin-bottom: 6px; cursor: pointer; min-height: 48px; }
+  .mengen { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+  .mengen input { flex: 1; min-width: 0; text-align: center; font-size: 1.4rem; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .mengen button { min-width: 56px; min-height: 56px; font-size: 1.4rem; border-radius: 10px; border: 1px solid var(--border); background: var(--raised); color: var(--text); cursor: pointer; }
+  .feld-zeile { margin: 10px 0; }
+  .feld-zeile label { display: block; font-size: .85rem; color: var(--dim); margin-bottom: 4px; }
+  .feld-zeile select, .feld-zeile input { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; }
+  .meldung { color: var(--red); font-size: .88rem; margin: 6px 0; min-height: 1em; }
+  .sheet-knoepfe { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .sheet-knoepfe .btn { flex: 1 1 140px; }
+  .mind-zeile { display: grid; grid-template-columns: 1fr 92px auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
+  .mind-zeile input { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; text-align: center; }
+  .rot-text { color: var(--red); }
+  #helpSheet { z-index: 70; }
+  #toast { position: fixed; bottom: 18px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; background: var(--raised); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: .9rem; z-index: 90; text-align: center; }
+  @media (max-width: 420px) { .mind-zeile { grid-template-columns: 1fr 80px; } .mind-zeile .btn { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'lager_anfordern';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <h1 data-i18n="titel">Lager anfordern</h1>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div class="meta"><div id="kontoZeile">—</div></div>
+    <button id="helpOpenBtn" class="help-btn" title="Hilfe" aria-label="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="regelLeiste" class="hinweis rot hidden" role="alert"></div>
+<div id="netzLeiste" class="hinweis warn hidden" role="status"></div>
+<div id="fehlerLeiste" class="hidden" role="alert">
+  <div class="kopf"><span data-i18n="fehler_titel">⚠︎ Fehler</span><button type="button" class="btn btn-outline" id="fehlerZuBtn" style="min-height:32px;padding:4px 10px" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+<div id="meldungLeiste" class="hinweis hidden" role="status"></div>
+<div id="hinweisZeile" class="leer hidden" role="status"></div>
+
+<section id="wahl" class="standort-wahl hidden" aria-label="Standort wählen"></section>
+<section id="haupt" class="hidden">
+  <div class="standort-kopf"><h2 id="standortName">—</h2><button type="button" class="btn btn-outline" id="wechselBtn" data-i18n="wechseln">Standort wechseln</button></div>
+  <nav class="reiter" id="reiter" aria-label="Bereiche"></nav>
+  <div id="inhalt" class="bereich"></div>
+</section>
+<main id="lade" class="leer" data-i18n="lade">Lade Daten …</main>
+
+<div id="sheet" class="sheet-overlay hidden"><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-handle"></div><div id="sheetInhalt"></div></div></div>
+
+<div id="helpSheet" class="sheet-overlay hidden">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-handle"></div>
+    <h2 id="helpTitle"></h2>
+    <div id="helpContent"></div>
+    <button type="button" class="btn btn-outline" id="helpCloseBtn" data-i18n="schliessen">Schließen</button>
+  </div>
+</div>
+<div id="toast" class="hidden" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="lager_logik.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="../bos_ungespeichert.js"></script>
+
+<script>
+'use strict';
+/* ==================================================================
+   Lager anfordern — Seitenlogik. Rechnen und Druckansicht: lager_logik.js.
+   Hier: Laden, Rechte, Standortwahl, Einträge (genau einer je Schreibvorgang),
+   Abschließen (Transaktion) + Drucken, Archiv, Korrekturen, Bestellungen,
+   Mindestmengen, Fehler sichtbar.
+   Keine Daten in dieser Datei: keine Standort-, Orts-, Artikel- oder Personennamen.
+   ================================================================== */
+const LG = window.BOS_LAGER_LOGIK;
+const COL = LG.COL;
+const REGEL_FASSUNG = 'lager-anfordern-2026-11-16';
+const REGEL_DATEI = 'firestore_regeln_2026-11-16_lager_anfordern.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const SPEICHER_STANDORT = 'bos_lager_anfordern_standort';
+const ART_TEXT = { anforderung: 'Liste', bestellung: 'Bestellung' };
+
+/* ---------- i18n (Checkliste §6) ---------- */
+const I18N_DE = {
+  titel: 'Lager anfordern', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  wechseln: 'Standort wechseln', kein_konto: 'Keine Anmeldung erkannt.',
+  kein_standort: 'Dir ist noch kein Standort zum Anfordern freigegeben. Das stellt die Kontenverwaltung ein (Gruppe „Lager anfordern“).',
+  reiter_liste: 'Liste', reiter_archiv: 'Archiv', reiter_bestellen: 'Bestellen', reiter_mindest: 'Mindestmengen',
+  liste_kopf: 'Liste {n} · offen', liste_leer: 'Noch nichts auf der Liste.', liste_wartet: 'Die Liste wird angelegt …', liste_keine: 'Keine offene Liste gefunden.',
+  anfordern: '＋ Anfordern', abschliessen: 'Abschließen und drucken', bestellung_kopf: 'Bestellung {n} · offen', bestellen_plus: '＋ Bestellt', bestellung_buchen: 'Bestellung buchen',
+  grund_leer: 'Die Liste ist leer.', grund_netz: 'Ohne Verbindung wird nichts geändert.', grund_recht: 'Dafür fehlt dir der Haken (Kontenverwaltung).',
+  grund_regel: 'Die Regel passt nicht zu dieser Seite.', grund_laedt: 'Einen Moment, die Daten laden noch.',
+  netz_weg: '⚠︎ Keine Verbindung. Ansehen geht, ändern nicht. Ohne Verbindung wird nichts geändert.',
+  ort_ohne: 'Ohne Lagerort', ort_pfeil: '→ {ort}', ort_keiner: 'hat hier noch keinen Lagerort — auf dem Zettel steht „Ohne Lagerort“',
+  wer: 'von {name}', such_platz: 'Artikel suchen …', andere: 'Ohne Lagerort hier', andere_zeigen: 'Auch Artikel ohne Lagerort hier zeigen',
+  menge: 'Menge (Gebinde)', ort: 'Lagerort', auf_liste: 'Auf die Liste', aendern: 'Ändern', loeschen: 'Löschen', abbrechen: 'Abbrechen',
+  menge_falsch: 'Bitte eine Menge über 0 eingeben, höchstens {max}, eine Stelle hinter dem Komma.',
+  frage_abschluss: '{art} {n} abschließen?', frage_abschluss_text: 'Alles auf der Liste wird jetzt vom Bestand abgebucht und gedruckt. Neues kommt auf {art} {m}.',
+  frage_buchen_text: 'Alles auf der Bestellung zählt jetzt zum Bestand. Neues kommt auf Bestellung {m}.',
+  ja_abschliessen: 'Abschließen und drucken', ja_buchen: 'Buchen',
+  gerade_zu: '{art} {n} hat eben {name} abgeschlossen. Sie ist schon gebucht.', nachdrucken: 'Nachdrucken (bucht nicht)',
+  abgeschlossen_ok: '{art} {n} ist abgeschlossen und gebucht. Der Druck ist unterwegs. Neues kommt auf {art} {m}.',
+  gebucht_ok: 'Bestellung {n} ist gebucht. Neues kommt auf Bestellung {m}.',
+  archiv_leer: 'Noch keine abgeschlossene Liste.', archiv_kopf: '{art} {n} · abgeschlossen {zeit} von {name}',
+  fehlte: 'fehlte', nur_statt: 'nur … statt …', zuruecknehmen: 'zurücknehmen',
+  korr_titel: 'Was fehlte bei „{name}“?', korr_nur: 'Wirklich genommen (statt {statt})', korr_text_b: 'Wirklich gekommen (statt {statt}) — 0 = zurücknehmen',
+  korr_speichern: 'Melden', korr_falsch: 'Bitte eine Zahl von 0 bis unter {statt} eingeben (eine Stelle hinter dem Komma).',
+  korr_steht: 'gemeldet: nur {nur} statt {statt} ({name})', korr_fehlte: 'gemeldet: fehlte ({name})', korr_zurueck: 'zurückgenommen ({name})',
+  mind_hinweis: 'Mindestmenge je Artikel in diesem Standort, in Gebinden. 0 = keine. Darunter kommt der Artikel auf „Bitte nachbestellen“.',
+  mind_speichern: 'Speichern', mind_gespeichert: 'Mindestmenge gespeichert.', mind_falsch: 'Bitte 0 bis {max} eingeben, eine Stelle hinter dem Komma.',
+  mind_leer: 'Hier liegen noch keine Artikel mit Lagerort. Lagerorte und Artikel pflegt die Seite „Lager“.',
+  bestand_unbekannt: 'noch nie gezählt', bestand_text: 'Bestand {b}', bestand_unter: 'unter der Mindestmenge',
+  nb_titel: 'Bitte nachbestellen (Stand jetzt)', nb_leer: 'Nichts unter der Mindestmenge.', nb_nie: 'Noch nie gezählt (mit Mindestmenge): {namen}',
+  bestand_fehler: 'Bestand nicht berechenbar: {grund}',
+  regel_alt: '⚠︎ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Eintragen und Abschließen werden abgelehnt. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  regel_unbekannt: 'Regelstand „{fassung}“ ließ sich nicht prüfen (wohl kein Netz). [{grund}]',
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: kein Haken für diesen Standort, die Liste ist inzwischen abgeschlossen, oder die Regeln sind älter als diese Seite.',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_laden: 'Laden „{was}“', err_eintrag: 'Eintragen', err_abschluss: 'Abschließen', err_drucken: 'Drucken', err_korrektur: 'Melden',
+  err_mindest: 'Mindestmenge speichern', err_anlegen: 'Liste anlegen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen', err_bestand: 'Bestand rechnen'
+};
+function t(k, w) {
+  let s = I18N_DE[k]; if (s === undefined) s = k;
+  Object.keys(w || {}).forEach(function (x) { s = s.split('{' + x + '}').join(String(w[x])); });
+  return s;
+}
+function wendeI18nAn() { document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); }); }
+const esc = LG.esc;
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, konto: null, geladen: false, regelstand: 'unbekannt', netz: navigator.onLine !== false,
+  standorte: [], orte: [], artikel: [], lieferanten: [], stand: [], mindest: [],
+  offeneAlle: null,            /* Abfrage status == 'offen' (alle Standorte); null = noch nicht da */
+  gebucht: [], korrekturen: [], bestandFehler: '', t0: undefined,
+  archiv: {},                  /* listeId → Liste */
+  archivKorr: {},              /* listeId → [Korrektur] */
+  standortId: null, reiter: 'liste',
+  schreibt: false, anlegen: {}, geladenTeile: {}, sheet: null,
+  mindEingabe: {}              /* artikelId → getippter Text (bleibt über Neuzeichnen erhalten) */
+};
+
+/* ---------- Fehler sichtbar (Checkliste §7a) ---------- */
+function erklaerung(err) {
+  const c = (err && err.code) || '';
+  if (c === 'permission-denied') return t('err_perm');
+  if (c === 'unavailable') return t('err_netz');
+  return '';
+}
+function rohText(err) { return (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)); }
+function fehlerText(kontext, err) { return kontext + ': ' + [erklaerung(err), rohText(err)].filter(Boolean).join(' · '); }
+function zeigeFehler(kontext, err) {
+  console.error('[Lager anfordern] ' + kontext, err);
+  const li = document.createElement('li');
+  li.textContent = fehlerText(kontext, err);
+  const liste = document.getElementById('fehlerListe');
+  liste.insertBefore(li, liste.firstChild);
+  while (liste.children.length > 6) liste.removeChild(liste.lastChild);
+  document.getElementById('fehlerLeiste').classList.remove('hidden');
+}
+window.addEventListener('error', function (e) { zeigeFehler(t('err_unbehandelt'), { message: (e.message || 'unbekannt') + ' (' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?') + ')' }); });
+window.addEventListener('unhandledrejection', function (e) { zeigeFehler(t('err_unbehandelt'), e.reason || { message: 'unbekannt' }); });
+let toastTimer = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.add('hidden'); }, 3500);
+}
+function meldung(text, art, knopf) {
+  const el = document.getElementById('meldungLeiste');
+  if (!text) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.className = 'hinweis ' + (art || '');
+  el.innerHTML = esc(text) + (knopf ? ' <button type="button" class="btn btn-outline btn-klein" data-aktion="' + esc(knopf.aktion) + '" data-id="' + esc(knopf.id) + '">' + esc(knopf.text) + '</button>' : '');
+}
+
+/* ---------- Laden ---------- */
+function tsMs(ts) {
+  if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
+  if (ts && typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1e6);
+  return null;
+}
+function listeAus(d) {
+  const x = d.data({ serverTimestamps: 'estimate' }) || {};
+  const pos = {};
+  Object.keys(x.pos || {}).forEach(function (k) { const p = x.pos[k] || {}; pos[k] = Object.assign({}, p, { tsMs: tsMs(p.ts) }); });
+  return Object.assign({}, x, { id: d.id, pos: pos, abgeschlossenMs: tsMs(x.abgeschlossenAm), _am: x.abgeschlossenAm || null });
+}
+let abos = [], aboListen = [], aboArchiv = [];
+function abo(col, ziel) {
+  return window.db.collection(col).onSnapshot({ includeMetadataChanges: false }, function (snap) {
+    const a = [];
+    snap.forEach(function (d) {
+      const x = d.data({ serverTimestamps: 'estimate' }) || {};
+      if (ziel === 'stand') a.push(Object.assign({}, x, { id: d.id, tsMs: tsMs(x.ts) }));
+      else a.push(Object.assign({ id: d.id }, x));
+    });
+    S[ziel] = a;
+    S.geladenTeile[ziel] = true;
+    if (ziel === 'stand') neuT0();
+    planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: col }), err); S.geladenTeile[ziel] = true; if (ziel === 'stand' || ziel === 'mindest') S.bestandFehler = rohText(err); planeRender(); });
+}
+function abonniere() {
+  abos.forEach(function (f) { f(); });
+  abos = [abo(COL.standorte, 'standorte'), abo(COL.orte, 'orte'), abo(COL.artikel, 'artikel'), abo(COL.lieferanten, 'lieferanten'), abo(COL.stand, 'stand'), abo(COL.mindest, 'mindest')];
+  abos.push(window.db.collection(COL.listen).where('status', '==', 'offen').onSnapshot(function (snap) {
+    const a = []; snap.forEach(function (d) { a.push(listeAus(d)); });
+    S.offeneAlle = a; S.geladenTeile.offen = true;
+    aboArchivNeu(); planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: COL.listen }), err); S.geladenTeile.offen = true; planeRender(); }));
+}
+/* Buchungen seit T0 (älteste Zählung, Bauplan §3.4): abgeschlossene Listen und Korrekturen — ein Feld je Abfrage, kein Index */
+function neuT0() {
+  const t0 = LG.bestandAb(S.stand);
+  if (t0 === S.t0 || (S.t0 !== undefined && S.t0 !== null && t0 !== null && t0 >= S.t0)) return;   /* nur weiter zurück neu abonnieren */
+  S.t0 = t0;
+  aboListen.forEach(function (f) { f(); }); aboListen = [];
+  if (t0 === null) { S.gebucht = []; S.korrekturen = []; S.geladenTeile.gebucht = true; S.geladenTeile.korr = true; return; }
+  const ab = new Date(t0 - 1);
+  aboListen.push(window.db.collection(COL.listen).where('abgeschlossenAm', '>', ab).onSnapshot(function (snap) {
+    const a = []; snap.forEach(function (d) { a.push(listeAus(d)); });
+    S.gebucht = a; S.geladenTeile.gebucht = true; S.bestandFehler = S.bestandFehler.indexOf(COL.listen) === 0 ? '' : S.bestandFehler; planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: COL.listen + ' (gebucht)' }), err); S.bestandFehler = COL.listen + ': ' + rohText(err); S.geladenTeile.gebucht = true; planeRender(); }));
+  aboListen.push(window.db.collection(COL.korrekturen).where('wirktAb', '>', ab).onSnapshot(function (snap) {
+    const a = []; snap.forEach(function (d) { const x = d.data() || {}; a.push(Object.assign({ id: d.id }, x, { wirktMs: tsMs(x.wirktAb) })); });
+    S.korrekturen = a; S.geladenTeile.korr = true; planeRender();
+  }, function (err) { zeigeFehler(t('err_laden', { was: COL.korrekturen }), err); S.bestandFehler = COL.korrekturen + ': ' + rohText(err); S.geladenTeile.korr = true; planeRender(); }));
+}
+/* Archiv: die zwei Listen vor der offenen (je Art), dazu ihre Korrekturen */
+let archivSchluessel = '';
+function aboArchivNeu() {
+  const ids = [];
+  ['anforderung', 'bestellung'].forEach(function (art) {
+    const o = S.standortId ? LG.offeneListe(S.offeneAlle, S.standortId, art) : null;
+    if (o) for (let n = o.nummer - 1; n >= Math.max(1, o.nummer - 2); n--) ids.push(LG.listeId(S.standortId, art, n));
+  });
+  const k = ids.join('|');
+  if (k === archivSchluessel) return;
+  archivSchluessel = k;
+  aboArchiv.forEach(function (f) { f(); }); aboArchiv = [];
+  S.archiv = {}; S.archivKorr = {};
+  ids.forEach(function (id) {
+    aboArchiv.push(window.db.collection(COL.listen).doc(id).onSnapshot({}, function (d) {
+      if (d.exists) S.archiv[id] = listeAus(d); else delete S.archiv[id];
+      planeRender();
+    }, function (err) { zeigeFehler(t('err_laden', { was: id }), err); }));
+    aboArchiv.push(window.db.collection(COL.korrekturen).where('listeId', '==', id).onSnapshot(function (snap) {
+      const a = []; snap.forEach(function (d) { const x = d.data() || {}; a.push(Object.assign({ id: d.id }, x, { wirktMs: tsMs(x.wirktAb) })); });
+      S.archivKorr[id] = a; planeRender();
+    }, function (err) { zeigeFehler(t('err_laden', { was: COL.korrekturen + ' ' + id }), err); }));
+  });
+}
+async function pruefeRegelstand() {
+  try { await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }); S.regelstand = 'passt'; }
+  catch (err) {
+    S.regelstand = err && err.code === 'permission-denied' ? 'alt' : 'unbekannt';
+    if (S.regelstand === 'unbekannt') { console.warn('[Lager anfordern] Regelstand nicht prüfbar:', err && err.message); S.regelGrund = rohText(err); }
+  }
+  const el = document.getElementById('regelLeiste');
+  el.textContent = S.regelstand === 'unbekannt' ? t('regel_unbekannt', { fassung: REGEL_FASSUNG, grund: S.regelGrund || '' }) : t('regel_alt', { fassung: REGEL_FASSUNG, datei: REGEL_DATEI });
+  el.classList.toggle('hidden', S.regelstand === 'passt');
+  planeRender();
+}
+function zeigeNetz() {
+  document.getElementById('netzLeiste').textContent = t('netz_weg');
+  document.getElementById('netzLeiste').classList.toggle('hidden', S.netz);
+}
+window.addEventListener('online', function () { S.netz = true; zeigeNetz(); planeRender(); });
+window.addEventListener('offline', function () { S.netz = false; zeigeNetz(); planeRender(); });
+async function start() {
+  wendeI18nAn(); renderHilfe(); zeigeNetz();
+  if (!window.db || !window.BOS_AUTH_READY || !LG) { zeigeFehler(t('err_laden', { was: 'Grundlagen' }), new Error('window.db, BOS_AUTH_READY oder lager_logik.js fehlt')); return; }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; } catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); }
+  S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+  if (S.kennung) {
+    try { const k = await window.db.collection('bos_accounts').doc(S.kennung).get(); S.konto = k.exists ? k.data() : null; }
+    catch (err) { zeigeFehler(t('err_konto'), err); }
+  }
+  document.getElementById('kontoZeile').textContent = (S.konto && S.konto.name) || S.kennung || t('kein_konto');
+  try { const w = localStorage.getItem(SPEICHER_STANDORT); if (w) S.standortId = w; } catch (e) { /* Speicher gesperrt: dann eben wählen */ }
+  abonniere();
+  S.geladen = true;
+  planeRender();
+  if (S.kennung) pruefeRegelstand();
+}
+
+/* ---------- Rechte ---------- */
+function konto() { return S.konto && S.konto.freigeschaltet === true ? S.konto : null; }
+function istAdmin() { return !!konto() && konto().role === 'admin'; }
+function darfAnfordern(sid) { const k = konto(); return !!k && (k.role === 'admin' || (Array.isArray(k.lagerAnfordernStandorte) && k.lagerAnfordernStandorte.indexOf(sid) !== -1)); }
+function darfBestellen() { const k = konto(); return !!k && (k.role === 'admin' || k.lagerBestellen === true); }
+function darf(art, sid) { return art === 'bestellung' ? darfBestellen() : darfAnfordern(sid); }
+function erlaubte() { return LG.aktiv(S.standorte).filter(function (s) { return darfAnfordern(s.id) || darfBestellen(); }).sort(LG.nachSort); }
+function meinName() { return String((konto() && konto().name) || ''); }
+/* Warum geht Schreiben gerade nicht? '' = es geht */
+function sperrGrund(art) {
+  if (!darf(art, S.standortId)) return t('grund_recht');
+  if (!S.netz) return t('grund_netz');
+  if (S.regelstand === 'alt') return t('grund_regel');
+  return '';
+}
+
+/* ---------- Standort ---------- */
+function waehle(id) {
+  S.standortId = id; S.reiter = 'liste'; meldung('');
+  try { if (id) localStorage.setItem(SPEICHER_STANDORT, id); else localStorage.removeItem(SPEICHER_STANDORT); } catch (e) { /* egal */ }
+  aboArchivNeu();
+  planeRender();
+}
+function standort() { return LG.nachId(S.standorte)[S.standortId] || null; }
+function om() { return LG.nachId(LG.aktiv(S.orte)); }
+function am() { return LG.nachId(S.artikel); }
+function offen(art) { return S.standortId && S.offeneAlle ? LG.offeneListe(S.offeneAlle, S.standortId, art) : null; }
+
+/* Erste Liste eines Standorts (Nummer 1) anlegen, wenn es noch keine gibt — in einer Transaktion */
+function sorgeFuerListe(art) {
+  const sid = S.standortId, schl = sid + '|' + art;
+  if (!sid || !S.offeneAlle || offen(art) || S.anlegen[schl] || sperrGrund(art) || S.regelstand !== 'passt') return;
+  S.anlegen[schl] = true;
+  const db = window.db, ref = db.collection(COL.listen).doc(LG.listeId(sid, art, 1));
+  db.runTransaction(function (tx) {
+    return tx.get(ref).then(function (s) { if (!s.exists) tx.set(ref, LG.neueListeDokument(art, sid, 1)); });
+  }).catch(function (err) { zeigeFehler(t('err_anlegen') + ' (' + ART_TEXT[art] + ' 1)', err); });
+}
+
+/* ---------- Bestand ---------- */
+function bestandDaten(extraListe) {
+  return { artikel: S.artikel, orte: S.orte, standorte: S.standorte, lieferanten: S.lieferanten, stand: S.stand,
+    listen: S.gebucht.concat(extraListe ? [extraListe] : []).filter(function (l, i, a) { return a.map(function (x) { return x.id; }).indexOf(l.id) === i; }),
+    korrekturen: S.korrekturen, mindest: S.mindest };
+}
+function bestandJetzt(extraListe) {
+  if (S.bestandFehler) return { fehler: S.bestandFehler };
+  try { const d = bestandDaten(extraListe); const b = LG.bestand(d, S.standortId); return { b: b, nb: LG.nachbestellen(b, d) }; }
+  catch (err) { zeigeFehler(t('err_bestand'), err); return { fehler: rohText(err) }; }
+}
+
+/* ---------- Schreiben: ein Eintrag (RK §32: genau ein Schlüssel in pos, genannt in letzte) ---------- */
+async function schreibeEintrag(liste, posId, eintrag) {
+  const db = window.db, ref = db.collection(COL.listen).doc(liste.id), upd = { letzte: posId };
+  upd['pos.' + posId] = eintrag ? Object.assign(LG.eintragDokument(eintrag), { ts: firebase.firestore.FieldValue.serverTimestamp() }) : firebase.firestore.FieldValue.delete();
+  S.schreibt = true; planeRender();
+  try { await ref.update(upd); return true; }
+  catch (err) {
+    zeigeFehler(t('err_eintrag') + ' (' + ART_TEXT[liste.art] + ' ' + liste.nummer + ')', err);
+    if (eintrag) setzeSheetMeldung(fehlerText(t('err_eintrag'), err));
+    return false;
+  } finally { S.schreibt = false; planeRender(); }
+}
+
+/* ---------- Abschließen: Transaktion (Liste zu + nächste offen), erst danach drucken ---------- */
+async function abschliessen(art) {
+  const l = offen(art); if (!l) return;
+  const db = window.db, sid = S.standortId, ref = db.collection(COL.listen).doc(l.id), naechste = db.collection(COL.listen).doc(LG.listeId(sid, art, l.nummer + 1));
+  let ergebnis = null;
+  S.schreibt = true; schliesseSheet(); planeRender();
+  try {
+    await db.runTransaction(function (tx) {
+      return tx.get(ref).then(function (s) {
+        if (!s.exists) throw Object.assign(new Error(ART_TEXT[art] + ' ' + l.nummer + ' gibt es nicht'), { code: 'bos/fehlt' });
+        const x = listeAus(s);
+        if (x.status !== 'offen') { ergebnis = { schonZu: true, liste: x }; return; }
+        if (!Object.keys(x.pos || {}).length) throw Object.assign(new Error(t('grund_leer')), { code: 'bos/leer' });
+        tx.update(ref, Object.assign(LG.abschlussFelder(S.kennung, meinName()), { abgeschlossenAm: firebase.firestore.FieldValue.serverTimestamp() }));
+        tx.set(naechste, LG.neueListeDokument(art, sid, l.nummer + 1));
+        ergebnis = { schonZu: false, liste: x };
+      });
+    });
+  } catch (err) {
+    zeigeFehler(t('err_abschluss') + ' (' + ART_TEXT[art] + ' ' + l.nummer + ')', err);
+    meldung(fehlerText(t('err_abschluss'), err) + ' — nichts gebucht, nichts gedruckt.', 'rot');
+    S.schreibt = false; planeRender(); return;
+  }
+  S.schreibt = false;
+  if (ergebnis.schonZu) {
+    meldung(t('gerade_zu', { art: ART_TEXT[art], n: l.nummer, name: ergebnis.liste.abgeschlossenName || '?' }), 'warn',
+      art === 'anforderung' ? { aktion: 'nachdruck', id: l.id, text: t('nachdrucken') } : null);
+    planeRender(); return;
+  }
+  /* Abschlusszeit vom Server holen (für Ausdruck und „nach dieser Liste“); misslingt das, Gerätezeit mit Vermerk */
+  let gebucht = Object.assign({}, ergebnis.liste, { status: 'zu', abgeschlossenVon: S.kennung, abgeschlossenName: meinName(), abgeschlossenMs: Date.now() }), zeitVermerk = ' (Gerätezeit)';
+  try { const s2 = await ref.get(); if (s2.exists) { gebucht = listeAus(s2); zeitVermerk = ''; } }
+  catch (err) { console.warn('[Lager anfordern] Abschlusszeit nicht gelesen:', rohText(err)); }
+  if (art === 'anforderung') {
+    meldung(t('abgeschlossen_ok', { art: ART_TEXT[art], n: l.nummer, m: l.nummer + 1 }), 'gut', { aktion: 'nachdruck', id: l.id, text: t('nachdrucken') });
+    drucke(gebucht, false, zeitVermerk);
+  } else meldung(t('gebucht_ok', { n: l.nummer, m: l.nummer + 1 }), 'gut');
+  planeRender();
+}
+function zeitText(ms) {
+  if (typeof ms !== 'number') return '';
+  try { return new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(new Date(ms)); }
+  catch (e) { return new Date(ms).toLocaleString('de-DE'); }
+}
+function zeitKurz(ms) {
+  if (typeof ms !== 'number') return '';
+  try { return new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(new Date(ms)); }
+  catch (e) { return new Date(ms).toLocaleString('de-DE'); }
+}
+/* Druck: Ausdruck = genau die gebuchte Liste. nachdruck: bucht nichts, „Bitte nachbestellen“ mit dem Stand jetzt. */
+function drucke(liste, nachdruck, zeitVermerk) {
+  try {
+    const bj = bestandJetzt(nachdruck ? null : liste);
+    const html = LG.druckHTML(liste, { artikel: S.artikel, orte: S.orte }, {
+      standortName: (standort() || {}).name || '', zeitText: zeitText(liste.abgeschlossenMs) + (zeitVermerk || ''), name: liste.abgeschlossenName || '',
+      nachdruck: !!nachdruck, nb: bj.nb || null, bestandFehler: bj.fehler || ''
+    });
+    if (!window.BOS_DRUCK || typeof window.BOS_DRUCK.drucken !== 'function') throw Object.assign(new Error('bos_druck.js nicht geladen — Seite neu laden, dann „Nachdrucken“'), { code: 'bos/skripte' });
+    window.BOS_DRUCK.drucken({ inhaltHTML: html, appName: 'Lager anfordern', titel: ART_TEXT[liste.art] + ' ' + liste.nummer, mitKopf: false, farbig: false, ausrichtung: 'portrait', extraCSS: LG.DRUCK_CSS });
+  } catch (err) { zeigeFehler(t('err_drucken'), err); meldung(fehlerText(t('err_drucken'), err) + ' — die Liste ist trotzdem gebucht. „Nachdrucken“ versucht es nochmal.', 'rot', { aktion: 'nachdruck', id: liste.id, text: t('nachdrucken') }); }
+}
+
+/* ---------- Korrektur (Fehlmeldung, Rücknahme) ---------- */
+async function speichereKorrektur(liste, posId, nur) {
+  const k = LG.korrekturDokument(liste, posId, nur);
+  if (!k) return false;
+  const doc = Object.assign(k, { wirktAb: liste._am, konto: S.kennung, name: meinName(), ts: firebase.firestore.FieldValue.serverTimestamp() });
+  try { await window.db.collection(COL.korrekturen).doc(LG.korrekturId(liste.id, posId)).set(doc); return true; }
+  catch (err) { zeigeFehler(t('err_korrektur'), err); setzeSheetMeldung(fehlerText(t('err_korrektur'), err)); return false; }
+}
+/* ---------- Mindestmenge ---------- */
+async function speichereMindest(artikelId, menge, knopf) {
+  const d = Object.assign(LG.mindestDokument(artikelId, S.standortId, menge), { geaendertVon: S.kennung, geaendertAm: firebase.firestore.FieldValue.serverTimestamp() });
+  if (knopf) knopf.disabled = true;
+  try { await window.db.collection(COL.mindest).doc(LG.mindestId(artikelId, S.standortId)).set(d); delete S.mindEingabe[artikelId]; toast(t('mind_gespeichert')); planeRender(); }
+  catch (err) { zeigeFehler(t('err_mindest'), err); }
+  finally { if (knopf) knopf.disabled = false; }
+}
+
+/* ---------- Sheets ---------- */
+function oeffneSheet(html, info) { S.sheet = info || { art: 'info' }; document.getElementById('sheetInhalt').innerHTML = html; document.getElementById('sheet').classList.remove('hidden'); }
+function schliesseSheet() { S.sheet = null; document.getElementById('sheet').classList.add('hidden'); document.getElementById('sheetInhalt').innerHTML = ''; }
+function setzeSheetMeldung(text) { const el = document.querySelector('#sheetInhalt .meldung'); if (el) el.textContent = text; }
+document.getElementById('sheet').addEventListener('click', function (e) { if (e.target === this) schliesseSheet(); });
+
+/* Auswahl: Artikel des Standorts nach Hauptort (Rundgang), Suche über alle aktiven Artikel */
+function auswahlHTML(art, such, alle) {
+  const sid = S.standortId, orte = om(), n = LG.norm(such);
+  const akt = LG.aktiv(S.artikel).filter(function (a) { return !n || LG.norm(a.name).indexOf(n) !== -1 || LG.norm(a.gebinde).indexOf(n) !== -1; });
+  const je = {}, ohne = [];
+  akt.forEach(function (a) { const h = LG.hauptort(a, sid, orte); if (h) (je[h] || (je[h] = [])).push(a); else ohne.push(a); });
+  const reihe = LG.aktiv(S.orte).filter(function (o) { return o.standortId === sid; }).sort(LG.nachSort);
+  let h = '';
+  reihe.forEach(function (o) {
+    if (!je[o.id]) return;
+    h += '<div class="ort-titel">' + esc(o.name) + '</div>' + LG.artikelInFolge(o, je[o.id]).map(function (a) {
+      return '<button type="button" class="wahl-zeile" data-aktion="waehle-artikel" data-id="' + esc(a.id) + '">' + esc(a.name) + ' <span class="unterzeile">' + esc(LG.gebindeText(a)) + '</span></button>';
+    }).join('');
+  });
+  if (ohne.length && (n || alle)) {
+    h += '<div class="ort-titel">' + esc(t('andere')) + '</div>' + ohne.sort(LG.nachName).map(function (a) {
+      return '<button type="button" class="wahl-zeile" data-aktion="waehle-artikel" data-id="' + esc(a.id) + '">' + esc(a.name) + ' <span class="unterzeile">' + esc(LG.gebindeText(a)) + '</span></button>';
+    }).join('');
+  } else if (ohne.length) h += '<button type="button" class="btn btn-outline" style="width:100%;margin-top:8px" data-aktion="auswahl-alle">' + esc(t('andere_zeigen')) + ' (' + ohne.length + ')</button>';
+  return h || '<div class="leer">—</div>';
+}
+function oeffneAuswahl(art) {
+  oeffneSheet('<h2>' + esc(art === 'bestellung' ? t('bestellen_plus') : t('anfordern')) + '</h2>' +
+    '<input type="search" class="such" id="suchFeld" placeholder="' + esc(t('such_platz')) + '" autocomplete="off">' +
+    '<div id="auswahlListe">' + auswahlHTML(art, '', false) + '</div>' +
+    '<div class="sheet-knoepfe"><button type="button" class="btn btn-outline" data-aktion="sheet-zu">' + esc(t('abbrechen')) + '</button></div>', { art: 'auswahl', listenArt: art, alle: false });
+  const f = document.getElementById('suchFeld');
+  f.addEventListener('input', function () { document.getElementById('auswahlListe').innerHTML = auswahlHTML(art, f.value, S.sheet && S.sheet.alle); });
+}
+/* Menge (und Ort, A27) für neuen oder bestehenden Eintrag */
+function oeffneMenge(art, artikelId, posId) {
+  const a = am()[artikelId] || { id: artikelId, name: '?' }, liste = offen(art), alt = posId && liste ? liste.pos[posId] : null;
+  const orte = LG.orteImStandort(a, S.standortId, om());
+  const ortJetzt = alt ? (alt.ortId || '') : LG.hauptort(a, S.standortId, om());
+  let ortTeil;
+  if (orte.length > 1 || (alt && ortJetzt && !orte.some(function (o) { return o.id === ortJetzt; }))) {
+    const opts = orte.map(function (o, i) { return '<option value="' + esc(o.id) + '"' + (o.id === ortJetzt ? ' selected' : '') + '>' + esc(o.name) + (i === 0 ? ' (Hauptort)' : '') + '</option>'; });
+    if (alt && ortJetzt && !orte.some(function (o) { return o.id === ortJetzt; })) opts.push('<option value="' + esc(ortJetzt) + '" selected>' + esc((om()[ortJetzt] || {}).name || ortJetzt) + '</option>');
+    ortTeil = '<div class="feld-zeile"><label for="ortWahl">' + esc(t('ort')) + '</label><select id="ortWahl">' + opts.join('') + '</select></div>';
+  } else ortTeil = '<p class="unterzeile">' + esc(ortJetzt ? t('ort_pfeil', { ort: (om()[ortJetzt] || {}).name || '' }) : t('ort_keiner')) + '</p>';
+  oeffneSheet('<h2>' + esc(a.name) + '</h2><p class="unterzeile">' + esc(LG.gebindeText(a)) + '</p>' +
+    '<div class="mengen"><button type="button" data-aktion="minus" aria-label="weniger">−</button>' +
+    '<input id="mengeFeld" inputmode="decimal" autocomplete="off" aria-label="' + esc(t('menge')) + '" value="' + esc(alt ? LG.mengeText(alt.menge) : '1') + '">' +
+    '<button type="button" data-aktion="plus" aria-label="mehr">＋</button></div>' + ortTeil +
+    '<div class="meldung" role="alert"></div>' +
+    '<div class="sheet-knoepfe">' +
+      (alt ? '<button type="button" class="btn btn-outline" data-aktion="eintrag-loeschen">' + esc(t('loeschen')) + '</button>' : '') +
+      '<button type="button" class="btn btn-outline" data-aktion="sheet-zu">' + esc(t('abbrechen')) + '</button>' +
+      '<button type="button" class="btn btn-primary" data-aktion="eintrag-speichern">' + esc(alt ? t('aendern') : t('auf_liste')) + '</button>' +
+    '</div>', { art: 'menge', listenArt: art, artikelId: artikelId, posId: posId || null, start: alt ? LG.mengeText(alt.menge) : '1', ortStart: ortJetzt });
+  const f = document.getElementById('mengeFeld'); f.focus(); f.select();
+  f.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); eintragSpeichern(); } });
+}
+async function eintragSpeichern() {
+  const s = S.sheet; if (!s || s.art !== 'menge') return;
+  const m = LG.mengeAus(document.getElementById('mengeFeld').value);
+  if (!LG.mengeGueltig(m)) { setzeSheetMeldung(t('menge_falsch', { max: LG.GRENZEN.mengeMax })); return; }
+  const liste = offen(s.listenArt); if (!liste) { setzeSheetMeldung(t('liste_keine')); return; }
+  const g = sperrGrund(s.listenArt); if (g) { setzeSheetMeldung(g); return; }
+  const w = document.getElementById('ortWahl'), ortId = w ? w.value : (s.ortStart || '');
+  if (!s.posId && Object.keys(liste.pos || {}).length >= LG.GRENZEN.posMax) { setzeSheetMeldung('Höchstens ' + LG.GRENZEN.posMax + ' Einträge je Liste.'); return; }
+  const posId = s.posId || LG.neuePosId();
+  const ok = await schreibeEintrag(liste, posId, { artikelId: s.artikelId, menge: m, ortId: ortId, von: S.kennung, vonName: meinName() });
+  if (ok) schliesseSheet();
+}
+function oeffneAbschluss(art) {
+  const l = offen(art); if (!l) return;
+  oeffneSheet('<h2>' + esc(t('frage_abschluss', { art: ART_TEXT[art], n: l.nummer })) + '</h2>' +
+    '<p>' + esc(art === 'bestellung' ? t('frage_buchen_text', { m: l.nummer + 1 }) : t('frage_abschluss_text', { art: ART_TEXT[art], m: l.nummer + 1 })) + '</p>' +
+    '<div class="sheet-knoepfe"><button type="button" class="btn btn-outline" data-aktion="sheet-zu">' + esc(t('abbrechen')) + '</button>' +
+    '<button type="button" class="btn btn-primary" data-aktion="ja-abschliessen" data-id="' + esc(art) + '">' + esc(art === 'bestellung' ? t('ja_buchen') : t('ja_abschliessen')) + '</button></div>', { art: 'frage' });
+}
+function oeffneKorrektur(listeId, posId) {
+  const l = S.archiv[listeId]; if (!l) return;
+  const p = l.pos[posId], a = am()[p.artikelId] || { name: '?' };
+  oeffneSheet('<h2>' + esc(t('korr_titel', { name: a.name })) + '</h2>' +
+    '<div class="feld-zeile"><label for="nurFeld">' + esc(l.art === 'bestellung' ? t('korr_text_b', { statt: LG.mengeText(p.menge) }) : t('korr_nur', { statt: LG.mengeText(p.menge) })) + '</label>' +
+    '<input id="nurFeld" inputmode="decimal" autocomplete="off" value="0"></div><div class="meldung" role="alert"></div>' +
+    '<div class="sheet-knoepfe"><button type="button" class="btn btn-outline" data-aktion="sheet-zu">' + esc(t('abbrechen')) + '</button>' +
+    '<button type="button" class="btn btn-primary" data-aktion="korr-speichern">' + esc(t('korr_speichern')) + '</button></div>', { art: 'korrektur', listeId: listeId, posId: posId, start: '0' });
+}
+async function korrekturSpeichern() {
+  const s = S.sheet; if (!s || s.art !== 'korrektur') return;
+  const l = S.archiv[s.listeId], p = l && l.pos[s.posId]; if (!p) return;
+  const nur = LG.mengeAus(document.getElementById('nurFeld').value);
+  if (!LG.korrekturGueltig(p.menge, nur)) { setzeSheetMeldung(t('korr_falsch', { statt: LG.mengeText(p.menge) })); return; }
+  const g = sperrGrund(l.art); if (g) { setzeSheetMeldung(g); return; }
+  if (await speichereKorrektur(l, s.posId, nur)) schliesseSheet();
+}
+
+/* ---------- Rendern ---------- */
+let renderGeplant = false;
+function planeRender() { if (renderGeplant) return; renderGeplant = true; requestAnimationFrame(function () { renderGeplant = false; render(); }); }
+function fertigGeladen() { return ['standorte', 'orte', 'artikel', 'offen'].every(function (k) { return S.geladenTeile[k]; }); }
+function render() {
+  if (!S.geladen) return;
+  const lade = document.getElementById('lade'), wahl = document.getElementById('wahl'), haupt = document.getElementById('haupt'), hz = document.getElementById('hinweisZeile');
+  if (!fertigGeladen()) return;
+  lade.classList.add('hidden');
+  const erl = erlaubte();
+  hz.classList.add('hidden'); wahl.classList.add('hidden'); haupt.classList.add('hidden');
+  if (!S.kennung) { hz.textContent = t('kein_konto'); hz.classList.remove('hidden'); return; }
+  if (!erl.length) { hz.textContent = t('kein_standort'); hz.classList.remove('hidden'); return; }
+  if (S.standortId && !erl.some(function (s) { return s.id === S.standortId; })) S.standortId = null;
+  if (!S.standortId && erl.length === 1) { S.standortId = erl[0].id; aboArchivNeu(); }
+  if (!S.standortId) {
+    wahl.innerHTML = erl.map(function (s) { return '<button type="button" class="standort-knopf" data-standort="' + esc(s.id) + '">' + esc(s.name) + '</button>'; }).join('');
+    wahl.classList.remove('hidden');
+    return;
+  }
+  haupt.classList.remove('hidden');
+  document.getElementById('standortName').textContent = standort().name;
+  document.getElementById('wechselBtn').classList.toggle('hidden', erl.length < 2);
+  const reiter = [['liste', t('reiter_liste')], ['archiv', t('reiter_archiv')]];
+  if (darfBestellen()) reiter.push(['bestellen', t('reiter_bestellen')], ['mindest', t('reiter_mindest')]);
+  if (!reiter.some(function (r) { return r[0] === S.reiter; })) S.reiter = 'liste';
+  document.getElementById('reiter').innerHTML = reiter.map(function (r) { return '<button type="button" data-reiter="' + r[0] + '" class="' + (r[0] === S.reiter ? 'aktiv' : '') + '">' + esc(r[1]) + '</button>'; }).join('');
+  const el = document.getElementById('inhalt');
+  if (S.reiter === 'liste') { if (darfAnfordern(S.standortId)) sorgeFuerListe('anforderung'); el.innerHTML = listeHTML('anforderung'); }
+  else if (S.reiter === 'archiv') el.innerHTML = archivHTML('anforderung');
+  else if (S.reiter === 'bestellen') { sorgeFuerListe('bestellung'); el.innerHTML = listeHTML('bestellung') + archivHTML('bestellung'); }
+  else {
+    const f = document.activeElement;
+    if (f && f.hasAttribute && f.hasAttribute('data-mindest') && el.contains(f)) return;   /* nicht unter den Fingern neu zeichnen */
+    el.innerHTML = mindestHTML();
+  }
+}
+function eintragZeile(art, x, aktiv) {
+  const e = x.eintrag, a = x.artikel, ort = e.ortId ? (om()[e.ortId] || null) : null;
+  const ortText = e.ortId ? t('ort_pfeil', { ort: ort ? ort.name : '?' }) : t('ort_ohne');
+  return '<div class="zeile" data-pos="' + esc(x.posId) + '"><div class="text"><div class="name">' + esc(a.name) + '</div>' +
+    '<div class="unterzeile"><span class="ort-am-eintrag">' + esc(ortText) + '</span> · ' + esc(t('wer', { name: e.vonName || '?' })) + '</div></div>' +
+    '<div class="menge">' + esc(LG.mengeMitGebinde(e.menge, a)) + '</div>' +
+    (aktiv ? '<div class="knoepfe"><button type="button" class="icon" data-aktion="eintrag-aendern" data-art="' + art + '" data-id="' + esc(x.posId) + '" aria-label="ändern">✎</button></div>' : '') + '</div>';
+}
+function listeHTML(art) {
+  const l = offen(art);
+  if (!l) { const g0 = sperrGrund(art); return '<div class="leer">' + esc(t('liste_keine')) + (g0 ? '<div class="grund" id="grund_' + art + '">' + esc(g0) + '</div>' : (S.regelstand === 'passt' ? '<div class="grund">' + esc(t('liste_wartet')) + '</div>' : '')) + '</div>'; }
+  const grund = sperrGrund(art), aktiv = !grund && !S.schreibt;
+  const gruppen = LG.listeNachOrt(l, { artikel: S.artikel, orte: S.orte }, false);
+  let h = '<h3>' + esc(t(art === 'bestellung' ? 'bestellung_kopf' : 'liste_kopf', { n: l.nummer })) + '</h3>';
+  if (!gruppen.length) h += '<div class="leer">' + esc(t('liste_leer')) + '</div>';
+  gruppen.forEach(function (g) {
+    h += '<div class="ort-titel">' + esc(g.ortId === '' ? t('ort_ohne') : g.titel) + '</div>' + g.eintraege.map(function (x) { return eintragZeile(art, x, aktiv); }).join('');
+  });
+  const leer = !Object.keys(l.pos || {}).length;
+  const abGrund = grund || (leer ? t('grund_leer') : '');
+  h += '<div class="aktionen">' +
+    '<button type="button" class="btn btn-outline btn-gross" data-aktion="auswahl" data-id="' + art + '"' + (aktiv ? '' : ' disabled') + '>' + esc(art === 'bestellung' ? t('bestellen_plus') : t('anfordern')) + '</button>' +
+    '<button type="button" class="btn btn-primary btn-gross" data-aktion="abschluss" data-id="' + art + '"' + (abGrund || S.schreibt ? ' disabled' : '') + '>' + esc(art === 'bestellung' ? t('bestellung_buchen') : t('abschliessen')) + '</button>' +
+    (abGrund ? '<div class="grund" id="grund_' + art + '">' + esc(abGrund) + '</div>' : '') + '</div>';
+  if (art === 'anforderung') h += nachbestellenHTML();
+  return h;
+}
+function nachbestellenHTML() {
+  const bj = bestandJetzt(null);
+  let h = '<h3>' + esc(t('nb_titel')) + '</h3>';
+  if (bj.fehler) return h + '<div class="hinweis rot" style="margin:0">' + esc(t('bestand_fehler', { grund: bj.fehler })) + '</div>';
+  if (!bj.nb.liste.length) h += '<p class="unterzeile">' + esc(t('nb_leer')) + '</p>';
+  bj.nb.liste.forEach(function (x) {
+    h += '<div class="zeile"><div class="text"><div class="name">' + esc(x.artikel.name) + '</div><div class="unterzeile">' + esc(x.lieferant ? x.lieferant.name : 'ohne Lieferant') + '</div></div>' +
+      '<div class="menge rot-text">' + esc(LG.mengeText(x.summe)) + ' / ' + esc(LG.mengeText(x.mindest)) + '</div></div>';
+  });
+  if (bj.nb.nieGezaehlt.length) h += '<p class="unterzeile">' + esc(t('nb_nie', { namen: bj.nb.nieGezaehlt.map(function (a) { return a.name; }).join(', ') })) + '</p>';
+  return h;
+}
+function archivHTML(art) {
+  const o = offen(art);
+  const ids = o ? [o.nummer - 1, o.nummer - 2].filter(function (n) { return n >= 1; }).map(function (n) { return LG.listeId(S.standortId, art, n); }) : [];
+  const listen = ids.map(function (id) { return S.archiv[id]; }).filter(function (l) { return l && l.status === 'zu'; });
+  let h = art === 'bestellung' ? '<h3>' + esc(t('reiter_archiv')) + '</h3>' : '';
+  if (!listen.length) return h + '<div class="leer">' + esc(t('archiv_leer')) + '</div>';
+  const grund = sperrGrund(art);
+  listen.forEach(function (l) {
+    const korr = {}; (S.archivKorr[l.id] || []).forEach(function (k) { korr[k.posId] = k; });
+    h += '<h3>' + esc(t('archiv_kopf', { art: ART_TEXT[art], n: l.nummer, zeit: zeitKurz(l.abgeschlossenMs), name: l.abgeschlossenName || '?' })) + '</h3>';
+    LG.listeNachOrt(l, { artikel: S.artikel, orte: S.orte }, false).forEach(function (g) {
+      h += '<div class="ort-titel">' + esc(g.ortId === '' ? t('ort_ohne') : g.titel) + '</div>';
+      g.eintraege.forEach(function (x) {
+        const k = korr[x.posId];
+        const kText = k ? (k.nur === 0 ? (art === 'bestellung' ? t('korr_zurueck', { name: k.name || '?' }) : t('korr_fehlte', { name: k.name || '?' })) : t('korr_steht', { nur: LG.mengeText(k.nur), statt: LG.mengeText(k.statt), name: k.name || '?' })) : '';
+        h += '<div class="zeile' + (k ? ' korrigiert' : '') + '"><div class="text"><div class="name">' + esc(x.artikel.name) + '</div><div class="unterzeile">' + esc(t('wer', { name: x.eintrag.vonName || '?' })) + (kText ? ' · <b>' + esc(kText) + '</b>' : '') + '</div></div>' +
+          '<div class="menge">' + esc(LG.mengeMitGebinde(x.eintrag.menge, x.artikel)) + '</div>' +
+          (!k ? '<div class="knoepfe"><button type="button" class="btn btn-outline btn-klein" data-aktion="korrektur" data-liste="' + esc(l.id) + '" data-id="' + esc(x.posId) + '"' + (grund ? ' disabled title="' + esc(grund) + '"' : '') + '>' + esc(art === 'bestellung' ? t('zuruecknehmen') : t('fehlte')) + ' / ' + esc(t('nur_statt')) + '</button></div>' : '') + '</div>';
+      });
+    });
+    if (art === 'anforderung') h += '<button type="button" class="btn btn-outline" style="width:100%" data-aktion="nachdruck" data-id="' + esc(l.id) + '">' + esc(t('nachdrucken')) + '</button>';
+  });
+  if (grund) h += '<div class="grund">' + esc(grund) + '</div>';
+  return h;
+}
+function mindestHTML() {
+  const sid = S.standortId, orte = om(), bj = bestandJetzt(null);
+  const mm = {}; (S.mindest || []).forEach(function (m) { if (m.standortId === sid) mm[m.artikelId] = m.menge; });
+  const liste = LG.aktiv(S.artikel).filter(function (a) { return LG.hauptort(a, sid, orte) || Object.prototype.hasOwnProperty.call(mm, a.id); }).sort(LG.nachName);
+  let h = '<p class="unterzeile" style="margin:8px 0">' + esc(t('mind_hinweis')) + '</p>';
+  if (bj.fehler) h += '<div class="hinweis rot" style="margin:0 0 8px">' + esc(t('bestand_fehler', { grund: bj.fehler })) + '</div>';
+  if (!liste.length) return h + '<div class="leer">' + esc(t('mind_leer')) + '</div>';
+  const grund = sperrGrund('bestellung');
+  liste.forEach(function (a) {
+    const b = bj.b ? bj.b[a.id] : null;
+    const bt = !b || b.status === 'unbekannt' ? t('bestand_unbekannt') : t('bestand_text', { b: LG.mengeMitGebinde(b.summe, a) }) + (b.unterMindest ? ' · ' + t('bestand_unter') : '');
+    h += '<div class="mind-zeile"><div><div class="name"><b>' + esc(a.name) + '</b></div><div class="unterzeile' + (b && b.unterMindest ? ' rot-text' : '') + '">' + esc(bt) + '</div></div>' +
+      '<input inputmode="decimal" data-mindest="' + esc(a.id) + '" aria-label="Mindestmenge ' + esc(a.name) + '" value="' + esc(Object.prototype.hasOwnProperty.call(S.mindEingabe, a.id) ? S.mindEingabe[a.id] : (mm[a.id] !== undefined ? LG.mengeText(mm[a.id]) : '')) + '" placeholder="0"' + (grund ? ' disabled' : '') + '>' +
+      '<button type="button" class="btn btn-outline btn-klein" data-aktion="mindest" data-id="' + esc(a.id) + '"' + (grund ? ' disabled' : '') + '>' + esc(t('mind_speichern')) + '</button></div>';
+  });
+  if (grund) h += '<div class="grund">' + esc(grund) + '</div>';
+  return h;
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (ev) {
+  const r = ev.target.closest('[data-reiter]');
+  if (r) { S.reiter = r.getAttribute('data-reiter'); planeRender(); return; }
+  const el = ev.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-aktion'), id = el.getAttribute('data-id');
+  if (a === 'auswahl') oeffneAuswahl(id);
+  else if (a === 'auswahl-alle') { if (S.sheet) S.sheet.alle = true; document.getElementById('auswahlListe').innerHTML = auswahlHTML(S.sheet.listenArt, document.getElementById('suchFeld').value, true); }
+  else if (a === 'waehle-artikel') oeffneMenge(S.sheet.listenArt, id, null);
+  else if (a === 'eintrag-aendern') {
+    const art = el.getAttribute('data-art'), l = offen(art), p = l && l.pos[id];
+    if (p) oeffneMenge(art, p.artikelId, id); else toast(t('liste_keine'));
+  }
+  else if (a === 'minus' || a === 'plus') {
+    const f = document.getElementById('mengeFeld'), m = LG.mengeAus(f.value);
+    const neu = (isFinite(m) ? m : 0) + (a === 'plus' ? 1 : -1);
+    f.value = LG.mengeText(Math.max(1, Math.min(LG.GRENZEN.mengeMax, Math.round(neu * 10) / 10)));
+  }
+  else if (a === 'eintrag-speichern') eintragSpeichern();
+  else if (a === 'eintrag-loeschen') { const s = S.sheet, l = offen(s.listenArt); if (l && !sperrGrund(s.listenArt)) schreibeEintrag(l, s.posId, null).then(function (ok) { if (ok) schliesseSheet(); }); }
+  else if (a === 'abschluss') oeffneAbschluss(id);
+  else if (a === 'ja-abschliessen') abschliessen(id);
+  else if (a === 'nachdruck') { const l = S.archiv[id] || (S.gebucht || []).filter(function (x) { return x.id === id; })[0]; if (l) drucke(l, true, ''); else zeigeFehler(t('err_drucken'), { code: 'bos/fehlt', message: 'Liste ' + id + ' ist noch nicht geladen — gleich nochmal versuchen' }); }
+  else if (a === 'korrektur') oeffneKorrektur(el.getAttribute('data-liste'), id);
+  else if (a === 'korr-speichern') korrekturSpeichern();
+  else if (a === 'mindest') {
+    const f = document.querySelector('[data-mindest="' + CSS.escape(id) + '"]'), m = LG.mengeAus(f.value === '' ? '0' : f.value);
+    if (!LG.mindestGueltig(m)) { zeigeFehler(t('err_mindest'), { code: 'bos/eingabe', message: t('mind_falsch', { max: LG.GRENZEN.mindestMax }) }); return; }
+    speichereMindest(id, m, el);
+  }
+  else if (a === 'sheet-zu') schliesseSheet();
+});
+document.addEventListener('input', function (ev) { const f = ev.target.closest && ev.target.closest('[data-mindest]'); if (f) S.mindEingabe[f.getAttribute('data-mindest')] = f.value; });
+document.getElementById('wahl').addEventListener('click', function (ev) { const b = ev.target.closest('[data-standort]'); if (b) waehle(b.getAttribute('data-standort')); });
+document.getElementById('wechselBtn').addEventListener('click', function () { waehle(null); });
+document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; });
+
+/* ---------- Halb eingegebene Menge melden (Checkliste §7b) ---------- */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () {
+  if (S.schreibt || Object.keys(S.mindEingabe).length) return true;
+  const s = S.sheet; if (!s) return false;
+  const f = document.getElementById(s.art === 'korrektur' ? 'nurFeld' : 'mengeFeld');
+  return !!f && (s.art === 'menge' || s.art === 'korrektur') && f.value !== s.start;
+});
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in LAGER_ANFORDERN_DOKU.md) ---------- */
+const helpData = {
+  title: 'Lager anfordern — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'Sie ersetzt den Zettel. Wer etwas aus dem Lager braucht, schreibt es auf die offene Liste, in Gebinden: Sack, Karton, Eimer. Wer die Liste abholt, drückt „Abschließen und drucken“. Dann wird alles genau einmal vom Bestand abgebucht und gedruckt, und eine neue, leere Liste ist sofort offen.' },
+    { heading: 'Standort', text: 'Oben steht der Standort, für den die Liste gilt. Darfst du an mehreren anfordern, wählst du ihn am Anfang; „Standort wechseln“ bringt dich zurück. Wer wo anfordern darf, steht in der Kontenverwaltung.' },
+    { heading: 'Anfordern', text: '„＋ Anfordern“ öffnet die Auswahl, nach Lagerorten sortiert, mit Suche. Artikel antippen, Menge mit − und ＋ oder ins Feld tippen (halbe mit Komma), „Auf die Liste“. Am Eintrag steht, wo der Artikel liegt („→ Regal 1“) und wer ihn eingetragen hat.' },
+    { heading: 'Liegt an mehreren Orten?', text: 'Dann steht beim Eintragen eine Auswahl der Lagerorte da. Vorgabe ist der Hauptort, das ist der erste Ort in der Artikelkarte des Lagers. Wird die Ware woanders genommen, stell hier den richtigen Ort ein — danach rechnet BOS den Bestand je Ort.' },
+    { heading: 'Ändern und löschen', text: 'Mit ✎ am Eintrag änderst du Menge oder Ort, „Löschen“ nimmt ihn von der Liste. Wie beim Zettel darf das jeder, der anfordern darf. Auf der Liste steht danach dein Name.' },
+    { heading: 'Abschließen und drucken', text: 'Nach der Rückfrage wird die Liste abgeschlossen und gebucht, dann druckt der Drucker. Hat jemand anderes im selben Moment abgeschlossen, steht oben „hat eben … abgeschlossen“ — gebucht wird trotzdem nur einmal. Kommt kein Papier, „Nachdrucken (bucht nicht)“.' },
+    { heading: 'Der Ausdruck', text: 'Je Lagerort die Artikel mit Kästchen zum Abhaken. Darunter „Bitte nachbestellen“ mit allem, was nach dieser Liste unter der Mindestmenge liegt, und „Noch nie gezählt“ für Artikel mit Mindestmenge, die noch keine Zählung haben.' },
+    { heading: 'Archiv und „fehlte“', text: 'Im Archiv stehen die zwei letzten Listen. Fehlte etwas oder war es weniger, tippst du am Eintrag „fehlte / nur … statt …“ und trägst ein, was wirklich genommen wurde (0 = fehlte ganz). Das wird zurückgebucht. Je Eintrag geht das einmal.' },
+    { heading: 'Bestellen und Mindestmengen', text: 'Mit dem Haken „Lager bestellen“ gibt es zwei Reiter mehr. „Bestellen“: eintragen, was beim Lieferanten bestellt ist, dann „Bestellung buchen“ — es zählt sofort zum Bestand. Im Archiv darunter nimmst du eine Position zurück oder trägst ein, was wirklich kam. „Mindestmengen“: je Artikel die Menge, unter der er auf „Bitte nachbestellen“ kommt.' },
+    { heading: 'Ohne Netz und Fehler', text: 'Ohne Verbindung kannst du die Liste ansehen, aber nichts ändern — die Knöpfe sind grau und sagen warum. Fehler stehen oben im roten Kasten, mit der echten Meldung. „Keine Berechtigung“ heißt meistens: kein Haken für diesen Standort, oder die Liste wurde gerade abgeschlossen.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('helpTitle').textContent = helpData.title;
+  document.getElementById('helpContent').innerHTML = helpData.sections.map(function (s) { return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>'; }).join('');
+}
+document.getElementById('helpOpenBtn').addEventListener('click', function () { document.getElementById('helpSheet').classList.remove('hidden'); });
+document.getElementById('helpCloseBtn').addEventListener('click', function () { document.getElementById('helpSheet').classList.add('hidden'); });
+document.getElementById('helpSheet').addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>

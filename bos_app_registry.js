@@ -2,6 +2,9 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-16 · 09:27 · Lager Stufe 3a, #169 (Freigabe KC 16.11. 08:44/08:49): neuer
+       Eintrag lager_anfordern (Kachel „Lager anfordern“, Bereich Produktion, nur über
+       die Haken lagerAnfordern ODER lagerBestellen, kein roles, kein direkt). Sonst unverändert.
      2026-11-11 · 07:09 · Lager Stufe 2, #120 (Freigabe KC 11.11. 06:43): neuer
        Eintrag lager_zaehlen (Kachel „Lager zählen“, Bereich Produktion, nur
        über den Haken lagerZaehlen, kein roles, kein direkt). Sonst unverändert.
@@ -606,6 +609,24 @@ window.BOS_APPS = [
     url: 'lager/lager_zaehlen.html',
     status: 'live',
     haken: ['lagerZaehlen']
+  },
+  {
+    id: 'lager_anfordern',
+    // NEU 16.11.2026 (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44): Anforderungsliste
+    // statt Zettel — eintragen, „Abschließen und drucken“ bucht genau einmal ab, Archiv
+    // der letzten zwei Listen, Bestellungen und Mindestmengen. KEIN roles-Feld und KEINE
+    // Zeile in bos_permissions.js: die Kachel hängt an den Haken lagerAnfordern ODER
+    // lagerBestellen (bos_access.js: ein Haken reicht). Das Schloss ist die Liste
+    // lagerAnfordernStandorte bzw. lagerBestellen im Konto, die die Regel prüft (RK §32);
+    // Rolle admin darf immer. Kein direkt: QR/Stationsgerät entscheidet Ulf vor der
+    // Einführung (Kompendium O26). Siehe lager/LAGER_ANFORDERN_DOKU.md.
+    bereich: 'produktion',
+    name: 'Lager anfordern',
+    icon: '🧾',
+    color: '#8b5a2b',
+    url: 'lager/lager_anfordern.html',
+    status: 'live',
+    haken: ['lagerAnfordern', 'lagerBestellen']
   },
   {
     id: 'konten_verwaltung',

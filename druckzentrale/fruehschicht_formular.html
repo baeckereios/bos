@@ -1,4 +1,17 @@
 <!--
+  2026-11-17 · 08:27 · v0.7 · Feature
+    Stikken-Verteilung Stufe 3c (Anweisung KC 17.11., 02:48, Fassung 2; Go 06:25, M1–M4):
+    - Tablet hochkant ≈ 600 CSS-px (460 bis < 680 px):
+      Rest aus: alle Zeilen einzeilig wie v0.5;
+      Rest an (M1, Ulf: „rechts darunter“): in jeder Zeile Name oben, Felder
+      darunter rechtsbündig, Rechnung in einer Zeile, „2 mehr als benötigt“
+      rechtsbündig darunter. Unter 460 px wie 3b (v0.6).
+      Klasse fh-row-stikke an den Stikken-Zeilen.
+    - Druck Seite 1: kein Rest-Hinweis mehr neben der Zahl (R6 aufgehoben,
+      Ulf 17.11., 02:46/02:48); restHinweis() wird nicht mehr aufgerufen.
+    - Hilfe: Satz zum Hinweis gestrichen. L1: CSS-Kommentar 640 → 680 px.
+    SESSION_2026-11-17_STIKKEN_3C_TABLET_BAU.md
+
   2026-11-16 · 01:51 · v0.6 · Feature
     Stikken-Verteilung Stufe 3b (Anweisung KC 15.11., 04:55; Go 16.11., 01:40, K1–K4):
     schmales Formular-Fenster < 680 CSS-px (Media Query im Dokument, nicht Gerät;
@@ -232,30 +245,45 @@
   .fh-fremd input { flex: 1 1 180px; min-width: 150px; }
   .fh-fremd select { width: 70px; flex: 0 0 auto; }
 
-  /* ── Stufe 3b: schmales Formular-Fenster (Handy) ──────────────────
-     Grenze 640 CSS-px Breite DIESES Dokuments (Media Query im Formular, gilt
+  /* ── Stufe 3b/3c: schmales Formular-Fenster (Handy, Tablet hochkant ≈ 600 px) ──
+     Grenze 680 CSS-px Breite DIESES Dokuments (Media Query im Formular, gilt
      also auch für ein schmales Satellite-Fenster am Tablet, nicht „Gerät“).
-     Gemessen v0.5: Die Köpfe „Benötigt · Rest · Absetzen“ stehen ab 630 px über
-     ihren Feldern, darunter nicht mehr. Gleicher Wert in SCHMAL_ABFRAGE (JS).
-     Breit (≥ 640 px) bleibt alles wie v0.5. */
+     Ab 680 px hat der Inhalt seine volle Breite. Gemessen v0.5: Die Köpfe
+     „Benötigt · Rest · Absetzen“ stehen erst ab 630 px über ihren Feldern.
+     Gleicher Wert in SCHMAL_ABFRAGE (JS). Breit (≥ 680 px) bleibt alles wie v0.5.
+     3c (M1, Ulf: „rechts darunter“): Unter 680 px bei Rest an steht in jeder
+     Zeile der Name oben, die Felder darunter RECHTSBÜNDIG (Rechnung in einer
+     Zeile). Bei Rest aus bleiben die Zeilen einzeilig wie v0.5. Unter der
+     zweiten Grenze (460 px, Block darunter) gilt wieder 3b (linksbündig). */
   @media (max-width: 679.98px) {
     .fh-th-rest { display: none !important; }                       /* Kopfzeile entfällt, jede Zeile spricht für sich */
     #fh-rows .fh-row { row-gap: 6px; }
-    #fh-rows .fh-row-name { flex: 1 1 100%; min-width: 0; }         /* Name eigene Zeile, darunter die Felder linksbündig */
-    .rest-an #fh-rows .fh-row { column-gap: 6px; }
+    .rest-an #fh-rows .fh-row-name { flex: 1 1 100%; min-width: 0; }   /* Name eigene Zeile (alle Zeilen, M1) */
+    .rest-an #fh-rows .fh-row { column-gap: 6px; justify-content: flex-end; }   /* Felder rechtsbündig an der Innenkante */
     .rest-an #fh-rows .fh-ben { width: 80px; }                       /* Platz für die graue Vorgabe „Benötigt“ */
-    .fh-rest-teil { gap: 6px; flex: 1 1 0; min-width: 0; }          /* Basis 0: bleibt in der Zeile neben „Benötigt“ */
+    .fh-rest-teil { gap: 6px; flex: 0 0 auto; }
     .fh-rest-teil select { width: 56px; }
     .fh-rest-teil .fh-op { width: 10px; }
     .fh-rest-teil .fh-ergebnis { min-width: 40px; }
-    .fh-rest-teil .fh-suffix { width: auto; flex: 1 1 0; min-width: 0; line-height: 1.15; }   /* darf bei sehr schmal zweizeilig werden, bleibt in der Zeile */
-    .fh-mehr { text-align: left; margin-top: 0; }
+    .fh-rest-teil .fh-suffix { width: auto; flex: 0 0 auto; white-space: nowrap; }
+    .fh-mehr { flex: 1 1 100%; text-align: right; margin-top: 0; }
     #fh-rows select.leer { color: var(--faint); }                   /* „Benötigt“/„Rest“ grau, solange leer */
     .fh-fremd-label { flex: 1 1 100%; }                              /* 2b: Beschriftung eigene Zeile … */
     .fh-fremd { column-gap: 8px; }
     .fh-fremd input { flex: 1 1 0; min-width: 0; }                   /* … darunter Text (wächst mit), Zahl, „Fächer“ */
     .fh-fremd select { width: 56px; }
     .fh-fremd .fh-suffix { font-size: var(--bos-font-sm, 0.78rem); color: var(--dim); }
+  }
+  /* Stufe 3c: zweite Grenze 460 CSS-px — darunter passen Zeilen ohne Rechnung
+     nicht mehr sauber in eine Zeile (gemessen v0.5, Rest aus, Ersatzschrift:
+     einzeilig ab 440 px mit „Mini-Schokocroissants“ 172 px; + 20 px Luft;
+     Barlow läuft auf Ulfs Tablet etwa 13 % schmaler). Dann wie 3b: Name oben. */
+  @media (max-width: 459.98px) {
+    #fh-rows .fh-row-name { flex: 1 1 100%; min-width: 0; }         /* alle Zeilen: Name oben (wie 3b) */
+    .rest-an #fh-rows .fh-row { justify-content: normal; }          /* 3b: linksbündig */
+    .fh-rest-teil { flex: 1 1 0; min-width: 0; }                     /* Basis 0: bleibt in der Zeile neben „Benötigt“ */
+    .fh-rest-teil .fh-suffix { flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.15; }   /* darf zweizeilig werden */
+    .fh-mehr { text-align: left; }
   }
   .fh-rest-info { font-size: var(--bos-font-sm, 0.82rem); color: var(--dim); line-height: 1.5; white-space: pre-line; }
   .fh-rest-info.fehler { color: var(--red); }
@@ -384,7 +412,7 @@
     </div>
     <div class="sec">
       <h3>Rest und Reste-Stikken</h3>
-      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Dann wird je Sorte gerechnet: <strong>Benötigt</strong> − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = Bleche absetzen. Das Ergebnis im weißen Kästchen kommt genau so auf den Zettel, daneben ein kurzer Hinweis wie „+2 alte im Reste-Stikken“. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Dann wird je Sorte gerechnet: <strong>Benötigt</strong> − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = Bleche absetzen. Das Ergebnis im weißen Kästchen kommt genau so auf den Zettel. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
       <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
       <p>Auf dem Stikken-Blatt steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
       <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
@@ -497,7 +525,7 @@
         kopfGesetzt = true;
       }
       var r = document.createElement('div');
-      r.className = 'fh-row';
+      r.className = 'fh-row' + (item.stikke ? ' fh-row-stikke' : '');   // 3c: nur diese Zeilen tragen bei Rest an eine Rechnung
       r.innerHTML =
         '<span class="fh-row-name">' + escapeHtml(item.name) + '</span>' +
         '<select class="bos-input' + (item.stikke ? ' fh-ben' : '') + '" id="fh-' + item.kennung + '"></select>' +
@@ -790,11 +818,9 @@
       if (neuerBlock) { blockGesetzt = true; html += '<div class="fs-abstand"></div>'; }   // zählt nicht im Zebra
       var val = document.getElementById('fh-' + item.kennung).value;
       var suffix = item.suffix;
-      if (restAn && item.stikke) {                 // Kästchen = setzt ab, daneben der Hinweis (R6)
+      if (restAn && item.stikke) {                 // Kästchen = abzusetzende Bleche; kein Hinweis daneben (3c: R6 aufgehoben, Ulf 17.11.)
         var pe = postenAus(plan, item.kennung);
         val = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '';
-        var hinweis = BOS_STIKKEN.restHinweis(pe);
-        if (hinweis) suffix += ' · ' + hinweis;
       }
       html += '<div class="fs-item' + zebra() + (neuerBlock ? ' fs-block-anfang' : '') + '">' +
               '<span class="fs-name">' + escapeHtml(item.name) + '</span>' +

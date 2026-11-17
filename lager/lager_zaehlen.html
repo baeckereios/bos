@@ -4,7 +4,7 @@
   MODUL: lager/lager_zaehlen.html — Lager zählen (Bestand je Standort, Ort und Artikel)
   Doku:  lager/LAGER_ZAEHLEN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (Zählliste, Stand-Kennung, Zählgang); Liste + Karte: ../bos_zaehlkarte.js
-  Regel: RK §31 (firestore_regeln_2026-11-11_lager_zaehlen.rules) — zählen darf, wer den Standort in
+  Regel: RK §31 (seit 3a in firestore_regeln_2026-11-16_lager_anfordern.rules) — zählen darf, wer den Standort in
          bos_accounts/<kennung>.lagerZaehlenStandorte trägt, oder die Rolle admin. Jede Zählung wird
          nur angehängt (lager_zaehlungen) und setzt im selben Vorgang lager_stand/<artikel>__<ort>.
   Nur zählen: kein Stift, keine Pflege (Konzept 30.10., 15:20). Kachel über Registry-Feld haken:
@@ -12,6 +12,13 @@
   Ohne Netz (Variante A, Ulf 11.11., 06:41): Firestore puffert im Speicher der offenen Seite;
   die Seite zeigt ⏳ und fragt beim Schließen, solange etwas wartet. Kein Zeitlimit als Fehler.
   CHANGELOG
+    2026-11-16 · 09:59 · v2 · Feature (Lager Stufe 3a, #169; Freigabe Kontroll-Chat 16.11. 08:44/08:49 mit A28)
+      „liegt hier noch?“ (B26, Bauplan §6.3): an jedem Ort stehen am Ende auch die Artikel, die dort nicht mehr fest
+      liegen, aber einen Stand > 0 haben (LG.zaehlliste mit Stand); eine 0 räumt sie ab. A28: gelber Hinweis oben,
+      wenn am Standort in den letzten 24 Stunden eine Anforderungsliste abgeschlossen wurde (eine Abfrage
+      lager_listen abgeschlossenAm > jetzt − 24 h; Fehler sichtbar). Kein Sperren. Hilfe-Satz „erst zählen, wenn die
+      gedruckte Liste abgearbeitet ist“. REGEL_DATEI auf die Regel vom 16.11. Zählen, Schreiben, Regel unverändert.
+      lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
     2026-11-11 · 07:04 · v1 · Erstfassung (Lager Stufe 2, #120; Freigabe Kontroll-Chat 11.11. 06:43,
       Ulfs Antworten 06:41: Variante A, Zählgang 12 Stunden, eine Nachkommastelle, kein QR)
       Nachtrag 07:19: Regelstand nicht prüfbar (z. B. kein Netz beim Öffnen) → Satz mit Grund
@@ -96,6 +103,7 @@
   <ul id="fehlerListe"></ul>
 </div>
 <div id="wartetLeiste" class="hinweis warn hidden" role="status"></div>
+<div id="listeLeiste" class="hinweis warn hidden" role="status"></div>
 <div id="hinweisZeile" class="leer hidden" role="status"></div>
 
 <section id="wahl" class="standort-wahl hidden" aria-label="Standort wählen"></section>
@@ -137,7 +145,7 @@ const LG = window.BOS_LAGER_LOGIK;
 const ZK = window.BOS_ZAEHLKARTE;
 const COL = LG.COL;
 const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
-const REGEL_DATEI = 'firestore_regeln_2026-11-11_lager_zaehlen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-16_lager_anfordern.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const WARTE_HINWEIS_MS = 20000;   /* danach „kein Netz, wird gesammelt“ — KEIN Fehler (Variante A) */
 const SPEICHER_STANDORT = 'bos_lager_zaehlen_standort';
 
@@ -157,7 +165,9 @@ const I18N_DE = {
   err_netz: 'Keine Verbindung zum Server (WLAN?).',
   err_laden: 'Laden „{was}“', err_zaehlen: 'Zählen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen',
   zk_keine_eintraege: '(noch keine Artikel)', zk_ende: 'Fertig mit {standort}.', zk_weiter_in: 'Weiter in {ort}',
-  zk_getippt: 'Getippt: {w} — der nächste Tipp hier ersetzt ihn.', zk_nichts_zurueck: 'Noch kein Tipp zum Zurücknehmen.'
+  zk_getippt: 'Getippt: {w} — der nächste Tipp hier ersetzt ihn.', zk_nichts_zurueck: 'Noch kein Tipp zum Zurücknehmen.',
+  liegt_noch: '❓ liegt hier noch? (nicht mehr fest hier — 0, wenn weg)',
+  liste_offen: '⚠︎ Liste {n} wurde {zeit} abgeschlossen. Erst zählen, wenn sie abgearbeitet ist.', err_liste: 'Laden „letzte Anforderungsliste“'
 };
 function t(k, w) {
   let s = I18N_DE[k]; if (s === undefined) s = k;
@@ -172,6 +182,7 @@ const S = {
   kennung: null, konto: null, geladen: false, regelstand: 'unbekannt',
   standorte: [], orte: [], artikel: [], stand: {},   /* stand: { artikelId__ortId: { wert, tsMs, ausstehend } } */
   standortId: null,
+  listen24: [],      /* Stufe 3a, A28: in den letzten 24 Stunden abgeschlossene Listen (alle Standorte) */
   wartet: {},        /* zaehlungId → { sid, seit } */
   abgelehnt: {},     /* artikelId__ortId → Text */
   geladenTeile: {}
@@ -233,6 +244,24 @@ function abo(col, ziel) {
 function abonniere() {
   abos.forEach(function (f) { f(); });
   abos = [abo(COL.standorte, 'standorte'), abo(COL.orte, 'orte'), abo(COL.artikel, 'artikel'), abo(COL.stand, 'stand')];
+  /* A28: EINE Abfrage, ein Feld (kein Index): abgeschlossen in den letzten 24 Stunden */
+  const ab = new Date(Date.now() - LG.GRENZEN.hinweisStunden * 3600000);
+  abos.push(window.db.collection(COL.listen).where('abgeschlossenAm', '>', ab).onSnapshot({}, function (snap) {
+    const a = [];
+    snap.forEach(function (d) { const x = d.data({ serverTimestamps: 'estimate' }) || {}; a.push({ id: d.id, art: x.art, standortId: x.standortId, nummer: x.nummer, status: x.status, abgeschlossenMs: x.abgeschlossenAm ? tsMs(x.abgeschlossenAm) : null }); });
+    S.listen24 = a; planeRender();
+  }, function (err) { zeigeFehler(t('err_liste'), err); }));
+}
+function zeitKurz(ms) {
+  try { return new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(new Date(ms)); }
+  catch (e) { return new Date(ms).toLocaleString('de-DE'); }
+}
+function zeigeListeHinweis() {
+  const el = document.getElementById('listeLeiste');
+  const l = S.standortId ? LG.juengsteAbgeschlossen(S.listen24, S.standortId, Date.now(), LG.GRENZEN.hinweisStunden) : null;
+  if (!l) { el.classList.add('hidden'); return; }
+  el.textContent = t('liste_offen', { n: l.nummer, zeit: zeitKurz(l.abgeschlossenMs) });
+  el.classList.remove('hidden');
 }
 async function pruefeRegelstand() {
   try { await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' }); S.regelstand = 'passt'; }
@@ -278,8 +307,9 @@ function zaehlDaten() {
   const st = standort();
   return {
     standort: st ? { id: st.id, name: st.name } : null,
-    orte: st ? LG.zaehlliste(st.id, S.orte, S.artikel).map(function (g) {
-      return { id: g.ort.id, name: g.ort.name, eintraege: g.artikel.map(function (a) { return { id: a.id, name: a.name, unter: LG.gebindeText(a), _artikel: a }; }) };
+    orte: st ? LG.zaehlliste(st.id, S.orte, S.artikel, S.stand).map(function (g) {
+      return { id: g.ort.id, name: g.ort.name, eintraege: g.artikel.map(function (a) { return { id: a.id, name: a.name, unter: LG.gebindeText(a), _artikel: a }; })
+        .concat((g.noch || []).map(function (a) { return { id: a.id, name: a.name, unter: [t('liegt_noch'), LG.gebindeText(a)].filter(Boolean).join(' · '), _artikel: a, _noch: true }; })) };
     }) : []
   };
 }
@@ -339,6 +369,7 @@ function render() {
   if (!erl.length) { hz.textContent = t('kein_standort'); hz.classList.remove('hidden'); return; }
   if (S.standortId && !erl.some(function (s) { return s.id === S.standortId; })) S.standortId = null;
   if (!S.standortId && erl.length === 1) S.standortId = erl[0].id;
+  zeigeListeHinweis();   /* Stufe 3a, A28: erst wenn der Standort feststeht */
   if (!S.standortId) {
     wahl.innerHTML = erl.map(function (s) { return '<button type="button" class="standort-knopf" data-standort="' + esc(s.id) + '">' + esc(s.name) + '</button>'; }).join('');
     wahl.classList.remove('hidden');
@@ -381,6 +412,7 @@ const helpData = {
     { heading: 'Zahlenfeld', text: 'Passt kein Knopf, tippst du die Zahl ins Feld und drückst OK oder die Eingabetaste. Halbe gehen mit Komma, zum Beispiel 2,5 — eine Stelle hinter dem Komma.' },
     { heading: '0 ist nicht „nicht gezählt“', text: 'Liegt nichts da, tippst du 0. Dann steht – in der Liste. Einen Artikel, den du nicht anfasst, speichert die Seite gar nicht; er bleibt ○. Das ist wichtig, damit später kein falscher Verbrauch herauskommt.' },
     { heading: 'Vertippt?', text: '„↶ Zurück“ bringt dich zur Karte deines letzten Tipps, die Zahl ist markiert. Tipp dort die richtige Zahl, sie ersetzt die falsche. Mehrmals Zurück geht auch.' },
+    { heading: 'Nach einer Anforderungsliste', text: 'Im Vorratslager erst zählen, wenn die gedruckte Liste abgearbeitet ist. Sonst liegt beim Zählen noch Ware da, die schon abgebucht ist, und der Bestand stimmt nicht. Wurde am Standort in den letzten 24 Stunden eine Liste abgeschlossen, steht das oben gelb. Steht ein Artikel mit „❓ liegt hier noch?“ an einem Ort, gehört er dort nicht mehr fest hin, hat aber noch einen Stand: zählen, was da ist, oder 0, wenn er weg ist.' },
     { heading: 'Ohne Netz', text: 'Hat das Lager kein Netz, zählst du einfach weiter. Oben steht dann „⏳ … Tipps warten aufs Netz“, und die Tipps gehen raus, sobald wieder Netz da ist. Lass die Seite so lange offen; schließt du sie vorher, fragt sie nach. Öffnen musst du die Seite mit Netz, am besten vor der Tür.' },
     { heading: 'Wenn etwas schiefgeht', text: 'Fehler stehen oben im roten Kasten, mit der echten Meldung. Wird ein Tipp abgelehnt, steht am Artikel ⚠︎ mit dem Grund, und der Tipp zählt nicht. „Keine Berechtigung“ heißt meistens: kein Haken für diesen Standort.' }
   ]

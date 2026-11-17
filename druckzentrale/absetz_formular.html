@@ -1,4 +1,12 @@
 <!--
+  2026-11-17 · 08:27 · v0.8 · Feature
+    Stikken-Verteilung Stufe 3c (Anweisung KC 17.11., 02:48, Fassung 2; Go 06:25, M1–M4):
+    Druck Seite 1 — das Kästchen des ersten Tages zeigt bei Rest nur noch die
+    Zahl, darunter kein Hinweis mehr (R6 aufgehoben, Ulf 17.11.); restHinweis()
+    wird nicht mehr aufgerufen (CSS .af-rest-hinweis bleibt ungenutzt stehen).
+    Hilfe: Satz zum Hinweis gestrichen. L1: CSS-Kommentar 640 → 680 px.
+    Bildschirm unverändert. SESSION_2026-11-17_STIKKEN_3C_TABLET_BAU.md
+
   2026-11-16 · 01:51 · v0.7 · Feature
     Stikken-Verteilung Stufe 3b (Anweisung KC 15.11., 04:55; Go 16.11., 01:40, K1–K4):
     < 680 px „Steht auch mit drin“: Beschriftung eigene Zeile, darunter Text,
@@ -266,12 +274,12 @@
      Gemessen v0.6 mit Rest an: Köpfe über den Feldern mit drei Tagen ab
      480 px, mit zwei Tagen ab 400 px; „Fächer“ rutschte zwischen 560 und
      610 px und unter 390 px in eine eigene Zeile. Daraus:
-       < 640 px  „Steht auch mit drin“: Beschriftung eigene Zeile, darunter
+       < 680 px  „Steht auch mit drin“: Beschriftung eigene Zeile, darunter
                  Text (wächst mit), Zahl, „Fächer“ (2b) — gleiche Grenze wie
                  die Frühschicht (SCHMAL_ABFRAGE)
        < 500 px  mit drei Tagen: Name über den Feldern, Felder unter den Köpfen
        < 400 px  mit zwei Tagen: ebenso
-     Breit (≥ 640 px) bleibt alles wie v0.6. */
+     Breit (≥ 680 px; ab dort hat der Inhalt seine volle Breite) bleibt alles wie v0.6. */
   @media (max-width: 679.98px) {
     .af-fremd { column-gap: 8px; }
     .af-fremd-label { flex: 1 1 100%; }
@@ -457,7 +465,7 @@
     </div>
     <div class="sec">
       <h3>Rest und Reste-Stikken</h3>
-      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (ohne Samstag Sonntag, mit Samstag Samstag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann links in einem schmalen Band die Rechnung für diesen Tag: Benötigt − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = absetzen. Im leeren Feld steht grau „Rest“. Solange bei einer Sorte noch nichts eingetragen ist, ist ihre Rechnung blass. Das Ergebnis im weißen Kästchen kommt genau so in sein Kästchen auf dem Zettel, darunter ein kurzer Hinweis wie „+2 alte im Reste-Stikken“. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
+      <p>Stehen im Froster noch alte Bleche in einem Reste-Stikken, oben bei den Produkten den Schalter <strong>Rest</strong> einschalten (beim Öffnen immer aus). Rest gibt es nur für den ersten Tag des Zettels (ohne Samstag Sonntag, mit Samstag Samstag), denn der Reste-Stikken gehört zum ersten Tag. Unter jeder Sorte steht dann links in einem schmalen Band die Rechnung für diesen Tag: Benötigt − <strong>Rest</strong> (alte Bleche im Reste-Stikken) = absetzen. Im leeren Feld steht grau „Rest“. Solange bei einer Sorte noch nichts eingetragen ist, ist ihre Rechnung blass. Das Ergebnis im weißen Kästchen kommt genau so in sein Kästchen auf dem Zettel. Ist mehr Rest da als benötigt, steht 0 im Kästchen und darunter zum Beispiel „2 mehr als benötigt“.</p>
       <p>Die Frühschicht füllt den Reste-Stikken auf: Die neuen Bleche kommen in seine freien Fächer, danach geht er zurück in den Froster, und die Nachtschicht zieht ihn mit den anderen Stikken raus. Frische Stikken gehen vor: In den Reste-Stikken kommt höchstens der Inhalt des letzten angebrochenen frischen Stikkens, und nur wenn er ganz hineinpasst.</p>
       <p>Auf dem Blatt des ersten Tages steht der Reste-Stikken als erster, mit „Rest“ statt Buchstabe. Darin von oben: ALT (dunkel, gestrichelt) steht schon drin, das Fremde (schraffiert), NEU (hell) kommt dazu, dann die freien Fächer.</p>
       <p>Steht im Reste-Stikken noch etwas, das nicht gezählt wird (zum Beispiel Dinkelschoko-Zwerge), bei „Steht auch mit drin“ eintragen und wie viele Fächer es belegt. Das zählt erst, wenn mindestens ein altes Blech von uns drinsteht.</p>
@@ -926,13 +934,11 @@
       html += '<tr class="' + zebra() + '">' + '<td>' + escapeHtml(p.name) + '</td>' +
               tage.map(function (t) {
                 var wert = document.getElementById('af-' + p.kennung + '-' + t.kennung).value;
-                var hinweis = '';
-                if (restAn && p.stikke && t === erster) {   // Kästchen des ersten Tages = absetzen, darunter der Hinweis (R6)
+                if (restAn && p.stikke && t === erster) {   // Kästchen des ersten Tages = absetzen; darunter nichts (3c: R6 aufgehoben)
                   var pe = postenAus(plan, p.kennung, t.kennung);
                   wert = pe && (pe.will || pe.rest) ? String(pe.setztAb) : '';
-                  hinweis = BOS_STIKKEN.restHinweis(pe);
                 }
-                return kaestchen(wert, hinweis);
+                return kaestchen(wert);
               }).join('') + '</tr>';
     });
 
