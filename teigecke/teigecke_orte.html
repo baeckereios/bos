@@ -14,6 +14,7 @@
       archivHTML entfernt. Übersicht der Wagen mit ihren Zutaten, Wagen anlegen, Bereiche, Reihenfolge,
       Schilder, QR, Archiv unverändert. REGEL_FASSUNG/REGEL_DATEI unverändert.
       lager/_protokolle/SESSION_2026-11-12_LAGER_ZUHAUSE_BAU.md
+    2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31, Ulf 01:28: keine andere offene Lieferung auf dieser Datei, nur diese Zeile; RK §33). REGEL_FASSUNG und sonst alles unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
     2026-11-16 · 09:36 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44, Kern-Freigabe Ulf 08:42 nur für diese Zeile; RK §32). REGEL_FASSUNG und sonst alles unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
     2026-11-11 · 06:50 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules (Lager Stufe 2, #120; Freigabe KC 11.11. 06:43, Anweisung §3.5; RK §31). REGEL_FASSUNG und sonst alles unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
     2026-11-02 · 00:54 · v0.4 · Feature (Lager Stufe 1, #120; Kern-Freigabe Ulf 02.11. 00:39)
@@ -194,7 +195,7 @@ const HAKEN_FUER = {
   teigecke_orte: 'wagen'
 };
 const REGEL_FASSUNG = 'lager-2026-11-02';   /* seit 02.11.2026: Blatt nur noch Zuhause, Stamm lesen (RK §30) */
-const REGEL_DATEI = 'firestore_regeln_2026-11-16_lager_anfordern.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
 /* Das Adressfeld „QR-Adresse“ gibt es seit 03.10.2026 (14:47) nicht mehr. Ein alter
    Wert kann auf Geräten noch im Browser stehen: einmal entfernen. */
 try { localStorage.removeItem('bos_teigecke_qr_basis'); } catch (e) { /* Speicher gesperrt: dann steht dort auch nichts, was stört */ }

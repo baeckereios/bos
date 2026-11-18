@@ -12,6 +12,7 @@
   (lager_listen abgeschlossen, lager_korrekturen) und zeigt den Bestand. Schreibt davon NICHTS (Mindestmengen pflegt
   die Seite „Lager anfordern“, Ulf F1 b).
   CHANGELOG
+    2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). REGEL_FASSUNG und sonst alles unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
     2026-11-16 · 09:43 · v6 · Feature (Lager Stufe 3a, #169; Freigabe Kontroll-Chat 16.11. 08:44/08:49 mit A27)
       Bestand je Ort (LG.bestandAlle): Zahl rechts an der Artikelzeile, wo ein Lagerort feststeht (Ort-, Temperatur-
       Ordner, „Alle Artikel“ nach Ort): „?“ = noch nie gezählt, „< 0“ = rechnerisch unter 0, rot = unter Mindestmenge.
@@ -376,7 +377,7 @@ const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
 const COL_TEIGECKE = { blaetter: 'teigecke_zutaten', orte: 'teigecke_orte', teige: 'teigecke_teige', sicherungen: 'teigecke_sicherungen' };
 const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
-const REGEL_DATEI = 'firestore_regeln_2026-11-16_lager_anfordern.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SCHREIB_ZEITLIMIT_MS = 20000;
 const SPEICHER_SORTIERUNG = 'bos_lager_sortierung';
 const SPEICHER_ORDNER = 'bos_lager_ordner';          /* Ordneransicht: zuletzt gewählter Ordner je Gerät */

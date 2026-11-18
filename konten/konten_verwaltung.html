@@ -7,6 +7,17 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-11-18 · 02:24 · v-Mitbringer · Feature (Mitbringer, #183; Bauplan §6, Go KC 18.11. 01:31,
+      Kern-Freigabe Ulf 01:28)
+      Rein additiv, nach dem Muster „🔧 Reparaturanfrage“. Neue Gruppe „🧺 Mitbringer“ unter
+      „Lager anfordern“ mit zwei Haken: „Mitbringer drucken“ (mitbringerDrucken, Regel mbDrucken())
+      und „Mitbringer bearbeiten“ (mitbringerBearbeiten, Regel mbBearbeiten(), RK §33), Setzer
+      BOS_ACCOUNTS.setzeMitbringerDruckenRecht / setzeMitbringerBearbeitenRecht. Die Haken gibt es
+      nur bei Art „Person“ (bei Ort, System und ohne Art ein Hinweis; ein gesetzter Haken wird beim
+      Speichern dort auf aus gezogen — die Regel fragt den Haken, nicht die Art). Keine Kachel hängt
+      an den Haken, keine Rolle bekommt sie von selbst. Ein Hilfe-Abschnitt. Keine anderen Haken,
+      keine Rollen, keine Regel in dieser Datei.
+      mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
     2026-11-16 · 09:26 · v-Lager-3a · Feature (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44/08:49,
       Kern-Freigabe Ulf 08:42, F1 b, F2 a)
       Rein additiv, nach dem Muster „📦 Lager zählen“. Neue Gruppe „🧾 Lager anfordern“ unter
@@ -862,6 +873,10 @@ var helpData = {
       text: "Sie gehört zur Kachel „Lager anfordern“, dem Ersatz für den Zettel. Je Standort ein Haken: Angehakt heißt, dieses Konto darf dort auf die offene Liste schreiben, sie abschließen und drucken und im Archiv melden, was gefehlt hat. Die Datenbank prüft das bei jedem Eintrag. Darunter steht ein einzelner Haken „Lager bestellen“: Er gilt für alle Standorte und erlaubt, Bestellungen einzutragen und zurückzunehmen und die Mindestmengen zu pflegen. Die Kachel erscheint mit einem der beiden Haken beim nächsten Anmelden. Rolle admin darf alles, braucht für die Kachel aber auch einen Haken. Auf dem Ausdruck steht der Name aus dem Konto (bei einem Stationskonto der Ortsname)."
     },
     {
+      heading: "Was ist die Gruppe „🧺 Mitbringer“?",
+      text: "Sie gehört zur Kachel „Mitbringer“: Dort meldet man Gebrauchsmaterial (Bleche, Körbe, Rollcontainer), das die Fahrer mitbringen sollen. Melden darf jedes Personenkonto ohne Haken, ansehen jedes freigeschaltete Konto. Die Gruppe hat zwei Haken, nur bei Konten der Art „Person“. „Mitbringer drucken“: druckt nach dem Meldeschluss die Mitbringliste und hält den Druck fest. „Mitbringer bearbeiten“: ändert und streicht fremde Meldungen, nimmt Nachzügler auf die Liste und pflegt Materialliste und Meldeschluss. Die Datenbank prüft beide Haken bei jedem Schritt. Sie gelten für niemanden von selbst, auch nicht für die Rolle admin oder die Produktionsleitung: Wer drucken oder bearbeiten soll, bekommt den Haken hier."
+    },
+    {
       heading: "Warum das Admin-Passwort schon beim Öffnen?",
       text: "Die Kontenliste zeigt, wer welche Karte hat. Das geht niemanden außer dem Admin etwas an. Deshalb darf jedes Konto nur sein eigenes Dokument lesen, die ganze Liste nur die gesonderte Admin-Anmeldung. Sie bleibt bestehen, solange die Seite offen ist, wird nie auf dem Gerät gespeichert und endet beim Verlassen der Seite, mit 🔒 Sperren oder von selbst nach 5 Minuten ohne Eingabe (eine Minute vorher erscheint oben ein Hinweis)."
     },
@@ -1121,6 +1136,8 @@ function initBearbeitung() {
       lagerZaehlenStandorte: lagerListeVon(k),                  // NEU 11.11.2026, Lager Stufe 2 — Kopie, nie dieselbe Liste wie im Konto
       lagerAnfordernStandorte: lagerAnfListeVon(k),             // NEU 16.11.2026, Lager Stufe 3a — Kopie
       lagerBestellen: k.lagerBestellen === true,                // NEU 16.11.2026, Lager Stufe 3a
+      mitbringerDrucken: k.mitbringerDrucken === true,          // NEU 18.11.2026, Mitbringer (#183)
+      mitbringerBearbeiten: k.mitbringerBearbeiten === true,    // NEU 18.11.2026, Mitbringer (#183)
       farbschema: (typeof k.farbschema === 'string' && k.farbschema) ? k.farbschema : null, // NEU 15.10.2026, #72 Stufe B — null = „Nach Rolle“
       farbHinweis: null
     };
@@ -1331,7 +1348,8 @@ var KONTO_KARTEN_TABS = [
         reparaturHakenHTML(k, b) +
         nachrichtenHakenHTML(k, b) +  // NEU 27.10.2026, Nachrichtenzentrale 1b
         lagerZaehlenHTML(k, b) +      // NEU 11.11.2026, Lager Stufe 2
-        lagerAnfordernHTML(k, b)      // NEU 16.11.2026, Lager Stufe 3a
+        lagerAnfordernHTML(k, b) +    // NEU 16.11.2026, Lager Stufe 3a
+        mitbringerHakenHTML(k, b)     // NEU 18.11.2026, Mitbringer (#183)
       );
     }
   },
@@ -1738,6 +1756,39 @@ function toggleKontoLagerAnfordern(standortId, checked) {
 function toggleKontoLagerBestellen(checked) {
   if (!kontoKarteId) return;
   bearbeitung[kontoKarteId].lagerBestellen = !!checked;
+  markiereGeaendert();
+}
+
+// NEU 18.11.2026, Mitbringer (#183; Bauplan §6, Kern-Freigabe Ulf 18.11. 01:28) — eigene Gruppe
+// unter „Lager anfordern“, Mechanik wie „Reparaturanfrage“: Haken in bearbeitung[], gespeichert
+// in derselben Sammelaktion. Das Schloss ist die Regel (mbDrucken()/mbBearbeiten(), RK §33):
+// NUR diese Haken zählen, keine Rolle, auch admin nicht (Ulf 18.11.). Keine Kachel hängt daran —
+// die Kachel „Mitbringer“ ist für alle da. Nur für Personen-Konten: Die Regel fragt den Haken,
+// nicht die Art; deshalb werden die Haken bei Ort/System/ohne Art gar nicht angeboten und ein
+// dort gesetzter Haken beim Speichern auf aus gezogen (wie bei den Nachrichten-Haken).
+var MITBRINGER_HAKEN = [
+  { feld: 'mitbringerDrucken', setzer: 'setzeMitbringerDruckenRecht', text: 'Mitbringer drucken — druckt die Mitbringliste nach dem Meldeschluss und hält den Druck fest' },
+  { feld: 'mitbringerBearbeiten', setzer: 'setzeMitbringerBearbeitenRecht', text: 'Mitbringer bearbeiten — ändert und streicht fremde Meldungen, nimmt Nachzügler auf die Liste, pflegt Material und Meldeschluss' }
+];
+function mitbringerHakenHTML(k, b) {
+  var art = k ? (k.art || '') : '';
+  var kopf = '<div class="detail-section full"><div><div class="haken-gruppe-titel">🧺 Mitbringer</div>';
+  if (art !== 'person') {
+    var grund = art === 'ort' ? 'Ort-Konto: Die Mitbringer-Haken gibt es nur für Personen. Ansehen kann jedes freigeschaltete Konto, melden nur ein Personenkonto.'
+      : art === 'system' ? 'Systemkonto: keine Mitbringer-Haken.'
+      : 'Dieses Konto hat noch keine Art — erst oben die Art setzen (Person), dann erscheinen die Haken.';
+    return kopf + '<div class="haken-gruppe-hinweis">' + esc(grund) + '</div></div></div>';
+  }
+  return kopf + MITBRINGER_HAKEN.map(function (h) {
+    return '<label class="checkbox-feld"><input type="checkbox" ' + (b[h.feld] ? 'checked' : '') +
+      ' onchange="toggleKontoMitbringer(\'' + h.feld + '\', this.checked)">' +
+      '<span class="cb-label">' + esc(h.text) + '</span></label>';
+  }).join('') + '<div class="haken-gruppe-hinweis">Melden darf jedes Personenkonto ohne Haken. Diese beiden Haken gelten für niemanden von selbst, auch nicht für die Rolle admin.</div></div></div>';
+}
+function toggleKontoMitbringer(feld, checked) {
+  var erlaubt = MITBRINGER_HAKEN.some(function (h) { return h.feld === feld; });
+  if (!kontoKarteId || !erlaubt) return;
+  bearbeitung[kontoKarteId][feld] = !!checked;
   markiereGeaendert();
 }
 
@@ -2966,6 +3017,14 @@ function tatsaechlichSpeichern() {
     if (!!b.lagerBestellen !== (k.lagerBestellen === true)) {
       aufgaben.push(window.BOS_ACCOUNTS.setzeLagerBestellenRecht(window.db, k.id, b.lagerBestellen));
     }
+    // NEU 18.11.2026, Mitbringer (#183): zwei Haken, selbe Sammelaktion. Art-Sperre wie bei den
+    // Nachrichten-Haken: nur bei Art „Person“ wird ein Haken als gesetzt geschrieben.
+    MITBRINGER_HAKEN.forEach(function (h) {
+      var will = b[h.feld] === true && k.art === 'person';
+      if (will !== (k[h.feld] === true)) {
+        aufgaben.push(window.BOS_ACCOUNTS[h.setzer](window.db, k.id, will));
+      }
+    });
     // NEU 15.10.2026, Farbprofile Stufe B: selbe Sammelaktion. Gegen die NEUE
     // Rolle normalisiert (gleich wie Rolle = Feld löschen); unbekannte, nicht
     // angefasste ID bleibt stehen.

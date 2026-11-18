@@ -99,6 +99,7 @@
      BOS_PRODUKTE.richtwertWerte(p), .richtwertPruefen(eingaben, p), .rundeRichtwert(x, p)
 
    CHANGELOG
+     2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
      2026-11-16 · 09:36 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44; RK §32). Sonst unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
      2026-11-11 · 06:50 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules (Lager Stufe 2, #120; Freigabe KC 11.11. 06:43; RK §31). Sonst unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
      2026-11-02 · 01:05 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-02_lager.rules (Lager Stufe 1, #120; Kern-Freigabe Ulf 02.11. 00:39; RK §30). Sonst unverändert. lager/_protokolle/SESSION_2026-11-01_LAGER_STUFE1_BAU.md
@@ -158,7 +159,7 @@
   /* Zeitnetz (KC 05.10., 08:18): sieben Tage, 0 = aus. */
   var ZEITNETZ_MS = 7 * 24 * 60 * 60 * 1000;
   var REGEL_FASSUNG = 'produkte-2026-10-05';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-16_lager_anfordern.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';
   var MELDUNG_ID = 'bosProdukteMeldung';
 
   /* Texte an einer Stelle. */

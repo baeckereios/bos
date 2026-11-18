@@ -88,6 +88,12 @@
    vor der Kontenumstellung und gelten so nicht mehr.
 
    CHANGELOG
+     2026-11-18 · 02:24 · v-Mitbringer · Feature (Mitbringer, #183; Go KC 18.11. 01:31,
+       Kern-Freigabe Ulf 01:28): neue Felder mitbringerDrucken, mitbringerBearbeiten; Setzer
+       setzeMitbringerDruckenRecht(db, schluessel, wert) und
+       setzeMitbringerBearbeitenRecht(db, schluessel, wert), je eine Zeile wie
+       setzeLagerBestellenRecht. Das Schloss ist die Regel (mbDrucken()/mbBearbeiten(), RK §33),
+       keine Rolle. Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
      2026-11-16 · 09:27 · v-Lager-3a · Feature (Lager Stufe 3a, #169; Freigabe KC 16.11.
        08:44/08:49, Kern-Freigabe Ulf 08:42, F1 b / F2 a): neue Felder lagerAnfordern,
        lagerAnfordernStandorte, lagerBestellen; Setzer setzeLagerAnfordernRecht(db,
@@ -505,6 +511,14 @@ window.BOS_ACCOUNTS = (function () {
   async function setzeLagerBestellenRecht(db, schluessel, wert) {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ lagerBestellen: !!wert });
   }
+  /** NEU (18.11.2026, Mitbringer, #183). Haken „Mitbringer drucken“ (Ausdruck-Stand setzen, Regel mbDrucken(), RK §33). */
+  async function setzeMitbringerDruckenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ mitbringerDrucken: !!wert });
+  }
+  /** NEU (18.11.2026, Mitbringer, #183). Haken „Mitbringer bearbeiten“ (fremde Meldungen, Nachzügler, Material, Frist; Regel mbBearbeiten(), RK §33). */
+  async function setzeMitbringerBearbeitenRecht(db, schluessel, wert) {
+    return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ mitbringerBearbeiten: !!wert });
+  }
 
   /**
    * NEU (15.10.2026, Farbprofile Stufe B). Admin-Funktion wie die Haken-Setzer.
@@ -637,6 +651,8 @@ window.BOS_ACCOUNTS = (function () {
     setzeLagerZaehlenRecht: setzeLagerZaehlenRecht,                           // NEU 11.11.2026, Lager Stufe 2
     setzeLagerAnfordernRecht: setzeLagerAnfordernRecht,                       // NEU 16.11.2026, Lager Stufe 3a
     setzeLagerBestellenRecht: setzeLagerBestellenRecht,                       // NEU 16.11.2026, Lager Stufe 3a
+    setzeMitbringerDruckenRecht: setzeMitbringerDruckenRecht,                 // NEU 18.11.2026, Mitbringer (#183)
+    setzeMitbringerBearbeitenRecht: setzeMitbringerBearbeitenRecht,           // NEU 18.11.2026, Mitbringer (#183)
     setzeFarbschema: setzeFarbschema,
     loescheKonto: loescheKonto,
     ladeAlleKonten: ladeAlleKonten,

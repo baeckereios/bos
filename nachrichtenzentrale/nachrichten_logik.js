@@ -54,6 +54,7 @@
      Kette: ein get je fehlendem Glied (ersetzt), höchstens GRENZEN.KETTE.
 
    CHANGELOG
+     2026-11-18 · 02:24 · v1.2d · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
      2026-11-16 · 09:36 · v1.2c · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44; RK §32). Sonst unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
      2026-11-11 · 06:50 · v1.2b · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules
        (Lager Stufe 2, #120; RK §31). Sonst unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
@@ -84,7 +85,7 @@
 
   /* Regelstand (RK §13). REGEL_DATEI = neueste Datei, die REGEL_FASSUNG erfüllt (Pflege bei jeder neuen Regel). */
   var REGEL_FASSUNG = 'nachrichten-offen-2026-10-27';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-16_lager_anfordern.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';
   /* Die Fassungen, die RK §29 erfüllen: 1d (offen: Kästchen, Nachtrag, Sammelpfad) vorn, dahinter die drei von 1b
      (Hauptform, flache Listen, Rückfall B — Bau-Doku 1b §6 Nr. 13). Mit einer alten Fassung schreibt die Seite wie 1c
      (kein Kästchen, kein Feld antwortenOffen — F34). */

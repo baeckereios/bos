@@ -2,6 +2,9 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-18 · 02:24 · Mitbringer, #183 (Go KC 18.11. 01:31): neuer Eintrag mitbringer
+       (Kachel „Mitbringer“, Bereich Produktion, OHNE roles und OHNE haken — für alle
+       Konten da, kein direkt). Sonst unverändert.
      2026-11-16 · 09:27 · Lager Stufe 3a, #169 (Freigabe KC 16.11. 08:44/08:49): neuer
        Eintrag lager_anfordern (Kachel „Lager anfordern“, Bereich Produktion, nur über
        die Haken lagerAnfordern ODER lagerBestellen, kein roles, kein direkt). Sonst unverändert.
@@ -627,6 +630,24 @@ window.BOS_APPS = [
     url: 'lager/lager_anfordern.html',
     status: 'live',
     haken: ['lagerAnfordern', 'lagerBestellen']
+  },
+  {
+    id: 'mitbringer',
+    // NEU 18.11.2026 (Mitbringer, #183; Go KC 18.11. 01:31): Gebrauchsmaterial melden, das die
+    // Fahrer mitbringen (Bleche, Körbe, Rollcontainer) — Meldeschluss am Liefertag, Nachzügler,
+    // Mitbringliste zum Aushängen. Bewusst KEIN roles-Feld und keine Zeile in
+    // bos_permissions.js (wie Nachrichten): ansehen darf jedes freigeschaltete Konto, melden
+    // jedes Personenkonto — das prüft die Datenbank-Regel, nicht die Kachel (RK §33). Bewusst
+    // KEIN haken-Feld: sonst wäre die Kachel nur mit Haken sichtbar (bos_access.js); die Haken
+    // mitbringerDrucken / mitbringerBearbeiten schalten nur Knöpfe auf der Seite frei und sind
+    // das Schloss in der Regel. Nicht angeheftet: kommt über den BackStore.
+    // Siehe mitbringer/MITBRINGER_DOKU.md.
+    bereich: 'produktion',
+    name: 'Mitbringer',
+    icon: '🧺',
+    color: '#8b5a2b',
+    url: 'mitbringer/mitbringer.html',
+    status: 'live'
   },
   {
     id: 'konten_verwaltung',

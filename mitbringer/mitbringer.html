@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<!--
+  MODUL: mitbringer/mitbringer.html — Mitbringer (Gebrauchsmaterial melden, das die Fahrer mitbringen)
+  Doku:  mitbringer/MITBRINGER_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
+  Logik: mitbringer/mitbringer_logik.js (BOS_MITBRINGER — DIE Schnittstelle: Tag, Frist, Nachzügler,
+         beobachteTag, lesen, schreiben, Druckansicht). Diese Seite rechnet nichts selbst.
+  Druck: mitbringer/mitbringer_druck.js meldet den Zettel „mitbringer“ bei BOS_DRUCK an; die Seite druckt
+         über denselben Zettel (BOS_DRUCK.zettel.drucke(['mitbringer'])) und baut nichts Zweites.
+  Regel: RK §33 (firestore_regeln_2026-11-18_mitbringer.rules) — mitbringer_meldungen (eine Meldung = ein
+         Dokument), mitbringer_tage (Ausdruck-Stand), mitbringer_material, mitbringer_einstellungen,
+         mitbringer_sicherungen.
+  Rechte: lesen jedes freigeschaltete Konto · melden nur Personenkonten · drucken Haken „Mitbringer
+          drucken“ · fremde Meldungen ändern/streichen, Nachzügler aufnehmen, Material und Frist pflegen
+          Haken „Mitbringer bearbeiten“. KEINE Rolle zählt, auch admin nicht (Ulf 18.11.2026).
+          Kachel: Registry-Eintrag ohne roles und ohne haken (für alle da, das Schloss ist die Regel).
+  Ohne Netz: ansehen ja, melden und ändern nein (Knöpfe grau mit Grund). Eine nachgereichte Meldung
+          würde sonst still zum Nachzügler — es zählt die Serverzeit.
+  In Planung (sichtbar auf der Seite): Rückmeldung „eingepackt / fehlt“, Monitor im Lager (#179/#181).
+  Keine Daten in dieser Datei: keine Personen, keine Betriebsangaben.
+  CHANGELOG
+    2026-11-18 · 02:24 · v1 · Erstfassung (#183; Bauplan 01:22, Go Kontroll-Chat 01:31; Ulf 01:28:
+      „Sonstiges“ mit Pflicht-Freitext, lesen für alle Konten, nur Haken, leerer Zettel druckbar,
+      nach dem Druck streichen statt löschen)
+      mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Mitbringer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- MUSS vor bos_design_tokens.css stehen (Theme + Farbprofil des Kontos) -->
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<style>
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --raised: var(--bos-surface-raised, #2b2218);
+    --amber: var(--bos-amber, #c07a10);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --red: var(--bos-red, #d6584a);
+    --green: var(--bos-green, #4caf7d);
+    --warn: var(--bos-warn, #c07a10);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --font: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--bos-font-body, 'Barlow', sans-serif); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
+  header { background: var(--surface); padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 20; gap: 10px; }
+  header h1 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; }
+  header .meta { font-size: .72rem; color: var(--dim); text-align: right; overflow-wrap: anywhere; }
+  .help-btn { background: transparent; border: 1px solid var(--border); color: var(--amber); padding: 6px 11px; border-radius: 8px; font-size: 1rem; cursor: pointer; min-height: 40px; }
+  .btn { font-family: var(--font); font-size: .82rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-primary { background: var(--amber); color: #16120e; }
+  .btn-gefahr { background: transparent; border: 1px solid var(--red); color: var(--red); }
+  .btn-gross { width: 100%; min-height: 56px; font-size: .95rem; }
+  .btn-klein { min-height: 40px; padding: 6px 10px; }
+  .hinweis { margin: 10px 14px 0; padding: 10px 12px; border-radius: 8px; font-size: .86rem; line-height: 1.45; border: 1px solid var(--border); }
+  .hinweis.rot { border-color: var(--red); }
+  .hinweis.warn { border-color: var(--warn); color: var(--warn); }
+  .hinweis.gut { border-color: var(--green); }
+  #fehlerLeiste { margin: 10px 14px 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--red); font-size: .84rem; line-height: 1.45; overflow-wrap: anywhere; }
+  #fehlerLeiste ul { margin: 6px 0 0 18px; }
+  #fehlerLeiste .kopf { display: flex; justify-content: space-between; font-weight: 700; color: var(--red); gap: 8px; }
+  .hidden { display: none !important; }
+  .tagwahl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px 4px; }
+  .tagwahl button { min-height: 62px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--dim); cursor: pointer; padding: 6px 10px; text-align: left; }
+  .tagwahl button.aktiv { border-color: var(--amber); color: var(--text); background: var(--raised); }
+  .tagwahl .wort { display: block; font-family: var(--font); font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; }
+  .tagwahl .datum { display: block; font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; }
+  .tagwahl .zahl { display: block; font-size: .76rem; }
+  .statuszeile { padding: 6px 14px 0; font-size: .86rem; line-height: 1.5; color: var(--dim); }
+  .statuszeile b { color: var(--text); }
+  .reiter { display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; }
+  .reiter button { flex: 0 0 auto; background: transparent; border: 1px solid var(--border); color: var(--dim); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-family: var(--font); font-weight: 700; font-size: .85rem; cursor: pointer; }
+  .reiter button.aktiv { background: var(--raised); color: var(--text); border-color: var(--amber); }
+  .bereich { padding: 4px 14px 14px; }
+  .unterzeile { color: var(--dim); font-size: .8rem; overflow-wrap: anywhere; }
+  .bereich-titel { font-family: var(--font); font-weight: 700; font-size: .92rem; color: var(--amber); margin: 16px 0 4px; text-transform: uppercase; letter-spacing: .04em; display: flex; justify-content: space-between; gap: 8px; }
+  .zeile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
+  .zeile .menge { font-family: var(--font); font-weight: 700; font-size: 1.05rem; white-space: nowrap; min-width: 4.2em; }
+  .zeile .text { flex: 1; min-width: 0; }
+  .zeile .name { font-weight: 700; overflow-wrap: anywhere; }
+  .zeile .knoepfe { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .zeile.gestrichen .menge, .zeile.gestrichen .name, .zeile.gestrichen .notiz { text-decoration: line-through; color: var(--dim); }
+  .zeile.nachzuegler { border-style: dashed; }
+  .zeile button.icon { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 8px; min-width: 44px; min-height: 44px; font-size: 1rem; cursor: pointer; }
+  .marke { display: inline-block; font-family: var(--font); font-weight: 700; font-size: .72rem; letter-spacing: .03em; text-transform: uppercase; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; margin: 3px 4px 0 0; color: var(--dim); }
+  .marke.warn { border-color: var(--warn); color: var(--warn); }
+  .marke.gut { border-color: var(--green); color: var(--green); }
+  .nichts { color: var(--dim); font-size: .88rem; font-style: italic; padding: 4px 2px 8px; }
+  .leer { text-align: center; padding: 30px 20px; color: var(--dim); font-size: .95rem; line-height: 1.5; }
+  .grund { color: var(--dim); font-size: .82rem; margin-top: 6px; text-align: center; }
+  .aktionen { display: grid; gap: 10px; margin-top: 12px; }
+  .planung { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .planung .btn { opacity: .5; cursor: not-allowed; text-align: left; }
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 50; display: flex; align-items: flex-end; }
+  .sheet { background: var(--surface); width: 100%; max-height: 92vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 14px 18px 24px; border-top: 1px solid var(--border); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 14px; }
+  .sheet h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.15rem; margin: 0 0 10px; overflow-wrap: anywhere; }
+  .sheet .sec { margin-bottom: 16px; }
+  .sheet .sec h3 { font-size: .9rem; color: var(--amber); margin: 0 0 4px; }
+  .sheet .sec p { font-size: .88rem; line-height: 1.5; }
+  .feld-zeile { margin: 12px 0; }
+  .feld-zeile > label, .feld-zeile > .label { display: block; font-size: .85rem; color: var(--dim); margin-bottom: 4px; }
+  .feld-zeile select, .feld-zeile input[type="text"], .feld-zeile input[type="number"], .feld-zeile input[type="time"] { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; min-height: 46px; }
+  .pillen { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pillen button { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 9px 14px; min-height: 44px; font-size: .95rem; cursor: pointer; }
+  .pillen button.aktiv { border-color: var(--amber); background: var(--raised); font-weight: 700; }
+  .mengen { display: flex; align-items: center; gap: 8px; }
+  .mengen input { flex: 1; min-width: 0; text-align: center; font-size: 1.4rem; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .mengen button { min-width: 56px; min-height: 56px; font-size: 1.4rem; border-radius: 10px; border: 1px solid var(--border); background: var(--raised); color: var(--text); cursor: pointer; }
+  .meldung { color: var(--red); font-size: .88rem; margin: 6px 0; min-height: 1em; overflow-wrap: anywhere; }
+  .sheet-knoepfe { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .sheet-knoepfe .btn { flex: 1 1 140px; }
+  .haken-zeile { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: .95rem; }
+  .haken-zeile input { width: 22px; height: 22px; }
+  .mat-zeile.aus { opacity: .55; }
+  .einst { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .einst h3 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.05rem; margin: 10px 0 2px; }
+  .einst-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #helpSheet { z-index: 70; }
+  #toast { position: fixed; bottom: 18px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; background: var(--raised); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: .9rem; z-index: 90; text-align: center; pointer-events: none; }
+  @media (max-width: 420px) { .zeile { flex-wrap: wrap; } .zeile .knoepfe { width: 100%; } .einst-raster { grid-template-columns: 1fr; } }
+  @media (min-width: 760px) { .bereich, .tagwahl, .statuszeile, .reiter { max-width: 760px; margin-left: auto; margin-right: auto; } .sheet { max-width: 620px; margin: 0 auto; } }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'mitbringer';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <h1 data-i18n="titel">Mitbringer</h1>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div class="meta"><div id="kontoZeile">—</div></div>
+    <button id="helpOpenBtn" class="help-btn" title="Hilfe" aria-label="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="regelLeiste" class="hinweis rot hidden" role="alert"></div>
+<div id="netzLeiste" class="hinweis warn hidden" role="status"></div>
+<div id="fehlerLeiste" class="hidden" role="alert">
+  <div class="kopf"><span data-i18n="fehler_titel">⚠︎ Fehler</span><button type="button" class="btn btn-outline" id="fehlerZuBtn" style="min-height:32px;padding:4px 10px" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+<div id="meldungLeiste" class="hinweis hidden" role="status"></div>
+<div id="kontoHinweis" class="hinweis hidden" role="status"></div>
+
+<section id="haupt" class="hidden">
+  <div class="tagwahl" id="tagwahl" role="tablist" aria-label="Liefertag"></div>
+  <div class="statuszeile" id="statuszeile"></div>
+  <nav class="reiter hidden" id="reiter" aria-label="Bereiche"></nav>
+  <div id="inhalt" class="bereich"></div>
+</section>
+<main id="lade" class="leer" data-i18n="lade">Lade Daten …</main>
+
+<div id="sheet" class="sheet-overlay hidden"><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-handle"></div><div id="sheetInhalt"></div></div></div>
+
+<div id="helpSheet" class="sheet-overlay hidden">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-handle"></div>
+    <h2 id="helpTitle"></h2>
+    <div id="helpContent"></div>
+    <button type="button" class="btn btn-outline" id="helpCloseBtn" data-i18n="schliessen">Schließen</button>
+  </div>
+</div>
+<div id="toast" class="hidden" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="mitbringer_logik.js"></script>
+<script src="../bos_druck.js"></script>
+<script src="mitbringer_druck.js"></script>
+<script src="../bos_ungespeichert.js"></script>
+
+<script>
+'use strict';
+/* ==================================================================
+   Mitbringer — Seitenlogik. Rechnen, Lesen, Schreiben, Druckansicht: mitbringer_logik.js.
+   Hier: Laden, Rechte anzeigen, Tag wählen, Melden, Ändern, Löschen/Streichen, Nachzügler
+   aufnehmen, Material und Frist pflegen, Drucken anstoßen, Fehler sichtbar.
+   ================================================================== */
+const L = window.BOS_MITBRINGER;
+const SPEICHER_BEREICH = 'bos_mitbringer_bereich';
+
+/* ---------- i18n (Checkliste §6): vollständig über das Wörterbuch, Platzhalter statt Satzbau ---------- */
+const I18N_DE = {
+  titel: 'Mitbringer', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  kein_konto: 'Keine Anmeldung erkannt.',
+  heute: 'Heute', morgen: 'Morgen', tag_zahl_0: 'noch nichts gemeldet', tag_zahl_1: '1 Meldung', tag_zahl_n: '{n} Meldungen',
+  frist_offen: 'Meldeschluss für {tag}: <b>{uhr} Uhr</b>.', frist_vorbei: 'Meldeschluss für {tag} war <b>{uhr} Uhr</b>. Neue Meldungen sind Nachzügler: Sie stehen hier, aber nicht auf dem schon gedruckten Zettel.',
+  frist_vorgabe: 'Die Frist steht noch auf dem Startwert {uhr} Uhr (Reiter „Material“ → Einstellungen).',
+  gedruckt: 'Gedruckt: <b>{wann}</b> von {name}.', gedruckt_n: 'Gedruckt: <b>{wann}</b> von {name} ({n}. Druck, zuerst {erst}).', nicht_gedruckt: 'Noch nicht gedruckt.',
+  nach_druck: '{n} davon nach dem letzten Druck dazugekommen — für den Zettel nachdrucken.',
+  reiter_liste: 'Liste', reiter_material: 'Material',
+  melden: '＋ Melden', drucken: 'Mitbringliste drucken', nachdrucken: 'Mitbringliste nachdrucken',
+  nichts: 'noch nichts gemeldet', zahl: '{n} auf dem Zettel',
+  von: 'von {name} · {wann}', geaendert: 'geändert von {name}, {wann}',
+  marke_nachzuegler: 'Nachzügler · nicht auf dem Zettel', marke_aufgenommen: 'nachgetragen {wann} ({name})', marke_gestrichen: 'gestrichen von {name}, {wann}',
+  marke_neu: 'noch auf keinem Ausdruck', marke_wartet: 'wird gesendet …',
+  aufnehmen: 'Auf die Liste', aendern_titel: 'Meldung ändern', melden_titel: 'Was wird gebraucht?',
+  fuer_tag: 'Für welchen Tag?', fuer_nachzuegler: 'Die Frist für {tag} ist vorbei ({uhr} Uhr). Das wird ein Nachzügler: Er steht hier auf dem Bildschirm, aber nicht auf dem schon gedruckten Zettel.',
+  bereich: 'Bereich', material: 'Material', material_waehlen: '— bitte wählen —', einheit: 'Einheit', menge: 'Menge',
+  freitext: 'Hinweis (freiwillig)', freitext_pflicht: 'Was genau wird gebraucht? (Pflicht bei „Sonstiges“)', freitext_platz: 'z. B. wofür, wohin',
+  absenden: 'Melden', speichern: 'Speichern', abbrechen: 'Abbrechen', loeschen: 'Löschen', loeschen_sicher: 'Wirklich löschen? Nochmal tippen', streichen: 'Durchstreichen', streichen_sicher: 'Wirklich durchstreichen? Nochmal tippen',
+  streichen_hinweis: 'Diese Meldung steht schon auf einem Zettel. Sie wird nicht gelöscht, sondern durchgestrichen — mit deinem Namen und der Uhrzeit, damit Zettel und Bildschirm erklärbar bleiben.',
+  gemeldet: 'Gemeldet für {tag}.', als_nachzuegler: 'Als Nachzügler angekommen ({uhr} Uhr, Meldeschluss war {frist} Uhr). Die Meldung steht hier, aber nicht auf dem schon gedruckten Zettel. Wer „Mitbringer bearbeiten“ darf, kann sie auf die Liste nehmen.',
+  gespeichert: 'Gespeichert.', geloescht: 'Gelöscht.', gestrichen: 'Durchgestrichen.', aufgenommen: 'Auf die Liste genommen. Für den Zettel nachdrucken.',
+  druck_los: 'Druck gestartet: {datei} ({n} auf dem Zettel). Der Druck ist festgehalten.',
+  ein_bereich: 'Bitte einen Bereich wählen.', ein_material: 'Bitte ein Material wählen.', ein_material_aus: 'Dieses Material ist abgeschaltet. Bitte ein anderes wählen.', ein_einheit: 'Bitte eine Einheit wählen.',
+  ein_menge: 'Bitte eine ganze Zahl von {min} bis {max} eingeben.', ein_freitext_lang: 'Der Hinweis ist zu lang (höchstens {max} Zeichen).', ein_freitext_pflicht: 'Bei „Sonstiges“ bitte dazuschreiben, was gebraucht wird.', ein_tag: 'Bitte heute oder morgen wählen.',
+  grund_netz: 'Ohne Verbindung wird nichts gemeldet oder geändert.', grund_regel: 'Die Regel passt nicht zu dieser Seite.', grund_laedt: 'Einen Moment, die Daten laden noch.',
+  grund_person: 'Melden geht nur mit einem eigenen Konto (Art „Person“). Das stellt die Kontenverwaltung ein.', grund_station: 'Dieses Gerät läuft mit einem Stationskonto: ansehen ja, melden nur mit dem eigenen Konto.',
+  grund_material: 'Es gibt noch kein Material. Wer „Mitbringer bearbeiten“ darf, legt im Reiter „Material“ die Startliste an.',
+  grund_druck_tag: 'Gedruckt wird am Liefertag ab {uhr} Uhr.', grund_druck_frist: 'Druck ab {uhr} Uhr.', grund_druck_modul: 'Das Druckmodul ist nicht bereit: {grund}',
+  netz_weg: '⚠︎ Keine Verbindung. Ansehen geht, melden und ändern nicht.',
+  station_hinweis: 'Stationskonto: Die Liste ist zum Ansehen da. Melden geht nur mit dem eigenen Konto.',
+  planung_titel: 'In Planung', planung_rueck: '🚧 Rückmeldung „eingepackt / fehlt“ — in Planung', planung_monitor: '🚧 Monitor im Lager (Anzeige für die Fahrer) — in Planung',
+  mat_hinweis: 'Nur Gebrauchsmaterial, das wiederkommt (Bleche, Körbe, Rollcontainer). Verbrauchsmaterial und Rohstoffe laufen über das Lager.',
+  mat_leer: 'Noch kein Material angelegt.', mat_start: 'Startliste anlegen', mat_start_ok: 'Angelegt: {liste}.', mat_start_nichts: 'Die Startliste ist schon vollständig da.',
+  mat_neu: '＋ Material', mat_neu_titel: 'Neues Material', mat_aendern_titel: 'Material ändern', mat_name: 'Name', mat_einheiten: 'Einheiten (mit Komma getrennt)', mat_einheiten_platz: 'Stück, Stapel',
+  mat_reihenfolge: 'Reihenfolge (kleine Zahl = weiter oben)', mat_aktiv: 'aktiv (zum Melden wählbar)', mat_aus: 'abgeschaltet', mat_fest: 'fest · nicht abschaltbar · Freitext ist Pflicht',
+  mat_id: 'Kennung: {id}', mat_doppelt: 'Ein Material mit der Kennung „{id}“ gibt es schon. Bitte einen anderen Namen wählen oder das vorhandene ändern.',
+  ein_mat_id: 'Aus diesem Namen lässt sich keine Kennung bilden (mindestens zwei Buchstaben oder Ziffern).', ein_mat_name: 'Bitte einen Namen mit 1 bis {max} Zeichen eingeben.',
+  ein_mat_einheiten: 'Bitte 1 bis {max} Einheiten eingeben, mit Komma getrennt.', ein_mat_einheit_lang: 'Eine Einheit ist zu lang (höchstens {max} Zeichen).', ein_mat_reihenfolge: 'Reihenfolge: bitte eine ganze Zahl von 0 bis {max}.', ein_mat_fest_aus: '„Sonstiges“ lässt sich nicht abschalten.',
+  einst_titel: 'Einstellungen', einst_frist: 'Meldeschluss (Uhrzeit am Liefertag)', einst_leer: 'Leerzeilen je Bereich auf dem Zettel', einst_speichern: 'Einstellungen speichern',
+  einst_vorgabe: 'Noch nie gespeichert — es gelten die Startwerte.', einst_wirkt: 'Eine neue Frist gilt für alle Tage, die noch nicht gedruckt sind.',
+  ein_frist: 'Bitte eine Uhrzeit eingeben. Zwischen 02:00 und 02:59 geht nicht (Zeitumstellung).', ein_leer: 'Leerzeilen: bitte eine ganze Zahl von 0 bis {max}.',
+  regel_alt: '⚠︎ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Melden und Ändern werden abgelehnt. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
+  regel_unbekannt: 'Regelstand „{fassung}“ ließ sich nicht prüfen (wohl kein Netz). [{grund}]',
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: Dir fehlt der Haken, die Meldung steht inzwischen auf einem Zettel, oder die Regeln sind älter als diese Seite.',
+  err_netz: 'Keine Verbindung zum Server (WLAN?).',
+  err_laden: 'Laden „{was}“', err_melden: 'Melden', err_aendern: 'Ändern', err_loeschen: 'Löschen', err_streichen: 'Durchstreichen', err_aufnehmen: 'Auf die Liste nehmen', err_drucken: 'Drucken',
+  err_material: 'Material speichern', err_einstellung: 'Einstellungen speichern', err_start: 'Startliste anlegen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen'
+};
+function t(k, w) {
+  let s = I18N_DE[k]; if (s === undefined) s = k;
+  Object.keys(w || {}).forEach(function (x) { s = s.split('{' + x + '}').join(String(w[x])); });
+  return s;
+}
+function wendeI18nAn() { document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); }); }
+const esc = L ? L.esc : function (s) { return String(s); };
+/* Für Texte mit <b> im Wörterbuch: die Werte werden maskiert, das Gerüst nicht. */
+function tHtml(k, w) { const m = {}; Object.keys(w || {}).forEach(function (x) { m[x] = esc(w[x]); }); return t(k, m); }
+
+/* ---------- Zustand ---------- */
+const S = {
+  kennung: null, konto: null, recht: { lesen: false, melden: false, drucken: false, bearbeiten: false },
+  geladen: false, regelstand: 'unbekannt', regelGrund: '', netz: navigator.onLine !== false,
+  tage: { heute: null, morgen: null }, roh: { heute: null, morgen: null }, wahl: null,   /* wahl: null = Vorschlag */
+  einst: L ? L.einstellungenVon(null) : null, material: null,
+  reiter: 'liste', sheet: null, schreibt: false, sicher: null
+};
+function jetzt() { return Date.now(); }
+function ctx() { return { kennung: S.kennung, name: (S.konto && S.konto.name) || '' }; }
+
+/* ---------- Fehler sichtbar (Checkliste §7a) ---------- */
+function erklaerung(err) {
+  const c = (err && err.code) || '';
+  if (c === 'permission-denied') return t('err_perm');
+  if (c === 'unavailable') return t('err_netz');
+  return '';
+}
+function rohText(err) { return (err && err.code ? err.code + ' — ' : '') + ((err && err.message) || String(err)); }
+function fehlerText(kontext, err) { return kontext + ': ' + [erklaerung(err), rohText(err)].filter(Boolean).join(' · '); }
+function zeigeFehler(kontext, err) {
+  console.error('[Mitbringer] ' + kontext, err);
+  const li = document.createElement('li');
+  li.textContent = fehlerText(kontext, err);
+  const liste = document.getElementById('fehlerListe');
+  liste.insertBefore(li, liste.firstChild);
+  while (liste.children.length > 6) liste.removeChild(liste.lastChild);
+  document.getElementById('fehlerLeiste').classList.remove('hidden');
+}
+window.addEventListener('error', function (e) { zeigeFehler(t('err_unbehandelt'), { message: (e.message || 'unbekannt') + ' (' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?') + ')' }); });
+window.addEventListener('unhandledrejection', function (e) { zeigeFehler(t('err_unbehandelt'), e.reason || { message: 'unbekannt' }); });
+let toastTimer = null;
+function toast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text; el.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.add('hidden'); }, 3500);
+}
+function meldung(text, art) {
+  const el = document.getElementById('meldungLeiste');
+  if (!text) { el.classList.add('hidden'); el.textContent = ''; return; }
+  el.className = 'hinweis ' + (art || ''); el.textContent = text;
+}
+function zeigeNetz() {
+  const el = document.getElementById('netzLeiste');
+  el.textContent = t('netz_weg'); el.classList.toggle('hidden', S.netz);
+}
+window.addEventListener('online', function () { S.netz = true; zeigeNetz(); planeRender(); if (S.kennung && S.regelstand !== 'passt') pruefeRegelstand(); });
+window.addEventListener('offline', function () { S.netz = false; zeigeNetz(); planeRender(); });
+
+/* ---------- Laden und Beobachten ---------- */
+let abos = [];
+function abonniere() {
+  abos.forEach(function (f) { f(); }); abos = [];
+  const v = L.vorschlag(jetzt(), S.einst);
+  S.tage = { heute: v.heute, morgen: v.morgen };
+  S.roh = { heute: null, morgen: null };
+  ['heute', 'morgen'].forEach(function (k) {
+    const tag = S.tage[k];
+    abos.push(L.beobachteTag(window.db, tag, function (bild, roh) {
+      if (S.tage[k] !== tag) return;
+      S.roh[k] = roh;
+      /* Ändert sich die Frist-Einstellung, verschieben sich Vorschlag und Nachzügler — nicht die Tage. */
+      if (roh.einst.fristMinute !== S.einst.fristMinute || roh.einst.leerzeilen !== S.einst.leerzeilen || roh.einst.vorgabe !== S.einst.vorgabe) S.einst = roh.einst;
+      planeRender();
+    }, function (err, was) { zeigeFehler(t('err_laden', { was: was + ' (' + tag + ')' }), err); S.roh[k] = S.roh[k] || { meldungen: [], tagDok: null, einst: S.einst, fehler: true }; planeRender(); }));
+  });
+  abos.push(L.beobachteMaterial(window.db, function (liste) { S.material = liste; planeRender(); if (S.sheet && S.sheet.art === 'meldung') fuelleMaterialWahl(); },
+    function (err, was) { zeigeFehler(t('err_laden', { was: was }), err); S.material = S.material || []; planeRender(); }));
+}
+function bild(k) { const r = S.roh[k]; return r ? L.tagesbild(S.tage[k], r.meldungen, r.tagDok, r.einst, jetzt()) : null; }
+function wahl() { return S.wahl || L.vorschlag(jetzt(), S.einst).vorschlag; }
+/* Uhr: Tageswechsel → neu abonnieren; sonst nur neu zeichnen (Frist läuft ab, „Druck ab …“ wird frei). */
+setInterval(function () {
+  if (!S.geladen || !L) return;
+  const v = L.vorschlag(jetzt(), S.einst);
+  if (v.heute !== S.tage.heute) { S.wahl = null; abonniere(); }
+  planeRender();
+}, 20000);
+
+async function pruefeRegelstand() {
+  const r = await L.pruefeRegelstand(window.db);
+  S.regelstand = r.stand; S.regelGrund = r.grund;
+  if (r.stand === 'unbekannt') console.warn('[Mitbringer] Regelstand nicht prüfbar:', r.grund);
+  const el = document.getElementById('regelLeiste');
+  el.textContent = r.stand === 'unbekannt' ? t('regel_unbekannt', { fassung: L.REGEL_FASSUNG, grund: r.grund }) : t('regel_alt', { fassung: L.REGEL_FASSUNG, datei: L.REGEL_DATEI });
+  el.classList.toggle('hidden', r.stand === 'passt');
+  planeRender();
+}
+async function start() {
+  wendeI18nAn(); renderHilfe(); zeigeNetz();
+  if (!window.db || !window.BOS_AUTH_READY || !L) { zeigeFehler(t('err_laden', { was: 'Grundlagen' }), new Error('window.db, BOS_AUTH_READY oder mitbringer_logik.js fehlt')); return; }
+  let nutzer = null;
+  try { nutzer = await window.BOS_AUTH_READY; } catch (err) { zeigeFehler(t('err_laden', { was: 'Anmeldung' }), err); }
+  S.kennung = nutzer && nutzer.email ? nutzer.email.split('@')[0] : null;
+  if (S.kennung) {
+    try { S.konto = await L.ladeKonto(window.db, S.kennung); }
+    catch (err) { zeigeFehler(t('err_konto'), err); }
+  }
+  S.recht = L.rechte(S.konto);
+  document.getElementById('kontoZeile').textContent = (S.konto && S.konto.name) || S.kennung || t('kein_konto');
+  const kh = document.getElementById('kontoHinweis');
+  if (S.konto && S.konto.art === 'ort') { kh.textContent = t('station_hinweis'); kh.classList.remove('hidden'); }
+  abonniere();
+  S.geladen = true;
+  planeRender();
+  if (S.kennung) pruefeRegelstand();
+}
+
+/* ---------- Sperrgründe (die Knöpfe sind dann grau und sagen warum) ---------- */
+function grundSchreiben() {
+  if (!S.netz) return t('grund_netz');
+  if (S.regelstand === 'alt') return t('grund_regel');
+  return '';
+}
+function grundMelden() {
+  if (!S.kennung) return t('kein_konto');
+  if (!S.recht.melden) return t(S.konto && S.konto.art === 'ort' ? 'grund_station' : 'grund_person');
+  if (S.material === null) return t('grund_laedt');
+  if (!L.aktivesMaterial(S.material).length) return t('grund_material');
+  return grundSchreiben();
+}
+function grundDrucken(k, b) {
+  const D = window.BOS_MITBRINGER_DRUCK;
+  if (!D || !D.angemeldet) return t('grund_druck_modul', { grund: (D && D.fehler) || 'mitbringer_druck.js fehlt' });
+  if (k !== 'heute') return t('grund_druck_tag', { uhr: L.uhr(b.fristMs) });
+  if (!b.fristVorbei) return t('grund_druck_frist', { uhr: L.uhr(b.fristMs) });
+  return grundSchreiben();
+}
+
+/* ---------- Zeichnen ---------- */
+let renderGeplant = false;
+function planeRender() { if (renderGeplant) return; renderGeplant = true; requestAnimationFrame(function () { renderGeplant = false; render(); }); }
+function zahlText(n) { return n === 0 ? t('tag_zahl_0') : n === 1 ? t('tag_zahl_1') : t('tag_zahl_n', { n: n }); }
+function render() {
+  if (!S.geladen || !L) return;
+  const k = wahl(), b = bild(k);
+  document.getElementById('lade').classList.toggle('hidden', !!b);
+  document.getElementById('haupt').classList.toggle('hidden', !b);
+  if (!b) return;
+  document.getElementById('tagwahl').innerHTML = ['heute', 'morgen'].map(function (x) {
+    const bx = bild(x);
+    return '<button type="button" role="tab" aria-selected="' + (x === k) + '" data-tag="' + x + '" class="' + (x === k ? 'aktiv' : '') + '"><span class="wort">' + esc(t(x)) + '</span><span class="datum">' + esc(L.tagKurz(S.tage[x])) + '</span><span class="zahl">' + esc(bx ? zahlText(bx.anzahl) : '…') + '</span></button>';
+  }).join('');
+  const tagWort = t(k) + ' (' + L.tagKurz(b.tag) + ')';
+  let st = tHtml(b.fristVorbei ? 'frist_vorbei' : 'frist_offen', { tag: tagWort, uhr: L.uhr(b.fristMs) });
+  if (b.gedruckt) {
+    const g = b.gedruckt;
+    st += '<br>' + (g.drucke > 1 ? tHtml('gedruckt_n', { wann: L.datumUhr(g.letzterDruckMs), name: g.druckName || g.druckVon, n: g.drucke, erst: L.uhr(g.ersterDruckMs) }) : tHtml('gedruckt', { wann: L.datumUhr(g.letzterDruckMs), name: g.druckName || g.druckVon }));
+    const neu = b.bereiche.reduce(function (n, x) { return n + x.zeilen.filter(function (z) { return z.nochNichtGedruckt; }).length; }, 0);
+    if (neu) st += '<br>' + tHtml('nach_druck', { n: neu });
+  } else if (b.fristVorbei) st += '<br>' + esc(t('nicht_gedruckt'));
+  if (S.einst.vorgabe && S.recht.bearbeiten) st += '<br>' + tHtml('frist_vorgabe', { uhr: L.uhrText(S.einst.fristMinute) });
+  document.getElementById('statuszeile').innerHTML = st;
+  const r = document.getElementById('reiter');
+  r.classList.toggle('hidden', !S.recht.bearbeiten);
+  if (!S.recht.bearbeiten) S.reiter = 'liste';
+  r.innerHTML = [['liste', 'reiter_liste'], ['material', 'reiter_material']].map(function (x) { return '<button type="button" data-reiter="' + x[0] + '" class="' + (S.reiter === x[0] ? 'aktiv' : '') + '">' + esc(t(x[1])) + '</button>'; }).join('');
+  /* Neuzeichnen darf das Tippen in den Einstellungen nicht unterbrechen: Fokus und Schreibmarke merken */
+  const aktiv = document.activeElement, fokusId = aktiv && (aktiv.id === 'einstFrist' || aktiv.id === 'einstLeer') ? aktiv.id : null;
+  document.getElementById('inhalt').innerHTML = S.reiter === 'material' ? materialHTML() : listeHTML(k, b);
+  if (fokusId) { const f = document.getElementById(fokusId); if (f) f.focus(); }
+}
+function zeileHTML(z) {
+  const eigen = z.vonKonto === S.kennung;
+  const darfAendern = !z.wartet && ((eigen && S.recht.melden && z.frei) || (S.recht.bearbeiten && !z.gestrichen));
+  const marken = [];
+  if (z.wartet) marken.push('<span class="marke">' + esc(t('marke_wartet')) + '</span>');
+  if (z.gestrichen) marken.push('<span class="marke">' + esc(t('marke_gestrichen', { name: z.gestrichenName, wann: L.uhr(z.gestrichenMs) })) + '</span>');
+  else if (z.nachzuegler && !z.aufgenommen) marken.push('<span class="marke warn">' + esc(t('marke_nachzuegler')) + '</span>');
+  else if (z.nachzuegler && z.aufgenommen) marken.push('<span class="marke gut">' + esc(t('marke_aufgenommen', { wann: L.uhr(z.aufgenommenMs), name: z.aufgenommenName })) + '</span>');
+  if (z.nochNichtGedruckt) marken.push('<span class="marke warn">' + esc(t('marke_neu')) + '</span>');
+  const knoepfe = [];
+  if (S.recht.bearbeiten && z.nachzuegler && !z.aufgenommen && !z.gestrichen && !z.wartet) knoepfe.push('<button type="button" class="btn btn-outline btn-klein" data-aktion="aufnehmen" data-id="' + esc(z.id) + '"' + (grundSchreiben() ? ' disabled' : '') + '>' + esc(t('aufnehmen')) + '</button>');
+  if (darfAendern) knoepfe.push('<button type="button" class="icon" data-aktion="aendern" data-id="' + esc(z.id) + '" aria-label="' + esc(t('aendern_titel')) + '">✎</button>');
+  return '<div class="zeile' + (z.gestrichen ? ' gestrichen' : '') + (z.nachzuegler && !z.aufgenommen && !z.gestrichen ? ' nachzuegler' : '') + '" data-meldung="' + esc(z.id) + '">' +
+    '<div class="menge">' + esc(z.menge) + ' ' + esc(z.einheit) + '</div>' +
+    '<div class="text"><div class="name">' + esc(z.material) + '</div>' + (z.notiz ? '<div class="notiz">' + esc(z.notiz) + '</div>' : '') +
+    '<div class="unterzeile">' + esc(t('von', { name: z.vonName || z.vonKonto || '', wann: L.datumUhr(z.erstelltMs) })) + (z.geaendertMs ? ' · ' + esc(t('geaendert', { name: z.geaendertName || z.geaendertVon, wann: L.uhr(z.geaendertMs) })) : '') + '</div>' +
+    (marken.length ? '<div>' + marken.join('') + '</div>' : '') + '</div>' +
+    (knoepfe.length ? '<div class="knoepfe">' + knoepfe.join('') + '</div>' : '') + '</div>';
+}
+function listeHTML(k, b) {
+  let h = '';
+  const gm = grundMelden();
+  h += '<div class="aktionen"><button type="button" class="btn btn-primary btn-gross" data-aktion="melden"' + (gm ? ' disabled' : '') + '>' + esc(t('melden')) + '</button>';
+  if (gm) h += '<div class="grund" id="grundMelden">' + esc(gm) + '</div>';
+  if (S.recht.drucken) {
+    const gd = grundDrucken(k, b);
+    h += '<button type="button" class="btn btn-outline btn-gross" data-aktion="drucken"' + (gd || S.schreibt ? ' disabled' : '') + '>' + esc(t(b.gedruckt ? 'nachdrucken' : 'drucken')) + '</button>';
+    if (gd) h += '<div class="grund" id="grundDrucken">' + esc(gd) + '</div>';
+  }
+  h += '</div>';
+  b.bereiche.forEach(function (x) {
+    h += '<div class="bereich-titel" data-bereich="' + esc(x.id) + '"><span>' + esc(x.name) + '</span><span class="unterzeile">' + (x.zettel.length ? esc(t('zahl', { n: x.zettel.length })) : '') + '</span></div>';
+    if (!x.zeilen.length) h += '<div class="nichts">' + esc(t('nichts')) + '</div>';
+    x.zeilen.forEach(function (z) { h += zeileHTML(z); });
+  });
+  h += '<div class="planung"><div class="unterzeile">' + esc(t('planung_titel')) + '</div><div class="aktionen">' +
+    '<button type="button" class="btn btn-outline" disabled aria-disabled="true">' + esc(t('planung_rueck')) + '</button>' +
+    '<button type="button" class="btn btn-outline" disabled aria-disabled="true">' + esc(t('planung_monitor')) + '</button></div></div>';
+  return h;
+}
+function materialHTML() {
+  const liste = L.sichtbaresMaterial(S.material || []), g = grundSchreiben();
+  let h = '<p class="unterzeile" style="margin:8px 0">' + esc(t('mat_hinweis')) + '</p>';
+  const fehlt = L.STARTLISTE.some(function (m) { return !(S.material || []).some(function (x) { return x.id === m.id; }); });
+  h += '<div class="aktionen"><button type="button" class="btn btn-primary" data-aktion="mat-neu"' + (g ? ' disabled' : '') + '>' + esc(t('mat_neu')) + '</button>';
+  if (fehlt) h += '<button type="button" class="btn btn-outline" data-aktion="mat-start"' + (g || S.schreibt ? ' disabled' : '') + '>' + esc(t('mat_start')) + '</button>';
+  if (g) h += '<div class="grund">' + esc(g) + '</div>';
+  h += '</div>';
+  if (!liste.length) h += '<div class="leer">' + esc(t('mat_leer')) + '</div>';
+  liste.forEach(function (m) {
+    h += '<div class="zeile mat-zeile' + (m.aktiv ? '' : ' aus') + '" data-material="' + esc(m.id) + '"><div class="text"><div class="name">' + esc(m.name) + '</div>' +
+      '<div class="unterzeile">' + esc(m.einheiten.join(' · ')) + (m.fest ? ' — ' + esc(t('mat_fest')) : '') + (m.aktiv ? '' : ' — ' + esc(t('mat_aus'))) + '</div></div>' +
+      '<div class="knoepfe"><button type="button" class="icon" data-aktion="mat-aendern" data-id="' + esc(m.id) + '" aria-label="' + esc(t('mat_aendern_titel')) + '"' + (g ? ' disabled' : '') + '>✎</button></div></div>';
+  });
+  h += '<div class="einst"><h3>' + esc(t('einst_titel')) + '</h3><p class="unterzeile">' + esc(t(S.einst.vorgabe ? 'einst_vorgabe' : 'einst_wirkt')) + '</p>' +
+    '<div class="einst-raster"><div class="feld-zeile"><label for="einstFrist">' + esc(t('einst_frist')) + '</label><input type="time" id="einstFrist" value="' + esc(S.einstEingabe ? S.einstEingabe.frist : L.uhrText(S.einst.fristMinute)) + '"' + (g ? ' disabled' : '') + '></div>' +
+    '<div class="feld-zeile"><label for="einstLeer">' + esc(t('einst_leer')) + '</label><input type="number" id="einstLeer" inputmode="numeric" min="0" max="' + L.GRENZEN.leerzeilenMax + '" value="' + esc(S.einstEingabe ? S.einstEingabe.leer : S.einst.leerzeilen) + '"' + (g ? ' disabled' : '') + '></div></div>' +
+    '<div class="meldung" id="einstMeldung"></div>' +
+    '<button type="button" class="btn btn-outline" data-aktion="einst-speichern"' + (g || S.schreibt ? ' disabled' : '') + '>' + esc(t('einst_speichern')) + '</button></div>';
+  return h;
+}
+
+/* ---------- Blatt: Melden / Ändern ---------- */
+function oeffneSheet(html, zustand) {
+  S.sheet = zustand; S.sicher = null;
+  document.getElementById('toast').classList.add('hidden');   /* die Bestätigung von eben soll keine Knöpfe im Blatt verdecken */
+  document.getElementById('sheetInhalt').innerHTML = html;
+  document.getElementById('sheet').classList.remove('hidden');
+}
+function schliesseSheet() { S.sheet = null; S.sicher = null; document.getElementById('sheet').classList.add('hidden'); document.getElementById('sheetInhalt').innerHTML = ''; }
+function sheetMeldung(text) { const el = document.getElementById('sheetMeldung'); if (el) el.textContent = text || ''; }
+function pillen(name, liste, aktiv) {
+  return '<div class="pillen" data-pillen="' + name + '">' + liste.map(function (x) { return '<button type="button" data-wert="' + esc(x.id) + '" class="' + (x.id === aktiv ? 'aktiv' : '') + '" aria-pressed="' + (x.id === aktiv) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>';
+}
+function meldungFinden(id) {
+  for (const k of ['heute', 'morgen']) { const b = bild(k); if (!b) continue; for (const x of b.bereiche) for (const z of x.zeilen) if (z.id === id) return z; }
+  return null;
+}
+function oeffneMeldung(id) {
+  const z = id ? meldungFinden(id) : null;
+  if (id && !z) { toast(t('nichts')); return; }
+  let bereich = z ? z.bereich : '';
+  if (!z) { try { bereich = localStorage.getItem(SPEICHER_BEREICH) || ''; } catch (e) { /* Speicher gesperrt: dann eben wählen */ } }
+  const s = { art: 'meldung', id: id || null, tagWahl: wahl(), bereich: bereich, materialId: z ? z.materialId : '', einheit: z ? z.einheit : '', frei: z ? z.frei : true,
+    start: z ? JSON.stringify([z.bereich, z.materialId, z.einheit, String(z.menge), z.freitext]) : JSON.stringify([bereich, '', '', '1', '']) };
+  let h = '<h2>' + esc(t(z ? 'aendern_titel' : 'melden_titel')) + '</h2>';
+  if (!z) h += '<div class="feld-zeile"><div class="label">' + esc(t('fuer_tag')) + '</div>' + pillen('tag', [{ id: 'heute', name: t('heute') + ' · ' + L.tagKurz(S.tage.heute) }, { id: 'morgen', name: t('morgen') + ' · ' + L.tagKurz(S.tage.morgen) }], s.tagWahl) + '<div class="unterzeile" id="tagHinweis" style="margin-top:6px"></div></div>';
+  else if (!z.frei) h += '<div class="hinweis warn" style="margin:0 0 8px">' + esc(t('streichen_hinweis')) + '</div>';
+  h += '<div class="feld-zeile"><div class="label">' + esc(t('bereich')) + '</div>' + pillen('bereich', L.BEREICHE, s.bereich) + '</div>';
+  h += '<div class="feld-zeile"><label for="materialWahl">' + esc(t('material')) + '</label><select id="materialWahl"></select></div>';
+  h += '<div class="feld-zeile"><div class="label">' + esc(t('einheit')) + '</div><div id="einheitWahl"></div></div>';
+  h += '<div class="feld-zeile"><label for="mengeFeld">' + esc(t('menge')) + '</label><div class="mengen"><button type="button" data-aktion="minus" aria-label="weniger">−</button><input id="mengeFeld" inputmode="numeric" autocomplete="off" value="' + esc(z ? z.menge : 1) + '"><button type="button" data-aktion="plus" aria-label="mehr">＋</button></div></div>';
+  h += '<div class="feld-zeile"><label for="freitextFeld" id="freitextLabel">' + esc(t('freitext')) + '</label><input type="text" id="freitextFeld" maxlength="' + L.GRENZEN.freitext + '" placeholder="' + esc(t('freitext_platz')) + '" value="' + esc(z ? z.freitext : '') + '"></div>';
+  h += '<div class="meldung" id="sheetMeldung" role="alert"></div><div class="sheet-knoepfe"><button type="button" class="btn btn-primary" data-aktion="meldung-speichern">' + esc(t(z ? 'speichern' : 'absenden')) + '</button>';
+  if (z && z.frei) h += '<button type="button" class="btn btn-gefahr" data-aktion="meldung-loeschen">' + esc(t('loeschen')) + '</button>';
+  if (z && !z.frei && S.recht.bearbeiten && !z.gestrichen) h += '<button type="button" class="btn btn-gefahr" data-aktion="meldung-streichen">' + esc(t('streichen')) + '</button>';
+  h += '<button type="button" class="btn btn-outline" data-aktion="sheet-zu">' + esc(t('abbrechen')) + '</button></div>';
+  oeffneSheet(h, s);
+  fuelleMaterialWahl(); zeigeTagHinweis();
+}
+function materialNachId(id) { return (S.material || []).filter(function (m) { return m.id === id; })[0] || null; }
+function fuelleMaterialWahl() {
+  const s = S.sheet, sel = document.getElementById('materialWahl'); if (!s || !sel) return;
+  const liste = L.aktivesMaterial(S.material || []);
+  /* ein abgeschaltetes Material einer alten Meldung bleibt sichtbar, aber nicht speicherbar */
+  const jetztM = materialNachId(s.materialId);
+  let h = '<option value="">' + esc(t('material_waehlen')) + '</option>';
+  if (jetztM && !jetztM.aktiv) h += '<option value="' + esc(jetztM.id) + '">' + esc(jetztM.name) + ' (' + esc(t('mat_aus')) + ')</option>';
+  h += liste.map(function (m) { return '<option value="' + esc(m.id) + '">' + esc(m.name) + '</option>'; }).join('');
+  sel.innerHTML = h; sel.value = s.materialId || '';
+  fuelleEinheiten();
+}
+function fuelleEinheiten() {
+  const s = S.sheet; if (!s) return;
+  const m = materialNachId(s.materialId), e = m ? m.einheiten : [];
+  if (e.indexOf(s.einheit) === -1) s.einheit = e.length ? e[0] : '';
+  document.getElementById('einheitWahl').innerHTML = e.length ? pillen('einheit', e.map(function (x) { return { id: x, name: x }; }), s.einheit) : '<span class="unterzeile">—</span>';
+  const pflicht = !!m && m.id === L.SONSTIGES;
+  document.getElementById('freitextLabel').textContent = t(pflicht ? 'freitext_pflicht' : 'freitext');
+}
+function zeigeTagHinweis() {
+  const s = S.sheet, el = document.getElementById('tagHinweis'); if (!s || !el) return;
+  const b = bild(s.tagWahl);
+  el.textContent = b && b.fristVorbei ? t('fuer_nachzuegler', { tag: t(s.tagWahl), uhr: L.uhr(b.fristMs) }) : '';
+}
+function eingabe() {
+  const s = S.sheet;
+  return { tag: S.tage[s.tagWahl], bereich: s.bereich, materialId: s.materialId, einheit: s.einheit,
+    menge: L.mengeAus(document.getElementById('mengeFeld').value), freitext: document.getElementById('freitextFeld').value };
+}
+const EIN_TEXT = { bereich: 'ein_bereich', material: 'ein_material', material_aus: 'ein_material_aus', einheit: 'ein_einheit', menge: 'ein_menge', freitext_lang: 'ein_freitext_lang', freitext_pflicht: 'ein_freitext_pflicht', tag: 'ein_tag' };
+async function meldungSpeichern() {
+  const s = S.sheet; if (!s || S.schreibt) return;
+  const g = s.id ? grundSchreiben() : grundMelden();
+  if (g) { sheetMeldung(g); return; }
+  const e = eingabe(), m = materialNachId(e.materialId);
+  const p = L.pruefeEingabe(e, m, !s.id);
+  if (p) { sheetMeldung(t(EIN_TEXT[p], { min: L.GRENZEN.mengeMin, max: p === 'menge' ? L.GRENZEN.mengeMax : L.GRENZEN.freitext })); return; }
+  S.schreibt = true; sheetMeldung('');
+  try {
+    if (s.id) { await L.aendere(window.db, ctx(), s.id, e, m); schliesseSheet(); toast(t('gespeichert')); }
+    else {
+      const frist = bild(s.tagWahl).fristMs, tagWort = t(s.tagWahl) + ' (' + L.tagKurz(e.tag) + ')';
+      const r = await L.melde(window.db, ctx(), e, m);
+      try { localStorage.setItem(SPEICHER_BEREICH, e.bereich); } catch (x) { /* egal */ }
+      S.wahl = s.tagWahl; schliesseSheet();
+      if (r.erstelltMs !== null && r.erstelltMs >= frist) meldung(t('als_nachzuegler', { uhr: L.uhr(r.erstelltMs), frist: L.uhr(frist) }), 'warn');
+      else { meldung('', ''); toast(t('gemeldet', { tag: tagWort })); }
+    }
+  } catch (err) { zeigeFehler(t(s.id ? 'err_aendern' : 'err_melden'), err); sheetMeldung(fehlerText(t(s.id ? 'err_aendern' : 'err_melden'), err)); }
+  finally { S.schreibt = false; planeRender(); }
+}
+/* Löschen und Durchstreichen: zweimal tippen statt Browser-Dialog */
+async function meldungWeg(knopf, art) {
+  const s = S.sheet; if (!s || !s.id || S.schreibt) return;
+  const g = grundSchreiben(); if (g) { sheetMeldung(g); return; }
+  if (S.sicher !== art) { S.sicher = art; knopf.textContent = t(art === 'loeschen' ? 'loeschen_sicher' : 'streichen_sicher'); return; }
+  S.schreibt = true;
+  try {
+    if (art === 'loeschen') await L.loesche(window.db, s.id); else await L.streiche(window.db, ctx(), s.id);
+    schliesseSheet(); toast(t(art === 'loeschen' ? 'geloescht' : 'gestrichen'));
+  } catch (err) { zeigeFehler(t(art === 'loeschen' ? 'err_loeschen' : 'err_streichen'), err); sheetMeldung(fehlerText(t(art === 'loeschen' ? 'err_loeschen' : 'err_streichen'), err)); }
+  finally { S.schreibt = false; planeRender(); }
+}
+async function aufnehmen(id) {
+  if (S.schreibt || grundSchreiben()) return;
+  S.schreibt = true;
+  try { await L.nimmAuf(window.db, ctx(), id); toast(t('aufgenommen')); }
+  catch (err) { zeigeFehler(t('err_aufnehmen'), err); }
+  finally { S.schreibt = false; planeRender(); }
+}
+
+/* ---------- Drucken: über den Zettel „mitbringer“ (mitbringer_druck.js), nie selbst ---------- */
+async function drucken() {
+  if (S.schreibt) return;
+  const k = wahl(), b = bild(k), g = b ? grundDrucken(k, b) : t('grund_laedt');
+  if (g) { meldung(g, 'warn'); return; }
+  S.schreibt = true; planeRender();
+  try {
+    const r = await window.BOS_MITBRINGER_DRUCK.drucke();
+    meldung(t('druck_los', { datei: r.dateiname, n: b.anzahlZettel }), 'gut');
+  } catch (err) {
+    /* bos_druck.js zeigt Druckfehler selbst im Kasten; steht dort nichts, dann hier */
+    if (!document.getElementById('bos-druck-fehler')) zeigeFehler(t('err_drucken'), err); else console.error('[Mitbringer] ' + t('err_drucken'), err);
+  } finally { S.schreibt = false; planeRender(); }
+}
+
+/* ---------- Material und Einstellungen (Haken „Mitbringer bearbeiten“) ---------- */
+function oeffneMaterial(id) {
+  const m = id ? materialNachId(id) : null;
+  if (id && !m) return;
+  const naechste = (L.sichtbaresMaterial(S.material || []).filter(function (x) { return !x.fest; }).reduce(function (n, x) { return Math.max(n, x.reihenfolge); }, 0)) + 10;
+  const s = { art: 'material', id: id || null, start: m ? JSON.stringify([m.name, m.einheiten.join(', '), String(m.reihenfolge), m.aktiv]) : JSON.stringify(['', '', String(Math.min(naechste, L.GRENZEN.reihenfolgeMax)), true]) };
+  let h = '<h2>' + esc(t(m ? 'mat_aendern_titel' : 'mat_neu_titel')) + '</h2>';
+  h += '<div class="feld-zeile"><label for="matName">' + esc(t('mat_name')) + '</label><input type="text" id="matName" maxlength="' + L.GRENZEN.materialName + '" value="' + esc(m ? m.name : '') + '"><div class="unterzeile" id="matIdZeile" style="margin-top:4px">' + (m ? esc(t('mat_id', { id: m.id })) : '') + '</div></div>';
+  h += '<div class="feld-zeile"><label for="matEinheiten">' + esc(t('mat_einheiten')) + '</label><input type="text" id="matEinheiten" placeholder="' + esc(t('mat_einheiten_platz')) + '" value="' + esc(m ? m.einheiten.join(', ') : '') + '"></div>';
+  h += '<div class="feld-zeile"><label for="matReihenfolge">' + esc(t('mat_reihenfolge')) + '</label><input type="number" id="matReihenfolge" inputmode="numeric" min="0" max="' + L.GRENZEN.reihenfolgeMax + '" value="' + esc(m ? m.reihenfolge : Math.min(naechste, L.GRENZEN.reihenfolgeMax)) + '"></div>';
+  h += '<label class="haken-zeile"><input type="checkbox" id="matAktiv"' + (!m || m.aktiv ? ' checked' : '') + (m && m.fest ? ' disabled' : '') + '><span>' + esc(t(m && m.fest ? 'mat_fest' : 'mat_aktiv')) + '</span></label>';
+  h += '<div class="meldung" id="sheetMeldung" role="alert"></div><div class="sheet-knoepfe"><button type="button" class="btn btn-primary" data-aktion="mat-speichern">' + esc(t('speichern')) + '</button><button type="button" class="btn btn-outline" data-aktion="sheet-zu">' + esc(t('abbrechen')) + '</button></div>';
+  oeffneSheet(h, s);
+}
+const MAT_TEXT = { id: 'ein_mat_id', name: 'ein_mat_name', einheiten: 'ein_mat_einheiten', einheit_lang: 'ein_mat_einheit_lang', reihenfolge: 'ein_mat_reihenfolge', fest_aus: 'ein_mat_fest_aus' };
+async function materialSpeichern() {
+  const s = S.sheet; if (!s || S.schreibt) return;
+  const g = grundSchreiben(); if (g) { sheetMeldung(g); return; }
+  const name = document.getElementById('matName').value.trim();
+  const e = { name: name, einheiten: L.einheitenAus(document.getElementById('matEinheiten').value), aktiv: document.getElementById('matAktiv').checked, reihenfolge: parseInt(document.getElementById('matReihenfolge').value, 10) };
+  if (isNaN(e.reihenfolge)) e.reihenfolge = -1;
+  const id = s.id || L.materialIdAus(name);
+  const p = L.pruefeMaterial(id, e);
+  if (p) { sheetMeldung(t(MAT_TEXT[p], { max: p === 'name' ? L.GRENZEN.materialName : p === 'einheiten' ? L.GRENZEN.einheiten : p === 'einheit_lang' ? L.GRENZEN.einheit : L.GRENZEN.reihenfolgeMax })); return; }
+  if (!s.id && materialNachId(id)) { sheetMeldung(t('mat_doppelt', { id: id })); return; }
+  S.schreibt = true; sheetMeldung('');
+  try { await L.speichereMaterial(window.db, ctx(), id, e); schliesseSheet(); toast(t('gespeichert')); }
+  catch (err) { zeigeFehler(t('err_material'), err); sheetMeldung(fehlerText(t('err_material'), err)); }
+  finally { S.schreibt = false; planeRender(); }
+}
+async function startliste() {
+  if (S.schreibt || grundSchreiben()) return;
+  S.schreibt = true; planeRender();
+  try { const neu = await L.legeStartlisteAn(window.db, ctx()); toast(neu.length ? t('mat_start_ok', { liste: neu.join(', ') }) : t('mat_start_nichts')); }
+  catch (err) { zeigeFehler(t('err_start'), err); }
+  finally { S.schreibt = false; planeRender(); }
+}
+async function einstellungenSpeichern() {
+  if (S.schreibt) return;
+  const el = document.getElementById('einstMeldung'), g = grundSchreiben();
+  if (g) { el.textContent = g; return; }
+  const frist = L.minuteAus(document.getElementById('einstFrist').value), leer = parseInt(document.getElementById('einstLeer').value, 10);
+  if (!L.fristMinuteGueltig(frist)) { el.textContent = t('ein_frist'); return; }
+  if (!L.leerzeilenGueltig(leer)) { el.textContent = t('ein_leer', { max: L.GRENZEN.leerzeilenMax }); return; }
+  S.schreibt = true; el.textContent = '';
+  try { await L.speichereEinstellungen(window.db, ctx(), { fristMinute: frist, leerzeilen: leer }); S.einstEingabe = null; toast(t('gespeichert')); }
+  catch (err) { zeigeFehler(t('err_einstellung'), err); el.textContent = fehlerText(t('err_einstellung'), err); }
+  finally { S.schreibt = false; planeRender(); }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click', function (ev) {
+  const tg = ev.target.closest('[data-tag]');
+  if (tg) { S.wahl = tg.getAttribute('data-tag'); planeRender(); return; }
+  const r = ev.target.closest('[data-reiter]');
+  if (r) { S.reiter = r.getAttribute('data-reiter'); planeRender(); return; }
+  const pl = ev.target.closest('[data-pillen] button');
+  if (pl && S.sheet) {
+    const name = pl.parentNode.getAttribute('data-pillen'), wert = pl.getAttribute('data-wert');
+    if (name === 'tag') { S.sheet.tagWahl = wert; zeigeTagHinweis(); } else if (name === 'bereich') S.sheet.bereich = wert; else if (name === 'einheit') S.sheet.einheit = wert;
+    pl.parentNode.querySelectorAll('button').forEach(function (b) { const an = b === pl; b.classList.toggle('aktiv', an); b.setAttribute('aria-pressed', String(an)); });
+    return;
+  }
+  const el = ev.target.closest('[data-aktion]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-aktion'), id = el.getAttribute('data-id');
+  if (a === 'melden') oeffneMeldung(null);
+  else if (a === 'aendern') oeffneMeldung(id);
+  else if (a === 'aufnehmen') aufnehmen(id);
+  else if (a === 'drucken') drucken();
+  else if (a === 'minus' || a === 'plus') {
+    const f = document.getElementById('mengeFeld'), m = L.mengeAus(f.value);
+    f.value = String(Math.max(L.GRENZEN.mengeMin, Math.min(L.GRENZEN.mengeMax, (isNaN(m) ? 0 : m) + (a === 'plus' ? 1 : -1))));
+  }
+  else if (a === 'meldung-speichern') meldungSpeichern();
+  else if (a === 'meldung-loeschen') meldungWeg(el, 'loeschen');
+  else if (a === 'meldung-streichen') meldungWeg(el, 'streichen');
+  else if (a === 'mat-neu') oeffneMaterial(null);
+  else if (a === 'mat-aendern') oeffneMaterial(id);
+  else if (a === 'mat-speichern') materialSpeichern();
+  else if (a === 'mat-start') startliste();
+  else if (a === 'einst-speichern') einstellungenSpeichern();
+  else if (a === 'sheet-zu') schliesseSheet();
+});
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'materialWahl' && S.sheet) { S.sheet.materialId = ev.target.value; fuelleEinheiten(); }
+});
+document.addEventListener('input', function (ev) {
+  if (ev.target.id === 'matName' && S.sheet && !S.sheet.id) { const id = L.materialIdAus(ev.target.value); document.getElementById('matIdZeile').textContent = id ? t('mat_id', { id: id }) : ''; }
+  if (ev.target.id === 'einstFrist' || ev.target.id === 'einstLeer') S.einstEingabe = { frist: document.getElementById('einstFrist').value, leer: document.getElementById('einstLeer').value };   /* bleibt über Neuzeichnen erhalten */
+});
+document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; });
+
+/* ---------- Halb eingegebenes melden (Checkliste §7b) ---------- */
+(function (pruef) {
+  if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
+  window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
+})(function () {
+  if (S.schreibt || S.einstEingabe) return true;
+  const s = S.sheet; if (!s) return false;
+  if (s.art === 'meldung') { const f = document.getElementById('mengeFeld'), x = document.getElementById('freitextFeld'); return !!f && JSON.stringify([s.bereich, s.materialId, s.einheit, f.value, x.value]) !== s.start && !!s.materialId; }
+  if (s.art === 'material') { const n = document.getElementById('matName'); return !!n && JSON.stringify([n.value, document.getElementById('matEinheiten').value, document.getElementById('matReihenfolge').value, document.getElementById('matAktiv').checked]) !== s.start; }
+  return false;
+});
+
+/* ---------- Hilfe (Checkliste §7; kanonische Fassung in MITBRINGER_DOKU.md) ---------- */
+const helpData = {
+  title: 'Mitbringer — was ist das hier?',
+  sections: [
+    { heading: 'Wofür ist diese Seite?', text: 'Hier meldest du Gebrauchsmaterial, das die Fahrer aus dem Lager mitbringen sollen: Bleche, Körbe, Rollcontainer und alles andere, was im Umlauf ist und wiederkommt. Verbrauchsmaterial und Rohstoffe gehören nicht hierher, die laufen über das Lager.' },
+    { heading: 'Heute oder morgen', text: 'Oben wählst du den Liefertag. Vorgeschlagen ist der nächste Tag, dessen Meldeschluss noch nicht vorbei ist. Darunter steht, was für diesen Tag schon gemeldet ist, getrennt nach Frühschicht, Nachtschicht und Konditorei. So siehst du, ob jemand dasselbe schon bestellt hat. Doppelt melden ist erlaubt.' },
+    { heading: 'Melden', text: '„＋ Melden“: Bereich, Material, Einheit und Menge wählen, bei Bedarf einen Hinweis dazuschreiben. Fehlt das Material in der Liste, nimm „Sonstiges“ und schreib dazu, was gebraucht wird. Melden geht nur mit dem eigenen Konto, auch von zu Hause. Am Stationstablet kann man die Liste ansehen, aber nicht melden.' },
+    { heading: 'Meldeschluss und Nachzügler', text: 'Meldeschluss ist am Liefertag um die Uhrzeit, die oben steht. Was danach für denselben Tag kommt, ist ein Nachzügler: Er steht hier auf dem Bildschirm, aber nicht auf dem schon gedruckten Zettel. Es zählt die Uhr des Servers, nicht die des Handys.' },
+    { heading: 'Ändern und löschen', text: 'Deine eigene Meldung änderst oder löschst du mit ✎, solange sie auf keinem Zettel steht. Danach geht das nur noch mit dem Haken „Mitbringer bearbeiten“.' },
+    { heading: 'Mit dem Haken „Mitbringer bearbeiten“', text: 'Du änderst auch fremde Meldungen, nimmst Nachzügler mit „Auf die Liste“ auf den Zettel und pflegst im Reiter „Material“ die Materialliste und den Meldeschluss. Was schon auf einem Zettel steht, wird nicht gelöscht, sondern durchgestrichen, mit deinem Namen und der Uhrzeit.' },
+    { heading: 'Mit dem Haken „Mitbringer drucken“', text: 'Nach dem Meldeschluss druckst du die Mitbringliste für heute. Vorher ist der Knopf grau. Auf dem Zettel stehen alle drei Bereiche mit Kästchen zum Abhaken und Leerzeilen zum Eintragen von Hand. Jeder Druck wird festgehalten, auch wenn du den Druckdialog abbrichst. Nach aufgenommenen Nachzüglern druckst du nach, sie stehen dann mit „＋ nachgetragen“ auf dem Zettel.' },
+    { heading: 'Ohne Netz und Fehler', text: 'Ohne Verbindung kannst du die Liste ansehen, aber nichts melden oder ändern. Die Knöpfe sind dann grau und sagen warum. Fehler stehen oben im roten Kasten, mit der echten Meldung.' },
+    { heading: 'Was noch kommt', text: 'In Planung sind die Rückmeldung „eingepackt / fehlt“ und ein Monitor im Lager, der diese Liste für die Fahrer zeigt.' }
+  ]
+};
+function renderHilfe() {
+  document.getElementById('helpTitle').textContent = helpData.title;
+  document.getElementById('helpContent').innerHTML = helpData.sections.map(function (s) { return '<div class="sec"><h3>' + esc(s.heading) + '</h3><p>' + esc(s.text) + '</p></div>'; }).join('');
+}
+document.getElementById('helpOpenBtn').addEventListener('click', function () { document.getElementById('helpSheet').classList.remove('hidden'); });
+document.getElementById('helpCloseBtn').addEventListener('click', function () { document.getElementById('helpSheet').classList.add('hidden'); });
+document.getElementById('helpSheet').addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
+
+start().catch(function (err) { zeigeFehler(t('err_unbehandelt'), err); });
+</script>
+</body>
+</html>
