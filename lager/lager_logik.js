@@ -23,12 +23,19 @@
    (lager_listen), Korrekturen, Mindestmengen, Bestand je Ort, Hauptort,
    „Bitte nachbestellen“, Druckansicht der Liste.
 
+   Seit 18.11.2026 (RK §34, Ein Name überall): Personen-Nummer an Eintrag,
+   Abschluss und Korrektur (vonPerson, abgeschlossenPerson, person).
+
    WARNUNG: FELDER und GRENZEN müssen zur Regel passen
-   (_regeln/_protokolle/firestore_regeln_2026-11-16_lager_anfordern.rules,
+   (_regeln/_protokolle/firestore_regeln_2026-11-18_namen.rules,
    Blöcke lager_*). test_lager.js und test_lager_anfordern.js vergleichen
    beides — immer beide ändern.
 
    CHANGELOG
+     2026-11-18 · 05:45 · v7 · Ein Name überall (RK §34; Bauplan 04:28, Go KC 04:42): FELDER_LISTE,
+       FELDER_EINTRAG, FELDER_KORREKTUR um die Personen-Nummer; eintragDokument mit vonPerson,
+       abschlussFelder(von, name, person). Sonst unverändert.
+       _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
      2026-11-16 · 09:52 · v6 · Feature (Lager Stufe 3a, #169; Freigabe Kontroll-Chat 16.11. 08:44/08:49 mit A27–A29,
        Kern-Freigabe Ulf 08:42 für Regel/Konten)
        Neu, nur rechnend: COL listen/korrekturen/mindest, FELDER_LISTE/EINTRAG/KORREKTUR/MINDEST (= Regel RK §32),
@@ -908,9 +915,11 @@
      Freigabe KC 16.11. 08:44/08:49 (A27–A29). Nur Rechnen, kein Firestore.
      Zeitstempel kommen als Millisekunden (die Seite rechnet um).
      ================================================================= */
-  var FELDER_LISTE = ['art', 'standortId', 'nummer', 'status', 'pos', 'letzte', 'abgeschlossenVon', 'abgeschlossenName', 'abgeschlossenAm'];
-  var FELDER_EINTRAG = ['artikelId', 'menge', 'ortId', 'von', 'vonName', 'ts'];
-  var FELDER_KORREKTUR = ['listeId', 'posId', 'art', 'artikelId', 'ortId', 'standortId', 'statt', 'nur', 'wirktAb', 'konto', 'name', 'ts'];
+  /* RK §34 (18.11.2026): …Person = Personen-Nummer zum Namen (Stationskonto: null); der Name ist Rufname, sonst
+     Beschreibung dieser Person bzw. die Notiz des Stationskontos — die Seite holt beides über BOS_NAMEN.ichSelbst. */
+  var FELDER_LISTE = ['art', 'standortId', 'nummer', 'status', 'pos', 'letzte', 'abgeschlossenVon', 'abgeschlossenPerson', 'abgeschlossenName', 'abgeschlossenAm'];
+  var FELDER_EINTRAG = ['artikelId', 'menge', 'ortId', 'von', 'vonPerson', 'vonName', 'ts'];
+  var FELDER_KORREKTUR = ['listeId', 'posId', 'art', 'artikelId', 'ortId', 'standortId', 'statt', 'nur', 'wirktAb', 'konto', 'person', 'name', 'ts'];
   var FELDER_MINDEST = ['artikelId', 'standortId', 'menge', 'geaendertVon', 'geaendertAm'];
   var LISTEN_ART = { anforderung: 'a', bestellung: 'b' };
   var POS_MUSTER = /^[A-Za-z0-9]{6,20}$/;
@@ -943,9 +952,13 @@
     return { art: art, standortId: String(standortId), nummer: nummer, status: 'offen', pos: {}, letzte: '' };
   }
   function eintragDokument(e) {
-    return { artikelId: String(e.artikelId), menge: e.menge, ortId: String(e.ortId || ''), von: String(e.von), vonName: String(e.vonName || '') };
+    return { artikelId: String(e.artikelId), menge: e.menge, ortId: String(e.ortId || ''), von: String(e.von),
+      vonPerson: typeof e.vonPerson === 'string' ? e.vonPerson : null, vonName: String(e.vonName || '') };
   }
-  function abschlussFelder(von, name) { return { status: 'zu', abgeschlossenVon: String(von), abgeschlossenName: String(name || '') }; }
+  /* person: Personen-Nummer (RK §34) oder null beim Stationskonto */
+  function abschlussFelder(von, name, person) {
+    return { status: 'zu', abgeschlossenVon: String(von), abgeschlossenPerson: typeof person === 'string' ? person : null, abgeschlossenName: String(name || '') };
+  }
   function korrekturDokument(liste, posId, nur) {
     var p = (liste && liste.pos && liste.pos[posId]) || null;
     if (!p) return null;

@@ -33,6 +33,40 @@
      status()             { geladen, fehler, anzahl, quelle }
      fehlerZeigen(el?)    Grund sichtbar in el oder als Streifen oben
 
+   WER BIN ICH — für gebundene Schreibvorgänge (seit 18.11.2026, RK §34)
+     ichSelbst(db, kennung, opt)
+                          Promise, wird NIE abgelehnt. Liest JEDES MAL frisch
+                          vom Server (source 'server'): erst personen where
+                          bosKontoId == kennung (limit 2), dann namen/{P}.
+                          Gedacht für den Aufruf UNMITTELBAR vor jedem
+                          Schreibvorgang, der einen Namen trägt (ein Rufname-
+                          Wechsel gilt ab dem nächsten Schreiben).
+                          opt: { konto, ortErlaubt }  — konto = bos_accounts-
+                          Dokument des Nutzers; ortErlaubt: true → ein Konto
+                          der Art 'ort' ohne Person bekommt seine Notiz.
+                          Ergebnis:
+                            { personId: 'P07' | null,
+                              name:   der gespeicherte Text, UNGEKÜRZT (kein trim —
+                                      die Regel nmGilt vergleicht 1:1) | '',
+                              quelle: 'rufname' | 'beschreibung' | 'ort' | '',
+                              grund:  '' | 'keine_person' | 'mehrere' | 'kein_name' |
+                                      'ort_ohne_name' | 'keine_kennung' | 'lesefehler',
+                              text:   '' | Satz für die Oberfläche (beim Lesefehler
+                                      mit err.code und err.message),
+                              fehler: null | err }
+                          Reihenfolge NE-6: rufname !== '' → Rufname, sonst
+                          beschreibung !== '' → Beschreibung, sonst Grund.
+                          Ist grund gesetzt, schreibt der Aufrufer NICHTS und
+                          zeigt text (Formular + Fehlerleiste).
+                          Nebenwirkung: der frische Eintrag ersetzt den von
+                          laden() für diese Person (anzeige() zeigt ihn dann).
+                          WARNUNG: dieselbe Reihenfolge steht in der Firestore-
+                          Regel (nmGilt, nmIch, nmOrt; RK §34) — immer beide.
+                          Unterschied zu anzeige(): anzeige() ist für die
+                          Anzeige (einmal geladen, getrimmt, mit Ersatztext);
+                          ichSelbst() ist für das, was die Regel prüft.
+     ICH_TEXT             die Texte zu grund (für Tests und Seiten)
+
    PERSONEN FÜR DIE PLANUNG (#59, 10.10.2026)
      Jede Person hat das Feld imSchichtplan (boolean). FEHLT es, gilt
      „im Plan“ — so bleiben alle Bestandspersonen ohne Schreibvorgang
@@ -74,6 +108,11 @@
        imSchichtplan, nurImSchichtplan, personenFuerPlanung, personenAlle.
        Ersetzt den Inhalt der acht wortgleichen personenUndNamen()-Kopien
        der Planungsseiten. anzeige/auswahl/laden unverändert.
+     2026-11-18 · 05:45 · v1.3 · Feature (Ein Name überall, RK §34; Bauplan
+       _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAUPLAN.md 04:28, Go KC 04:42)
+       ichSelbst() + ICH_TEXT. Erste Nutzer: Mitbringer, Lager anfordern.
+       anzeige/auswahl/laden/personen* unverändert.
+       Bau-Doku: _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
    ================================================================ */
 (function () {
   'use strict';
@@ -194,6 +233,65 @@
     return '— ohne Nummer und Konto';
   }
 
+  /* ---- Wer bin ich? (RK §34, 18.11.2026) — Name für gebundene Schreibvorgänge ----
+     Kopie von bos_meldungen.js eigenerName() (Starter §4: kopieren, nicht nachbauen),
+     erweitert: frisch vom Server, Text UNGEKÜRZT (die Regel nmGilt vergleicht 1:1),
+     kein Ersatztext, Grund statt Rückfall auf die Kennung. */
+  var ICH_TEXT = {
+    keine_person: 'Dein Konto ist mit keiner Person verknüpft — bitte Ulf Bescheid geben.',
+    mehrere: 'Mit deinem Konto sind mehrere Personen verknüpft — bitte Ulf Bescheid geben.',
+    kein_name: 'Für deine Person {p} steht kein Name in der Namensliste — bitte Ulf Bescheid geben.',
+    ort_ohne_name: 'Dieses Stationskonto hat keinen Ortsnamen (Notiz) — bitte Ulf Bescheid geben.',
+    keine_kennung: 'Nicht angemeldet — bitte an der Tür anmelden.',
+    lesefehler: 'Dein Name ließ sich nicht lesen: {f}'
+  };
+  function ichAntwort(personId, name, quelle, grund, fehler, p) {
+    var text = '';
+    if (grund) {
+      text = ICH_TEXT[grund] || grund;
+      text = text.split('{p}').join(p || '');
+      if (fehler) text = text.split('{f}').join((fehler.code ? fehler.code + ' — ' : '') + (fehler.message || String(fehler)));
+    }
+    return { personId: personId, name: name, quelle: quelle, grund: grund, text: text, fehler: fehler || null };
+  }
+  function roherText(t) { return (typeof t === 'string') ? t : ''; }
+
+  function ichSelbst(db, kennung, opt) {
+    var o = opt || {};
+    var d = db || window.db;
+    if (!kennung) return Promise.resolve(ichAntwort(null, '', '', 'keine_kennung', null));
+    if (!d || typeof d.collection !== 'function') {
+      return Promise.resolve(ichAntwort(null, '', '', 'lesefehler',
+        new Error('Keine Firestore-Verbindung (window.db fehlt — bos_firebase_config.js geladen?)')));
+    }
+    var server = { source: 'server' };
+    return Promise.resolve().then(function () {
+      return d.collection('personen').where('bosKontoId', '==', kennung).limit(2).get(server);
+    }).then(function (snap) {
+      if (snap.size > 1) return ichAntwort(null, '', '', 'mehrere', null);
+      if (snap.size === 1) {
+        var personId = snap.docs[0].id;
+        return d.collection('namen').doc(personId).get(server).then(function (n) {
+          var e = n.exists ? (n.data() || {}) : {};
+          eintraege[personId] = e;                       // anzeige() zeigt danach den frischen Stand
+          var r = roherText(e.rufname), b = roherText(e.beschreibung);
+          if (r !== '') return ichAntwort(personId, r, 'rufname', '', null);
+          if (b !== '') return ichAntwort(personId, b, 'beschreibung', '', null);
+          return ichAntwort(personId, '', '', 'kein_name', null, personId);
+        });
+      }
+      var k = o.konto || null;
+      if (o.ortErlaubt && k && k.art === 'ort') {
+        var notiz = roherText(k.name);
+        return notiz !== '' ? ichAntwort(null, notiz, 'ort', '', null) : ichAntwort(null, '', '', 'ort_ohne_name', null);
+      }
+      return ichAntwort(null, '', '', 'keine_person', null);
+    }).catch(function (f) {
+      console.error('[BOS_NAMEN] ichSelbst:', f);
+      return ichAntwort(null, '', '', 'lesefehler', f);
+    });
+  }
+
   /* ---- Personen für die Planung (#59) ---- */
   function imSchichtplan(person) {
     return !!person && person.imSchichtplan !== false;
@@ -245,6 +343,8 @@
     imSchichtplan: imSchichtplan,
     nurImSchichtplan: nurImSchichtplan,
     personenFuerPlanung: personenFuerPlanung,
-    personenAlle: personenAlle
+    personenAlle: personenAlle,
+    ichSelbst: ichSelbst,
+    ICH_TEXT: ICH_TEXT
   };
 })();

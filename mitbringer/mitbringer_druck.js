@@ -1,7 +1,7 @@
 /* ================================================================
    BäckereiOS · Mitbringer — der Zettel „Mitbringliste“ (Zettel-Form von bos_druck.js v0.4)
    ================================================================
-   Einbindung (nach bos_firebase_config.js, mitbringer_logik.js, bos_druck.js):
+   Einbindung (nach bos_firebase_config.js, mitbringer_logik.js, bos_namen.js, bos_druck.js):
      <script src="../mitbringer/mitbringer_druck.js"></script>
    Lädt OHNE die Meldeseite — die Sammeldruck-Seite (#190) bindet genau diese
    drei Dateien ein und hat damit den Zettel „mitbringer“ in ihrer Liste.
@@ -28,6 +28,12 @@
 
    2026-11-18 · 02:24 · v1 · Erstfassung (#183, Schritt 2 des Druck-Plans; Go Kontroll-Chat 01:31)
      mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
+   2026-11-18 · 05:45 · v2 · Ein Name überall (RK §34): baue() holt den Namen FRISCH über
+     BOS_MITBRINGER.ichFrisch (BOS_NAMEN.ichSelbst) unmittelbar vor dem Festhalten — nie mehr das
+     Altfeld bos_accounts.name. Ohne Person oder Namen wird nicht gedruckt, der Grund steht sichtbar da.
+     Einbindung jetzt: … mitbringer_logik.js, bos_namen.js, bos_druck.js, mitbringer_druck.js (auch im
+     Sammeldruck #190 — ohne bos_namen.js meldet baue() das mit Grund).
+     _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
    ================================================================ */
 (function (global) {
   'use strict';
@@ -42,7 +48,8 @@
     kein_haken: 'Dafür fehlt dir der Haken „Mitbringer drucken“ (Kontenverwaltung).',
     vor_frist: 'Druck ab {uhr} Uhr (Mitbringliste für {tag}).',
     nicht_pruefbar: 'Nicht prüfbar: {grund}',
-    festhalten: 'Der Druck ließ sich nicht festhalten, darum wird nicht gedruckt: {grund}'
+    festhalten: 'Der Druck ließ sich nicht festhalten, darum wird nicht gedruckt: {grund}',
+    kein_name: 'Nicht gedruckt — dein Name für den Zettel fehlt: {grund}'
   };
   function t(k, w) {
     var s = I18N_DE[k]; if (s === undefined) s = k;
@@ -74,8 +81,7 @@
       a.frist = L.fristMs(a.tag, r.einst, r.tagDok);
       if (a.jetzt < a.frist) throw fehler('mitbringer/vor-frist', t('vor_frist', { uhr: L.uhr(a.frist), tag: L.tagKurz(a.tag) }));
       a.bild = L.tagesbild(a.tag, r.meldungen, r.tagDok, r.einst, a.jetzt);
-      a.ctx = { kennung: a.kennung, name: (a.konto && a.konto.name) || '' };
-      a.db = db; a.L = L;
+      a.db = db; a.L = L;   /* der Name kommt erst in baue() — frisch (RK §34) */
       return a;
     });
   }
@@ -95,6 +101,9 @@
   /* Baut die Druck-Optionen für heute. LETZTER Schritt: Ausdruck-Stand festhalten (siehe Kopf). */
   function baue() {
     return lage().then(function (a) {
+      return a.L.ichFrisch(a.db, a.kennung, a.konto).then(function (ctx) { a.ctx = ctx; return a; },
+        function (err) { throw fehler((err && err.code) || 'mitbringer/name', t('kein_name', { grund: (err && err.message) || String(err) })); });
+    }).then(function (a) {
       var L = a.L;
       var nr = (a.daten.tagDok ? a.daten.tagDok.drucke : 0) + 1;
       var optionen = L.druckOptionen(a.bild, { gedrucktMs: a.jetzt, druckNr: nr });

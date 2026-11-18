@@ -58,6 +58,7 @@
    dreht, dreht dort mit — und umgekehrt.
 
    CHANGELOG
+     2026-11-18 · 05:45 · v1.6d · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
      2026-11-18 · 02:24 · v1.6c · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
      2026-11-16 · 09:36 · v1.6b · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44; RK §32). Sonst unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
      2026-11-11 · 06:50 · v1.6a · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules (Lager Stufe 2, #120; Freigabe KC 11.11. 06:43; RK §31). Sonst unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
@@ -88,7 +89,7 @@
      Regeldatei wechseln (REGEL_DATEI bzw. RUECKFALL.datei). */
   var FRIST_WEG = 'versatz';
   var REGEL_FASSUNG = 'maschinen-b-2026-10-24';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
   var RUECKFALL = { fassung: 'maschinen-b-fenster-2026-10-24', datei: 'RUECKFALL_A_firestore_regeln_2026-10-24_maschinen_b.rules' };
   if (FRIST_WEG === 'fenster') { REGEL_FASSUNG = RUECKFALL.fassung; REGEL_DATEI = RUECKFALL.datei; }
   var FRIST_FELD = FRIST_WEG === 'fenster' ? 'ablauf' : 'fristStart';

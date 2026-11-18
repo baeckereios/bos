@@ -4,6 +4,7 @@
   MODUL: teigecke/teigecke_nacht.html — BrotTeigRechner (bis 16.10.2026 „Teigecke Nacht“; Stufe 2: Teigführung)
   Doku:  teigecke/TEIGECKE_NACHT_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   CHANGELOG
+    2026-11-18 · 05:45 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). REGEL_FASSUNG und sonst alles unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
     2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31, Ulf 01:28: keine andere offene Lieferung auf dieser Datei, nur diese Zeile; RK §33). REGEL_FASSUNG und sonst alles unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
     2026-11-16 · 09:36 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44, Kern-Freigabe Ulf 08:42 nur für diese Zeile; RK §32). REGEL_FASSUNG und sonst alles unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
     2026-11-11 · 06:50 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-11_lager_zaehlen.rules (Lager Stufe 2, #120; Freigabe KC 11.11. 06:43, Anweisung §3.5; RK §31). REGEL_FASSUNG und sonst alles unverändert. lager/_protokolle/SESSION_2026-11-11_LAGER_STUFE2_ZAEHLEN_BAU.md
@@ -1213,7 +1214,7 @@ window.addEventListener('offline', planeRender);
    kein Schreiben, keine Daten. Nur „permission-denied“ vom SERVER zählt als
    „alt“; ohne Netz oder bei anderen Fehlern bleibt es still (unbekannt). */
 const REGEL_FASSUNG = 'lager-2026-11-02';   /* Mehl-Regel, Langzeit, Jahreszeit (RK §19) + Lager-Stamm lesen (RK §30) */
-const REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
+const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt */
 async function pruefeRegelstand() {
   try {
     await window.db.collection('bos_regelstand').doc(REGEL_FASSUNG).get({ source: 'server' });

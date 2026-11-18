@@ -32,12 +32,14 @@
      mitbringer_meldungen/{autoId}  eine Meldung = ein Dokument
        tag 'JJJJ-MM-TT' (fest) · bereich frueh|nacht|konditorei · materialId ·
        materialName (Kopie, Regel prüft sie) · menge 1–999 ganz · einheit ·
-       freitext 0–200 · vonKonto, vonName, erstellt (fest, Serverzeit)
-       optional: geaendertVon/-Name/-Am · aufgenommenVon/-Name/-Am ·
-       gestrichenVon/-Name/-Am
+       freitext 0–200 · vonKonto, vonPerson, vonName, erstellt (fest, Serverzeit)
+       optional: geaendertVon/-Person/-Name/-Am · aufgenommenVon/-Person/-Name/-Am ·
+       gestrichenVon/-Person/-Name/-Am
+       NAME (RK §34): …Name = Rufname, sonst Beschreibung der Person …Person, die dem Konto
+       gehört (Regel nmIch). Kommt NUR aus ichFrisch() → BOS_NAMEN.ichSelbst().
      mitbringer_tage/{JJJJ-MM-TT}   Ausdruck-Stand
        fristZeit (Frist beim ersten Druck, fest) · ersterDruck (fest) ·
-       letzterDruck · drucke · druckVon · druckName
+       letzterDruck · drucke · druckVon · druckPerson · druckName
      mitbringer_material/{id}       name, einheiten[], aktiv, reihenfolge,
        geaendertVon, geaendertAm, sicherungId — nie löschen
      mitbringer_einstellungen/allgemein  fristMinute, leerzeilen, …
@@ -50,7 +52,7 @@
      KEINE Rolle zählt, auch admin nicht (Ulf 18.11.2026).
 
    WARNUNG: FELDER_*, GRENZEN und BEREICHE stehen genauso in der
-   Firestore-Regel (firestore_regeln_2026-11-18_mitbringer.rules, RK §33).
+   Firestore-Regel (firestore_regeln_2026-11-18_namen.rules, RK §33, §34).
    test_mitbringer.js vergleicht beides — immer beide ändern.
 
    Keine Daten in dieser Datei: keine Personen, keine Betriebsangaben. Die
@@ -60,6 +62,12 @@
      Ulf 01:28: Sonstiges mit Pflicht-Freitext, lesen für alle Konten, nur Haken, leerer
      Zettel druckbar, nach dem Druck streichen)
      mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
+   2026-11-18 · 05:45 · v2 · Ein Name überall (RK §34; Bauplan 04:28, Go KC 04:42): Name auf Meldung,
+     Änderung, Aufnahme, Streichung und Ausdruck-Stand = Rufname, sonst Beschreibung der EIGENEN Person
+     (BOS_NAMEN.ichSelbst, frisch vor jedem Schreiben über ichFrisch), dazu die Personen-Nummer
+     (vonPerson, geaendertPerson, aufgenommenPerson, gestrichenPerson, druckPerson). Nie mehr das
+     Altfeld bos_accounts.name. REGEL_FASSUNG mitbringer-namen-2026-11-18.
+     _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
    ================================================================ */
 (function (global) {
   'use strict';
@@ -67,8 +75,8 @@
   var COL = { meldungen: 'mitbringer_meldungen', tage: 'mitbringer_tage', material: 'mitbringer_material',
     einstellungen: 'mitbringer_einstellungen', sicherungen: 'mitbringer_sicherungen' };
   var EINSTELLUNG_ID = 'allgemein';
-  var REGEL_FASSUNG = 'mitbringer-2026-11-18';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+  var REGEL_FASSUNG = 'mitbringer-namen-2026-11-18';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
   var ZONE = 'Europe/Berlin';
   var SONSTIGES = 'sonstiges';
   var PRUEF_VORSATZ = 'zz_pruef_';   /* Prüf-Material der Prüfseite (Fall Z): keine Seite zeigt es */
@@ -90,13 +98,13 @@
      mitbringer_einstellungen/allgemein fehlt. Geändert wird die Frist im Reiter „Material“. */
   var START = { fristMinute: 300, leerzeilen: 5 };
 
-  var FELDER_MELDUNG = ['tag', 'bereich', 'materialId', 'materialName', 'menge', 'einheit', 'freitext', 'vonKonto', 'vonName', 'erstellt'];
+  var FELDER_MELDUNG = ['tag', 'bereich', 'materialId', 'materialName', 'menge', 'einheit', 'freitext', 'vonKonto', 'vonPerson', 'vonName', 'erstellt'];
   var FELDER_INHALT = ['bereich', 'materialId', 'materialName', 'menge', 'einheit', 'freitext'];
-  var FELDER_GEAENDERT = ['geaendertVon', 'geaendertName', 'geaendertAm'];
-  var FELDER_AUFGENOMMEN = ['aufgenommenVon', 'aufgenommenName', 'aufgenommenAm'];
-  var FELDER_GESTRICHEN = ['gestrichenVon', 'gestrichenName', 'gestrichenAm'];
-  var FELDER_TAG = ['fristZeit', 'ersterDruck', 'letzterDruck', 'drucke', 'druckVon', 'druckName'];
-  var FELDER_TAG_NACHDRUCK = ['letzterDruck', 'drucke', 'druckVon', 'druckName'];
+  var FELDER_GEAENDERT = ['geaendertVon', 'geaendertPerson', 'geaendertName', 'geaendertAm'];
+  var FELDER_AUFGENOMMEN = ['aufgenommenVon', 'aufgenommenPerson', 'aufgenommenName', 'aufgenommenAm'];
+  var FELDER_GESTRICHEN = ['gestrichenVon', 'gestrichenPerson', 'gestrichenName', 'gestrichenAm'];
+  var FELDER_TAG = ['fristZeit', 'ersterDruck', 'letzterDruck', 'drucke', 'druckVon', 'druckPerson', 'druckName'];
+  var FELDER_TAG_NACHDRUCK = ['letzterDruck', 'drucke', 'druckVon', 'druckPerson', 'druckName'];
   var FELDER_MATERIAL = ['name', 'einheiten', 'aktiv', 'reihenfolge', 'geaendertVon', 'geaendertAm', 'sicherungId'];
   var FELDER_EINSTELLUNG = ['fristMinute', 'leerzeilen', 'geaendertVon', 'geaendertAm', 'sicherungId'];
   var FELDER_SICHERUNG = ['collection', 'dokId', 'aktion', 'vorher', 'konto', 'ts'];
@@ -301,15 +309,16 @@
   function inhalt(e, material) {
     return { bereich: e.bereich, materialId: material.id, materialName: material.name, menge: e.menge, einheit: e.einheit, freitext: String(e.freitext || '').trim() };
   }
-  /* ctx = { kennung, name }; zeit = serverTimestamp() */
+  /* ctx = { kennung, personId, name } aus ichFrisch() (Name ungekürzt, RK §34); zeit = serverTimestamp() */
+  function pid(ctx) { return (ctx && typeof ctx.personId === 'string') ? ctx.personId : null; }
   function neueMeldung(e, ctx, material, zeit) {
-    return Object.assign({ tag: e.tag }, inhalt(e, material), { vonKonto: ctx.kennung, vonName: ctx.name || '', erstellt: zeit });
+    return Object.assign({ tag: e.tag }, inhalt(e, material), { vonKonto: ctx.kennung, vonPerson: pid(ctx), vonName: ctx.name || '', erstellt: zeit });
   }
   function inhaltAenderung(e, ctx, material, zeit) {
-    return Object.assign(inhalt(e, material), { geaendertVon: ctx.kennung, geaendertName: ctx.name || '', geaendertAm: zeit });
+    return Object.assign(inhalt(e, material), { geaendertVon: ctx.kennung, geaendertPerson: pid(ctx), geaendertName: ctx.name || '', geaendertAm: zeit });
   }
-  function aufnahme(ctx, zeit) { return { aufgenommenVon: ctx.kennung, aufgenommenName: ctx.name || '', aufgenommenAm: zeit }; }
-  function streichung(ctx, zeit) { return { gestrichenVon: ctx.kennung, gestrichenName: ctx.name || '', gestrichenAm: zeit }; }
+  function aufnahme(ctx, zeit) { return { aufgenommenVon: ctx.kennung, aufgenommenPerson: pid(ctx), aufgenommenName: ctx.name || '', aufgenommenAm: zeit }; }
+  function streichung(ctx, zeit) { return { gestrichenVon: ctx.kennung, gestrichenPerson: pid(ctx), gestrichenName: ctx.name || '', gestrichenAm: zeit }; }
 
   function einheitenAus(text) {   /* „Stück, Stapel“ → ['Stück', 'Stapel'] (ohne Doppelte) */
     var aus = [];
@@ -463,6 +472,20 @@
       return { meldungen: a, tagDok: r[1].exists ? tagAus(r[1].data()) : null, einst: einstellungenVon(r[2].exists ? r[2].data() : null) };
     });
   }
+  /* Name frisch vor JEDEM Schreibvorgang (RK §34, Go KC 04:42): → ctx { kennung, personId, name, quelle }.
+     Ohne Person, ohne Namen: abgelehnt mit code 'mitbringer/name-<grund>' und dem sichtbaren Satz aus
+     BOS_NAMEN.ichSelbst. Beim Lesefehler mit dem ECHTEN code (z. B. permission-denied, unavailable) und
+     dem Satz „Dein Name ließ sich nicht lesen: <code — message>“; err.ich = Ergebnis von ichSelbst. Melden nur
+     Personen — darum kein Ort-Rückfall (ortErlaubt fehlt). */
+  function ichFrisch(db, kennung, konto) {
+    var N = global.BOS_NAMEN;
+    if (!N || typeof N.ichSelbst !== 'function') return Promise.reject(fehler('mitbringer/name-modul', 'bos_namen.js (ab v1.3, ichSelbst) ist nicht geladen — Seite neu laden.'));
+    return N.ichSelbst(db, kennung, { konto: konto || null }).then(function (r) {
+      /* Beim Lesefehler bleibt der echte Code (permission-denied, unavailable …) — die Seite erklärt ihn dann wie jeden anderen. */
+      if (r.grund) { var f = fehler(r.grund === 'lesefehler' && r.fehler && r.fehler.code ? r.fehler.code : 'mitbringer/name-' + r.grund, r.text); f.ich = r; throw f; }
+      return { kennung: kennung, personId: r.personId, name: r.name, quelle: r.quelle };
+    });
+  }
   function ladeKonto(db, kennung) {
     return db.collection('bos_accounts').doc(kennung).get().then(function (d) { return d.exists ? d.data() : null; });
   }
@@ -540,11 +563,11 @@
     return ref.get({ source: 'server' }).then(function (s) {
       var z = jetztServer();
       if (!s.exists) {
-        return ref.set({ fristZeit: new Date(frist), ersterDruck: z, letzterDruck: z, drucke: 1, druckVon: ctx.kennung, druckName: ctx.name || '' })
+        return ref.set({ fristZeit: new Date(frist), ersterDruck: z, letzterDruck: z, drucke: 1, druckVon: ctx.kennung, druckPerson: pid(ctx), druckName: ctx.name || '' })
           .then(function () { return { nr: 1 }; });
       }
       var n = (typeof s.data().drucke === 'number' ? s.data().drucke : 0) + 1;
-      return ref.update({ letzterDruck: z, drucke: n, druckVon: ctx.kennung, druckName: ctx.name || '' }).then(function () { return { nr: n }; });
+      return ref.update({ letzterDruck: z, drucke: n, druckVon: ctx.kennung, druckPerson: pid(ctx), druckName: ctx.name || '' }).then(function () { return { nr: n }; });
     });
   }
 
@@ -564,7 +587,7 @@
     einheitenAus: einheitenAus, materialIdAus: materialIdAus, materialIdGueltig: materialIdGueltig, pruefeMaterial: pruefeMaterial,
     materialDok: materialDok, einstellungDok: einstellungDok, sicherungDok: sicherungDok,
     rechte: rechte, DRUCK_CSS: DRUCK_CSS, druckHTML: druckHTML, druckOptionen: druckOptionen,
-    beobachteTag: beobachteTag, beobachteMaterial: beobachteMaterial, ladeTag: ladeTag, ladeKonto: ladeKonto, pruefeRegelstand: pruefeRegelstand,
+    beobachteTag: beobachteTag, beobachteMaterial: beobachteMaterial, ladeTag: ladeTag, ladeKonto: ladeKonto, ichFrisch: ichFrisch, pruefeRegelstand: pruefeRegelstand,
     melde: melde, aendere: aendere, loesche: loesche, streiche: streiche, nimmAuf: nimmAuf,
     speichereMaterial: speichereMaterial, speichereEinstellungen: speichereEinstellungen, legeStartlisteAn: legeStartlisteAn, haltDruckFest: haltDruckFest
   };

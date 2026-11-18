@@ -4,7 +4,7 @@
   MODUL: lager/lager_anfordern.html — Lager anfordern (Anforderungsliste statt Zettel, Bestellungen, Mindestmengen)
   Doku:  lager/LAGER_ANFORDERN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (Liste, Bestand je Ort, Hauptort, „Bitte nachbestellen“, Druckansicht)
-  Regel: RK §32 (firestore_regeln_2026-11-16_lager_anfordern.rules) — lager_listen/{standortId}__{a|b}{n}:
+  Regel: RK §32, §34 (firestore_regeln_2026-11-18_namen.rules) — lager_listen/{standortId}__{a|b}{n}:
          je Standort und Art genau eine offene Liste; jede Änderung genau EIN Eintrag (letzte);
          „Abschließen“ setzt die Liste auf zu und legt im selben Vorgang die nächste offene an (Transaktion).
          Die abgeschlossene Liste IST die Buchung. Korrekturen (lager_korrekturen) nur anlegen,
@@ -13,7 +13,15 @@
           Rolle admin darf alles. Kachel über Registry-Feld haken: ['lagerAnfordern', 'lagerBestellen'].
   Ohne Netz: nichts ändern (Knöpfe grau mit Grund) — das Abschließen ist eine Transaktion (Bauplan §6.5).
   Drucken: erst buchen, dann BOS_DRUCK.drucken (Iframe, nie window.print). Nachdruck bucht nie.
+  Name (RK §34): auf Eintrag, Abschluss und Korrektur steht der Rufname, sonst die Beschreibung der EIGENEN
+          Person (frisch vor jedem Schreiben, ichFrisch → BOS_NAMEN.ichSelbst), am Stationskonto (Art „Ort“, ohne
+          Person) die Notiz = der Ortsname. Dazu die Personen-Nummer (vonPerson, abgeschlossenPerson, person; Ort: null).
   CHANGELOG
+    2026-11-18 · 05:45 · v2 · Ein Name überall (RK §34; Bauplan 04:28, Go KC 04:42): Name nie mehr aus dem Altfeld
+      bos_accounts.name einer Person; meinName() durch ichFrisch() ersetzt; Kopfzeile zeigt den frischen Namen bzw.
+      den Grund. Ohne Person/Namen: Eintragen, Abschließen, Korrektur grau mit Grund, nichts geschrieben. Neu
+      eingebunden: ../bos_namen.js. REGEL_FASSUNG lager-namen-2026-11-18, REGEL_DATEI firestore_regeln_2026-11-18_namen.rules.
+      _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
     2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). REGEL_FASSUNG und sonst alles unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
     2026-11-16 · 09:59 · v1 · Erstfassung (Lager Stufe 3a, #169; Freigabe Kontroll-Chat 16.11. 08:44/08:49,
       Ulf F1 b, F2 a, F3; Auflagen A27 Ort am Eintrag sichtbar und wählbar, A28 siehe Zählseite)
@@ -161,6 +169,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
 <script src="lager_logik.js"></script>
+<script src="../bos_namen.js"></script>          <!-- RK §34: ichSelbst — Name frisch vor jedem Schreiben -->
 <script src="../bos_druck.js"></script>
 <script src="../bos_ungespeichert.js"></script>
 
@@ -175,8 +184,8 @@
    ================================================================== */
 const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
-const REGEL_FASSUNG = 'lager-anfordern-2026-11-16';
-const REGEL_DATEI = 'firestore_regeln_2026-11-18_mitbringer.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_FASSUNG = 'lager-namen-2026-11-18';
+const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SPEICHER_STANDORT = 'bos_lager_anfordern_standort';
 const ART_TEXT = { anforderung: 'Liste', bestellung: 'Bestellung' };
 
@@ -214,7 +223,8 @@ const I18N_DE = {
   bestand_fehler: 'Bestand nicht berechenbar: {grund}',
   regel_alt: '⚠︎ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Eintragen und Abschließen werden abgelehnt. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
   regel_unbekannt: 'Regelstand „{fassung}“ ließ sich nicht prüfen (wohl kein Netz). [{grund}]',
-  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: kein Haken für diesen Standort, die Liste ist inzwischen abgeschlossen, oder die Regeln sind älter als diese Seite.',
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: kein Haken für diesen Standort, die Liste ist inzwischen abgeschlossen, die Regeln sind älter als diese Seite, oder dein Rufname wurde gerade geändert (dann einfach nochmal tippen).',
+  err_name: 'Dein Name für die Liste',
   err_netz: 'Keine Verbindung zum Server (WLAN?).',
   err_laden: 'Laden „{was}“', err_eintrag: 'Eintragen', err_abschluss: 'Abschließen', err_drucken: 'Drucken', err_korrektur: 'Melden',
   err_mindest: 'Mindestmenge speichern', err_anlegen: 'Liste anlegen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen', err_bestand: 'Bestand rechnen'
@@ -229,7 +239,7 @@ const esc = LG.esc;
 
 /* ---------- Zustand ---------- */
 const S = {
-  kennung: null, konto: null, geladen: false, regelstand: 'unbekannt', netz: navigator.onLine !== false,
+  kennung: null, konto: null, ich: { grund: '', text: '', name: '', personId: null }, geladen: false, regelstand: 'unbekannt', netz: navigator.onLine !== false,
   standorte: [], orte: [], artikel: [], lieferanten: [], stand: [], mindest: [],
   offeneAlle: null,            /* Abfrage status == 'offen' (alle Standorte); null = noch nicht da */
   gebucht: [], korrekturen: [], bestandFehler: '', t0: undefined,
@@ -377,7 +387,8 @@ async function start() {
     try { const k = await window.db.collection('bos_accounts').doc(S.kennung).get(); S.konto = k.exists ? k.data() : null; }
     catch (err) { zeigeFehler(t('err_konto'), err); }
   }
-  document.getElementById('kontoZeile').textContent = (S.konto && S.konto.name) || S.kennung || t('kein_konto');
+  zeigeKonto();
+  if (S.kennung) { try { await ichFrisch(); } catch (err) { zeigeFehler(t('err_name'), err); } }
   try { const w = localStorage.getItem(SPEICHER_STANDORT); if (w) S.standortId = w; } catch (e) { /* Speicher gesperrt: dann eben wählen */ }
   abonniere();
   S.geladen = true;
@@ -392,7 +403,31 @@ function darfAnfordern(sid) { const k = konto(); return !!k && (k.role === 'admi
 function darfBestellen() { const k = konto(); return !!k && (k.role === 'admin' || k.lagerBestellen === true); }
 function darf(art, sid) { return art === 'bestellung' ? darfBestellen() : darfAnfordern(sid); }
 function erlaubte() { return LG.aktiv(S.standorte).filter(function (s) { return darfAnfordern(s.id) || darfBestellen(); }).sort(LG.nachSort); }
-function meinName() { return String((konto() && konto().name) || ''); }
+/* RK §34: Name FRISCH vor jedem Schreibvorgang mit Namen — Rufname, sonst Beschreibung der eigenen Person;
+   Stationskonto (Art „Ort“, keine Person): Notiz = Ortsname. Ein dauerhafter Grund sperrt Eintragen, Abschließen
+   und Korrektur mit Text; ein Lesefehler nicht (der nächste Versuch liest wieder frisch). → { personId, name } */
+async function ichFrisch() {
+  const N = window.BOS_NAMEN;
+  if (!N || typeof N.ichSelbst !== 'function') throw Object.assign(new Error('bos_namen.js (ab v1.3, ichSelbst) ist nicht geladen — Seite neu laden.'), { code: 'lager/name-modul' });
+  const r = await N.ichSelbst(window.db, S.kennung, { konto: S.konto, ortErlaubt: true });
+  if (r.grund) {
+    const dauerhaft = ['keine_person', 'mehrere', 'kein_name', 'ort_ohne_name', 'keine_kennung'].indexOf(r.grund) !== -1;
+    S.ich = { grund: dauerhaft ? r.grund : '', text: r.text, name: '', personId: null };
+    zeigeKonto(); planeRender();
+    throw Object.assign(new Error(r.text), { code: r.grund === 'lesefehler' && r.fehler && r.fehler.code ? r.fehler.code : 'lager/name-' + r.grund });   /* Lesefehler: echter Code */
+  }
+  S.ich = { grund: '', text: '', name: r.name, personId: r.personId };
+  zeigeKonto();
+  return { personId: r.personId, name: r.name };
+}
+function grundName() { return S.ich && S.ich.grund ? S.ich.text : ''; }
+function zeigeKonto() {
+  const el = document.getElementById('kontoZeile');
+  if (!S.kennung) { el.textContent = t('kein_konto'); return; }
+  el.textContent = S.ich.name || S.ich.text || '…';
+}
+/* wie sperrGrund, dazu der Name (Eintrag, Abschluss, Korrektur tragen einen Namen) */
+function sperrGrundName(art) { return sperrGrund(art) || grundName(); }
 /* Warum geht Schreiben gerade nicht? '' = es geht */
 function sperrGrund(art) {
   if (!darf(art, S.standortId)) return t('grund_recht');
@@ -453,16 +488,17 @@ async function schreibeEintrag(liste, posId, eintrag) {
 async function abschliessen(art) {
   const l = offen(art); if (!l) return;
   const db = window.db, sid = S.standortId, ref = db.collection(COL.listen).doc(l.id), naechste = db.collection(COL.listen).doc(LG.listeId(sid, art, l.nummer + 1));
-  let ergebnis = null;
+  let ergebnis = null, ich = null;
   S.schreibt = true; schliesseSheet(); planeRender();
   try {
+    ich = await ichFrisch();   /* vor der Transaktion: darin geht keine Abfrage (RK §34) */
     await db.runTransaction(function (tx) {
       return tx.get(ref).then(function (s) {
         if (!s.exists) throw Object.assign(new Error(ART_TEXT[art] + ' ' + l.nummer + ' gibt es nicht'), { code: 'bos/fehlt' });
         const x = listeAus(s);
         if (x.status !== 'offen') { ergebnis = { schonZu: true, liste: x }; return; }
         if (!Object.keys(x.pos || {}).length) throw Object.assign(new Error(t('grund_leer')), { code: 'bos/leer' });
-        tx.update(ref, Object.assign(LG.abschlussFelder(S.kennung, meinName()), { abgeschlossenAm: firebase.firestore.FieldValue.serverTimestamp() }));
+        tx.update(ref, Object.assign(LG.abschlussFelder(S.kennung, ich.name, ich.personId), { abgeschlossenAm: firebase.firestore.FieldValue.serverTimestamp() }));
         tx.set(naechste, LG.neueListeDokument(art, sid, l.nummer + 1));
         ergebnis = { schonZu: false, liste: x };
       });
@@ -479,7 +515,7 @@ async function abschliessen(art) {
     planeRender(); return;
   }
   /* Abschlusszeit vom Server holen (für Ausdruck und „nach dieser Liste“); misslingt das, Gerätezeit mit Vermerk */
-  let gebucht = Object.assign({}, ergebnis.liste, { status: 'zu', abgeschlossenVon: S.kennung, abgeschlossenName: meinName(), abgeschlossenMs: Date.now() }), zeitVermerk = ' (Gerätezeit)';
+  let gebucht = Object.assign({}, ergebnis.liste, { status: 'zu', abgeschlossenVon: S.kennung, abgeschlossenPerson: ich.personId, abgeschlossenName: ich.name, abgeschlossenMs: Date.now() }), zeitVermerk = ' (Gerätezeit)';
   try { const s2 = await ref.get(); if (s2.exists) { gebucht = listeAus(s2); zeitVermerk = ''; } }
   catch (err) { console.warn('[Lager anfordern] Abschlusszeit nicht gelesen:', rohText(err)); }
   if (art === 'anforderung') {
@@ -515,7 +551,9 @@ function drucke(liste, nachdruck, zeitVermerk) {
 async function speichereKorrektur(liste, posId, nur) {
   const k = LG.korrekturDokument(liste, posId, nur);
   if (!k) return false;
-  const doc = Object.assign(k, { wirktAb: liste._am, konto: S.kennung, name: meinName(), ts: firebase.firestore.FieldValue.serverTimestamp() });
+  let ich;
+  try { ich = await ichFrisch(); } catch (err) { zeigeFehler(t('err_korrektur'), err); setzeSheetMeldung(fehlerText(t('err_korrektur'), err)); return false; }
+  const doc = Object.assign(k, { wirktAb: liste._am, konto: S.kennung, person: ich.personId, name: ich.name, ts: firebase.firestore.FieldValue.serverTimestamp() });
   try { await window.db.collection(COL.korrekturen).doc(LG.korrekturId(liste.id, posId)).set(doc); return true; }
   catch (err) { zeigeFehler(t('err_korrektur'), err); setzeSheetMeldung(fehlerText(t('err_korrektur'), err)); return false; }
 }
@@ -592,11 +630,13 @@ async function eintragSpeichern() {
   const m = LG.mengeAus(document.getElementById('mengeFeld').value);
   if (!LG.mengeGueltig(m)) { setzeSheetMeldung(t('menge_falsch', { max: LG.GRENZEN.mengeMax })); return; }
   const liste = offen(s.listenArt); if (!liste) { setzeSheetMeldung(t('liste_keine')); return; }
-  const g = sperrGrund(s.listenArt); if (g) { setzeSheetMeldung(g); return; }
+  const g = sperrGrundName(s.listenArt); if (g) { setzeSheetMeldung(g); return; }
   const w = document.getElementById('ortWahl'), ortId = w ? w.value : (s.ortStart || '');
   if (!s.posId && Object.keys(liste.pos || {}).length >= LG.GRENZEN.posMax) { setzeSheetMeldung('Höchstens ' + LG.GRENZEN.posMax + ' Einträge je Liste.'); return; }
   const posId = s.posId || LG.neuePosId();
-  const ok = await schreibeEintrag(liste, posId, { artikelId: s.artikelId, menge: m, ortId: ortId, von: S.kennung, vonName: meinName() });
+  let ich;
+  try { ich = await ichFrisch(); } catch (err) { zeigeFehler(t('err_eintrag'), err); setzeSheetMeldung(fehlerText(t('err_eintrag'), err)); return; }
+  const ok = await schreibeEintrag(liste, posId, { artikelId: s.artikelId, menge: m, ortId: ortId, von: S.kennung, vonPerson: ich.personId, vonName: ich.name });
   if (ok) schliesseSheet();
 }
 function oeffneAbschluss(art) {
@@ -620,7 +660,7 @@ async function korrekturSpeichern() {
   const l = S.archiv[s.listeId], p = l && l.pos[s.posId]; if (!p) return;
   const nur = LG.mengeAus(document.getElementById('nurFeld').value);
   if (!LG.korrekturGueltig(p.menge, nur)) { setzeSheetMeldung(t('korr_falsch', { statt: LG.mengeText(p.menge) })); return; }
-  const g = sperrGrund(l.art); if (g) { setzeSheetMeldung(g); return; }
+  const g = sperrGrundName(l.art); if (g) { setzeSheetMeldung(g); return; }
   if (await speichereKorrektur(l, s.posId, nur)) schliesseSheet();
 }
 
@@ -672,7 +712,7 @@ function eintragZeile(art, x, aktiv) {
 function listeHTML(art) {
   const l = offen(art);
   if (!l) { const g0 = sperrGrund(art); return '<div class="leer">' + esc(t('liste_keine')) + (g0 ? '<div class="grund" id="grund_' + art + '">' + esc(g0) + '</div>' : (S.regelstand === 'passt' ? '<div class="grund">' + esc(t('liste_wartet')) + '</div>' : '')) + '</div>'; }
-  const grund = sperrGrund(art), aktiv = !grund && !S.schreibt;
+  const grund = sperrGrundName(art), aktiv = !grund && !S.schreibt;
   const gruppen = LG.listeNachOrt(l, { artikel: S.artikel, orte: S.orte }, false);
   let h = '<h3>' + esc(t(art === 'bestellung' ? 'bestellung_kopf' : 'liste_kopf', { n: l.nummer })) + '</h3>';
   if (!gruppen.length) h += '<div class="leer">' + esc(t('liste_leer')) + '</div>';
@@ -706,7 +746,7 @@ function archivHTML(art) {
   const listen = ids.map(function (id) { return S.archiv[id]; }).filter(function (l) { return l && l.status === 'zu'; });
   let h = art === 'bestellung' ? '<h3>' + esc(t('reiter_archiv')) + '</h3>' : '';
   if (!listen.length) return h + '<div class="leer">' + esc(t('archiv_leer')) + '</div>';
-  const grund = sperrGrund(art);
+  const grund = sperrGrundName(art);
   listen.forEach(function (l) {
     const korr = {}; (S.archivKorr[l.id] || []).forEach(function (k) { korr[k.posId] = k; });
     h += '<h3>' + esc(t('archiv_kopf', { art: ART_TEXT[art], n: l.nummer, zeit: zeitKurz(l.abgeschlossenMs), name: l.abgeschlossenName || '?' })) + '</h3>';

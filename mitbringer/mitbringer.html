@@ -7,7 +7,7 @@
          beobachteTag, lesen, schreiben, Druckansicht). Diese Seite rechnet nichts selbst.
   Druck: mitbringer/mitbringer_druck.js meldet den Zettel „mitbringer“ bei BOS_DRUCK an; die Seite druckt
          über denselben Zettel (BOS_DRUCK.zettel.drucke(['mitbringer'])) und baut nichts Zweites.
-  Regel: RK §33 (firestore_regeln_2026-11-18_mitbringer.rules) — mitbringer_meldungen (eine Meldung = ein
+  Regel: RK §33, §34 (firestore_regeln_2026-11-18_namen.rules) — mitbringer_meldungen (eine Meldung = ein
          Dokument), mitbringer_tage (Ausdruck-Stand), mitbringer_material, mitbringer_einstellungen,
          mitbringer_sicherungen.
   Rechte: lesen jedes freigeschaltete Konto · melden nur Personenkonten · drucken Haken „Mitbringer
@@ -23,6 +23,12 @@
       „Sonstiges“ mit Pflicht-Freitext, lesen für alle Konten, nur Haken, leerer Zettel druckbar,
       nach dem Druck streichen statt löschen)
       mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
+    2026-11-18 · 05:45 · v2 · Ein Name überall (RK §34; Bauplan 04:28, Go KC 04:42): Name auf Meldung,
+      Änderung, Streichung, Aufnahme und Druck = Rufname, sonst Beschreibung der EIGENEN Person, frisch vor
+      jedem Schreiben (ctxFrisch → BOS_MITBRINGER.ichFrisch → BOS_NAMEN.ichSelbst). Kopfzeile zeigt diesen
+      Namen bzw. den Grund, nie mehr das Altfeld. Ohne Person/Namen: Knöpfe grau mit Grund, nichts
+      geschrieben. Neu eingebunden: ../bos_namen.js. Regelstand mitbringer-namen-2026-11-18.
+      _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
 -->
 <head>
 <meta charset="UTF-8">
@@ -181,6 +187,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../bos_firebase_config.js"></script>
 <script src="mitbringer_logik.js"></script>
+<script src="../bos_namen.js"></script>          <!-- RK §34: ichSelbst — Name frisch vor jedem Schreiben -->
 <script src="../bos_druck.js"></script>
 <script src="mitbringer_druck.js"></script>
 <script src="../bos_ungespeichert.js"></script>
@@ -240,7 +247,8 @@ const I18N_DE = {
   ein_frist: 'Bitte eine Uhrzeit eingeben. Zwischen 02:00 und 02:59 geht nicht (Zeitumstellung).', ein_leer: 'Leerzeilen: bitte eine ganze Zahl von 0 bis {max}.',
   regel_alt: '⚠︎ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Melden und Ändern werden abgelehnt. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
   regel_unbekannt: 'Regelstand „{fassung}“ ließ sich nicht prüfen (wohl kein Netz). [{grund}]',
-  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: Dir fehlt der Haken, die Meldung steht inzwischen auf einem Zettel, oder die Regeln sind älter als diese Seite.',
+  err_perm: 'Keine Berechtigung — die Datenbank hat abgelehnt. Mögliche Gründe: Dir fehlt der Haken, die Meldung steht inzwischen auf einem Zettel, die Regeln sind älter als diese Seite, oder dein Rufname wurde gerade geändert (dann einfach nochmal tippen).',
+  err_name: 'Dein Name für die Liste',
   err_netz: 'Keine Verbindung zum Server (WLAN?).',
   err_laden: 'Laden „{was}“', err_melden: 'Melden', err_aendern: 'Ändern', err_loeschen: 'Löschen', err_streichen: 'Durchstreichen', err_aufnehmen: 'Auf die Liste nehmen', err_drucken: 'Drucken',
   err_material: 'Material speichern', err_einstellung: 'Einstellungen speichern', err_start: 'Startliste anlegen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen'
@@ -257,14 +265,40 @@ function tHtml(k, w) { const m = {}; Object.keys(w || {}).forEach(function (x) {
 
 /* ---------- Zustand ---------- */
 const S = {
-  kennung: null, konto: null, recht: { lesen: false, melden: false, drucken: false, bearbeiten: false },
+  kennung: null, konto: null, ich: { grund: '', text: '', name: '', personId: null }, recht: { lesen: false, melden: false, drucken: false, bearbeiten: false },
   geladen: false, regelstand: 'unbekannt', regelGrund: '', netz: navigator.onLine !== false,
   tage: { heute: null, morgen: null }, roh: { heute: null, morgen: null }, wahl: null,   /* wahl: null = Vorschlag */
   einst: L ? L.einstellungenVon(null) : null, material: null,
   reiter: 'liste', sheet: null, schreibt: false, sicher: null
 };
 function jetzt() { return Date.now(); }
-function ctx() { return { kennung: S.kennung, name: (S.konto && S.konto.name) || '' }; }
+/* Nur für Material, Einstellungen, Startliste: dort steht kein Name, nur die Kennung. */
+function ctx() { return { kennung: S.kennung }; }
+/* RK §34: Name FRISCH vor jedem Schreibvorgang, der einen Namen trägt (Rufname, sonst Beschreibung).
+   Ein dauerhafter Grund (keine Person, mehrere, kein Name) sperrt die Knöpfe mit Text; ein Lesefehler nicht —
+   der nächste Versuch liest wieder frisch. */
+async function ctxFrisch() {
+  try {
+    const c = await L.ichFrisch(window.db, S.kennung, S.konto);
+    S.ich = { grund: '', text: '', name: c.name, personId: c.personId };
+    zeigeKonto();
+    return c;
+  } catch (err) {
+    const g = err && err.ich ? err.ich.grund : '';
+    const dauerhaft = ['keine_person', 'mehrere', 'kein_name', 'keine_kennung'].indexOf(g) !== -1;
+    S.ich = { grund: dauerhaft ? g : '', text: (err && err.message) || String(err), name: '', personId: null };
+    zeigeKonto(); planeRender();
+    throw err;
+  }
+}
+function grundName() { return S.ich && S.ich.grund ? S.ich.text : ''; }
+function zeigeKonto() {
+  const el = document.getElementById('kontoZeile');
+  if (!S.kennung) { el.textContent = t('kein_konto'); return; }
+  /* Stationskonto: der Ortsname (Notiz) — melden geht dort ohnehin nicht (station_hinweis) */
+  if (S.konto && S.konto.art === 'ort') { el.textContent = String(S.konto.name || '') || S.kennung; return; }
+  el.textContent = S.ich.name || S.ich.text || '…';
+}
 
 /* ---------- Fehler sichtbar (Checkliste §7a) ---------- */
 function erklaerung(err) {
@@ -354,7 +388,10 @@ async function start() {
     catch (err) { zeigeFehler(t('err_konto'), err); }
   }
   S.recht = L.rechte(S.konto);
-  document.getElementById('kontoZeile').textContent = (S.konto && S.konto.name) || S.kennung || t('kein_konto');
+  zeigeKonto();
+  if (S.kennung && !(S.konto && S.konto.art === 'ort')) {
+    try { await ctxFrisch(); } catch (err) { zeigeFehler(t('err_name'), err); }
+  }
   const kh = document.getElementById('kontoHinweis');
   if (S.konto && S.konto.art === 'ort') { kh.textContent = t('station_hinweis'); kh.classList.remove('hidden'); }
   abonniere();
@@ -372,6 +409,7 @@ function grundSchreiben() {
 function grundMelden() {
   if (!S.kennung) return t('kein_konto');
   if (!S.recht.melden) return t(S.konto && S.konto.art === 'ort' ? 'grund_station' : 'grund_person');
+  if (grundName()) return grundName();
   if (S.material === null) return t('grund_laedt');
   if (!L.aktivesMaterial(S.material).length) return t('grund_material');
   return grundSchreiben();
@@ -381,7 +419,7 @@ function grundDrucken(k, b) {
   if (!D || !D.angemeldet) return t('grund_druck_modul', { grund: (D && D.fehler) || 'mitbringer_druck.js fehlt' });
   if (k !== 'heute') return t('grund_druck_tag', { uhr: L.uhr(b.fristMs) });
   if (!b.fristVorbei) return t('grund_druck_frist', { uhr: L.uhr(b.fristMs) });
-  return grundSchreiben();
+  return grundName() || grundSchreiben();
 }
 
 /* ---------- Zeichnen ---------- */
@@ -427,7 +465,7 @@ function zeileHTML(z) {
   else if (z.nachzuegler && z.aufgenommen) marken.push('<span class="marke gut">' + esc(t('marke_aufgenommen', { wann: L.uhr(z.aufgenommenMs), name: z.aufgenommenName })) + '</span>');
   if (z.nochNichtGedruckt) marken.push('<span class="marke warn">' + esc(t('marke_neu')) + '</span>');
   const knoepfe = [];
-  if (S.recht.bearbeiten && z.nachzuegler && !z.aufgenommen && !z.gestrichen && !z.wartet) knoepfe.push('<button type="button" class="btn btn-outline btn-klein" data-aktion="aufnehmen" data-id="' + esc(z.id) + '"' + (grundSchreiben() ? ' disabled' : '') + '>' + esc(t('aufnehmen')) + '</button>');
+  if (S.recht.bearbeiten && z.nachzuegler && !z.aufgenommen && !z.gestrichen && !z.wartet) knoepfe.push('<button type="button" class="btn btn-outline btn-klein" data-aktion="aufnehmen" data-id="' + esc(z.id) + '"' + (grundName() || grundSchreiben() ? ' disabled' : '') + '>' + esc(t('aufnehmen')) + '</button>');
   if (darfAendern) knoepfe.push('<button type="button" class="icon" data-aktion="aendern" data-id="' + esc(z.id) + '" aria-label="' + esc(t('aendern_titel')) + '">✎</button>');
   return '<div class="zeile' + (z.gestrichen ? ' gestrichen' : '') + (z.nachzuegler && !z.aufgenommen && !z.gestrichen ? ' nachzuegler' : '') + '" data-meldung="' + esc(z.id) + '">' +
     '<div class="menge">' + esc(z.menge) + ' ' + esc(z.einheit) + '</div>' +
@@ -550,17 +588,17 @@ function eingabe() {
 const EIN_TEXT = { bereich: 'ein_bereich', material: 'ein_material', material_aus: 'ein_material_aus', einheit: 'ein_einheit', menge: 'ein_menge', freitext_lang: 'ein_freitext_lang', freitext_pflicht: 'ein_freitext_pflicht', tag: 'ein_tag' };
 async function meldungSpeichern() {
   const s = S.sheet; if (!s || S.schreibt) return;
-  const g = s.id ? grundSchreiben() : grundMelden();
+  const g = s.id ? (grundName() || grundSchreiben()) : grundMelden();
   if (g) { sheetMeldung(g); return; }
   const e = eingabe(), m = materialNachId(e.materialId);
   const p = L.pruefeEingabe(e, m, !s.id);
   if (p) { sheetMeldung(t(EIN_TEXT[p], { min: L.GRENZEN.mengeMin, max: p === 'menge' ? L.GRENZEN.mengeMax : L.GRENZEN.freitext })); return; }
   S.schreibt = true; sheetMeldung('');
   try {
-    if (s.id) { await L.aendere(window.db, ctx(), s.id, e, m); schliesseSheet(); toast(t('gespeichert')); }
+    if (s.id) { await L.aendere(window.db, await ctxFrisch(), s.id, e, m); schliesseSheet(); toast(t('gespeichert')); }
     else {
       const frist = bild(s.tagWahl).fristMs, tagWort = t(s.tagWahl) + ' (' + L.tagKurz(e.tag) + ')';
-      const r = await L.melde(window.db, ctx(), e, m);
+      const r = await L.melde(window.db, await ctxFrisch(), e, m);
       try { localStorage.setItem(SPEICHER_BEREICH, e.bereich); } catch (x) { /* egal */ }
       S.wahl = s.tagWahl; schliesseSheet();
       if (r.erstelltMs !== null && r.erstelltMs >= frist) meldung(t('als_nachzuegler', { uhr: L.uhr(r.erstelltMs), frist: L.uhr(frist) }), 'warn');
@@ -572,19 +610,21 @@ async function meldungSpeichern() {
 /* Löschen und Durchstreichen: zweimal tippen statt Browser-Dialog */
 async function meldungWeg(knopf, art) {
   const s = S.sheet; if (!s || !s.id || S.schreibt) return;
-  const g = grundSchreiben(); if (g) { sheetMeldung(g); return; }
+  const g = (art === 'loeschen' ? '' : grundName()) || grundSchreiben(); if (g) { sheetMeldung(g); return; }
   if (S.sicher !== art) { S.sicher = art; knopf.textContent = t(art === 'loeschen' ? 'loeschen_sicher' : 'streichen_sicher'); return; }
   S.schreibt = true;
   try {
-    if (art === 'loeschen') await L.loesche(window.db, s.id); else await L.streiche(window.db, ctx(), s.id);
+    if (art === 'loeschen') await L.loesche(window.db, s.id); else await L.streiche(window.db, await ctxFrisch(), s.id);
     schliesseSheet(); toast(t(art === 'loeschen' ? 'geloescht' : 'gestrichen'));
   } catch (err) { zeigeFehler(t(art === 'loeschen' ? 'err_loeschen' : 'err_streichen'), err); sheetMeldung(fehlerText(t(art === 'loeschen' ? 'err_loeschen' : 'err_streichen'), err)); }
   finally { S.schreibt = false; planeRender(); }
 }
 async function aufnehmen(id) {
-  if (S.schreibt || grundSchreiben()) return;
+  const g = grundName() || grundSchreiben();
+  if (S.schreibt) return;
+  if (g) { meldung(g, 'warn'); return; }
   S.schreibt = true;
-  try { await L.nimmAuf(window.db, ctx(), id); toast(t('aufgenommen')); }
+  try { await L.nimmAuf(window.db, await ctxFrisch(), id); toast(t('aufgenommen')); }
   catch (err) { zeigeFehler(t('err_aufnehmen'), err); }
   finally { S.schreibt = false; planeRender(); }
 }
