@@ -3,6 +3,11 @@
 <!--
   MODUL: maschinenseite/maschinenseite.html — Maschinen (Stufe A + B + Nachträge Übersicht und 2)
   CHANGELOG
+    2026-11-18 · 12:19 · v1.4 · Ein Name überall, Lieferung 2 (RK §34; Freigabe KC 18.11. 09:17 §4, Antwort 11:00;
+      _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md): Name und Personen-Nummer FRISCH vor jedem Speichern
+      (BOS_MASCHINEN.ichFrisch → BOS_NAMEN.ichSelbst) statt einmal je Seite aus bos_meldungen.js; Kopfzeile zeigt
+      den Namen oder den Grund; ohne Person/Namen sind Senden, Anpinnen und Speichern grau mit Grund; Name neu holen
+      bei „online“ und beim Ausblenden der Fehlerleiste.
     2026-10-24 · 13:41 · v1.3 · Gestaltung (Nachtrag 2 „Reiter, Zurück-Pfeil, Reparatur-Zeile, Chatfenster zuerst“,
       Go KC 24.10. 13:28; Kompendium M42–M44, Ulf F1 a, KC F2, Auflagen A1–A4). Kopf: großer ← links (alle Ansichten
       außer der Liste), Name, darunter klein „Maschinen · Name“, ❓; darunter flache Ofen-Reiter (role=tab,
@@ -278,8 +283,8 @@
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
 <script src="../bos_produkte.js"></script>
-<script src="../bos_meldungen.js"></script>          <!-- BOS_MELDUNGEN.ich() (dein Name) und .offen() (offene Reparaturanfragen, Stufe B) -->
-<script src="../bos_namen.js"></script>              <!-- Verwalten: Namen zur Maschinenführer-Auswahl -->
+<script src="../bos_namen.js"></script>              <!-- Verwalten: Namen zur Maschinenführer-Auswahl; RK §34: ichSelbst (dein Name, frisch) -->
+<script src="../bos_meldungen.js"></script>          <!-- BOS_MELDUNGEN.offen() (offene Reparaturanfragen, Stufe B) -->
 <script src="../teigecke/teigecke_logik.js"></script> <!-- nur backtag(): Wechsel um 12:00 -->
 <script src="../bos_druck.js"></script>
 <script src="../bos_ungespeichert.js"></script>
@@ -333,6 +338,7 @@ const A = window.BOS_MASCHINEN_ANSICHT;
 const I18N_DE = {
   titel: 'Maschinen', lade: 'Einen Moment …',
   du_als: '· {name}',
+  du_als_grund: '· ⚠ ohne Namen wird nichts gespeichert: {grund}',
   ab_admin: 'Admin', ab_fuehrer: 'Maschinenführer',
   liste_titel: 'Maschinen', liste_leer: 'Noch keine Maschine angelegt.', liste_leer_admin: 'Noch keine Maschine angelegt. Mit „＋ Maschine“ fängst du an.',
   neu_maschine: '＋ Maschine', ausgeblendet_titel: 'Ausgeblendete Maschinen ({n})',
@@ -471,7 +477,9 @@ function zeigeFehler(was, err) {
 document.getElementById('fehlerZuBtn').addEventListener('click', function () {
   document.getElementById('fehlerLeiste').hidden = true;
   document.getElementById('fehlerListe').innerHTML = '';
+  nameNeu();   // RK §34: eine veraltete Namens-Meldung oben soll nicht stehen bleiben
 });
+window.addEventListener('online', function () { nameNeu(); });
 window.onerror = function (msg, quelle, zeile, spalte, err) {
   zeigeFehler(t('err_unbehandelt'), err || new Error(String(msg) + ' (' + (quelle || '') + ':' + (zeile || '') + ')'));
 };
@@ -583,7 +591,7 @@ function setzeFilter(k) {
 function werZeile() {
   const el = document.getElementById('werZeile');
   if (!S.ich) { el.textContent = ''; return; }
-  el.innerHTML = esc(t('du_als', { name: S.ich.name })) +
+  el.innerHTML = esc(S.ich.name ? t('du_als', { name: S.ich.name }) : t('du_als_grund', { grund: S.ich.text || '…' })) +
     (istAdmin() ? '<span class="abzeichen">' + esc(t('ab_admin')) + '</span>' : '') +
     (S.maschine && istFuehrerHier() ? '<span class="abzeichen">' + esc(t('ab_fuehrer')) + '</span>' : '');
 }
@@ -603,9 +611,8 @@ async function start() {
   try { S.konto = await M.ladeKonto(null, S.kennung); }
   catch (e) { zeigeFehler(t('err_laden', { was: t('w_konto') }), e); document.getElementById('ladeStatus').textContent = ''; return; }
   S.zugang = M.zugang(S.konto);
-  try { S.ich = window.BOS_MELDUNGEN ? await window.BOS_MELDUNGEN.ich() : { kennung: S.kennung, name: S.kennung, warnungen: [] }; }
-  catch (e) { S.ich = { kennung: S.kennung, name: S.kennung, warnungen: [] }; }
-  (S.ich.warnungen || []).forEach(function (w) { hinweis(w); });
+  if (S.zugang.person) { try { await ichJetzt(); } catch (e) { /* Grund steht oben (werZeile) */ } }   /* RK §34 */
+  else { S.ich = { kennung: S.kennung, name: '', personId: null, grund: '', text: '' }; }
   werZeile();
   if (!S.zugang.lesen) { zeigeZugang(); return; }
   if (S.zugang.admin && !S.zugang.person) hinweis(t('zg_admin_hinweis'));
@@ -716,7 +723,30 @@ function zeichneWerkzeuge() {
     const b = document.getElementById(x[0]); if (b) b.addEventListener('click', function () { geheZu(S.mid, x[1]); });
   });
 }
-function ich() { return { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung }; }
+/* RK §34: Name FRISCH unmittelbar vor jedem Speichern (Rufname, sonst Beschreibung der eigenen Person).
+   Dauerhafter Grund → Knöpfe grau mit Text (nameSperre); Lesefehler sperrt nicht, der nächste Versuch liest neu. */
+const NAME_DAUERHAFT = ['keine_person', 'mehrere', 'kein_name', 'keine_kennung', 'modul'];
+async function ichJetzt() {
+  try {
+    const r = await M.ichFrisch(null, S.kennung, S.konto);
+    S.ich = { kennung: S.kennung, name: r.name, personId: r.personId, grund: '', text: '' };
+    werZeile();
+    return r;
+  } catch (err) {
+    const g = err && err.ich ? err.ich.grund : String((err && err.code) || '').replace('maschinen/name-', '');
+    S.ich = { kennung: S.kennung, name: '', personId: null, grund: NAME_DAUERHAFT.indexOf(g) !== -1 ? g : '', text: (err && err.message) || String(err) };
+    werZeile();
+    throw err;
+  }
+}
+function nameSperre() { return S.ich && S.ich.grund ? S.ich.text : ''; }
+/* Fehler beim Namen holen: der Text ist schon der Grund (kein erklaere) */
+function nameFehler(err) { return err && (err.ich || /^maschinen\/name-/.test(String(err.code || ''))) ? { art: 'kein_name', meldung: err.message, original: err.ich && err.ich.fehler ? M.fehlerOriginal(err.ich.fehler) : '' } : null; }
+/* bei „online“ und beim Ausblenden der Fehlerleiste (KC 18.11. 09:17 §3 Anm. 2) */
+function nameNeu() {
+  if (!S.kennung || !S.zugang || !S.zugang.person) return Promise.resolve();
+  return ichJetzt().then(function () { zeige(); }, function () { zeige(); });
+}
 function fehlerText(e) { const x = (e && e.meldung) ? e : M.einordnen(e); return x.meldung + (x.original ? ' (' + x.original + ')' : ''); }
 function woText(ofen) { return ofen === 'alle' ? t('chat_gilt_alle') : M.ofenName(S.maschine, ofen); }
 
@@ -864,7 +894,7 @@ function giltWahlHTML() {
         esc(k === 'alle' ? t('ik_alle') : M.ofenKurz(m, k)) + '</button>';
     }).join('') + '</div>';
 }
-function sendenGesperrt(text) { return S.chat.laeuft || !String(text || '').trim() || (S.ofenAktiv === 'alle' && !S.chat.gilt); }
+function sendenGesperrt(text) { return S.chat.laeuft || !!nameSperre() || !String(text || '').trim() || (S.ofenAktiv === 'alle' && !S.chat.gilt); }
 function notizHTML(n, jetzt) {
   const pin = M.istAngepinnt(n), id = n.id, mel = S.chat.notizMeldung[id], laeuft = !!S.chat.laeuftNotiz[id];
   const eigen = n.von === S.kennung;
@@ -878,7 +908,7 @@ function notizHTML(n, jetzt) {
   const knoepfe = [];
   if (S.zugang.person && !n._ausstehend) {
     const tx = pin ? t('chat_nadel_los') : t('chat_nadel_an');
-    knoepfe.push('<button type="button" class="mini-btn nadel' + (pin ? ' an' : '') + '" data-pin="' + esc(id) + '" data-an="' + (pin ? '0' : '1') + '" aria-pressed="' + (pin ? 'true' : 'false') + '" title="' + esc(tx) + '" aria-label="' + esc(tx) + '"' + (laeuft ? ' disabled' : '') + '>📌</button>');
+    knoepfe.push('<button type="button" class="mini-btn nadel' + (pin ? ' an' : '') + '" data-pin="' + esc(id) + '" data-an="' + (pin ? '0' : '1') + '" aria-pressed="' + (pin ? 'true' : 'false') + '" title="' + esc(nameSperre() || tx) + '" aria-label="' + esc(tx) + '"' + (laeuft || nameSperre() ? ' disabled' : '') + '>📌</button>');
   }
   if (M.darfNotizLoeschen(n, S.kennung, S.zugang) && !n._ausstehend) {
     const tx = (eigen && S.zugang.person ? t('chat_loeschen') : t('chat_loeschen_admin')).replace(/^🗑\s*/, '');   /* das Zeichen steht schon auf dem Knopf */
@@ -910,12 +940,14 @@ async function sendeNotiz() {
   const ofen = S.ofenAktiv === 'alle' ? c.gilt : S.ofenAktiv;   /* unter „Alle“: die Pflichtwahl (D5) */
   if (!ofen) { c.meldung = { text: t('chat_gilt_fehlt') }; zeichneChatFormular(); return; }
   c.laeuft = true; c.meldung = null; zeichneChatFormular();
+  let wer = null;
   try {
-    await M.notizAnlegen(null, { maschine: S.mid, exemplar: ofen, text: c.entwurf }, ich(), c.pin);
+    wer = await ichJetzt();
+    await M.notizAnlegen(null, { maschine: S.mid, exemplar: ofen, text: c.entwurf }, wer, c.pin);
     c.entwurf = ''; c.pin = false; c.gilt = null; c.offen = false; c.meldung = { text: t('chat_ok'), ok: true };   /* G5: nach dem Senden zu */
   } catch (err) {
     console.error('[Maschinen] Notiz speichern:', err);
-    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'notiz', kennung: S.kennung, maschineId: S.mid, exemplar: ofen });
+    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : nameFehler(err) || await M.erklaere(null, err, { art: 'notiz', kennung: S.kennung, maschineId: S.mid, exemplar: ofen, ich: wer });
     c.meldung = { text: e.meldung, original: e.original };
   } finally { c.laeuft = false; }
   zeichneChat();
@@ -924,10 +956,11 @@ async function pinneNotiz(id, anpinnen) {
   const n = notizNach(id); if (!n || S.chat.laeuftNotiz[id]) return;
   if (!anpinnen && M.loesenLoescht(n, Date.now()) && !window.confirm(t('chat_loesen_alt', { tage: M.alterTage(n, Date.now()) }))) return;
   S.chat.laeuftNotiz[id] = true; delete S.chat.notizMeldung[id]; zeichneChatListe();
-  try { await M.notizPinnen(null, id, anpinnen, ich()); }
+  let wer = null;
+  try { wer = anpinnen ? await ichJetzt() : { kennung: S.kennung }; await M.notizPinnen(null, id, anpinnen, wer); }   /* lösen trägt keinen Namen */
   catch (err) {
     console.error('[Maschinen] anpinnen/lösen:', err);
-    const e = err && err.code === 'weg' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'pinnen', kennung: S.kennung, maschineId: S.mid, exemplar: n.exemplar });
+    const e = err && err.code === 'weg' ? { meldung: err.message, original: '' } : nameFehler(err) || await M.erklaere(null, err, { art: 'pinnen', kennung: S.kennung, maschineId: S.mid, exemplar: n.exemplar, ich: anpinnen ? wer : null });
     S.chat.notizMeldung[id] = { text: e.meldung, original: e.original };
   } finally { delete S.chat.laeuftNotiz[id]; }
   zeichneChatListe();
@@ -996,7 +1029,7 @@ function ikFormHTML(k, neu, i, anzahl) {
     '<div class="v-feld"><label for="ikX_' + esc(id) + '">' + esc(t('ik_text_feld')) + ' <span class="klein" data-ikzaehler="' + esc(id) + '">' + esc(t('chat_zaehler', { n: String(text || '').length, max: M.GRENZEN_B.KARTE })) + '</span></label>' +
     '<textarea class="bos-input" id="ikX_' + esc(id) + '" data-iktext="' + esc(id) + '" maxlength="' + M.GRENZEN_B.KARTE + '">' + esc(text) + '</textarea></div>' +
     '<div class="ed-unter"><span class="klein">' + (neu ? '' : esc(t('ik_zuletzt', { name: k.geaendertVonName || k.geaendertVon, zeit: M.zeitText(k.geaendertAm) }))) + '</span><span class="knopfreihe" style="margin:0">' +
-    (geaendert ? '<button type="button" class="bos-btn bos-btn--amber" data-iksave="' + esc(id) + '"' + (laeuft ? ' disabled' : '') + '>' + esc(laeuft ? t('ed_speichert') : t('ik_speichern')) + '</button>' : '') +
+    (geaendert ? '<button type="button" class="bos-btn bos-btn--amber" data-iksave="' + esc(id) + '"' + (laeuft || nameSperre() ? ' disabled title="' + esc(nameSperre()) + '"' : '') + '>' + esc(laeuft ? t('ed_speichert') : t('ik_speichern')) + '</button>' : '') +
     (neu ? '<button type="button" class="bos-btn" data-ikverwerfen="' + esc(id) + '">' + esc(t('ik_verwerfen')) + '</button>' : '<button type="button" class="bos-btn" data-ikweg="' + esc(id) + '"' + (laeuft ? ' disabled' : '') + '>' + esc(t('ik_loeschen')) + '</button>') +
     '</span></div>';
   if (mel) h += '<div class="ed-meldung' + (mel.ok ? ' ok' : '') + '">' + esc(mel.text) + (mel.original ? ' <span class="klein">(' + esc(mel.original) + ')</span>' : '') +
@@ -1064,16 +1097,17 @@ async function speichereIk(id) {
   const falsch = M.pruefeKarte(eingabe, S.maschine);
   if (falsch.length) { S.ik.meldung[id] = { text: falsch.join(' ') }; zeichneKartenEditor(); return; }
   S.ik.laeuft[id] = true; delete S.ik.konflikt[id]; delete S.ik.meldung[id]; zeichneKartenEditor();
-  let neueId = null;
+  let neueId = null, wer = null;
   try {
-    neueId = await M.speichereKarte(null, eingabe, f.neu ? null : k, ich(), S.maschine);
+    wer = await ichJetzt();
+    neueId = await M.speichereKarte(null, eingabe, f.neu ? null : k, wer, S.maschine);
     if (f.neu) S.ik.neu = S.ik.neu.filter(function (n) { return n.tmp !== id; });
     else { delete S.ik.eingabe[id]; delete S.ik.geaendert[id]; }
     await ladeKartenNeu();
     S.ik.meldung[neueId] = { text: t('ik_gespeichert'), ok: true };
   } catch (err) {
     console.error('[Maschinen] Karte speichern:', err);
-    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : await M.erklaere(null, err, { art: 'karte', kennung: S.kennung, maschineId: S.mid, karteId: f.neu ? null : k.id, altStand: f.neu ? null : k.stand });
+    const e = err && err.code === 'eingabe' ? { meldung: err.message, original: '' } : nameFehler(err) || await M.erklaere(null, err, { art: 'karte', kennung: S.kennung, maschineId: S.mid, karteId: f.neu ? null : k.id, altStand: f.neu ? null : k.stand, ich: wer });
     S.ik.meldung[id] = { text: e.meldung, original: e.original };
     if (e.art === 'konflikt' || e.art === 'karte_weg') S.ik.konflikt[id] = true;
   } finally { delete S.ik.laeuft[id]; }
@@ -1118,10 +1152,11 @@ async function loescheIk(id) {
 async function tauscheIk(a, b) {
   if (S.ik.laeuft[a.id] || S.ik.laeuft[b.id]) return;
   S.ik.laeuft[a.id] = true; S.ik.laeuft[b.id] = true; zeichneKartenEditor();
-  try { await M.tauscheKarten(null, a, b, ich()); await ladeKartenNeu(); (S.karten || []).forEach(function (k) { if (S.ik.eingabe[k.id]) ikMarkiere(k); }); }
+  let wer = null;
+  try { wer = await ichJetzt(); await M.tauscheKarten(null, a, b, wer); await ladeKartenNeu(); (S.karten || []).forEach(function (k) { if (S.ik.eingabe[k.id]) ikMarkiere(k); }); }
   catch (err) {
     console.error('[Maschinen] Karten tauschen:', err);
-    const e = await M.erklaere(null, err, { art: 'karte', kennung: S.kennung, maschineId: S.mid, karteId: a.id, altStand: a.stand });
+    const e = nameFehler(err) || await M.erklaere(null, err, { art: 'karte', kennung: S.kennung, maschineId: S.mid, karteId: a.id, altStand: a.stand, ich: wer });
     S.ik.meldung[a.id] = { text: e.meldung, original: e.original };
     if (e.art === 'konflikt' || e.art === 'karte_weg') S.ik.konflikt[a.id] = true;
   } finally { delete S.ik.laeuft[a.id]; delete S.ik.laeuft[b.id]; }
@@ -1209,7 +1244,7 @@ function zeichneEditor() {
   /* N1: Reihenfolge speichern geht auch, solange es „noch nicht einsortiert“ gibt (sonst bliebe die Marke bei einem einzigen Produkt für immer stehen) */
   const folgeAktiv = (S.ed.folgeGeaendert || folge.some(function (k) { return S.ed.neu[k]; })) && !S.ed.laeuft.__folge;
   /* N2: auf dem Handy klebt die Leiste unten und ist leer unsichtbar (Klasse leer) */
-  h += '<div class="ed-leiste knopfreihe' + (n || folgeAktiv ? '' : ' leer') + '" id="edLeiste"><button type="button" class="bos-btn bos-btn--amber" id="alleBtn"' + (n && !S.speichertAlle ? '' : ' disabled') + '>' + alleText(n) + '</button>' +
+  h += '<div class="ed-leiste knopfreihe' + (n || folgeAktiv ? '' : ' leer') + '" id="edLeiste"><button type="button" class="bos-btn bos-btn--amber" id="alleBtn"' + (n && !S.speichertAlle && !nameSperre() ? '' : ' disabled') + '>' + alleText(n) + '</button>' +
     '<button type="button" class="bos-btn" id="folgeBtn"' + (folgeAktiv ? '' : ' disabled') + '><span class="lang">' + esc(t('ed_reihenfolge')) + '</span><span class="kurz">' + esc(t('ed_reihenfolge_kurz')) + '</span></button><span class="klein" id="folgeMeldung"></span></div>' +
     '<p class="klein">' + esc(t('ed_reihenfolge_hinweis')) + '</p>';
   h += folge.map(function (k, i) { return karteHTML(pmap[k], i, folge.length); }).join('');
@@ -1236,7 +1271,7 @@ function karteHTML(p, i, anzahl) {
     return '<div class="ed-feld breit"><label for="' + esc(id) + '">' + esc(f.name) + '</label><textarea class="bos-input' + (falsch ? ' falsch' : '') + '" id="' + esc(id) + '" data-wert="' + esc(k) + '" data-feld="' + esc(f.id) + '" maxlength="' + M.SEITE.TEXT + '" placeholder="–">' + esc(v) + '</textarea></div>';
   }).join('') + '</div>';
   h += '<div class="ed-unter"><span class="klein">' + esc(a ? t('ed_zuletzt', { name: a.geaendertVonName || a.geaendertVon, zeit: M.zeitText(a.geaendertAm) }) : t('ed_noch_nichts')) + '</span>' +
-    (geaendert ? '<button type="button" class="bos-btn bos-btn--amber" data-speichern="' + esc(k) + '"' + (S.ed.laeuft[k] || S.speichertAlle ? ' disabled' : '') + '>' + esc(S.ed.laeuft[k] ? t('ed_speichert') : t('ed_speichern')) + '</button>' : '') + '</div>';
+    (geaendert ? '<button type="button" class="bos-btn bos-btn--amber" data-speichern="' + esc(k) + '"' + (S.ed.laeuft[k] || S.speichertAlle || nameSperre() ? ' disabled title="' + esc(nameSperre()) + '"' : '') + '>' + esc(S.ed.laeuft[k] ? t('ed_speichert') : t('ed_speichern')) + '</button>' : '') + '</div>';
   const mel = S.ed.meldung[k];
   if (mel) h += '<div class="ed-meldung' + (mel.ok ? ' ok' : '') + '" data-meldung="' + esc(k) + '">' + esc(mel.text) + (mel.original ? ' <span class="klein">(' + esc(mel.original) + ')</span>' : '') +
     (S.ed.konflikt[k] ? '<div class="knopfreihe"><button type="button" class="bos-btn" data-neuladen="' + esc(k) + '">' + esc(t('ed_neu_laden')) + '</button></div>' : '') + '</div>';
@@ -1266,7 +1301,7 @@ function bindeEditor() {
       markiere(k);
       delete S.ed.meldung[k];
       if (vorher !== !!S.ed.geaendert[k]) zeichneEditorBehalteFokus(el.id);
-      else { const ab = document.getElementById('alleBtn'); if (ab) { const n = Object.keys(S.ed.geaendert).length; ab.innerHTML = alleText(n); ab.disabled = !n || S.speichertAlle; } }
+      else { const ab = document.getElementById('alleBtn'); if (ab) { const n = Object.keys(S.ed.geaendert).length; ab.innerHTML = alleText(n); ab.disabled = !n || S.speichertAlle || !!nameSperre(); } }
     });
   });
   main.querySelectorAll('[data-hoch],[data-runter]').forEach(function (b) {
@@ -1310,17 +1345,19 @@ async function speichereKarte(k) {
   const werte = M.werteAus(felder(), eingabe, a ? a.werte : {});
   if (M.werteGleich(werte, a ? a.werte || {} : {})) { delete S.ed.geaendert[k]; S.ed.meldung[k] = { text: t('ed_unveraendert'), ok: true }; return true; }
   S.ed.laeuft[k] = true; delete S.ed.konflikt[k]; zeichneEditor();
+  let wer = null;
   try {
     let alt = a;
     if (S.ed.veraltet[k]) { alt = await M.ladeAngabe(null, S.mid, k); S.angaben[k] = alt || undefined; delete S.ed.veraltet[k]; }
-    await M.speichereAngaben(null, S.mid, k, werte, alt, { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung });
+    wer = await ichJetzt();
+    await M.speichereAngaben(null, S.mid, k, werte, alt, wer);
     delete S.ed.geaendert[k]; delete S.ed.eingabe[k];
     try { const frisch = await M.ladeAngabe(null, S.mid, k); if (frisch) S.angaben[k] = frisch; else S.ed.veraltet[k] = true; }
     catch (e2) { S.ed.veraltet[k] = true; }
     S.ed.meldung[k] = { text: t('ed_gespeichert'), ok: true };
     return true;
   } catch (err) {
-    const e = await M.erklaere(null, err, { art: 'angaben', kennung: S.kennung, maschineId: S.mid, produktKey: k, altAm: a ? a.geaendertAm : null });
+    const e = nameFehler(err) || await M.erklaere(null, err, { art: 'angaben', kennung: S.kennung, maschineId: S.mid, produktKey: k, altAm: a ? a.geaendertAm : null, ich: wer });
     console.error('[Maschinen] Angaben speichern:', err);
     S.ed.meldung[k] = { text: e.meldung, original: e.original };
     if (e.art === 'konflikt') S.ed.konflikt[k] = e.jetzt;
@@ -1352,15 +1389,17 @@ async function speichereFolge() {
   if (!S.ed || S.ed.laeuft.__folge) return;
   S.ed.laeuft.__folge = true; zeichneEditor();
   const el = function () { return document.getElementById('folgeMeldung'); };
+  let wer = null;
   try {
     const liste = M.reihenfolgeNeu(S.reihenfolge ? S.reihenfolge.produkte : [], sichtbareFolge());
-    await M.speichereReihenfolge(null, S.mid, liste, { kennung: S.kennung, name: S.ich ? S.ich.name : S.kennung });
+    wer = await ichJetzt();
+    await M.speichereReihenfolge(null, S.mid, liste, wer);
     S.ed.folgeGeaendert = false; S.ed.neu = {};
     try { S.reihenfolge = await M.ladeReihenfolge(null, S.mid); } catch (e2) { S.reihenfolge = { produkte: liste }; }
     delete S.ed.laeuft.__folge; zeichneEditor(); if (el()) el().textContent = t('ed_reihenfolge_ok'); toast(t('ed_reihenfolge_ok'));
   } catch (err) {
     console.error('[Maschinen] Reihenfolge speichern:', err);
-    const e = await M.erklaere(null, err, { art: 'reihenfolge', kennung: S.kennung, maschineId: S.mid });
+    const e = nameFehler(err) || await M.erklaere(null, err, { art: 'reihenfolge', kennung: S.kennung, maschineId: S.mid, ich: wer });
     delete S.ed.laeuft.__folge; zeichneEditor();
     zeigeFehler(t('err_speichern', { was: t('w_reihenfolge') }), e);
   }

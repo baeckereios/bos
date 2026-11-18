@@ -20,19 +20,19 @@
        geaendertVon, geaendertAm
        (reserviert, NICHT gebaut, NICHT in der Regel: apps — K6)
      maschinen_reihenfolge/{maschineId}     nur Maschinenführer
-       produkte [legacyKey …], geaendertVon, geaendertVonName, geaendertAm
+       produkte [legacyKey …], geaendertVon, geaendertPerson, geaendertVonName, geaendertAm
      maschinen_angaben/{maschineId}__{legacyKey}   nur Maschinenführer
        maschine, produkt, werte { feldId: 'Text' }, frueher [ { werte, von,
-       vonName, am } … ] (neueste zuerst, höchstens 20), geaendertVon,
-       geaendertVonName, geaendertAm
+       vonName, am } … ] (neueste zuerst, höchstens 20; Kopien OHNE Person), geaendertVon,
+       geaendertPerson, geaendertVonName, geaendertAm
      Produktfeld werdegang [maschineId …] — schreibt der Produkt-Editor,
        nicht diese Datei.
 
    STUFE B (24.10.2026, Regel RK §28, Fassung REGEL_FASSUNG):
      maschinen_notizen/{auto}   Chatfenster — jedes Personenkonto
-       maschine, exemplar ("1"…"12" | "alle"), text (≤ 500), von, vonName,
+       maschine, exemplar ("1"…"12" | "alle"), text (≤ 500), von, vonPerson, vonName,
        erstellt (Serverzeit), fristStart (= erstellt; fehlt = angepinnt),
-       angepinntVon, angepinntVonName (nur solange angepinnt).
+       angepinntVon, angepinntPerson, angepinntVonName (nur solange angepinnt).
        Gelöscht wird von der TTL-Richtlinie der Datenbank: Feld fristStart,
        Versatz 40 Tage (Google-Cloud-Konsole bzw. Cloud Shell). Die Seite
        blendet selbst nach FRIST_TAGE aus (K2) und rechnet NIE mit
@@ -44,7 +44,13 @@
      maschinen_karten/{auto}    Info-Karten — nur Maschinenführer
        maschine, exemplar, titel (≤ 60), text (≤ 2000), rang (0–99),
        stand (1, dann genau +1 = Sperrzettel), geaendertVon,
-       geaendertVonName, geaendertAm.
+       geaendertPerson, geaendertVonName, geaendertAm.
+     NAME (RK §34, Ein Name überall, seit 18.11.2026): jeder …Name ist der Rufname,
+       sonst die Beschreibung der EIGENEN Person, daneben …Person (Personen-Nummer).
+       ichFrisch() holt beides frisch über BOS_NAMEN.ichSelbst (bos_namen.js ab
+       v1.3) — unmittelbar vor jedem Schreiben; ohne Person/Namen wird nicht
+       geschrieben. Die Regel prüft es (nmIch). Alte Notizen ohne vonPerson
+       lassen sich weiter anpinnen und lösen (die Regel vergleicht mit null).
      Offene Reparaturanfragen: BOS_MELDUNGEN.offen() (bos_meldungen.js),
        hier nur der Abgleich Gerät ↔ Exemplar-Name (geraetPasst).
 
@@ -58,6 +64,10 @@
    dreht, dreht dort mit — und umgekehrt.
 
    CHANGELOG
+     2026-11-18 · 12:19 · v1.7 · Ein Name überall, Lieferung 2 (RK §34; Freigabe KC 18.11. 09:17 §4, Antwort 11:00):
+       ichFrisch(); geaendertPerson (Angaben, Reihenfolge, Karten), vonPerson/angepinntPerson (Notizen);
+       vonName() ohne Kürzen (Regel vergleicht 1:1); erklaere() nennt einen Namen, der sich eben geändert hat.
+       REGEL_FASSUNG maschinen-namen-2026-11-18, REGEL_DATEI …_namen2.rules. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
      2026-11-18 · 05:45 · v1.6d · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
      2026-11-18 · 02:24 · v1.6c · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
      2026-11-16 · 09:36 · v1.6b · Nur REGEL_DATEI (Hauptform): nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44; RK §32). Sonst unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
@@ -88,8 +98,8 @@
      'fenster' = Rückfall (a), wenn die Konsole keinen Versatz anbietet. Nur zusammen mit der
      Regeldatei wechseln (REGEL_DATEI bzw. RUECKFALL.datei). */
   var FRIST_WEG = 'versatz';
-  var REGEL_FASSUNG = 'maschinen-b-2026-10-24';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+  var REGEL_FASSUNG = 'maschinen-namen-2026-11-18';   /* RK §34 (vorher maschinen-b-2026-10-24, herausgenommen) */
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
   var RUECKFALL = { fassung: 'maschinen-b-fenster-2026-10-24', datei: 'RUECKFALL_A_firestore_regeln_2026-10-24_maschinen_b.rules' };
   if (FRIST_WEG === 'fenster') { REGEL_FASSUNG = RUECKFALL.fassung; REGEL_DATEI = RUECKFALL.datei; }
   var FRIST_FELD = FRIST_WEG === 'fenster' ? 'ablauf' : 'fristStart';
@@ -236,7 +246,7 @@
   function frueherEintrag(alt) {
     return { werte: alt.werte, von: alt.geaendertVon, vonName: alt.geaendertVonName, am: alt.geaendertAm };
   }
-  /* alt = rohes Serverdokument oder null. ich = { kennung, name }. */
+  /* alt = rohes Serverdokument oder null. ich = { kennung, name, personId } (aus ichFrisch). */
   function angabenDokument(maschineId, produktKey, werte, alt, ich, zeit) {
     var frueher = [];
     if (alt) {
@@ -245,12 +255,33 @@
     }
     return {
       maschine: maschineId, produkt: produktKey, werte: werte, frueher: frueher,
-      geaendertVon: ich.kennung, geaendertVonName: vonName(ich), geaendertAm: zeit
+      geaendertVon: ich.kennung, geaendertPerson: person(ich), geaendertVonName: vonName(ich), geaendertAm: zeit
     };
   }
-  function vonName(ich) { var n = text(ich && ich.name).trim() || text(ich && ich.kennung); return n.slice(0, GRENZEN.VON_NAME); }
+  /* RK §34: der Name so, wie er in der Namensliste steht (ungekürzt — die Regel vergleicht 1:1) */
+  function vonName(ich) { var n = text(ich && ich.name); return n !== '' ? n : text(ich && ich.kennung).slice(0, GRENZEN.VON_NAME); }
+  function person(ich) { return ich && typeof ich.personId === 'string' ? ich.personId : null; }
   function reihenfolgeDokument(liste, ich, zeit) {
-    return { produkte: liste.slice(0, GRENZEN.REIHENFOLGE), geaendertVon: ich.kennung, geaendertVonName: vonName(ich), geaendertAm: zeit };
+    return { produkte: liste.slice(0, GRENZEN.REIHENFOLGE), geaendertVon: ich.kennung, geaendertPerson: person(ich), geaendertVonName: vonName(ich), geaendertAm: zeit };
+  }
+  /* RK §34: Name FRISCH (Rufname, sonst Beschreibung der eigenen Person) — unmittelbar vor jedem Schreiben.
+     → { kennung, name, personId, quelle }; sonst Ablehnung mit sichtbarem Text (err.message), err.ich = Antwort
+     von ichSelbst, err.code = echter Code beim Lesefehler, sonst 'maschinen/name-<grund>'. Kein Orts-Rückfall:
+     auf der Maschinenseite schreiben nur persönliche Konten. */
+  function ichFrisch(db, kennung, konto) {
+    var N = global.BOS_NAMEN;
+    if (!N || typeof N.ichSelbst !== 'function') {
+      var f = new Error('bos_namen.js (ab v1.3) ist nicht geladen — ohne Namen wird nichts gespeichert. Seite neu laden.');
+      f.code = 'maschinen/name-modul'; return Promise.reject(f);
+    }
+    return N.ichSelbst(db || global.db, kennung, { konto: konto || null }).then(function (r) {
+      if (r.grund) {
+        var e = new Error(r.text);
+        e.code = r.grund === 'lesefehler' && r.fehler && r.fehler.code ? r.fehler.code : 'maschinen/name-' + r.grund;
+        e.ich = r; throw e;
+      }
+      return { kennung: kennung, name: r.name, personId: r.personId, quelle: r.quelle };
+    });
   }
 
   /* ---------- Produkte und Reihenfolge ---------- */
@@ -412,16 +443,20 @@
   }
   /* neues Notiz-Dokument. zeit = Serverzeit-Platzhalter, jetztMs + Zeitstempel nur für den Rückfall. */
   function notizDokument(e, ich, zeit, angepinnt, jetztMs, Zeitstempel) {
-    var d = { maschine: e.maschine, exemplar: String(e.exemplar), text: e.text, von: ich.kennung, vonName: vonName(ich), erstellt: zeit };
-    if (angepinnt) { d.angepinntVon = ich.kennung; d.angepinntVonName = vonName(ich); }
+    var d = { maschine: e.maschine, exemplar: String(e.exemplar), text: e.text, von: ich.kennung, vonPerson: person(ich), vonName: vonName(ich), erstellt: zeit };
+    if (angepinnt) { d.angepinntVon = ich.kennung; d.angepinntPerson = person(ich); d.angepinntVonName = vonName(ich); }
     else if (FRIST_WEG === 'fenster') d.ablauf = Zeitstempel.fromMillis(jetztMs + FRIST_TAGE * TAG_MS);
     else d.fristStart = zeit;
     return d;
   }
   /* aus dem frisch gelesenen Server-Dokument: angepinnt bzw. gelöst. Die festen Felder
      werden unverändert übernommen (erstellt als gelesener Zeitstempel). */
-  function notizBasis(alt) { return { maschine: alt.maschine, exemplar: alt.exemplar, text: alt.text, von: alt.von, vonName: alt.vonName, erstellt: alt.erstellt }; }
-  function notizAngepinnt(alt, ich) { var d = notizBasis(alt); d.angepinntVon = ich.kennung; d.angepinntVonName = vonName(ich); return d; }
+  function notizBasis(alt) {
+    var d = { maschine: alt.maschine, exemplar: alt.exemplar, text: alt.text, von: alt.von, vonName: alt.vonName, erstellt: alt.erstellt };
+    if (Object.prototype.hasOwnProperty.call(alt, 'vonPerson')) d.vonPerson = alt.vonPerson;   /* RK §34: fest; alte Notizen haben keine */
+    return d;
+  }
+  function notizAngepinnt(alt, ich) { var d = notizBasis(alt); d.angepinntVon = ich.kennung; d.angepinntPerson = person(ich); d.angepinntVonName = vonName(ich); return d; }
   function notizGeloest(alt, Zeitstempel) {
     var d = notizBasis(alt);
     if (FRIST_WEG === 'fenster') d.ablauf = plusFrist(alt.erstellt, Zeitstempel);
@@ -447,7 +482,7 @@
       maschine: e.maschine, exemplar: String(e.exemplar), titel: text(e.titel).trim(),
       text: text(e.text).replace(/\r\n?/g, '\n').replace(/\s+$/, ''), rang: e.rang,
       stand: alt ? Number(alt.stand) + 1 : 1,
-      geaendertVon: ich.kennung, geaendertVonName: vonName(ich), geaendertAm: zeit
+      geaendertVon: ich.kennung, geaendertPerson: person(ich), geaendertVonName: vonName(ich), geaendertAm: zeit
     };
   }
   function kartenSortiert(liste) {
@@ -631,6 +666,16 @@
      „eine falsche Erklärung ist schlechter als keine“).
      k = { art: 'angaben'|'reihenfolge'|'maschine'|'notiz'|'pinnen'|'notiz_loeschen'|'karte'|'karte_loeschen',
            kennung, maschineId, produktKey, altAm, notiz (Stufe B), karteId, altStand } */
+  /* RK §34: Hat sich der Name zwischen Lesen und Schreiben geändert (k.ich = der benutzte)? → { art, meldung } oder null */
+  function namensProbe(db, k, konto) {
+    var N = global.BOS_NAMEN;
+    if (!k.ich || !N || typeof N.ichSelbst !== 'function') return Promise.resolve(null);
+    return N.ichSelbst(datenbank(db), k.kennung, { konto: konto || null }).then(function (n) {
+      if (n.grund) return { art: 'kein_name', meldung: n.text + ' Nichts gespeichert.' };
+      if (n.name !== k.ich.name || n.personId !== k.ich.personId) return { art: 'name_neu', meldung: 'Dein Name hat sich eben geändert (jetzt „' + n.name + '“). Nichts gespeichert — bitte noch einmal.' };
+      return null;
+    });
+  }
   function erklaere(db, err, k) {
     var basis = einordnen(err);
     if (basis.art !== 'keine_berechtigung') return Promise.resolve(basis);
@@ -651,6 +696,8 @@
           return g('abgelehnt', 'Die Datenbank hat die Maschine abgelehnt. Nichts gespeichert.');
         }
         if (!z.person) return g('keine_person', 'Dein Konto ist kein persönliches Konto (' + (z.grund === 'ort' ? 'eingetragen als „Ort“' : z.grund === 'ohne_art' ? 'keine Art eingetragen' : z.grund === 'system' ? 'Generalschlüssel' : 'nicht freigeschaltet') + '). Speichern dürfen nur eingetragene Maschinenführer mit persönlichem Konto. Ulf fragen (Konten & Rollen → Konto → Freigabe).');
+        return namensProbe(db, k, konto).then(function (nm) {
+        if (nm) return g(nm.art, nm.meldung);
         if (k.art === 'notiz' || k.art === 'pinnen') {
           return ladeMaschine(db, k.maschineId).then(function (m) {
             if (!m || m.geloescht === true) return g('maschine_weg', 'Die Maschine gibt es nicht (mehr) oder sie ist ausgeblendet — dort schreibt niemand mehr. Nichts gespeichert.');
@@ -677,6 +724,7 @@
           }
           return g('abgelehnt', 'Die Datenbank hat die Reihenfolge abgelehnt. Nichts gespeichert.');
         });
+        });
       });
     }).catch(function (e2) {
       var r = einordnen(err); r.meldung = r.meldung + ' Den Grund konnte die Seite nicht klären (' + fehlerOriginal(e2) + ').'; return r;
@@ -693,7 +741,7 @@
     frueherEintrag: frueherEintrag, angabenDokument: angabenDokument, reihenfolgeDokument: reihenfolgeDokument,
     werdegangVon: werdegangVon, produkteDerMaschine: produkteDerMaschine, inReihenfolge: inReihenfolge,
     reihenfolgeNeu: reihenfolgeNeu, verschiebe: verschiebe, werdegangPruefen: werdegangPruefen,
-    kontoArt: kontoArt, zugang: zugang, msVon: msVon, zeitText: zeitText,
+    kontoArt: kontoArt, zugang: zugang, msVon: msVon, zeitText: zeitText, ichFrisch: ichFrisch, vonName: vonName,
     fehlerOriginal: fehlerOriginal, fehlerArt: fehlerArt, einordnen: einordnen, mitZeitlimit: mitZeitlimit,
     pruefeRegelstand: pruefeRegelstand, ladeKonto: ladeKonto, ladeMaschinen: ladeMaschinen, ladeMaschine: ladeMaschine,
     ladeReihenfolge: ladeReihenfolge, ladeAngaben: ladeAngaben, ladeAngabe: ladeAngabe,

@@ -52,7 +52,7 @@
      KEINE Rolle zählt, auch admin nicht (Ulf 18.11.2026).
 
    WARNUNG: FELDER_*, GRENZEN und BEREICHE stehen genauso in der
-   Firestore-Regel (firestore_regeln_2026-11-18_namen.rules, RK §33, §34).
+   Firestore-Regel (firestore_regeln_2026-11-18_namen2.rules, RK §33, §34).
    test_mitbringer.js vergleicht beides — immer beide ändern.
 
    Keine Daten in dieser Datei: keine Personen, keine Betriebsangaben. Die
@@ -68,6 +68,10 @@
      (vonPerson, geaendertPerson, aufgenommenPerson, gestrichenPerson, druckPerson). Nie mehr das
      Altfeld bos_accounts.name. REGEL_FASSUNG mitbringer-namen-2026-11-18.
      _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
+   2026-11-18 · 12:19 · v2.1 · Ein Name überall, Lieferung 2 (Antwort KC 18.11. 11:00 §4.2): tagesbild() lässt
+     Meldungen mit Prüf-Material (zz_pruef_…) weg — Seite, Zettel, Sammeldruck und Monitor zeigen sie nie. Damit
+     kann die Prüfseite (Fall ZA5) eine unsichtbare Prüf-Meldung für einen echten Tag vorhalten, die nach dessen
+     Druck „auf dem Zettel“ steht. REGEL_DATEI …_namen2.rules. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
    ================================================================ */
 (function (global) {
   'use strict';
@@ -76,7 +80,7 @@
     einstellungen: 'mitbringer_einstellungen', sicherungen: 'mitbringer_sicherungen' };
   var EINSTELLUNG_ID = 'allgemein';
   var REGEL_FASSUNG = 'mitbringer-namen-2026-11-18';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
   var ZONE = 'Europe/Berlin';
   var SONSTIGES = 'sonstiges';
   var PRUEF_VORSATZ = 'zz_pruef_';   /* Prüf-Material der Prüfseite (Fall Z): keine Seite zeigt es */
@@ -268,6 +272,7 @@
       return (x - y) || String(a.id).localeCompare(String(b.id));
     }).forEach(function (m) {
       if (m.tag !== tag) return;
+      if (String(m.materialId || '').indexOf(PRUEF_VORSATZ) === 0) return;   /* Prüf-Meldung der Prüfseite: nie zeigen, nie drucken */
       var z = Object.assign({}, m);
       z.material = anzeigeMaterial(m); z.notiz = anzeigeNotiz(m);
       z.nachzuegler = m.erstelltMs !== null ? m.erstelltMs >= frist : jetzt >= frist;

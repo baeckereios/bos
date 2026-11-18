@@ -7,7 +7,7 @@
          beobachteTag, lesen, schreiben, Druckansicht). Diese Seite rechnet nichts selbst.
   Druck: mitbringer/mitbringer_druck.js meldet den Zettel „mitbringer“ bei BOS_DRUCK an; die Seite druckt
          über denselben Zettel (BOS_DRUCK.zettel.drucke(['mitbringer'])) und baut nichts Zweites.
-  Regel: RK §33, §34 (firestore_regeln_2026-11-18_namen.rules) — mitbringer_meldungen (eine Meldung = ein
+  Regel: RK §33, §34 (firestore_regeln_2026-11-18_namen2.rules) — mitbringer_meldungen (eine Meldung = ein
          Dokument), mitbringer_tage (Ausdruck-Stand), mitbringer_material, mitbringer_einstellungen,
          mitbringer_sicherungen.
   Rechte: lesen jedes freigeschaltete Konto · melden nur Personenkonten · drucken Haken „Mitbringer
@@ -29,6 +29,9 @@
       Namen bzw. den Grund, nie mehr das Altfeld. Ohne Person/Namen: Knöpfe grau mit Grund, nichts
       geschrieben. Neu eingebunden: ../bos_namen.js. Regelstand mitbringer-namen-2026-11-18.
       _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
+    2026-11-18 · 12:19 · v2.1 · Ein Name überall, Lieferung 2 (KC 18.11. 09:17 §3 Anm. 2): den Namen neu holen,
+      sobald das Gerät wieder online ist und wenn die Fehlerleiste ausgeblendet wird — eine veraltete
+      Namens-Fehlermeldung bleibt nicht oben stehen. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
 -->
 <head>
 <meta charset="UTF-8">
@@ -292,6 +295,12 @@ async function ctxFrisch() {
   }
 }
 function grundName() { return S.ich && S.ich.grund ? S.ich.text : ''; }
+/* RK §34: Name neu holen bei „online“ und beim Ausblenden der Fehlerleiste (KC 18.11. 09:17 §3 Anm. 2).
+   Ein Grund steht danach oben in der Kopfzeile (zeigeKonto), nicht noch einmal in der Fehlerleiste. */
+function nameNeu() {
+  if (!S.kennung || !S.ich || (S.konto && S.konto.art === 'ort')) return;
+  ctxFrisch().then(function () { planeRender(); }, function () { /* Grund steht oben */ });
+}
 function zeigeKonto() {
   const el = document.getElementById('kontoZeile');
   if (!S.kennung) { el.textContent = t('kein_konto'); return; }
@@ -335,7 +344,7 @@ function zeigeNetz() {
   const el = document.getElementById('netzLeiste');
   el.textContent = t('netz_weg'); el.classList.toggle('hidden', S.netz);
 }
-window.addEventListener('online', function () { S.netz = true; zeigeNetz(); planeRender(); if (S.kennung && S.regelstand !== 'passt') pruefeRegelstand(); });
+window.addEventListener('online', function () { S.netz = true; zeigeNetz(); planeRender(); if (S.kennung && S.regelstand !== 'passt') pruefeRegelstand(); nameNeu(); });
 window.addEventListener('offline', function () { S.netz = false; zeigeNetz(); planeRender(); });
 
 /* ---------- Laden und Beobachten ---------- */
@@ -735,7 +744,7 @@ document.addEventListener('input', function (ev) {
   if (ev.target.id === 'matName' && S.sheet && !S.sheet.id) { const id = L.materialIdAus(ev.target.value); document.getElementById('matIdZeile').textContent = id ? t('mat_id', { id: id }) : ''; }
   if (ev.target.id === 'einstFrist' || ev.target.id === 'einstLeer') S.einstEingabe = { frist: document.getElementById('einstFrist').value, leer: document.getElementById('einstLeer').value };   /* bleibt über Neuzeichnen erhalten */
 });
-document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; });
+document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; nameNeu(); });
 
 /* ---------- Halb eingegebenes melden (Checkliste §7b) ---------- */
 (function (pruef) {

@@ -9,6 +9,7 @@
 
      <script src="../bos_firebase_config.js"></script>
      <script src="../bos_accounts.js"></script>
+     <script src="../bos_namen.js"></script>       (seit 18.11.2026, RK §34: Pflicht vor dieser Datei)
      <script src="../bos_meldungen.js"></script>
 
    Zweck (Reparaturanfrage Stufe 1, Anweisung des Kontroll-Chats vom
@@ -62,9 +63,23 @@
      'archiviert'         die Anfrage liegt inzwischen im Archiv
      'index_fehlt'        Firestore verlangt einen Index (.link zum Anlegen)
      'ungueltig'          Eingabe passt nicht (vor dem Senden geprüft)
+     'kein_name'          kein Name für dieses Konto (RK §34, .nameGrund: keine_person,
+                          mehrere, kein_name, ort_ohne_name, keine_kennung, kein_modul)
+     'name_neu'           abgelehnt, weil sich der eigene Name gerade geändert hat
      'keine_berechtigung' abgelehnt, Ursache nicht eindeutig
      'fehler'             alles andere
    Die Seite zeigt .meldung und .original sichtbar an (Ulfs Regel).
+
+   NAME (RK §34, Ein Name überall, Lieferung 2, 18.11.2026): Jeder Schreibvorgang
+   holt den Namen FRISCH über BOS_NAMEN.ichSelbst (bos_namen.js ab v1.3, muss
+   VOR dieser Datei geladen sein) — Person: Rufname, sonst Beschreibung, dazu
+   vonPerson; Stationskonto (Art „Ort“, keine Person): Notiz, vonPerson null.
+   Ohne Person/Namen wird NICHT geschrieben (Fehler 'kein_name' mit Grund) —
+   kein Rückfall mehr auf die Kennung. Die Regel prüft dasselbe (rpName).
+   Ein Lesefehler behält seine Art (kein_netz …) und den echten Code.
+   ich() liest den Namen beim Laden mit (Anzeige „du schreibst als …“),
+   nameFrisch() holt ihn neu (Seite: bei „online“ und beim Schließen der
+   Fehlerleiste), wird nie abgelehnt.
 
    Datum nie über toISOString() (UTC-Falle zwischen 0 und 2 Uhr).
 
@@ -104,6 +119,10 @@
      'abgebrochen'        Hochladen vom Nutzer abgebrochen (verworfen)
 
    CHANGELOG
+     2026-11-18 · 12:19 · v2 · Ein Name überall, Lieferung 2 (RK §34; Antwort KC 18.11. 11:00, Freigabe 09:17 §4):
+       eigenerName() entfällt, Name über BOS_NAMEN.ichSelbst frisch vor jedem Schreiben (anlegen, status, fenster,
+       dringlichkeit, nachricht), Feld vonPerson in Kopf und Verlauf, Fehler 'kein_name' / 'name_neu', nameFrisch();
+       REGEL_FASSUNG reparatur-namen-2026-11-18, REGEL_DATEI …_namen2.rules. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
      2026-11-18 · 05:45 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
      2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
      2026-11-16 · 09:36 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-16_lager_anfordern.rules (Lager Stufe 3a, #169; Freigabe KC 16.11. 08:44; RK §32). Sonst unverändert. lager/_protokolle/SESSION_2026-11-12_LAGER_STUFE3A_BAU.md
@@ -139,8 +158,8 @@ window.BOS_MELDUNGEN = (function () {
   var ARCHIV_TAGE = 7;
   var TAG_MS = 24 * 60 * 60 * 1000;
   var SEITE = 20;
-  var REGEL_FASSUNG = 'reparatur-2026-10-10';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';
+  var REGEL_FASSUNG = 'reparatur-namen-2026-11-18';   /* RK §34 (vorher reparatur-2026-10-10, herausgenommen) */
+  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';
   var GRENZEN = { text: 500, nachricht: 300, geraet: 60, name: 40, grund: 300 };
   var STATUS = ['gemeldet', 'gesehen', 'repariert'];
   var DRINGLICHKEIT = ['normal', 'dringend'];
@@ -335,26 +354,27 @@ window.BOS_MELDUNGEN = (function () {
       return (s.localProfiles || []).filter(function (p) { return p.id === s.activeProfileId; })[0] || null;
     } catch (e) { return null; }
   }
-  /* Name, wie ihn die Kollegen ohnehin sehen (Bauplan, Frage 2):
-     Rufname → Beschreibung aus der Namensliste (über die eigene Person);
-     Ort-Konto → Konto-Notiz (Ortsname); sonst die Kennung. NIE Ulfs
-     Konto-Notiz bei einem Personen-Konto — die ist nicht für Kollegen. */
-  function eigenerName(db, kennung, konto) {
-    return db.collection('personen').where('bosKontoId', '==', kennung).limit(2).get().then(function (snap) {
-      if (snap.size === 1) {
-        var personId = snap.docs[0].id;
-        return db.collection('namen').doc(personId).get().then(function (n) {
-          var e = n.exists ? (n.data() || {}) : {};
-          var name = sauber(e.rufname, GRENZEN.name) || sauber(e.beschreibung, GRENZEN.name);
-          return name ? { name: name, quelle: e.rufname ? 'rufname' : 'beschreibung' } : { name: kennung, quelle: 'kennung', warnung: 'Für deine Person ' + personId + ' steht kein Name in der Namensliste — es erscheint deine Kennung.' };
-        });
-      }
-      if (snap.size > 1) return { name: kennung, quelle: 'kennung', warnung: 'Mit deinem Konto sind mehrere Personen verknüpft — es erscheint deine Kennung. Ulf Bescheid geben.' };
-      if (konto && konto.art === 'ort' && sauber(konto.name, GRENZEN.name)) return { name: sauber(konto.name, GRENZEN.name), quelle: 'ort' };
-      return { name: kennung, quelle: 'kennung' };
-    }).catch(function (err) {
-      return { name: kennung, quelle: 'kennung', warnung: 'Name nicht lesbar, es erscheint deine Kennung (' + einordnen(err).original + ').' };
-    });
+  /* Name (RK §34, NE-6): Rufname → Beschreibung der EIGENEN Person; Stationskonto ohne Person → Notiz.
+     Immer frisch vom Server (BOS_NAMEN.ichSelbst), ungekürzt — die Regel vergleicht 1:1. Nie abgelehnt. */
+  function nameAus(db, kennung, konto) {
+    var N = window.BOS_NAMEN;
+    if (!N || typeof N.ichSelbst !== 'function') {
+      return Promise.resolve({ personId: null, name: '', quelle: '', grund: 'kein_modul', fehler: null,
+        text: 'bos_namen.js (ab v1.3) ist nicht geladen — ohne Namen wird nichts geschrieben. Seite neu laden; bleibt es, Ulf Bescheid geben.' });
+    }
+    return N.ichSelbst(db, kennung, { konto: konto || null, ortErlaubt: true });
+  }
+  function nameInI(i, n) {
+    i.name = n.name; i.personId = n.personId; i.nameQuelle = n.quelle;
+    i.nameGrund = n.grund; i.nameText = n.text; i.nameFehler = n.fehler || null;
+    return i;
+  }
+  function nameFehler(n) {
+    if (n.grund === 'lesefehler') {
+      var e = einordnen(n.fehler);
+      return fehler(e.art, 'Dein Name ließ sich nicht frisch lesen — ' + e.meldung, n.fehler, { nameGrund: 'lesefehler', link: e.link });
+    }
+    return fehler('kein_name', n.text, null, { nameGrund: n.grund });
   }
 
   var ichVersprechen = null;
@@ -371,21 +391,38 @@ window.BOS_MELDUNGEN = (function () {
         return laden.then(function (konto) {
           var frei = !!(konto && konto.freigeschaltet === true);
           var haken = frei ? konto : {};
-          return eigenerName(db, kennung, konto).then(function (n) {
-            return { kennung: kennung, name: n.name, nameQuelle: n.quelle, warnungen: n.warnung ? [n.warnung] : [],
-                     freigeschaltet: frei, kontoDa: !!konto, rechte: rechteAus(haken), quelle: 'server' };
+          return nameAus(db, kennung, konto).then(function (n) {
+            return nameInI({ kennung: kennung, warnungen: n.grund ? [n.text] : [], konto: konto || null,
+                     freigeschaltet: frei, kontoDa: !!konto, rechte: rechteAus(haken), quelle: 'server' }, n);
           });
         }, function (err) {
           var p = profilAusGeraet();
           var e = einordnen(err);
-          // Ohne Netz kein Name aus der Namensliste — dann die Kennung, nie die Konto-Notiz.
-          return { kennung: kennung, name: kennung, nameQuelle: 'kennung',
+          // Ohne Netz kein Name (RK §34: kein Rückfall auf Kennung oder Konto-Notiz) — vor dem Schreiben wird neu gelesen.
+          return nameInI({ kennung: kennung,
                    warnungen: ['Konto nicht frisch lesbar — es gilt der Stand auf diesem Gerät (' + e.original + ').'],
-                   freigeschaltet: !!(p && p.freigeschaltet !== false), kontoDa: true,
-                   rechte: rechteAus(p && p.kontoHaken), quelle: 'geraet', grund: e };
+                   konto: null, freigeschaltet: !!(p && p.freigeschaltet !== false), kontoDa: true,
+                   rechte: rechteAus(p && p.kontoHaken), quelle: 'geraet', grund: e },
+                 { personId: null, name: '', quelle: '', grund: 'lesefehler', fehler: err, text: 'Dein Name ließ sich nicht lesen: ' + e.original });
         });
       });
     return ichVersprechen;
+  }
+
+  /* RK §34: Name neu holen (Seite: „online“, Fehlerleiste geschlossen). Aktualisiert ich() — nie abgelehnt;
+     Rückgabe = das ich-Objekt (name/nameGrund/nameText frisch). */
+  function nameFrisch() {
+    return ich().then(function (i) {
+      return nameAus(datenbank(), i.kennung, i.konto).then(function (n) { return nameInI(i, n); });
+    }, function (err) { return null; });
+  }
+  /* RK §34: unmittelbar vor jedem Schreiben. → Kopie von i mit frischem Namen, oder Fehler mit Grund. */
+  function frisch(i) {
+    return nameAus(datenbank(), i.kennung, i.konto).then(function (n) {
+      nameInI(i, n);
+      if (n.grund) throw nameFehler(n);
+      return Object.assign({}, i, { name: n.name, personId: n.personId });
+    });
   }
 
   /* ---------------- Regelstand-Probe (RK §13) ---------------- */
@@ -399,7 +436,7 @@ window.BOS_MELDUNGEN = (function () {
   /* Warum hat die Datenbank „nein“ gesagt? Erst Regelstand, dann Haken,
      dann ob jemand anderes inzwischen geändert hat (Muster bos_produkte.js
      und Teigecke „Gegenlesen nach abgelehntem Speichern“). */
-  function ursache(err, kopf, braucht) {
+  function ursache(err, kopf, braucht, benutzt) {
     var e = einordnen(err);
     if (e.art !== 'keine_berechtigung') return Promise.resolve(e);
     var db = datenbank();
@@ -412,6 +449,11 @@ window.BOS_MELDUNGEN = (function () {
         if (braucht && !i.rechte[braucht]) {
           var name = { lesen: 'Mitlesen & antworten', melden: 'Melden', bearbeiten: 'Bearbeiten' }[braucht];
           return fehler('kein_haken', 'Dafür fehlt dir der Haken „' + name + '“ (Reparaturanfrage) — Ulf fragen.', err);
+        }
+        // RK §34: Name zwischen Lesen und Schreiben geändert (Rufname neu)? ich(true) hat ihn eben frisch gelesen.
+        if (benutzt && (i.nameGrund || i.name !== benutzt.name || i.personId !== benutzt.personId)) {
+          return i.nameGrund ? nameFehler({ grund: i.nameGrund, text: i.nameText, fehler: i.nameFehler })
+            : fehler('name_neu', 'Dein Name hat sich eben geändert (jetzt „' + i.name + '“) — bitte noch einmal tippen.', err);
         }
         if (!kopf || !kopf.id) return e;
         return db.collection('meldungen').doc(kopf.id).get({ source: 'server' }).then(function (snap) {
@@ -513,20 +555,22 @@ window.BOS_MELDUNGEN = (function () {
       var db = datenbank();
       if (eingabe.id !== undefined && !KENNUNG_RE.test(String(eingabe.id))) throw fehler('ungueltig', 'Ungültige Kennung der Anfrage.');
       var ref = eingabe.id ? db.collection('meldungen').doc(eingabe.id) : db.collection('meldungen').doc();
-      var kopf = {
-        kanal: kanal, text: text, geraet: geraet, weiterarbeiten: eingabe.weiterarbeiten,
-        von: i.kennung, vonName: sauber(i.name, GRENZEN.name), erstellt: serverZeit(),
-        status: 'gemeldet', dringlichkeit: 'normal', fenster: '', repariertAm: null,
-        geaendertVon: i.kennung, geaendertAm: serverZeit(), letzterEintrag: ''
-      };
       // Stufe 2: Wiederholung mit derselben Kennung (Fotos sind schon oben).
       // Ist die Anfrage doch angekommen, nicht noch einmal schreiben — ein
       // zweites set wäre beim Server eine Änderung, und die lehnt die Regel ab.
       var schon = eingabe.id && eingabe.wiederholung ? schonGeschrieben(ref, i.kennung) : Promise.resolve(false);
       return schon.then(function (da) {
         if (da) return ref.id;
-        return mitZeitlimit(ref.set(kopf)).then(function () { return ref.id; },
-          function (err) { return ursache(err, null, 'melden').then(function (e) { throw e; }); });
+        return frisch(i).then(function (f) {   // RK §34: Name frisch
+          var kopf = {
+            kanal: kanal, text: text, geraet: geraet, weiterarbeiten: eingabe.weiterarbeiten,
+            von: f.kennung, vonPerson: f.personId, vonName: f.name, erstellt: serverZeit(),
+            status: 'gemeldet', dringlichkeit: 'normal', fenster: '', repariertAm: null,
+            geaendertVon: f.kennung, geaendertAm: serverZeit(), letzterEintrag: ''
+          };
+          return mitZeitlimit(ref.set(kopf)).then(function () { return ref.id; },
+            function (err) { return ursache(err, null, 'melden', f).then(function (e) { throw e; }); });
+        });
       });
     });
   }
@@ -559,7 +603,7 @@ window.BOS_MELDUNGEN = (function () {
     if (art === 'status') upd.repariertAm = nachher === 'repariert' ? serverZeit() : null;
     batch.update(ref, upd);
     batch.set(eRef, {
-      art: art, von: i.kennung, vonName: sauber(i.name, GRENZEN.name), ts: serverZeit(),
+      art: art, von: i.kennung, vonPerson: i.personId, vonName: i.name, ts: serverZeit(),   // RK §34: i = frisch(i)
       vorher: kopf[art] === undefined ? '' : kopf[art], nachher: nachher, grund: sauber(grund, GRENZEN.grund)
     });
     return eRef.id;
@@ -569,9 +613,9 @@ window.BOS_MELDUNGEN = (function () {
     if (!kopf || !kopf.id) throw fehler('ungueltig', 'Keine Anfrage gewählt.');
     if (imArchiv(kopf)) throw fehler('archiviert', 'Diese Anfrage liegt im Archiv — dort ändert sich nichts mehr.');
   }
-  function senden(batch, kopf, braucht) {
+  function senden(batch, kopf, braucht, benutzt) {
     return mitZeitlimit(batch.commit()).catch(function (err) {
-      return ursache(err, kopf, braucht).then(function (e) { throw e; });
+      return ursache(err, kopf, braucht, benutzt).then(function (e) { throw e; });
     });
   }
 
@@ -580,11 +624,13 @@ window.BOS_MELDUNGEN = (function () {
       bearbeitenVorab(i, kopf);
       if (STATUS.indexOf(neu) === -1) throw fehler('ungueltig', 'Unbekannter Status „' + neu + '“.');
       if (!erlaubterSchritt(kopf.status, neu)) throw fehler('ungueltig', 'Von „' + kopf.status + '“ nach „' + neu + '“ geht nicht.');
-      var batch = datenbank().batch();
-      var eintrag = aenderungInBatch(batch, i, kopf, 'status', neu, grund);
-      // Nachtrag 2: der neue letzterEintrag geht an die Seite zurück
-      // („zurücknehmen“ aus dem Posteingang, bevor die Liste nachgezogen hat).
-      return senden(batch, kopf, 'bearbeiten').then(function () { return { letzterEintrag: eintrag }; });
+      return frisch(i).then(function (f) {
+        var batch = datenbank().batch();
+        var eintrag = aenderungInBatch(batch, f, kopf, 'status', neu, grund);
+        // Nachtrag 2: der neue letzterEintrag geht an die Seite zurück
+        // („zurücknehmen“ aus dem Posteingang, bevor die Liste nachgezogen hat).
+        return senden(batch, kopf, 'bearbeiten', f).then(function () { return { letzterEintrag: eintrag }; });
+      });
     });
   }
   function fenster(kopf, datum, grund) {
@@ -596,9 +642,11 @@ window.BOS_MELDUNGEN = (function () {
       // Verschieben verlangt einen Grund (die Regel nicht — Bedienung, kein Schloss).
       if (kopf.fenster && !sauber(grund, GRENZEN.grund)) throw fehler('ungueltig', 'Beim Verschieben bitte kurz den Grund nennen.');
       if (String(grund || '').trim().length > GRENZEN.grund) throw fehler('ungueltig', 'Grund zu lang: höchstens ' + GRENZEN.grund + ' Zeichen.');
-      var batch = datenbank().batch();
-      aenderungInBatch(batch, i, kopf, 'fenster', datum, grund);
-      return senden(batch, kopf, 'bearbeiten');
+      return frisch(i).then(function (f) {
+        var batch = datenbank().batch();
+        aenderungInBatch(batch, f, kopf, 'fenster', datum, grund);
+        return senden(batch, kopf, 'bearbeiten', f);
+      });
     });
   }
   function dringlichkeit(kopf, stufe) {
@@ -606,9 +654,11 @@ window.BOS_MELDUNGEN = (function () {
       bearbeitenVorab(i, kopf);
       if (DRINGLICHKEIT.indexOf(stufe) === -1) throw fehler('ungueltig', 'Unbekannte Dringlichkeit „' + stufe + '“.');
       if (stufe === kopf.dringlichkeit) throw fehler('ungueltig', 'Steht schon auf „' + stufe + '“.');
-      var batch = datenbank().batch();
-      aenderungInBatch(batch, i, kopf, 'dringlichkeit', stufe, '');
-      return senden(batch, kopf, 'bearbeiten');
+      return frisch(i).then(function (f) {
+        var batch = datenbank().batch();
+        aenderungInBatch(batch, f, kopf, 'dringlichkeit', stufe, '');
+        return senden(batch, kopf, 'bearbeiten', f);
+      });
     });
   }
   /* Nachricht. Mit Bearbeiten-Haken auf einer roten Anfrage: im selben
@@ -630,13 +680,15 @@ window.BOS_MELDUNGEN = (function () {
       var schon = opt.eintragId && opt.wiederholung ? schonGeschrieben(eRef, i.kennung) : Promise.resolve(false);
       return schon.then(function (da) {
         if (da) return { gesehenGesetzt: false, schonDa: true };
-        var batch = db.batch();
-        var gesehen = i.rechte.bearbeiten && kopf.status === 'gemeldet';
-        if (gesehen) aenderungInBatch(batch, i, kopf, 'status', 'gesehen', 'Antwort im Chat');
-        batch.set(eRef, {
-          art: 'nachricht', von: i.kennung, vonName: sauber(i.name, GRENZEN.name), ts: serverZeit(), text: t
+        return frisch(i).then(function (f) {   // RK §34: Name frisch
+          var batch = db.batch();
+          var gesehen = f.rechte.bearbeiten && kopf.status === 'gemeldet';
+          if (gesehen) aenderungInBatch(batch, f, kopf, 'status', 'gesehen', 'Antwort im Chat');
+          batch.set(eRef, {
+            art: 'nachricht', von: f.kennung, vonPerson: f.personId, vonName: f.name, ts: serverZeit(), text: t
+          });
+          return senden(batch, kopf, 'lesen', f).then(function () { return { gesehenGesetzt: gesehen }; });
         });
-        return senden(batch, kopf, 'lesen').then(function () { return { gesehenGesetzt: gesehen }; });
       });
     });
   }
@@ -974,6 +1026,7 @@ window.BOS_MELDUNGEN = (function () {
     ARCHIV_TAGE: ARCHIV_TAGE,
     woerterbuch: woerterbuch,
     ich: ich,
+    nameFrisch: nameFrisch,
     pruefeRegelstand: pruefeRegelstand,
     offen: offen,
     grueneWoche: grueneWoche,

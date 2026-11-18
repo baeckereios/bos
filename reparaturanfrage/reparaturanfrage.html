@@ -17,6 +17,14 @@
          QR-Kärtchen an den Geräten; keine Geräteliste in BOS).
   KEINE DATEN IM CODE: keine Namen, keine Geräte, keine Telefonnummern.
   CHANGELOG
+    2026-11-18 · 12:19 · Ein Name überall, Lieferung 2 (RK §34; Freigabe KC 18.11. 09:17 §4, Antwort 11:00;
+      _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md)
+      - lädt ../bos_namen.js (vor bos_meldungen.js): der Name kommt frisch aus der Namensliste
+        (Rufname, sonst Beschreibung; Stationskonto: Ortsname), nie mehr die Kennung.
+      - Kopfzeile „Du schreibst als …“ zeigt den Namen oder den Grund, warum es keinen gibt; ohne
+        Person/Namen sind „＋ Melden“, „Anfrage senden“ und „Senden“ grau, Handlungen melden den Grund.
+      - Den Namen neu holen, sobald das Gerät wieder online ist und wenn die Fehlerleiste
+        ausgeblendet wird (KC 18.11. 09:17 §3 Anm. 2).
     2026-10-26 · 04:55 · Fix (Ulf 26.10., 04:38–04:41, Tablet-Fotos; Bau-Doku
       SESSION_2026-10-26_REPARATURANFRAGE_FEHLERMELDUNGEN_BAU.md)
       - A: Nach „Anfrage senden“ kam „Laden Kennzeichen neu: Die Datenbank hat
@@ -324,6 +332,7 @@
 <script src="../bos_permissions.js"></script>
 <script src="../bos_access.js"></script>
 <script src="../bos_standalone_login.js"></script>
+<script src="../bos_namen.js"></script>       <!-- RK §34: BOS_NAMEN.ichSelbst — bos_meldungen.js braucht es vor jedem Schreiben -->
 <script src="../bos_meldungen.js"></script>
 <script src="../bos_ungespeichert.js"></script>   <!-- NEU 17.10.2026, #77: Ungespeichert-Schutz (✕ im Launcher + Neuladen) -->
 
@@ -392,6 +401,7 @@ const I18N_DE = {
   ausblenden: 'ausblenden',
   fehler_titel: '⚠ Fehler',
   du_als: 'Du schreibst als: {name}',
+  du_als_grund: '⚠ Ohne Namen wird nichts gespeichert: {grund}',
   haken_lesen: 'Mitlesen', haken_melden: 'Melden', haken_bearbeiten: 'Bearbeiten',
   kein_haken: 'Kein Haken für die Reparaturanfrage — Ulf fragen. Er setzt ihn in der Kontenverwaltung; danach den Launcher einmal neu starten.',
   nicht_frei: 'Dein Konto ist noch nicht freigeschaltet — Ulf Bescheid geben.',
@@ -588,11 +598,32 @@ function zeigeFehler(was, err) {
 document.getElementById('fehlerZuBtn').addEventListener('click', function () {
   document.getElementById('fehlerLeiste').hidden = true;
   document.getElementById('fehlerListe').innerHTML = '';
+  nameNeu();   // RK §34: eine veraltete Namens-Fehlermeldung oben soll nicht stehen bleiben
 });
 window.onerror = function (msg, quelle, zeile, spalte, err) {
   zeigeFehler(t('err_unbehandelt'), err || new Error(String(msg) + ' (' + (quelle || '') + ':' + (zeile || '') + ')'));
 };
 window.addEventListener('unhandledrejection', function (ev) { zeigeFehler(t('err_unbehandelt'), ev.reason); });
+
+/* ---------- Name (RK §34, Ein Name überall) ---------- */
+/* Dauerhafter Grund (keine Person, mehrere, kein Name, Ort ohne Notiz, Modul fehlt): nichts geht, Knöpfe grau mit Text.
+   Ein Lesefehler sperrt nicht — vor jedem Schreiben liest bos_meldungen.js ohnehin frisch. */
+function nameSperre() { return S.ich && S.ich.nameGrund && S.ich.nameGrund !== 'lesefehler' ? (S.ich.nameText || S.ich.nameGrund) : ''; }
+function zeigeWer() {
+  if (!S.ich) return;
+  const r = S.ich.rechte;
+  document.getElementById('werZeile').innerHTML = esc(S.ich.name ? t('du_als', { name: S.ich.name }) : t('du_als_grund', { grund: S.ich.nameText || S.ich.nameGrund || '—' })) +
+    (r.lesen ? '<span class="abzeichen">' + esc(t('haken_lesen')) + '</span>' : '') +
+    (r.melden ? '<span class="abzeichen">' + esc(t('haken_melden')) + '</span>' : '') +
+    (r.bearbeiten ? '<span class="abzeichen">' + esc(t('haken_bearbeiten')) + '</span>' : '');
+  const mb = document.getElementById('meldenBtn');
+  if (mb) { mb.disabled = !!nameSperre(); mb.title = nameSperre(); }
+}
+/* bei „online“ und beim Ausblenden der Fehlerleiste (KC 18.11. 09:17 §3 Anm. 2); Fehler stehen oben in der Kopfzeile */
+function nameNeu() {
+  if (!S.ich || !M.nameFrisch) return Promise.resolve();
+  return M.nameFrisch().then(function (i) { if (i) { S.ich = i; zeigeWer(); render(); } });
+}
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -987,7 +1018,8 @@ function renderAnfrage(main) {
     chatHtml += '<div class="feld" style="margin-top:12px;"><textarea class="bos-input" id="chatText" maxlength="' + M.GRENZEN.nachricht + '" placeholder="' + esc(t('chat_platzhalter')) + '"></textarea>' +
       '<div class="klein zaehler" id="chatZaehler">' + esc(t('zeichen', { n: 0, max: M.GRENZEN.nachricht })) + '</div>' +
       fotoFeldHTML('rueck') +
-      '<button type="button" class="bos-btn bos-btn--amber" id="chatBtn"' + (S.arbeitet ? ' disabled' : '') + '>' + esc(t('senden')) + '</button></div>';
+      '<button type="button" class="bos-btn bos-btn--amber" id="chatBtn"' + (S.arbeitet || nameSperre() ? ' disabled' : '') + '>' + esc(t('senden')) + '</button>' +
+      (nameSperre() ? '<div class="klein">' + esc(nameSperre()) + '</div>' : '') + '</div>';
   }
   html += flaeche('rueckfragen', chatHtml) + flaeche('verlauf', verlaufHtml);
 
@@ -1087,7 +1119,8 @@ function renderMelden(main) {
       '<input type="text" class="bos-input" id="mGeraet" maxlength="' + M.GRENZEN.geraet + '" placeholder="' + esc(t('m_geraet_platzhalter')) + '"></div>' +
     fotoFeldHTML('melden') +
     '<div class="klein" id="mFehlt">' + (fehlt.length ? esc(t('m_fehlt', { was: fehlt.join(', ') })) : '') + '</div>' +
-    '<div class="knopfreihe"><button type="button" class="bos-btn bos-btn--amber" id="mSenden"' + (fehlt.length || S.arbeitet ? ' disabled' : '') + '>' + esc(t('m_senden')) + '</button>' +
+    (nameSperre() ? '<div class="klein">' + esc(nameSperre()) + '</div>' : '') +
+    '<div class="knopfreihe"><button type="button" class="bos-btn bos-btn--amber" id="mSenden"' + (fehlt.length || S.arbeitet || nameSperre() ? ' disabled' : '') + '>' + esc(t('m_senden')) + '</button>' +
     '<button type="button" class="bos-btn bos-btn--ghost" data-zurueck="1">' + esc(t('m_abbrechen')) + '</button></div></section>';
   setzeWert('mText', m.text);
   setzeWert('mGeraet', m.geraet);
@@ -1099,7 +1132,7 @@ function renderMelden(main) {
     const f = [];
     if (!M.sauber(m.text, 10000)) f.push(t('m_fehlt_text'));
     if (!m.weiterarbeiten) f.push(t('m_fehlt_wahl'));
-    document.getElementById('mSenden').disabled = !!f.length || S.arbeitet;
+    document.getElementById('mSenden').disabled = !!f.length || S.arbeitet || !!nameSperre();
     document.getElementById('mFehlt').textContent = f.length ? t('m_fehlt', { was: f.join(', ') }) : '';
   };
   document.getElementById('mText').addEventListener('input', function () { m.text = this.value; zaehle(); pruefeKnopf(); });
@@ -1131,6 +1164,7 @@ function renderVerbindung() {
 /* Einheitlich: Knöpfe sperren, ausführen, Fehler sichtbar, Erfolg melden. */
 function aktion(fn, danach, eigenerToast) {
   if (S.arbeitet) { if (fotoSendenLaeuft()) toast(t('senden_laeuft')); return; }
+  if (nameSperre()) { zeigeFehler('Speichern', new Error(nameSperre())); return; }   // RK §34
   S.arbeitet = true;
   document.querySelectorAll('#main button').forEach(function (b) { b.disabled = true; });
   Promise.resolve().then(fn).then(function (erg) {
@@ -1837,12 +1871,9 @@ function start() {
     S.ich = ich;
     document.getElementById('ladeStatus') && document.getElementById('ladeStatus').remove();
     const r = ich.rechte;
-    document.getElementById('werZeile').innerHTML = esc(t('du_als', { name: ich.name })) +
-      (r.lesen ? '<span class="abzeichen">' + esc(t('haken_lesen')) + '</span>' : '') +
-      (r.melden ? '<span class="abzeichen">' + esc(t('haken_melden')) + '</span>' : '') +
-      (r.bearbeiten ? '<span class="abzeichen">' + esc(t('haken_bearbeiten')) + '</span>' : '');
+    zeigeWer();
     document.getElementById('meldenBtn').hidden = !r.melden;
-    (ich.warnungen || []).forEach(function (w) {
+    (ich.warnungen || []).filter(function (w) { return w !== ich.nameText; }).forEach(function (w) {   // der Name steht oben (zeigeWer)
       const h = document.getElementById('hinweisLeiste');
       h.textContent = (h.textContent ? h.textContent + ' · ' : '') + w; h.hidden = false;
     });
@@ -1879,7 +1910,7 @@ function start() {
   // Alter („seit 3 Tagen“) und Archivgrenze laufen weiter, auch ohne neue Daten.
   setInterval(function () { render(); }, 60000);  // beim Tippen aufgeschoben, siehe render()
 }
-window.addEventListener('online', renderVerbindung);
+window.addEventListener('online', function () { renderVerbindung(); nameNeu(); });   // RK §34: Name neu holen
 window.addEventListener('offline', renderVerbindung);
 start();
 </script>

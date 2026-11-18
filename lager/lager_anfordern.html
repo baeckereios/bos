@@ -4,7 +4,7 @@
   MODUL: lager/lager_anfordern.html — Lager anfordern (Anforderungsliste statt Zettel, Bestellungen, Mindestmengen)
   Doku:  lager/LAGER_ANFORDERN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (Liste, Bestand je Ort, Hauptort, „Bitte nachbestellen“, Druckansicht)
-  Regel: RK §32, §34 (firestore_regeln_2026-11-18_namen.rules) — lager_listen/{standortId}__{a|b}{n}:
+  Regel: RK §32, §34 (firestore_regeln_2026-11-18_namen2.rules) — lager_listen/{standortId}__{a|b}{n}:
          je Standort und Art genau eine offene Liste; jede Änderung genau EIN Eintrag (letzte);
          „Abschließen“ setzt die Liste auf zu und legt im selben Vorgang die nächste offene an (Transaktion).
          Die abgeschlossene Liste IST die Buchung. Korrekturen (lager_korrekturen) nur anlegen,
@@ -17,6 +17,9 @@
           Person (frisch vor jedem Schreiben, ichFrisch → BOS_NAMEN.ichSelbst), am Stationskonto (Art „Ort“, ohne
           Person) die Notiz = der Ortsname. Dazu die Personen-Nummer (vonPerson, abgeschlossenPerson, person; Ort: null).
   CHANGELOG
+    2026-11-18 · 12:19 · v2.1 · Ein Name überall, Lieferung 2 (KC 18.11. 09:17 §3 Anm. 2): den Namen neu holen, sobald
+      das Gerät wieder online ist und wenn die Fehlerleiste ausgeblendet wird. REGEL_DATEI firestore_regeln_2026-11-18_namen2.rules.
+      _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
     2026-11-18 · 05:45 · v2 · Ein Name überall (RK §34; Bauplan 04:28, Go KC 04:42): Name nie mehr aus dem Altfeld
       bos_accounts.name einer Person; meinName() durch ichFrisch() ersetzt; Kopfzeile zeigt den frischen Namen bzw.
       den Grund. Ohne Person/Namen: Eintragen, Abschließen, Korrektur grau mit Grund, nichts geschrieben. Neu
@@ -185,7 +188,7 @@
 const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
 const REGEL_FASSUNG = 'lager-namen-2026-11-18';
-const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SPEICHER_STANDORT = 'bos_lager_anfordern_standort';
 const ART_TEXT = { anforderung: 'Liste', bestellung: 'Bestellung' };
 
@@ -375,7 +378,7 @@ function zeigeNetz() {
   document.getElementById('netzLeiste').textContent = t('netz_weg');
   document.getElementById('netzLeiste').classList.toggle('hidden', S.netz);
 }
-window.addEventListener('online', function () { S.netz = true; zeigeNetz(); planeRender(); });
+window.addEventListener('online', function () { S.netz = true; zeigeNetz(); planeRender(); nameNeu(); });
 window.addEventListener('offline', function () { S.netz = false; zeigeNetz(); planeRender(); });
 async function start() {
   wendeI18nAn(); renderHilfe(); zeigeNetz();
@@ -421,6 +424,12 @@ async function ichFrisch() {
   return { personId: r.personId, name: r.name };
 }
 function grundName() { return S.ich && S.ich.grund ? S.ich.text : ''; }
+/* RK §34: Name neu holen bei „online“ und beim Ausblenden der Fehlerleiste (KC 18.11. 09:17 §3 Anm. 2).
+   Ein Grund steht danach oben in der Kopfzeile (zeigeKonto), nicht noch einmal in der Fehlerleiste. */
+function nameNeu() {
+  if (!S.kennung || !S.ich) return;
+  ichFrisch().then(function () { planeRender(); }, function () { /* Grund steht oben */ });
+}
 function zeigeKonto() {
   const el = document.getElementById('kontoZeile');
   if (!S.kennung) { el.textContent = t('kein_konto'); return; }
@@ -820,7 +829,7 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('input', function (ev) { const f = ev.target.closest && ev.target.closest('[data-mindest]'); if (f) S.mindEingabe[f.getAttribute('data-mindest')] = f.value; });
 document.getElementById('wahl').addEventListener('click', function (ev) { const b = ev.target.closest('[data-standort]'); if (b) waehle(b.getAttribute('data-standort')); });
 document.getElementById('wechselBtn').addEventListener('click', function () { waehle(null); });
-document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; });
+document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; nameNeu(); });
 
 /* ---------- Halb eingegebene Menge melden (Checkliste §7b) ---------- */
 (function (pruef) {
