@@ -19,6 +19,9 @@
   In Planung (sichtbar auf der Seite): Rückmeldung „eingepackt / fehlt“, Monitor im Lager (#179/#181).
   Keine Daten in dieser Datei: keine Personen, keine Betriebsangaben.
   CHANGELOG
+    2026-11-19 · 09:28 · Name: die Seite heißt für die Kollegen „Bleche &amp; Material“ (vorher „Mitbringer“; Ulf 09:25,
+      Zusatz KC allgemein 09:25). Geändert NUR Fenstertitel, Überschrift, i18n titel und der Titel der Hilfe.
+      Kennung, Adresse, Haken, Zettel und Druckname, Regeln und alle übrigen Texte unverändert.
     2026-11-18 · 02:24 · v1 · Erstfassung (#183; Bauplan 01:22, Go Kontroll-Chat 01:31; Ulf 01:28:
       „Sonstiges“ mit Pflicht-Freitext, lesen für alle Konten, nur Haken, leerer Zettel druckbar,
       nach dem Druck streichen statt löschen)
@@ -37,7 +40,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>BäckereiOS · Mitbringer</title>
+<title>BäckereiOS · Bleche &amp; Material</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <!-- MUSS vor bos_design_tokens.css stehen (Theme + Farbprofil des Kontos) -->
@@ -149,7 +152,7 @@
 <script src="../bos_access_guard.js"></script>
 
 <header>
-  <h1 data-i18n="titel">Mitbringer</h1>
+  <h1 data-i18n="titel">Bleche &amp; Material</h1>
   <div style="display:flex; align-items:center; gap:10px;">
     <div class="meta"><div id="kontoZeile">—</div></div>
     <button id="helpOpenBtn" class="help-btn" title="Hilfe" aria-label="Hilfe">❓</button>
@@ -207,7 +210,7 @@ const SPEICHER_BEREICH = 'bos_mitbringer_bereich';
 
 /* ---------- i18n (Checkliste §6): vollständig über das Wörterbuch, Platzhalter statt Satzbau ---------- */
 const I18N_DE = {
-  titel: 'Mitbringer', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  titel: 'Bleche & Material', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
   kein_konto: 'Keine Anmeldung erkannt.',
   heute: 'Heute', morgen: 'Morgen', tag_zahl_0: 'noch nichts gemeldet', tag_zahl_1: '1 Meldung', tag_zahl_n: '{n} Meldungen',
   frist_offen: 'Meldeschluss für {tag}: <b>{uhr} Uhr</b>.', frist_vorbei: 'Meldeschluss für {tag} war <b>{uhr} Uhr</b>. Neue Meldungen sind Nachzügler: Sie stehen hier, aber nicht auf dem schon gedruckten Zettel.',
@@ -760,7 +763,7 @@ document.getElementById('fehlerZuBtn').addEventListener('click', function () { d
 
 /* ---------- Hilfe (Checkliste §7; kanonische Fassung in MITBRINGER_DOKU.md) ---------- */
 const helpData = {
-  title: 'Mitbringer — was ist das hier?',
+  title: 'Bleche & Material — was ist das hier?',
   sections: [
     { heading: 'Wofür ist diese Seite?', text: 'Hier meldest du Gebrauchsmaterial, das die Fahrer aus dem Lager mitbringen sollen: Bleche, Körbe, Rollcontainer und alles andere, was im Umlauf ist und wiederkommt. Verbrauchsmaterial und Rohstoffe gehören nicht hierher, die laufen über das Lager.' },
     { heading: 'Heute oder morgen', text: 'Oben wählst du den Liefertag. Vorgeschlagen ist der nächste Tag, dessen Meldeschluss noch nicht vorbei ist. Darunter steht, was für diesen Tag schon gemeldet ist, getrennt nach Frühschicht, Nachtschicht und Konditorei. So siehst du, ob jemand dasselbe schon bestellt hat. Doppelt melden ist erlaubt.' },

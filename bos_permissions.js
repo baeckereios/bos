@@ -25,6 +25,9 @@
    separat über bos_accounts / die Freischaltungs-Tabelle und haben
    Vorrang — siehe BOS_ACCESS.can().
 
+   [ÜBERHOLT, Vermerk 19.11.2026: die Kontenverwaltung liest diese Datei längst per
+   <script src="../bos_permissions.js"> (window.BOS_PERMISSIONS), kein fetch() mehr. Der
+   folgende Absatz bleibt nur als Geschichte stehen.]
    OFFEN, NICHT VON HIER AUS GEFIXT: konten_verwaltung.html (Freischal-
    tungs-Tabelle) hat bisher vermutlich bos_permissions.json per
    fetch() gelesen, um die Standard-Haken zu setzen. Diese Datei muss
@@ -41,6 +44,19 @@
      <script src="bos_access_guard.js"></script>
      ... restlicher Seiteninhalt ...
    ================================================================ */
+/* GEÄNDERT 19.11.2026, 08:58 (Startbildschirm-Hubs; Anweisung KC allgemein 08:16, Go 08:53):
+   NEU   "mein_dienst" (Hub) bei backstube, konditorei, produktionsleitung, admin — wie seine
+         drei Kinder wunschtag, urlaub_anfrage, mein_konto.
+   NEU   "konfiguration" (Hub), "zeitkontext_global", "zeitkontext_hamster" NUR bei admin —
+         Registry roles ['admin'], sonst fail-open für alle. Wächter:
+         _PRUEF_launcher_werkzeuge/startbildschirm_hubs/test_hub_rechte.js.
+   WEG   "druckzentrale" bei backstube, konditorei, admin: der Hub hat keine Rollen mehr und ist
+         für alle offen (Ulf 19.11., 08:12), wie der Schnelldruck. Die zwei Formulare
+         druckzentrale_fruehschicht / druckzentrale_absetz BLEIBEN bei ihren drei Rollen.
+   WEG   "produkt_config" bei admin: der Hub ist aufgelöst (Registry-Eintrag entfernt), seine
+         Kinder produkt_config_editor / produkt_config_sync bleiben und stehen im Hub konfiguration.
+   Der Hub "lager" bekommt bewusst keine Zeile (keine Rollen, wie mitbringer).
+   _protokolle/SESSION_2026-11-19_STARTBILDSCHIRM_HUBS_BAU.md */
 /* ERGÄNZT 18.11.2026, 19:40 (Personalakte Lieferung A): "personalakte" nur bei admin —
    Registry roles ['admin'], sonst fail-open für alle. Die Rolle entscheidet nur über die Kachel;
    die Seite verlangt zusätzlich das Admin-Passwort (Admin-Sitzung, bos_admin_sitzung.js).
@@ -120,10 +136,10 @@ window.BOS_PERMISSIONS = {
     "wunschtag": true,
     "urlaub_anfrage": true,
     "mein_konto": true,
+    "mein_dienst": true,
     "schichtplaner": true,
     "freezer_produktion": true,
     "freezer_ziele": true,
-    "druckzentrale": true,
     "druckzentrale_fruehschicht": true,
     "druckzentrale_absetz": true,
     "teigecke": true,
@@ -151,10 +167,10 @@ window.BOS_PERMISSIONS = {
     "wunschtag": true,
     "urlaub_anfrage": true,
     "mein_konto": true,
+    "mein_dienst": true,
     "schichtplaner": true,
     "freezer_produktion": true,
     "freezer_ziele": true,
-    "druckzentrale": true,
     "druckzentrale_fruehschicht": true,
     "druckzentrale_absetz": true,
     "maschinenseite": true
@@ -180,6 +196,7 @@ window.BOS_PERMISSIONS = {
     "wunschtag": true,
     "urlaub_anfrage": true,
     "mein_konto": true,
+    "mein_dienst": true,
     "schichtplaner": true,
     "schichtplaner_entwuerfe": true,
     "schichtplaner_abwesenheiten": true,
@@ -212,7 +229,6 @@ window.BOS_PERMISSIONS = {
     "fahrer": true,
     "verkauf": true,
     "kommissionierung": true,
-    "produkt_config": true,
     "produkt_config_editor": true,
     "produkt_config_sync": true,
     "verbrauch_einstellungen_editor": true,
@@ -221,12 +237,16 @@ window.BOS_PERMISSIONS = {
     "verbrauch_werkstatt": true,
     "backzettel_erfassung": true,
     "zeitkontext_editor": true,
+    "zeitkontext_global": true,
+    "zeitkontext_hamster": true,
     "schnellrechner": true,
+    "konfiguration": true,
     "konten_verwaltung": true,
     "personalakte": true,
     "wunschtag": true,
     "urlaub_anfrage": true,
     "mein_konto": true,
+    "mein_dienst": true,
     "schichtplaner": true,
     "schichtplaner_entwuerfe": true,
     "schichtplaner_personen": true,
@@ -247,7 +267,6 @@ window.BOS_PERMISSIONS = {
     "produktionsplaner_nachtschicht": true,
     "freezer_ziele": true,
     "aufgaben_verwaltung": true,
-    "druckzentrale": true,
     "druckzentrale_fruehschicht": true,
     "druckzentrale_absetz": true,
     "teigecke": true,

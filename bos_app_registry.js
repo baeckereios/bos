@@ -2,6 +2,27 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-19 · 09:28 · Zwei neue Namen (Zusatz KC allgemein 19.11. 09:25; Ulf 09:21/09:25): lager_anfordern
+       heißt „Rohstoffe holen“ (vorher „Lager anfordern“ — klang nach Bestellung beim Lieferanten),
+       mitbringer heißt „Bleche & Material“ (vorher „Mitbringer“). NUR das Feld name; id, url, haken,
+       hub und alles andere unverändert. Die Haken in der Kontenverwaltung und der Druckname
+       tragen weiter die alten Wörter (eigene Baustelle, Bau-Doku).
+     2026-11-19 · 08:58 · Startbildschirm-Hubs (Anweisung KC allgemein 19.11. 08:16, Go 08:53;
+       Ulf 19.11. 08:04–08:15). Neue Felder umzug, ersetzt, abschnitte (am Hub) und abschnitt
+       (am Kind), unten bei den Feldern beschrieben; der Launcher liest sie ab v3.12.
+       NEU: Hubs mein_dienst („Mein Dienst“), lager („Lager“), konfiguration („Konfiguration“,
+       nur admin, vier Abschnitte, ersetzt den aufgelösten Hub produkt_config); Einträge
+       zeitkontext_global und zeitkontext_hamster (dieselbe Seite mit ?ansicht=…, nur admin).
+       GEÄNDERT: druckzentrale ohne roles (für alle) und mit umzug; hub-Feld neu an wunschtag,
+       urlaub_anfrage, mein_konto (mein_dienst), schnelldruck (druckzentrale), lager_zaehlen,
+       lager_anfordern, mitbringer (lager), konten_verwaltung, personalakte,
+       produkt_config_editor, produkt_config_sync, lager_editor, nfc_qr_zentrale (konfiguration,
+       je mit abschnitt). Namen: zeitkontext_editor „Zeitkontext“, produkt_config_editor
+       „Produkte bearbeiten“, produkt_config_sync „Produkte Import/Export“, lager_editor
+       „Lager einrichten“ (Symbol 🗃️). ENTFERNT: Eintrag produkt_config (aufgelöst).
+       Keine id, keine url, kein direkt, keine Rolle eines Kindes geändert.
+       bos_permissions.js in derselben Lieferung. Siehe _protokolle/
+       SESSION_2026-11-19_STARTBILDSCHIRM_HUBS_BAU.md.
      2026-11-18 · 19:40 · Personalakte Lieferung A (Go KC 18.11. 04:42, Start 19:37): neuer Eintrag
        personalakte (Kachel „Personalakte“, Bereich Verwaltung, roles ['admin'], kein haken,
        kein direkt). Gleich dem admin-Block in bos_permissions.js (sonst fail-open für alle).
@@ -144,6 +165,55 @@
               Nur Kacheln des Hauptbildschirms; Hub-Kinder kennen die Zahl
               (noch) nicht. Betrifft nur launcher.html/buildTileEl(), keine
               Zugriffswirkung.
+     umzug  — NEU (19.11.2026, Startbildschirm-Hubs). optional, nur an einem Hub
+              (type: 'hub'). true = „Hub neuer Art“. Der Launcher (ab v3.12) tut
+              für diesen Hub drei Dinge, ohne dass launcher.html angefasst wird:
+              (1) UMZUG: Steht ein Kind, das das Konto sehen darf, noch einzeln
+                  auf einem Startbildschirm (profileData.installed), ersetzt der
+                  Hub das erste dieser Kinder an SEINER Stelle; die übrigen
+                  verschwinden vom Startbildschirm und stehen im Hub. Einmalig,
+                  von selbst, beim nächsten Laden.
+              (2) LEER: Sieht ein Konto kein einziges Kind, erscheint der Hub
+                  bei ihm gar nicht (statt „hier gibt es nichts zu sehen“).
+              (3) WAISE: Sieht ein Konto ein Kind, aber den Hub nicht (Ausnahme
+                  am Konto für das Kind, Rolle des Hubs fehlt), bleibt das Kind
+                  als eigene Kachel auf dem Startbildschirm. Der BackStore
+                  bietet eine Waise nicht neu an — dann den Hub am Konto
+                  freigeben (Kontenverwaltung, Zugriffe).
+              Fehlt das Feld → der Hub verhält sich wie vor dem 19.11.2026
+              (alle alten Hubs; verbrauch zieht weiter über die feste Liste
+              HUB_UMZUEGE im Launcher um).
+              NEUEN HUB BAUEN = hier einen Eintrag mit type: 'hub' und
+              umzug: true, an den Kindern hub: '<id>'. Hat der Hub roles,
+              gehört dieselbe Zeile in bos_permissions.js (sonst fail-open).
+              Ohne roles ist er für alle da, die ein Kind sehen. Beispiel:
+                { id: 'mein_dienst', name: 'Mein Dienst', icon: '👤',
+                  color: '#c07a10', url: null, status: 'live', type: 'hub',
+                  umzug: true, bereich: 'allgemein',
+                  roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung'] }
+     ersetzt — NEU (19.11.2026). optional, nur an einem Hub mit umzug: true.
+              Liste von ids AUFGELÖSTER Hubs, die es in dieser Registry nicht
+              mehr gibt. Steht eine davon noch auf einem Startbildschirm, tritt
+              dieser Hub an ihre Stelle (gleicher Platz, auch wenn ein Kind
+              weiter vorn steht), der tote Eintrag und sein Platz verschwinden. Nur für Konten, die diesen Hub sehen.
+              Beispiel: ersetzt: ['produkt_config'] am Hub konfiguration.
+              Die alte id NIE neu vergeben.
+     abschnitte — NEU (19.11.2026). optional, an jedem Hub möglich. Liste
+              { id, titel } in der Reihenfolge, in der das Hub-Fenster die
+              Zwischenüberschriften zeigt. Beispiel:
+                abschnitte: [ { id: 'personen', titel: 'Personen & Konten' },
+                              { id: 'geraete',  titel: 'Geräte' } ]
+              Abschnitte ohne sichtbares Kind zeigt der Launcher nicht.
+              Innerhalb eines Abschnitts stehen die Kinder in der Reihenfolge
+              DIESER DATEI (auf jedem Gerät gleich) — wer die Reihenfolge
+              ändern will, stellt die Einträge hier um.
+              Fehlt das Feld → Kacheln ohne Überschriften, Reihenfolge des
+              Kontos, wie bisher.
+     abschnitt — NEU (19.11.2026). optional, am Kind eines Hubs mit
+              abschnitte: die id des Abschnitts, unter dem die Kachel steht.
+              Fehlt das Feld oder ist der Wert unbekannt → die Kachel steht
+              sichtbar unter „Weitere“ am Ende, statt zu verschwinden.
+              Reine Anzeige, keine Zugriffswirkung.
      (beschreibung — 21.10.2026, 08:38 bis 21.10.2026 (#110): ENTFERNT.
               Die App-Texte (kurz, lang, Verlauf) stehen in der Datenbank
               (backstore_texte, RK §26) und werden im BackStore gepflegt, nicht
@@ -368,36 +438,53 @@ window.BOS_APPS = [
     roles: ['admin', 'kommissionierung']
   },
   {
-    id: 'produkt_config',
+    /* NEU 19.11.2026 (Startbildschirm-Hubs; Ulf 19.11. 08:12/08:15): Hub „Konfiguration“ —
+       alles, was nur Ulf einstellt, an einem Ort, mit Abschnitten. NUR Rolle admin:
+       bos_permissions.js trägt konfiguration nur bei admin, sonst wäre der Hub für jede
+       Rolle offen (Wächter: _PRUEF_launcher_werkzeuge/startbildschirm_hubs/test_hub_rechte.js).
+       ERSETZT den aufgelösten Hub produkt_config (bis 19.11.2026 „Produkt-Config“, 🗂️): dessen
+       zwei Kinder stehen jetzt einzeln hier; wer ihn installiert hatte, bekommt diesen Hub
+       an derselben Stelle (Feld ersetzt). Die id produkt_config nie neu vergeben. */
+    id: 'konfiguration',
     bereich: 'verwaltung',
-    name: 'Produkt-Config',
-    icon: '🗂️',
+    name: 'Konfiguration',
+    icon: '🎛️',
     color: '#8b5cf6',
     url: null,
     status: 'live',
     type: 'hub',
+    umzug: true,
+    ersetzt: ['produkt_config'],
+    abschnitte: [
+      { id: 'personen', titel: 'Personen & Konten' },
+      { id: 'produkte', titel: 'Produkte & Lager' },
+      { id: 'tag', titel: 'Tag & Hamster' },
+      { id: 'geraete', titel: 'Geräte' }
+    ],
     roles: ['admin']
   },
   {
     id: 'produkt_config_editor',
     bereich: 'verwaltung',
-    name: 'Bearbeiten',
+    name: 'Produkte bearbeiten',   // bis 19.11.2026 „Bearbeiten“ im Hub Produkt-Config
     icon: '✎',
     color: '#8b5cf6',
     url: 'produkt_config/produkt_config_editor.html',
     status: 'live',
-    hub: 'produkt_config',
+    hub: 'konfiguration',
+    abschnitt: 'produkte',
     roles: ['admin']
   },
   {
     id: 'produkt_config_sync',
     bereich: 'verwaltung',
-    name: 'Import / Export',
+    name: 'Produkte Import/Export',   // bis 19.11.2026 „Import / Export“ im Hub Produkt-Config
     icon: '🔄',
     color: '#8b5cf6',
     url: 'produkt_config/produkt_config_sync.html',
     status: 'live',
-    hub: 'produkt_config',
+    hub: 'konfiguration',
+    abschnitt: 'produkte',
     roles: ['admin']
   },
   {
@@ -487,13 +574,64 @@ window.BOS_APPS = [
   },
   {
     id: 'zeitkontext_editor',
+    /* 19.11.2026 (Startbildschirm-Hubs; Ulf 08:15 „aufteilen“): heißt „Zeitkontext“ (vorher
+       „Zeitkontext & Hamster“) und zeigt ohne ?ansicht= nur noch den Teil „Schnell (dieses
+       Gerät)“. id, url, Rollen und Symbol unverändert — die Kollegen sollen ihre Kachel
+       wiedererkennen. Die zwei globalen Teile: zeitkontext_global, zeitkontext_hamster. */
     bereich: 'produktion',
-    name: 'Zeitkontext & Hamster',
+    name: 'Zeitkontext',
     icon: '🐹',
     color: '#8b5cf6',
     url: 'zeitkontext/zeitkontext_editor.html',
     status: 'live',
     roles: ['backstube', 'konditorei', 'produktionsleitung', 'admin']
+  },
+  {
+    /* NEU 19.11.2026: der Teil „Tageskontext (global)“ derselben Seite als eigene Kachel im
+       Hub Konfiguration. Die Seite setzt aus ?ansicht=global ihre Kennung auf diese id, BEVOR
+       der Wächter prüft. Nur admin (Matrix gleich). BEWUSSTE FOLGE (Ulf, Anweisung §1): die
+       Produktionsleitung darf laut Datenbank-Regel weiter global schreiben, hat aber keine
+       Kachel mehr dafür. Die Regel bleibt, wie sie ist. Kein direkt. */
+    id: 'zeitkontext_global',
+    bereich: 'verwaltung',
+    name: 'Tageskontext (global)',
+    icon: '🌍',
+    color: '#8b5cf6',
+    url: 'zeitkontext/zeitkontext_editor.html?ansicht=global',
+    status: 'live',
+    hub: 'konfiguration',
+    abschnitt: 'tag',
+    roles: ['admin']
+  },
+  {
+    /* NEU 19.11.2026: der Teil „Hamster-Konfiguration“ derselben Seite (?ansicht=hamster).
+       Nur admin (Matrix gleich). Die Seite schreibt hier nichts in die Datenbank, sie lädt
+       bos_hamster_config.json zum Ersetzen im Repo herunter. Kein direkt. */
+    id: 'zeitkontext_hamster',
+    bereich: 'verwaltung',
+    name: 'Hamster-Konfiguration',
+    icon: '🎚️',
+    color: '#8b5cf6',
+    url: 'zeitkontext/zeitkontext_editor.html?ansicht=hamster',
+    status: 'live',
+    hub: 'konfiguration',
+    abschnitt: 'tag',
+    roles: ['admin']
+  },
+  {
+    /* NEU 19.11.2026 (Startbildschirm-Hubs; Ulf 08:12 „eigener Hub Mein Dienst … finde ich
+       super“): Wunschtag, Urlaub beantragen, Mein Konto. Rollen wie die drei Kinder
+       (Matrix gleich). Bewusst NICHT im SchichtPlaner-Hub. */
+    id: 'mein_dienst',
+    bereich: 'allgemein',
+    name: 'Mein Dienst',
+    icon: '👤',
+    color: '#c07a10',
+    url: null,
+    status: 'live',
+    type: 'hub',
+    umzug: true,
+    roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
   },
   {
     id: 'wunschtag',
@@ -509,6 +647,7 @@ window.BOS_APPS = [
     url: 'wunschtag/wunschtag.html',
     direkt: 'anmeldung',
     status: 'live',
+    hub: 'mein_dienst',   // seit 19.11.2026
     roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
   },
   {
@@ -527,6 +666,7 @@ window.BOS_APPS = [
     url: 'urlaub/urlaub_anfrage.html',
     direkt: 'anmeldung',
     status: 'live',
+    hub: 'mein_dienst',   // seit 19.11.2026
     roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
   },
   {
@@ -545,6 +685,7 @@ window.BOS_APPS = [
     url: 'mein_konto/mein_konto.html',
     direkt: 'anmeldung',
     status: 'live',
+    hub: 'mein_dienst',   // seit 19.11.2026
     roles: ['admin', 'backstube', 'konditorei', 'produktionsleitung']
   },
   {
@@ -588,16 +729,35 @@ window.BOS_APPS = [
   {
     id: 'lager_editor',
     bereich: 'verwaltung',
-    name: 'Lager',
-    icon: '📦',
+    name: 'Lager einrichten',   // bis 19.11.2026 „Lager“ (so heißt jetzt der Hub lager); Ulf: „eine reine Einstellung“
+    icon: '🗃️',                 // bis 19.11.2026 📦 (jetzt das Symbol des Hubs lager)
     color: '#8b5cf6',
     url: 'lager/lager_editor.html',
     status: 'live',
+    hub: 'konfiguration',
+    abschnitt: 'produkte',
     roles: ['admin']
     // NEU 02.11.2026 (Lager Stufe 1, #120): Artikelstamm, Lagerorte, Kategorien,
     // Lieferanten. Pflegen nur Rolle admin (Regel RK §30). Lila wie die anderen
     // Admin-Werkzeuge. bos_permissions.js: "lager_editor: true" nur bei admin.
     // Siehe lager/LAGER_EDITOR_DOKU.md.
+  },
+  {
+    /* NEU 19.11.2026 (Startbildschirm-Hubs): Hub „Lager“ für lager_zaehlen („Lager zählen“),
+       lager_anfordern („Rohstoffe holen“) und mitbringer („Bleche & Material“). Bewusst KEIN
+       roles-Feld und KEINE Zeile in bos_permissions.js: zwei Kinder hängen an Haken, mitbringer
+       ist für jedes Konto da. Der Hub erscheint bei jedem, der mindestens ein Kind sieht
+       (umzug: true, Punkt LEER) — heute also bei allen, mit mindestens „Bleche & Material“. Der Editor heißt seitdem „Lager einrichten“ (lager_editor,
+       Hub konfiguration). */
+    id: 'lager',
+    bereich: 'produktion',
+    name: 'Lager',
+    icon: '📦',
+    color: '#8b5a2b',
+    url: null,
+    status: 'live',
+    type: 'hub',
+    umzug: true
   },
   {
     id: 'lager_zaehlen',
@@ -615,6 +775,7 @@ window.BOS_APPS = [
     color: '#8b5a2b',
     url: 'lager/lager_zaehlen.html',
     status: 'live',
+    hub: 'lager',   // seit 19.11.2026
     haken: ['lagerZaehlen']
   },
   {
@@ -628,11 +789,12 @@ window.BOS_APPS = [
     // Rolle admin darf immer. Kein direkt: QR/Stationsgerät entscheidet Ulf vor der
     // Einführung (Kompendium O26). Siehe lager/LAGER_ANFORDERN_DOKU.md.
     bereich: 'produktion',
-    name: 'Lager anfordern',
+    name: 'Rohstoffe holen',   // bis 19.11.2026 „Lager anfordern“ (Ulf 09:21: klingt nach Bestellung beim Lieferanten)
     icon: '🧾',
     color: '#8b5a2b',
     url: 'lager/lager_anfordern.html',
     status: 'live',
+    hub: 'lager',   // seit 19.11.2026
     haken: ['lagerAnfordern', 'lagerBestellen']
   },
   {
@@ -647,11 +809,12 @@ window.BOS_APPS = [
     // das Schloss in der Regel. Nicht angeheftet: kommt über den BackStore.
     // Siehe mitbringer/MITBRINGER_DOKU.md.
     bereich: 'produktion',
-    name: 'Mitbringer',
+    name: 'Bleche & Material',   // bis 19.11.2026 „Mitbringer“ (Ulf 09:25)
     icon: '🧺',
     color: '#8b5a2b',
     url: 'mitbringer/mitbringer.html',
-    status: 'live'
+    status: 'live',
+    hub: 'lager'   // seit 19.11.2026
   },
   {
     id: 'konten_verwaltung',
@@ -661,6 +824,8 @@ window.BOS_APPS = [
     color: '#8b5cf6',
     url: 'konten/konten_verwaltung.html',
     status: 'live',
+    hub: 'konfiguration',   // seit 19.11.2026
+    abschnitt: 'personen',
     roles: ['admin']
   },
   {
@@ -671,6 +836,8 @@ window.BOS_APPS = [
     color: '#8b5cf6',
     url: 'konten/personalakte.html',
     status: 'live',
+    hub: 'konfiguration',   // seit 19.11.2026
+    abschnitt: 'personen',
     roles: ['admin']
   },
   {
@@ -682,6 +849,8 @@ window.BOS_APPS = [
     url: 'nfc_qr/nfc_qr_zentrale.html',
     direkt: 'anmeldung',
     status: 'live',
+    hub: 'konfiguration',   // seit 19.11.2026
+    abschnitt: 'geraete',
     roles: ['admin']
     // NEU 03.10.2026 (14:47). NFC-/QR-Zentrale, Stufe 1: Liste aller Ziele
     // aus dieser Registry, Adresse, Chip beschreiben/prüfen, Einzelschild.
@@ -748,7 +917,8 @@ window.BOS_APPS = [
     color: '#c07a10',
     url: 'schnelldruck/schnelldruck.html',
     direkt: 'offen',
-    status: 'live'
+    status: 'live',
+    hub: 'druckzentrale'   // seit 19.11.2026 (Ulf 08:12: „in die Druckzentrale“)
     // Bewusst KEIN roles-Feld, gleiches Muster wie taschenrechner:
     // allgemeines Werkzeug (Notiz/Checkliste drucken), keine sensiblen
     // Daten, für alle Konten sofort sichtbar. Kein Eintrag in
@@ -916,10 +1086,14 @@ window.BOS_APPS = [
     url: null,
     status: 'live',
     type: 'hub',
-    roles: ['admin', 'backstube', 'konditorei']
-    // NEU 03.09.2026. Rollen an den Froster-Hub angelehnt — Backstuben-
-    // Werkzeug, kein offenes Utility wie Taschenrechner/Schnelldruck.
-    // Details: DRUCKZENTRALE_DOKU.md.
+    umzug: true
+    // NEU 03.09.2026. Details: DRUCKZENTRALE_DOKU.md.
+    // 19.11.2026 (Startbildschirm-Hubs; Ulf 08:12: „Die Druckzentrale ist für alle offen …
+    // nichts Geheimes“): KEIN roles-Feld mehr (vorher admin, backstube, konditorei) und
+    // KEINE Zeile mehr in bos_permissions.js — wie beim Schnelldruck greift „nicht
+    // konfiguriert = offen“. Die zwei Formulare behalten ihre Rollen und ihre Matrix-Zeilen.
+    // Neues Kind: schnelldruck. ACHTUNG: eine alte Ausnahme „druckzentrale aus“ an einem
+    // Konto sperrt weiter und ist in der Kontenverwaltung nicht mehr zu sehen (Bau-Doku).
   },
   {
     id: 'druckzentrale_fruehschicht',

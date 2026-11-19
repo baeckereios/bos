@@ -19,6 +19,39 @@
       erreichbar ist die Funktion aber nur aus dem Overlay selbst.
 
   CHANGELOG
+    2026-11-19 · 08:59 · v3.12 · Feature (Startbildschirm-Hubs; Anweisung KC allgemein 19.11. 08:16,
+      Go 08:53; Kern-Datei-Freigabe Ulf 19.11. „Ja, einmal“ — nur Zusätze)
+      - NEU „Hub neuer Art“ = Registry-Feld umzug: true (bos_app_registry.js, Kopf). Dafür fünf
+        kleine Funktionen: hubNeuerArt, umzugsHubs, sichtbareKinder, istSichtbar, istWaise.
+        Neue Hubs brauchen diese Datei damit nicht mehr.
+          · UMZUG: hubUmzug() läuft über umzugsHubs() = feste Liste HUB_UMZUEGE (bleibt, nur
+            für verbrauch) + alle Hubs mit dem Feld.
+          · AUFGELÖSTER HUB: Feld ersetzt: ['<alte id>'] am neuen Hub. Steht die alte id noch
+            in installed (und nicht mehr in der Registry), zählt sie wie ein installiertes Kind:
+            der neue Hub tritt an IHRE Stelle (auch wenn ein Kind weiter vorn steht), ihr Platz
+            wird gelöscht (sonst bliebe er als unsichtbare Sperre im Raster). Nur für Konten,
+            die den neuen Hub sehen.
+          · LEER: ein Hub neuer Art ohne ein einziges sichtbares Kind erscheint nicht.
+          · WAISE: ein Kind eines Hubs neuer Art, den das Konto nicht sieht (Ausnahme am Konto
+            für das Kind, Rolle des Hubs fehlt), bleibt als eigene Kachel samt Platz stehen.
+            Der BackStore bietet Waisen nicht neu an (dort unverändert: keine Hub-Kinder).
+      - NEU Abschnitte im Hub: Feld abschnitte: [{ id, titel }] am Hub, abschnitt: '<id>' am
+        Kind. buildHubBody() setzt Zwischenüberschriften; Abschnitte und Kinder darin in der
+        Reihenfolge der Registry (auf jedem Gerät gleich); Kinder ohne/mit unbekanntem Abschnitt
+        stehen sichtbar unter „Weitere“; leere Abschnitte entfallen. Auf breiten Fenstern stehen die
+        Abschnitte nebeneinander (ab 480 px je Spalte: am PC zwei Spalten, hochkant eine). Ohne das Feld läuft der
+        alte Weg Zeichen für Zeichen wie bisher. CSS .bos-hub-abschnitte / __titel.
+      - DREI BESTEHENDE ZEILEN ändern einen Aufruf (sonst nur Zusätze):
+          · hubUmzug: HUB_UMZUEGE.forEach wird umzugsHubs().forEach
+          · hubUmzug: sieht() nimmt für Hubs neuer Art istSichtbar(), sonst isVisibleForRole()
+          · renderGrid: .filter(isVisibleForRole).filter(!a.hub) wird
+            .filter(istSichtbar).filter(!a.hub || istWaise(a))
+        Für alles ohne das Feld umzug liefern die drei Stellen dasselbe wie vorher — kein alter
+        Hub (Froster, Teigecke, Produktionsplaner, SchichtPlaner, Verbrauch) trägt es.
+      - isVisibleForRole, getMergedApps, launchApp, createWindow, attachHubHandlers unverändert.
+      - Prüfung: _PRUEF_launcher_werkzeuge/startbildschirm_hubs/ (test_hub_umzug.js zieht die
+        Funktionen aus DIESER Datei; Gegenprobe gegen v3.11). Siehe _protokolle/
+        SESSION_2026-11-19_STARTBILDSCHIRM_HUBS_BAU.md und LAUNCHER_DOKU.md „Hub-Zwischenseiten“.
     2026-10-30 · 03:57 · v3.11 · Nacharbeit N1 (KC allgemein 30.10., 03:4x)
       - meldeSyncFehler(fehler, 'wartet'): gelb (--bos-gelb) „Nur auf diesem Gerät gespeichert — wird
         abgeglichen, sobald wieder Netz da ist. [code: err.message]“ (Text settings.syncWartet);
@@ -577,6 +610,21 @@
     display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 1rem; padding: 1.4rem; height: 100%; align-content: start;
   }
+  /* 19.11.2026 (v3.12): Hub mit Abschnitten (Registry-Feld abschnitte). Die Hülle füllt das
+     Fenster und scrollt; jedes Raster darin ist nur so hoch wie seine Kacheln. Auf breiten
+     Fenstern (PC, Tablet quer) stehen die Abschnitte nebeneinander, ab 480 px je Spalte —
+     so sind am PC alle Abschnitte ohne Scrollen zu sehen; hochkant (800 px) untereinander.
+     Die Regel .bos-hub-grid oben bleibt für Hubs ohne Abschnitte unverändert. */
+  .bos-hub-abschnitte {
+    height: 100%; overflow-y: auto; padding: .4rem 0 1.4rem;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr)); align-content: start;
+  }
+  .bos-hub-abschnitt__titel {
+    margin: 0; padding: 1rem 1.4rem 0;
+    font-family: var(--bos-font-label); font-weight: 700; font-size: .82rem;
+    letter-spacing: .05em; text-transform: uppercase; color: var(--bos-text-dim);
+  }
+  .bos-hub-abschnitte .bos-hub-grid { height: auto; padding: .7rem 1.4rem .4rem; }
   .bos-hubtile {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;
     aspect-ratio: 1 / 1; background: var(--bos-surface); border: 1px solid var(--bos-border);
@@ -1016,6 +1064,7 @@
     'profile.addFalscherPin': 'Diesen Namen mit diesem Geburtsdatum gibt es schon, aber der PIN stimmt nicht. Falls das dein bestehendes Konto ist: PIN nochmal prüfen. Falls du eine andere Person bist: unten einen Zusatz eintragen und erneut versuchen.',
     'profile.deleteConfirm': 'Dieses Profil wirklich entfernen? Persönliche Anpassungen gehen dabei verloren.',
     'hub.empty': 'Für dein Profil gibt es hier aktuell nichts zu sehen.',
+    'hub.weitere': 'Weitere',
     'backstore.hinweisTitle': 'Willkommen bei BäckereiOS',
     'backstore.hinweisText': 'Dein Desktop ist noch leer. Über den BackStore holst du dir die Werkzeuge, die du brauchst — und kannst sie jederzeit wieder entfernen.',
     'backstore.hinweisLater': 'Später',
@@ -1216,33 +1265,73 @@
 
   /* ---------------- Umzug ins Hub (20.10.2026, Verbrauch aufräumen, V5) ----------------
      Feste Liste — NICHT für alle Hubs (alte Hubs könnten sonst Startbildschirme
-     verändern, die niemand angefasst hat). Siehe CHANGELOG v3.7. */
+     verändern, die niemand angefasst hat). Siehe CHANGELOG v3.7.
+     19.11.2026 (v3.12): alte Liste, nur für verbrauch; neue Hubs über das Registry-Feld
+     umzug: true (siehe umzugsHubs). */
   var HUB_UMZUEGE = ['verbrauch'];
+
+  /* ---------------- Hub neuer Art (19.11.2026, v3.12, Startbildschirm-Hubs) ----------------
+     Ein Hub mit dem Registry-Feld umzug: true. Nur für diese Hubs gelten Umzug über das Feld,
+     „leer erscheint nicht“ und „Waisen bleiben stehen“. Kein alter Hub trägt das Feld — für
+     sie antworten alle fünf Funktionen so, dass sich nichts ändert. */
+  function hubNeuerArt(app) { return !!app && app.type === 'hub' && app.umzug === true; }
+  function umzugsHubs() {
+    var ids = HUB_UMZUEGE.slice();
+    (window.BOS_APPS || []).forEach(function (a) { if (hubNeuerArt(a) && ids.indexOf(a.id) === -1) ids.push(a.id); });
+    return ids;
+  }
+  function sichtbareKinder(hubId) {
+    return (window.BOS_APPS || []).filter(function (a) { return a.hub === hubId && isVisibleForRole(a); });
+  }
+  /* Wie isVisibleForRole — nur ein Hub neuer Art ohne ein einziges sichtbares Kind erscheint nicht. */
+  function istSichtbar(app) {
+    if (!isVisibleForRole(app)) return false;
+    return hubNeuerArt(app) ? sichtbareKinder(app.id).length > 0 : true;
+  }
+  /* Kind eines Hubs neuer Art, den das Konto nicht sieht: bleibt eine eigene Kachel. */
+  function istWaise(app) {
+    if (!app || !app.hub) return false;
+    var hub = (window.BOS_APPS || []).filter(function (h) { return h.id === app.hub; })[0];
+    return hubNeuerArt(hub) && !istSichtbar(hub);
+  }
+
   function hubUmzug(d) {
     var apps = window.BOS_APPS || [];
     var geaendert = false;
     if (!d || !Array.isArray(d.installed) || !d.positions) return false;
-    HUB_UMZUEGE.forEach(function (hubId) {
+    umzugsHubs().forEach(function (hubId) {
       var hub = apps.find(function (a) { return a.id === hubId && a.type === 'hub'; });
       if (!hub) return;
       var kinder = apps.filter(function (a) { return a.hub === hubId; });
-      var sieht = function (app) { try { return isVisibleForRole(app); } catch (e) { return false; } };
+      var sieht = function (app) { try { return hubNeuerArt(app) ? istSichtbar(app) : isVisibleForRole(app); } catch (e) { return false; } };
       var sichtbareInstallierte = kinder.filter(function (a) { return d.installed.indexOf(a.id) !== -1 && sieht(a); }).map(function (a) { return a.id; });
-      if (sichtbareInstallierte.length && d.installed.indexOf(hubId) === -1 && sieht(hub)) {
-        var reihe = (d.order || []).filter(function (id) { return sichtbareInstallierte.indexOf(id) !== -1; });
-        var erstes = reihe.length ? reihe[0] : sichtbareInstallierte[0];
+      /* NEU v3.12: aufgelöste Hubs (Registry-Feld ersetzt) zählen wie ein installiertes Kind —
+         nur wenn das Konto den neuen Hub sieht und die alte id nicht mehr in der Registry steht.
+         Ohne das Feld ist abgeloest leer und kandidaten gleich sichtbareInstallierte. */
+      var abgeloest = (hubNeuerArt(hub) && Array.isArray(hub.ersetzt) && sieht(hub))
+        ? hub.ersetzt.filter(function (id) { return d.installed.indexOf(id) !== -1 && !apps.some(function (a) { return a.id === id; }); })
+        : [];
+      var kandidaten = sichtbareInstallierte.concat(abgeloest);
+      if (kandidaten.length && d.installed.indexOf(hubId) === -1 && sieht(hub)) {
+        /* NEU v3.12: steht ein aufgelöster Hub auf dem Startbildschirm, übernimmt der neue Hub DESSEN Stelle
+           (er ist sein Nachfolger) — auch wenn ein Kind weiter vorn steht. Sonst wie bisher das erste Kind nach order. */
+        var bevorzugt = abgeloest.length ? abgeloest : kandidaten;
+        var reihe = (d.order || []).filter(function (id) { return bevorzugt.indexOf(id) !== -1; });
+        var erstes = reihe.length ? reihe[0] : d.installed.filter(function (id) { return bevorzugt.indexOf(id) !== -1; })[0];
         d.installed[d.installed.indexOf(erstes)] = hubId;          // an SEINER Stelle, keine andere Reihenfolge
         if (d.positions[erstes] && !d.positions[hubId]) d.positions[hubId] = d.positions[erstes];
         geaendert = true;
       }
       if (d.installed.indexOf(hubId) !== -1) {
         var vorher = d.installed.length;
-        d.installed = d.installed.filter(function (id) { return sichtbareInstallierte.indexOf(id) === -1; });
+        d.installed = d.installed.filter(function (id) { return kandidaten.indexOf(id) === -1; });
         if (d.installed.length !== vorher) geaendert = true;
+        abgeloest.forEach(function (id) { if (d.positions[id]) { delete d.positions[id]; geaendert = true; } });   // kein toter Platz im Raster
       }
       kinder.forEach(function (a) {
         if (!d.positions[a.id]) return;
         if (d.installed.indexOf(a.id) !== -1 && !sieht(a)) return;   // Rolle (noch) unbekannt: nichts anfassen
+        if (d.installed.indexOf(a.id) !== -1 && istWaise(a)) return; // NEU v3.12: Waise behält ihren Platz
         delete d.positions[a.id];
         geaendert = true;
       });
@@ -1442,7 +1531,9 @@
     return el;
   }
   function renderGrid() {
-    var apps = getMergedApps().filter(isVisibleForRole).filter(function (a) { return !a.hub; });
+    /* 19.11.2026 (v3.12): istSichtbar statt isVisibleForRole (ein Hub neuer Art ohne sichtbares
+       Kind erscheint nicht) und Waisen bleiben stehen. Ohne Registry-Feld umzug wie vorher. */
+    var apps = getMergedApps().filter(istSichtbar).filter(function (a) { return !a.hub || istWaise(a); });
     var data = getActiveProfileData();
     var grid = document.getElementById('grid');
     var cols = computeCols(grid);
@@ -1850,7 +1941,7 @@
         '<p style="color:var(--bos-text-dim);margin:0;">' + t('hub.empty') + '</p>' +
         '</div>';
     }
-    var tiles = children.map(function (child) {
+    var kachel = function (child) {
       var iconBg = hexToRgba(child.color, 0.20);
       var statusLabel = child.status === 'geplant' ? '<div class="bos-hubtile__status">' + t('tile.planned') + '</div>' : '';
       return '<div class="bos-hubtile" data-hub-child="' + escapeHtml(child.id) + '">' +
@@ -1858,7 +1949,30 @@
         '<div class="bos-hubtile__name">' + escapeHtml(child.name) + '</div>' +
         statusLabel +
         '</div>';
-    }).join('');
+    };
+    /* 19.11.2026 (v3.12): Abschnitte (Registry-Feld abschnitte am Hub, abschnitt am Kind).
+       Reihenfolge der Abschnitte UND der Kinder darin aus der Registry — ein Hub mit Abschnitten
+       sieht auf jedem Gerät gleich aus (in einem Hub lässt sich nichts verschieben; die Reihenfolge
+       aus order wäre dort ein Zufall des alten Startbildschirms). Kinder ohne oder mit unbekanntem
+       Abschnitt: „Weitere“ am Ende — sichtbar statt verschwunden. Abschnitte ohne sichtbares Kind
+       entfallen. Hubs OHNE das Feld: Reihenfolge aus order wie bisher (Zweig darunter). */
+    if (Array.isArray(app.abschnitte) && app.abschnitte.length) {
+      var registryReihe = (window.BOS_APPS || []).map(function (a) { return a.id; });
+      var geordnet = children.slice().sort(function (a, b) { return registryReihe.indexOf(a.id) - registryReihe.indexOf(b.id); });
+      var bekannt = app.abschnitte.map(function (ab) { return ab.id; });
+      var gruppen = app.abschnitte.map(function (ab) {
+        return { titel: ab.titel || ab.id, kinder: geordnet.filter(function (c) { return c.abschnitt === ab.id; }) };
+      });
+      var rest = geordnet.filter(function (c) { return bekannt.indexOf(c.abschnitt) === -1; });
+      if (rest.length) gruppen.push({ titel: t('hub.weitere'), kinder: rest });
+      return '<div class="bos-hub-abschnitte">' + gruppen.filter(function (g) { return g.kinder.length; }).map(function (g) {
+        return '<section class="bos-hub-abschnitt">' +
+          '<h3 class="bos-hub-abschnitt__titel">' + escapeHtml(g.titel) + '</h3>' +
+          '<div class="bos-hub-grid">' + g.kinder.map(kachel).join('') + '</div>' +
+          '</section>';
+      }).join('') + '</div>';
+    }
+    var tiles = children.map(kachel).join('');
     return '<div class="bos-hub-grid">' + tiles + '</div>';
   }
   /* Hub bleibt offen, wenn eine App daraus geöffnet wird (22.09.2026).

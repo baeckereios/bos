@@ -2,6 +2,9 @@
 <html lang="de" data-theme="dark">
 <!--
   MODUL: lager/lager_anfordern.html — Lager anfordern (Anforderungsliste statt Zettel, Bestellungen)
+  NAME:  seit 19.11.2026, 09:28 heißt die Seite für die Kollegen „Rohstoffe holen“ (Ulf 09:21; Zusatz KC allgemein 09:25):
+         geändert NUR Fenstertitel, Überschrift, i18n titel und der Titel der Hilfe. Kennung, Adresse, Haken
+         (lagerAnfordern), Druckname (appName), Regeln und alle übrigen Texte unverändert.
   Doku:  lager/LAGER_ANFORDERN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (Liste, Bestand je Ort, Hauptort, „Bitte nachbestellen“, Druckansicht)
   Regel: RK §32 (Nachtrag 19.11.), §34 (firestore_regeln_2026-11-19_lager_feinschliff.rules) — lager_listen/{standortId}__{a|b}{n}:
@@ -41,7 +44,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>BäckereiOS · Lager anfordern</title>
+<title>BäckereiOS · Rohstoffe holen</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <!-- MUSS vor bos_design_tokens.css stehen (Theme + Farbprofil des Kontos) -->
@@ -135,7 +138,7 @@
 <script src="../bos_access_guard.js"></script>
 
 <header>
-  <h1 data-i18n="titel">Lager anfordern</h1>
+  <h1 data-i18n="titel">Rohstoffe holen</h1>
   <div style="display:flex; align-items:center; gap:10px;">
     <div class="meta"><div id="kontoZeile">—</div></div>
     <button id="helpOpenBtn" class="help-btn" title="Hilfe" aria-label="Hilfe">❓</button>
@@ -198,7 +201,7 @@ const ART_TEXT = { anforderung: 'Liste', bestellung: 'Bestellung' };
 
 /* ---------- i18n (Checkliste §6) ---------- */
 const I18N_DE = {
-  titel: 'Lager anfordern', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
+  titel: 'Rohstoffe holen', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
   wechseln: 'Standort wechseln', kein_konto: 'Keine Anmeldung erkannt.',
   kein_standort: 'Dir ist noch kein Standort zum Anfordern freigegeben. Das stellt die Kontenverwaltung ein (Gruppe „🧾 Entnahme — rausholen“).',
   reiter_liste: 'Liste', reiter_archiv: 'Archiv', reiter_bestellen: 'Bestellen',
@@ -806,7 +809,7 @@ document.getElementById('fehlerZuBtn').addEventListener('click', function () { d
 
 /* ---------- Hilfe (Checkliste §7; kanonische Fassung in LAGER_ANFORDERN_DOKU.md) ---------- */
 const helpData = {
-  title: 'Lager anfordern — was ist das hier?',
+  title: 'Rohstoffe holen — was ist das hier?',
   sections: [
     { heading: 'Wofür ist diese Seite?', text: 'Sie ersetzt den Zettel. Wer etwas aus dem Lager braucht, schreibt es auf die offene Liste, in Gebinden: Sack, Karton, Eimer. Wer die Liste abholt, drückt „Abschließen und drucken“. Dann wird alles genau einmal vom Bestand abgebucht und gedruckt, und eine neue, leere Liste ist sofort offen.' },
     { heading: 'Standort', text: 'Oben steht der Standort, für den die Liste gilt. Darfst du an mehreren anfordern, wählst du ihn am Anfang; „Standort wechseln“ bringt dich zurück. Wer wo anfordern darf, steht in der Kontenverwaltung.' },

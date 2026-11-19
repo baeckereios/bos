@@ -1,5 +1,15 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
+<!-- 2026-11-19 · 09:01 · Aufgeteilt (Startbildschirm-Hubs; Anweisung KC allgemein 19.11. 08:16, Go 08:53; Ulf 08:15 „aufteilen“).
+     EINE Seite, DREI Ansichten über die Adresse: ohne Zusatz oder ?ansicht=schnell zeigt „Schnell (dieses Gerät)“
+     (Kennung zeitkontext_editor, Kachel „Zeitkontext“), ?ansicht=global zeigt „Tageskontext (global)“ (Kennung
+     zeitkontext_global), ?ansicht=hamster zeigt die „Hamster-Konfiguration“ (Kennung zeitkontext_hamster); die
+     letzten zwei sind Kacheln im Hub Konfiguration, nur Rolle admin. Ein unbekannter Wert zählt wie kein Zusatz.
+     Die Kennung wird VOR dem Wächter gesetzt. Die Reiterleiste ist ausgeblendet, genau ein Teil ist sichtbar.
+     Rechnen, Laden, Speichern und die Datenbank-Regel sind unverändert. Hilfetext: nichts gekürzt, das Wort „Tab“
+     durch den Namen des Teils ersetzt, neuer Absatz „Wo sind die anderen Teile?“. Fehleranzeige: Grund mit
+     err.message an Stand, Tage-Reihe, geplanten Tagen, Sammelspeichern und Hamster-Datei; zwei globale Fänger.
+     _protokolle/SESSION_2026-11-19_STARTBILDSCHIRM_HUBS_BAU.md (im Paket: bos/_protokolle) -->
 <!-- 2026-10-15 · 10:55 · Farbprofile Stufe A (#72, Freigabe Kontroll-Chat 10:50): Tönungen Herkunftsmarke und aktiver Tag folgen dem Akzent (color-mix statt festem Amber). SESSION_2026-10-15_FARBSCHEMA_STUFE_A_BAU.md -->
 <head>
 <meta charset="UTF-8">
@@ -53,6 +63,21 @@
   .tab-btn.aktiv { color: var(--zk-amber); border-bottom-color: var(--zk-amber); }
   .tab-inhalt { display: none; }
   .tab-inhalt.aktiv { display: block; }
+  /* 19.11.2026: Ansichten statt Reiter. Die Leiste entfällt (die Knöpfe bleiben im Dokument, damit
+     wechsleTab weiter läuft). Welcher Teil zu sehen ist, entscheidet data-zk-ansicht am html-Element,
+     gesetzt im ersten Skript des body — schon vor dem ersten Bild. Fehlt das Attribut, bleibt „Schnell“. */
+  .tabs { display: none; }
+  html[data-zk-ansicht] .tab-inhalt { display: none; }
+  html[data-zk-ansicht="schnell"] #tabLokal,
+  html[data-zk-ansicht="global"] #tabKontext,
+  html[data-zk-ansicht="hamster"] #tabHamster { display: block; }
+  .fehler-zeile { color: var(--zk-red); font-size: var(--bos-font-sm, .8rem); margin-top: var(--bos-space-xs, 8px); overflow-wrap: anywhere; }
+  .zk-fehlerleiste {
+    position: sticky; top: 0; z-index: 50; margin: 0 0 var(--bos-space-sm, 14px);
+    padding: var(--bos-space-xs, 10px) 56px var(--bos-space-xs, 10px) var(--bos-space-sm, 14px); border-radius: 8px;   /* rechts Platz für den Hilfe-Knopf */
+    background: var(--zk-surface-2); border: 1px solid var(--zk-red); color: var(--zk-red);
+    font-size: var(--bos-font-sm, .85rem); overflow-wrap: anywhere;
+  }
 
   .karte {
     background: var(--zk-surface); border: 1px solid var(--zk-border);
@@ -202,7 +227,46 @@
 </style>
 </head>
 <body>
-<script>var BOS_APP_ID = 'zeitkontext_editor';</script>
+<script>
+/* 19.11.2026: Ansicht aus der Adresse, BEVOR der Wächter (bos_access_guard.js) prüft.
+   ?ansicht=global  → Kennung zeitkontext_global  (Hub Konfiguration, nur admin)
+   ?ansicht=hamster → Kennung zeitkontext_hamster (Hub Konfiguration, nur admin)
+   sonst            → Kennung zeitkontext_editor  (Kachel „Zeitkontext“, nur „Schnell“);
+                      auch bei unbekanntem Wert — alte Lesezeichen laufen weiter. */
+var BOS_ZK_ANSICHT = (function () {
+  var a = null;
+  try { a = new URLSearchParams(window.location.search).get('ansicht'); } catch (e) { a = null; }
+  return (a === 'global' || a === 'hamster') ? a : 'schnell';
+})();
+var BOS_APP_ID = BOS_ZK_ANSICHT === 'global' ? 'zeitkontext_global'
+  : BOS_ZK_ANSICHT === 'hamster' ? 'zeitkontext_hamster' : 'zeitkontext_editor';
+document.documentElement.setAttribute('data-zk-ansicht', BOS_ZK_ANSICHT);
+
+/* 19.11.2026: Fehler, die sonst nur in der Konsole stünden, auf den Bildschirm (Fehlerregel).
+   Steht hier oben, damit auch ein Fehler in einem der späteren Skripte sichtbar wird. */
+(function () {
+  function zeige(text) {
+    var leiste = document.getElementById('zkFehlerLeiste');
+    if (!leiste) {
+      leiste = document.createElement('div');
+      leiste.id = 'zkFehlerLeiste';
+      leiste.className = 'zk-fehlerleiste';
+      leiste.setAttribute('role', 'alert');
+      if (document.body) document.body.insertBefore(leiste, document.body.firstChild);
+      else document.addEventListener('DOMContentLoaded', function () { document.body.insertBefore(leiste, document.body.firstChild); });
+    }
+    leiste.textContent = text;
+  }
+  window.addEventListener('error', function (e) {
+    var wo = (e && e.filename) ? ' (' + String(e.filename).split('/').pop().split('?')[0] + ':' + (e.lineno || '?') + ')' : '';
+    zeige('⚠ Fehler auf dieser Seite: ' + ((e && e.message) || 'unbekannt') + wo);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    zeige('⚠ Fehler auf dieser Seite: ' + ((r && r.code) ? r.code + ' — ' : '') + ((r && r.message) || String(r)));
+  });
+})();
+</script>
 <script src="../bos_app_registry.js"></script>
 <script src="../bos_launcher_profiles.js"></script>
 <script src="../bos_permissions.js"></script>
@@ -235,6 +299,7 @@
       <button type="button" class="tag-davor-btn" id="tagDavorBtnLokal" data-i18n="tagDavor"></button>
     </div>
     <div class="tage-streifen" id="tageStreifenLokal"></div>
+    <div class="fehler-zeile" id="streifenFehlerLokal" role="alert" hidden></div>
     <button class="save-btn sekundaer" id="alleSpeichernBtnLokal" type="button" style="margin-top:8px;" hidden></button>
     <div class="status-text" id="alleSpeichernStatusLokal"></div>
   </div>
@@ -244,6 +309,7 @@
       <label style="margin:0;" data-i18n="statusLabel"></label>
       <span class="quelle-badge" id="quelleBadgeLokal"></span>
     </div>
+    <div class="fehler-zeile" id="ladeFehlerLokal" role="alert" hidden></div>
 
     <label data-i18n="offenLabel"></label>
     <div class="offen-toggle">
@@ -287,6 +353,7 @@
       <button type="button" class="tag-davor-btn" id="tagDavorBtnGlobal" data-i18n="tagDavor"></button>
     </div>
     <div class="tage-streifen" id="tageStreifenGlobal"></div>
+    <div class="fehler-zeile" id="streifenFehlerGlobal" role="alert" hidden></div>
     <button class="save-btn sekundaer" id="alleSpeichernBtnGlobal" type="button" style="margin-top:8px;" hidden></button>
     <div class="status-text" id="alleSpeichernStatusGlobal"></div>
   </div>
@@ -296,6 +363,7 @@
       <label style="margin:0;" data-i18n="statusLabel"></label>
       <span class="quelle-badge" id="quelleBadge"></span>
     </div>
+    <div class="fehler-zeile" id="ladeFehler" role="alert" hidden></div>
 
     <label data-i18n="offenLabel"></label>
     <div class="offen-toggle">
@@ -365,6 +433,9 @@
 
     <h3 data-i18n="hilfeConfigTitel"></h3>
     <p data-i18n="hilfeConfigText"></p>
+
+    <h3 data-i18n="hilfeTeileTitel"></h3>
+    <p id="hilfeTeileText"></p>
   </div>
 </div>
 
@@ -409,7 +480,7 @@
     hilfeTitel: 'Hilfe zu dieser Seite',
     hilfeWofuerTitel: 'Wofür ist diese Seite?',
     hilfeWofuerText: 'Hier wird für ein beliebiges Datum – heute, nächste Woche, irgendwann später – festgelegt, ob der Betrieb an dem Tag geöffnet ist und ob mit erhöhtem Bedarf (Hamster-Stufe) zu rechnen ist. Der Sinn: weit im Voraus planen, damit rechtzeitig genug in den Froster bzw. ins Lager geht, statt erst am Tag selbst zu merken, dass mehr gebraucht wird.',
-    hilfeLokalTitel: 'Was ist der Unterschied zwischen den ersten beiden Tabs?',
+    hilfeLokalTitel: 'Was ist der Unterschied zwischen „Schnell (dieses Gerät)" und „Tageskontext (global)"?',
     hilfeLokalText: '„Schnell (dieses Gerät)" speichert nur lokal auf dem gerade genutzten Gerät, ohne PIN, sofort nutzbar von jedem, der Produktion mitplant. „Tageskontext (global)" speichert für alle Geräte gleichzeitig und steht deshalb nur der Planung zu — wer es trotzdem versucht, bekommt eine Meldung mit dem Grund. Gibt es für einen Tag beides, gewinnt immer die globale Einstellung – die lokale ist ein Fallback für den Fall, dass noch niemand die globale gesetzt hat.',
     hilfeKettenTitel: 'Wer nutzt das gerade?',
     hilfeKettenText: 'Aktuell liest die Verbrauchs-Durchschnittsberechnung diese Einträge, um besondere Tage aus dem Vergleich herauszuhalten. Die eigentliche Produktionskette, die daraus konkrete Vorschläge für Froster und Lager ableiten soll, existiert noch nicht – was hier heute gesetzt wird, ist aber schon genau die Grundlage, die sie später braucht.',
@@ -418,15 +489,57 @@
     hilfeStreifenTitel: 'Was ist die Tage-Reihe unter dem Datum?',
     hilfeStreifenText: 'Steht ein Feiertag oder eine Ferienzeit in den nächsten Tagen an, zeigt die Reihe automatisch die Tage davor bis zu diesem besonderen Tag. Ist gerade nichts Besonderes in der Nähe, zeigt sie einfach die letzten Tage vor dem gewählten Datum. Über „+ Tag davor" lässt sie sich beliebig weiter nach vorne verlängern. Antippen wechselt zu dem Tag oben – Eingaben, die dort noch nicht gespeichert wurden, bleiben beim Wechseln zwischen Tagen erhalten (ein kleiner Punkt am Chip zeigt „noch nicht gespeichert") und lassen sich am Ende mit einem Tipp auf „X Tage speichern" unter der Reihe alle auf einmal sichern, statt jeden Tag einzeln.',
     hilfeHamsterTitel: 'Was bedeutet eine Hamster-Stufe?',
-    hilfeHamsterText: 'Kunden kaufen vor Feiertagen oft mehr auf Vorrat. Die Stufe legt fest, wie stark der Bedarf für diesen Tag angehoben wird – von leicht erhöht bis maximal. „Kein Hamster" bedeutet: normaler Bedarf, keine Vorratskäufe erwartet. Die genaue Rechenregel je Stufe steht im dritten Tab.',
-    hilfeConfigTitel: 'Wofür ist der dritte Tab?',
-    hilfeConfigText: 'Dort wird festgelegt, was jede Hamster-Stufe rechnerisch bedeutet – nicht für einen einzelnen Tag, sondern grundsätzlich für alle. Änderungen werden als Datei heruntergeladen und müssen von Hand im Repository ersetzt werden, genau wie bei der Produkt-Konfiguration. Kein PIN nötig, da hier nichts direkt in eine Datenbank geschrieben wird.'
+    hilfeHamsterText: 'Kunden kaufen vor Feiertagen oft mehr auf Vorrat. Die Stufe legt fest, wie stark der Bedarf für diesen Tag angehoben wird – von leicht erhöht bis maximal. „Kein Hamster" bedeutet: normaler Bedarf, keine Vorratskäufe erwartet. Die genaue Rechenregel je Stufe steht in der „Hamster-Konfiguration".',
+    hilfeConfigTitel: 'Wofür ist die „Hamster-Konfiguration"?',
+    hilfeConfigText: 'Dort wird festgelegt, was jede Hamster-Stufe rechnerisch bedeutet – nicht für einen einzelnen Tag, sondern grundsätzlich für alle. Änderungen werden als Datei heruntergeladen und müssen von Hand im Repository ersetzt werden, genau wie bei der Produkt-Konfiguration. Kein PIN nötig, da hier nichts direkt in eine Datenbank geschrieben wird.',
+    /* 19.11.2026: Ansichten statt Reiter */
+    titelSchnell: 'Zeitkontext',
+    titelGlobal: 'Tageskontext (global)',
+    titelHamster: 'Hamster-Konfiguration',
+    untertitelHamster: 'Was jede Hamster-Stufe rechnerisch bedeutet — grundsätzlich, für alle Tage.',
+    hilfeTeileTitel: 'Wo sind die anderen Teile?',
+    hilfeTeileSchnell: 'Diese Seite zeigt den Teil „Schnell (dieses Gerät)". „Tageskontext (global)" und die „Hamster-Konfiguration" liegen seit dem 19.11.2026 als eigene Kacheln im Hub „Konfiguration" (nur Admin).',
+    hilfeTeileGlobal: 'Diese Seite zeigt den Teil „Tageskontext (global)". „Schnell (dieses Gerät)" ist die Kachel „Zeitkontext" auf dem Startbildschirm; die „Hamster-Konfiguration" liegt neben dieser Kachel im Hub „Konfiguration".',
+    hilfeTeileHamster: 'Diese Seite zeigt die „Hamster-Konfiguration". „Schnell (dieses Gerät)" ist die Kachel „Zeitkontext" auf dem Startbildschirm; „Tageskontext (global)" liegt neben dieser Kachel im Hub „Konfiguration".'
   };
   function t(key) { return I18N_DE[key] || key; }
   function wendeI18nAn() {
     document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.dataset.i18n); });
   }
   wendeI18nAn();
+
+  /* -----------------------------------------------------------
+   * Ansicht (19.11.2026): welcher der drei Teile zu sehen ist, steht
+   * in BOS_ZK_ANSICHT (erstes Skript im body, aus ?ansicht=). Hier
+   * nur noch Titel, Unterzeile und der Absatz der Hilfe dazu.
+   * --------------------------------------------------------- */
+  const ANSICHT = (window.BOS_ZK_ANSICHT === 'global' || window.BOS_ZK_ANSICHT === 'hamster') ? window.BOS_ZK_ANSICHT : 'schnell';
+  (function () {
+    const gross = { schnell: 'Schnell', global: 'Global', hamster: 'Hamster' }[ANSICHT];
+    const h1 = document.querySelector('h1[data-i18n="titel"]');
+    if (h1) h1.textContent = t('titel' + gross);
+    document.title = t('titel' + gross) + ' · BäckereiOS';
+    const sub = document.querySelector('p.sub[data-i18n="untertitel"]');
+    if (sub && ANSICHT === 'hamster') sub.textContent = t('untertitelHamster');
+    const teile = document.getElementById('hilfeTeileText');
+    if (teile) teile.textContent = t('hilfeTeile' + gross);
+  })();
+
+  /* Grund eines Fehlers für die Anzeige (19.11.2026, Fehlerregel): Ursache unterscheiden,
+     die echte Meldung immer dahinter. */
+  function fehlerGrund(fehler) {
+    const code = (fehler && fehler.code) || '';
+    const meldung = (fehler && fehler.message) || String(fehler);
+    const was = code === 'permission-denied' ? 'Keine Berechtigung für diese Daten. '
+      : (code === 'unavailable' || code === 'deadline-exceeded') ? 'Kein Netz oder keine Antwort der Datenbank. '
+      : '';
+    return was + '[' + (code ? code + ': ' : '') + meldung + ']';
+  }
+  function zeigeFehlerZeile(element, text) {
+    if (!element) return;
+    element.textContent = text || '';
+    element.hidden = !text;
+  }
 
   /* -----------------------------------------------------------
    * Rollen-Check läuft bereits VOR diesem Skript, siehe
@@ -476,6 +589,10 @@
     hilfeSheet: document.getElementById('hilfeSheet'),
     hilfeSchliessen: document.getElementById('hilfeSchliessen'),
 
+    ladeFehler: document.getElementById('ladeFehler'),
+    ladeFehlerLokal: document.getElementById('ladeFehlerLokal'),
+    streifenFehlerGlobal: document.getElementById('streifenFehlerGlobal'),
+    streifenFehlerLokal: document.getElementById('streifenFehlerLokal'),
     tabBtnLokal: document.getElementById('tabBtnLokal'),
     tabBtnKontext: document.getElementById('tabBtnKontext'),
     tabBtnHamster: document.getElementById('tabBtnHamster'),
@@ -636,6 +753,7 @@
     }
 
     ziel.badge.textContent = '…';
+    zeigeFehlerZeile(ziel.ladeFehler, '');
     try {
       await window.BOS_AUTH_READY;
       const status = await window.BOS_ZEITKONTEXT.status(window.db, datumStr);
@@ -651,6 +769,7 @@
     } catch (fehler) {
       console.warn('Zeitkontext-Status konnte nicht geladen werden:', fehler);
       ziel.badge.textContent = '⚠ Fehler';
+      zeigeFehlerZeile(ziel.ladeFehler, 'Stand für ' + datumStr + ' nicht lesbar: ' + fehlerGrund(fehler));   // 19.11.2026
     }
   }
 
@@ -658,11 +777,13 @@
     btnOffen: el.btnOffen, btnZu: el.btnZu, stufenWahl: el.stufenWahl, offenFeld: 'offen', stufeFeld: 'hamsterStufe',
     datumInput: el.datumInput, streifenContainer: el.tageStreifenGlobal, tagDavorBtn: el.tagDavorBtnGlobal, streifenTage: [],
     alleSpeichernBtn: el.alleSpeichernBtnGlobal, alleSpeichernStatus: el.alleSpeichernStatusGlobal,
+    ladeFehler: el.ladeFehler, streifenFehler: el.streifenFehlerGlobal,
     entwuerfe: {}, aktuellesDatum: null, geladenerStand: null };
   const zielLokal = { hinweis: el.besondersHinweisLokal, badge: el.quelleBadgeLokal, grund: el.grundInputLokal,
     btnOffen: el.btnOffenLokal, btnZu: el.btnZuLokal, stufenWahl: el.stufenWahlLokal, offenFeld: 'offenLokal', stufeFeld: 'hamsterStufeLokal',
     datumInput: el.datumInputLokal, streifenContainer: el.tageStreifenLokal, tagDavorBtn: el.tagDavorBtnLokal, streifenTage: [],
     alleSpeichernBtn: el.alleSpeichernBtnLokal, alleSpeichernStatus: el.alleSpeichernStatusLokal,
+    ladeFehler: el.ladeFehlerLokal, streifenFehler: el.streifenFehlerLokal,
     entwuerfe: {}, aktuellesDatum: null, geladenerStand: null };
 
   /* -----------------------------------------------------------
@@ -738,11 +859,20 @@
     // ergänzen, ohne die Chips beim Warten schon wieder zu verwerfen. Ein
     // ungespeicherter Entwurf hat Vorrang vor dem geladenen Firestore-Status,
     // da er den zuletzt eingegebenen (aber noch nicht gesicherten) Stand zeigt.
+    zeigeFehlerZeile(ziel.streifenFehler, '');
     try {
       await window.BOS_AUTH_READY;
+      /* 19.11.2026: der erste Fehler eines Tages wird gemerkt und unter der Reihe gezeigt
+         (vorher still: der Punkt blieb grau, ohne Grund). Die übrigen Tage laden weiter. */
+      let ersterFehler = null, fehlerTage = 0;
       const stati = await Promise.all(tage.map(function (datumStr) {
-        return window.BOS_ZEITKONTEXT.status(window.db, datumStr).catch(function () { return null; });
+        return window.BOS_ZEITKONTEXT.status(window.db, datumStr).catch(function (fehler) {
+          fehlerTage++; if (!ersterFehler) ersterFehler = fehler;
+          console.warn('Status für ' + datumStr + ' nicht lesbar:', fehler);
+          return null;
+        });
       }));
+      if (ersterFehler) zeigeFehlerZeile(ziel.streifenFehler, 'Stand von ' + fehlerTage + (fehlerTage === 1 ? ' Tag' : ' Tagen') + ' der Reihe nicht lesbar (grauer Punkt): ' + fehlerGrund(ersterFehler));
       tage.forEach(function (datumStr, idx) {
         const chip = ziel.streifenContainer.querySelector('.tag-chip[data-datum="' + datumStr + '"]');
         if (!chip) return;
@@ -769,6 +899,7 @@
       });
     } catch (fehler) {
       console.warn('Status für Tage-Streifen konnte nicht geladen werden:', fehler);
+      zeigeFehlerZeile(ziel.streifenFehler, 'Tage-Reihe nicht geladen: ' + fehlerGrund(fehler));   // 19.11.2026
     }
 
     // Aktiv-Markierung getrennt vom Status-Nachladen, damit sie sofort stimmt
@@ -906,6 +1037,7 @@
       } catch (fehler) {
         console.error('Speichern fehlgeschlagen für ' + datumStr + ':', fehler);
         erfolg = false;
+        if (!letzterGrund) letzterGrund = fehlerGrund(fehler);   // 19.11.2026: auch ein geworfener Fehler nennt seinen Grund (lokal wie global)
       }
       if (erfolg) { erfolgreich++; delete ziel.entwuerfe[datumStr]; }
       else if (istGlobal && !letzterGrund && window.BOS_ZEITKONTEXT.grundDesLetztenFehlers) {
@@ -986,7 +1118,7 @@
       });
     } catch (fehler) {
       console.warn('Geplante Tage konnten nicht geladen werden (evtl. fehlender Firestore-Index beim allerersten Aufruf — Link erscheint dann in der Konsole):', fehler);
-      el.geplantListe.textContent = 'Konnte nicht geladen werden.';
+      el.geplantListe.textContent = 'Konnte nicht geladen werden: ' + fehlerGrund(fehler);   // 19.11.2026: mit Grund
     }
   }
 
@@ -1104,6 +1236,9 @@
     } catch (fehler) {
       console.warn('Hamster-Config konnte nicht geladen werden, Stufen-Auswahl nutzt Fallback-Labels.', fehler);
       zustand.hamsterConfig = { stufen: {} };
+      /* 19.11.2026: sichtbar statt nur in der Konsole. Die Stufen-Auswahl läuft mit Ersatznamen weiter. */
+      el.configStatus.textContent = '⚠ Hamster-Konfiguration (bos_hamster_config.json) nicht geladen: ' + fehlerGrund(fehler);
+      zeigeFehlerZeile(ANSICHT === 'global' ? el.ladeFehler : el.ladeFehlerLokal, 'Hamster-Stufen nur mit Ersatznamen — bos_hamster_config.json nicht geladen: ' + fehlerGrund(fehler));
     }
     baueStufenWahl(el.stufenWahl, 'hamsterStufe');
     baueStufenWahl(el.stufenWahlLokal, 'hamsterStufeLokal');
