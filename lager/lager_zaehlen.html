@@ -12,6 +12,7 @@
   Ohne Netz (Variante A, Ulf 11.11., 06:41): Firestore puffert im Speicher der offenen Seite;
   die Seite zeigt ⏳ und fragt beim Schließen, solange etwas wartet. Kein Zeitlimit als Fehler.
   CHANGELOG
+    2026-11-19 · 04:41 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-19_lager_feinschliff.rules (Lager Feinschliff, #169/#186; Freigabe KC 19.11. 04:32; RK §32 Nachtrag: Mindestmengen nur Rolle admin). REGEL_FASSUNG und sonst alles unverändert.
     2026-11-18 · 12:19 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen2.rules (Ein Name überall, Lieferung 2: Maschinenseite und Reparatur; Freigabe KC 18.11. 09:17; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
     2026-11-18 · 05:45 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). REGEL_FASSUNG und sonst alles unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
     2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). REGEL_FASSUNG und sonst alles unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
@@ -148,7 +149,7 @@ const LG = window.BOS_LAGER_LOGIK;
 const ZK = window.BOS_ZAEHLKARTE;
 const COL = LG.COL;
 const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
-const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const WARTE_HINWEIS_MS = 20000;   /* danach „kein Netz, wird gesammelt“ — KEIN Fehler (Variante A) */
 const SPEICHER_STANDORT = 'bos_lager_zaehlen_standort';
 

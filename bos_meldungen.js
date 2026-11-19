@@ -119,6 +119,7 @@
      'abgebrochen'        Hochladen vom Nutzer abgebrochen (verworfen)
 
    CHANGELOG
+     2026-11-19 · 04:41 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-19_lager_feinschliff.rules (Lager Feinschliff, #169/#186; Freigabe KC 19.11. 04:32; RK §32 Nachtrag: Mindestmengen nur Rolle admin). REGEL_FASSUNG und sonst alles unverändert.
      2026-11-18 · 12:19 · v2 · Ein Name überall, Lieferung 2 (RK §34; Antwort KC 18.11. 11:00, Freigabe 09:17 §4):
        eigenerName() entfällt, Name über BOS_NAMEN.ichSelbst frisch vor jedem Schreiben (anlegen, status, fenster,
        dringlichkeit, nachricht), Feld vonPerson in Kopf und Verlauf, Fehler 'kein_name' / 'name_neu', nameFrisch();
@@ -159,7 +160,7 @@ window.BOS_MELDUNGEN = (function () {
   var TAG_MS = 24 * 60 * 60 * 1000;
   var SEITE = 20;
   var REGEL_FASSUNG = 'reparatur-namen-2026-11-18';   /* RK §34 (vorher reparatur-2026-10-10, herausgenommen) */
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';
   var GRENZEN = { text: 500, nachricht: 300, geraet: 60, name: 40, grund: 300 };
   var STATUS = ['gemeldet', 'gesehen', 'repariert'];
   var DRINGLICHKEIT = ['normal', 'dringend'];

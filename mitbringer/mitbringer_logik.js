@@ -72,6 +72,7 @@
      Meldungen mit Prüf-Material (zz_pruef_…) weg — Seite, Zettel, Sammeldruck und Monitor zeigen sie nie. Damit
      kann die Prüfseite (Fall ZA5) eine unsichtbare Prüf-Meldung für einen echten Tag vorhalten, die nach dessen
      Druck „auf dem Zettel“ steht. REGEL_DATEI …_namen2.rules. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
+   2026-11-19 · 04:41 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-19_lager_feinschliff.rules (Lager Feinschliff, #169/#186; Freigabe KC 19.11. 04:32, Auflage 1: fremde Baustelle, nur diese Zeile; RK §32 Nachtrag). REGEL_FASSUNG und sonst alles unverändert.
    ================================================================ */
 (function (global) {
   'use strict';
@@ -80,7 +81,7 @@
     einstellungen: 'mitbringer_einstellungen', sicherungen: 'mitbringer_sicherungen' };
   var EINSTELLUNG_ID = 'allgemein';
   var REGEL_FASSUNG = 'mitbringer-namen-2026-11-18';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+  var REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
   var ZONE = 'Europe/Berlin';
   var SONSTIGES = 'sonstiges';
   var PRUEF_VORSATZ = 'zz_pruef_';   /* Prüf-Material der Prüfseite (Fall Z): keine Seite zeigt es */

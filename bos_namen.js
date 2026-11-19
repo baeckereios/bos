@@ -113,6 +113,14 @@
        ichSelbst() + ICH_TEXT. Erste Nutzer: Mitbringer, Lager anfordern.
        anzeige/auswahl/laden/personen* unverändert.
        Bau-Doku: _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
+   // >>> Zusatz Admin-Sitzung (Personalakte)
+     2026-11-18 · 19:40 · v1.4 · Zusatz (Personalakte Lieferung A, KC 18.11. 09:17)
+       uebernimm(liste) und leeren(). Nur eingefügt; anzeige, auswahl, laden und alles
+       Bestehende unverändert. Nutzer: konten/personalakte.html.
+       WARNUNG zu leeren(): Nicht zusammen mit ichSelbst() auf einer Seite benutzen.
+       Ein laufendes ichSelbst kann nach leeren() seinen Eintrag zurückschreiben.
+       Wer beides braucht, baut vorher einen Stand-Zähler ein.
+   // <<< Zusatz Admin-Sitzung
    ================================================================ */
 (function () {
   'use strict';
@@ -331,9 +339,47 @@
   function personenFuerPlanung(db) { return personenLaden(db, true); }
   function personenAlle(db) { return personenLaden(db, false); }
 
+  // >>> Zusatz Admin-Sitzung (Personalakte)
+  /* Für Seiten, die die Namensliste selbst über eine andere Verbindung laden (Personalakte: Admin-Sitzung).
+     uebernimm(liste) setzt NUR die Einträge ({ P07: { beschreibung, rufname } }) — keine Abfrage, kein Warten
+     auf die normale Anmeldung. Die Reihenfolge Rufname vor Beschreibung bleibt allein in anzeige().
+     status().quelle ist danach 'uebernommen' (nicht 'firestore': diese Datei hat nichts geladen). */
+  function uebernimm(liste) {
+    var neu = {};
+    Object.keys(liste || {}).forEach(function (id) {
+      var e = liste[id] || {};
+      neu[id] = { beschreibung: e.beschreibung || '', rufname: e.rufname || '' };
+    });
+    eintraege = neu;
+    zustand.geladen = true;
+    zustand.fehler = null;
+    zustand.anzahl = Object.keys(eintraege).length;
+    zustand.quelle = 'uebernommen';
+    return status();
+  }
+  /* Leert ALLES: die Einträge (auch einen von ichSelbst gesetzten), das gemerkte laden()-Versprechen und den
+     Status. Ein späteres laden() liest dadurch wirklich neu. Die Personalakte ruft das bei jedem Sperren.
+     WARNUNG (KC 18.11.2026, 11:17): Nicht zusammen mit ichSelbst() auf einer Seite benutzen. Ein laufendes
+     ichSelbst kann nach leeren() seinen Eintrag zurückschreiben. Wer beides braucht, baut vorher einen
+     Stand-Zähler ein. */
+  function leeren() {
+    eintraege = {};
+    ladePromise = null;
+    zustand.geladen = false;
+    zustand.fehler = null;
+    zustand.anzahl = 0;
+    zustand.quelle = null;
+    return status();
+  }
+  // <<< Zusatz Admin-Sitzung
+
   lokalenSpeicherRaeumen();
 
   window.BOS_NAMEN = {
+    // >>> Zusatz Admin-Sitzung (Personalakte)
+    uebernimm: uebernimm,
+    leeren: leeren,
+    // <<< Zusatz Admin-Sitzung
     laden: laden,
     anzeige: anzeige,
     auswahl: auswahl,

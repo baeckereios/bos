@@ -2,6 +2,10 @@
    BäckereiOS · Satellite — App-Registry
    ================================================================
    CHANGELOG (Kopf, neu seit 21.10.2026)
+     2026-11-18 · 19:40 · Personalakte Lieferung A (Go KC 18.11. 04:42, Start 19:37): neuer Eintrag
+       personalakte (Kachel „Personalakte“, Bereich Verwaltung, roles ['admin'], kein haken,
+       kein direkt). Gleich dem admin-Block in bos_permissions.js (sonst fail-open für alle).
+       Die Seite selbst verlangt zusätzlich das Admin-Passwort. Sonst unverändert.
      2026-11-18 · 02:24 · Mitbringer, #183 (Go KC 18.11. 01:31): neuer Eintrag mitbringer
        (Kachel „Mitbringer“, Bereich Produktion, OHNE roles und OHNE haken — für alle
        Konten da, kein direkt). Sonst unverändert.
@@ -656,6 +660,16 @@ window.BOS_APPS = [
     icon: '🔑',
     color: '#8b5cf6',
     url: 'konten/konten_verwaltung.html',
+    status: 'live',
+    roles: ['admin']
+  },
+  {
+    id: 'personalakte',
+    bereich: 'verwaltung',
+    name: 'Personalakte',
+    icon: '📁',
+    color: '#8b5cf6',
+    url: 'konten/personalakte.html',
     status: 'live',
     roles: ['admin']
   },

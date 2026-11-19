@@ -41,6 +41,10 @@
      <script src="bos_access_guard.js"></script>
      ... restlicher Seiteninhalt ...
    ================================================================ */
+/* ERGÄNZT 18.11.2026, 19:40 (Personalakte Lieferung A): "personalakte" nur bei admin —
+   Registry roles ['admin'], sonst fail-open für alle. Die Rolle entscheidet nur über die Kachel;
+   die Seite verlangt zusätzlich das Admin-Passwort (Admin-Sitzung, bos_admin_sitzung.js).
+   konten/_protokolle/SESSION_2026-11-18_PERSONALAKTE_BAU.md */
 /* ERGÄNZT 08.11.2026 (Produktionsplaner Schritt 1, Seite Bestellungen):
    "produktionsplaner_bestellungen" bei backstube, konditorei,
    produktionsleitung, admin — genau wie produktionsplaner_uebersicht und
@@ -219,6 +223,7 @@ window.BOS_PERMISSIONS = {
     "zeitkontext_editor": true,
     "schnellrechner": true,
     "konten_verwaltung": true,
+    "personalakte": true,
     "wunschtag": true,
     "urlaub_anfrage": true,
     "mein_konto": true,

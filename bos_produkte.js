@@ -99,6 +99,7 @@
      BOS_PRODUKTE.richtwertWerte(p), .richtwertPruefen(eingaben, p), .rundeRichtwert(x, p)
 
    CHANGELOG
+     2026-11-19 · 04:41 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-19_lager_feinschliff.rules (Lager Feinschliff, #169/#186; Freigabe KC 19.11. 04:32; RK §32 Nachtrag: Mindestmengen nur Rolle admin). REGEL_FASSUNG und sonst alles unverändert.
      2026-11-18 · 12:19 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen2.rules (Ein Name überall, Lieferung 2: Maschinenseite und Reparatur; Freigabe KC 18.11. 09:17; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
      2026-11-18 · 05:45 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
      2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). Sonst unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
@@ -161,7 +162,7 @@
   /* Zeitnetz (KC 05.10., 08:18): sieben Tage, 0 = aus. */
   var ZEITNETZ_MS = 7 * 24 * 60 * 60 * 1000;
   var REGEL_FASSUNG = 'produkte-2026-10-05';
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';
+  var REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';
   var MELDUNG_ID = 'bosProdukteMeldung';
 
   /* Texte an einer Stelle. */

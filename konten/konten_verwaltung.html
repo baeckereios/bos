@@ -7,6 +7,15 @@
 <!--
   MODUL: konten/konten_verwaltung.html — Konten & Rollen (Admin-Werkzeug)
   CHANGELOG
+    2026-11-19 · 04:59 · v-Lager-Feinschliff · Texte (Lager Feinschliff, #169/#186, B34, A30; Freigabe KC 19.11.
+      04:32, Kern-Freigabe Ulf 04:32)
+      Die drei Lager-Haken heißen nach der Tätigkeit, Kachelname in Klammern, darunter klein, was die Datenbank prüft:
+      „📦 Inventur — nachgucken“ (Kachel „Lager zählen“), „🧾 Entnahme — rausholen“ (Kachel „Lager anfordern“),
+      „🚚 Nachbestellung — reinholen“ (Kachel „Lager anfordern“, Reiter Bestellen) jetzt als EIGENE Gruppe
+      (lagerNachbestellungHTML) statt Haken in der Gruppe „Lager anfordern“. Nachbestellung = nur Bestellungen
+      eintragen und zurücknehmen (Mindestmengen pflegt seit 19.11. nur Rolle admin im Lager-Editor, L38).
+      Admin-Hinweis in allen drei Gruppen (B33). Hilfe: drei Einträge. Felder, Setzer, Speichern unverändert.
+      lager/_protokolle/SESSION_2026-11-19_LAGER_FEINSCHLIFF_BAU.md
     2026-11-18 · 02:24 · v-Mitbringer · Feature (Mitbringer, #183; Bauplan §6, Go KC 18.11. 01:31,
       Kern-Freigabe Ulf 01:28)
       Rein additiv, nach dem Muster „🔧 Reparaturanfrage“. Neue Gruppe „🧺 Mitbringer“ unter
@@ -865,12 +874,16 @@ var helpData = {
       text: "Jedes Konto sieht BOS in einer eigenen Farbe: Akzent und Grundton der Flächen, auf jeder Seite. Statusfarben (Rot, Gelb, Grün, Warnung) und Ausgedrucktes bleiben immer gleich. Voreingestellt ist das Profil der Rolle („Nach Rolle: …“). Für Azubis zum Beispiel „Apfel“ wählen. Wählst du das Profil, das die Rolle ohnehin hat, springt die Auswahl auf „Nach Rolle“ — das Konto folgt dann bei einem Rollenwechsel der neuen Rolle. Eine neu angelegte Rolle hat noch kein eigenes Profil und bekommt Honig. Gespeichert wird mit „Änderungen speichern“, sichtbar wird es beim nächsten Anmelden. Jeder kann sein Profil in seinen Einstellungen für sich ändern; das hier ist die Vorgabe."
     },
     {
-      heading: "Was ist die Gruppe „📦 Lager zählen“?",
-      text: "In der Konto-Karte (Stammdaten) steht je Standort des Lagers ein Haken. Angehakt heißt: dieses Konto darf an diesem Standort zählen, die Datenbank prüft das bei jeder Zahl. Mit mindestens einem Haken erscheint die Kachel „Lager zählen“ beim nächsten Anmelden. Die Standorte legst du im Lager an (Reiter „Standorte“). Rolle admin darf überall zählen, braucht für die Kachel aber auch einen Haken. Ein Stationskonto ist das gemeinsame Konto eines Tablets (z. B. das der Backstube). Hakst du dort einen Standort an, darf jeder an diesem Tablet dort zählen. Ob du das willst, entscheidest du je Konto. Ein archivierter Standort, der noch an einem Konto hängt, steht grau da und lässt sich nur noch abhaken."
+      heading: "Was ist die Gruppe „📦 Inventur — nachgucken“?",
+      text: "Sie gehört zur Kachel „Lager zählen“. In der Konto-Karte (Stammdaten) steht je Standort des Lagers ein Haken. Angehakt heißt: dieses Konto darf an diesem Standort zählen, was da liegt; die Datenbank prüft das bei jeder Zahl (Konto-Feld lagerZaehlenStandorte). Mit mindestens einem Haken erscheint die Kachel „Lager zählen“ beim nächsten Anmelden. Die Standorte legst du im Lager an (Reiter „Standorte“). Rolle admin darf überall zählen, braucht für die Kachel aber auch einen Haken. Ein Stationskonto ist das gemeinsame Konto eines Tablets (z. B. das der Backstube). Hakst du dort einen Standort an, darf jeder an diesem Tablet dort zählen. Ob du das willst, entscheidest du je Konto. Ein archivierter Standort, der noch an einem Konto hängt, steht grau da und lässt sich nur noch abhaken."
     },
     {
-      heading: "Was ist die Gruppe „🧾 Lager anfordern“?",
-      text: "Sie gehört zur Kachel „Lager anfordern“, dem Ersatz für den Zettel. Je Standort ein Haken: Angehakt heißt, dieses Konto darf dort auf die offene Liste schreiben, sie abschließen und drucken und im Archiv melden, was gefehlt hat. Die Datenbank prüft das bei jedem Eintrag. Darunter steht ein einzelner Haken „Lager bestellen“: Er gilt für alle Standorte und erlaubt, Bestellungen einzutragen und zurückzunehmen und die Mindestmengen zu pflegen. Die Kachel erscheint mit einem der beiden Haken beim nächsten Anmelden. Rolle admin darf alles, braucht für die Kachel aber auch einen Haken. Auf dem Ausdruck steht der Name aus dem Konto (bei einem Stationskonto der Ortsname)."
+      heading: "Was ist die Gruppe „🧾 Entnahme — rausholen“?",
+      text: "Sie gehört zur Kachel „Lager anfordern“, dem Ersatz für den Zettel. Je Standort ein Haken: Angehakt heißt, dieses Konto darf eintragen, was aus diesem Lager geholt wird, die Liste abschließen (bucht ab, druckt) und im Archiv melden, was gefehlt hat. Die Datenbank prüft das bei jedem Eintrag (Konto-Feld lagerAnfordernStandorte). Mit einem Haken erscheint die Kachel beim nächsten Anmelden. Rolle admin darf das überall, braucht für die Kachel aber auch einen Haken. Auf dem Ausdruck steht der Name der Person (bei einem Stationskonto der Ortsname)."
+    },
+    {
+      heading: "Was ist die Gruppe „🚚 Nachbestellung — reinholen“?",
+      text: "Sie gehört auch zur Kachel „Lager anfordern“, dort zum Reiter „Bestellen“. Ein einzelner Haken für alle Standorte: Angehakt heißt, dieses Konto darf eintragen, was beim Lieferanten bestellt ist, und es zurücknehmen. Gedacht ist das für die Produktionsleitung. Die Datenbank prüft das bei jedem Eintrag. Mindestmengen gehören nicht dazu: Die trägt seit 19.11. nur Rolle admin ein, im Lager auf der Artikelkarte. Mit diesem Haken erscheint die Kachel „Lager anfordern“ auch ohne Standort-Haken. Rolle admin darf bestellen, braucht für die Kachel aber auch einen Haken."
     },
     {
       heading: "Was ist die Gruppe „🧺 Mitbringer“?",
@@ -1348,7 +1361,8 @@ var KONTO_KARTEN_TABS = [
         reparaturHakenHTML(k, b) +
         nachrichtenHakenHTML(k, b) +  // NEU 27.10.2026, Nachrichtenzentrale 1b
         lagerZaehlenHTML(k, b) +      // NEU 11.11.2026, Lager Stufe 2
-        lagerAnfordernHTML(k, b) +    // NEU 16.11.2026, Lager Stufe 3a
+        lagerAnfordernHTML(k, b) +    // NEU 16.11.2026, Lager Stufe 3a (seit 19.11. „Entnahme“)
+        lagerNachbestellungHTML(k, b) + // NEU 19.11.2026, Lager Feinschliff (B34)
         mitbringerHakenHTML(k, b)     // NEU 18.11.2026, Mitbringer (#183)
       );
     }
@@ -1634,10 +1648,10 @@ function ladeLagerStandorteEinmal() {
   });
 }
 function lagerZaehlenHTML(k, b) {
-  var kopf = '<div class="detail-section full" id="lagerZaehlenGruppe"><div><div class="haken-gruppe-titel">📦 Lager zählen</div>';
+  var kopf = '<div class="detail-section full" id="lagerZaehlenGruppe"><div><div class="haken-gruppe-titel">📦 Inventur — nachgucken (Kachel „Lager zählen“)</div>';   // 19.11.2026: Name nach der Tätigkeit (B34)
   var fuss = '</div></div>';
   var hinweise = [];
-  if (b.role === 'admin') hinweise.push('Rolle admin darf an allen Standorten zählen. Die Kachel „Lager zählen“ erscheint aber erst, wenn mindestens ein Standort angehakt ist.');
+  if (b.role === 'admin') hinweise.push('Rolle admin darf das an allen Standorten. Die Kachel „Lager zählen“ erscheint aber erst mit einem Haken in dieser Gruppe.');
   if (k && k.art === 'ort') hinweise.push('Ein Stationskonto ist das gemeinsame Konto eines Tablets (z. B. das der Backstube). Hakst du dort einen Standort an, darf jeder an diesem Tablet dort zählen. Ob du das willst, entscheidest du je Konto.');
   var hinweisHTML = hinweise.map(function (t) { return '<div class="haken-gruppe-hinweis">' + esc(t) + '</div>'; }).join('');
   if (lagerStandorte.stand === 'aus' || lagerStandorte.stand === 'laedt') {
@@ -1669,7 +1683,7 @@ function lagerZaehlenHTML(k, b) {
     return kopf + '<div class="haken-gruppe-hinweis">Noch keine Standorte angelegt — im Lager (Reiter „Standorte“) anlegen, dann hier anhaken.</div>' + hinweisHTML + fuss;
   }
   return kopf + zeilen.join('') +
-    '<div class="haken-gruppe-hinweis">Angehakt = darf an diesem Standort zählen. Die Datenbank prüft jeden Standort selbst.</div>' + hinweisHTML + fuss;
+    '<div class="haken-gruppe-hinweis">Angehakt = darf an diesem Standort zählen, was da liegt.</div>' + LAGER_DB_HINWEIS('lagerZaehlenStandorte, je Standort bei jeder Zahl') + hinweisHTML + fuss;
 }
 function toggleKontoLagerZaehlen(standortId, checked) {
   if (!kontoKarteId) return;
@@ -1689,31 +1703,28 @@ function toggleKontoLagerZaehlen(standortId, checked) {
 }
 
 // NEU 16.11.2026, Lager Stufe 3a (#169; Freigabe KC 16.11. 08:44, Ulf F1 b / F2 a 08:42).
-// Gruppe „🧾 Lager anfordern“ nach dem Muster „📦 Lager zählen“: ein Haken je aktivem
-// Standort → lagerAnfordernStandorte (das Schloss, Regel laAnfordern(), RK §32) und
-// lagerAnfordern (= Liste nicht leer, Kachel) in EINEM Setzer; darunter EIN Haken
-// „Lager bestellen“ (lagerBestellen, alle Standorte: Bestellungen und Mindestmengen,
-// Regel laBestellen()). Standorte aus ladeLagerStandorteEinmal (gemeinsam mit „Lager zählen“).
+// Gruppe „🧾 Entnahme — rausholen“ (bis 19.11. „Lager anfordern“) nach dem Muster der Inventur: ein
+// Haken je aktivem Standort → lagerAnfordernStandorte (das Schloss, Regel laAnfordern(), RK §32) und
+// lagerAnfordern (= Liste nicht leer, Kachel) in EINEM Setzer. Der Haken lagerBestellen steht seit
+// 19.11. in der eigenen Gruppe „🚚 Nachbestellung — reinholen“ (lagerNachbestellungHTML): nur
+// Bestellungen, Regel laBestellen(). Standorte aus ladeLagerStandorteEinmal (gemeinsam mit der Inventur).
 function lagerAnfListeVon(k) {
   return (k && Array.isArray(k.lagerAnfordernStandorte))
     ? k.lagerAnfordernStandorte.filter(function (x) { return typeof x === 'string' && x !== ''; })
     : [];
 }
 function lagerAnfordernHTML(k, b) {
-  var kopf = '<div class="detail-section full" id="lagerAnfordernGruppe"><div><div class="haken-gruppe-titel">🧾 Lager anfordern</div>';
+  var kopf = '<div class="detail-section full" id="lagerAnfordernGruppe"><div><div class="haken-gruppe-titel">🧾 Entnahme — rausholen (Kachel „Lager anfordern“)</div>';
   var fuss = '</div></div>';
-  var bestellen = '<label class="checkbox-feld"><input type="checkbox" ' + (b.lagerBestellen ? 'checked' : '') +
-    ' onchange="toggleKontoLagerBestellen(this.checked)">' +
-    '<span class="cb-label">Lager bestellen — Bestellungen eintragen und zurücknehmen, Mindestmengen pflegen (alle Standorte)</span></label>';
   var hinweise = [];
-  if (b.role === 'admin') hinweise.push('Rolle admin darf überall anfordern und bestellen. Die Kachel „Lager anfordern“ erscheint aber erst mit einem Haken in dieser Gruppe.');
+  if (b.role === 'admin') hinweise.push('Rolle admin darf das an allen Standorten. Die Kachel „Lager anfordern“ erscheint aber erst mit einem Haken in dieser Gruppe oder bei „Nachbestellung“.');
   if (k && k.art === 'ort') hinweise.push('Stationskonto: Hakst du hier einen Standort an, darf jeder an diesem Gerät dort anfordern und die Liste abschließen. Auf dem Ausdruck steht dann der Ortsname.');
   var hinweisHTML = hinweise.map(function (t) { return '<div class="haken-gruppe-hinweis">' + esc(t) + '</div>'; }).join('');
   if (lagerStandorte.stand === 'aus' || lagerStandorte.stand === 'laedt') {
-    return kopf + '<div class="haken-gruppe-hinweis">Standorte werden geladen …</div>' + bestellen + hinweisHTML + fuss;
+    return kopf + '<div class="haken-gruppe-hinweis">Standorte werden geladen …</div>' + hinweisHTML + fuss;
   }
   if (lagerStandorte.stand === 'fehler') {
-    return kopf + '<div class="haken-gruppe-hinweis" style="color:var(--bos-red)">' + esc(lagerStandorte.fehler) + ' Die Standort-Haken dieser Gruppe bleiben, wie sie sind. Seite neu laden, um es nochmal zu versuchen.</div>' + bestellen + hinweisHTML + fuss;
+    return kopf + '<div class="haken-gruppe-hinweis" style="color:var(--bos-red)">' + esc(lagerStandorte.fehler) + ' Die Standort-Haken dieser Gruppe bleiben, wie sie sind. Seite neu laden, um es nochmal zu versuchen.</div>' + hinweisHTML + fuss;
   }
   var vorher = lagerAnfListeVon(k);
   var jetzt = b.lagerAnfordernStandorte || [];
@@ -1733,9 +1744,9 @@ function lagerAnfordernHTML(k, b) {
       ' onchange="toggleKontoLagerAnfordern(\'' + esc(id) + '\', this.checked)">' +
       '<span class="cb-label">' + esc(name) + ' — nur noch abhaken</span></label>');
   });
-  var standortTeil = zeilen.length ? zeilen.join('') + '<div class="haken-gruppe-hinweis">Angehakt = darf an diesem Standort anfordern, abschließen und drucken. Die Datenbank prüft jeden Standort selbst.</div>'
+  var standortTeil = zeilen.length ? zeilen.join('') + '<div class="haken-gruppe-hinweis">Angehakt = darf eintragen, was aus diesem Lager geholt wird, und die Liste abschließen (bucht ab, druckt).</div>' + LAGER_DB_HINWEIS('lagerAnfordernStandorte, je Standort bei jedem Eintrag')
     : '<div class="haken-gruppe-hinweis">Noch keine Standorte angelegt — im Lager (Reiter „Standorte“) anlegen, dann hier anhaken.</div>';
-  return kopf + standortTeil + bestellen + hinweisHTML + fuss;
+  return kopf + standortTeil + hinweisHTML + fuss;
 }
 function toggleKontoLagerAnfordern(standortId, checked) {
   if (!kontoKarteId) return;
@@ -1753,6 +1764,19 @@ function toggleKontoLagerAnfordern(standortId, checked) {
   markiereGeaendert();
   renderKontoKarte();
 }
+// NEU 19.11.2026 (Lager Feinschliff, B34): eigene Gruppe für den Haken lagerBestellen — nur Bestellungen
+// eintragen und zurücknehmen, alle Standorte (Regel laBestellen(), RK §32). Feld und Setzer unverändert.
+function lagerNachbestellungHTML(k, b) {
+  var hinweise = [];
+  if (b.role === 'admin') hinweise.push('Rolle admin darf bestellen. Die Kachel „Lager anfordern“ erscheint aber erst mit einem Haken in dieser Gruppe oder bei „Entnahme“.');
+  return '<div class="detail-section full" id="lagerNachbestellungGruppe"><div><div class="haken-gruppe-titel">🚚 Nachbestellung — reinholen (Kachel „Lager anfordern“, Reiter Bestellen)</div>' +
+    '<label class="checkbox-feld"><input type="checkbox" ' + (b.lagerBestellen ? 'checked' : '') + ' onchange="toggleKontoLagerBestellen(this.checked)">' +
+    '<span class="cb-label">Darf eintragen, was beim Lieferanten bestellt ist, und es zurücknehmen. Gilt für alle Standorte. Gedacht für die Produktionsleitung.</span></label>' +
+    LAGER_DB_HINWEIS('lagerBestellen, bei jedem Eintrag') +
+    hinweise.map(function (t) { return '<div class="haken-gruppe-hinweis">' + esc(t) + '</div>'; }).join('') + '</div></div>';
+}
+// Klein unter jeder Lager-Gruppe: was die Datenbank prüft (B34: das Tun steht oben, das Feld nur hier).
+function LAGER_DB_HINWEIS(was) { return '<div class="haken-gruppe-hinweis" style="font-size:.75rem;opacity:.75">Datenbank prüft: Konto-Feld ' + esc(was) + '.</div>'; }
 function toggleKontoLagerBestellen(checked) {
   if (!kontoKarteId) return;
   bearbeitung[kontoKarteId].lagerBestellen = !!checked;
@@ -1760,7 +1784,7 @@ function toggleKontoLagerBestellen(checked) {
 }
 
 // NEU 18.11.2026, Mitbringer (#183; Bauplan §6, Kern-Freigabe Ulf 18.11. 01:28) — eigene Gruppe
-// unter „Lager anfordern“, Mechanik wie „Reparaturanfrage“: Haken in bearbeitung[], gespeichert
+// unter den Lager-Gruppen, Mechanik wie „Reparaturanfrage“: Haken in bearbeitung[], gespeichert
 // in derselben Sammelaktion. Das Schloss ist die Regel (mbDrucken()/mbBearbeiten(), RK §33):
 // NUR diese Haken zählen, keine Rolle, auch admin nicht (Ulf 18.11.). Keine Kachel hängt daran —
 // die Kachel „Mitbringer“ ist für alle da. Nur für Personen-Konten: Die Regel fragt den Haken,

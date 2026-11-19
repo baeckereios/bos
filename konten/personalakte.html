@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<!--
+  MODUL: konten/personalakte.html
+  ZWECK: Alles zu einer Person an einem Ort. Links ein Baum (Schicht, Abteilung,
+         Person; dazu die Konten ohne Person), rechts die Akte: Name, Planung,
+         Positionen, Konto, Rechte, Urlaub, sonstige Abwesenheit, Wunschtag,
+         Bankkonto. STUFE 1: NUR LESEN. Bearbeitet wird in den alten Seiten, zu
+         denen jeder Abschnitt springt.
+  ZUGANG: Rolle admin (Zugriffsschutz) UND Admin-Passwort (Admin-Sitzung wie in
+         der Kontenverwaltung). Vor der Anmeldung ist nichts geladen. Die Sitzung
+         wird nie gespeichert und endet beim Verlassen, mit 🔒 Sperren oder nach
+         5 Minuten ohne Eingabe (Hinweis eine Minute vorher): bos_admin_sitzung.js.
+         Beim Sperren wird ALLES geleert: Zustand, Baum, Akte, Suchfeld, Namen.
+  DATENFLUSS: nur über die Admin-Verbindung (BOS_ACCOUNTS.adminFirestore()),
+         nie über window.db. Welche Sammlungen mit welchem Filter gelesen werden,
+         steht an EINER Stelle: personalakte_logik.js, abfragen() und
+         abfragenFuer(). Jedes Dokument geht sofort durch die Reinigung dort;
+         die Seite behält keine rohen Dokumente.
+  DREI GRENZEN (Bauplan §4, Go KC 18.11.2026 04:42):
+         - Krankheit: Abwesenheiten nur mit der Positivliste (Urlaub, Sonstiges)
+           abgefragt; die Krank-Einträge kommen nicht aufs Gerät.
+         - Begründungen (Freitext) werden nie behalten und nie gezeigt.
+         - Die Wochenpläne werden nie geladen.
+         Der Knopf „Krank-Grenze prüfen“ holt die Antworten frisch und zählt nach.
+  SCHNITTSTELLEN: bos_accounts.js (Admin-Anmeldung, Admin-Verbindung),
+         bos_admin_sitzung.js (Uhr, Sperren), personalakte_logik.js (alles Rechnen),
+         bos_ordnerbaum.js (Baum, unverändert), bos_access.js + bos_permissions.js +
+         bos_app_registry.js + bos_launcher_roles.js (nur lesend für „Rechte“),
+         bos_namen.js ab v1.4, mit uebernimm() und leeren() (Anzeigename:
+         die Akte lädt die Namen selbst und gibt sie dorthin; eigene Reihenfolge
+         Rufname/Beschreibung gibt es hier nicht).
+  KEIN SCHREIBEN: Diese Datei enthält keinen Schreibaufruf (Wächter-Test).
+  BEKANNTE OFFENE PUNKTE:
+    - Die alten Seiten können nicht „bei dieser Person“ öffnen; ein Sprung landet
+      an ihrem Anfang.
+    - Ein Sprung verlässt die Akte. Sie sperrt sich dabei (gewollt).
+    - Bearbeiten: Stufe 2 (Planung, Urlaub, Sonstiges), Stufe 3 (Name, Konto, Rechte).
+
+  CHANGELOG
+    2026-11-18 · 19:40 · v1.0 · Lieferung A (Start KC 19:37). Inhaltlich wie v0.2; mit dieser
+      Lieferung in bos_app_registry.js und bos_permissions.js eingetragen (nur admin),
+      bos_namen.js v1.4 bringt uebernimm() und leeren().
+    2026-11-18 · 10:06 · v0.2 · Antwort KC 09:17: Anzeigename nur noch über
+      BOS_NAMEN (uebernimm/leeren Pflicht, sonst klare Meldung); Baum erscheint
+      erst, wenn Personen, Namen und Konten da sind; Sprünge sagen „Akte wird
+      gesperrt“; Hilfe um den Satz zu den Begründungen ergänzt.
+    2026-11-18 · 05:11 · v0.1 · Erstfassung, Vorarbeit zu Lieferung A (Stufe 1, nur lesen).
+      Noch nicht in bos_app_registry.js und bos_permissions.js eingetragen — das
+      folgt auf dem Stand nach der zweiten Namens-Lieferung (Go KC §0).
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BäckereiOS · Personalakte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="../bos_theme_sync.js"></script>
+<link rel="stylesheet" href="../bos_design_tokens.css">
+<link rel="stylesheet" href="../bos_ordnerbaum.css">
+<style>
+  :root {
+    --bg: var(--bos-bg, #16120e);
+    --surface: var(--bos-surface, #221b14);
+    --raised: var(--bos-surface-raised, #2b231a);
+    --amber: var(--bos-amber, #c07a10);
+    --text: var(--bos-text, #f3ece1);
+    --dim: var(--bos-text-dim, #ab9c8a);
+    --faint: var(--bos-text-faint, #7a6e60);
+    --red: var(--bos-red, #d6584a);
+    --green: var(--bos-green, #4caf7d);
+    --warn: var(--bos-warn, #d9a441);
+    --border: var(--bos-border-strong, rgba(255,255,255,0.18));
+    --font: var(--bos-font-label, 'Barlow Condensed', sans-serif);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--bos-font-body, 'Barlow', sans-serif); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 60px; }
+  .hidden { display: none !important; }
+  header { background: var(--surface); padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: 0; z-index: 20; }
+  header h1 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; }
+  .kopf-rechts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  #statusBar { font-size: .75rem; color: var(--dim); text-align: right; }
+  .help-btn { background: transparent; border: 1px solid var(--border); color: var(--amber); padding: 6px 11px; border-radius: 8px; font-size: .95rem; cursor: pointer; min-height: 40px; font-family: var(--font); font-weight: 700; }
+  .btn { font-family: var(--font); font-size: .78rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: none; border-radius: 7px; padding: 9px 13px; cursor: pointer; min-height: 40px; }
+  .btn-amber { background: var(--amber); color: var(--bos-bg, #1a1710); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+  .toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+  #suchfeld { font-family: var(--font); font-size: .9rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 9px 10px; flex: 1 1 180px; max-width: 320px; min-height: 40px; }
+  #trefferZeile { font-size: .75rem; color: var(--dim); }
+  .hinweis { margin: 10px 14px 0; padding: 10px 12px; border-radius: 8px; font-size: .82rem; line-height: 1.45; border: 1px solid var(--border); overflow-wrap: anywhere; }
+  .hinweis.rot { border-color: var(--red); }
+  .hinweis.warn { border-color: var(--warn); }
+  .hinweis.akzent { border-color: var(--amber); }
+  .hinweis ul { margin: 4px 0 0 18px; }
+  #leerlaufStreifen { position: sticky; top: 64px; z-index: 19; background: var(--surface); border-color: var(--warn); color: var(--warn); font-weight: 600; }
+  #fehlerLeiste .kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; color: var(--red); }
+  /* Sperrbild */
+  #gesperrtBox { max-width: 520px; margin: 28px auto; padding: 22px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; text-align: center; display: flex; flex-direction: column; gap: 12px; }
+  #gesperrtBox h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.15rem; }
+  #gesperrtBox p { color: var(--dim); font-size: .9rem; line-height: 1.45; }
+  .fehler-text { color: var(--red); font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 18px; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 440px; max-height: 88vh; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .dialog.breit { max-width: 640px; }
+  .dialog h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.1rem; }
+  .dialog p, .dialog li { font-size: .88rem; line-height: 1.5; }
+  .dialog h3 { font-size: .9rem; color: var(--amber); margin-top: 6px; }
+  .dialog input[type=password] { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px 13px; font-size: 1rem; width: 100%; min-height: 46px; }
+  .knopf-zeile { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .test-zeile { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .86rem; line-height: 1.45; }
+  .test-zeile .zeichen { flex: 0 0 1.4em; font-weight: 700; }
+  .test-zeile.gut .zeichen { color: var(--green); } .test-zeile.schlecht .zeichen, .test-zeile.schlecht { color: var(--red); }
+  /* Baum + Akte. Grenze 900 px Fensterbreite (= BREIT_AB_PX im Skript), wie im Lager */
+  .pfad-btn { display: none; flex: 1 1 100%; justify-content: flex-start; text-align: left; text-transform: none; letter-spacing: 0; font-size: .9rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #baumSpalte { display: none; background: var(--surface); }
+  .baum-kopf { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  .baum-zu { background: none; border: none; color: var(--dim); font-size: 1.4rem; cursor: pointer; padding: 8px; min-width: 44px; min-height: 44px; }
+  @media (max-width: 899.98px) {
+    .pfad-btn { display: block; }
+    body.baum-offen #baumSpalte { display: block; position: fixed; inset: 0; z-index: 40; overflow-y: auto; }
+  }
+  @media (min-width: 900px) {
+    .rahmen { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+    #baumSpalte { display: block; position: sticky; top: 64px; max-height: calc(100vh - 64px); overflow-y: auto; border-right: 1px solid var(--border); }
+    .baum-kopf { display: none; }
+  }
+  .ob-art-kopf .ob-name { font-weight: 700; }
+  .ob-art-unterkopf .ob-name { color: var(--dim); }
+  .ob-zahl { white-space: nowrap; }
+  .ob-art-person .ob-zahl, .ob-art-konto .ob-zahl { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--warn); font-family: var(--font); }
+  #akte { padding: 4px 0 30px; min-width: 0; }
+  .leer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: .9rem; line-height: 1.5; }
+  .akte-kopf { padding: 16px 14px 4px; }
+  .akte-kopf h2 { font-family: var(--bos-font-display, 'Fraunces', serif); font-size: 1.45rem; overflow-wrap: anywhere; }
+  .akte-kopf .unter { color: var(--dim); font-size: .82rem; margin-top: 2px; overflow-wrap: anywhere; }
+  .abschnitte { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 12px; padding: 12px 14px; align-items: start; }
+  .abschnitt { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px 14px; min-width: 0; }
+  .abschnitt h3 { font-family: var(--font); font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); margin-bottom: 8px; }
+  .felder { display: grid; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); gap: 5px 10px; font-size: .88rem; line-height: 1.4; }
+  .felder dt { color: var(--dim); overflow-wrap: anywhere; }
+  .felder dd { overflow-wrap: anywhere; }
+  .liste-titel { font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; color: var(--dim); font-family: var(--font); font-weight: 700; margin: 10px 0 2px; }
+  .abschnitt .liste-titel:first-of-type { margin-top: 2px; }
+  .felder + .liste-titel { margin-top: 12px; }
+  .liste { list-style: none; }
+  .liste li { padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: .88rem; line-height: 1.4; overflow-wrap: anywhere; }
+  .liste li:last-child { border-bottom: none; }
+  .liste li.vergangen { color: var(--faint); }
+  .liste li.leer-zeile { color: var(--dim); font-style: italic; }
+  .mehr-btn { background: none; border: 0; color: var(--amber); font: inherit; font-size: .82rem; text-decoration: underline dotted; cursor: pointer; padding: 8px 0; min-height: 40px; }
+  .ab-hinweis { font-size: .8rem; color: var(--dim); line-height: 1.45; margin-top: 8px; }
+  .ab-fehler { font-size: .82rem; color: var(--red); line-height: 1.45; border: 1px solid var(--red); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; overflow-wrap: anywhere; }
+  .ab-laedt { font-size: .82rem; color: var(--dim); font-style: italic; padding: 2px 0 6px; }
+  .spruenge { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; }
+  .spruenge a { color: var(--amber); font-size: .82rem; text-decoration: underline dotted; text-underline-offset: 3px; padding: 8px 0; min-height: 40px; display: inline-flex; align-items: center; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<script>var BOS_APP_ID = 'personalakte';</script>
+<script src="../bos_app_registry.js"></script>
+<script src="../bos_launcher_profiles.js"></script>
+<script src="../bos_permissions.js"></script>
+<script src="../bos_access.js"></script>
+<script src="../bos_access_guard.js"></script>
+
+<header>
+  <h1 data-i18n="titel">Personalakte</h1>
+  <div class="kopf-rechts">
+    <span id="statusBar">—</span>
+    <button type="button" id="sperrenBtn" class="help-btn hidden" data-i18n="sperren" data-i18n-title="sperren_titel">🔒 Sperren</button>
+    <button type="button" id="helpOpenBtn" class="help-btn" data-i18n-title="hilfe" aria-label="Hilfe">❓</button>
+  </div>
+</header>
+
+<div id="fehlerLeiste" class="hinweis rot hidden" role="alert">
+  <div class="kopf"><span data-i18n="fehler_titel">⚠︎ Fehler</span><button type="button" class="btn btn-outline" id="fehlerZuBtn" data-i18n="ausblenden">ausblenden</button></div>
+  <ul id="fehlerListe"></ul>
+</div>
+<div id="leerlaufStreifen" class="hinweis hidden" role="alert"></div>
+
+<div id="gesperrtBox">
+  <h2 data-i18n="gesperrt_titel">Nur mit Admin-Passwort</h2>
+  <p data-i18n="gesperrt_text">Die Personalakte zeigt erst nach der Admin-Anmeldung etwas an. Die Rolle Admin allein reicht nicht.</p>
+  <p id="gesperrtGrund" class="hidden"></p>
+  <p id="gesperrtErr" class="fehler-text hidden" role="alert"></p>
+  <button type="button" class="btn btn-amber" id="entsperrenBtn" data-i18n="oeffnen">Mit Admin-Passwort öffnen</button>
+</div>
+
+<div id="adminInhalt" class="hidden">
+  <div class="toolbar">
+    <button type="button" class="btn btn-outline pfad-btn" id="pfadBtn" aria-expanded="false" aria-controls="baumSpalte">—</button>
+    <input type="search" id="suchfeld" autocomplete="off" data-i18n-placeholder="suche_platzhalter" aria-label="Suchen">
+    <span id="trefferZeile"></span>
+    <button type="button" class="btn btn-outline" id="neuLadenBtn" data-i18n="neu_laden">↻ Neu laden</button>
+    <button type="button" class="btn btn-outline" id="selbsttestBtn" data-i18n="selbsttest">Krank-Grenze prüfen</button>
+  </div>
+  <div id="zaehlFehler" class="hinweis rot hidden" role="alert"></div>
+  <div id="ladeFehler" class="hinweis rot hidden" role="alert"></div>
+  <div id="aktivHinweis" class="hinweis warn hidden" role="status"></div>
+  <div id="auffaellig" class="hinweis warn hidden" role="status"></div>
+  <div class="rahmen">
+    <nav id="baumSpalte" aria-label="Personen und Konten">
+      <div class="baum-kopf"><span data-i18n="baum_titel">Personen und Konten</span><button type="button" class="baum-zu" id="baumZuBtn" aria-label="Schließen">✕</button></div>
+      <div id="baumLaedt" class="ab-laedt hidden" style="padding:14px" data-i18n="status_laedt">Lädt …</div>
+      <div id="baum"></div>
+    </nav>
+    <main id="akte"></main>
+  </div>
+</div>
+
+<div id="adminAuthOverlay" class="overlay hidden">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="adminAuthTitel">
+    <h2 id="adminAuthTitel" data-i18n="anmeldung_titel">Admin-Anmeldung</h2>
+    <p data-i18n="anmeldung_text">Die Personalakte ist ein Admin-Werkzeug. Anmeldung mit dem Admin-Passwort.</p>
+    <input type="password" id="adminPwInput" autocomplete="off" data-i18n-placeholder="anmeldung_platzhalter" aria-label="Admin-Passwort">
+    <p id="adminPwErr" class="fehler-text hidden" role="alert"></p>
+    <div class="knopf-zeile">
+      <button type="button" class="btn btn-outline" id="adminPwCancel" data-i18n="abbrechen">Abbrechen</button>
+      <button type="button" class="btn btn-amber" id="adminPwConfirm" data-i18n="bestaetigen">Bestätigen</button>
+    </div>
+  </div>
+</div>
+
+<div id="selbsttestOverlay" class="overlay hidden">
+  <div class="dialog breit" role="dialog" aria-modal="true" aria-labelledby="selbsttestTitel">
+    <h2 id="selbsttestTitel" data-i18n="selbsttest_titel">Krank-Grenze prüfen</h2>
+    <p id="selbsttestErgebnis" role="status"></p>
+    <div id="selbsttestZeilen"></div>
+    <div class="knopf-zeile"><button type="button" class="btn btn-outline" id="selbsttestZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<div id="helpOverlay" class="overlay hidden">
+  <div class="dialog breit" role="dialog" aria-modal="true" aria-labelledby="helpTitel">
+    <h2 id="helpTitel"></h2>
+    <div id="helpInhalt"></div>
+    <div class="knopf-zeile"><button type="button" class="btn btn-outline" id="helpZuBtn" data-i18n="schliessen">Schließen</button></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../bos_firebase_config.js"></script>
+<script src="../bos_launcher_backgrounds.js"></script>
+<script src="../bos_accounts.js"></script>
+<script src="../bos_launcher_roles.js"></script>
+<script src="../bos_namen.js"></script>
+<script src="../bos_ordnerbaum.js"></script>
+<script src="../bos_admin_sitzung.js"></script>
+<script src="personalakte_logik.js"></script>
+
+<script>
+/* ============================== Wörterbuch (i18n-Hook, Checkliste §6) ============================== */
+const I18N_DE = {
+  titel: 'Personalakte', hilfe: 'Hilfe', sperren: '🔒 Sperren', sperren_titel: 'Admin-Sitzung beenden und Seite sperren',
+  fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', abbrechen: 'Abbrechen', bestaetigen: 'Bestätigen', schliessen: 'Schließen',
+  gesperrt_titel: 'Nur mit Admin-Passwort',
+  gesperrt_text: 'Die Personalakte zeigt erst nach der Admin-Anmeldung etwas an. Die Rolle Admin allein reicht nicht.',
+  oeffnen: 'Mit Admin-Passwort öffnen',
+  anmeldung_titel: 'Admin-Anmeldung', anmeldung_text: 'Die Personalakte ist ein Admin-Werkzeug. Anmeldung mit dem Admin-Passwort.',
+  anmeldung_platzhalter: 'Admin-Passwort', anmeldung_laeuft: 'Meldet an …',
+  modul_fehlt: '{datei} ist nicht geladen — die Seite kann nicht arbeiten. Seite neu laden; hilft das nicht, fehlt die Datei auf dem Server.',
+  modul_alt: '{datei} ist zu alt für die Personalakte — eine Funktion fehlt. Wahrscheinlich liefert das Gerät noch die alte Datei aus dem Zwischenspeicher: etwa 10 Minuten warten, App ganz schließen und neu öffnen.',
+  leerlauf: '⏳ Keine Eingabe seit {minuten} Minuten — die Personalakte sperrt sich in {sekunden} s. Tippen zum Weiterarbeiten.',
+  suche_platzhalter: 'Name, Nummer oder Kennung', treffer: '{zahl} Treffer', kein_treffer: 'kein Treffer',
+  neu_laden: '↻ Neu laden', selbsttest: 'Krank-Grenze prüfen', selbsttest_titel: 'Krank-Grenze prüfen',
+  baum_titel: 'Personen und Konten', baum_waehlen: '☰ Person wählen', baum_gewaehlt: '☰ {name}',
+  status_laedt: 'Lädt …', status_stand: '{personen} Personen · {konten} Konten', status_gesperrt: 'Gesperrt',
+  akte_leer: 'Links eine Person oder ein Konto wählen.', akte_leer_schmal: 'Oben auf „☰ Person wählen“ tippen.',
+  akte_weg: 'Diesen Eintrag gibt es nicht mehr. Bitte links neu wählen.',
+  ab_laedt: 'Lädt …', mehr: 'alle {zahl} zeigen', weniger: 'weniger zeigen',
+  sprung: '{text} → (Akte wird gesperrt)',
+  zaehl_personen: '⚠︎ Zählprobe: Im Baum stehen {baum} Personen, in der Datenbank {gesamt}. Es fehlt jemand — bitte dem Bau-Chat melden.',
+  zaehl_konten: '⚠︎ Zählprobe: Im Baum stehen {baum} Konten, in der Datenbank {gesamt}.',
+  aktiv_fehlt: '⚠︎ Bei {zahl} Personen fehlt das Feld „aktiv“ ({liste}). Der Personen-Editor zeigt sie als inaktiv, die Planung und diese Akte rechnen sie als aktiv.',
+  aktiv_fehlt_eins: '⚠︎ Bei einer Person fehlt das Feld „aktiv“ ({liste}). Der Personen-Editor zeigt sie als inaktiv, die Planung und diese Akte rechnen sie als aktiv.',
+  auffaellig_titel: '⚠︎ Auffällig:',
+  lade_fehler_titel: '✕ Nicht alles konnte geladen werden:',
+  quelle_personen: 'Personen', quelle_namen: 'Namen', quelle_konten: 'Konten', quelle_positionen: 'Positionen', quelle_abwesenheiten: 'Urlaub und sonstige Abwesenheit', quelle_gruppen: 'Gruppen',
+  fehler_recht: 'Keine Berechtigung ({code}): {text}',
+  fehler_recht_planung: 'Keine Berechtigung ({code}): {text} — Für diesen Teil muss das Konto des Generalschlüssels in der Kontenverwaltung freigeschaltet sein und die Rolle Admin haben. Namen, Planung und Konten sind davon nicht betroffen.',
+  fehler_netz: 'Kein Netz ({code}): {text} — Verbindung prüfen, dann „Neu laden“.',
+  fehler_zeit: 'Zeitlimit: Die Datenbank hat nach {sekunden} Sekunden nicht geantwortet. Verbindung prüfen, dann „Neu laden“.',
+  fehler_sonst: '{code}{text}',
+  fehler_unvollstaendig: 'Unvollständig — {zahl} von {gesamt} Abfragen sind gescheitert: {text}',
+  fehler_seite: 'Fehler in der Seite: {text} ({ort})', fehler_versprechen: 'Unbehandelter Fehler: {text}',
+  test_laeuft: 'Holt die Antworten der Datenbank frisch …', test_sauber: '✓ Sauber. Keine Krankheit und keine Begründung in der Akte.',
+  test_fund: '✕ Nicht sauber. Bitte nichts weiter öffnen und die rote Zeile dem Bau-Chat melden.',
+  test_fehler: '✕ Der Test konnte nicht vollständig laufen: {text}',
+  test_umfang: 'Geprüft: {abfragen} Abfragen{akte}.', test_umfang_akte: ', davon {zahl} für die geöffnete Akte',
+  hilfe_titel: 'Hilfe · Personalakte'
+};
+function t(key, w) {
+  const s = I18N_DE[key];
+  if (s === undefined) return key;
+  return String(s).replace(/\{(\w+)\}/g, function (m, n) { return w && w[n] !== undefined && w[n] !== null ? w[n] : m; });
+}
+function wendeI18nAn() {
+  document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-title]').forEach(function (el) { el.title = t(el.getAttribute('data-i18n-title')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) { el.placeholder = t(el.getAttribute('data-i18n-placeholder')); });
+}
+
+/* Nutzer-Hilfetext — wörtlich wie in konten/PERSONALAKTE_DOKU.md, Abschnitt „Nutzer-Hilfetext“ (die Doku ist die Quelle). */
+const helpData = [
+  { titel: 'Wozu ist die Personalakte da?', text: ['Hier steht alles zu einer Person an einem Ort: Name, Planung, Positionen, Konto, Rechte, Urlaub, sonstige Abwesenheit, Wunschtage und das Bankkonto. Bisher lag das über mehrere Seiten verteilt.', 'Im Moment kannst du hier nur lesen. Unter jedem Kasten steht ein Verweis auf die Seite, in der du den Teil änderst. Der Verweis verlässt die Akte; sie sperrt sich dabei, und du brauchst danach wieder das Admin-Passwort.'] },
+  { titel: 'Anmelden und Sperren', text: ['Die Akte öffnet sich nur mit dem Admin-Passwort, wie die Kontenverwaltung. Vorher ist nichts geladen.', 'Nach 5 Minuten ohne Tippen sperrt sie sich von selbst. Eine Minute vorher erscheint oben ein Hinweis; ein Tipp irgendwohin genügt, dann laufen die 5 Minuten neu.', 'Mit „🔒 Sperren“ sperrst du sofort. Auch wenn du die Seite verlässt, ist die Anmeldung weg. Beim Sperren wird alles Geladene vom Bildschirm und aus dem Speicher der Seite genommen.'] },
+  { titel: 'Der Baum links', text: ['Oben stehen die Schichten, darunter die Abteilungen, darunter die Personen. Die Zahl hinter einem Ast sagt, wie viele Personen darin stehen.', '„Stammschicht offen“: Personen, bei denen noch keine Stammschicht eingetragen ist. „Nicht im Schichtplan“: Hausmeister, Fahrer, Büro. „Inaktiv“: ausgeschieden, aber noch nicht gelöscht.', 'Ganz unten stehen Konten, die zu keiner Person gehören: Stationskonten, Konten ohne Person und Systemkonten.', 'Steht hinter einer Person „kein Konto“, hat sie keinen Zugang zu BäckereiOS.', 'Am Handy und am Tablet hochkant öffnest du den Baum mit dem Knopf „☰ Person wählen“.'] },
+  { titel: 'Suchen', text: ['Im Suchfeld findest du eine Person über ihren Namen, ihre Nummer (z. B. P07) oder die Kennung ihres Kontos. Der Baum zeigt dann nur die Treffer.'] },
+  { titel: 'Was hier nicht steht', text: ['Krankheit kommt in der Akte nicht vor. Krank-Einträge werden gar nicht erst geladen.', 'Die Sätze, die jemand zu einem Urlaub, einem Wunschtag oder einer Absage dazugeschrieben hat, zeigt die Akte nicht. Du siehst Datum und Art. Den Satz liest du auf der alten Seite.', 'Begründungen kommen technisch mit aufs Gerät, werden aber weder angezeigt noch gespeichert.', 'Mit „Krank-Grenze prüfen“ zählt die Seite selbst nach, ob beides hält. Steht dort „Sauber“, ist alles in Ordnung.'] },
+  { titel: 'Bankkonto', text: ['Du siehst den aktuellen Stand, wie auf der Seite „Bankkonto“. Einen Verlauf Woche für Woche gibt es in BäckereiOS nicht, und von Hand buchen kann man auch nicht.'] },
+  { titel: 'Wenn etwas rot ist', text: ['Steht in einem Kasten eine rote Meldung, konnte dieser Teil nicht geladen werden. Die Meldung nennt den Grund. Die anderen Kästen stimmen trotzdem.', 'Steht über dem Baum eine rote „Zählprobe“, fehlt im Baum jemand. Das darf nicht sein — bitte melden.'] }
+];
+
+/* ============================== Stellschrauben ============================== */
+const BREIT_AB_PX = 900;          /* ab dieser Fensterbreite Baum und Akte nebeneinander (= CSS @media) */
+const ZEITLIMIT_MS = 15000;       /* so lange wartet eine Abfrage auf die Datenbank */
+const LISTE_KURZ = 8;             /* so viele Zeilen zeigt eine Liste, bevor „alle zeigen“ erscheint */
+const PLANUNGS_QUELLEN = ['positionen', 'abwesenheiten', 'einreichungen', 'bankkonto'];   /* brauchen laut Regel das Konto-Dokument des Generalschlüssels */
+
+/* ============================== Zustand ============================== */
+const L = window.BOS_PERSONALAKTE_LOGIK;
+const Z = L ? L.neuerZustand() : {};     /* ALLES Geladene. Beim Sperren: L.leere(Z). */
+const S = { sitzung: null, baum: null, lauf: 0, baumDaten: null, mehr: {}, fehler: [] };   /* nur Bedienung, keine Personendaten */
+const el = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+function zeige(id, an) { el(id).classList.toggle('hidden', !an); }
+function schmal() { return window.innerWidth < BREIT_AB_PX; }
+
+/* ============================== Fehler auf den Bildschirm (Checkliste §7a) ============================== */
+function meldeFehler(text) {
+  console.error('[Personalakte]', text);
+  if (S.fehler.indexOf(text) === -1) S.fehler.push(text);
+  el('fehlerListe').innerHTML = S.fehler.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('');
+  zeige('fehlerLeiste', true);
+}
+window.onerror = function (msg, quelle, zeile) { meldeFehler(t('fehler_seite', { text: msg, ort: String(quelle || '').split('/').pop() + ':' + zeile })); };
+window.addEventListener('unhandledrejection', function (e) { meldeFehler(t('fehler_versprechen', { text: (e.reason && e.reason.message) || String(e.reason) })); });
+/* Ursache unterscheiden: keine Berechtigung ≠ kein Netz ≠ Zeitlimit. */
+function fehlertext(err, quelle) {
+  const code = (err && err.code) || '';
+  const text = (err && err.message) || String(err);
+  if (code === 'zeitlimit') return t('fehler_zeit', { sekunden: Math.round(ZEITLIMIT_MS / 1000) });
+  if (code === 'permission-denied') return t(PLANUNGS_QUELLEN.indexOf(quelle) !== -1 ? 'fehler_recht_planung' : 'fehler_recht', { code: code, text: text });
+  if (code === 'unavailable') return t('fehler_netz', { code: code, text: text });
+  return t('fehler_sonst', { code: code ? code + ' — ' : '', text: text });
+}
+function mitZeitlimit(versprechen) {
+  return Promise.race([versprechen, new Promise(function (_, nein) {
+    setTimeout(function () { const e = new Error('Zeitlimit'); e.code = 'zeitlimit'; nein(e); }, ZEITLIMIT_MS);
+  })]);
+}
+
+/* ============================== Lesen (nur Admin-Verbindung, immer vom Server) ============================== */
+function adb() { return window.BOS_ACCOUNTS.adminFirestore(); }
+/* Führt eine Abfrage-Beschreibung aus → [{ id, daten }]. Die rohen Daten gehen direkt an den Aufrufer weiter und bleiben nirgends liegen. */
+function hole(a) {
+  const q = L.baueAbfrage(adb(), a);
+  return mitZeitlimit(q.get({ source: 'server' })).then(function (ergebnis) {
+    if (a.dokument) return ergebnis.exists ? [{ id: ergebnis.id, daten: ergebnis.data() }] : [];
+    const aus = [];
+    ergebnis.forEach(function (doc) { aus.push({ id: doc.id, daten: doc.data() }); });
+    return aus;
+  });
+}
+/* Eine Mechanik: Der Anzeigename kommt nur aus bos_namen.js. Die Akte lädt die Namen über die Admin-Verbindung
+   und gibt sie mit uebernimm() dorthin; beim Sperren leert sie dort wieder (leeren()). */
+function nameFn() { return window.BOS_NAMEN.anzeige; }
+function umfeld() {
+  return { apps: window.BOS_APPS || [], permissions: window.BOS_PERMISSIONS || {}, rollen: window.BOS_ROLES || [],
+    can: window.BOS_ACCESS && typeof window.BOS_ACCESS.can === 'function' ? window.BOS_ACCESS.can : null };
+}
+function ladeAlles() {
+  const lauf = ++S.lauf;                    /* Antworten eines früheren Laufs (vor dem Sperren, vor „Neu laden“) werden verworfen */
+  L.leere(Z); S.mehr = {};
+  window.BOS_NAMEN.leeren();
+  el('statusBar').textContent = t('status_laedt');
+  zeichne();
+  return Promise.all(L.abfragen().map(function (a) {
+    return hole(a).then(function (dokumente) {
+      if (lauf !== S.lauf || !S.sitzung.entsperrt()) return;
+      L.nimmAuf(Z, a.id, dokumente);
+      if (a.id === 'namen') window.BOS_NAMEN.uebernimm(Z.namen);
+    }, function (err) {
+      if (lauf !== S.lauf || !S.sitzung.entsperrt()) return;
+      console.error('[Personalakte] Abfrage ' + a.id + ' gescheitert:', err);
+      Z.fehler[a.id] = fehlertext(err, a.id);
+    }).then(function () { if (lauf === S.lauf && S.sitzung.entsperrt()) zeichne(); });
+  })).then(function () {
+    if (lauf !== S.lauf || !S.sitzung.entsperrt()) return;
+    if (S.baumDaten && !S.angefangen) { S.angefangen = true; S.baum.klappeAuf(S.baumDaten.zuAnfangOffen); }
+  });
+}
+/* Einreichungen und Kontostand der geöffneten Akte — erst jetzt, nur für sie. */
+function ladeKnoten(knotenId) {
+  const lauf = S.lauf;
+  const abfragen = L.abfragenFuer(Z, knotenId);
+  if (!abfragen.length) return Promise.resolve();
+  const st = L.knotenStand(Z, knotenId);
+  const ein = abfragen.filter(function (a) { return a.id === 'einreichungen'; });
+  const bank = abfragen.filter(function (a) { return a.id === 'bankkonto'; })[0];
+  const gilt = function () { return lauf === S.lauf && S.sitzung.entsperrt() && Z.proKnoten[knotenId] === st; };
+  const fehler = [];
+  const arbeit = [Promise.all(ein.map(function (a) {
+    return hole(a).then(function (dok) { if (gilt()) L.nimmEinreichungenAuf(Z, knotenId, dok); }, function (err) {
+      console.error('[Personalakte] Einreichungen gescheitert:', err); fehler.push(fehlertext(err, 'einreichungen'));
+    });
+  })).then(function () {
+    if (!gilt()) return;
+    if (fehler.length) st.fehler.einreichungen = fehler.length === ein.length ? fehler[0] : t('fehler_unvollstaendig', { zahl: fehler.length, gesamt: ein.length, text: fehler[0] });
+    else L.nimmEinreichungenAuf(Z, knotenId, []);
+  })];
+  if (bank) arbeit.push(hole(bank).then(function (dok) {
+    if (gilt()) L.nimmBankkontoAuf(Z, knotenId, bank.dokument, dok.length ? dok[0].daten : null);
+  }, function (err) {
+    console.error('[Personalakte] Bankkonto gescheitert:', err);
+    if (gilt()) st.fehler.bankkonto = fehlertext(err, 'bankkonto');
+  }));
+  return Promise.all(arbeit).then(function () { if (gilt() && Z.gewaehlt === knotenId) zeichneAkte(); });
+}
+
+/* ============================== Zeichnen ============================== */
+/* Der Baum erscheint erst, wenn Personen, Namen UND Konten da sind (oder gescheitert): sonst stünde für einen
+   Augenblick „kein Name hinterlegt“ oder „kein Konto“ an Personen, bei denen das gar nicht stimmt. */
+function grunddatenDa() {
+  return ['personen', 'namen', 'konten'].every(function (q) { return Object.prototype.hasOwnProperty.call(Z.geladen, q) || Z.fehler[q]; });
+}
+function zeichne() {
+  const da = grunddatenDa();
+  zeige('baumLaedt', !da); zeige('baum', da);
+  S.baumDaten = da ? L.baum(Z, { nameFn: nameFn() }) : L.baum(L.neuerZustand(), { nameFn: nameFn() });
+  const gefiltert = L.filterBaum(S.baumDaten.knoten, Z.suche);
+  S.sichtbar = da ? gefiltert.knoten : [];
+  S.baum.zeichne();
+  if (da && gefiltert.offen) S.baum.klappeAuf(gefiltert.offen);
+  el('trefferZeile').textContent = gefiltert.treffer === null ? '' : (gefiltert.treffer ? t('treffer', { zahl: gefiltert.treffer }) : t('kein_treffer'));
+  const z = S.baumDaten.zaehl;
+  el('statusBar').textContent = da ? t('status_stand', { personen: z.personenGesamt, konten: z.kontenGesamt }) : t('status_laedt');
+  /* Zählprobe: niemand darf fehlen */
+  const zf = [];
+  if (!z.personenStimmt) zf.push(t('zaehl_personen', { baum: z.personenImBaum, gesamt: z.personenGesamt }));
+  if (!Z.fehler.konten && !z.kontenStimmt) zf.push(t('zaehl_konten', { baum: z.kontenImBaum, gesamt: z.kontenGesamt }));
+  el('zaehlFehler').textContent = zf.join(' '); zeige('zaehlFehler', zf.length > 0);
+  /* Ladefehler der Grunddaten gesammelt über dem Baum (zusätzlich stehen sie am Abschnitt) */
+  const lf = Object.keys(Z.fehler);
+  el('ladeFehler').innerHTML = esc(t('lade_fehler_titel')) + '<ul>' + lf.map(function (q) { return '<li><b>' + esc(t('quelle_' + q)) + ':</b> ' + esc(Z.fehler[q]) + '</li>'; }).join('') + '</ul>';
+  zeige('ladeFehler', lf.length > 0);
+  const oa = S.baumDaten.ohneAktivFeld;
+  el('aktivHinweis').textContent = t(oa.length === 1 ? 'aktiv_fehlt_eins' : 'aktiv_fehlt', { zahl: oa.length, liste: oa.join(', ') }); zeige('aktivHinweis', oa.length > 0);
+  const au = S.baumDaten.auffaellig;
+  el('auffaellig').innerHTML = esc(t('auffaellig_titel')) + '<ul>' + au.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'; zeige('auffaellig', au.length > 0);
+  zeichneAkte();
+}
+function listeHtml(schluessel, l) {
+  let h = '<div class="liste-titel">' + esc(l.titel) + '</div>';
+  if (l.fehler) return h + '<div class="ab-fehler" role="alert">' + esc(l.fehler) + '</div>';
+  if (l.laedt) return h + '<div class="ab-laedt">' + esc(t('ab_laedt')) + '</div>';
+  if (!l.zeilen.length) return h + '<ul class="liste"><li class="leer-zeile">' + esc(l.leer) + '</li></ul>';
+  const alle = !!S.mehr[schluessel];
+  const zeilen = alle ? l.zeilen : l.zeilen.slice(0, LISTE_KURZ);
+  h += '<ul class="liste">' + zeilen.map(function (z) { return '<li' + (z.vergangen ? ' class="vergangen"' : '') + '>' + esc(z.text) + '</li>'; }).join('') + '</ul>';
+  if (l.zeilen.length > LISTE_KURZ) h += '<button type="button" class="mehr-btn" data-mehr="' + esc(schluessel) + '">' + esc(alle ? t('weniger') : t('mehr', { zahl: l.zeilen.length })) + '</button>';
+  return h;
+}
+function zeichneAkte() {
+  const box = el('akte');
+  const pfad = el('pfadBtn');
+  if (!Z.gewaehlt) { box.innerHTML = '<div class="leer">' + esc(t(schmal() ? 'akte_leer_schmal' : 'akte_leer')) + '</div>'; pfad.textContent = t('baum_waehlen'); return; }
+  const a = L.akte(Z, Z.gewaehlt, { nameFn: nameFn(), umfeld: umfeld() });
+  if (!a) { box.innerHTML = '<div class="leer">' + esc(t('akte_weg')) + '</div>'; pfad.textContent = t('baum_waehlen'); return; }
+  pfad.textContent = t('baum_gewaehlt', { name: a.titel });
+  let h = '<div class="akte-kopf"><h2>' + esc(a.titel) + '</h2><div class="unter">' + esc(a.unter) + '</div></div>';
+  a.hinweise.forEach(function (x) { h += '<div class="hinweis warn" role="status">⚠︎ ' + esc(x) + '</div>'; });
+  h += '<div class="abschnitte">';
+  a.abschnitte.forEach(function (ab) {
+    h += '<section class="abschnitt" data-abschnitt="' + esc(ab.id) + '"><h3>' + esc(ab.titel) + '</h3>';
+    if (ab.fehler) h += '<div class="ab-fehler" role="alert">✕ ' + esc(ab.fehler) + '</div>';
+    else if (ab.laedt) h += '<div class="ab-laedt">' + esc(t('ab_laedt')) + '</div>';
+    if (!ab.fehler && !ab.laedt) {
+      if (ab.felder.length) h += '<dl class="felder">' + ab.felder.map(function (f) { return '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>'; }).join('') + '</dl>';
+      ab.listen.forEach(function (l, i) { h += listeHtml(a.knotenId + '|' + ab.id + '|' + i, l); });
+    }
+    ab.hinweise.forEach(function (x) { h += '<div class="ab-hinweis">' + esc(x) + '</div>'; });
+    if (ab.spruenge.length) h += '<div class="spruenge">' + ab.spruenge.map(function (s) { return '<a href="' + esc(s.href) + '">' + esc(t('sprung', { text: s.text })) + '</a>'; }).join('') + '</div>';
+    h += '</section>';
+  });
+  box.innerHTML = h + '</div>';
+}
+function setzeBaumOffen(an) {
+  document.body.classList.toggle('baum-offen', !!an);
+  el('pfadBtn').setAttribute('aria-expanded', an ? 'true' : 'false');
+}
+function waehle(knotenId) {
+  Z.gewaehlt = knotenId;
+  setzeBaumOffen(false);
+  S.baum.zeichne();
+  zeichneAkte();
+  const st = Z.proKnoten[knotenId];
+  if (!st || !(st.geladen.einreichungen || st.fehler.einreichungen)) ladeKnoten(knotenId);
+  if (schmal()) window.scrollTo(0, 0);
+}
+
+/* ============================== Sperren und Entsperren ============================== */
+/* Nach dem Sperren ist NICHTS mehr da: Zustand, Namen, Baum, Akte, Suchfeld, Hinweise, offene Dialoge (Go KC Punkt 5). */
+function leereAlles() {
+  S.lauf++;                                  /* laufende Abfragen kommen ins Leere */
+  L.leere(Z);
+  S.baumDaten = null; S.sichtbar = []; S.mehr = {}; S.angefangen = false;
+  window.BOS_NAMEN.leeren();
+  if (S.baum) S.baum.offen().forEach(function (id) { S.baum.umschalten(id, false); });
+  ['baum', 'akte', 'zaehlFehler', 'ladeFehler', 'aktivHinweis', 'auffaellig', 'selbsttestZeilen', 'selbsttestErgebnis', 'trefferZeile'].forEach(function (id) { el(id).innerHTML = ''; });
+  ['zaehlFehler', 'ladeFehler', 'aktivHinweis', 'auffaellig', 'selbsttestOverlay', 'leerlaufStreifen', 'baumLaedt'].forEach(function (id) { zeige(id, false); });
+  el('suchfeld').value = '';
+  el('pfadBtn').textContent = t('baum_waehlen');
+  setzeBaumOffen(false);
+}
+function zeigeGesperrt(grund, fehler) {
+  leereAlles();
+  zeige('adminInhalt', false); zeige('gesperrtBox', true); zeige('sperrenBtn', false);
+  el('statusBar').textContent = t('status_gesperrt');
+  el('gesperrtGrund').textContent = grund || ''; zeige('gesperrtGrund', !!grund);
+  el('gesperrtErr').textContent = fehler || ''; zeige('gesperrtErr', !!fehler);
+}
+function zeigeEntsperrt() {
+  zeige('gesperrtBox', false); zeige('adminInhalt', true); zeige('sperrenBtn', true);
+  ladeAlles();
+}
+function oeffneAnmeldung() {
+  if (!S.sitzung) return;
+  el('adminPwInput').value = ''; zeige('adminPwErr', false);
+  zeige('adminAuthOverlay', true);
+  el('adminPwInput').focus();
+}
+function schliesseAnmeldung() { el('adminPwInput').value = ''; zeige('adminAuthOverlay', false); }
+function bestaetigeAnmeldung() {
+  const pw = el('adminPwInput').value;
+  if (!pw) return;
+  const btn = el('adminPwConfirm');
+  btn.disabled = true; btn.textContent = t('anmeldung_laeuft');
+  S.sitzung.anmelden(pw).then(function () { schliesseAnmeldung(); }, function (err) {
+    el('adminPwErr').textContent = err.message; zeige('adminPwErr', true);
+  }).then(function () { btn.disabled = false; btn.textContent = t('bestaetigen'); });
+}
+
+/* ============================== Selbsttest der Krank-Grenze (Go KC Punkt 6) ============================== */
+function selbsttest() {
+  const lauf = S.lauf;
+  zeige('selbsttestOverlay', true);
+  el('selbsttestErgebnis').textContent = t('test_laeuft'); el('selbsttestZeilen').innerHTML = '';
+  const grund = L.abfragen(), fuer = Z.gewaehlt ? L.abfragenFuer(Z, Z.gewaehlt) : [];
+  const roh = {}; const fehler = [];
+  Promise.all(grund.concat(fuer).map(function (a, i) {
+    return hole(a).then(function (dok) { roh[a.id + '#' + i] = dok.map(function (d) { return d.daten; }); }, function (err) { fehler.push(fehlertext(err, a.id)); });
+  })).then(function () {
+    if (lauf !== S.lauf || !S.sitzung.entsperrt()) return;      /* inzwischen gesperrt: nichts mehr zeigen */
+    const b = L.selbsttest(roh, Z);                               /* roh lebt nur in dieser Funktion */
+    el('selbsttestErgebnis').textContent = fehler.length ? t('test_fehler', { text: fehler[0] }) : (b.sauber ? t('test_sauber') : t('test_fund'));
+    el('selbsttestZeilen').innerHTML = b.zeilen.map(function (z) {
+      return '<div class="test-zeile ' + (z.hinweis ? '' : (z.ok ? 'gut' : 'schlecht')) + '"><span class="zeichen">' + (z.hinweis ? '·' : (z.ok ? '✓' : '✕')) + '</span><span>' + esc(z.text) + '</span></div>';
+    }).join('') + '<div class="test-zeile"><span class="zeichen"></span><span>' + esc(t('test_umfang', { abfragen: grund.length + fuer.length, akte: fuer.length ? t('test_umfang_akte', { zahl: fuer.length }) : '' })) + '</span></div>';
+  });
+}
+
+/* ============================== Hilfe ============================== */
+function zeigeHilfe() {
+  el('helpTitel').textContent = t('hilfe_titel');
+  el('helpInhalt').innerHTML = helpData.map(function (h) { return '<h3>' + esc(h.titel) + '</h3>' + h.text.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join(''); }).join('');
+  zeige('helpOverlay', true);
+}
+
+/* ============================== Start ============================== */
+function starte() {
+  wendeI18nAn();
+  el('pfadBtn').textContent = t('baum_waehlen');
+  el('statusBar').textContent = t('status_gesperrt');
+  el('helpOpenBtn').addEventListener('click', zeigeHilfe);
+  el('helpZuBtn').addEventListener('click', function () { zeige('helpOverlay', false); });
+  el('fehlerZuBtn').addEventListener('click', function () { S.fehler = []; zeige('fehlerLeiste', false); });
+  const fehlt = [['firebase', 'Firebase (firebase-app-compat.js)'], ['BOS_ACCOUNTS', 'bos_accounts.js'], ['BOS_ADMIN_SITZUNG', 'bos_admin_sitzung.js'],
+    ['BOS_PERSONALAKTE_LOGIK', 'personalakte_logik.js'], ['BOS_ORDNERBAUM', 'bos_ordnerbaum.js'], ['BOS_NAMEN', 'bos_namen.js']].filter(function (m) { return !window[m[0]]; });
+  const zuAlt = fehlt.length ? '' : (typeof window.BOS_ACCOUNTS.adminFirestore !== 'function' ? 'bos_accounts.js' :
+    ((typeof window.BOS_NAMEN.uebernimm !== 'function' || typeof window.BOS_NAMEN.leeren !== 'function') ? 'bos_namen.js' : ''));
+  if (fehlt.length || zuAlt) {
+    el('gesperrtErr').textContent = fehlt.length ? t('modul_fehlt', { datei: fehlt.map(function (m) { return m[1]; }).join(', ') }) : t('modul_alt', { datei: zuAlt });
+    zeige('gesperrtErr', true); el('entsperrenBtn').disabled = true;
+    return;
+  }
+  S.baum = window.BOS_ORDNERBAUM.erzeuge({
+    wurzel: el('baum'), modus: 'navigation',
+    knoten: function () { return S.sichtbar || []; },
+    gewaehlt: function () { return Z.gewaehlt; },
+    beiWahl: function (id) { waehle(id); }
+  });
+  S.sitzung = window.BOS_ADMIN_SITZUNG.erzeuge({
+    konten: window.BOS_ACCOUNTS,
+    beiEntsperrt: zeigeEntsperrt,
+    beiGesperrt: function (grund, info) { zeigeGesperrt(grund, ''); if (info && info.art === 'rueckkehr') oeffneAnmeldung(); },
+    beiVorwarnung: function (rest, vergangen) {
+      if (rest === null) { zeige('leerlaufStreifen', false); return; }
+      el('leerlaufStreifen').textContent = t('leerlauf', { minuten: Math.floor(vergangen / 60000), sekunden: rest });
+      zeige('leerlaufStreifen', true);
+    }
+  });
+  el('entsperrenBtn').addEventListener('click', oeffneAnmeldung);
+  el('sperrenBtn').addEventListener('click', function () { S.sitzung.sperren(); });
+  el('adminPwCancel').addEventListener('click', schliesseAnmeldung);
+  el('adminPwConfirm').addEventListener('click', bestaetigeAnmeldung);
+  el('adminPwInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') bestaetigeAnmeldung(); });
+  el('suchfeld').addEventListener('input', function () { Z.suche = el('suchfeld').value; if (S.sitzung.entsperrt()) zeichne(); });
+  el('neuLadenBtn').addEventListener('click', function () { const g = Z.gewaehlt; ladeAlles().then(function () { if (g && S.sitzung.entsperrt() && L.akte(Z, g)) waehle(g); }); });
+  el('selbsttestBtn').addEventListener('click', selbsttest);
+  el('selbsttestZuBtn').addEventListener('click', function () { zeige('selbsttestOverlay', false); el('selbsttestZeilen').innerHTML = ''; });
+  el('pfadBtn').addEventListener('click', function () { setzeBaumOffen(true); });
+  el('baumZuBtn').addEventListener('click', function () { setzeBaumOffen(false); });
+  el('akte').addEventListener('click', function (e) {
+    const b = e.target.closest ? e.target.closest('[data-mehr]') : null;
+    if (!b) return;
+    const k = b.getAttribute('data-mehr'); S.mehr[k] = !S.mehr[k]; zeichneAkte();
+  });
+  window.addEventListener('resize', function () { if (!schmal()) setzeBaumOffen(false); });
+  oeffneAnmeldung();                            /* wie die Kontenverwaltung: gleich nach dem Passwort fragen */
+}
+try { starte(); } catch (e) { meldeFehler((e && e.message) || String(e)); }
+</script>
+</body>
+</html>

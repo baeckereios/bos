@@ -52,7 +52,7 @@
        lagerZaehlenStandorte: string[],    // NEU 11.11.2026 — IDs aus lager_standorte, an denen das Konto zählen darf; das Schloss (Regel lzRecht(), RK §31). Rolle admin darf immer
        lagerAnfordern: boolean,            // NEU 16.11.2026 (Lager Stufe 3a, #169) — öffnet die Kachel „Lager anfordern“ (Registry haken). true genau dann, wenn lagerAnfordernStandorte nicht leer ist
        lagerAnfordernStandorte: string[],  // NEU 16.11.2026 — IDs aus lager_standorte, an denen das Konto anfordern, abschließen und Fehlendes melden darf; das Schloss (Regel laAnfordern(), RK §32). Rolle admin darf immer
-       lagerBestellen: boolean,            // NEU 16.11.2026 — Bestellungen eintragen/zurücknehmen und Mindestmengen pflegen, alle Standorte (Regel laBestellen(), RK §32); öffnet auch die Kachel „Lager anfordern“
+       lagerBestellen: boolean,            // NEU 16.11.2026 — Haken „🚚 Nachbestellung“: Bestellungen eintragen/zurücknehmen, alle Standorte (Regel laBestellen(), RK §32; Mindestmengen seit 19.11. nur Rolle admin); öffnet auch die Kachel „Lager anfordern“
        erstelltAm: Firestore-Timestamp
      }
 
@@ -507,7 +507,7 @@ window.BOS_ACCOUNTS = (function () {
     var ids = Array.isArray(liste) ? liste.filter(function (x) { return typeof x === 'string' && x !== ''; }) : [];
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ lagerAnfordernStandorte: ids, lagerAnfordern: ids.length > 0 });
   }
-  /** NEU (16.11.2026, Lager Stufe 3a). Haken „Lager bestellen“ (Bestellungen und Mindestmengen, Regel laBestellen(), RK §32). */
+  /** NEU (16.11.2026, Lager Stufe 3a). Haken „🚚 Nachbestellung“ (nur Bestellungen, Regel laBestellen(), RK §32; Mindestmengen seit 19.11. nur Rolle admin). */
   async function setzeLagerBestellenRecht(db, schluessel, wert) {
     return holeAdminApp().firestore().collection('bos_accounts').doc(schluessel).update({ lagerBestellen: !!wert });
   }

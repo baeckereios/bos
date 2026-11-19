@@ -4,14 +4,25 @@
   MODUL: lager/lager_editor.html — Lager (Artikelstamm, Lagerorte, Standorte, Kategorien, Lieferanten)
   Doku:  lager/LAGER_EDITOR_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (BOS_LAGER_LOGIK, mit node testbar)
-  Regel: RK §30/§31, seit 3a §32 (firestore_regeln_2026-11-16_lager_anfordern.rules) — lesen jedes Konto, schreiben
+  Regel: RK §30/§31, seit 3a §32, Mindestmenge seit 19.11. nur Rolle admin (firestore_regeln_2026-11-19_lager_feinschliff.rules) — lesen jedes Konto, schreiben
          Rolle admin, je Dokument eine Sicherung der Vorversion in lager_sicherungen im selben Vorgang.
          Gezählt wird NICHT hier, sondern auf lager/lager_zaehlen.html (Zählen und Pflegen getrennt).
   Ansicht: Ordnerbaum (bos_ordnerbaum.js) + Inhalt, seit v3 (Ordneransicht, #168).
   Seit v6 (Stufe 3a, RK §32): liest zusätzlich lager_stand, lager_mindest und die Buchungen seit der ältesten Zählung
-  (lager_listen abgeschlossen, lager_korrekturen) und zeigt den Bestand. Schreibt davon NICHTS (Mindestmengen pflegt
-  die Seite „Lager anfordern“, Ulf F1 b).
+  (lager_listen abgeschlossen, lager_korrekturen) und zeigt den Bestand. Seit v7 (Feinschliff, L38): Die Mindestmenge
+  pflegt NUR Rolle admin auf der Artikelkarte, Reiter „Bestand & Mindestmenge“ (lager_mindest, im selben Vorgang wie
+  Artikel und Sicherung; die Regel prüft hatAdminRolle()). Sonst schreibt die Seite von 3a nichts.
   CHANGELOG
+    2026-11-19 · 04:36 · v7 · Feature (Lager Feinschliff, #169/#186, A30; Freigabe Kontroll-Chat 19.11. 04:32)
+      Reiter „Bestand“ heißt „Bestand & Mindestmenge“. Je aktivem Standort: hat der Artikel im ENTWURF einen Lagerort
+      dort → Feld „Mindestmenge [ ] ‹Gebinde›“ mit Bestand daneben (noch nie gezählt / Bestand / rot unter der
+      Mindestmenge, mit dem eingegebenen Wert gerechnet); sonst grau „Erst einen Lagerort geben“, ein vorhandener Wert
+      über 0 bleibt sichtbar mit „auf 0 setzen“. Gespeichert mit „Speichern“ der Karte, nur geänderte Zeilen, im SELBEN
+      Batch wie Artikel und Sicherung (alles oder nichts; nur Mindestmenge geändert → nur die Mindest-Dokumente). Neuer
+      Artikel: Hinweis „erst speichern“ (die Regel prüft exists() gegen den Stand vor dem Vorgang). Höchstens 17
+      Mindest-Zeilen je Vorgang (Nachschlage-Grenze 20). Neu zeichnen nicht, solange ein Mindest-Feld den Fokus hat.
+      REGEL_DATEI firestore_regeln_2026-11-19_lager_feinschliff.rules, REGEL_FASSUNG unverändert.
+      lager/_protokolle/SESSION_2026-11-19_LAGER_FEINSCHLIFF_BAU.md
     2026-11-18 · 12:19 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen2.rules (Ein Name überall, Lieferung 2: Maschinenseite und Reparatur; Freigabe KC 18.11. 09:17; RK §34). Sonst unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
     2026-11-18 · 05:45 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_namen.rules (Ein Name überall; Go KC 18.11. 04:42; RK §34). REGEL_FASSUNG und sonst alles unverändert. _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU.md
     2026-11-18 · 02:24 · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-18_mitbringer.rules (Mitbringer, #183; Go KC 18.11. 01:31; RK §33). REGEL_FASSUNG und sonst alles unverändert. mitbringer/_protokolle/SESSION_2026-11-18_MITBRINGER_BAU.md
@@ -240,6 +251,12 @@
   .bestand-block h4 { font-size: .95rem; margin-bottom: 4px; }
   .bestand-ort { display: flex; justify-content: space-between; gap: 8px; font-size: .86rem; padding: 3px 0; border-bottom: 1px dashed var(--border); }
   .bestand-ort:last-child { border-bottom: none; }
+  /* v7: Mindestmenge auf der Karte */
+  .mind-zeile { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 4px 0 6px; }
+  .mind-zeile label { display: flex; align-items: center; gap: 6px; font-size: .9rem; }
+  .mind-zeile input { width: 6.5em; text-align: right; }
+  .mind-bestand { font-size: .86rem; }
+  .mind-alt .btn { margin-left: 6px; }
   .orte-folge .of-zeile { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: .88rem; }
   .orte-folge .of-zeile .of-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .rot-text { color: var(--red); } .bestand-ort .dim { color: var(--dim); font-size: .78rem; }
@@ -379,7 +396,7 @@ const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
 const COL_TEIGECKE = { blaetter: 'teigecke_zutaten', orte: 'teigecke_orte', teige: 'teigecke_teige', sicherungen: 'teigecke_sicherungen' };
 const REGEL_FASSUNG = 'lager-zaehlen-2026-11-11';
-const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SCHREIB_ZEITLIMIT_MS = 20000;
 const SPEICHER_SORTIERUNG = 'bos_lager_sortierung';
 const SPEICHER_ORDNER = 'bos_lager_ordner';          /* Ordneransicht: zuletzt gewählter Ordner je Gerät */
@@ -435,8 +452,14 @@ const I18N_DE = {
   archiviert_et: 'archiviert',
   teigecke_et: 'Teigecke', plaus_et: '⚠︎ Lagerort', mindest_et: '📉 unter Mindestmenge', ordner_unter_mindest: 'Unter Mindestmenge',
   zahl_unbekannt_titel: 'noch nie gezählt', zahl_unter_null_titel: 'rechnerisch unter 0 — bitte zählen', zahl_unter_mindest_titel: 'unter der Mindestmenge',
-  k_bestand: 'Bestand', b_summe: 'Bestand {b}', b_unbekannt: 'noch nie gezählt', b_mindest: 'Mindestmenge {m}', b_mindest_keine: 'keine Mindestmenge',
-  b_mindest_hilfe: 'Mindestmengen pflegt, wer den Haken „Lager bestellen“ hat, auf der Seite „Lager anfordern“ (Reiter Mindestmengen). Hier wird sie nur angezeigt.',
+  k_bestand: 'Bestand & Mindestmenge', b_summe: 'Bestand {b}', b_unbekannt: 'noch nie gezählt', b_mindest: 'Mindestmenge {m}', b_mindest_keine: 'keine Mindestmenge',
+  b_mindest_hilfe: 'Mindestmenge in Gebinden, 0 = keine. Liegt der Bestand darunter, steht der Artikel auf „Bitte nachbestellen“ und im Ordner „Unter Mindestmenge“. Ein Feld gibt es nur an Standorten, an denen der Artikel einen Lagerort hat. Gespeichert wird mit „Speichern“, zusammen mit dem Rest der Karte. Pflegen darf nur Rolle admin.',
+  b_mind_feld: 'Mindestmenge', b_mind_gebinde: 'Gebinde', b_mind_kein_ort: 'Erst einen Lagerort geben (Reiter Lagerung), dann gibt es hier die Mindestmenge.',
+  b_mind_alt: 'Mindestmenge {m} — hier liegt der Artikel nicht mehr.', b_mind_null: 'auf 0 setzen', b_mind_wird_null: 'Mindestmenge wird mit „Speichern“ auf 0 gesetzt.',
+  b_mind_neu: 'Bestand und Mindestmenge gibt es erst, wenn der Artikel gespeichert ist. Die Datenbank prüft die Mindestmenge gegen den schon gespeicherten Artikel. Also erst „Anlegen“, dann die Karte wieder öffnen und hier die Mindestmenge eintragen.',
+  b_mind_falsch: 'Mindestmenge bei {st}: bitte 0 bis {max} eingeben, höchstens eine Stelle hinter dem Komma.',
+  b_mind_zu_viele: 'Zu viele Mindestmengen auf einmal ({n}, höchstens {max} je Speichern). Bitte in mehreren Schritten speichern.',
+  b_mind_gespeichert: '✓ Mindestmenge gespeichert', b_mind_nichts: 'Nichts gespeichert, auch keine Mindestmenge: Es wird immer alles zusammen gespeichert oder nichts.',
   b_gezaehlt: 'gezählt {zeit}', b_nie_ort: 'hier noch nie gezählt, ab der ersten Zählung im Standort', b_buchungen: '{n} Buchungen danach', b_unter_null: 'rechnerisch unter 0 — bitte zählen',
   b_liegt_noch: 'liegt hier noch? (nicht mehr fest hier — beim Zählen 0 tippen, wenn weg)', b_ohne_ort: 'ohne Lagerort gebucht', b_letzte: 'Letzte Buchungen', b_keine_buchung: 'noch keine Buchung',
   b_keiner: 'Dieser Artikel hat noch keinen Standort mit Lagerort, Zählung oder Mindestmenge.', b_nur_gespeichert: 'Den Bestand gibt es erst, wenn der Artikel gespeichert ist.',
@@ -588,7 +611,7 @@ function sperrGrund() {
   if (!online()) return t('offline');
   return '';
 }
-async function schreibe(auftraege) {
+async function schreibe(auftraege, mindest) {   /* mindest (v7): [{ artikelId, standortId, menge }] ohne Sicherung, im selben Batch */
   const g = sperrGrund();
   if (g) { const e = new Error(g); e.code = 'gesperrt'; throw e; }
   const db = window.db;
@@ -601,6 +624,10 @@ async function schreibe(auftraege) {
     batch.set(sichRef, { collection: a.col, dokId: zielRef.id, aktion: a.aktion, vorher: ohneId(a.vorher), konto: S.kennung, ts: ts });
     batch.set(zielRef, Object.assign(nurFelder(a.col, a.daten), { sicherungId: sichRef.id, geaendertVon: S.kennung, geaendertAm: ts }));
     ids.push(zielRef.id);
+  });
+  (mindest || []).forEach(function (m) {
+    batch.set(db.collection(COL.mindest).doc(LG.mindestId(m.artikelId, m.standortId)),
+      Object.assign(LG.mindestDokument(m.artikelId, m.standortId, m.menge), { geaendertVon: S.kennung, geaendertAm: ts }));
   });
   await mitZeitlimit(batch.commit());
   return ids;
@@ -797,7 +824,7 @@ function hinzuAmOrdner(id) {
 function render() {
   if (!S.geladen) return;
   rechneBestand();   /* Stufe 3a: einmal je Zeichnen */
-  if (S.karte && S.karte.reiter === 'k_bestand') zeichneKarte();   /* Reiter Bestand hat keine Eingaben: neu zeichnen ist gefahrlos */
+  if (S.karte && S.karte.reiter === 'k_bestand' && !mindFokus()) zeichneKarte();   /* v7: Mindest-Felder — nicht unter den Fingern neu zeichnen; Werte stehen in k.mindEingabe */
   if (!S.ordner && alleDa()) {   /* A24: alte Kennung abgebildet (in startordner) und zurückgeschrieben */
     const g = lies(SPEICHER_ORDNER);
     S.ordner = LG.startordner(daten(), g);
@@ -1216,7 +1243,7 @@ function oeffneKarte(col, id, extra) {
   if (id && !roh) return;
   const ids = idsFuer(col);
   const reiter = reiterFuer(col).indexOf(x.reiter) !== -1 ? x.reiter : reiterFuer(col)[0];
-  S.karte = { col: col, id: id || null, roh: roh, entwurf: roh ? entwurfAus(col, roh) : leerEntwurf(col, x.vorgabe), reiter: reiter, ids: ids, geaendert: false };
+  S.karte = { col: col, id: id || null, roh: roh, entwurf: roh ? entwurfAus(col, roh) : leerEntwurf(col, x.vorgabe), reiter: reiter, ids: ids, geaendert: false, mindEingabe: {} };
   document.getElementById('karteFehler').classList.add('hidden');
   document.getElementById('karteOverlay').classList.remove('hidden');
   zeichneKarte();
@@ -1234,7 +1261,12 @@ function karteNav(r) {
   oeffneKarte(k.col, k.ids[j]);
 }
 function karteFehler(text) { const el = document.getElementById('karteFehler'); el.textContent = text; el.classList.toggle('hidden', !text); }
-function markiereGeaendert() { if (!S.karte) return; S.karte.geaendert = !S.karte.roh || !LG.inhaltGleich(entwurfAus(S.karte.col, S.karte.roh), S.karte.entwurf); aktualisiereKarteKopf(); }
+function markiereGeaendert() {
+  if (!S.karte) return;
+  const m = mindAenderungen(S.karte);
+  S.karte.geaendert = !S.karte.roh || !LG.inhaltGleich(entwurfAus(S.karte.col, S.karte.roh), S.karte.entwurf) || m.aend.length > 0 || !!m.fehler;
+  aktualisiereKarteKopf();
+}
 function aktualisiereKarteKopf() {
   const k = S.karte; if (!k) return;
   const e = k.entwurf;
@@ -1283,20 +1315,56 @@ function zeitKurzE(ms) {
   try { return new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(new Date(ms)); }
   catch (e) { return new Date(ms).toLocaleString('de-DE'); }
 }
-/* Reiter „Bestand“ (nur lesen, Mindestmenge nur anzeigen — Ulf F1 b) */
+/* v7 (Feinschliff, L38): Mindestmenge je Standort auf der Karte. Eingaben in k.mindEingabe[standortId] (Text). */
+function mindFokus() { const f = document.activeElement; return !!(f && f.hasAttribute && f.hasAttribute('data-mindest-sid')); }
+function mindGespeichert(artikelId, sid) { const m = (S.mindest || []).filter(function (x) { return x.artikelId === artikelId && x.standortId === sid; })[0]; return m && typeof m.menge === 'number' ? m.menge : 0; }
+function mindStandorteMitOrt(e) { const o = omap(), aus = {}; (e.orte || []).forEach(function (oid) { const x = o[oid]; if (x && !x.geloescht && x.standortId) aus[x.standortId] = true; }); return aus; }
+/* geänderte Zeilen: { aend: [{ standortId, menge }], fehler: '' } */
+function mindAenderungen(k) {
+  const aus = { aend: [], fehler: '' };
+  if (!k || k.col !== COL.artikel || !k.id || !k.mindEingabe) return aus;
+  const sm = smap();
+  Object.keys(k.mindEingabe).sort().forEach(function (sid) {
+    if (aus.fehler) return;
+    const roh = String(k.mindEingabe[sid]).trim(), m = LG.mengeAus(roh === '' ? '0' : roh);
+    if (!LG.mindestGueltig(m)) { aus.fehler = t('b_mind_falsch', { st: (sm[sid] || {}).name || sid, max: LG.GRENZEN.mindestMax }); return; }
+    if (m !== mindGespeichert(k.id, sid)) aus.aend.push({ standortId: sid, menge: m });
+  });
+  return aus;
+}
+const MIND_MAX_JE_VORGANG = 17;   /* Konto + Sicherung + Artikel + je Zeile ein Standort ≤ 20 (Nachschlage-Grenze je Batch) */
+function mindZeile(k, st, b, a, mitOrt, dis) {
+  const roh = Object.prototype.hasOwnProperty.call(k.mindEingabe || {}, st.id) ? k.mindEingabe[st.id] : null;
+  const gesp = mindGespeichert(k.id, st.id);
+  if (!mitOrt) {
+    if (!(gesp > 0)) return '<div class="lesewert dim">' + esc(t('b_mind_kein_ort')) + '</div>';
+    if (roh !== null && LG.mengeAus(String(roh).trim() || '0') === 0) return '<div class="lesewert">' + esc(t('b_mind_wird_null')) + '</div>';
+    return '<div class="lesewert mind-alt">' + esc(t('b_mind_alt', { m: LG.mengeMitGebinde(gesp, a) })) +
+      ' <button type="button" class="btn btn-outline btn-klein" data-aktion="mindest-null" data-sid="' + esc(st.id) + '"' + dis + '>' + esc(t('b_mind_null')) + '</button></div>';
+  }
+  const wertText = roh !== null ? roh : (gesp > 0 ? LG.mengeText(gesp) : '');
+  const m = LG.mengeAus(String(wertText).trim() || '0');
+  const unter = !!(b && b.status === 'bekannt' && LG.mindestGueltig(m) && m > 0 && b.summe < m);
+  const bt = !b || b.status !== 'bekannt' ? t('b_unbekannt') : t('b_summe', { b: LG.mengeMitGebinde(b.summe, a) });
+  return '<div class="mind-zeile"><label><span>' + esc(t('b_mind_feld')) + '</span> ' +
+    '<input data-mindest-sid="' + esc(st.id) + '" inputmode="decimal" autocomplete="off" size="6" aria-label="' + esc(t('b_mind_feld') + ' ' + st.name) + '" value="' + esc(wertText) + '"' + dis + '> ' +
+    '<span>' + esc(a.gebinde || t('b_mind_gebinde')) + '</span></label>' +
+    '<span class="mind-bestand' + (unter ? ' rot-text' : '') + '">' + esc(bt) + (unter ? ' · <b>' + esc(t('zahl_unter_mindest_titel')) + '</b>' : '') + '</span></div>';
+}
+/* Reiter „Bestand & Mindestmenge“ (Bestand lesen; Mindestmenge pflegen nur admin — v7, L38) */
 function bestandReiter(k) {
-  if (!k.id) return '<div class="lesewert dim">' + esc(t('b_nur_gespeichert')) + '</div>';
+  if (!k.id) return '<div class="hinweis" style="margin:0">' + esc(t('b_mind_neu')) + '</div>';
   if (S.bestandFehler) return '<div class="hinweis rot" style="margin:0">' + esc(t('b_fehler', { grund: S.bestandFehler })) + '</div>';
   if (!S.bestand) return '<div class="lesewert dim">' + esc(t('b_laedt')) + '</div>';
   const a = LG.nachId(S.artikel)[k.id] || k.roh, o = omap();
   const buch = LG.buchungenAus(S.gebucht, S.korrekturen).filter(function (b) { return b.artikelId === k.id; });
   let html = '';
+  const mitOrt = mindStandorteMitOrt(k.entwurf), dis = sperrGrund() ? ' disabled' : '';
   LG.aktiv(S.standorte).slice().sort(LG.nachSort).forEach(function (st) {
     const b = (S.bestand[st.id] || {})[k.id];
-    if (!b) return;
-    const kopf = b.status === 'bekannt' ? t('b_summe', { b: LG.mengeMitGebinde(b.summe, a) }) : t('b_unbekannt');
-    html += '<div class="bestand-block" data-standort="' + esc(st.id) + '"><h4>' + esc(st.name) + ' · <span class="' + (b.unterMindest ? 'rot-text' : '') + '">' + esc(kopf) + '</span></h4>';
-    html += '<div class="lesewert">' + esc(b.mindest !== null ? t('b_mindest', { m: LG.mengeText(b.mindest) }) : t('b_mindest_keine')) + (b.unterMindest ? ' · <b>' + esc(t('zahl_unter_mindest_titel')) + '</b>' : '') + '</div>';
+    html += '<div class="bestand-block" data-standort="' + esc(st.id) + '"><h4>' + esc(st.name) + '</h4>';
+    html += mindZeile(k, st, b, a, !!mitOrt[st.id], dis);
+    if (!b) { html += '</div>'; return; }
     b.orte.forEach(function (x) {
       const name = x.ortId === '' ? t('b_ohne_ort') : ((o[x.ortId] || {}).name || x.ortId);
       const teile = [];
@@ -1443,6 +1511,7 @@ function nimmEingabe(el) {
     else if (f === 'inhaltEinheit' || f === 'bestellweg' || f === 'standortId') { if (el.value) e[f] = el.value; else delete e[f]; }
     else e[f] = el.value;
   }
+  if (el.hasAttribute('data-mindest-sid')) k.mindEingabe[el.getAttribute('data-mindest-sid')] = el.value;   /* v7 */
   if (el.hasAttribute('data-quelle')) e.quellen[el.getAttribute('data-quelle')] = el.value;
   if (el.hasAttribute('data-bis-tag')) { const x = e.liefertage[el.getAttribute('data-bis-tag')]; if (x) x.bisTag = el.value; }
   if (el.hasAttribute('data-bis-zeit')) { const x = e.liefertage[el.getAttribute('data-bis-zeit')]; if (x) x.bisMinute = LG.minuteAus(el.value); }
@@ -1470,8 +1539,12 @@ async function speichereKarte() {
   karteFehler('');
   const b = bauDokument(k);
   if (b.fehler.length) { karteFehler(b.fehler.join(' ')); return; }
-  if (k.roh && LG.inhaltGleich(b.daten, k.roh)) { toast(t('nichts_geaendert')); k.geaendert = false; aktualisiereKarteKopf(); return; }
-  await fuehreAus(k, b.daten, k.id ? 'aendern' : 'anlegen', k.id ? t('gespeichert') : t('angelegt'));
+  const m = mindAenderungen(k);   /* v7 */
+  if (m.fehler) { karteFehler(m.fehler); return; }
+  if (m.aend.length > MIND_MAX_JE_VORGANG) { karteFehler(t('b_mind_zu_viele', { n: m.aend.length, max: MIND_MAX_JE_VORGANG })); return; }
+  const artikelGleich = !!k.roh && LG.inhaltGleich(b.daten, k.roh);
+  if (artikelGleich && !m.aend.length) { toast(t('nichts_geaendert')); k.geaendert = false; aktualisiereKarteKopf(); return; }
+  await fuehreAus(k, artikelGleich ? null : b.daten, k.id ? 'aendern' : 'anlegen', artikelGleich ? t('b_mind_gespeichert') : (k.id ? t('gespeichert') : t('angelegt')), m.aend);
 }
 async function archiviereKarte() {
   const k = S.karte; if (!k || !k.id || !k.roh || S.speichertGerade) return;
@@ -1488,10 +1561,12 @@ async function archiviereKarte() {
   const d = LG.BAUER[k.col](k.roh); d.geloescht = !zurueck;
   await fuehreAus(k, d, zurueck ? 'wiederherstellen' : 'archivieren', zurueck ? t('wiederhergestellt') : t('archiviert'));
 }
-async function fuehreAus(k, daten, aktion, okText) {
+/* daten null = nur Mindestmengen (v7); mindest = [{ standortId, menge }] für Artikel k.id, im selben Batch */
+async function fuehreAus(k, daten, aktion, okText, mindest) {
   S.speichertGerade = true; aktualisiereKarteKopf();
+  const mitMind = !!(mindest && mindest.length);
   try {
-    const ids = await schreibe([{ col: k.col, id: k.id, daten: daten, aktion: aktion, vorher: k.roh }]);
+    const ids = await schreibe(daten ? [{ col: k.col, id: k.id, daten: daten, aktion: aktion, vorher: k.roh }] : [], mitMind ? mindest.map(function (x) { return { artikelId: k.id, standortId: x.standortId, menge: x.menge }; }) : null);
     S.speichertGerade = false;
     toast(okText);
     if (!k.id) { k.id = ids[0]; }
@@ -1509,7 +1584,7 @@ async function fuehreAus(k, daten, aktion, okText) {
         return;
       }
     }
-    karteFehler(fehlerText(t('err_speichern'), err));
+    karteFehler(fehlerText(t('err_speichern'), err) + (mitMind ? ' · ' + t('b_mind_nichts') : ''));
     zeigeFehler(t('err_speichern'), err);
     aktualisiereKarteKopf();
   }
@@ -1645,6 +1720,7 @@ document.addEventListener('click', function (ev) {
     case 'karte-reiter': if (k) { k.reiter = el.getAttribute('data-wert'); zeichneKarte(); } break;
     case 'speichern': speichereKarte(); break;
     case 'archiv': archiviereKarte(); break;
+    case 'mindest-null': if (k) { k.mindEingabe[el.getAttribute('data-sid')] = '0'; markiereGeaendert(); zeichneKarte(); } break;
     case 'ort-folge': aenderungMitZeichnen(function (e) { e.orte = LG.verschiebe(e.orte, Number(el.getAttribute('data-i')), Number(el.getAttribute('data-r'))); }); break;
     case 'ort-chip': aenderungMitZeichnen(function (e) { const id = el.getAttribute('data-id'); const i = e.orte.indexOf(id); if (i === -1) e.orte.push(id); else e.orte.splice(i, 1); }); break;
     case 'quelle-dazu': { const s = document.getElementById('quelleNeu'); if (s && s.value) aenderungMitZeichnen(function (e) { e.quellen[s.value] = ''; if (!e.standardLieferantId) e.standardLieferantId = s.value; }); break; }
@@ -1701,7 +1777,7 @@ const helpData = {
     { heading: 'Standorte', text: 'Ein Standort ist ein Gebäude, zum Beispiel die Backstube oder ein Vorratslager. Jeder Lagerort gehört zu einem Standort; das wählst du in der Karte des Lagerorts. Solange keiner gewählt ist, steht der Ort im Ordner „Lagerorte ohne Standort“, und an ihm kann nicht gezählt werden. Der Standort sagt nichts über die Temperatur: ein TK-Raum kann in jedem Standort stehen. Tippst du unter einem Standort auf „❄ gekühlt“, siehst du alles, was an diesem Standort gekühlt liegt, nach Ort. Im Standort selbst stehen seine Lagerorte in der Reihenfolge des Rundgangs; mit ▲▼ änderst du sie. Gezählt wird je Standort, und wer wo zählen darf, steht in der Kontenverwaltung.' },
     { heading: 'Alle Artikel: nach Ort oder nach Kategorie', text: 'Im Ordner „Alle Artikel“ schaltest du oben um. „Nach Ort“ zeigt die Artikel so, wie man beim Zählen durch die Räume geht. „Nach Kategorie“ zeigt sie so, wie man pflegt und bestellt. Ganz oben stehen jeweils die Artikel, denen noch etwas fehlt (ohne festen Ort, noch ohne Kategorie).' },
     { heading: 'Ein Artikel an mehreren Orten', text: 'Liegt ein Artikel an zwei Orten, steht er in beiden Ordnern, mit „⇄ liegt auch in …“. Es ist trotzdem nur ein Artikel; eine Änderung an der Karte gilt überall. Der erste Ort je Standort ist sein Hauptort: dort steht er auf der Anforderungsliste. Im Reiter Lagerung steht unter „Reihenfolge der Orte“, welcher das ist; mit ▲▼ änderst du die Reihenfolge, dann Speichern.' },
-    { heading: 'Bestand und Mindestmenge', text: 'Seit „Lager anfordern“ rechnet BOS den Bestand: die letzte Zählung je Ort, minus abgeschlossene Anforderungslisten, plus gebuchte Bestellungen. Rechts an der Zeile steht er, wo ein Lagerort feststeht: „?“ heißt noch nie gezählt, „< 0“ heißt rechnerisch unter 0 — bitte zählen, rot heißt unter der Mindestmenge. Der Ordner „Unter Mindestmenge“ sammelt alles, was nachbestellt werden muss. Der Reiter „Bestand“ in der Artikelkarte zeigt je Standort die Orte, die letzte Zählung, „liegt hier noch?“ und die letzten Buchungen. Die Mindestmenge steht dort nur zum Ansehen; gepflegt wird sie auf der Seite „Lager anfordern“, mit dem Haken „Lager bestellen“.' },
+    { heading: 'Bestand und Mindestmenge', text: 'Seit „Lager anfordern“ rechnet BOS den Bestand: die letzte Zählung je Ort, minus abgeschlossene Anforderungslisten, plus gebuchte Bestellungen. Rechts an der Zeile steht er, wo ein Lagerort feststeht: „?“ heißt noch nie gezählt, „< 0“ heißt rechnerisch unter 0 — bitte zählen, rot heißt unter der Mindestmenge. Der Ordner „Unter Mindestmenge“ sammelt alles, was nachbestellt werden muss. Der Reiter „Bestand & Mindestmenge“ in der Artikelkarte zeigt je Standort die Orte, die letzte Zählung, „liegt hier noch?“ und die letzten Buchungen. Dort trägst du auch die Mindestmenge ein, in Gebinden, 0 = keine. Ein Feld gibt es nur an Standorten, an denen der Artikel einen Lagerort hat (Reiter Lagerung); hat er dort keinen mehr, bleibt ein alter Wert sichtbar mit „auf 0 setzen“. Gespeichert wird mit „Speichern“, zusammen mit dem Rest der Karte: alles oder nichts. Ein neuer Artikel bekommt die Mindestmenge erst nach dem ersten Speichern, weil die Datenbank sie gegen den gespeicherten Artikel prüft. Pflegen darf nur Rolle admin.' },
     { heading: 'Verschieben und „Liegt auch hier“', text: 'Über ⋯ am Artikel. „Verschieben nach …“ und „Liegt auch hier …“ zeigen denselben Baum zum Auswählen; ✓ heißt, er liegt dort schon. „Hier entfernen“ nimmt ihn nur aus diesem Ort; liegt er sonst nirgends, steht er danach in „ohne Lagerort“. Wurde er am alten Ort im laufenden Zählgang schon gezählt, fragt die Seite vorher: Die Zählung bleibt beim alten Ort, am neuen ist er noch nicht gezählt. Liegt der neue Ort an einem anderen Standort, steht das in der Frage. „ohne Lagerort“ (unten bei den Standorten) ist der Ordner, den du abarbeitest, bevor gezählt werden kann: Dort stehen die Artikel ohne festen Lagerort. Ein Wagen der Teigecke ist kein Lagerort und steht hier deshalb nicht zur Wahl.' },
     { heading: 'Suchen', text: 'Das Suchfeld sucht in allem: Artikel (Name, Gebinde, Artikelnummer), Lagerorte, Standorte, Kategorien und Lieferanten. Jeder Treffer zeigt, wo er steht, zum Beispiel „Backstube › ❄ gekühlt › Kühlung 1“; ein Artikel an zwei Orten steht zweimal da. Archiviertes sucht es nicht mit, sagt aber, wie viele Treffer dort wären.' },
     { heading: 'Eine Karte bearbeiten', text: 'Einen Artikel antippen öffnet seine Karte. Oben blätterst du mit ‹ › durch den offenen Ordner (ein Artikel, der dort mehrfach steht, kommt nur einmal dran), ✕ schließt. Die Reiter der Karte: Stammdaten (Name, Kategorie, Bereich, Gebinde und Inhalt), Lagerung (feste Lagerorte, Zählart), Bezug (Lieferanten mit Artikelnummer, einer ist Standard) und Teigecke. „💾 Speichern“ schreibt genau diese Karte; vorher wird die alte Fassung automatisch gesichert. Steht oben „noch nicht gespeichert“, fragt die Seite nach, bevor du weggehst.' },

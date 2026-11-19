@@ -1,22 +1,29 @@
 <!DOCTYPE html>
 <html lang="de" data-theme="dark">
 <!--
-  MODUL: lager/lager_anfordern.html — Lager anfordern (Anforderungsliste statt Zettel, Bestellungen, Mindestmengen)
+  MODUL: lager/lager_anfordern.html — Lager anfordern (Anforderungsliste statt Zettel, Bestellungen)
   Doku:  lager/LAGER_ANFORDERN_DOKU.md (dort auch der kanonische Nutzer-Hilfetext)
   Logik: lager/lager_logik.js (Liste, Bestand je Ort, Hauptort, „Bitte nachbestellen“, Druckansicht)
-  Regel: RK §32, §34 (firestore_regeln_2026-11-18_namen2.rules) — lager_listen/{standortId}__{a|b}{n}:
+  Regel: RK §32 (Nachtrag 19.11.), §34 (firestore_regeln_2026-11-19_lager_feinschliff.rules) — lager_listen/{standortId}__{a|b}{n}:
          je Standort und Art genau eine offene Liste; jede Änderung genau EIN Eintrag (letzte);
          „Abschließen“ setzt die Liste auf zu und legt im selben Vorgang die nächste offene an (Transaktion).
          Die abgeschlossene Liste IST die Buchung. Korrekturen (lager_korrekturen) nur anlegen,
-         Mindestmengen (lager_mindest) mit Haken „Lager bestellen“ oder Rolle admin.
-  Rechte: Haken „Lager anfordern“ je Standort (lagerAnfordernStandorte), „Lager bestellen“ (lagerBestellen);
-          Rolle admin darf alles. Kachel über Registry-Feld haken: ['lagerAnfordern', 'lagerBestellen'].
+         Mindestmengen (lager_mindest) liest die Seite nur (für „Bitte nachbestellen“); pflegen: Rolle admin
+         auf der Artikelkarte im Lager-Editor (seit 19.11., L38).
+  Rechte: Haken „🧾 Entnahme“ je Standort (lagerAnfordernStandorte), „🚚 Nachbestellung“ (lagerBestellen: nur
+          Bestellungen); Rolle admin darf alles. Kachel über Registry-Feld haken: ['lagerAnfordern', 'lagerBestellen'].
   Ohne Netz: nichts ändern (Knöpfe grau mit Grund) — das Abschließen ist eine Transaktion (Bauplan §6.5).
   Drucken: erst buchen, dann BOS_DRUCK.drucken (Iframe, nie window.print). Nachdruck bucht nie.
   Name (RK §34): auf Eintrag, Abschluss und Korrektur steht der Rufname, sonst die Beschreibung der EIGENEN
           Person (frisch vor jedem Schreiben, ichFrisch → BOS_NAMEN.ichSelbst), am Stationskonto (Art „Ort“, ohne
           Person) die Notiz = der Ortsname. Dazu die Personen-Nummer (vonPerson, abgeschlossenPerson, person; Ort: null).
   CHANGELOG
+    2026-11-19 · 04:38 · v2.2 · Feinschliff (#169/#186, A30, L38; Freigabe KC 19.11. 04:32): Reiter „Mindestmengen“
+      entfällt (mindestHTML, speichereMindest, Texte mind_*, err_mindest, S.mindEingabe heraus). Ein Rest S.reiter
+      'mindest' fällt auf „Liste“ (wie jeder unbekannte Reiter). „Bitte nachbestellen“ auf Liste und Ausdruck
+      unverändert, Abo lager_mindest bleibt. Hilfe „Bestellen und Mindestmengen“ → „Bestellen“, Haken mit neuen Namen.
+      REGEL_DATEI firestore_regeln_2026-11-19_lager_feinschliff.rules, REGEL_FASSUNG unverändert.
+      lager/_protokolle/SESSION_2026-11-19_LAGER_FEINSCHLIFF_BAU.md
     2026-11-18 · 12:19 · v2.1 · Ein Name überall, Lieferung 2 (KC 18.11. 09:17 §3 Anm. 2): den Namen neu holen, sobald
       das Gerät wieder online ist und wenn die Fehlerleiste ausgeblendet wird. REGEL_DATEI firestore_regeln_2026-11-18_namen2.rules.
       _protokolle/SESSION_2026-11-18_NAMEN_RUFNAME_BAU_2.md
@@ -114,12 +121,9 @@
   .meldung { color: var(--red); font-size: .88rem; margin: 6px 0; min-height: 1em; }
   .sheet-knoepfe { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
   .sheet-knoepfe .btn { flex: 1 1 140px; }
-  .mind-zeile { display: grid; grid-template-columns: 1fr 92px auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
-  .mind-zeile input { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; text-align: center; }
   .rot-text { color: var(--red); }
   #helpSheet { z-index: 70; }
   #toast { position: fixed; bottom: 18px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; background: var(--raised); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: .9rem; z-index: 90; text-align: center; }
-  @media (max-width: 420px) { .mind-zeile { grid-template-columns: 1fr 80px; } .mind-zeile .btn { grid-column: 1 / -1; } }
 </style>
 </head>
 <body>
@@ -182,13 +186,13 @@
    Lager anfordern — Seitenlogik. Rechnen und Druckansicht: lager_logik.js.
    Hier: Laden, Rechte, Standortwahl, Einträge (genau einer je Schreibvorgang),
    Abschließen (Transaktion) + Drucken, Archiv, Korrekturen, Bestellungen,
-   Mindestmengen, Fehler sichtbar.
+   Fehler sichtbar. Mindestmengen nur lesen (seit 19.11.).
    Keine Daten in dieser Datei: keine Standort-, Orts-, Artikel- oder Personennamen.
    ================================================================== */
 const LG = window.BOS_LAGER_LOGIK;
 const COL = LG.COL;
 const REGEL_FASSUNG = 'lager-namen-2026-11-18';
-const REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
+const REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13) */
 const SPEICHER_STANDORT = 'bos_lager_anfordern_standort';
 const ART_TEXT = { anforderung: 'Liste', bestellung: 'Bestellung' };
 
@@ -196,8 +200,8 @@ const ART_TEXT = { anforderung: 'Liste', bestellung: 'Bestellung' };
 const I18N_DE = {
   titel: 'Lager anfordern', lade: 'Lade Daten …', fehler_titel: '⚠︎ Fehler', ausblenden: 'ausblenden', schliessen: 'Schließen',
   wechseln: 'Standort wechseln', kein_konto: 'Keine Anmeldung erkannt.',
-  kein_standort: 'Dir ist noch kein Standort zum Anfordern freigegeben. Das stellt die Kontenverwaltung ein (Gruppe „Lager anfordern“).',
-  reiter_liste: 'Liste', reiter_archiv: 'Archiv', reiter_bestellen: 'Bestellen', reiter_mindest: 'Mindestmengen',
+  kein_standort: 'Dir ist noch kein Standort zum Anfordern freigegeben. Das stellt die Kontenverwaltung ein (Gruppe „🧾 Entnahme — rausholen“).',
+  reiter_liste: 'Liste', reiter_archiv: 'Archiv', reiter_bestellen: 'Bestellen',
   liste_kopf: 'Liste {n} · offen', liste_leer: 'Noch nichts auf der Liste.', liste_wartet: 'Die Liste wird angelegt …', liste_keine: 'Keine offene Liste gefunden.',
   anfordern: '＋ Anfordern', abschliessen: 'Abschließen und drucken', bestellung_kopf: 'Bestellung {n} · offen', bestellen_plus: '＋ Bestellt', bestellung_buchen: 'Bestellung buchen',
   grund_leer: 'Die Liste ist leer.', grund_netz: 'Ohne Verbindung wird nichts geändert.', grund_recht: 'Dafür fehlt dir der Haken (Kontenverwaltung).',
@@ -218,10 +222,6 @@ const I18N_DE = {
   korr_titel: 'Was fehlte bei „{name}“?', korr_nur: 'Wirklich genommen (statt {statt})', korr_text_b: 'Wirklich gekommen (statt {statt}) — 0 = zurücknehmen',
   korr_speichern: 'Melden', korr_falsch: 'Bitte eine Zahl von 0 bis unter {statt} eingeben (eine Stelle hinter dem Komma).',
   korr_steht: 'gemeldet: nur {nur} statt {statt} ({name})', korr_fehlte: 'gemeldet: fehlte ({name})', korr_zurueck: 'zurückgenommen ({name})',
-  mind_hinweis: 'Mindestmenge je Artikel in diesem Standort, in Gebinden. 0 = keine. Darunter kommt der Artikel auf „Bitte nachbestellen“.',
-  mind_speichern: 'Speichern', mind_gespeichert: 'Mindestmenge gespeichert.', mind_falsch: 'Bitte 0 bis {max} eingeben, eine Stelle hinter dem Komma.',
-  mind_leer: 'Hier liegen noch keine Artikel mit Lagerort. Lagerorte und Artikel pflegt die Seite „Lager“.',
-  bestand_unbekannt: 'noch nie gezählt', bestand_text: 'Bestand {b}', bestand_unter: 'unter der Mindestmenge',
   nb_titel: 'Bitte nachbestellen (Stand jetzt)', nb_leer: 'Nichts unter der Mindestmenge.', nb_nie: 'Noch nie gezählt (mit Mindestmenge): {namen}',
   bestand_fehler: 'Bestand nicht berechenbar: {grund}',
   regel_alt: '⚠︎ Die Firestore-Regeln passen nicht zu dieser Seite (erwartet: Regelstand „{fassung}“). Eintragen und Abschließen werden abgelehnt. Bitte in der Firebase-Konsole die Regeldatei {datei} einsetzen.',
@@ -230,7 +230,7 @@ const I18N_DE = {
   err_name: 'Dein Name für die Liste',
   err_netz: 'Keine Verbindung zum Server (WLAN?).',
   err_laden: 'Laden „{was}“', err_eintrag: 'Eintragen', err_abschluss: 'Abschließen', err_drucken: 'Drucken', err_korrektur: 'Melden',
-  err_mindest: 'Mindestmenge speichern', err_anlegen: 'Liste anlegen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen', err_bestand: 'Bestand rechnen'
+  err_anlegen: 'Liste anlegen', err_unbehandelt: 'Unerwarteter Fehler', err_konto: 'Konto lesen', err_bestand: 'Bestand rechnen'
 };
 function t(k, w) {
   let s = I18N_DE[k]; if (s === undefined) s = k;
@@ -249,8 +249,7 @@ const S = {
   archiv: {},                  /* listeId → Liste */
   archivKorr: {},              /* listeId → [Korrektur] */
   standortId: null, reiter: 'liste',
-  schreibt: false, anlegen: {}, geladenTeile: {}, sheet: null,
-  mindEingabe: {}              /* artikelId → getippter Text (bleibt über Neuzeichnen erhalten) */
+  schreibt: false, anlegen: {}, geladenTeile: {}, sheet: null
 };
 
 /* ---------- Fehler sichtbar (Checkliste §7a) ---------- */
@@ -566,14 +565,6 @@ async function speichereKorrektur(liste, posId, nur) {
   try { await window.db.collection(COL.korrekturen).doc(LG.korrekturId(liste.id, posId)).set(doc); return true; }
   catch (err) { zeigeFehler(t('err_korrektur'), err); setzeSheetMeldung(fehlerText(t('err_korrektur'), err)); return false; }
 }
-/* ---------- Mindestmenge ---------- */
-async function speichereMindest(artikelId, menge, knopf) {
-  const d = Object.assign(LG.mindestDokument(artikelId, S.standortId, menge), { geaendertVon: S.kennung, geaendertAm: firebase.firestore.FieldValue.serverTimestamp() });
-  if (knopf) knopf.disabled = true;
-  try { await window.db.collection(COL.mindest).doc(LG.mindestId(artikelId, S.standortId)).set(d); delete S.mindEingabe[artikelId]; toast(t('mind_gespeichert')); planeRender(); }
-  catch (err) { zeigeFehler(t('err_mindest'), err); }
-  finally { if (knopf) knopf.disabled = false; }
-}
 
 /* ---------- Sheets ---------- */
 function oeffneSheet(html, info) { S.sheet = info || { art: 'info' }; document.getElementById('sheetInhalt').innerHTML = html; document.getElementById('sheet').classList.remove('hidden'); }
@@ -697,18 +688,13 @@ function render() {
   document.getElementById('standortName').textContent = standort().name;
   document.getElementById('wechselBtn').classList.toggle('hidden', erl.length < 2);
   const reiter = [['liste', t('reiter_liste')], ['archiv', t('reiter_archiv')]];
-  if (darfBestellen()) reiter.push(['bestellen', t('reiter_bestellen')], ['mindest', t('reiter_mindest')]);
+  if (darfBestellen()) reiter.push(['bestellen', t('reiter_bestellen')]);   /* seit 19.11. ohne „Mindestmengen“ (L38) */
   if (!reiter.some(function (r) { return r[0] === S.reiter; })) S.reiter = 'liste';
   document.getElementById('reiter').innerHTML = reiter.map(function (r) { return '<button type="button" data-reiter="' + r[0] + '" class="' + (r[0] === S.reiter ? 'aktiv' : '') + '">' + esc(r[1]) + '</button>'; }).join('');
   const el = document.getElementById('inhalt');
   if (S.reiter === 'liste') { if (darfAnfordern(S.standortId)) sorgeFuerListe('anforderung'); el.innerHTML = listeHTML('anforderung'); }
   else if (S.reiter === 'archiv') el.innerHTML = archivHTML('anforderung');
   else if (S.reiter === 'bestellen') { sorgeFuerListe('bestellung'); el.innerHTML = listeHTML('bestellung') + archivHTML('bestellung'); }
-  else {
-    const f = document.activeElement;
-    if (f && f.hasAttribute && f.hasAttribute('data-mindest') && el.contains(f)) return;   /* nicht unter den Fingern neu zeichnen */
-    el.innerHTML = mindestHTML();
-  }
 }
 function eintragZeile(art, x, aktiv) {
   const e = x.eintrag, a = x.artikel, ort = e.ortId ? (om()[e.ortId] || null) : null;
@@ -774,24 +760,6 @@ function archivHTML(art) {
   if (grund) h += '<div class="grund">' + esc(grund) + '</div>';
   return h;
 }
-function mindestHTML() {
-  const sid = S.standortId, orte = om(), bj = bestandJetzt(null);
-  const mm = {}; (S.mindest || []).forEach(function (m) { if (m.standortId === sid) mm[m.artikelId] = m.menge; });
-  const liste = LG.aktiv(S.artikel).filter(function (a) { return LG.hauptort(a, sid, orte) || Object.prototype.hasOwnProperty.call(mm, a.id); }).sort(LG.nachName);
-  let h = '<p class="unterzeile" style="margin:8px 0">' + esc(t('mind_hinweis')) + '</p>';
-  if (bj.fehler) h += '<div class="hinweis rot" style="margin:0 0 8px">' + esc(t('bestand_fehler', { grund: bj.fehler })) + '</div>';
-  if (!liste.length) return h + '<div class="leer">' + esc(t('mind_leer')) + '</div>';
-  const grund = sperrGrund('bestellung');
-  liste.forEach(function (a) {
-    const b = bj.b ? bj.b[a.id] : null;
-    const bt = !b || b.status === 'unbekannt' ? t('bestand_unbekannt') : t('bestand_text', { b: LG.mengeMitGebinde(b.summe, a) }) + (b.unterMindest ? ' · ' + t('bestand_unter') : '');
-    h += '<div class="mind-zeile"><div><div class="name"><b>' + esc(a.name) + '</b></div><div class="unterzeile' + (b && b.unterMindest ? ' rot-text' : '') + '">' + esc(bt) + '</div></div>' +
-      '<input inputmode="decimal" data-mindest="' + esc(a.id) + '" aria-label="Mindestmenge ' + esc(a.name) + '" value="' + esc(Object.prototype.hasOwnProperty.call(S.mindEingabe, a.id) ? S.mindEingabe[a.id] : (mm[a.id] !== undefined ? LG.mengeText(mm[a.id]) : '')) + '" placeholder="0"' + (grund ? ' disabled' : '') + '>' +
-      '<button type="button" class="btn btn-outline btn-klein" data-aktion="mindest" data-id="' + esc(a.id) + '"' + (grund ? ' disabled' : '') + '>' + esc(t('mind_speichern')) + '</button></div>';
-  });
-  if (grund) h += '<div class="grund">' + esc(grund) + '</div>';
-  return h;
-}
 
 /* ---------- Ereignisse ---------- */
 document.addEventListener('click', function (ev) {
@@ -819,14 +787,8 @@ document.addEventListener('click', function (ev) {
   else if (a === 'nachdruck') { const l = S.archiv[id] || (S.gebucht || []).filter(function (x) { return x.id === id; })[0]; if (l) drucke(l, true, ''); else zeigeFehler(t('err_drucken'), { code: 'bos/fehlt', message: 'Liste ' + id + ' ist noch nicht geladen — gleich nochmal versuchen' }); }
   else if (a === 'korrektur') oeffneKorrektur(el.getAttribute('data-liste'), id);
   else if (a === 'korr-speichern') korrekturSpeichern();
-  else if (a === 'mindest') {
-    const f = document.querySelector('[data-mindest="' + CSS.escape(id) + '"]'), m = LG.mengeAus(f.value === '' ? '0' : f.value);
-    if (!LG.mindestGueltig(m)) { zeigeFehler(t('err_mindest'), { code: 'bos/eingabe', message: t('mind_falsch', { max: LG.GRENZEN.mindestMax }) }); return; }
-    speichereMindest(id, m, el);
-  }
   else if (a === 'sheet-zu') schliesseSheet();
 });
-document.addEventListener('input', function (ev) { const f = ev.target.closest && ev.target.closest('[data-mindest]'); if (f) S.mindEingabe[f.getAttribute('data-mindest')] = f.value; });
 document.getElementById('wahl').addEventListener('click', function (ev) { const b = ev.target.closest('[data-standort]'); if (b) waehle(b.getAttribute('data-standort')); });
 document.getElementById('wechselBtn').addEventListener('click', function () { waehle(null); });
 document.getElementById('fehlerZuBtn').addEventListener('click', function () { document.getElementById('fehlerLeiste').classList.add('hidden'); document.getElementById('fehlerListe').innerHTML = ''; nameNeu(); });
@@ -836,7 +798,7 @@ document.getElementById('fehlerZuBtn').addEventListener('click', function () { d
   if (window.BOS_UNGESPEICHERT) { window.BOS_UNGESPEICHERT.melde(pruef); return; }
   window.addEventListener('beforeunload', function (e) { if (pruef()) { e.preventDefault(); e.returnValue = ''; } });
 })(function () {
-  if (S.schreibt || Object.keys(S.mindEingabe).length) return true;
+  if (S.schreibt) return true;
   const s = S.sheet; if (!s) return false;
   const f = document.getElementById(s.art === 'korrektur' ? 'nurFeld' : 'mengeFeld');
   return !!f && (s.art === 'menge' || s.art === 'korrektur') && f.value !== s.start;
@@ -854,7 +816,7 @@ const helpData = {
     { heading: 'Abschließen und drucken', text: 'Nach der Rückfrage wird die Liste abgeschlossen und gebucht, dann druckt der Drucker. Hat jemand anderes im selben Moment abgeschlossen, steht oben „hat eben … abgeschlossen“ — gebucht wird trotzdem nur einmal. Kommt kein Papier, „Nachdrucken (bucht nicht)“.' },
     { heading: 'Der Ausdruck', text: 'Je Lagerort die Artikel mit Kästchen zum Abhaken. Darunter „Bitte nachbestellen“ mit allem, was nach dieser Liste unter der Mindestmenge liegt, und „Noch nie gezählt“ für Artikel mit Mindestmenge, die noch keine Zählung haben.' },
     { heading: 'Archiv und „fehlte“', text: 'Im Archiv stehen die zwei letzten Listen. Fehlte etwas oder war es weniger, tippst du am Eintrag „fehlte / nur … statt …“ und trägst ein, was wirklich genommen wurde (0 = fehlte ganz). Das wird zurückgebucht. Je Eintrag geht das einmal.' },
-    { heading: 'Bestellen und Mindestmengen', text: 'Mit dem Haken „Lager bestellen“ gibt es zwei Reiter mehr. „Bestellen“: eintragen, was beim Lieferanten bestellt ist, dann „Bestellung buchen“ — es zählt sofort zum Bestand. Im Archiv darunter nimmst du eine Position zurück oder trägst ein, was wirklich kam. „Mindestmengen“: je Artikel die Menge, unter der er auf „Bitte nachbestellen“ kommt.' },
+    { heading: 'Bestellen', text: 'Mit dem Haken „🚚 Nachbestellung — reinholen“ gibt es den Reiter „Bestellen“: eintragen, was beim Lieferanten bestellt ist, dann „Bestellung buchen“ — es zählt sofort zum Bestand. Im Archiv darunter nimmst du eine Position zurück oder trägst ein, was wirklich kam. Die Mindestmengen, nach denen „Bitte nachbestellen“ rechnet, pflegt Rolle admin auf der Artikelkarte im Lager (Reiter „Bestand & Mindestmenge“).' },
     { heading: 'Ohne Netz und Fehler', text: 'Ohne Verbindung kannst du die Liste ansehen, aber nichts ändern — die Knöpfe sind grau und sagen warum. Fehler stehen oben im roten Kasten, mit der echten Meldung. „Keine Berechtigung“ heißt meistens: kein Haken für diesen Standort, oder die Liste wurde gerade abgeschlossen.' }
   ]
 };

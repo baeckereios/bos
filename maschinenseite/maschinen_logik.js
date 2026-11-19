@@ -64,6 +64,7 @@
    dreht, dreht dort mit — und umgekehrt.
 
    CHANGELOG
+     2026-11-19 · 04:41 · v1.7a · Nur REGEL_DATEI: nennt jetzt die neueste Regeldatei firestore_regeln_2026-11-19_lager_feinschliff.rules (Lager Feinschliff, #169/#186; Freigabe KC 19.11. 04:32; RK §32 Nachtrag: Mindestmengen nur Rolle admin). REGEL_FASSUNG und sonst alles unverändert.
      2026-11-18 · 12:19 · v1.7 · Ein Name überall, Lieferung 2 (RK §34; Freigabe KC 18.11. 09:17 §4, Antwort 11:00):
        ichFrisch(); geaendertPerson (Angaben, Reihenfolge, Karten), vonPerson/angepinntPerson (Notizen);
        vonName() ohne Kürzen (Regel vergleicht 1:1); erklaere() nennt einen Namen, der sich eben geändert hat.
@@ -99,7 +100,7 @@
      Regeldatei wechseln (REGEL_DATEI bzw. RUECKFALL.datei). */
   var FRIST_WEG = 'versatz';
   var REGEL_FASSUNG = 'maschinen-namen-2026-11-18';   /* RK §34 (vorher maschinen-b-2026-10-24, herausgenommen) */
-  var REGEL_DATEI = 'firestore_regeln_2026-11-18_namen2.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
+  var REGEL_DATEI = 'firestore_regeln_2026-11-19_lager_feinschliff.rules';   /* neueste Datei, die REGEL_FASSUNG erfüllt (RK §13, Pflege) */
   var RUECKFALL = { fassung: 'maschinen-b-fenster-2026-10-24', datei: 'RUECKFALL_A_firestore_regeln_2026-10-24_maschinen_b.rules' };
   if (FRIST_WEG === 'fenster') { REGEL_FASSUNG = RUECKFALL.fassung; REGEL_DATEI = RUECKFALL.datei; }
   var FRIST_FELD = FRIST_WEG === 'fenster' ? 'ablauf' : 'fristStart';
